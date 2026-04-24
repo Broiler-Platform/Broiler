@@ -922,6 +922,232 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
             $"Select[size] scrolling and sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Theory]
+    [InlineData("horizontal-tb", false, "writing-modes-select-multiple-native-horizontal")]
+    [InlineData("horizontal-tb", true, "writing-modes-select-multiple-none-horizontal")]
+    [InlineData("vertical-lr", false, "writing-modes-select-multiple-native-vlr")]
+    [InlineData("vertical-lr", true, "writing-modes-select-multiple-none-vlr")]
+    [InlineData("vertical-rl", false, "writing-modes-select-multiple-native-vrl")]
+    [InlineData("vertical-rl", true, "writing-modes-select-multiple-none-vrl")]
+    public void Wpt_WritingModes_SelectMultiple_Fallback_MatchReference(
+        string writingMode,
+        bool appearanceNone,
+        string namePrefix)
+    {
+        var style = appearanceNone
+            ? $@"writing-mode: {writingMode}; appearance: none"
+            : $@"writing-mode: {writingMode}";
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The select below should match the correct writing mode.</p>
+  <select multiple style="{{style}}">
+    <option>Option 1</option>
+    <option>Option 2</option>
+    <option>Option 3</option>
+    <option>Option 4</option>
+    <option>Option 5</option>
+    <option>Option 6</option>
+  </select>
+</body>
+</html>
+""";
+
+        var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                       writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+        var reverseBlock = writingMode.EndsWith("-rl", StringComparison.OrdinalIgnoreCase);
+        var nativeAppearance = !appearanceNone;
+        var hostWidth = vertical ? 68 : 72;
+        var hostHeight = vertical ? 72 : 68;
+        var hostBackground = nativeAppearance ? "#f0f0f0" : "#ffffff";
+        var hostBorder = nativeAppearance ? "#767676" : "#9a9a9a";
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The select below should match the correct writing mode.</p>
+  <div style="display:inline-block;position:relative;box-sizing:border-box;overflow:hidden;vertical-align:middle;font:13px sans-serif;width:{{hostWidth}}px;height:{{hostHeight}}px;border:1px solid {{hostBorder}};background-color:{{hostBackground}}">
+    {{BuildSelectMultipleReferenceTracks(vertical, reverseBlock, nativeAppearance)}}
+    {{(nativeAppearance ? BuildSelectMultipleReferenceChrome(vertical, reverseBlock, hostWidth, hostHeight) : string.Empty)}}
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix, 240, 120);
+        Assert.True(result.Passed,
+            $"select[multiple] fallback should match reference for {writingMode} appearance-none={appearanceNone}. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("checkbox", "vertical-lr")]
+    [InlineData("checkbox", "vertical-rl")]
+    [InlineData("radio", "vertical-lr")]
+    [InlineData("radio", "vertical-rl")]
+    public void Wpt_WritingModes_NativeCheckableControls_VerticalBaseline_MatchReference(
+        string inputType,
+        string writingMode)
+    {
+        var controlLabel = inputType == "radio" ? "radio button" : "checkbox";
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+label {
+    color: red;
+    background-color: red;
+    margin-top: -30px;
+}
+</style>
+</head>
+<body>
+<p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
+<div style="writing-mode: {{writingMode}}">
+    <input type="{{inputType}}" id="primary" checked>
+    <label for="primary">こんにちは</label>
+</div>
+
+<br>
+
+<p>The {{controlLabel}} should be left-aligned with the label text since it has text-orientation sideways.</p>
+<div style="writing-mode: {{writingMode}}; text-orientation: sideways;">
+  <input type="{{inputType}}" id="sideways" checked>
+  <label for="sideways">Baseline</label>
+</div>
+</body>
+</html>
+""";
+
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+label {
+    color: red;
+    background-color: red;
+    margin-top: -30px;
+}
+
+input {
+    visibility: hidden;
+}
+</style>
+</head>
+<body>
+<p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
+<div style="writing-mode: {{writingMode}}">
+    <input type="{{inputType}}" id="primary" checked>
+    <label for="primary">こんにちは</label>
+</div>
+
+<br>
+
+<p>The {{controlLabel}} should be left-aligned with the label text since it has text-orientation sideways.</p>
+<div style="writing-mode: {{writingMode}}; text-orientation: sideways;">
+  <input type="{{inputType}}" id="sideways" checked>
+  <label for="sideways">Baseline</label>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, $"writing-modes-{inputType}-{writingMode}-baseline", 640, 520);
+        Assert.True(result.Passed,
+            $"{inputType} baseline alignment in {writingMode} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    private static string BuildSelectMultipleReferenceTracks(bool vertical, bool reverseBlock, bool nativeAppearance)
+    {
+        var sb = new System.Text.StringBuilder();
+        var horizontalTrackWidth = nativeAppearance ? 62 : 70;
+        for (var i = 0; i < 4; i++)
+        {
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            var offset = 1 + (i * 16);
+            if (vertical)
+            {
+                sb.Append("<div style=\"position:absolute;top:1px;")
+                    .Append(reverseBlock ? "right:" : "left:")
+                    .Append(offset)
+                    .Append("px;width:16px;height:70px;background-color:")
+                    .Append(background)
+                    .Append(";border-")
+                    .Append(reverseBlock ? "left" : "right")
+                    .Append(":1px solid #d0d0d0\"></div>");
+            }
+            else
+            {
+                sb.Append("<div style=\"position:absolute;left:1px;top:")
+                    .Append(offset)
+                    .Append("px;width:")
+                    .Append(horizontalTrackWidth)
+                    .Append("px;height:16px;background-color:")
+                    .Append(background)
+                    .Append(";border-bottom:1px solid #d0d0d0\"></div>");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildSelectMultipleReferenceChrome(bool vertical, bool reverseBlock, int hostWidth, int hostHeight)
+    {
+        if (vertical)
+        {
+            return $"""<div style="position:absolute;left:1px;{(reverseBlock ? "top:1px;" : "bottom:1px;")}width:{hostWidth - 2}px;height:8px;background-color:#dcdcdc;border-top:1px solid #b8b8b8"></div>""";
+        }
+
+        return $"""<div style="position:absolute;top:1px;right:1px;width:8px;height:{hostHeight - 2}px;background-color:#dcdcdc;border-left:1px solid #b8b8b8"></div>""";
+    }
+
+    [Theory]
+    [InlineData("horizontal-tb", "ltr", "meter-native-horizontal")]
+    [InlineData("horizontal-tb", "rtl", "meter-native-horizontal-rtl")]
+    [InlineData("vertical-rl", "ltr", "meter-native-vertical")]
+    [InlineData("vertical-rl", "rtl", "meter-native-vertical-rtl")]
+    public void Wpt_WritingModes_MeterNativeAppearance_Fallback_MatchReference(
+        string writingMode,
+        string direction,
+        string namePrefix)
+    {
+        var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                       writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+        var fillPositionStyle = vertical
+            ? reverseInline ? "left:0;right:0;bottom:0;height:84px;" : "left:0;right:0;top:0;height:84px;"
+            : reverseInline ? "top:0;bottom:0;right:0;width:84px;" : "top:0;bottom:0;left:0;width:84px;";
+        var hostSizeStyle = vertical ? "width:16px;height:120px;" : "width:120px;height:16px;";
+
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The meter element below should match the correct writing mode.</p>
+  <meter value="70" min="0" max="100" style="writing-mode: {{writingMode}}; direction: {{direction}};"></meter>
+</body>
+</html>
+""";
+
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The meter element below should match the correct writing mode.</p>
+  <div style="display:inline-block;box-sizing:border-box;position:relative;overflow:hidden;padding:0;border:1px solid #767676;background-color:#e6e6e6;vertical-align:middle;{{hostSizeStyle}}">
+    <div style="position:absolute;background-color:#4caf50;{{fillPositionStyle}}"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix, 320, 120);
+        Assert.True(result.Passed,
+            $"meter fallback appearance should match reference for {writingMode}/{direction}. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
@@ -1225,6 +1451,32 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
 
         Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", serialized);
         Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", serialized);
+    }
+
+    [Fact]
+    public void Wpt_TimeoutTrack_TableHarness_BodyOnloadProperty_Fires_On_WindowLoad()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="out"></div>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            document.body.onload = () => {
+              document.getElementById('out').textContent = 'ready';
+            };
+            """);
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("document.getElementById('out').textContent");
+        Assert.Equal("ready", result.ToString());
     }
 
     [Fact]
@@ -1565,6 +1817,77 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
         var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-zoom-scroll-offset");
         Assert.True(result.Passed,
             $"zoom scroll and offset APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_OffsetTopLeft_BorderBoxPaddingEdge_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""fixtures""></div>
+  <div id=""pass""></div>
+  <script>
+    function createCase(display, writingMode, tagName) {
+      var container = document.createElement('div');
+      container.style.position = 'relative';
+      container.style.font = '20px/1 monospace';
+      container.style.width = '150px';
+      container.style.height = '100px';
+      container.style.padding = '2px 10px';
+      container.style.borderStyle = 'solid';
+      container.style.borderWidth = '3px 6px';
+      container.style.boxSizing = 'border-box';
+      container.style.display = display;
+      container.style.writingMode = writingMode;
+
+      var target = document.createElement(tagName);
+      target.textContent = 'x';
+      container.appendChild(target);
+      document.getElementById('fixtures').appendChild(container);
+      return target.offsetLeft === 10 && target.offsetTop === 2;
+    }
+
+    var displays = ['block', 'inline-block', 'grid', 'inline-grid', 'flex', 'inline-flex', 'flow-root'];
+    var writingModes = ['horizontal-tb', 'vertical-lr'];
+    var tags = ['span', 'div'];
+    var passed = true;
+
+    for (var i = 0; i < displays.length; i++) {
+      for (var j = 0; j < writingModes.length; j++) {
+        for (var k = 0; k < tags.length; k++) {
+          passed = createCase(displays[i], writingModes[j], tags[k]) && passed;
+        }
+      }
+    }
+
+    document.getElementById('fixtures').style.display = 'none';
+    document.getElementById('pass').style.background = passed ? 'green' : 'red';
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-offset-top-left-border-box");
+        Assert.True(result.Passed,
+            $"offsetTop/offsetLeft should resolve against the offset parent padding edge. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -6062,6 +6385,86 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_Selectors4_LangInvalidRangeList_DoesNotMatch()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+    :lang(de, nl, 0, fr) { background: red; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="fr"></span>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="fr"></span>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-invalid-range-list", 80, 80);
+        Assert.True(result.Passed,
+            $"Invalid :lang(...) ranges should invalidate the whole pseudo. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Selectors4_LangDigitOnlyRange_DoesNotMatch()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+    :lang(0) { background: red; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="0"></span>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="0"></span>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-digit-only-range", 80, 80);
+        Assert.True(result.Passed,
+            $"Digit-only :lang(...) ranges should not match. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
     {
         var testHtml = """
@@ -6248,6 +6651,211 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-nth-last-child-sibling-change", 460, 180);
         Assert.True(result.Passed,
             $"nth-last-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithNthChild_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+    #target1:has(.item:nth-child(3)) { background: red; }
+    #target2:has(.item:nth-last-child(3)) { background: red; }
+    #target3:has(.item:nth-child(3) > .child) { background: red; }
+    #target4:has(.item:nth-last-child(3) > .child) { background: red; }
+  </style>
+</head>
+<body onload="item1.remove(); item2.remove(); item3.remove(); item4.remove();">
+  <div id="test-container">
+    <div id="target1">
+      <div class="item" id="item1"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target2">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item" id="item2"></div>
+    </div>
+    <div id="target3">
+      <div class="item" id="item3"></div>
+      <div class="item"></div>
+      <div class="item"><span class="child"></span></div>
+    </div>
+    <div id="target4">
+      <div class="item"><span class="child"></span></div>
+      <div class="item"></div>
+      <div class="item" id="item4"></div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+  </style>
+</head>
+<body>
+  <div id="test-container">
+    <div id="target1"></div>
+    <div id="target2"></div>
+    <div id="target3"></div>
+    <div id="target4"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-nth-child", 120, 120);
+        Assert.True(result.Passed,
+            $":has(.item:nth-child(...)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithNthChildSiblingRemove_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .square {
+      width: 100px;
+      height: 100px;
+      background: red;
+    }
+
+    .item:not(:has(~ .item > :nth-child(2))) {
+      background: green;
+    }
+  </style>
+</head>
+<body onload="td.remove();">
+  <div id="container">
+    <div class="item square">
+      <div></div>
+      <div></div>
+    </div>
+    <div id="td" class="item">
+      <div></div>
+      <div></div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .square {
+      width: 100px;
+      height: 100px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="square"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-nth-child-sibling-remove", 120, 120);
+        Assert.True(result.Passed,
+            $":has(~ .item > :nth-child(2)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithIsWrappedSiblingRelations_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+    #target1:has(:is(.item + .item + .item)) { background: red; }
+    #target2:has(:is(.invalid .item, .item + .item + .item)) { background: red; }
+    #target3:has(:is(.item:nth-child(3))) { background: red; }
+    #target4:has(:is(.item:nth-last-child(3))) { background: red; }
+    #target5:has(:is(:where(:is(.item + .item + .item) > .child) + .child + .child)) { background: red; }
+  </style>
+</head>
+<body onload="item1.remove(); item2.remove(); item3.remove(); item4.remove(); item5.remove();">
+  <div id="test-container">
+    <div id="target1">
+      <div class="item" id="item1"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target2">
+      <div class="item" id="item2"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target3">
+      <div class="item" id="item3"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target4">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item" id="item4"></div>
+    </div>
+    <div id="target5">
+      <div class="item"></div>
+      <div class="item" id="item5"></div>
+      <div class="item">
+        <span class="child"></span>
+        <span class="child"></span>
+        <span class="child"></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+  </style>
+</head>
+<body>
+  <div id="test-container">
+    <div id="target1"></div>
+    <div id="target2"></div>
+    <div id="target3"></div>
+    <div id="target4"></div>
+    <div id="target5"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-is-wrapped-siblings", 120, 150);
+        Assert.True(result.Passed,
+            $":has(:is(...)) sibling/nth invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

@@ -2906,20 +2906,30 @@ public sealed partial class DomBridge
 
     private double ResolveContentBoxExtent(DomElement element, bool vertical)
     {
-        var props = GetComputedProps(element);
-        var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
-        var specified = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "height" : "width"),
-            element,
-            percentageBasis: percentageBasis);
-        if (specified > 0)
-            return specified;
+        if (!_contentExtentInProgress.Add((element, vertical)))
+            return 0;
 
-        var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
-        if (svgLength > 0)
-            return svgLength;
+        try
+        {
+            var props = GetComputedProps(element);
+            var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
+            var specified = ParseCssLengthToPixelsWithViewport(
+                props.GetValueOrDefault(vertical ? "height" : "width"),
+                element,
+                percentageBasis: percentageBasis);
+            if (specified > 0)
+                return specified;
 
-        return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+            var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
+            if (svgLength > 0)
+                return svgLength;
+
+            return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+        }
+        finally
+        {
+            _contentExtentInProgress.Remove((element, vertical));
+        }
     }
 
     private double ResolveBorderBoxExtent(DomElement element, bool vertical)
@@ -3262,21 +3272,24 @@ public sealed partial class DomBridge
 
     private double ComputeOffsetWithinParentForOffset(DomElement element, bool vertical)
     {
-        if (element.Parent == null)
+        var parent = element.Parent;
+        if (parent == null)
             return 0;
 
         var props = GetComputedProps(element);
         var position = props.GetValueOrDefault("position");
         var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
         var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
+        var parentProps = GetComputedProps(parent);
+        var parentPadding = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), parent);
 
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
             return margin + positional;
 
-        double offset = 0;
+        double offset = parentPadding;
         if (vertical)
         {
-            foreach (var sibling in element.Parent.Children)
+            foreach (var sibling in parent.Children)
             {
                 if (ReferenceEquals(sibling, element))
                     break;
@@ -3418,7 +3431,7 @@ public sealed partial class DomBridge
                 {
                     continue;
                 }
-                baseTop += siblingRect.Height;
+                baseTop += GetNormalFlowHeightContribution(sibling, siblingRect);
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
             }
@@ -3439,6 +3452,61 @@ public sealed partial class DomBridge
         resolvedLeft += translateX;
 
         return (resolvedLeft, resolvedTop, width, height);
+    }
+
+    private double GetNormalFlowHeightContribution(
+        DomElement element,
+        (double Left, double Top, double Width, double Height) renderedRect)
+    {
+        var display = GetComputedProps(element).GetValueOrDefault("display");
+        if (!string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
+            return renderedRect.Height;
+
+        var hasRect = false;
+        var minTop = 0.0;
+        var maxBottom = 0.0;
+        CollectDisplayContentsFlowExtents(element, ref hasRect, ref minTop, ref maxBottom);
+        return hasRect ? Math.Max(0, maxBottom - minTop) : 0;
+    }
+
+    private void CollectDisplayContentsFlowExtents(
+        DomElement element,
+        ref bool hasRect,
+        ref double minTop,
+        ref double maxBottom)
+    {
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode || string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var childProps = GetComputedProps(child);
+            var childPosition = childProps.GetValueOrDefault("position");
+            if (string.Equals(childPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(childPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var childDisplay = childProps.GetValueOrDefault("display");
+            if (string.Equals(childDisplay, "contents", StringComparison.OrdinalIgnoreCase))
+            {
+                CollectDisplayContentsFlowExtents(child, ref hasRect, ref minTop, ref maxBottom);
+                continue;
+            }
+
+            var rect = ComputeRenderedRect(child);
+            if (!hasRect)
+            {
+                minTop = rect.Top;
+                maxBottom = rect.Top + rect.Height;
+                hasRect = true;
+                continue;
+            }
+
+            minTop = Math.Min(minTop, rect.Top);
+            maxBottom = Math.Max(maxBottom, rect.Top + rect.Height);
+        }
     }
 
     private static bool IsSvgGeometryContainer(DomElement? element) =>
@@ -4622,10 +4690,12 @@ public sealed partial class DomBridge
         var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
         var (marginStart, marginStartOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
         var (marginEnd, marginEndOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
-        var (paddingStart, _) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
-        var (paddingEnd, _) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
+        var (paddingStart, paddingStartOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
+        var (paddingEnd, paddingEndOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
         marginStart = ConvertInsetToScrollContainerCoordinates(marginStart, marginStartOwner, scrollContainer);
         marginEnd = ConvertInsetToScrollContainerCoordinates(marginEnd, marginEndOwner, scrollContainer);
+        paddingStart = ConvertInsetToScrollContainerCoordinates(paddingStart, paddingStartOwner, scrollContainer);
+        paddingEnd = ConvertInsetToScrollContainerCoordinates(paddingEnd, paddingEndOwner, scrollContainer);
         var viewportSize = viewportSizeOverride ?? (vertical
             ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
             : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));

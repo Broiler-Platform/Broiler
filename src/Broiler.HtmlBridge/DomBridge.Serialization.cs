@@ -20,6 +20,7 @@ public sealed partial class DomBridge
 
     private const int MaxSerializationDepth = 1024;
     private const double ZoomSerializationEpsilon = 0.0001;
+    private const double DefaultProgressLikeTrackLengthPx = 120;
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -42,6 +43,115 @@ public sealed partial class DomBridge
 
         _serializationTransformsApplied = true;
         ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+    }
+
+    private void ApplyProgressLikeSerializationPlaceholders(DomElement element)
+    {
+        if (element.IsTextNode)
+            return;
+
+        foreach (var child in element.Children.ToList())
+            ApplyProgressLikeSerializationPlaceholders(child);
+
+        var tag = element.TagName.ToLowerInvariant();
+        if (tag is not ("progress" or "meter"))
+            return;
+
+        var props = GetComputedProps(element);
+        var width = props.GetValueOrDefault("width");
+        var height = props.GetValueOrDefault("height");
+        var writingMode = props.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
+        var direction = props.GetValueOrDefault("direction") ?? "ltr";
+        var vertical = IsVerticalWritingMode(writingMode);
+        var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var ratio = ResolveProgressLikeValueRatio(element, tag);
+
+        element.Style["display"] = "inline-block";
+        element.Style["box-sizing"] = "border-box";
+        element.Style["position"] = "relative";
+        element.Style["overflow"] = "hidden";
+        element.Style["padding"] = "0";
+        element.Style["border"] = "1px solid #767676";
+        element.Style["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
+        element.Style["vertical-align"] = "middle";
+        if (!string.IsNullOrWhiteSpace(width) && !string.Equals(width, "auto", StringComparison.OrdinalIgnoreCase))
+            element.Style["width"] = width;
+        if (!string.IsNullOrWhiteSpace(height) && !string.Equals(height, "auto", StringComparison.OrdinalIgnoreCase))
+            element.Style["height"] = height;
+
+        element.Children.Clear();
+        element.InnerHtml = string.Empty;
+        element.TextContent = null;
+
+        var fill = new DomElement("div", null, null, string.Empty);
+        fill.Parent = element;
+        fill.Style["position"] = "absolute";
+        fill.Style["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
+
+        var fillExtent = vertical
+            ? ReadPixelLength(height, DefaultProgressLikeTrackLengthPx) * ratio
+            : ReadPixelLength(width, DefaultProgressLikeTrackLengthPx) * ratio;
+        var fillExtentPx = $"{fillExtent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}px";
+        if (vertical)
+        {
+            fill.Style["left"] = "0";
+            fill.Style["right"] = "0";
+            fill.Style[reverseInline ? "bottom" : "top"] = "0";
+            fill.Style["height"] = fillExtentPx;
+        }
+        else
+        {
+            fill.Style["top"] = "0";
+            fill.Style["bottom"] = "0";
+            fill.Style[reverseInline ? "right" : "left"] = "0";
+            fill.Style["width"] = fillExtentPx;
+        }
+
+        element.Children.Add(fill);
+    }
+
+    private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
+    {
+        var min = tag == "meter" ? ReadNumericAttribute(element, "min", 0) : 0;
+        var max = ReadNumericAttribute(element, "max", 1);
+        if (max <= min)
+            max = min + 1;
+
+        var value = ReadNumericAttribute(element, "value", min);
+        return Math.Clamp((value - min) / (max - min), 0, 1);
+    }
+
+    private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
+    {
+        if (!element.Attributes.TryGetValue(attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
+            return fallback;
+
+        return double.TryParse(
+            rawValue,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static double ReadPixelLength(string? rawValue, double fallback)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return fallback;
+
+        var trimmed = rawValue.Trim();
+        if (trimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed[..^2];
+
+        return double.TryParse(
+            trimmed,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : fallback;
     }
 
     private void ApplyZoomSerializationStyles(DomElement element, double parentZoom)

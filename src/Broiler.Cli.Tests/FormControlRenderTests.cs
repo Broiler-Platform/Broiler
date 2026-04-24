@@ -31,6 +31,37 @@ public class FormControlRenderTests
         return count;
     }
 
+    /// <summary>
+    /// Finds the bounds of the green-ish fallback fill region used by the
+    /// progress/meter placeholder assertions.  The returned tuple contains the
+    /// min/max coordinates and total matching pixel count for pixels whose
+    /// green channel dominates while red/blue stay comparatively low.
+    /// </summary>
+    private static (int minX, int maxX, int minY, int maxY, int count) FindFillBounds(SKBitmap bmp)
+    {
+        int minX = bmp.Width;
+        int minY = bmp.Height;
+        int maxX = -1;
+        int maxY = -1;
+        int count = 0;
+
+        for (int y = 0; y < bmp.Height; y++)
+        for (int x = 0; x < bmp.Width; x++)
+        {
+            var px = bmp.GetPixel(x, y);
+            if (px.Green < 120 || px.Red > 120 || px.Blue > 120)
+                continue;
+
+            count++;
+            minX = Math.Min(minX, x);
+            minY = Math.Min(minY, y);
+            maxX = Math.Max(maxX, x);
+            maxY = Math.Max(maxY, y);
+        }
+
+        return (minX, maxX, minY, maxY, count);
+    }
+
     [Fact]
     public void InputSubmit_Renders_Visible()
     {
@@ -413,5 +444,94 @@ document.getElementById('result').textContent = [
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Theory]
+    [InlineData("horizontal-tb", "ltr", false, false)]
+    [InlineData("horizontal-tb", "rtl", false, true)]
+    [InlineData("vertical-rl", "ltr", true, false)]
+    [InlineData("vertical-rl", "rtl", true, true)]
+    public void Serialized_Meter_Fallback_Follows_WritingMode_And_Direction(
+        string writingMode,
+        string direction,
+        bool vertical,
+        bool reverseInline)
+    {
+        var html = $@"<!DOCTYPE html>
+<html><body style='margin:0'>
+<meter value='70' min='0' max='100'
+       style='writing-mode:{writingMode}; direction:{direction}'></meter>
+</body></html>";
+
+        var serialized = HtmlPostProcessor.Process(CaptureService.ExecuteScriptsWithDom(html, "file:///test.html"));
+        using var bmp = HtmlRender.RenderToImage(serialized, 200, 200);
+        var bounds = FindFillBounds(bmp);
+
+        Assert.True(bounds.count > 0, "Serialized meter fallback should paint a visible fill region.");
+
+        var fillWidth = bounds.maxX - bounds.minX + 1;
+        var fillHeight = bounds.maxY - bounds.minY + 1;
+
+        if (vertical)
+        {
+            Assert.True(fillHeight > fillWidth, "Vertical meter fill should be taller than it is wide.");
+            if (reverseInline)
+                Assert.True(bounds.maxY > 80, "Vertical RTL meter fill should anchor toward the bottom edge.");
+            else
+                Assert.True(bounds.minY < 40, "Vertical LTR meter fill should anchor toward the top edge.");
+        }
+        else
+        {
+            Assert.True(fillWidth > fillHeight, "Horizontal meter fill should be wider than it is tall.");
+            if (reverseInline)
+                Assert.True(bounds.maxX > 80, "Horizontal RTL meter fill should anchor toward the right edge.");
+            else
+                Assert.True(bounds.minX < 40, "Horizontal LTR meter fill should anchor toward the left edge.");
+        }
+    }
+
+    [Theory]
+    [InlineData("horizontal-tb", "", "width:72px", "height:68px", "top:1px", "right:1px", "background-color:#f0f0f0")]
+    [InlineData("horizontal-tb", "appearance:none", "width:72px", "height:68px", "top:1px", null, "background-color:#ffffff")]
+    [InlineData("vertical-lr", "", "width:68px", "height:72px", "left:1px", "bottom:1px", "background-color:#f0f0f0")]
+    [InlineData("vertical-rl", "", "width:68px", "height:72px", "right:1px", "top:1px", "background-color:#f0f0f0")]
+    [InlineData("vertical-lr", "appearance:none", "width:68px", "height:72px", "left:1px", null, "background-color:#ffffff")]
+    [InlineData("vertical-rl", "appearance:none", "width:68px", "height:72px", "right:1px", null, "background-color:#ffffff")]
+    public void Serialized_SelectMultiple_Fallback_Follows_WritingMode_And_Appearance(
+        string writingMode,
+        string extraStyle,
+        string expectedWidth,
+        string expectedHeight,
+        string expectedTrackAnchor,
+        string? expectedChromeAnchor,
+        string expectedBackground)
+    {
+        var style = string.IsNullOrWhiteSpace(extraStyle)
+            ? $"writing-mode:{writingMode}"
+            : $"writing-mode:{writingMode}; {extraStyle}";
+        var html = $@"<!DOCTYPE html>
+<html><body>
+<select multiple style='{style}'>
+  <option>Option 1</option>
+  <option>Option 2</option>
+  <option>Option 3</option>
+  <option>Option 4</option>
+  <option>Option 5</option>
+</select>
+</body></html>";
+
+        var processed = HtmlPostProcessor.Process(html);
+
+        Assert.Contains(expectedWidth, processed);
+        Assert.Contains(expectedHeight, processed);
+        Assert.Contains(expectedTrackAnchor, processed);
+        Assert.Contains(expectedBackground, processed);
+        if (expectedChromeAnchor == null)
+            Assert.DoesNotContain("background-color:#dcdcdc", processed);
+        else
+        {
+            Assert.Contains("background-color:#dcdcdc", processed);
+            Assert.Contains(expectedChromeAnchor, processed);
+        }
     }
 }

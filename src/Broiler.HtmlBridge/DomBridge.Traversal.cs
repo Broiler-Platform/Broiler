@@ -6,6 +6,7 @@ using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
@@ -547,6 +548,29 @@ public sealed partial class DomBridge
             }, "get commonAncestorContainer"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // getBoundingClientRect()
+        range.FastAddValue(
+            (KeyString)"getBoundingClientRect",
+            new JSFunction((in Arguments _) =>
+            {
+                var rects = bridge.GetClientRectsForRange(state);
+                return bridge.CreateDomRectObject(UnionClientRects(rects));
+            }, "getBoundingClientRect", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getClientRects()
+        range.FastAddValue(
+            (KeyString)"getClientRects",
+            new JSFunction((in Arguments _) =>
+            {
+                var rects = bridge.GetClientRectsForRange(state);
+                if (rects.Count == 0)
+                    return new JSArray();
+
+                return new JSArray(rects.Select(rect => (JSValue)bridge.CreateDomRectObject(rect)).ToArray());
+            }, "getClientRects", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setStart(node, offset)
         range.FastAddValue(
@@ -1445,6 +1469,76 @@ public sealed partial class DomBridge
             return false;
 
         return true;
+    }
+
+    private JSObject CreateDomRectObject((double Left, double Top, double Width, double Height) rectData)
+    {
+        var rect = new JSObject();
+        rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        return rect;
+    }
+
+    private List<(double Left, double Top, double Width, double Height)> GetClientRectsForRange(RangeState state)
+    {
+        var rects = new List<(double Left, double Top, double Width, double Height)>();
+        if (state.Collapsed)
+            return rects;
+
+        foreach (var node in GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset))
+            CollectClientRectsForRangeNode(node, rects);
+
+        return rects;
+    }
+
+    private void CollectClientRectsForRangeNode(
+        DomElement node,
+        List<(double Left, double Top, double Width, double Height)> rects)
+    {
+        if (node.IsTextNode || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var display = GetComputedProps(node).GetValueOrDefault("display");
+        if (string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var child in node.Children)
+                CollectClientRectsForRangeNode(child, rects);
+
+            return;
+        }
+
+        var rect = GetBoundingClientRectForDomElement(node, isRoot: false);
+        if (rect.Width > 0 || rect.Height > 0)
+            rects.Add(rect);
+    }
+
+    private static (double Left, double Top, double Width, double Height) UnionClientRects(
+        IReadOnlyList<(double Left, double Top, double Width, double Height)> rects)
+    {
+        if (rects.Count == 0)
+            return (0, 0, 0, 0);
+
+        var left = rects[0].Left;
+        var top = rects[0].Top;
+        var right = rects[0].Left + rects[0].Width;
+        var bottom = rects[0].Top + rects[0].Height;
+
+        for (var i = 1; i < rects.Count; i++)
+        {
+            var rect = rects[i];
+            left = Math.Min(left, rect.Left);
+            top = Math.Min(top, rect.Top);
+            right = Math.Max(right, rect.Left + rect.Width);
+            bottom = Math.Max(bottom, rect.Top + rect.Height);
+        }
+
+        return (left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
 
     /// <summary>

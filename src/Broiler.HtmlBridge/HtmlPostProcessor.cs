@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
@@ -10,6 +11,31 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 internal static class HtmlPostProcessor
 {
+    /// <summary>
+    /// Default rendered track length for progress-like native fallbacks.
+    /// </summary>
+    private const double DefaultProgressLikeTrackLengthPx = 120;
+
+    /// <summary>
+    /// Default number of visible option tracks for a plain <c>select[multiple]</c>.
+    /// </summary>
+    private const int DefaultSelectMultipleVisibleTracks = 4;
+
+    /// <summary>
+    /// Thickness in pixels of one visible listbox option track in the fallback.
+    /// </summary>
+    private const int SelectMultipleTrackThicknessPx = 16;
+
+    /// <summary>
+    /// Inline-axis extent in pixels used for the simple listbox placeholder.
+    /// </summary>
+    private const int SelectMultipleInlineExtentPx = 72;
+
+    /// <summary>
+    /// Thickness in pixels of the simple native-chrome gutter for listboxes.
+    /// </summary>
+    private const int SelectMultipleChromeThicknessPx = 10;
+
     /// <summary>
     /// Matches all <c>&lt;script …&gt;…&lt;/script&gt;</c> blocks.
     /// </summary>
@@ -40,6 +66,29 @@ internal static class HtmlPostProcessor
     /// </summary>
     private static readonly Regex VideoContentPattern = new(
         @"<video(?<attrs>[^>]*)>[\s\S]*?</video>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches progress-like native controls so they can be rewritten into
+    /// simple styled fallback boxes for static rendering.
+    /// </summary>
+    private static readonly Regex ProgressLikePattern = new(
+        @"<(?<tag>progress|meter)(?<attrs>[^>]*)>[\s\S]*?</\k<tag>>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches multi-select listboxes so they can be rewritten into simple
+    /// static placeholders that preserve writing-mode differences.
+    /// </summary>
+    private static readonly Regex SelectMultiplePattern = new(
+        @"<select(?<attrs>[^>]*\bmultiple\b[^>]*)>(?<content>[\s\S]*?)</select>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches the inline <c>style</c> attribute within a raw attribute string.
+    /// </summary>
+    private static readonly Regex StyleAttributePattern = new(
+        @"\bstyle\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)')",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -154,6 +203,8 @@ internal static class HtmlPostProcessor
         // image fallback).  Acid3 tests that need object stripping call
         // StripObjectContent() directly; the default pipeline preserves them.
         html = ReplaceVideoWithPlaceholder(html);
+        html = ReplaceProgressLikeWithPlaceholder(html);
+        html = ReplaceSelectMultipleWithPlaceholder(html);
         html = StripHiddenTestArtifacts(html);
         html = RewriteRootSelector(html);
         return html;
@@ -221,6 +272,127 @@ internal static class HtmlPostProcessor
             string h = hMatch.Success ? hMatch.Groups[1].Value + "px" : "150px";
 
             return $"<div style=\"display:inline-block;width:{w};height:{h};background-color:black\"></div>";
+        });
+    }
+
+    internal static string ReplaceProgressLikeWithPlaceholder(string html)
+    {
+        return ProgressLikePattern.Replace(html, m =>
+        {
+            var tag = m.Groups["tag"].Value.ToLowerInvariant();
+            var attrs = m.Groups["attrs"].Value;
+            var styleMatch = StyleAttributePattern.Match(attrs);
+            var existingStyle = styleMatch.Success ? styleMatch.Groups["value"].Value : string.Empty;
+            var attrsWithoutStyle = styleMatch.Success
+                ? StyleAttributePattern.Replace(attrs, string.Empty, 1)
+                : attrs;
+
+            var writingMode = GetInlineStyleValue(existingStyle, "writing-mode") ?? "horizontal-tb";
+            var direction = GetInlineStyleValue(existingStyle, "direction") ?? "ltr";
+            var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                           writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+            var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+            var ratio = ResolveProgressLikeValueRatio(attrs, tag);
+
+            var hostStyles = new List<string>();
+            if (!string.IsNullOrWhiteSpace(existingStyle))
+                hostStyles.Add(existingStyle.Trim().TrimEnd(';'));
+            hostStyles.Add("display:inline-block");
+            hostStyles.Add("box-sizing:border-box");
+            hostStyles.Add("position:relative");
+            hostStyles.Add("overflow:hidden");
+            hostStyles.Add("padding:0");
+            hostStyles.Add("border:1px solid #767676");
+            hostStyles.Add($"background-color:{(tag == "meter" ? "#e6e6e6" : "#f0f0f0")}");
+            hostStyles.Add("vertical-align:middle");
+            hostStyles.Add(vertical ? "width:16px" : "width:120px");
+            hostStyles.Add(vertical ? "height:120px" : "height:16px");
+
+            var fillExtent = (DefaultProgressLikeTrackLengthPx * ratio).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
+            var fillStyles = new List<string>
+            {
+                "position:absolute",
+                $"background-color:{(tag == "meter" ? "#4caf50" : "#0a84ff")}"
+            };
+
+            if (vertical)
+            {
+                fillStyles.Add("left:0");
+                fillStyles.Add("right:0");
+                fillStyles.Add((reverseInline ? "bottom" : "top") + ":0");
+                fillStyles.Add("height:" + fillExtent);
+            }
+            else
+            {
+                fillStyles.Add("top:0");
+                fillStyles.Add("bottom:0");
+                fillStyles.Add((reverseInline ? "right" : "left") + ":0");
+                fillStyles.Add("width:" + fillExtent);
+            }
+
+            var hostStyle = string.Join("; ", hostStyles);
+            var fillStyle = string.Join("; ", fillStyles);
+            return $"<{tag}{attrsWithoutStyle} style=\"{hostStyle}\"><div style=\"{fillStyle}\"></div></{tag}>";
+        });
+    }
+
+    internal static string ReplaceSelectMultipleWithPlaceholder(string html)
+    {
+        return SelectMultiplePattern.Replace(html, m =>
+        {
+            var attrs = m.Groups["attrs"].Value;
+            var styleMatch = StyleAttributePattern.Match(attrs);
+            var existingStyle = styleMatch.Success ? styleMatch.Groups["value"].Value : string.Empty;
+
+            var writingMode = GetInlineStyleValue(existingStyle, "writing-mode") ?? "horizontal-tb";
+            var appearance = GetInlineStyleValue(existingStyle, "appearance") ?? "auto";
+            var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                           writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+            var reverseBlock = writingMode.EndsWith("-rl", StringComparison.OrdinalIgnoreCase);
+            var nativeAppearance = !string.Equals(appearance, "none", StringComparison.OrdinalIgnoreCase);
+
+            var visibleTracks = (int)Math.Clamp(
+                ReadNumericAttribute(attrs, "size", DefaultSelectMultipleVisibleTracks),
+                2,
+                8);
+
+            var blockExtent = (visibleTracks * SelectMultipleTrackThicknessPx) + 4;
+            var hostWidth = vertical ? blockExtent : SelectMultipleInlineExtentPx;
+            var hostHeight = vertical ? SelectMultipleInlineExtentPx : blockExtent;
+            var contentWidth = vertical
+                ? visibleTracks * SelectMultipleTrackThicknessPx
+                : SelectMultipleInlineExtentPx - (nativeAppearance ? SelectMultipleChromeThicknessPx : 2);
+            var contentHeight = vertical
+                ? SelectMultipleInlineExtentPx - (nativeAppearance ? SelectMultipleChromeThicknessPx : 2)
+                : visibleTracks * SelectMultipleTrackThicknessPx;
+
+            var hostStyles = new List<string>
+            {
+                "display:inline-block",
+                "position:relative",
+                "box-sizing:border-box",
+                "overflow:hidden",
+                "vertical-align:middle",
+                "font:13px sans-serif",
+                $"width:{hostWidth}px",
+                $"height:{hostHeight}px",
+                nativeAppearance ? "border:1px solid #767676" : "border:1px solid #9a9a9a",
+                nativeAppearance ? "background-color:#f0f0f0" : "background-color:#ffffff"
+            };
+
+            var sb = new StringBuilder();
+            sb.Append("<div style=\"").Append(string.Join("; ", hostStyles)).Append("\">");
+
+            if (vertical)
+                AppendVerticalSelectMultipleTracks(sb, visibleTracks, contentHeight, reverseBlock);
+            else
+                AppendHorizontalSelectMultipleTracks(sb, visibleTracks, contentWidth);
+
+            if (nativeAppearance)
+                AppendSelectMultipleChrome(sb, vertical, reverseBlock, hostWidth, hostHeight);
+
+            sb.Append("</div>");
+            return sb.ToString();
         });
     }
 
@@ -370,5 +542,121 @@ internal static class HtmlPostProcessor
                 return m.Groups[1].Value + css + m.Groups[3].Value;
             },
             RegexOptions.IgnoreCase);
+    }
+
+    private static string? GetInlineStyleValue(string styleText, string propertyName)
+    {
+        foreach (var declaration in styleText.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = declaration.Split(':', 2);
+            if (parts.Length != 2)
+                continue;
+
+            if (string.Equals(parts[0].Trim(), propertyName, StringComparison.OrdinalIgnoreCase))
+                return parts[1].Trim();
+        }
+
+        return null;
+    }
+
+    private static void AppendHorizontalSelectMultipleTracks(StringBuilder sb, int visibleTracks, int contentWidth)
+    {
+        var trackWidth = Math.Max(contentWidth, 8);
+        for (var i = 0; i < visibleTracks; i++)
+        {
+            var top = 1 + (i * SelectMultipleTrackThicknessPx);
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            sb.Append("<div style=\"position:absolute;left:1px;top:")
+                .Append(top)
+                .Append("px;width:")
+                .Append(trackWidth)
+                .Append("px;height:")
+                .Append(SelectMultipleTrackThicknessPx)
+                .Append("px;background-color:")
+                .Append(background)
+                .Append(";border-bottom:1px solid #d0d0d0\"></div>");
+        }
+    }
+
+    private static void AppendVerticalSelectMultipleTracks(
+        StringBuilder sb,
+        int visibleTracks,
+        int contentHeight,
+        bool reverseBlock)
+    {
+        var trackHeight = Math.Max(contentHeight, 8);
+        for (var i = 0; i < visibleTracks; i++)
+        {
+            var offset = 1 + (i * SelectMultipleTrackThicknessPx);
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            sb.Append("<div style=\"position:absolute;top:1px;")
+                .Append(reverseBlock ? "right:" : "left:")
+                .Append(offset)
+                .Append("px;width:")
+                .Append(SelectMultipleTrackThicknessPx)
+                .Append("px;height:")
+                .Append(trackHeight)
+                .Append("px;background-color:")
+                .Append(background)
+                .Append(";border-")
+                .Append(reverseBlock ? "left" : "right")
+                .Append(":1px solid #d0d0d0\"></div>");
+        }
+    }
+
+    private static void AppendSelectMultipleChrome(
+        StringBuilder sb,
+        bool vertical,
+        bool reverseBlock,
+        int hostWidth,
+        int hostHeight)
+    {
+        if (vertical)
+        {
+            sb.Append("<div style=\"position:absolute;left:1px;")
+                .Append(reverseBlock ? "top:1px;" : "bottom:1px;")
+                .Append("width:")
+                .Append(hostWidth - 2)
+                .Append("px;height:")
+                .Append(SelectMultipleChromeThicknessPx - 2)
+                .Append("px;background-color:#dcdcdc;border-top:1px solid #b8b8b8\"></div>");
+            return;
+        }
+
+        sb.Append("<div style=\"position:absolute;top:1px;right:1px;width:")
+            .Append(SelectMultipleChromeThicknessPx - 2)
+            .Append("px;height:")
+            .Append(hostHeight - 2)
+            .Append("px;background-color:#dcdcdc;border-left:1px solid #b8b8b8\"></div>");
+    }
+
+    private static double ResolveProgressLikeValueRatio(string attrs, string tag)
+    {
+        var min = tag == "meter" ? ReadNumericAttribute(attrs, "min", 0) : 0;
+        var max = ReadNumericAttribute(attrs, "max", 1);
+        if (max <= min)
+            max = min + 1;
+
+        var value = ReadNumericAttribute(attrs, "value", min);
+        return Math.Clamp((value - min) / (max - min), 0, 1);
+    }
+
+    private static double ReadNumericAttribute(string attrs, string attributeName, double fallback)
+    {
+        var match = Regex.Match(
+            attrs,
+            $@"\b{Regex.Escape(attributeName)}\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)'|(?<value>[^\s>]+))",
+            RegexOptions.IgnoreCase);
+
+        if (!match.Success)
+            return fallback;
+
+        return double.TryParse(
+            match.Groups["value"].Value,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : fallback;
     }
 }

@@ -54,6 +54,30 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_FireWindowLoadEvent_Triggers_Body_Onload_Property_Assigned_By_Script()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        context.Eval("""
+            document.body.onload = function () {
+                document.getElementById('out').textContent = 'body-property-load-fired';
+            };
+            """);
+
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("document.getElementById('out').textContent");
+        Assert.Equal("body-property-load-fired", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FireWindowLoadEvent_Triggers_Window_Load_Listeners_And_Honors_Removal()
     {
         const string html = """
