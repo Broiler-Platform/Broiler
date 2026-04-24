@@ -47,6 +47,7 @@ internal sealed class DomParser
         bool followingBlock = true;
         CorrectLineBreaksBlocks(root, ref followingBlock);
         CorrectInlineBoxesParent(root, baseUrl);
+        PromoteInlineFormsWithOnlyBlockChildren(root);
         CorrectBlockInsideInline(root, baseUrl);
         CorrectInlineBoxesParent(root, baseUrl);
 
@@ -1857,6 +1858,46 @@ internal sealed class DomParser
         }
 
         return hasBlock && hasInline;
+    }
+
+    private static void PromoteInlineFormsWithOnlyBlockChildren(CssBox box)
+    {
+        if (box.Display == CssConstants.Inline
+            && box.HtmlTag?.Name.Equals("form", StringComparison.OrdinalIgnoreCase) == true
+            && ContainsOnlyBlockChildrenOrWhitespaceInlines(box))
+        {
+            box.Display = CssConstants.Block;
+        }
+
+        foreach (var child in box.Boxes)
+            PromoteInlineFormsWithOnlyBlockChildren(child);
+    }
+
+    private static bool ContainsOnlyBlockChildrenOrWhitespaceInlines(CssBox box)
+    {
+        bool hasBlock = false;
+
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None)
+                continue;
+
+            if (child.IsInline)
+            {
+                bool whitespaceOnly = child.Boxes.Count == 0
+                    && child.Words.Count == 0
+                    && !child.Text.IsEmpty
+                    && child.Text.Span.IsWhiteSpace();
+                if (!whitespaceOnly)
+                    return false;
+
+                continue;
+            }
+
+            hasBlock = true;
+        }
+
+        return hasBlock;
     }
 
     /// <summary>

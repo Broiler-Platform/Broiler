@@ -62,15 +62,32 @@ internal sealed class FontsHandler
                 if (font == null)
                 {
                     font = CreateFont(mappedFamily, size, style);
-                    _fontsCache[mappedFamily][size][style] = font;
+                    GetOrCreateSizeCache(mappedFamily, size)[style] = font;
                 }
             }
         }
 
         font ??= CreateFont(family, size, style);
-        _fontsCache[family][size][style] = font;
+        GetOrCreateSizeCache(family, size)[style] = font;
 
         return font;
+    }
+
+    private Dictionary<FontStyle, RFont> GetOrCreateSizeCache(string family, double size)
+    {
+        if (!_fontsCache.TryGetValue(family, out Dictionary<double, Dictionary<FontStyle, RFont>> sizeCache))
+        {
+            sizeCache = [];
+            _fontsCache[family] = sizeCache;
+        }
+
+        if (!sizeCache.TryGetValue(size, out Dictionary<FontStyle, RFont> styleCache))
+        {
+            styleCache = [];
+            sizeCache[size] = styleCache;
+        }
+
+        return styleCache;
     }
 
     private RFont TryGetFont(string family, double size, FontStyle style)
@@ -86,7 +103,7 @@ internal sealed class FontsHandler
             }
             else
             {
-                _fontsCache[family][size] = [];
+                a[size] = [];
             }
         }
         else

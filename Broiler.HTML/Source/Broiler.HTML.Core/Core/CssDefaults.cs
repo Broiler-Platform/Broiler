@@ -53,9 +53,9 @@ internal static class CssDefaults
         input[type=""hidden""] { display: none; min-width: 0; height: auto;
                           border: none; padding: 0; }
         input[type=""checkbox""] { min-width: 13px; width: 13px; height: 13px;
-                          padding: 0; }
+                          padding: 0; box-sizing: border-box; }
         input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
-                          padding: 0; border-radius: 50%; }
+                          padding: 0; box-sizing: border-box; border-radius: 50%; }
         input[type=""range""] { min-width: 0; height: auto; padding: 0; border: none; }
         input[type=""submit""],
         input[type=""button""],
