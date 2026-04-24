@@ -1,7 +1,6 @@
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.Compiler.Tests;
 
@@ -29,5 +28,22 @@ public class CompilerTests
         using var ctx = new JSContext();
         var result = ctx.Eval("((x) => x * 2)(21)");
         Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Compile_ArgumentsObject_WorksWithoutExplicitModulesLoad()
+    {
+        using var ctx = new JSContext();
+        var result = ctx.Eval("(function () { return arguments.length; })(1, 2, 3)");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void JSContext_LoadsClrInteropWithoutExplicitClrReference()
+    {
+        using var ctx = new JSContext();
+
+        Assert.Equal("Broiler.JavaScript.Clr.DefaultClrInterop", JSEngine.ClrInterop.GetType().FullName);
+        Assert.NotNull(JSEngine.ClrModuleProvider);
     }
 }

@@ -174,7 +174,8 @@ public static class JSEngine
     /// <summary>
     /// Attempts to load satellite assemblies and run their module
     /// constructors so that <c>[ModuleInitializer]</c> methods register
-    /// factory delegates and additional built-in type registrations.
+    /// factory delegates, CLR interop, module helpers, and additional
+    /// built-in type registrations.
     /// </summary>
     internal static void EnsureBuiltInsAssemblyLoaded()
     {
@@ -183,8 +184,10 @@ public static class JSEngine
 
         TryLoadAssembly("Broiler.JavaScript.Engine");
         TryLoadAssembly("Broiler.JavaScript.BuiltIns");
+        TryLoadAssembly("Broiler.JavaScript.Clr");
         TryLoadAssembly("Broiler.JavaScript.Globals");
         TryLoadAssembly("Broiler.JavaScript.Extensions");
+        TryLoadAssembly("Broiler.JavaScript.Modules");
     }
 
     private static void TryLoadAssembly(string name)
