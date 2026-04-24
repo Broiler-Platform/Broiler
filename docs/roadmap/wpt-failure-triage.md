@@ -5,6 +5,10 @@
 
 ## Implementation updates
 
+### 2026-04-24
+
+- Phase 6 has widened again: `scrollIntoView()` now converts inherited `scroll-padding-*` values from the padding owner’s zoom space into the active scroller’s coordinates before alignment, so focused CLI and WPT guards cover the remaining `css/css-viewport/zoom/scroll-padding.html` follow-up slice locally.
+
 ### 2026-04-23
 
 - Phase 6 has widened again: `HTMLElement.scrollParent()` now returns the nearest relevant scroll container for standard DOM cases, including `overflow:hidden`, `display:none`, `display:contents`, absolute/fixed positioning, and root/body/null edge cases, with focused CLI and WPT guards for the new scroll-parent foundation.

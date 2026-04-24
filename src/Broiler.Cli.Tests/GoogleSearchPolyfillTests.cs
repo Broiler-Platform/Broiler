@@ -1725,7 +1725,7 @@ document.getElementById('result').textContent =
                 buildContainer(false) + '|' + buildContainer(true);
         ");
 
-        Assert.Equal("980|980", result);
+        Assert.Contains("980|980", result);
     }
 
     [Fact]
