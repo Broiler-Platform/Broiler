@@ -2725,6 +2725,79 @@ input {
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomPseudoImage_MatchesReference()
+    {
+        var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
+        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+
+        var testHtml = @"<!doctype html>
+<meta charset=utf-8>
+<style>
+.icon {
+  width: 200px;
+  height: 200px;
+  background-color: blue;
+  margin-right: 5px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.icon::before {
+  display: block;
+  content: url(/images/green.png);
+  width: 100px;
+  height: 100px;
+  background-color: purple;
+}
+
+.zoom {
+  zoom: 2;
+}
+</style>
+<div class=""icon""></div>
+<div class=""icon zoom""></div>";
+
+        var referenceHtml = @"<!doctype html>
+<meta charset=utf-8>
+<style>
+.icon {
+  width: 200px;
+  height: 200px;
+  background-color: blue;
+  margin-right: 5px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.img-wrapper {
+  display: block;
+  width: 100px;
+  height: 100px;
+  background-color: purple;
+}
+
+.zoom {
+  zoom: 2;
+}
+</style>
+<div class=""icon"">
+  <div class=""img-wrapper"">
+    <img src=""/images/green.png"">
+  </div>
+</div>
+<div class=""icon zoom"">
+  <div class=""img-wrapper"">
+    <img src=""/images/green.png"">
+  </div>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-pseudo-image", 420, 220);
+        Assert.True(result.Passed,
+            $"zoom pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomScrollIntoViewAbsolutePosition_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

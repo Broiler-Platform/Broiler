@@ -991,9 +991,26 @@ internal sealed class DomParser
     /// </summary>
     private static CssBlock FindPseudoElementBlock(CssBox box, CssData cssData, string pseudoElement)
     {
-        // Element-level: e.g. "p::before"
-        var found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + pseudoElement);
-        if (found != null) return found;
+        CssBlock? merged = null;
+
+        void MergeMatchingBlocks(string key)
+        {
+            foreach (var block in cssData.GetCssBlock(key))
+            {
+                if (block.Selectors != null && !IsBlockAssignableToBoxWithSelector(box, block))
+                    continue;
+
+                if (merged == null)
+                    merged = block.Clone();
+                else
+                    merged.Merge(block);
+            }
+        }
+
+        // General-to-specific merge order so later, more specific matching
+        // pseudo-element rules override earlier ones like the normal cascade.
+        MergeMatchingBlocks("*" + pseudoElement);
+        MergeMatchingBlocks(box.HtmlTag.Name + pseudoElement);
 
         // Class-level: e.g. ".nose::before", "p.nose::before"
         if (box.HtmlTag.HasAttribute("class"))
@@ -1011,13 +1028,8 @@ internal sealed class DomParser
                 if (endIdx < 0) endIdx = classes.Length;
 
                 var cls = classes.Substring(startIdx, endIdx - startIdx);
-
-                found = MatchPseudoBlock(box, cssData, "." + cls + pseudoElement);
-                if (found != null) return found;
-
-                found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + "." + cls + pseudoElement);
-                if (found != null) return found;
-
+                MergeMatchingBlocks("." + cls + pseudoElement);
+                MergeMatchingBlocks(box.HtmlTag.Name + "." + cls + pseudoElement);
                 startIdx = endIdx + 1;
             }
         }
@@ -1026,23 +1038,10 @@ internal sealed class DomParser
         if (box.HtmlTag.HasAttribute("id"))
         {
             var id = box.HtmlTag.TryGetAttribute("id");
-            found = MatchPseudoBlock(box, cssData, "#" + id + pseudoElement);
-            if (found != null) return found;
+            MergeMatchingBlocks("#" + id + pseudoElement);
         }
 
-        // Universal: "*::before"
-        found = MatchPseudoBlock(box, cssData, "*" + pseudoElement);
-        return found;
-    }
-
-    private static CssBlock MatchPseudoBlock(CssBox box, CssData cssData, string key)
-    {
-        foreach (var block in cssData.GetCssBlock(key))
-        {
-            if (block.Selectors == null || IsBlockAssignableToBoxWithSelector(box, block))
-                return block;
-        }
-        return null;
+        return merged;
     }
 
     /// <summary>

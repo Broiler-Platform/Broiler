@@ -21,6 +21,7 @@ public sealed partial class DomBridge
     private const int MaxSerializationDepth = 1024;
     private const double ZoomSerializationEpsilon = 0.0001;
     private const double DefaultProgressLikeTrackLengthPx = 120;
+    private readonly Dictionary<DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -43,7 +44,104 @@ public sealed partial class DomBridge
 
         _serializationTransformsApplied = true;
         ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        ApplyZoomPseudoSerializationOverrides();
         ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+    }
+
+    private void ApplyZoomPseudoSerializationOverrides()
+    {
+        var rules = new List<string>();
+        int pseudoIndex = 0;
+        CollectZoomPseudoSerializationOverrides(DocumentElement, 1.0, rules, ref pseudoIndex);
+        if (rules.Count == 0)
+            return;
+
+        var styleElement = new DomElement("style", null, null, string.Empty);
+        styleElement.TextContent = string.Join(Environment.NewLine, rules);
+
+        var head = FindFirstElementByTagName(DocumentElement, "head");
+        if (head != null)
+        {
+            styleElement.Parent = head;
+            head.Children.Add(styleElement);
+            return;
+        }
+
+        styleElement.Parent = DocumentElement;
+        DocumentElement.Children.Insert(0, styleElement);
+    }
+
+    private void CollectZoomPseudoSerializationOverrides(
+        DomElement element,
+        double parentZoom,
+        List<string> rules,
+        ref int pseudoIndex)
+    {
+        if (element.IsTextNode)
+            return;
+
+        var props = GetComputedProps(element);
+        var specifiedZoom = props.GetValueOrDefault("zoom");
+        var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
+
+        if (Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon)
+        {
+            AppendZoomPseudoSerializationOverride(element, "::before", usedZoom, rules, ref pseudoIndex);
+            AppendZoomPseudoSerializationOverride(element, "::after", usedZoom, rules, ref pseudoIndex);
+        }
+
+        foreach (var child in element.Children)
+            CollectZoomPseudoSerializationOverrides(child, usedZoom, rules, ref pseudoIndex);
+    }
+
+    private void AppendZoomPseudoSerializationOverride(
+        DomElement element,
+        string pseudoElement,
+        double usedZoom,
+        List<string> rules,
+        ref int pseudoIndex)
+    {
+        var pseudoProps = BuildComputedStyleMap(element, pseudoElement);
+        var content = pseudoProps.GetValueOrDefault("content")?.Trim();
+        if (string.IsNullOrEmpty(content) ||
+            string.Equals(content, "none", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(content, "normal", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var declarations = new List<string>();
+        foreach (var property in ZoomScaledSerializationProperties)
+        {
+            if (!pseudoProps.TryGetValue(property, out var value) || string.IsNullOrWhiteSpace(value))
+                continue;
+
+            if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
+                declarations.Add($"{property}: {scaled} !important");
+        }
+
+        if (declarations.Count == 0)
+            return;
+
+        if (string.IsNullOrWhiteSpace(element.Id))
+            element.Id = $"broiler-zoom-pseudo-{++pseudoIndex}";
+
+        rules.Add($"#{element.Id}{pseudoElement} {{ {string.Join("; ", declarations)}; }}");
+    }
+
+    private static DomElement? FindFirstElementByTagName(DomElement root, string tagName)
+    {
+        if (string.Equals(root.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+            return root;
+
+        foreach (var child in root.Children)
+        {
+            var match = FindFirstElementByTagName(child, tagName);
+            if (match != null)
+                return match;
+        }
+
+        return null;
     }
 
     private void ApplyProgressLikeSerializationPlaceholders(DomElement element)
@@ -190,6 +288,17 @@ public sealed partial class DomBridge
         out string value)
     {
         value = string.Empty;
+        if (ZoomPreferSpecifiedProperties.Contains(property))
+        {
+            var specifiedProps = GetZoomSpecifiedStyleMap(element);
+            if (specifiedProps.TryGetValue(property, out value) &&
+                !string.IsNullOrWhiteSpace(value) &&
+                !string.Equals(value.Trim(), "inherit", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
         if (props.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
@@ -209,6 +318,27 @@ public sealed partial class DomBridge
 
         return false;
     }
+
+    private Dictionary<string, string> GetZoomSpecifiedStyleMap(DomElement element)
+    {
+        if (!_zoomSpecifiedStyleCache.TryGetValue(element, out var specified))
+        {
+            specified = BuildSpecifiedStyleMap(element);
+            _zoomSpecifiedStyleCache[element] = specified;
+        }
+
+        return specified;
+    }
+
+    private static readonly HashSet<string> ZoomPreferSpecifiedProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "width",
+        "height",
+        "min-width",
+        "min-height",
+        "max-width",
+        "max-height"
+    };
 
     private static readonly string[] ZoomScaledSerializationProperties =
     [

@@ -623,6 +623,60 @@ public sealed partial class DomBridge
 
     private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
+        var computed = BuildComputedStyleMap(element, pseudoElement);
+        var obj = new JSObject();
+
+        // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
+        static string ToCamelCase(string cssName)
+        {
+            var sb = new StringBuilder();
+            bool upper = false;
+            foreach (char c in cssName)
+            {
+                if (c == '-') { upper = true; continue; }
+                sb.Append(upper ? char.ToUpperInvariant(c) : c);
+                upper = false;
+            }
+            return sb.ToString();
+        }
+
+        // Expose all computed properties as both camelCase and kebab-case
+        foreach (var kv in computed)
+        {
+            var camel = ToCamelCase(kv.Key);
+            obj.FastAddValue((KeyString)kv.Key, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+            if (camel != kv.Key)
+                obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // getPropertyValue method (supports both kebab-case and camelCase lookups)
+        obj.FastAddValue(
+            (KeyString)"getPropertyValue",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    if (computed.TryGetValue(name, out var val))
+                        return new JSString(val);
+                    // Try kebab-case conversion for camelCase input
+                    var kebab = ToKebabCase(name);
+                    if (kebab != name && computed.TryGetValue(kebab, out val))
+                        return new JSString(val);
+                    // Try camelCase conversion for kebab-case input
+                    var camel = ToCamelCase(name);
+                    if (camel != name && computed.TryGetValue(camel, out val))
+                        return new JSString(val);
+                }
+                return new JSString(string.Empty);
+            }, "getPropertyValue", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return obj;
+    }
+
+    private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
+    {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var computedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         pseudoElement = NormalizePseudoElement(pseudoElement);
@@ -692,55 +746,35 @@ public sealed partial class DomBridge
             ApplyLogicalSizeAliases(computed);
         }
 
-        var obj = new JSObject();
+        return computed;
+    }
 
-        // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
-        static string ToCamelCase(string cssName)
+    private Dictionary<string, string> BuildSpecifiedStyleMap(DomElement element, string? pseudoElement = null)
+    {
+        var specified = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var specifiedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        pseudoElement = NormalizePseudoElement(pseudoElement);
+
+        var docRoot = GetDocumentRootFor(element);
+        var styleElements = new List<DomElement>();
+        CollectStyleElementsInTree(docRoot, styleElements);
+        var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
+
+        foreach (var styleEl in styleElements)
+            ParseAndApplyCssRules(GetStyleElementCssText(styleEl), element, specified, specifiedSpecificity, vpWidth, vpHeight, pseudoElement);
+
+        if (pseudoElement == null &&
+            element.Attributes.TryGetValue("style", out var inlineStyleAttr) &&
+            !string.IsNullOrEmpty(inlineStyleAttr))
         {
-            var sb = new StringBuilder();
-            bool upper = false;
-            foreach (char c in cssName)
-            {
-                if (c == '-') { upper = true; continue; }
-                sb.Append(upper ? char.ToUpperInvariant(c) : c);
-                upper = false;
-            }
-            return sb.ToString();
+            foreach (var kv in ParseStyle(inlineStyleAttr))
+                specified[kv.Key] = kv.Value;
         }
 
-        // Expose all computed properties as both camelCase and kebab-case
-        foreach (var kv in computed)
-        {
-            var camel = ToCamelCase(kv.Key);
-            obj.FastAddValue((KeyString)kv.Key, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
-            if (camel != kv.Key)
-                obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
+        if (pseudoElement != null)
+            ApplyPseudoElementRules(element, pseudoElement, styleElements, specified, specifiedSpecificity, vpWidth, vpHeight);
 
-        // getPropertyValue method (supports both kebab-case and camelCase lookups)
-        obj.FastAddValue(
-            (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var name = a[0].ToString();
-                    if (computed.TryGetValue(name, out var val))
-                        return new JSString(val);
-                    // Try kebab-case conversion for camelCase input
-                    var kebab = ToKebabCase(name);
-                    if (kebab != name && computed.TryGetValue(kebab, out val))
-                        return new JSString(val);
-                    // Try camelCase conversion for kebab-case input
-                    var camel = ToCamelCase(name);
-                    if (camel != name && computed.TryGetValue(camel, out val))
-                        return new JSString(val);
-                }
-                return new JSString(string.Empty);
-            }, "getPropertyValue", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return obj;
+        return specified;
     }
 
     private void ApplyInheritedProperties(Dictionary<string, string> computed, DomElement element)
