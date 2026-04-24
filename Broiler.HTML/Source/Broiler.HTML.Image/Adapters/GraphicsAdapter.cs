@@ -72,9 +72,9 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override SizeF MeasureString(string str, RFont font)
     {
         var fontAdapter = (FontAdapter)font;
-        var skFont = fontAdapter.Font;
+        var skFont = fontAdapter.RenderFont;
         var width = skFont.MeasureText(str);
-        return new SizeF(width, (float)font.Height);
+        return new SizeF(width, skFont.Spacing);
     }
 
     public override void MeasureString(string str, RFont font, double maxWidth, out int charFit, out double charFitWidth)
@@ -83,7 +83,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         charFitWidth = 0;
 
         var fontAdapter = (FontAdapter)font;
-        var skFont = fontAdapter.Font;
+        var skFont = fontAdapter.RenderFont;
 
         // Measure character by character to find how many fit
         for (int i = 1; i <= str.Length; i++)
