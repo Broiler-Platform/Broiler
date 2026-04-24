@@ -1173,6 +1173,9 @@ internal sealed class CssParser
     {
         // CSS2.1 §4.3.2: Non-zero lengths require a unit except where the
         // property grammar explicitly allows unitless numbers (e.g. line-height).
+        // Declarations are normalized before this switch, so both the
+        // canonical CSS spelling and the internal hyphenless form may
+        // reach this helper.
         bool allowsUnitlessNonZero = propName.Equals("lineheight", StringComparison.OrdinalIgnoreCase)
             || propName.Equals("line-height", StringComparison.OrdinalIgnoreCase);
         if (!allowsUnitlessNonZero
@@ -1846,7 +1849,8 @@ internal sealed class CssParser
                 // [class~=value] → .value (if not already present)
                 if (inner.StartsWith("class~=", StringComparison.OrdinalIgnoreCase))
                 {
-                    var val = DecodeCssEscapes(inner.Substring(7)).Trim('"', '\'', ' ');
+                    const int classIncludesPrefixLength = 7; // "class~=".Length
+                    var val = DecodeCssEscapes(inner.Substring(classIncludesPrefixLength)).Trim('"', '\'', ' ');
                     if (!string.IsNullOrEmpty(val) && addedClasses.Add(val))
                         sb.Append('.').Append(val);
                 }
