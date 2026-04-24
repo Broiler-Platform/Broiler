@@ -605,6 +605,57 @@ public class Acid2ImageComparisonTests
             "(class='second two') — it should remain red.");
     }
 
+    [Fact]
+    public void CssCompoundAttributeSelector_WithTagPrefixedClasses_MatchesAcid2EarsSelectors()
+    {
+        const string html = """
+            <html><head><style>
+                html { font: 12px sans-serif; margin: 0; padding: 0; }
+                body { margin: 0; padding: 0; }
+                [class~=one].first.one {
+                    position: absolute;
+                    top: 0;
+                    margin: 36px 0 0 60px;
+                    padding: 0;
+                    border: black 2em;
+                    border-style: none solid;
+                }
+                [class~=one][class~=first] [class=second\ two][class="second two"] {
+                    float: right;
+                    width: 48px;
+                    height: 12px;
+                    background: yellow;
+                    margin: 0;
+                    padding: 0;
+                }
+            </style></head>
+            <body>
+                <div style='position:relative; height:160px'>
+                    <blockquote class='first one'><address class='second two'></address></blockquote>
+                </div>
+            </body></html>
+            """;
+
+        using var bitmap = HtmlRender.RenderToImage(html, 220, 160);
+
+        int blackPixels = 0;
+        int yellowPixels = 0;
+        for (int y = 70; y < 90; y++)
+        for (int x = 80; x < 210; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Red < 40 && px.Green < 40 && px.Blue < 40)
+                blackPixels++;
+            if (px.Red > 200 && px.Green > 200 && px.Blue < 80)
+                yellowPixels++;
+        }
+
+        Assert.True(blackPixels > 150,
+            $"Expected visible black side-border pixels from the Acid2 ears selector pair, found {blackPixels}.");
+        Assert.True(yellowPixels > 150,
+            $"Expected visible yellow floated-child pixels from the Acid2 ears selector pair, found {yellowPixels}.");
+    }
+
     /// <summary>
     /// §2.14 — Margin collapsing with <c>clear</c>: the Acid2 smile
     /// region (below the eyes) should contain visible content rendered
@@ -1207,6 +1258,39 @@ public class Acid2ImageComparisonTests
             $"Expected visible right border pixels on the abs-pos shrink-to-fit box, found {rightBlack}.");
         Assert.True(yellowMiddle > 100,
             $"Expected the floated child to remain visible between the borders, found {yellowMiddle} yellow pixels.");
+    }
+
+    [Fact]
+    public void CssAutoHeightParent_DoesNotAbsorbLastChildBottomMargin_WhenSiblingFollows()
+    {
+        const string html = """
+            <html><body style='margin:0; padding:0'>
+                <div style='width:120px; background:#ffff00;'>
+                    <div style='width:120px; height:12px; margin-bottom:12px; background:#0000ff;'></div>
+                </div>
+                <div style='width:120px; height:12px; background:#00ff00;'></div>
+            </body></html>
+            """;
+
+        using var bitmap = HtmlRender.RenderToImage(html, 160, 80);
+
+        int whiteAtY18 = 0;
+        int greenAtY24 = 0;
+        for (int x = 0; x < 120; x++)
+        {
+            var y18 = bitmap.GetPixel(x, 18);
+            if (y18.Red > 220 && y18.Green > 220 && y18.Blue > 220)
+                whiteAtY18++;
+
+            var y24 = bitmap.GetPixel(x, 24);
+            if (y24.Green > 200 && y24.Red < 50 && y24.Blue < 50)
+                greenAtY24++;
+        }
+
+        Assert.True(whiteAtY18 > 80,
+            $"Expected the collapsed gap to remain outside the auto-height parent, found {whiteAtY18} white pixels at y=18.");
+        Assert.True(greenAtY24 > 80,
+            $"Expected the following sibling to start after the collapsed gap, found {greenAtY24} green pixels at y=24.");
     }
 
     // ──────── P1: §2.10 — Paint order verification ────────

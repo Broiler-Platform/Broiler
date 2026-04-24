@@ -2712,10 +2712,26 @@ internal class CssBox : CssBoxProperties, IDisposable
     {
         double margin = 0;
 
-        // CSS2.1 §8.3.1: Margins collapse through the parent only when
-        // the parent has no bottom padding and no bottom border.
-        bool collapseThrough = Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
-            && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1;
+        // CSS2.1 §8.3.1: A last in-flow child's bottom margin collapses
+        // with its parent when the parent has auto height and no bottom
+        // padding/border. This affects the parent's own height even when
+        // the parent is not the last sibling in its containing block.
+        bool hasAutoHeight = string.IsNullOrEmpty(Height)
+            || Height == CssConstants.Auto
+            || HeightPercentageResolvesToAuto();
+        bool preventsBottomMarginCollapse = Float != CssConstants.None
+            || Display == CssConstants.InlineBlock
+            || Display == CssConstants.TableCell
+            || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+            || Position == CssConstants.Absolute
+            || Position == CssConstants.Fixed
+            || (Overflow != null && Overflow != CssConstants.Visible)
+            || (AlignContent != null && AlignContent != "normal");
+        bool collapseThrough = Boxes.Count > 0
+            && hasAutoHeight
+            && !preventsBottomMarginCollapse
+            && ActualPaddingBottom < 0.1
+            && ActualBorderBottomWidth < 0.1;
         // NOTE: When collapseThrough is true, the collapsed margin is NOT
         // included in this box's height — it is external spacing handled
         // by the parent.  The `margin` variable stays 0.

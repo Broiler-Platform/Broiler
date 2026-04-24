@@ -570,6 +570,7 @@ internal sealed class DomParser
         if (box.HtmlTag.HasAttribute("class"))
         {
             var className = box.HtmlTag.TryGetAttribute("class");
+            var classWords = (" " + className + " ").ToLowerInvariant();
 
             // Single class match: ".foo" matches class="foo"
             if (selectorClass.Equals("." + className, StringComparison.InvariantCultureIgnoreCase)
@@ -580,7 +581,6 @@ internal sealed class DomParser
             if (selectorClass.StartsWith(".") && selectorClass.IndexOf('.', 1) > 0)
             {
                 var parts = selectorClass.Split('.');
-                var classWords = (" " + className + " ").ToLower();
                 bool allMatch = true;
                 for (int i = 1; i < parts.Length; i++) // skip first empty part from leading "."
                 {
@@ -592,6 +592,34 @@ internal sealed class DomParser
                     }
                 }
                 if (allMatch) return true;
+            }
+
+            // Tag-prefixed compound class match: "blockquote.foo.bar" matches
+            // a <blockquote class="foo bar"> element. Acid2 relies on this
+            // for selectors like [class~=one].first.one after attribute
+            // selectors are normalized into compound class selectors.
+            int firstDot = selectorClass.IndexOf('.');
+            if (firstDot > 0)
+            {
+                var tagPrefix = selectorClass.Substring(0, firstDot);
+                if (box.HtmlTag.Name.Equals(tagPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = selectorClass.Substring(firstDot + 1).Split('.');
+                    bool allMatch = true;
+                    foreach (var part in parts)
+                    {
+                        if (string.IsNullOrEmpty(part))
+                            continue;
+                        if (!classWords.Contains(" " + part.ToLowerInvariant() + " "))
+                        {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+
+                    if (allMatch)
+                        return true;
+                }
             }
         }
 

@@ -442,15 +442,6 @@ internal sealed class CssParser
         if (className.StartsWith(@"\.", StringComparison.Ordinal))
             return null;
 
-        // Decode CSS Unicode escapes (e.g. \212A → U+212A) before
-        // lowercasing so that non-ASCII characters are preserved.
-        className = DecodeCssEscapes(className);
-
-        // CSS Selectors §3: type selectors in HTML are ASCII
-        // case-insensitive.  Use ASCII-only lowering to avoid
-        // Unicode case-folding (e.g. U+212A Kelvin sign → 'k').
-        className = AsciiToLower(className);
-
         // Strip attribute selectors: convert [class~=value] to .value,
         // and extract other attribute selectors as conditions.  This enables
         // CSS2.1 §5.8.1 attribute selectors used in the Acid2 test.
@@ -458,6 +449,17 @@ internal sealed class CssParser
         className = StripAttributeSelectors(className, out attrConditions);
         if (string.IsNullOrEmpty(className))
             return null;
+
+        // Decode CSS Unicode escapes (e.g. \212A → U+212A) only after
+        // attribute selectors have been stripped.  Doing this earlier turns
+        // selectors like [class=second\ two] into a bare unescaped space
+        // and makes the rule look invalid before we can normalize it.
+        className = DecodeCssEscapes(className);
+
+        // CSS Selectors §3: type selectors in HTML are ASCII
+        // case-insensitive.  Use ASCII-only lowering to avoid
+        // Unicode case-folding (e.g. U+212A Kelvin sign → 'k').
+        className = AsciiToLower(className);
 
         // CSS2.1 §5.11: Pre-process structural pseudo-classes (:first-child,
         // :last-child) that may appear anywhere in the selector chain.
@@ -1844,7 +1846,7 @@ internal sealed class CssParser
                 // [class~=value] → .value (if not already present)
                 if (inner.StartsWith("class~=", StringComparison.OrdinalIgnoreCase))
                 {
-                    var val = inner.Substring(7).Trim('"', '\'', ' ');
+                    var val = DecodeCssEscapes(inner.Substring(7)).Trim('"', '\'', ' ');
                     if (!string.IsNullOrEmpty(val) && addedClasses.Add(val))
                         sb.Append('.').Append(val);
                 }
@@ -1852,9 +1854,10 @@ internal sealed class CssParser
                 else if (inner.StartsWith("class=", StringComparison.OrdinalIgnoreCase))
                 {
                     var raw = inner.Substring(6);
+                    var decodedRaw = DecodeCssEscapes(raw);
                     // CSS2.1 §4.1.3: backslash-escaped characters like "second\ two"
                     // are valid IDENTs. Normalize by removing backslashes before spaces.
-                    var val = raw.Replace("\\ ", " ").Trim('"', '\'', ' ');
+                    var val = decodedRaw.Replace("\\ ", " ").Trim('"', '\'', ' ');
                     bool hasBackslashEscape = raw.Contains('\\');
                     bool isQuoted = raw.Contains('"') || raw.Contains('\'');
                     // Bare unquoted/unescaped space → invalid selector per CSS2.1 grammar
@@ -1948,21 +1951,23 @@ internal sealed class CssParser
                 i++;
             var compound = selector.Substring(start, i - start);
 
-            // Deduplicate dot-separated parts
-            var parts = compound.Split('.');
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var deduped = new StringBuilder();
-            for (int p = 0; p < parts.Length; p++)
+            int firstDot = compound.IndexOf('.');
+            if (firstDot < 0)
             {
-                if (p == 0 && string.IsNullOrEmpty(parts[p]))
-                {
-                    // Leading dot produces empty first part
-                    continue;
-                }
-                if (seen.Add(parts[p]))
-                {
-                    deduped.Append('.').Append(parts[p]);
-                }
+                sb.Append(compound);
+                continue;
+            }
+
+            // Preserve any non-class prefix (e.g. "blockquote" in
+            // "blockquote.one.first.one") while deduplicating the class parts.
+            var prefix = compound[..firstDot];
+            var parts = compound[(firstDot + 1)..].Split('.', StringSplitOptions.RemoveEmptyEntries);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var deduped = new StringBuilder(prefix);
+            foreach (var part in parts)
+            {
+                if (seen.Add(part))
+                    deduped.Append('.').Append(part);
             }
             sb.Append(deduped);
         }
