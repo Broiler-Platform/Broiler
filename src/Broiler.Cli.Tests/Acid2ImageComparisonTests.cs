@@ -1293,6 +1293,39 @@ public class Acid2ImageComparisonTests
             $"Expected the following sibling to start after the collapsed gap, found {greenAtY24} green pixels at y=24.");
     }
 
+    [Fact]
+    public void CssEmptyNestedDisplayTable_PaintsBackgroundInsideAnonymousOuterTableCell()
+    {
+        const string html = """
+            <html><body style='margin:0'>
+                <ul style='display:table; padding:0; margin:0; background:red'>
+                    <li style='display:table-cell; width:12px; height:12px; background:black'></li>
+                    <li style='display:table; width:12px; height:12px; background:black'></li>
+                    <li style='display:table-cell; width:12px; height:12px; background:black'></li>
+                </ul>
+            </body></html>
+            """;
+
+        using var bitmap = HtmlRender.RenderToImage(html, 80, 40);
+
+        int blackMiddle = 0;
+        int redMiddle = 0;
+        for (int y = 0; y < 12; y++)
+        for (int x = 12; x < 24; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Red < 40 && px.Green < 40 && px.Blue < 40)
+                blackMiddle++;
+            if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+                redMiddle++;
+        }
+
+        Assert.True(blackMiddle > 100,
+            $"Expected the empty nested display:table cell to paint its own black background, found {blackMiddle} black pixels.");
+        Assert.True(redMiddle < 10,
+            $"Expected the outer red table background to stay hidden behind the nested table cell, found {redMiddle} red pixels.");
+    }
+
     // ──────── P1: §2.10 — Paint order verification ────────
 
     /// <summary>

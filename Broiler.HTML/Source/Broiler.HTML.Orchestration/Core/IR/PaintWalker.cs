@@ -1380,7 +1380,17 @@ internal static class PaintWalker
         if (blocks != null)
         {
             foreach (var child in blocks)
-                PaintFragmentForegroundPhase(child, items, propagatedFrom, viewport, bgClipTextColor);
+            {
+                // Tables are excluded from PaintChildrenBackgroundPhase because
+                // they paint via the table-specific six-layer model. When the
+                // parent is already in foreground-only mode, a direct table
+                // child still needs a full PaintFragment call so its layer-1
+                // background is not skipped entirely.
+                if (skipBlockBackgrounds && child.Style.Display is "table" or "inline-table")
+                    PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
+                else
+                    PaintFragmentForegroundPhase(child, items, propagatedFrom, viewport, bgClipTextColor);
+            }
         }
         if (inlineLevel != null)
         {

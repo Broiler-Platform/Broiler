@@ -6,8 +6,8 @@ namespace Broiler.Cli.Tests;
 
 public class Acid1RenderingFixTests
 {
-    // The regression fix restores the Acid1 footer from the pre-fix 392px / 52px
-    // layout back to at least a five-line wrap, which yields a 405px full-page render.
+    // The layout itself preserves the five-line footer wrap at 405px; the
+    // full-page bitmap additionally includes the trailing 15px body margin.
     private const float MinExpectedLayoutHeight = 405f;
     private const float MinExpectedFooterHeight = 65f;
 
@@ -40,5 +40,19 @@ public class Acid1RenderingFixTests
             $"Expected Acid1 full-page layout height to preserve the footer wrap (got {container.ActualSize.Height}).");
         Assert.True(footerRect.Value.Height >= MinExpectedFooterHeight,
             $"Expected Acid1 footer text to wrap to at least five lines (got {footerRect.Value.Height}px).");
+    }
+
+    [Fact]
+    public void Acid1_FullPage_AutoSized_Render_Includes_Trailing_Body_Margin()
+    {
+        var htmlPath = Path.Combine(RepoRoot, "acid", "acid1", "acid1.html");
+        Assert.True(File.Exists(htmlPath), $"Acid1 fixture not found at {htmlPath}");
+
+        var html = File.ReadAllText(htmlPath);
+
+        using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: 1024, maxHeight: 768);
+
+        Assert.Equal(520, bitmap.Width);
+        Assert.Equal(420, bitmap.Height);
     }
 }

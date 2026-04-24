@@ -6,6 +6,7 @@ using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Core.Core;
 using Broiler.HTML.Orchestration.Core;
 using Broiler.HTML.Image.Adapters;
+using Broiler.HTML.Dom.Core.Dom;
 
 namespace Broiler.HTML.Image;
 
@@ -83,6 +84,7 @@ public static class HtmlRender
         var minSize = new SizeF(0, 0);
         var maxSize = new SizeF(maxWidth, maxHeight);
         var finalSize = MeasureHtml(container, minSize, maxSize);
+        finalSize = ExpandAutoSizedHeightForTrailingBodyMargin(container, finalSize, maxHeight);
 
         // Ensure minimum dimensions
         int w = Math.Max(1, (int)Math.Ceiling(finalSize.Width));
@@ -106,6 +108,41 @@ public static class HtmlRender
         container.PerformPaint(canvas, clip);
 
         return bitmap;
+    }
+
+    private static SizeF ExpandAutoSizedHeightForTrailingBodyMargin(HtmlContainer container, SizeF measuredSize, int maxHeight)
+    {
+        var root = container.HtmlContainerInt.Root;
+        var body = FindFirstTag(root, "body");
+        if (body == null)
+            return measuredSize;
+
+        float requiredHeight = (float)(body.ActualBottom + body.ActualMarginBottom - root.Location.Y);
+        if (requiredHeight <= measuredSize.Height + 0.01f)
+            return measuredSize;
+
+        if (maxHeight > 0)
+            requiredHeight = Math.Min(requiredHeight, maxHeight);
+
+        return new SizeF(measuredSize.Width, requiredHeight);
+    }
+
+    private static CssBox? FindFirstTag(CssBox? box, string tagName)
+    {
+        if (box == null)
+            return null;
+
+        if (box.HtmlTag != null && box.HtmlTag.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase))
+            return box;
+
+        foreach (var child in box.Boxes)
+        {
+            var found = FindFirstTag(child, tagName);
+            if (found != null)
+                return found;
+        }
+
+        return null;
     }
 
     public static byte[] RenderToPng(string html, int width, int height,
