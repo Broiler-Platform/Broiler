@@ -2875,6 +2875,9 @@ public sealed partial class DomBridge
         if (isRoot)
             return GetViewportReferenceLength(element, vertical: false);
 
+        if (HasNoOffsetBoxMetrics(element))
+            return 0;
+
         var resolved = ResolvePositionAreaForElement(element);
         if (resolved != null)
             return resolved.Value.width;
@@ -2892,6 +2895,9 @@ public sealed partial class DomBridge
         if (isRoot)
             return GetViewportReferenceLength(element, vertical: true);
 
+        if (HasNoOffsetBoxMetrics(element))
+            return 0;
+
         var resolved = ResolvePositionAreaForElement(element);
         if (resolved != null)
             return resolved.Value.height;
@@ -2903,6 +2909,9 @@ public sealed partial class DomBridge
 
         return ResolveBorderBoxExtent(element, vertical: true);
     }
+
+    private static bool HasNoOffsetBoxMetrics(DomElement element) =>
+        string.Equals(element.TagName, "map", StringComparison.OrdinalIgnoreCase);
 
     private double ResolveContentBoxExtent(DomElement element, bool vertical)
     {
