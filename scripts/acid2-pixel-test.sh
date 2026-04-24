@@ -94,7 +94,12 @@ if [[ "$SKIP_REFERENCE" == "true" ]]; then
 else
     echo "--- Step 2: Rendering Acid2 with Chromium (Playwright) ---"
 
-    if command -v npx &>/dev/null; then
+    if command -v npx &>/dev/null && command -v npm &>/dev/null; then
+        PLAYWRIGHT_DIR="${TMPDIR:-/tmp}/broiler-playwright"
+        if [[ ! -d "$PLAYWRIGHT_DIR/node_modules/playwright" ]]; then
+            npm install --prefix "$PLAYWRIGHT_DIR" --no-save playwright >/dev/null
+        fi
+
         PLAYWRIGHT_SCRIPT=$(mktemp "${TMPDIR:-/tmp}/acid2-playwright-XXXXXX.js")
         cat > "$PLAYWRIGHT_SCRIPT" << 'JSEOF'
 const { chromium } = require('playwright');
@@ -113,8 +118,9 @@ const path = require('path');
     console.log('Reference render saved to: ' + outputPath);
 })();
 JSEOF
-        npx playwright install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
-        node "$PLAYWRIGHT_SCRIPT" "$ACID2_DIR/acid2.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
+        "$PLAYWRIGHT_DIR/node_modules/.bin/playwright" install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
+        NODE_PATH="$PLAYWRIGHT_DIR/node_modules" \
+            node "$PLAYWRIGHT_SCRIPT" "$ACID2_DIR/acid2.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
             echo "  ✓ Chromium reference saved to: $REFERENCE_OUTPUT"
             rm -f "$PLAYWRIGHT_SCRIPT"
         } || {
@@ -126,7 +132,7 @@ JSEOF
             fi
         }
     else
-        echo "  ⚠ Node.js/npx not found — skipping Chromium rendering"
+        echo "  ⚠ Node.js/npm/npx not found — skipping Chromium rendering"
         if [[ -f "$REFERENCE_OUTPUT" ]]; then
             echo "  Using existing reference: $REFERENCE_OUTPUT"
         else

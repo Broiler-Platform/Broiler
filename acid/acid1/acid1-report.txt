@@ -1,0 +1,33 @@
+======================================================================
+Acid1 Pixel Comparison Report
+======================================================================
+
+Broiler image:    /home/runner/work/Broiler/Broiler/acid/acid1/acid1.png
+Reference image:  /home/runner/work/Broiler/Broiler/acid/acid1/acid1-reference.png
+Viewport:         520×420
+Color tolerance:  5 (per-channel)
+
+--- Overall Pixel Statistics ---
+Full-image match:      164,803 /    218,400  (75.46%)
+Content-area match:    124,781 /    178,378  (69.95%)
+Mismatch bounds:    x=15-504, y=15-419
+
+--- Per-Region Content-Area Match ---
+Region                  Match    Total      Pct
+--------------------------------------------------
+toggle_column          25,436   27,603   92.15%
+upper_layout           41,835   56,438   74.13%
+form_controls          13,722   16,774   81.81%
+lower_layout           31,844   42,051   75.73%
+footer_text               116   18,148    0.64%
+
+--- Notes ---
+Acid1 mismatches are expected to cluster around native radio controls
+and text anti-aliasing when Broiler is compared against Chromium.
+
+--- Diff Image Colour Key ---
+  Green  — pixel match (per-channel diff ≤ 5)
+  Red    — content-area mismatch
+  Yellow — background-area mismatch
+
+======================================================================
