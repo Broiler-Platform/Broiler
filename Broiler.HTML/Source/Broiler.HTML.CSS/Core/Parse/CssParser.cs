@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -432,6 +433,14 @@ internal sealed class CssParser
 
     private CssBlock ParseCssBlockImp(string className, string blockSource)
     {
+        className = className.Trim();
+
+        // CSS2.1 §4.1.7 / §4.1.3: An escaped leading dot like "\.parser"
+        // is not a class selector and must not be normalized into ".parser".
+        // Acid2 relies on this rule being ignored entirely.
+        if (className.StartsWith(@"\.", StringComparison.Ordinal))
+            return null;
+
         // Decode CSS Unicode escapes (e.g. \212A → U+212A) before
         // lowercasing so that non-ASCII characters are preserved.
         className = DecodeCssEscapes(className);
@@ -1159,6 +1168,15 @@ internal sealed class CssParser
 
     private static void ParseLengthProperty(string propName, string propValue, Dictionary<string, string> properties)
     {
+        // CSS2.1 §4.3.2: Non-zero lengths require a unit except where the
+        // property grammar explicitly allows unitless numbers (e.g. line-height).
+        if (!string.Equals(propName, "lineheight", StringComparison.OrdinalIgnoreCase)
+            && double.TryParse(propValue, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out var unitlessNumber)
+            && Math.Abs(unitlessNumber) > double.Epsilon)
+        {
+            return;
+        }
+
         if (CssValueParser.IsValidLength(propValue) ||
             propValue.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase) ||
             propValue.Equals(CssConstants.Inherit, StringComparison.OrdinalIgnoreCase) ||

@@ -52,9 +52,10 @@ internal static class CssDefaults
         input            { min-width: 173px; height: 1.2em; }
         input[type=""hidden""] { display: none; min-width: 0; height: auto;
                           border: none; padding: 0; }
-        input[type=""checkbox""],
-        input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
+        input[type=""checkbox""] { min-width: 13px; width: 13px; height: 13px;
                           padding: 0; }
+        input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
+                          padding: 0; border-radius: 50%; }
         input[type=""range""] { min-width: 0; height: auto; padding: 0; border: none; }
         input[type=""submit""],
         input[type=""button""],

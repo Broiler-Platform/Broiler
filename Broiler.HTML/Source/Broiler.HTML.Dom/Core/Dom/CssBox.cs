@@ -2757,6 +2757,14 @@ internal class CssBox : CssBoxProperties, IDisposable
             // calculation.  Undo the relative offset so the parent
             // measures the child's normal-flow bottom.
             double childBottom = child.ActualBottom;
+            bool childHasExplicitHeight = child.Height != CssConstants.Auto && !string.IsNullOrEmpty(child.Height);
+            if (childHasExplicitHeight && !child.HeightPercentageResolvesToAuto())
+            {
+                double explicitBottom = child.Location.Y + child.ActualHeight
+                    + child.ActualPaddingTop + child.ActualPaddingBottom
+                    + child.ActualBorderTopWidth + child.ActualBorderBottomWidth;
+                childBottom = Math.Max(childBottom, explicitBottom);
+            }
             if (child.Position == CssConstants.Relative)
                 childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
             maxChildBottom = Math.Max(maxChildBottom, childBottom);

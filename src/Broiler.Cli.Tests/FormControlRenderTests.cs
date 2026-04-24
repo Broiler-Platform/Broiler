@@ -107,6 +107,30 @@ public class FormControlRenderTests
             "Textarea element should render visible pixels (border + text)");
     }
 
+    [Fact]
+    public void Radio_Input_Defaults_To_Circular_Chrome()
+    {
+        var html = @"<html><body style='margin:0; padding:10px; background:white'>
+            <input type='radio'>
+        </body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 60, 60);
+
+        var topMid = bmp.GetPixel(16, 10);
+        var leftMid = bmp.GetPixel(10, 16);
+        var topLeftCorner = bmp.GetPixel(10, 10);
+        var bottomRightCorner = bmp.GetPixel(22, 22);
+
+        Assert.True(topMid.Red < 230 || topMid.Green < 230 || topMid.Blue < 230,
+            "Expected a visible radio border at the top midpoint.");
+        Assert.True(leftMid.Red < 230 || leftMid.Green < 230 || leftMid.Blue < 230,
+            "Expected a visible radio border at the left midpoint.");
+        Assert.True(topLeftCorner.Red > 220 && topLeftCorner.Green > 220 && topLeftCorner.Blue > 220,
+            "Expected the top-left corner of the radio box to remain white for circular chrome.");
+        Assert.True(bottomRightCorner.Red > 220 && bottomRightCorner.Green > 220 && bottomRightCorner.Blue > 220,
+            "Expected the bottom-right corner of the radio box to remain white for circular chrome.");
+    }
+
     /// <summary>
     /// Regression: HtmlPostProcessor.Process must NOT strip form elements.
     /// Previously, StripHiddenTestArtifacts removed all &lt;form&gt; elements

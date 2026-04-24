@@ -1027,6 +1027,44 @@ public class Acid2ImageComparisonTests
     }
 
     [Fact]
+    public void CssErrorRecovery_InvalidSelectorAndUnitlessWidth_DoNotExpandAcid2ParserStrip()
+    {
+        const string html = @"
+            <html><head><style>
+                html { font: 12px sans-serif; }
+                .parser-container div { color: maroon; border: solid; color: orange; }
+                div.parser-container * { border-color: black; }
+                * div.parser { border-width: 0 2em; }
+                .parser { margin: 0 5em 1em; padding: 0 1em; width: 2em; height: 1em; error: \}; background: yellow; }
+                * html .parser { background: gray; }
+                \\.parser { padding: 2em; }
+                .parser { m\\argin: 2em; };
+                .parser { height: 3em; }
+                .parser { width: 200; }
+                .parser { border: 5em solid red ! error; }
+                .parser { background: red pink; }
+            </style></head>
+            <body style='margin:0; padding:0'>
+                <div class='parser-container'><div id='parser' class='parser'></div></div>
+            </body></html>";
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html);
+        container.MaxSize = new SizeF(500, 500);
+
+        using var layoutBmp = new SKBitmap(1, 1);
+        using var layoutCanvas = new SKCanvas(layoutBmp);
+        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, 500, 500));
+
+        var parserRect = container.GetElementRectangle("parser");
+        Assert.True(parserRect.HasValue, "Expected to resolve the parser strip element.");
+        Assert.InRange(parserRect.Value.Width, 90, 100);
+        Assert.InRange(parserRect.Value.Height, 10, 14);
+    }
+
+    [Fact]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
         var greenImagePath = CreateSolidTempPng(SKColors.Lime);
@@ -1129,6 +1167,46 @@ public class Acid2ImageComparisonTests
             $"Found {blueRight} blue pixels in right region (x≥200). " +
             "Shrink-to-fit should prevent the box from being as wide " +
             "as the containing block.");
+    }
+
+    [Fact]
+    public void CssAbsolutePositionShrinkToFit_WithFloatedChild_PaintsParentSideBorders()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='position:relative; width:400px; height:200px;'>
+                    <div style='position:absolute; top:0; left:0;
+                                border-left:24px solid black;
+                                border-right:24px solid black;'>
+                        <div style='float:right; width:48px; height:12px;
+                                    background:#ffff00;'></div>
+                    </div>
+                </div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        int leftBlack = 0;
+        int rightBlack = 0;
+        int yellowMiddle = 0;
+        for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 96; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            bool isBlack = px.Red < 40 && px.Green < 40 && px.Blue < 40;
+            bool isYellow = px.Red > 200 && px.Green > 200 && px.Blue < 80;
+
+            if (isBlack && x < 24) leftBlack++;
+            if (isBlack && x >= 72) rightBlack++;
+            if (isYellow && x >= 24 && x < 72) yellowMiddle++;
+        }
+
+        Assert.True(leftBlack > 50,
+            $"Expected visible left border pixels on the abs-pos shrink-to-fit box, found {leftBlack}.");
+        Assert.True(rightBlack > 50,
+            $"Expected visible right border pixels on the abs-pos shrink-to-fit box, found {rightBlack}.");
+        Assert.True(yellowMiddle > 100,
+            $"Expected the floated child to remain visible between the borders, found {yellowMiddle} yellow pixels.");
     }
 
     // ──────── P1: §2.10 — Paint order verification ────────
