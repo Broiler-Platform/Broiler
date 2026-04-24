@@ -117,7 +117,10 @@ public static class HtmlRender
         if (body == null)
             return measuredSize;
 
-        float requiredHeight = (float)(body.ActualBottom + body.ActualMarginBottom - root.Location.Y);
+        // Auto-sized bitmaps are rendered in document coordinates from y=0,
+        // so compare against the body's trailing margin edge directly instead
+        // of subtracting any root box offset.
+        float requiredHeight = (float)(body.ActualBottom + body.ActualMarginBottom);
         if (requiredHeight <= measuredSize.Height + 0.01f)
             return measuredSize;
 
