@@ -14,7 +14,7 @@
 #     1. Serve Acid3 over temporary localhost HTTP (required for absolute URL tests)
 #     2. Render Acid3 using broiler.cli → acid3.png
 #     3. (Optional) Render using Chromium/Playwright → acid3-reference.png
-#     3. Compare pixel-by-pixel → acid3-diff.png + acid3-report.txt
+#     4. Compare pixel-by-pixel → acid3-diff.png + acid3-report.txt
 
 set -euo pipefail
 
@@ -79,16 +79,24 @@ python3 -m http.server "$ACID3_SERVER_PORT" \
     >"$ACID3_SERVER_LOG" 2>&1 &
 ACID3_SERVER_PID=$!
 
+SERVER_READY=false
 for _ in {1..50}; do
     if python3 - <<PY
 import urllib.request
 urllib.request.urlopen("http://127.0.0.1:$ACID3_SERVER_PORT/acid3.html", timeout=1)
 PY
     then
+        SERVER_READY=true
         break
     fi
     sleep 0.2
 done
+
+if [[ "$SERVER_READY" != "true" ]]; then
+    echo "  ✗ Acid3 localhost HTTP server failed to start" >&2
+    echo "  Server log: $ACID3_SERVER_LOG" >&2
+    exit 1
+fi
 
 ACID3_URL="http://127.0.0.1:$ACID3_SERVER_PORT/acid3.html"
 

@@ -74,7 +74,10 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         var fontAdapter = (FontAdapter)font;
         var skFont = fontAdapter.RenderFont;
         var width = skFont.MeasureText(str);
-        return new SizeF(width, skFont.Spacing);
+        // Use the render font's line spacing so the measured height stays in
+        // the same CSS-pixel coordinate space as glyph rendering.
+        var lineSpacing = skFont.Spacing;
+        return new SizeF(width, lineSpacing);
     }
 
     public override void MeasureString(string str, RFont font, double maxWidth, out int charFit, out double charFitWidth)
