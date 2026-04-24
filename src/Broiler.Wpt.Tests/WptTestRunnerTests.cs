@@ -6755,6 +6755,84 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithIsWrappedSiblingRelations_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+    #target1:has(:is(.item + .item + .item)) { background: red; }
+    #target2:has(:is(.invalid .item, .item + .item + .item)) { background: red; }
+    #target3:has(:is(.item:nth-child(3))) { background: red; }
+    #target4:has(:is(.item:nth-last-child(3))) { background: red; }
+    #target5:has(:is(:where(:is(.item + .item + .item) > .child) + .child + .child)) { background: red; }
+  </style>
+</head>
+<body onload="item1.remove(); item2.remove(); item3.remove(); item4.remove(); item5.remove();">
+  <div id="test-container">
+    <div id="target1">
+      <div class="item" id="item1"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target2">
+      <div class="item" id="item2"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target3">
+      <div class="item" id="item3"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target4">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item" id="item4"></div>
+    </div>
+    <div id="target5">
+      <div class="item"></div>
+      <div class="item" id="item5"></div>
+      <div class="item">
+        <span class="child"></span>
+        <span class="child"></span>
+        <span class="child"></span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+  </style>
+</head>
+<body>
+  <div id="test-container">
+    <div id="target1"></div>
+    <div id="target2"></div>
+    <div id="target3"></div>
+    <div id="target4"></div>
+    <div id="target5"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-is-wrapped-siblings", 120, 150);
+        Assert.True(result.Passed,
+            $":has(:is(...)) sibling/nth invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.

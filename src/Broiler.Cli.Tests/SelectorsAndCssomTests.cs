@@ -456,6 +456,84 @@ document.body.setAttribute('data-after', matches('#first:not(:has(~ .item > :nth
         Assert.Contains("data-after=\"true\"", result);
     }
 
+    [Fact]
+    public void Has_IsAndWhereWrappedSelectors_Invalidation_Tracks_Removals()
+    {
+        var html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  #target1:has(:is(.item + .item + .item)) { color: red; }
+  #target2:has(:is(.invalid .item, .item + .item + .item)) { color: red; }
+  #target3:has(:is(.item:nth-child(3))) { color: red; }
+  #target4:has(:is(.item:nth-last-child(3))) { color: red; }
+  #target5:has(:is(:where(:is(.item + .item + .item) > .child) + .child + .child)) { color: red; }
+</style>
+</head>
+<body>
+<div id="target1">
+  <div class="item" id="item1"></div>
+  <div class="item"></div>
+  <div class="item"></div>
+</div>
+<div id="target2">
+  <div class="item" id="item2"></div>
+  <div class="item"></div>
+  <div class="item"></div>
+</div>
+<div id="target3">
+  <div class="item" id="item3"></div>
+  <div class="item"></div>
+  <div class="item"></div>
+</div>
+<div id="target4">
+  <div class="item"></div>
+  <div class="item"></div>
+  <div class="item" id="item4"></div>
+</div>
+<div id="target5">
+  <div class="item"></div>
+  <div class="item" id="item5"></div>
+  <div class="item">
+    <span class="child"></span>
+    <span class="child"></span>
+    <span class="child"></span>
+  </div>
+</div>
+<script>
+function matches(selector) {
+  return document.querySelector(selector) !== null;
+}
+document.body.setAttribute('data-before', [
+  matches('#target1:has(:is(.item + .item + .item))'),
+  matches('#target2:has(:is(.invalid .item, .item + .item + .item))'),
+  matches('#target3:has(:is(.item:nth-child(3)))'),
+  matches('#target4:has(:is(.item:nth-last-child(3)))'),
+  matches('#target5:has(:is(:where(:is(.item + .item + .item) > .child) + .child + .child))')
+].join(';'));
+document.getElementById('item1').remove();
+document.getElementById('item2').remove();
+document.getElementById('item3').remove();
+document.getElementById('item4').remove();
+document.getElementById('item5').remove();
+document.body.setAttribute('data-after', [
+  matches('#target1:has(:is(.item + .item + .item))'),
+  matches('#target2:has(:is(.invalid .item, .item + .item + .item))'),
+  matches('#target3:has(:is(.item:nth-child(3)))'),
+  matches('#target4:has(:is(.item:nth-last-child(3)))'),
+  matches('#target5:has(:is(:where(:is(.item + .item + .item) > .child) + .child + .child))')
+].join(';'));
+</script>
+</body>
+</html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("data-before=\"true;true;true;true;true\"", result);
+        Assert.Contains("data-after=\"false;false;false;false;false\"", result);
+    }
+
     // ─────────── Pseudo-classes: :enabled, :disabled, :checked ────────────
 
     [Fact]

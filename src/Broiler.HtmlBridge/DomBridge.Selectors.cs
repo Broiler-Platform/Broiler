@@ -434,7 +434,11 @@ public sealed partial class DomBridge
                     if (el.Parent != null && !el.Parent.TagName.StartsWith("#", StringComparison.Ordinal)) return false;
                     break;
                 case "not":
-                    if (arg != null && MatchesCompound(el, arg)) return false;
+                    if (arg != null && MatchesSelectorList(el, arg)) return false;
+                    break;
+                case "is":
+                case "where":
+                    if (arg == null || !MatchesSelectorList(el, arg)) return false;
                     break;
                 case "has":
                     if (arg == null || !MatchesHas(el, arg)) return false;
