@@ -1714,7 +1714,8 @@ public sealed partial class DomBridge
         if (!computed.ContainsKey("font-variant")) computed["font-variant"] = fontVariant;
         if (!computed.ContainsKey("font-weight")) computed["font-weight"] = fontWeight;
         if (!computed.ContainsKey("font-size")) computed["font-size"] = fontSize;
-        if (!computed.ContainsKey("line-height")) computed["line-height"] = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
+        var resolvedLineHeight = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
+        if (!computed.ContainsKey("line-height")) computed["line-height"] = resolvedLineHeight;
         if (!computed.ContainsKey("font-family")) computed["font-family"] = fontFamily;
     }
 
