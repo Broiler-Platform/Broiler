@@ -22,6 +22,8 @@ public class AcidRenderComparisonInfrastructureTests
         var script = File.ReadAllText(scriptPath);
         Assert.Contains("fullPage: false", script);
         Assert.DoesNotContain("fullPage: true", script);
+        Assert.Contains("python3 -m http.server", script);
+        Assert.Contains("http://127.0.0.1:", script);
     }
 
     [Fact]

@@ -1484,6 +1484,33 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Acid3_Http_Base_Reaches_Full_Score_And_Fills_All_Buckets()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var result = CaptureService.ExecuteScriptsWithDom(
+            html,
+            "http://127.0.0.1/acid3.html",
+            Path.GetDirectoryName(acid3Path));
+
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        Assert.Equal("100", scoreMatch.Groups[1].Value);
+
+        for (int i = 1; i <= 6; i++)
+        {
+            var bucketMatch = System.Text.RegularExpressions.Regex.Match(
+                result, $@"id=""bucket{i}""[^>]*class=""([^""]+)""");
+            Assert.True(bucketMatch.Success, $"bucket{i} element not found");
+            Assert.Equal("zPPPPPPPPPPPPPPPP", bucketMatch.Groups[1].Value);
+        }
+    }
+
+    [Fact]
     public void Acid3_SubmitButton_Click_Triggers_Form_Onsubmit()
     {
         var js = @"

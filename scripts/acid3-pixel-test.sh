@@ -11,8 +11,9 @@
 #     - Optional: Node.js + Playwright (for Chromium reference rendering)
 #
 # Steps:
-#     1. Render Acid3 using broiler.cli → acid3.png
-#     2. (Optional) Render using Chromium/Playwright → acid3-reference.png
+#     1. Serve Acid3 over temporary localhost HTTP (required for absolute URL tests)
+#     2. Render Acid3 using broiler.cli → acid3.png
+#     3. (Optional) Render using Chromium/Playwright → acid3-reference.png
 #     3. Compare pixel-by-pixel → acid3-diff.png + acid3-report.txt
 
 set -euo pipefail
@@ -52,9 +53,49 @@ done
 
 mkdir -p "$OUTPUT_DIR"
 
+ACID3_SERVER_PORT="$(python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(('127.0.0.1', 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)"
+ACID3_SERVER_LOG="$(mktemp "${TMPDIR:-/tmp}/acid3-http-server-XXXXXX.log")"
+
+cleanup() {
+    if [[ -n "${ACID3_SERVER_PID:-}" ]]; then
+        kill "$ACID3_SERVER_PID" 2>/dev/null || true
+        wait "$ACID3_SERVER_PID" 2>/dev/null || true
+    fi
+    rm -f "$ACID3_SERVER_LOG"
+}
+
+trap cleanup EXIT
+
+python3 -m http.server "$ACID3_SERVER_PORT" \
+    --bind 127.0.0.1 \
+    --directory "$ACID3_DIR" \
+    >"$ACID3_SERVER_LOG" 2>&1 &
+ACID3_SERVER_PID=$!
+
+for _ in {1..50}; do
+    if python3 - <<PY
+import urllib.request
+urllib.request.urlopen("http://127.0.0.1:$ACID3_SERVER_PORT/acid3.html", timeout=1)
+PY
+    then
+        break
+    fi
+    sleep 0.2
+done
+
+ACID3_URL="http://127.0.0.1:$ACID3_SERVER_PORT/acid3.html"
+
 echo "=== Acid3 Pixel Test Pipeline ==="
 echo "Repository root: $REPO_ROOT"
 echo "Output directory: $OUTPUT_DIR"
+echo "Acid3 URL: $ACID3_URL"
 echo ""
 
 # --- Step 1: Render with Broiler CLI -----------------------------------------
@@ -62,10 +103,9 @@ echo ""
 echo "--- Step 1: Rendering Acid3 with Broiler CLI ---"
 
 BROILER_OUTPUT="$OUTPUT_DIR/acid3.png"
-ACID3_HTML="file://$ACID3_DIR/acid3.html"
 
 dotnet run --project "$REPO_ROOT/src/Broiler.Cli" -- \
-    --capture-image "$ACID3_HTML" \
+    --capture-image "$ACID3_URL" \
     --output "$BROILER_OUTPUT" \
     --width 1024 --height 768
 
@@ -104,15 +144,14 @@ else
         PLAYWRIGHT_SCRIPT=$(mktemp /tmp/acid3-playwright-XXXXXX.js)
         cat > "$PLAYWRIGHT_SCRIPT" << 'JSEOF'
 const { chromium } = require('playwright');
-const path = require('path');
 
 (async () => {
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    const acid3Path = path.resolve(process.argv[2]);
+    const acid3Url = process.argv[2];
     const outputPath = process.argv[3];
 
-    await page.goto('file://' + acid3Path, { waitUntil: 'load' });
+    await page.goto(acid3Url, { waitUntil: 'load' });
     // Wait for Acid3 test to complete (animations + score calculation)
     await page.waitForTimeout(15000);
     await page.screenshot({ path: outputPath, fullPage: false });
@@ -122,7 +161,7 @@ const path = require('path');
 JSEOF
         "$PLAYWRIGHT_DIR/node_modules/.bin/playwright" install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
         NODE_PATH="$PLAYWRIGHT_DIR/node_modules" \
-            node "$PLAYWRIGHT_SCRIPT" "$ACID3_DIR/acid3.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
+            node "$PLAYWRIGHT_SCRIPT" "$ACID3_URL" "$REFERENCE_OUTPUT" 2>/dev/null && {
             echo "  ✓ Chromium reference saved to: $REFERENCE_OUTPUT"
             rm -f "$PLAYWRIGHT_SCRIPT"
         } || {
