@@ -262,7 +262,10 @@ public sealed partial class DomBridge
             {
                 var children = new List<JSValue>();
                 foreach (var child in element.Children)
-                    children.Add(ToJSObject(child));
+                {
+                    if (!string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
+                        children.Add(ToJSObject(child));
+                }
                 return new JSArray(children);
             }, "get childNodes"),
             null,
@@ -272,8 +275,11 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"firstChild",
             new JSFunction((in Arguments a) =>
-                element.Children.Count > 0 ? ToJSObject(element.Children[0]) : JSNull.Value,
-                "get firstChild"),
+            {
+                var first = element.Children.FirstOrDefault(c =>
+                    !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                return first != null ? ToJSObject(first) : JSNull.Value;
+            }, "get firstChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -281,8 +287,11 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"lastChild",
             new JSFunction((in Arguments a) =>
-                element.Children.Count > 0 ? ToJSObject(element.Children[^1]) : JSNull.Value,
-                "get lastChild"),
+            {
+                var last = element.Children.LastOrDefault(c =>
+                    !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                return last != null ? ToJSObject(last) : JSNull.Value;
+            }, "get lastChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -294,9 +303,12 @@ public sealed partial class DomBridge
                 if (element.Parent == null) return JSNull.Value;
                 var siblings = element.Parent.Children;
                 var idx = siblings.IndexOf(element);
-                return idx >= 0 && idx + 1 < siblings.Count
-                    ? ToJSObject(siblings[idx + 1])
-                    : JSNull.Value;
+                for (var i = idx + 1; i < siblings.Count; i++)
+                {
+                    if (!string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal))
+                        return ToJSObject(siblings[i]);
+                }
+                return JSNull.Value;
             }, "get nextSibling"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -309,9 +321,12 @@ public sealed partial class DomBridge
                 if (element.Parent == null) return JSNull.Value;
                 var siblings = element.Parent.Children;
                 var idx = siblings.IndexOf(element);
-                return idx > 0
-                    ? ToJSObject(siblings[idx - 1])
-                    : JSNull.Value;
+                for (var i = idx - 1; i >= 0; i--)
+                {
+                    if (!string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal))
+                        return ToJSObject(siblings[i]);
+                }
+                return JSNull.Value;
             }, "get previousSibling"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -805,7 +820,7 @@ public sealed partial class DomBridge
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // children (read-only) — element children only (no text nodes)
+        // children (read-only) — element children only (no text nodes, no #subdoc-root)
         obj.FastAddProperty(
             (KeyString)"children",
             new JSFunction((in Arguments a) =>
@@ -813,7 +828,7 @@ public sealed partial class DomBridge
                 var result = new List<JSValue>();
                 foreach (var child in element.Children)
                 {
-                    if (!child.IsTextNode)
+                    if (!child.IsTextNode && !string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
                         result.Add(ToJSObject(child));
                 }
                 return new JSArray(result);
@@ -825,7 +840,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"childElementCount",
             new JSFunction((in Arguments a) =>
-                new JSNumber(element.Children.Count(c => !c.IsTextNode)),
+                new JSNumber(element.Children.Count(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal))),
                 "get childElementCount"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -835,7 +850,7 @@ public sealed partial class DomBridge
             (KeyString)"firstElementChild",
             new JSFunction((in Arguments a) =>
             {
-                var first = element.Children.FirstOrDefault(c => !c.IsTextNode);
+                var first = element.Children.FirstOrDefault(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
                 return first != null ? ToJSObject(first) : JSNull.Value;
             }, "get firstElementChild"),
             null,
@@ -846,7 +861,7 @@ public sealed partial class DomBridge
             (KeyString)"lastElementChild",
             new JSFunction((in Arguments a) =>
             {
-                var last = element.Children.LastOrDefault(c => !c.IsTextNode);
+                var last = element.Children.LastOrDefault(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
                 return last != null ? ToJSObject(last) : JSNull.Value;
             }, "get lastElementChild"),
             null,
@@ -862,7 +877,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx + 1; i < siblings.Count; i++)
                 {
-                    if (!siblings[i].IsTextNode) return ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode && !string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal)) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get nextElementSibling"),
@@ -879,7 +894,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx - 1; i >= 0; i--)
                 {
-                    if (!siblings[i].IsTextNode) return ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode && !string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal)) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get previousElementSibling"),
@@ -5495,6 +5510,22 @@ public sealed partial class DomBridge
         subDocument.FastAddValue(
             (KeyString)"defaultView",
             subWindow,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // window.getComputedStyle — sub-window needs its own copy so that
+        // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
+        // the sub-document's <style> elements rather than the main document.
+        var bridgeForSubStyle = this;
+        subWindow.FastAddValue(
+            (KeyString)"getComputedStyle",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return new JSObject();
+                var targetObj = a[0] as JSObject;
+                var el = targetObj != null ? bridgeForSubStyle.FindDomElementByJSObject(targetObj) : null;
+                var pseudoElement = a.Length > 1 ? a[1]?.ToString() : null;
+                return bridgeForSubStyle.BuildComputedStyleObject(el, pseudoElement);
+            }, "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return subWindow;
