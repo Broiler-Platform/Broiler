@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "Unknown option: $1" >&2
+            echo "Unknown option: $1. Use --help for usage information." >&2
             exit 1
             ;;
     esac
@@ -95,7 +95,12 @@ else
     echo "--- Step 2: Rendering Acid3 with Chromium (Playwright) ---"
 
     # Check if npx/playwright are available
-    if command -v npx &>/dev/null; then
+    if command -v npx &>/dev/null && command -v npm &>/dev/null; then
+        PLAYWRIGHT_DIR="${TMPDIR:-/tmp}/broiler-playwright"
+        if [[ ! -d "$PLAYWRIGHT_DIR/node_modules/playwright" ]]; then
+            npm install --prefix "$PLAYWRIGHT_DIR" --no-save playwright >/dev/null
+        fi
+
         PLAYWRIGHT_SCRIPT=$(mktemp /tmp/acid3-playwright-XXXXXX.js)
         cat > "$PLAYWRIGHT_SCRIPT" << 'JSEOF'
 const { chromium } = require('playwright');
@@ -110,13 +115,14 @@ const path = require('path');
     await page.goto('file://' + acid3Path, { waitUntil: 'load' });
     // Wait for Acid3 test to complete (animations + score calculation)
     await page.waitForTimeout(15000);
-    await page.screenshot({ path: outputPath, fullPage: true });
+    await page.screenshot({ path: outputPath, fullPage: false });
     await browser.close();
     console.log('Reference render saved to: ' + outputPath);
 })();
 JSEOF
-        npx playwright install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
-        node "$PLAYWRIGHT_SCRIPT" "$ACID3_DIR/acid3.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
+        "$PLAYWRIGHT_DIR/node_modules/.bin/playwright" install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
+        NODE_PATH="$PLAYWRIGHT_DIR/node_modules" \
+            node "$PLAYWRIGHT_SCRIPT" "$ACID3_DIR/acid3.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
             echo "  ✓ Chromium reference saved to: $REFERENCE_OUTPUT"
             rm -f "$PLAYWRIGHT_SCRIPT"
         } || {
@@ -128,7 +134,7 @@ JSEOF
             fi
         }
     else
-        echo "  ⚠ Node.js/npx not found — skipping Chromium rendering"
+        echo "  ⚠ Node.js/npm/npx not found — skipping Chromium rendering"
         if [[ -f "$REFERENCE_OUTPUT" ]]; then
             echo "  Using existing reference: $REFERENCE_OUTPUT"
         else

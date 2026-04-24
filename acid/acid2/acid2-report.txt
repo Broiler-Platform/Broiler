@@ -2,37 +2,24 @@
 Acid2 Pixel Comparison Report
 ======================================================================
 
-Broiler image:    acid/acid2/acid2.png
-Reference image:  acid/acid2/acid2-reference.png
+Broiler image:    /home/runner/work/Broiler/Broiler/acid/acid2/acid2.png
+Reference image:  /home/runner/work/Broiler/Broiler/acid/acid2/acid2-reference.png
 Viewport:         1024×768
 Color tolerance:  5 (per-channel)
 
 --- Overall Pixel Statistics ---
-Full-image match:      781,846 /    786,432  (99.42%)
-Content-area match:     20,168 /     21,874  (92.20%)
-Red pixel count:             0
+Full-image match:      763,878 /    786,432  (97.13%)
+Content-area match:     17,030 /     39,584  (43.02%)
+Red pixel count:           144
 
 --- Per-Region Content-Area Match ---
 Region                       Y Range    Match    Total      Pct
 -----------------------------------------------------------------
-forehead                    48–120       632    2,290   27.60%
-eyes                       120–168     6,048    6,048  100.00%
-nose                       144–240    13,776   13,824   99.65%
-smile                      228–264     4,320    4,320  100.00%
-chin                       264–276       576      576  100.00%
-
---- Fixes Applied (2026-04-05) ---
-1. MarginBottomCollapse: Guard against empty Boxes collection — was
-   throwing ArgumentOutOfRangeException silently caught by PerformLayout,
-   causing float children in abs-pos elements to render with zero height.
-2. BFC auto-height: Call MarginBottomCollapse after CreateLineBoxes for
-   BFC elements so float children contribute to parent height (§10.6.7).
-3. PaintWalker: position:absolute categorized as positioned (steps 6-7).
-
---- Remaining Forehead Mismatches ---
-The forehead region (y=48-120) mismatches are text/font rendering
-differences ("Hello World!" heading and "Take The Acid2 Test" link),
-not CSS layout bugs. Different font rasterization and anti-aliasing.
+forehead                    51–68         26    1,624    1.60%
+eyes                        69–129       864    1,596   54.14%
+nose                       130–210    11,268   12,292   91.67%
+smile                      196–260     7,160   10,920   65.57%
+chin                       261–275       216    4,440    4.86%
 
 --- Diff Image Colour Key ---
   Green  — pixel match (per-channel diff ≤ 5)
