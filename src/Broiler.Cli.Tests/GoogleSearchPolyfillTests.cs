@@ -1664,6 +1664,71 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Converts_Inherited_ScrollPadding_From_Owner_To_Zoomed_Scroller_Coordinates()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoomed) {
+                if (!zoomed) {
+                    var container = document.createElement('div');
+                    container.style.width = '120px';
+                    container.style.height = '100px';
+                    container.style.overflow = 'hidden';
+                    container.style.border = '1px solid black';
+                    container.style.scrollPaddingTop = '20px';
+
+                    var before = document.createElement('div');
+                    before.style.height = '1000px';
+                    var target = document.createElement('div');
+                    target.style.height = '20px';
+                    var after = document.createElement('div');
+                    after.style.height = '1000px';
+
+                    container.appendChild(before);
+                    container.appendChild(target);
+                    container.appendChild(after);
+                    document.body.appendChild(container);
+                    target.scrollIntoView({ block: 'start', inline: 'start' });
+                    return String(container.scrollTop);
+                }
+
+                var owner = document.createElement('div');
+                owner.style.display = 'inline-block';
+                owner.style.scrollPaddingTop = '20px';
+
+                var zoomedContainer = document.createElement('div');
+                zoomedContainer.style.width = '120px';
+                zoomedContainer.style.height = '100px';
+                zoomedContainer.style.overflow = 'hidden';
+                zoomedContainer.style.border = '1px solid black';
+                zoomedContainer.style.scrollPaddingTop = 'inherit';
+                zoomedContainer.style.zoom = '2';
+
+                var zoomedBefore = document.createElement('div');
+                zoomedBefore.style.height = '1000px';
+                var zoomedTarget = document.createElement('div');
+                zoomedTarget.style.height = '20px';
+                var zoomedAfter = document.createElement('div');
+                zoomedAfter.style.height = '1000px';
+
+                zoomedContainer.appendChild(zoomedBefore);
+                zoomedContainer.appendChild(zoomedTarget);
+                zoomedContainer.appendChild(zoomedAfter);
+                owner.appendChild(zoomedContainer);
+                document.body.appendChild(owner);
+                zoomedTarget.scrollIntoView({ block: 'start', inline: 'start' });
+                return String(zoomedContainer.scrollTop);
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer(false) + '|' + buildContainer(true);
+        ");
+
+        Assert.Equal("980|980", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Honors_Block_And_Inline_Options_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
