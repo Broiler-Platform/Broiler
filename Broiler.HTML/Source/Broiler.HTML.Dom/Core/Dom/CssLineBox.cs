@@ -60,7 +60,7 @@ internal sealed class CssLineBox
         double leftspacing = box.ActualBorderLeftWidth + box.ActualPaddingLeft;
         double rightspacing = box.ActualBorderRightWidth + box.ActualPaddingRight;
         double topspacing = box.ActualBorderTopWidth + box.ActualPaddingTop;
-        double bottomspacing = box.ActualBorderBottomWidth + box.ActualPaddingTop;
+        double bottomspacing = box.ActualBorderBottomWidth + box.ActualPaddingBottom;
 
         if ((box.FirstHostingLineBox != null && box.FirstHostingLineBox.Equals(this)) || box.IsImage)
             x -= leftspacing;

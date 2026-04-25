@@ -1,4 +1,6 @@
 using Broiler.HTML.Image;
+using SkiaSharp;
+using System.Drawing;
 
 namespace Broiler.Cli.Tests;
 
@@ -333,6 +335,41 @@ body { margin: 0; }
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0 && bitmap.Height > 0,
             "Render should produce a valid image");
+    }
+
+    [Fact]
+    public void Negative_Padding_Is_Ignored_For_Box_Width()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+body { margin: 0; }
+#zero, #negative { display: block; width: 20px; height: 20px; padding-left: 10px; background: red; }
+#negative { padding-right: -10px; background: lime; }
+</style>
+</head><body>
+<div id=""zero""></div>
+<div id=""negative""></div>
+</body></html>";
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html);
+        container.MaxSize = new SizeF(200, 0);
+
+        using var bitmap = new SKBitmap(1, 1);
+        using var canvas = new SKCanvas(bitmap);
+        container.PerformLayout(canvas, new RectangleF(0, 0, 200, 200));
+
+        var zeroRect = container.GetElementRectangle("zero");
+        var negativeRect = container.GetElementRectangle("negative");
+
+        Assert.True(zeroRect.HasValue, "Expected to resolve the zero-padding box.");
+        Assert.True(negativeRect.HasValue, "Expected to resolve the negative-padding box.");
+        Assert.True(Math.Abs(zeroRect.Value.Width - negativeRect.Value.Width) < 1,
+            $"Expected invalid negative padding-right to behave like zero, got widths zero={zeroRect.Value.Width}px and negative={negativeRect.Value.Width}px.");
     }
 
     // ──────── P0 / TODO-3: border shorthand CSS 2.1 §8.5 reset ────────

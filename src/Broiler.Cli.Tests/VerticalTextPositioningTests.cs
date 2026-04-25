@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using Xunit;
 using Broiler.HTML.Image;
 using SkiaSharp;
@@ -44,6 +45,42 @@ h1 { margin: 0; padding: 0; font-size: 5em; font-weight: bold; line-height: 1.2;
         Assert.True(yNoBg < 80, $"Without bg: text at y={yNoBg}, expected y<80");
         Assert.True(Math.Abs(yBg - yNoBg) < 20,
             $"Text position differs by {Math.Abs(yBg - yNoBg)}px (bg={yBg}, noBg={yNoBg})");
+    }
+
+    [Fact]
+    public void Inline_Top_And_Bottom_Padding_Produce_Similar_Line_Rect_Heights()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<style>
+body { margin: 0; padding: 0; font: 20px/20px Arial, sans-serif; }
+p { margin: 0; }
+#topOnly { padding-top: 20px; background: lightyellow; }
+#bottomOnly { padding-bottom: 20px; background: lightyellow; }
+</style>
+<body>
+  <p><span id=""topOnly"">Top</span></p>
+  <p><span id=""bottomOnly"">Bottom</span></p>
+</body>
+</html>";
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html);
+        container.MaxSize = new SizeF(300, 0);
+
+        using var bitmap = new SKBitmap(1, 1);
+        using var canvas = new SKCanvas(bitmap);
+        container.PerformLayout(canvas, new RectangleF(0, 0, 300, 300));
+
+        var topRect = container.GetElementRectangle("topOnly");
+        var bottomRect = container.GetElementRectangle("bottomOnly");
+
+        Assert.True(topRect.HasValue, "Expected to resolve the top-padded inline span.");
+        Assert.True(bottomRect.HasValue, "Expected to resolve the bottom-padded inline span.");
+        Assert.True(Math.Abs(topRect.Value.Height - bottomRect.Value.Height) < 5,
+            $"Expected top-only and bottom-only inline padding to produce similar line-rect heights, got top={topRect.Value.Height}px and bottom={bottomRect.Value.Height}px.");
     }
 
     private static int FindFirstDarkRow(SKBitmap bmp)

@@ -708,7 +708,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingTop))
-                _actualPaddingTop = ParseLengthWithLineHeight(PaddingTop, Size.Width);
+                _actualPaddingTop = Math.Max(0, ParseLengthWithLineHeight(PaddingTop, Size.Width));
 
             return _actualPaddingTop;
         }
@@ -719,7 +719,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingLeft))
-                _actualPaddingLeft = ParseLengthWithLineHeight(PaddingLeft, Size.Width);
+                _actualPaddingLeft = Math.Max(0, ParseLengthWithLineHeight(PaddingLeft, Size.Width));
 
             return _actualPaddingLeft;
         }
@@ -730,7 +730,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingBottom))
-                _actualPaddingBottom = ParseLengthWithLineHeight(PaddingBottom, Size.Width);
+                _actualPaddingBottom = Math.Max(0, ParseLengthWithLineHeight(PaddingBottom, Size.Width));
 
             return _actualPaddingBottom;
         }
@@ -741,7 +741,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingRight))
-                _actualPaddingRight = ParseLengthWithLineHeight(PaddingRight, Size.Width);
+                _actualPaddingRight = Math.Max(0, ParseLengthWithLineHeight(PaddingRight, Size.Width));
 
             return _actualPaddingRight;
         }
