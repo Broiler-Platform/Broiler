@@ -29,7 +29,7 @@ reference, and writes a diff image plus a text report into the matching
 |---|---|---:|---:|---|
 | Acid1 | Natural document bounds (`520×420` reference and Broiler) | 88.83% | 85.26% | Footer text rasterization, residual form-control/widget differences |
 | Acid2 | `acid2.html#top` at `1024×768` | 99.48% | 82.07% | Forehead/top text band, smaller smile/text fidelity deltas |
-| Acid3 | Viewport `1024×768` | 92.01% | 89.35% | Bucket area layout/fill, residual frame geometry; score area already 100% |
+| Acid3 | Viewport `1024×768` | 92.64% | 90.18% | Bucket area layout/fill, residual 1px frame-bottom drift; score area already 100% |
 
 ## Acid1
 
@@ -114,7 +114,7 @@ reference, and writes a diff image plus a text report into the matching
   1024×768 Broiler output and the documented baseline.
 - Remaining gaps are still renderer-fidelity issues, not JavaScript score
   issues: the JS harness can reach 100/100 while the pixels still diverge.
-- Current rerun: **92.01% full-image**, **89.35% content-area**. The score area
+- Current rerun: **92.64% full-image**, **90.18% content-area**. The score area
   is already **100%**, so the visible gaps are concentrated elsewhere.
 - The Broiler render logs still emit repeated `JSException.Throw` traces with
   the `"Roses"` value during DOM filter callbacks while the image capture
@@ -123,11 +123,13 @@ reference, and writes a diff image plus a text report into the matching
 
 ### Mismatch checklist
 
-- Border/frame geometry and page-height overflow remain visible mismatch zones.
-- Bucket layout/fill remains the dominant miss (**72.24%** region match), but it
-  improved slightly after clamping invalid negative padding in the bucket layout
-  path.
-- Bottom instruction text is close (**97.99%**), so it is no longer the
+- Border/frame geometry improved again: the black body frame is now only **1px**
+  too tall (bottom row **449** vs Chromium **448**), and the gray outer frame is
+  likewise down to a **1px** bottom drift (**453** vs **452**).
+- Bucket layout/fill remains the dominant miss (**72.42%** region match), but it
+  improved slightly while the overmatched Acid3 `* + * > * > p` selector leak
+  was removed from later body paragraphs.
+- Bottom instruction text is now very close (**99.13%**), so it is no longer the
   highest-value target.
 - Any comparison based on a full-page reference should be treated as invalid
   because it distorts the viewport baseline.

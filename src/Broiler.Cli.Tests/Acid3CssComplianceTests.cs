@@ -1,5 +1,7 @@
 using SkiaSharp;
 using Broiler.HTML.Image;
+using Broiler.HtmlBridge;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 
@@ -442,6 +444,43 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Acid3_Important_Border_Selector_Does_Not_Leak_To_Later_Body_Paragraphs()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { border: 1px blue; }
+* + * > * > p { margin: 0; border: 1px solid !important; }
+</style>
+</head><body>
+<div class=""buckets"">
+  <p id=""bucket"">bucket</p>
+</div>
+<p id=""result"">result</p>
+<p id=""instructions"">instructions</p>
+</body></html>";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var matchesSelector = typeof(DomBridge).GetMethod(
+            "MatchesSelector",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(matchesSelector);
+
+        bool Matches(string id)
+            => (bool)matchesSelector!.Invoke(
+                null,
+                [bridge.Elements.Single(e => e.Id == id), "* + * > * > p"])!;
+
+        Assert.True(Matches("bucket"));
+        Assert.False(Matches("result"));
+        Assert.False(Matches("instructions"));
     }
 
     // ────────────── D8: @font-face with local file ──────────────

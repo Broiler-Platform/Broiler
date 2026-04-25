@@ -243,9 +243,12 @@ public sealed partial class DomBridge
         var siblings = el.Parent.Children;
         var idx = siblings.IndexOf(el);
         for (int i = idx - 1; i >= 0; i--)
-            if (!siblings[i].IsTextNode) return siblings[i];
+            if (IsElementSiblingCandidate(siblings[i])) return siblings[i];
         return null;
     }
+
+    private static bool IsElementSiblingCandidate(DomElement node)
+        => !node.IsTextNode && !node.TagName.StartsWith("#", StringComparison.Ordinal);
 
     /// <summary>
     /// Matches a compound selector (no combinators) against an element.
@@ -697,7 +700,7 @@ public sealed partial class DomBridge
         var siblings = el.Parent.Children;
         var idx = siblings.IndexOf(el);
         for (int i = idx + 1; i < siblings.Count; i++)
-            if (!siblings[i].IsTextNode) return siblings[i];
+            if (IsElementSiblingCandidate(siblings[i])) return siblings[i];
         return null;
     }
 
