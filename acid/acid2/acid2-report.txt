@@ -8,8 +8,8 @@ Viewport:         1024×768
 Color tolerance:  5 (per-channel)
 
 --- Overall Pixel Statistics ---
-Full-image match:      782,333 /    786,432  (99.48%)
-Content-area match:     18,764 /     22,863  (82.07%)
+Full-image match:      784,061 /    786,432  (99.70%)
+Content-area match:     20,492 /     22,863  (89.63%)
 Red pixel count:             0
 
 --- Per-Region Content-Area Match ---
@@ -18,7 +18,7 @@ Region                       Y Range    Match    Total      Pct
 forehead                    51–68         32    1,511    2.12%
 eyes                        69–129     1,536    1,596   96.24%
 nose                       130–210    11,460   12,292   93.23%
-smile                      196–260     7,376    9,120   80.88%
+smile                      196–260     9,104    9,120   99.82%
 chin                       261–275       864      864  100.00%
 
 --- Diff Image Colour Key ---

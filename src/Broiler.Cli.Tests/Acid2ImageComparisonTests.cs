@@ -822,6 +822,50 @@ public class Acid2ImageComparisonTests
             "margin from collapsing through per CSS 2.1 §8.3.1.");
     }
 
+    [Fact]
+    public void CssNegativeLastChildMargin_DoesNotShrink_BorderedZeroHeightParent()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0; background:white'>
+                <div style='position:relative; width:200px; height:80px; background:white'>
+                    <div style='margin-top:3px; background:black; width:144px; height:24px;
+                                position:relative; bottom:-12px;'>
+                        <div style='position:absolute; top:0; right:12px; width:auto; height:0;
+                                    margin:0; border:12px solid yellow;'>
+                            <span style='display:inline; margin:-12px 0 0 0;
+                                         border:solid 12px transparent; border-style:none solid;
+                                         float:right; background:black; height:12px;'>
+                                <em style='float:inherit; border-top:solid yellow 12px;
+                                           border-bottom:solid black 12px;'>
+                                    <strong style='width:72px; display:block; margin-bottom:-12px;'></strong>
+                                </em>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 240, 120);
+
+        int centerYellowTop = 0;
+        int centerBlackBottom = 0;
+        for (int x = 48; x < 120; x++)
+        {
+            var topPx = bitmap.GetPixel(x, 15);
+            if (topPx.Red > 200 && topPx.Green > 200 && topPx.Blue < 80)
+                centerYellowTop++;
+
+            var bottomPx = bitmap.GetPixel(x, 27);
+            if (bottomPx.Red < 40 && bottomPx.Green < 40 && bottomPx.Blue < 40)
+                centerBlackBottom++;
+        }
+
+        Assert.True(centerYellowTop > 40,
+            $"Expected the bordered zero-height parent to preserve the top yellow band, found {centerYellowTop} yellow center pixels.");
+        Assert.True(centerBlackBottom > 40,
+            $"Expected the negative last-child margin to not erase the parent's bottom black band, found {centerBlackBottom} black center pixels.");
+    }
+
     // ──────── P3: §2.21 — display:table and anonymous table cells ────────
 
     /// <summary>

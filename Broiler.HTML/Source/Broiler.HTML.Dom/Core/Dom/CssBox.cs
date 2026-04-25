@@ -2804,7 +2804,22 @@ internal class CssBox : CssBoxProperties, IDisposable
         // border or padding, the last child's margin does not collapse
         // through (§8.3.1), so add it as internal content spacing.
         if (!collapseThrough && lastInFlowChild != null)
-            maxChildBottom += lastInFlowChild.ActualMarginBottom;
+        {
+            double lastMarginBottom = lastInFlowChild.ActualMarginBottom;
+
+            // CSS2.1 §8.3.1: A child's bottom margin must not collapse
+            // through a parent that has vertical border or padding.  In
+            // that case a negative last-child margin cannot shrink away the
+            // parent's own border box; only positive margin contributes
+            // additional internal spacing.
+            if (ActualBorderTopWidth > 0.1 || ActualPaddingTop > 0.1
+                || ActualBorderBottomWidth > 0.1 || ActualPaddingBottom > 0.1)
+            {
+                lastMarginBottom = Math.Max(0, lastMarginBottom);
+            }
+
+            maxChildBottom += lastMarginBottom;
+        }
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
     }
 

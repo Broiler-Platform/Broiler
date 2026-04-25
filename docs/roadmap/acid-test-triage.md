@@ -28,7 +28,7 @@ reference, and writes a diff image plus a text report into the matching
 | Test | Baseline | Full-image match | Content-area match | Main hot spots |
 |---|---|---:|---:|---|
 | Acid1 | Natural document bounds (`520×420` reference and Broiler) | 88.83% | 85.26% | Footer text rasterization, residual form-control/widget differences |
-| Acid2 | `acid2.html#top` at `1024×768` | 99.48% | 82.07% | Forehead/top text band, smaller smile/text fidelity deltas |
+| Acid2 | `acid2.html#top` at `1024×768` | 99.70% | 89.63% | Forehead/top text band is now the dominant remaining gap |
 | Acid3 | Viewport `1024×768` | 92.57% | 90.08% | Bucket area layout/fill after restoring HTTP XHTML bucket progression, residual 1px frame-bottom drift |
 
 ## Acid1
@@ -75,9 +75,9 @@ reference, and writes a diff image plus a text report into the matching
 - The existing focused roadmap is `acid/acid2/acid2-compliance-roadmap.md`.
 - The current comparison artifacts live beside the test in `acid/acid2/`.
 - The latest rerun is dramatically better than the older checked-in roadmap
-  numbers: **99.48% full-image**, **82.07% content-area**, and **0 red pixels**.
+  numbers: **99.70% full-image**, **89.63% content-area**, and **0 red pixels**.
 - The dominant remaining mismatch is now concentrated in the forehead/top text
-  band, with smaller smile/text-fidelity deltas below it.
+  band; the smile is effectively geometry-stable again.
 
 ### Mismatch checklist
 
@@ -86,8 +86,8 @@ reference, and writes a diff image plus a text report into the matching
   failures.
 - Eyes (**96.24%**), nose (**93.23%**), and chin (**100.00%**) are now
   geometry-stable and should be preserved.
-- Smile fidelity improved materially (**80.88%**) but still has visible text or
-  line-shape deltas.
+- Smile fidelity improved materially again (**99.82%**) after fixing the
+  bordered zero-height negative-margin collapse in the mouth structure.
 - Red pixel leakage is fully suppressed again (**0 red pixels**), so the CSS
   failure signal is no longer an active blocker.
 
