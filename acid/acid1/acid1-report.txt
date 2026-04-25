@@ -8,18 +8,18 @@ Viewport:         520×420
 Color tolerance:  5 (per-channel)
 
 --- Overall Pixel Statistics ---
-Full-image match:      164,803 /    218,400  (75.46%)
-Content-area match:    124,781 /    178,378  (69.95%)
-Mismatch bounds:    x=15-504, y=15-419
+Full-image match:      194,007 /    218,400  (88.83%)
+Content-area match:    141,129 /    165,522  (85.26%)
+Mismatch bounds:    x=19-497, y=40-398
 
 --- Per-Region Content-Area Match ---
 Region                  Match    Total      Pct
 --------------------------------------------------
-toggle_column          25,436   27,603   92.15%
-upper_layout           41,835   56,438   74.13%
-form_controls          13,722   16,774   81.81%
-lower_layout           31,844   42,051   75.73%
-footer_text               116   18,148    0.64%
+toggle_column          26,545   26,985   98.37%
+upper_layout           45,967   53,400   86.08%
+form_controls          13,692   16,287   84.07%
+lower_layout           32,655   38,702   84.38%
+footer_text             2,456   12,564   19.55%
 
 --- Notes ---
 Acid1 mismatches are expected to cluster around native radio controls
