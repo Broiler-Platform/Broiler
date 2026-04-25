@@ -372,6 +372,73 @@ body { margin: 0; }
             $"Expected invalid negative padding-right to behave like zero, got widths zero={zeroRect.Value.Width}px and negative={negativeRect.Value.Width}px.");
     }
 
+    [Fact]
+    public void Visible_Overflow_FixedHeight_Block_Does_Not_Push_Sibling_Down()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+body { margin: 0; font: 20px/20px Arial, sans-serif; }
+#fixed { height: 20px; width: 120px; background: #ddd; }
+#after { width: 20px; height: 10px; background: lime; }
+</style>
+</head><body>
+<div id=""fixed"">line1<br>line2<br>line3</div>
+<div id=""after""></div>
+</body></html>";
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html);
+        container.MaxSize = new SizeF(200, 0);
+
+        using var bitmap = new SKBitmap(1, 1);
+        using var canvas = new SKCanvas(bitmap);
+        container.PerformLayout(canvas, new RectangleF(0, 0, 200, 200));
+
+        var afterRect = container.GetElementRectangle("after");
+
+        Assert.True(afterRect.HasValue, "Expected to resolve the following sibling.");
+        Assert.InRange(afterRect.Value.Y, 20f, 21f);
+    }
+
+    [Fact]
+    public void Acid3_Instruction_Height_Does_Not_Inflate_Following_Sibling()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; border-spacing: 0; font: inherit; line-height: 1.2; color: inherit; background: transparent; }
+html { font: 20px Arial, sans-serif; }
+body { margin: 0; }
+#instructions { margin-top: 0; font-size: 0.8em; color: gray; height: 6.125em; }
+#instructions { margin-right: -20px; padding-right: 20px; background: white; }
+#instructions span { float: right; width: 20px; margin-right: -20px; background: white; height: 20px; }
+#after { width: 20px; height: 10px; background: lime; }
+</style>
+</head><body>
+<p id=""instructions"">To pass the test,<span></span> a browser must use its default settings, the animation has to be smooth, the score has to end on 100/100, and the final page has to look exactly, pixel for pixel, like this reference rendering.</p>
+<div id=""after""></div>
+</body></html>";
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html);
+        container.MaxSize = new SizeF(1024, 0);
+
+        using var bitmap = new SKBitmap(1, 1);
+        using var canvas = new SKCanvas(bitmap);
+        container.PerformLayout(canvas, new RectangleF(0, 0, 1024, 400));
+
+        var afterRect = container.GetElementRectangle("after");
+
+        Assert.True(afterRect.HasValue, "Expected to resolve the following sibling.");
+        Assert.InRange(afterRect.Value.Y, 98f, 99f);
+    }
+
     // ──────── P0 / TODO-3: border shorthand CSS 2.1 §8.5 reset ────────
 
     /// <summary>

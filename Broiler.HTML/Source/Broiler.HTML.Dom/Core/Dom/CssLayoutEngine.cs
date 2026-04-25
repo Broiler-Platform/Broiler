@@ -358,7 +358,9 @@ internal static class CssLayoutEngine
         // inline formatting context has actual inline content (words or
         // inline-level boxes).  An empty block should have zero content
         // height from the IFC.
-        bool hasExplicitHeight = blockBox.Height != null && blockBox.Height != CssConstants.Auto;
+        bool hasExplicitHeight = blockBox.Height != null
+            && blockBox.Height != CssConstants.Auto
+            && !blockBox.HeightPercentageResolvesToAuto();
         bool hasInlineContent = false;
         foreach (var lb in blockBox.LineBoxes)
         {
@@ -388,15 +390,17 @@ internal static class CssLayoutEngine
 
         blockBox.ActualBottom = maxBottom + blockBox.ActualPaddingBottom + blockBox.ActualBorderBottomWidth;
 
-        // CSS2.1 §10.6.3: When height is not 'auto', the used value is the
-        // specified value.  Content may overflow (controlled by 'overflow').
-        // For overflow:hidden, overflow:auto, and overflow:scroll the box's
-        // layout height is clamped to the specified height so that subsequent
-        // siblings are not pushed down by overflowing content.
-        if (hasExplicitHeight
-            && blockBox.Overflow is CssConstants.Hidden or CssConstants.Auto or CssConstants.Scroll
-            && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
-            blockBox.ActualBottom = blockBox.Location.Y + blockBox.ActualHeight;
+        // CSS2.1 §10.6.3: When height is not 'auto', the used height is the
+        // specified height regardless of overflow. Overflowing content may
+        // paint outside the box when overflow is visible, but it must not
+        // enlarge the box for sibling positioning.
+        if (hasExplicitHeight)
+        {
+            double borderBoxHeight = blockBox.ActualHeight
+                + blockBox.ActualPaddingTop + blockBox.ActualPaddingBottom
+                + blockBox.ActualBorderTopWidth + blockBox.ActualBorderBottomWidth;
+            blockBox.ActualBottom = blockBox.Location.Y + borderBoxHeight;
+        }
     }
 
     public static void ApplyCellVerticalAlignment(RGraphics g, CssBox cell)
