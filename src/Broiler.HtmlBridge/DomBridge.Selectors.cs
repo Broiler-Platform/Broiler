@@ -243,11 +243,11 @@ public sealed partial class DomBridge
         var siblings = el.Parent.Children;
         var idx = siblings.IndexOf(el);
         for (int i = idx - 1; i >= 0; i--)
-            if (IsElementSiblingCandidate(siblings[i])) return siblings[i];
+            if (ShouldIncludeInSiblingTraversal(siblings[i])) return siblings[i];
         return null;
     }
 
-    private static bool IsElementSiblingCandidate(DomElement node)
+    private static bool ShouldIncludeInSiblingTraversal(DomElement node)
         => !node.IsTextNode && !node.TagName.StartsWith("#", StringComparison.Ordinal);
 
     /// <summary>
@@ -700,7 +700,7 @@ public sealed partial class DomBridge
         var siblings = el.Parent.Children;
         var idx = siblings.IndexOf(el);
         for (int i = idx + 1; i < siblings.Count; i++)
-            if (IsElementSiblingCandidate(siblings[i])) return siblings[i];
+            if (ShouldIncludeInSiblingTraversal(siblings[i])) return siblings[i];
         return null;
     }
 
