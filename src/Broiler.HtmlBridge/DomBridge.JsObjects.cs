@@ -5946,8 +5946,16 @@ public sealed partial class DomBridge
             if (!response.IsSuccessStatusCode)
                 return (null, FetchFailedContentType);
 
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? extensionMime;
             var content = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? extensionMime;
+
+            if (string.IsNullOrEmpty(contentType)
+                || string.Equals(contentType, "application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(contentType, "text/plain", StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = DetectContentTypeFromContent(content, resolvedUrl);
+            }
+
             return (content, contentType);
         }
         catch

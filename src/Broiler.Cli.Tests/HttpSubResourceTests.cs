@@ -265,9 +265,93 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
+    [Fact]
+    public async Task Iframe_Http_Xhtml_With_TextPlain_ContentType_Executes_Parent_Notification()
+    {
+        int port = GetFreePort();
+        using var listener = new System.Net.HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+
+        var serverTask = Task.Run(async () =>
+        {
+            while (listener.IsListening)
+            {
+                System.Net.HttpListenerContext context;
+                try
+                {
+                    context = await listener.GetContextAsync();
+                }
+                catch (System.Net.HttpListenerException)
+                {
+                    break;
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+
+                try
+                {
+                    context.Response.StatusCode = 200;
+                    context.Response.ContentType = "text/plain";
+                    var body = """
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>XHTML</title></head>
+  <body>
+    <script type="text/javascript">parent.notify('xhtml.1')</script>
+  </body>
+</html>
+""";
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+                    await context.Response.OutputStream.WriteAsync(bytes);
+                }
+                finally
+                {
+                    context.Response.OutputStream.Close();
+                }
+            }
+        });
+
+        try
+        {
+            var html = $@"<!DOCTYPE html>
+<html><body>
+<div id=""out""></div>
+<script>
+var notifications = {{}};
+function notify(file) {{ notifications[file] = 1; }}
+var iframe = document.createElement('iframe');
+iframe.src = 'http://127.0.0.1:{port}/xhtml.1';
+document.body.appendChild(iframe);
+window.onload = function () {{
+  document.getElementById('out').textContent = String(!!notifications['xhtml.1']);
+}};
+</script>
+</body></html>";
+
+            var result = CaptureService.ExecuteScriptsWithDom(html, $"http://127.0.0.1:{port}/host.html");
+
+            Assert.Contains(">true</div>", result);
+        }
+        finally
+        {
+            listener.Stop();
+            listener.Close();
+            await serverTask;
+        }
+    }
+
     // ------------------------------------------------------------------
     //  3.2 <object> element handling
     // ------------------------------------------------------------------
+
+    private static int GetFreePort()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+    }
 
     [Fact]
     public void Object_ContentDocument_Accessible_With_SameOrigin_Data()
