@@ -56,6 +56,38 @@ public class Acid2ImageComparisonTests
         return HtmlRender.RenderToImage(html, width, height);
     }
 
+    private static SKBitmap RenderAcid2AtTop(int width = 1024, int height = 768)
+    {
+        var html = LoadAcid2Html();
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(width, 99999);
+        container.SetHtml(html);
+
+        using var layoutBmp = new SKBitmap(width, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var layoutCanvas = new SKCanvas(layoutBmp);
+        layoutCanvas.Clear(SKColors.White);
+        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, width, 99999));
+
+        var rect = container.GetElementRectangle("top");
+        Assert.NotNull(rect);
+        float scrollY = rect.Value.Y;
+
+        container.Location = new PointF(0, scrollY);
+        container.MaxSize = new SizeF(width, height);
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        canvas.Save();
+        canvas.Translate(0, -scrollY);
+        container.PerformPaint(canvas, new RectangleF(0, scrollY, width, height));
+        canvas.Restore();
+        return bitmap;
+    }
+
     private static string CreateSolidTempPng(SKColor color, int width = 300, int height = 300)
     {
         var path = Path.Combine(Path.GetTempPath(), $"broiler-acid2-{Guid.NewGuid():N}.png");
@@ -250,34 +282,7 @@ public class Acid2ImageComparisonTests
     [Fact]
     public void Acid2_RenderAtAnchor_HasFaceContent()
     {
-        var html = LoadAcid2Html();
-        int w = 1024, h = 768;
-
-        using var container = new HtmlContainer();
-        container.AvoidAsyncImagesLoading = true;
-        container.AvoidImagesLateLoading = true;
-        container.MaxSize = new SizeF(w, 99999);
-        container.SetHtml(html);
-
-        using var layoutBmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var layoutCanvas = new SKCanvas(layoutBmp);
-        layoutCanvas.Clear(SKColors.White);
-        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, w, 99999));
-
-        var rect = container.GetElementRectangle("top");
-        Assert.NotNull(rect);
-        float scrollY = rect.Value.Y;
-
-        container.Location = new System.Drawing.PointF(0, scrollY);
-        container.MaxSize = new SizeF(w, h);
-
-        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
-        container.PerformPaint(canvas, new RectangleF(0, scrollY, w, h));
-        canvas.Restore();
+        using var bitmap = RenderAcid2AtTop();
 
         int nonWhitePixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
