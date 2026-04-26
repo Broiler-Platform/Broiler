@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Reflection;
 using Broiler.HTML.Image;
 using SkiaSharp;
 
@@ -95,5 +96,42 @@ public class Acid1RenderingFixTests
             $"Expected the second radio to keep Chromium-like 13×13 bounds (got {radio2Rect}).");
         Assert.True(radio2Rect.Value.Y > radio1Rect.Value.Y,
             $"Expected the second radio to appear below the first one (got r1={radio1Rect}, r2={radio2Rect}).");
+    }
+
+    [Fact]
+    public void CssFontFamilyList_Uses_Generic_Fallback_Candidate()
+    {
+        var adapterType = Type.GetType("Broiler.HTML.Image.Adapters.SkiaImageAdapter, Broiler.HTML.Image");
+        Assert.NotNull(adapterType);
+
+        var adapter = adapterType!
+            .GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)!
+            .GetValue(null);
+        Assert.NotNull(adapter);
+
+        var getFont = adapterType.BaseType!
+            .GetMethod("GetFont", BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(getFont);
+
+        var sansFont = getFont!.Invoke(adapter, [ "sans-serif", 10.0, FontStyle.Regular ]);
+        var verdanaFallbackFont = getFont.Invoke(adapter, [ "Verdana, sans-serif", 10.0, FontStyle.Regular ]);
+        Assert.NotNull(sansFont);
+        Assert.NotNull(verdanaFallbackFont);
+
+        var typefaceProperty = verdanaFallbackFont!.GetType().GetProperty("Typeface");
+        Assert.NotNull(typefaceProperty);
+
+        var sansTypeface = typefaceProperty!.GetValue(sansFont);
+        var verdanaFallbackTypeface = typefaceProperty.GetValue(verdanaFallbackFont);
+        Assert.NotNull(sansTypeface);
+        Assert.NotNull(verdanaFallbackTypeface);
+
+        var familyNameProperty = sansTypeface!.GetType().GetProperty("FamilyName");
+        Assert.NotNull(familyNameProperty);
+
+        var sansFamily = familyNameProperty!.GetValue(sansTypeface)?.ToString();
+        var verdanaFallbackFamily = familyNameProperty.GetValue(verdanaFallbackTypeface)?.ToString();
+
+        Assert.Equal(sansFamily, verdanaFallbackFamily);
     }
 }

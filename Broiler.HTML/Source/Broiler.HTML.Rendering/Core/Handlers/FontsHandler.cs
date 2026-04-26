@@ -21,6 +21,9 @@ internal sealed class FontsHandler
 
     public bool IsFontExists(string family)
     {
+        if (TryResolveFamilyListCandidate(family, out _))
+            return true;
+
         bool exists = _existingFontFamilies.ContainsKey(family);
 
         if (!exists)
@@ -49,6 +52,12 @@ internal sealed class FontsHandler
 
     public RFont GetCachedFont(string family, double size, FontStyle style)
     {
+        if (TryResolveFamilyListCandidate(family, out string resolvedCandidate)
+            && !string.Equals(resolvedCandidate, family, StringComparison.InvariantCultureIgnoreCase))
+        {
+            family = resolvedCandidate;
+        }
+
         var font = TryGetFont(family, size, style);
 
         if (font != null)
@@ -71,6 +80,54 @@ internal sealed class FontsHandler
         GetOrCreateSizeCache(family, size)[style] = font;
 
         return font;
+    }
+
+    private bool TryResolveFamilyListCandidate(string family, out string resolvedFamily)
+    {
+        resolvedFamily = family;
+
+        if (string.IsNullOrWhiteSpace(family) || family.IndexOf(',') < 0)
+            return false;
+
+        foreach (var candidate in family.Split(','))
+        {
+            var normalized = NormalizeFamilyName(candidate);
+            if (string.IsNullOrEmpty(normalized))
+                continue;
+
+            if (_existingFontFamilies.ContainsKey(normalized))
+            {
+                resolvedFamily = normalized;
+                return true;
+            }
+
+            if (_fontsMapping.TryGetValue(normalized, out string mappedFamily))
+            {
+                resolvedFamily = mappedFamily;
+                return true;
+            }
+        }
+
+        var first = NormalizeFamilyName(family.Split(',')[0]);
+        if (!string.IsNullOrEmpty(first))
+            resolvedFamily = first;
+
+        return false;
+    }
+
+    private static string NormalizeFamilyName(string family)
+    {
+        if (string.IsNullOrWhiteSpace(family))
+            return string.Empty;
+
+        var normalized = family.Trim();
+        if ((normalized.StartsWith('"') && normalized.EndsWith('"'))
+            || (normalized.StartsWith('\'') && normalized.EndsWith('\'')))
+        {
+            normalized = normalized[1..^1];
+        }
+
+        return normalized.Trim();
     }
 
     private Dictionary<FontStyle, RFont> GetOrCreateSizeCache(string family, double size)
