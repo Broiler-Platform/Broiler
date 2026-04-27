@@ -1,0 +1,490 @@
+# Roadmap: Replace SkiaSharp with a Broiler-Owned Graphics Implementation
+
+> **Status**: Draft for team review  
+> **Tracking issue**: Create a roadmap to replace SkiaSharp with a custom implementation
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Current State and Scope](#2-current-state-and-scope)
+3. [Target Outcome and Design Principles](#3-target-outcome-and-design-principles)
+4. [Research Workstreams](#4-research-workstreams)
+5. [Proposed Architecture and Module Plan](#5-proposed-architecture-and-module-plan)
+6. [Migration and Phasing Strategy](#6-migration-and-phasing-strategy)
+7. [Milestones, Resources, and Delivery Sequence](#7-milestones-resources-and-delivery-sequence)
+8. [Compatibility Considerations](#8-compatibility-considerations)
+9. [Risks and Mitigations](#9-risks-and-mitigations)
+10. [Acceptance and Testing Criteria](#10-acceptance-and-testing-criteria)
+11. [Documentation Strategy](#11-documentation-strategy)
+12. [Open Questions](#12-open-questions)
+
+---
+
+## 1. Executive Summary
+
+Broiler currently relies on **SkiaSharp** as the primary cross-platform raster
+implementation for HTML image rendering, pixel-diff tooling, CLI capture, dev
+site previews, WPT comparison infrastructure, and part of the WPF image path.
+This roadmap defines an incremental plan to replace that dependency with a
+**Broiler-owned graphics layer and runtime implementation** while keeping the
+existing rendering pipeline functional throughout the transition.
+
+The recommended strategy is **compatibility-first and seam-driven**:
+
+- isolate SkiaSharp behind Broiler-owned image, canvas, font, and encoder
+  abstractions before changing behavior;
+- move public and cross-project APIs away from `SK*` types early, so the final
+  backend swap is mostly internal;
+- preserve current rendering fidelity and test infrastructure by running the new
+  implementation in parallel with SkiaSharp until parity thresholds are met;
+- defer optional accelerations and advanced features until the software raster
+  baseline is stable and measurable.
+
+The first success condition is not "remove every SkiaSharp reference". It is to
+establish a Broiler-owned graphics contract that can host a custom renderer
+without breaking CLI capture, dev tooling, WPF integration, or visual
+comparison workflows.
+
+---
+
+## 2. Current State and Scope
+
+### 2.1 Current SkiaSharp Footprint
+
+The current repository footprint is broad enough that this work must be treated
+as a platform migration rather than a single-package swap:
+
+- **Package dependencies**
+  - `Broiler.HTML.Image` references `SkiaSharp` and
+    `SkiaSharp.NativeAssets.Linux`
+  - `Broiler.HTML.WPF` references `SkiaSharp`
+- **Production source usage**
+  - roughly **19 production files** currently import `SkiaSharp`
+  - the most concentrated usage is in `Broiler.HTML.Image`
+- **Test usage**
+  - roughly **19 test files** currently import `SkiaSharp`
+  - many image-comparison and rendering tests use `SKBitmap` directly
+
+### 2.2 Primary Integration Points
+
+Current integration points that must be covered by the roadmap:
+
+| Area | Current dependency shape | Why it matters |
+|---|---|---|
+| `Broiler.HTML.Image/HtmlRender` | Returns `SKBitmap`, accepts `SKColor`, encodes via `SKEncodedImageFormat` | Public rendering surface for CLI/dev tooling |
+| `Broiler.HTML.Image/Adapters/*` | Skia-backed implementation of `RAdapter`, brushes, pens, images, fonts, paths, canvas | Core raster implementation |
+| `PixelDiffRunner` / `PixelDiffResult` | Uses `SKBitmap` for normalization and diff images | Visual regression infrastructure |
+| `Broiler.HTML.WPF/WpfAdapter` | Uses SkiaSharp for SVG rasterization and image conversion | WPF compatibility path |
+| `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | Consume `SKBitmap`-based APIs | External tooling and workflow coupling |
+| Rendering tests | Construct and inspect `SKBitmap` values directly | Large migration surface for validation |
+
+### 2.3 Existing Architectural Seams
+
+The codebase already has partial seams that should be expanded rather than
+discarded:
+
+- `IRasterBackend` separates display-list replay from the underlying surface.
+- `RGraphicsRasterBackend` replays drawing commands through `RGraphics`.
+- `RAdapter` already models platform concerns such as fonts, pens, brushes, and
+  images.
+
+These seams reduce migration risk, but they are not yet sufficient because
+Broiler still exposes SkiaSharp types directly in higher-level APIs.
+
+### 2.4 In Scope
+
+- Replacing SkiaSharp-backed raster, image, and encoding services with a
+  Broiler-owned implementation
+- Removing SkiaSharp types from public and cross-project APIs where practical
+- Preserving current CLI, dev site, WPT, and test workflows
+- Defining parity targets, migration checkpoints, and rollback options
+
+### 2.5 Out of Scope for the First Delivery
+
+- Hardware acceleration
+- GPU renderer support
+- Rewriting the HTML layout engine
+- Feature expansion unrelated to SkiaSharp replacement
+- Perfect browser-level typography parity on day one
+
+---
+
+## 3. Target Outcome and Design Principles
+
+### 3.1 Target Outcome
+
+At the end of this roadmap, Broiler should provide:
+
+- a **Broiler-owned graphics API** for surfaces, bitmaps, colors, paths, text,
+  gradients, and encoding;
+- a **custom raster backend implementation** that satisfies the rendering needs
+  currently served by SkiaSharp;
+- a compatibility layer that keeps CLI/dev/test workflows stable during
+  migration; and
+- a controlled path for removing SkiaSharp package references from runtime code.
+
+### 3.2 Design Principles
+
+1. **Own the abstractions first** — define Broiler contracts before replacing
+   implementation details.
+2. **Preserve behavior before optimizing** — match current semantics first, then
+   improve performance.
+3. **Keep migration observable** — every phase should have measurable fidelity
+   and performance gates.
+4. **Minimize surface-area churn** — prefer adapter-based transitions over broad
+   call-site rewrites.
+5. **Allow side-by-side backends** — the custom implementation should be
+   selectable while SkiaSharp remains available as a fallback during rollout.
+
+---
+
+## 4. Research Workstreams
+
+Before implementation begins, the team should complete these research tracks.
+
+### 4.1 Capability Inventory
+
+- Enumerate every SkiaSharp type and operation used in production code.
+- Group them into required primitives:
+  - bitmap allocation and pixel access
+  - canvas transforms and clipping
+  - solid fills, gradients, and strokes
+  - text measurement and glyph rasterization
+  - image decode/encode
+  - SVG rasterization needs
+  - alpha/blend/opacity layers
+
+### 4.2 API Surface Audit
+
+- Identify all APIs that currently expose `SKBitmap`, `SKColor`,
+  `SKEncodedImageFormat`, or other `SK*` types.
+- Classify each as:
+  - internal-only
+  - cross-project internal
+  - consumer-facing/public
+- Decide which need immediate replacement vs temporary shims.
+
+### 4.3 Performance Baseline
+
+Create a baseline for the current SkiaSharp path:
+
+- render time for representative pages (`broiler.cli`, acid fixtures, WPT
+  subsets, dev site preview pages);
+- memory usage during image render and diff generation;
+- PNG encode/decode throughput;
+- text measurement hot spots;
+- SVG rasterization cost.
+
+### 4.4 Typography and Fidelity Requirements
+
+- Document the current text-related gaps already attributed to SkiaSharp
+  metrics/fallback behavior.
+- Define acceptable parity thresholds for:
+  - layout metrics
+  - text baseline/ascent/descent
+  - anti-aliasing differences
+  - pixel-diff tolerances
+
+### 4.5 Build and Packaging Research
+
+- Determine how the custom implementation will ship native-free assets, fonts,
+  and codecs.
+- Decide whether SVG support remains internal, moves behind a separate module,
+  or stays temporarily delegated until the core raster path is complete.
+
+---
+
+## 5. Proposed Architecture and Module Plan
+
+### 5.1 Recommended Layering
+
+| Layer | Responsibility |
+|---|---|
+| `Broiler.Graphics.Abstractions` | Core types: `BColor`, `BBitmap`, `BCanvas`, `BImageFormat`, `BFont`, `BPath`, blend/clip primitives |
+| `Broiler.Graphics.Raster` | Custom software rasterizer implementation |
+| `Broiler.Graphics.Text` | Font loading, metrics, shaping hooks, fallback selection |
+| `Broiler.Graphics.Codecs` | PNG/image decode and encode support |
+| `Broiler.Graphics.Svg` | Optional SVG rasterization bridge or replacement |
+| `Broiler.HTML.Image` | Rendering facade built on Broiler graphics abstractions, not SkiaSharp types |
+| Compatibility shims | Temporary adapters for legacy `SK*`-based tests/tooling during migration |
+
+These can begin as namespaces or projects depending on team capacity. The key
+requirement is **clear ownership boundaries**, not immediate assembly splitting.
+
+### 5.2 Initial Custom Graphics Contracts
+
+The first internal API draft should cover at least:
+
+- bitmap creation/disposal and pixel get/set
+- canvas clear, translate, save/restore
+- rectangle/polygon/line/path draw/fill
+- clipping and rounded clipping
+- opacity and blend layers
+- text measurement and draw
+- image draw and tiled draw
+- image encoding to PNG
+
+### 5.3 Migration-Oriented API Changes
+
+Recommended early refactors:
+
+1. Change `HtmlRender` to return Broiler-owned bitmap types instead of
+   `SKBitmap`.
+2. Replace `SKColor` inputs with Broiler-owned color structs or shared adapters.
+3. Refactor `PixelDiffRunner` to operate on a backend-neutral bitmap contract.
+4. Keep an internal Skia compatibility adapter during transition so tests and
+   tools can migrate in smaller batches.
+
+### 5.4 Backend Strategy
+
+Use a **dual-backend phase**:
+
+- **Backend A**: existing SkiaSharp implementation
+- **Backend B**: new custom implementation
+
+Add a backend selection mechanism for tests and diagnostics so parity can be
+measured before the final switchover.
+
+---
+
+## 6. Migration and Phasing Strategy
+
+### Phase 0 — Discovery and Baseline
+
+- Complete the capability inventory and dependency map.
+- Capture current rendering/performance baselines.
+- Freeze the minimum feature set required for first replacement release.
+
+**Exit criteria**
+
+- agreed feature inventory
+- agreed parity metrics
+- agreed API migration targets
+
+### Phase 1 — Abstraction Extraction
+
+- Introduce Broiler-owned graphics primitives and interfaces.
+- Add compatibility wrappers around current Skia-backed implementations.
+- Move `HtmlRender`, `PixelDiffRunner`, and similar entry points to the new
+  contracts while still delegating to SkiaSharp underneath.
+
+**Exit criteria**
+
+- no new production APIs expose fresh `SK*` types
+- core render/diff flows compile against Broiler graphics abstractions
+
+### Phase 2 — Custom Raster Core
+
+- Implement bitmap, canvas, clipping, fills, strokes, alpha layers, and image
+  encoding in the custom backend.
+- Bring up deterministic rendering for non-text primitives first.
+
+**Exit criteria**
+
+- solid-color/layout-dominant test pages render correctly
+- pixel diff pipeline works against the custom bitmap model
+
+### Phase 3 — Text and Font Migration
+
+- Implement font loading, metrics, and text rasterization/shaping integration.
+- Reproduce current generic-family mapping and local font loading behavior.
+- Calibrate layout-impacting font metrics and baseline alignment.
+
+**Exit criteria**
+
+- representative text-heavy pages stay within agreed layout/pixel thresholds
+- existing font-loading workflows continue to function
+
+### Phase 4 — Tooling, SVG, and WPF Parity
+
+- Replace or isolate the remaining SkiaSharp-dependent tooling pieces:
+  - SVG rasterization path
+  - dev site render helpers
+  - CLI capture helpers
+  - WPT comparison utilities
+  - WPF image conversion bridges
+
+**Exit criteria**
+
+- dev/CI image workflows do not require runtime SkiaSharp for the default path
+
+### Phase 5 — Cutover and Removal
+
+- Switch the default backend to the custom implementation.
+- Keep SkiaSharp as an optional fallback for one stabilization window if needed.
+- Remove runtime SkiaSharp package references after validation and rollback
+  criteria are satisfied.
+
+**Exit criteria**
+
+- default backend is Broiler-owned
+- no runtime-critical path depends on SkiaSharp
+- package removal plan is approved and executed
+
+---
+
+## 7. Milestones, Resources, and Delivery Sequence
+
+The effort is significant enough to plan in **milestones** rather than ad-hoc
+PRs.
+
+| Milestone | Focus | Suggested staffing | Rough effort |
+|---|---|---|---:|
+| M0 | Discovery, dependency audit, baseline metrics | 1 rendering engineer + 1 reviewer | 1-2 weeks |
+| M1 | Graphics abstractions + API decoupling | 1-2 rendering engineers | 2-3 weeks |
+| M2 | Core bitmap/canvas raster features | 2 rendering engineers | 4-6 weeks |
+| M3 | Text/fonts/layout-sensitive parity | 2 rendering engineers + 1 test/fidelity owner | 4-8 weeks |
+| M4 | Tooling/WPF/SVG migration | 1-2 engineers | 2-4 weeks |
+| M5 | Cutover, stabilization, package removal | 1 engineer + reviewers | 1-2 weeks |
+
+### Recommended Role Split
+
+- **Rendering owner** — backend design, raster primitives, paint semantics
+- **Text/fidelity owner** — fonts, metrics, parity analysis, diff triage
+- **Tooling owner** — CLI/dev site/WPT/test migration
+- **Reviewer/maintainer** — API stability, rollout gating, regression review
+
+### Delivery Sequence
+
+1. baseline and audit
+2. abstraction extraction
+3. raster primitive parity
+4. text/font parity
+5. tooling and WPF migration
+6. cutover and cleanup
+
+This ordering keeps the highest-risk work (text fidelity) from being hidden
+inside the initial abstraction phase.
+
+---
+
+## 8. Compatibility Considerations
+
+### 8.1 API Compatibility
+
+- `HtmlRender` currently exposes SkiaSharp types directly; this is the most
+  important API seam to neutralize early.
+- Test helpers and dev tooling should be migrated with shims to avoid a single
+  large PR that mixes implementation and test rewrites.
+
+### 8.2 Behavioral Compatibility
+
+The replacement should preserve:
+
+- current display-list replay order
+- clipping semantics
+- border and gradient behavior
+- font-family mapping and local font loading behavior
+- PNG output compatibility for existing artifact workflows
+
+### 8.3 Rollback Strategy
+
+Until the custom backend is stable:
+
+- keep a selectable SkiaSharp backend available;
+- add backend-labeled artifacts in CI/dev diagnostics when parity differs; and
+- define explicit rollback conditions for text/layout regressions.
+
+---
+
+## 9. Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Text metrics differ enough to change layout | High | Isolate text migration as its own milestone; compare layout metrics and pixel output separately |
+| Public API churn spreads through many projects | High | Introduce Broiler-owned types first and migrate callers incrementally |
+| Pixel diff tooling becomes unstable during migration | High | Move diffing to backend-neutral bitmap contracts before backend cutover |
+| SVG support blocks cutover | Medium | Treat SVG as an isolated sub-track; allow temporary fallback if necessary |
+| Performance regresses versus SkiaSharp | High | Capture baseline metrics at M0 and enforce milestone-specific budgets |
+| WPF-specific image path lags behind | Medium | Keep WPF parity as a dedicated milestone, not an afterthought |
+| Package removal happens too early | High | Require dual-backend validation and explicit cutover criteria before removing fallback |
+
+---
+
+## 10. Acceptance and Testing Criteria
+
+### 10.1 Functional Acceptance
+
+The custom implementation should demonstrate:
+
+- successful rendering of representative CLI/dev/WPT pages;
+- correct output for current non-text rendering primitives;
+- stable PNG export and image-diff generation;
+- working font loading and family fallback;
+- no critical regression in WPF image/SVG workflows.
+
+### 10.2 Validation Strategy
+
+- keep existing solution build green;
+- run targeted rendering/image-comparison tests against both backends where
+  possible;
+- maintain a curated parity suite:
+  - acid fixtures
+  - representative WPT subsets
+  - CLI screenshot samples
+  - SVG sample pages
+  - text-heavy regression pages
+
+### 10.3 Exit Metrics
+
+Before default cutover:
+
+- **layout parity**: no known P0 layout regressions on the curated suite
+- **pixel parity**: agreed diff thresholds met for representative pages
+- **performance**: no unacceptable regression against M0 baselines
+- **stability**: CI/dev-site/CLI workflows succeed without backend-specific
+  manual intervention
+
+---
+
+## 11. Documentation Strategy
+
+Documentation should be updated in parallel with implementation, not after it.
+
+### 11.1 Developer Documentation
+
+- architecture note describing Broiler graphics abstractions and backend
+  boundaries;
+- migration guide for converting `SK*`-based call sites to Broiler-owned types;
+- backend-selection instructions for tests and diagnostics;
+- contributor notes for adding new drawing primitives.
+
+### 11.2 User/Operator Documentation
+
+- CLI/dev-site notes if output differences or backend toggles are exposed;
+- release notes describing the migration stage and known fidelity caveats;
+- troubleshooting guidance for font/resource issues if behavior changes.
+
+### 11.3 Tracking Artifacts
+
+- keep this roadmap updated as milestones advance;
+- record milestone decisions in ADRs when architecture choices become final;
+- maintain a living parity dashboard or checklist for backend comparison.
+
+---
+
+## 12. Open Questions
+
+1. Should the custom implementation begin as a single assembly/namespace or as a
+   dedicated `Broiler.Graphics.*` project set from day one?
+2. Is SVG rasterization part of the first backend cutover, or an explicitly
+   allowed temporary fallback?
+3. Will Broiler own font shaping fully, or integrate an external shaping
+   component behind a Broiler API?
+4. Which APIs must remain source-compatible for downstream consumers, if any?
+5. What performance regression budget is acceptable for the first non-Skia
+   release?
+6. Should CI run a dual-backend comparison matrix during the migration window?
+
+---
+
+## Suggested Next Steps for the Tracking Issue
+
+1. Convert the capability inventory and API audit into a checked list linked from
+   the issue.
+2. Assign owners for M0 discovery, M1 abstractions, and M3 text fidelity up
+   front.
+3. Decide whether the first implementation target is full runtime replacement or
+   an internal preview backend behind a feature flag.
