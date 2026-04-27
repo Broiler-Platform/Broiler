@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using Broiler.HTML.Core.Core.IR;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image;
 
@@ -117,24 +115,6 @@ public static class PixelDiffRunner
             IsMatch = false,
             Mismatches = mismatches
         };
-    }
-
-    /// <summary>
-    /// Compares two bitmaps per-pixel and returns a <see cref="PixelDiffResult"/>
-    /// including a diff bitmap highlighting changed pixels.
-    /// </summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static PixelDiffResult Compare(
-        SKBitmap actual,
-        SKBitmap baseline,
-        DeterministicRenderConfig? config = null)
-    {
-        ArgumentNullException.ThrowIfNull(actual);
-        ArgumentNullException.ThrowIfNull(baseline);
-
-        using var actualBitmap = BBitmap.Wrap(actual);
-        using var baselineBitmap = BBitmap.Wrap(baseline);
-        return Compare(actualBitmap, baselineBitmap, config);
     }
 
     private static BBitmap NormalizeForComparison(BBitmap source)

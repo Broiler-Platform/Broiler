@@ -28,8 +28,6 @@ public class SkiaDecouplingGuardTests
         "HtmlRender.RenderToImage(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>, String) -> SKBitmap",
         "HtmlRender.RenderToImageAutoSized(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>) -> SKBitmap",
         "HtmlRender.RenderToPng(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>) -> Byte[]",
-        "PixelDiffResult.DiffImage -> SKBitmap",
-        "PixelDiffRunner.Compare(SKBitmap, SKBitmap, DeterministicRenderConfig) -> PixelDiffResult",
     ];
 
     [Fact]

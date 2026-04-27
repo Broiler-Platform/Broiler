@@ -82,7 +82,7 @@ Current integration points that must be covered by the roadmap:
 |---|---|---|
 | `Broiler.HTML.Image/HtmlRender` | Primary API is now `BBitmap`/`BColor`/`BImageFormat`; compatibility overloads still return `SKBitmap`, accept `SKColor`, and encode via `SKEncodedImageFormat` | Public rendering surface still defines the migration pace for consumers |
 | `Broiler.HTML.Image/Adapters/*` | Skia-backed implementation of `RAdapter`, brushes, pens, images, fonts, paths, canvas | Core raster implementation |
-| `PixelDiffRunner` / `PixelDiffResult` | Primary API is `BBitmap`; `Compare(SKBitmap, SKBitmap)` and `DiffImage` remain as compatibility shims | Visual regression infrastructure still has a narrow compatibility seam |
+| `PixelDiffRunner` / `PixelDiffResult` | Primary API is `BBitmap`; the high-level public diff surface no longer exposes `SKBitmap` compatibility shims | Visual regression infrastructure is now on the backend-neutral bitmap API at the public entry-point layer |
 | `Broiler.HTML.WPF/WpfAdapter` | No direct SkiaSharp usage; routes SVG loading through `BSvgRasterizer` | WPF compatibility path now depends on the shared abstraction boundary instead of Skia APIs |
 | `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | DevSite, WPT, and CLI now consume `BBitmap`-first APIs without direct Skia imports | External tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 | Rendering tests | Construct and inspect `SKBitmap` values directly | Large migration surface for validation |
@@ -424,13 +424,14 @@ PRs.
 | Surface | Broiler-owned path available now | Remaining public/compatibility `SK*` exposure | Current downstream status |
 |---|---|---|---|
 | `HtmlRender` | Yes — `BBitmap`, `BColor`, `BImageFormat`, and anchor-render helpers are present | `RenderToImage(...)` / `RenderToImageAutoSized(...)` return `SKBitmap`; overloads still accept `SKColor`; `RenderToFile(...)` still exposes `SKEncodedImageFormat` | DevSite and WPT use the Broiler-owned path; CLI uses Broiler-owned save/anchor helpers |
-| `PixelDiffRunner` | Yes — `Compare(BBitmap, BBitmap, ...)` is the primary path | `Compare(SKBitmap, SKBitmap, ...)` remains as a compatibility shim | Downstream production callers are already on `BBitmap`; compatibility remains for incremental cleanup and tests |
-| `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | `DiffImage` still returns `SKBitmap` copies | DevSite compare/test pages use `DiffBitmap`; older callers/tests can still consume `DiffImage` |
+| `PixelDiffRunner` | Yes — `Compare(BBitmap, BBitmap, ...)` is the primary path | None at the high-level public API layer | Downstream production callers are already on `BBitmap`; no high-level `SKBitmap` compare shim remains |
+| `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | None at the high-level public API layer | DevSite compare/test pages use `DiffBitmap`; no high-level `SKBitmap` diff-image shim remains |
 | Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat` | Tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 
 The remaining high-level `SK*` members above are now explicitly hidden from
-IntelliSense as compatibility shims, and `SkiaDecouplingGuardTests` freezes that
-allowlist so new high-level `SK*` public APIs do not creep back in unnoticed.
+IntelliSense as compatibility shims, and `SkiaDecouplingGuardTests` freezes the
+reduced allowlist so new high-level `SK*` public APIs do not creep back in
+unnoticed.
 
 ##### M0 package footprint and removal order (2026-04-27)
 
@@ -449,8 +450,8 @@ Proposed removal order:
 2. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
    `Broiler.HTML.Image` requires Skia on Linux.
 3. Remove `SkiaSharp` after the remaining compatibility shims in `HtmlRender`,
-   `PixelDiffRunner`, `PixelDiffResult`, `BBitmap`, and the Skia adapter layer
-   are either deleted or isolated behind a non-runtime compatibility package.
+   `BBitmap`, and the Skia adapter layer are either deleted or isolated behind a
+   non-runtime compatibility package.
 
 ##### M0 CI/backend-comparison decision (2026-04-27)
 
@@ -473,8 +474,8 @@ Evidence driving the decision today:
   Skia-backed implementation that satisfies the new interfaces.
 - [ ] Move `HtmlRender` off `SKBitmap`, `SKColor`, and `SKEncodedImageFormat`
   in favor of Broiler-owned types or tightly scoped compatibility shims.
-- [ ] Refactor `PixelDiffRunner` and `PixelDiffResult` to operate on a
-  backend-neutral bitmap contract.
+- [x] Refactor `PixelDiffRunner` and `PixelDiffResult` to operate on a
+  backend-neutral bitmap contract at the high-level public API layer.
 - [ ] Add temporary adapters so CLI, DevSite, WPT, and existing tests can
   migrate incrementally instead of requiring a single all-at-once rewrite.
 - [x] Freeze a "no new `SK*` in production APIs" rule once the replacement
