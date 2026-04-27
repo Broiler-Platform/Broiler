@@ -38,12 +38,29 @@ public class SkiaDecouplingGuardTests
                 }
 
                 var lines = File.ReadAllLines(path);
+                var inBlockComment = false;
                 for (var i = 0; i < lines.Length; i++)
                 {
                     var line = lines[i].Trim();
+
+                    if (inBlockComment)
+                    {
+                        if (line.Contains("*/", StringComparison.Ordinal))
+                            inBlockComment = false;
+
+                        continue;
+                    }
+
+                    if (line.StartsWith("/*", StringComparison.Ordinal))
+                    {
+                        if (!line.Contains("*/", StringComparison.Ordinal))
+                            inBlockComment = true;
+
+                        continue;
+                    }
+
                     if (line.StartsWith("//", StringComparison.Ordinal) ||
-                        line.StartsWith("///", StringComparison.Ordinal) ||
-                        line.StartsWith("*", StringComparison.Ordinal))
+                        line.StartsWith("///", StringComparison.Ordinal))
                     {
                         continue;
                     }
