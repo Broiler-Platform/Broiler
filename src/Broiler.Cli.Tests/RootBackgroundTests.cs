@@ -94,9 +94,9 @@ public class RootBackgroundTests
         using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: 200);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(192, pixel.Red);
-        Assert.Equal(192, pixel.Green);
-        Assert.Equal(192, pixel.Blue);
+        Assert.Equal(192, pixel.R);
+        Assert.Equal(192, pixel.G);
+        Assert.Equal(192, pixel.B);
     }
 
     /// <summary>

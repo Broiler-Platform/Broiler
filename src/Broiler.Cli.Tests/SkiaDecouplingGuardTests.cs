@@ -24,10 +24,7 @@ public class SkiaDecouplingGuardTests
 
     private static readonly string[] AllowedHighLevelSkiaCompatibilityMembers =
     [
-        "HtmlRender.RenderToFile(String, Int32, Int32, String, SKEncodedImageFormat, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>, String) -> Void",
         "HtmlRender.RenderToImage(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>, String) -> SKBitmap",
-        "HtmlRender.RenderToImageAutoSized(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>) -> SKBitmap",
-        "HtmlRender.RenderToPng(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>) -> Byte[]",
     ];
 
     [Fact]

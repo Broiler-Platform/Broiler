@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Core.Core.Entities;
@@ -32,12 +31,19 @@ public static class HtmlRender
         return bitmap.ToSkBitmapCopy();
     }
 
-    public static BBitmap RenderToImageAutoSized(string html, int maxWidth, int maxHeight,
-        BColor backgroundColor,
+    public static BBitmap RenderToImageAutoSized(string html, int maxWidth = 0, int maxHeight = 0,
+        BColor backgroundColor = default,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null) =>
-        RenderToImageAutoSizedCore(html, maxWidth, maxHeight, backgroundColor, cssData, stylesheetLoad, imageLoad);
+        RenderToImageAutoSizedCore(
+            html,
+            maxWidth,
+            maxHeight,
+            backgroundColor == default ? null : backgroundColor,
+            cssData,
+            stylesheetLoad,
+            imageLoad);
 
     public static BBitmap? RenderToImageAtAnchor(string html, string elementId, int width, int height,
         BColor backgroundColor = default,
@@ -56,31 +62,12 @@ public static class HtmlRender
             imageLoad,
             baseUrl);
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SKBitmap RenderToImageAutoSized(string html, int maxWidth = 0, int maxHeight = 0,
-        SKColor backgroundColor = default,
-        CssData cssData = null,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
-    {
-        using var bitmap = RenderToImageAutoSizedCore(html, maxWidth, maxHeight, backgroundColor == default ? null : backgroundColor.ToBColor(), cssData, stylesheetLoad, imageLoad);
-        return bitmap.ToSkBitmapCopy();
-    }
-
     public static byte[] RenderToPng(string html, int width, int height,
         BColor backgroundColor,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
         => RenderToPngCore(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad);
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static byte[] RenderToPng(string html, int width, int height,
-        SKColor backgroundColor = default,
-        CssData cssData = null,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
-        => RenderToPngCore(html, width, height, backgroundColor == default ? null : backgroundColor.ToBColor(), cssData, stylesheetLoad, imageLoad);
 
     public static void RenderToFile(string html, int width, int height, string filePath,
         BImageFormat format,
@@ -102,23 +89,6 @@ public static class HtmlRender
             imageLoad,
             baseUrl);
         bitmap.Save(filePath, format, quality);
-    }
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void RenderToFile(string html, int width, int height, string filePath,
-        SKEncodedImageFormat format = SKEncodedImageFormat.Png,
-        int quality = 90,
-        SKColor backgroundColor = default,
-        CssData cssData = null,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null, string baseUrl = null)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(filePath);
-
-        using var bitmap = RenderToImage(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, baseUrl:baseUrl);
-        using var data = bitmap.Encode(format, quality);
-        using var stream = File.OpenWrite(filePath);
-        data.SaveTo(stream);
     }
 
     public static void RenderToFileAutoSized(string html, string filePath,
