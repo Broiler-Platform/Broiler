@@ -4584,8 +4584,13 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         ]);
 
         using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var backend = doc.RootElement.GetProperty("renderBackend");
         var result = doc.RootElement.GetProperty("results").EnumerateArray().Single();
 
+        Assert.Equal(BGraphicsBackend.CurrentId, backend.GetProperty("id").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, backend.GetProperty("displayName").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentId, result.GetProperty("renderBackendId").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, result.GetProperty("renderBackendDisplayName").GetString());
         Assert.Equal("Timeout", result.GetProperty("category").GetString());
         Assert.Contains("Test timed out after 0.05 second(s)", result.GetProperty("message").GetString());
         Assert.Contains("Timeout detection stack", result.GetProperty("stackTrace").GetString());
@@ -4665,6 +4670,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         var markdown = File.ReadAllText(markdownPath);
         Assert.Contains("## Timeout failures", markdown);
+        Assert.Contains($"- Render backend: {BGraphicsBackend.CurrentLabel}", markdown);
         Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html`", markdown);
         Assert.Contains("`css/css-tables/html5-table-formatting-3.html`", markdown);
         Assert.Contains("### Suggested timeout subset commands", markdown);
@@ -5707,6 +5713,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         var json = result.ToJsonObject();
 
         Assert.Equal("/test.html", json["testPath"]);
+        Assert.Equal(BGraphicsBackend.CurrentId, json["renderBackendId"]);
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, json["renderBackendDisplayName"]);
         Assert.Equal(false, json["passed"]);
         Assert.Equal(85.5, json["matchPercent"]);
         Assert.Equal("PixelMismatch", json["category"]);

@@ -49,6 +49,16 @@ internal enum SkipReason
 /// </summary>
 internal sealed class WptTestResult
 {
+    /// <summary>
+    /// Stable machine-readable identifier of the backend that produced the rendered image.
+    /// </summary>
+    public string RenderBackendId { get; init; } = BGraphicsBackend.CurrentId;
+
+    /// <summary>
+    /// Human-readable name of the backend that produced the rendered image.
+    /// </summary>
+    public string RenderBackendDisplayName { get; init; } = BGraphicsBackend.CurrentDisplayName;
+
     /// <summary>Full path to the test file.</summary>
     public required string TestPath { get; init; }
 
@@ -100,14 +110,18 @@ internal sealed class WptTestResult
         var obj = new Dictionary<string, object?>
         {
             ["testPath"] = TestPath,
+            ["renderBackendId"] = RenderBackendId,
+            ["renderBackendDisplayName"] = RenderBackendDisplayName,
             ["passed"] = Passed,
             ["skipped"] = Skipped,
-            ["skipReason"] = SkipReason != SkipReason.None ? SkipReason.ToString() : null,
             ["matchPercent"] = MatchPercent,
             ["category"] = Category.ToString(),
             ["message"] = Message,
             ["stackTrace"] = StackTrace,
         };
+
+        if (SkipReason != SkipReason.None)
+            obj["skipReason"] = SkipReason.ToString();
 
         if (!string.IsNullOrWhiteSpace(wptPath))
         {
