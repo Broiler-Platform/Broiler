@@ -71,9 +71,15 @@ public static class HtmlRender
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        using var bitmap = backgroundColor == default
-            ? RenderToImageCore(html, width, height, null, cssData, stylesheetLoad, imageLoad, baseUrl)
-            : RenderToImage(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, baseUrl);
+        using var bitmap = RenderToImageCore(
+            html,
+            width,
+            height,
+            backgroundColor == default ? null : backgroundColor,
+            cssData,
+            stylesheetLoad,
+            imageLoad,
+            baseUrl);
         bitmap.Save(filePath, format, quality);
     }
 
@@ -105,9 +111,14 @@ public static class HtmlRender
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        using var bitmap = backgroundColor == default
-            ? RenderToImageAutoSizedCore(html, maxWidth, maxHeight, null, cssData, stylesheetLoad, imageLoad)
-            : RenderToImageAutoSized(html, maxWidth, maxHeight, backgroundColor, cssData, stylesheetLoad, imageLoad);
+        using var bitmap = RenderToImageAutoSizedCore(
+            html,
+            maxWidth,
+            maxHeight,
+            backgroundColor == default ? null : backgroundColor,
+            cssData,
+            stylesheetLoad,
+            imageLoad);
         bitmap.Save(filePath, format, quality);
     }
 
