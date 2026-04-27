@@ -61,10 +61,11 @@ as a platform migration rather than a single-package swap:
     `SkiaSharp.NativeAssets.Linux`
   - `Broiler.HTML.WPF` references `SkiaSharp`
 - **Production source usage**
-  - roughly **19 production files** currently import `SkiaSharp`
+  - the current audit confirms **19 production files** currently import
+    `SkiaSharp`
   - the most concentrated usage is in `Broiler.HTML.Image`
 - **Test usage**
-  - roughly **19 test files** currently import `SkiaSharp`
+  - the current audit confirms **16 test files** currently import `SkiaSharp`
   - many image-comparison and rendering tests use `SKBitmap` directly
 
 ### 2.2 Primary Integration Points
@@ -193,6 +194,36 @@ Create a baseline for the current SkiaSharp path:
   and codecs.
 - Decide whether SVG support remains internal, moves behind a separate module,
   or stays temporarily delegated until the core raster path is complete.
+
+### 4.6 Current Blockers and Investigation Snapshot
+
+The latest repository audit highlights the following concrete blockers that
+should shape milestone planning:
+
+- **Public API blocker** — `Broiler.HTML.Image/HtmlRender` still returns
+  `SKBitmap`, accepts `SKColor`, and exposes `SKEncodedImageFormat`, so any
+  backend replacement remains coupled to SkiaSharp until that surface is
+  neutralized.
+- **Workflow coupling blocker** — CLI capture/layout fuzzing, DevSite rendering
+  pages, and the WPT runner still consume Skia-backed rendering outputs
+  directly, so abstraction work has to include a compatibility layer for those
+  entry points instead of only changing renderer internals.
+- **Validation blocker** — `PixelDiffRunner`, `PixelDiffResult`, and a large set
+  of rendering/image-comparison tests still assume `SKBitmap`, which means the
+  diff pipeline must be migrated early or parity work will stall behind test
+  infrastructure churn.
+- **SVG/WPF blocker** — `SkiaImageAdapter` and `Broiler.HTML.WPF/WpfAdapter`
+  still depend on SkiaSharp for bitmap decode/encode and SVG rasterization, so
+  the SVG fallback policy needs to be decided before tooling/WPF migration can
+  finish.
+- **Packaging blocker** — runtime package removal is concentrated in
+  `Broiler.HTML.Image` and `Broiler.HTML.WPF`, but `SkiaSharp.NativeAssets.Linux`
+  means the final cutover must explicitly account for packaging/runtime asset
+  changes rather than treating dependency removal as a pure code cleanup step.
+- **Typography investigation hotspot** — font loading, generic-family mapping,
+  and text measurement currently live in the image adapter stack, so typography
+  parity work needs explicit M0/M3 spikes rather than waiting until the final
+  cutover window.
 
 ---
 
@@ -339,6 +370,92 @@ PRs.
 | M4 | Tooling/WPF/SVG migration | 1-2 engineers | 2-4 weeks |
 | M5 | Cutover, stabilization, package removal | 1 engineer + reviewers | 1-2 weeks |
 
+### Actionable Milestone Backlog
+
+#### M0 — Discovery, Dependency Audit, Baseline Metrics
+
+**Primary owners:** rendering owner + reviewer
+
+- [ ] Produce a checked inventory of every `SK*` type/member used in
+  `Broiler.HTML.Image`, `Broiler.HTML.WPF`, `Broiler.Cli`, `Broiler.DevSite`,
+  and `Broiler.Wpt`.
+- [ ] Publish an API exposure matrix for `HtmlRender`, `PixelDiffRunner`,
+  `PixelDiffResult`, and downstream wrappers that currently leak `SKBitmap`,
+  `SKColor`, or `SKEncodedImageFormat`.
+- [ ] Capture render time, memory, and PNG encode/decode baselines for CLI
+  sample pages, acid fixtures, and a representative WPT subset.
+- [ ] Record the current native/package footprint and proposed removal order for
+  `SkiaSharp`, `SkiaSharp.NativeAssets.Linux`, and any SVG-specific fallback.
+- [ ] Decide whether backend comparison runs in CI from M1 onward or begins as a
+  local/dev-only diagnostic path.
+
+#### M1 — Graphics Abstractions and API Decoupling
+
+**Primary owners:** rendering owner + reviewer, with tooling owner support
+
+- [ ] Introduce Broiler-owned bitmap/color/image-format contracts plus a
+  Skia-backed implementation that satisfies the new interfaces.
+- [ ] Move `HtmlRender` off `SKBitmap`, `SKColor`, and `SKEncodedImageFormat`
+  in favor of Broiler-owned types or tightly scoped compatibility shims.
+- [ ] Refactor `PixelDiffRunner` and `PixelDiffResult` to operate on a
+  backend-neutral bitmap contract.
+- [ ] Add temporary adapters so CLI, DevSite, WPT, and existing tests can
+  migrate incrementally instead of requiring a single all-at-once rewrite.
+- [ ] Freeze a "no new `SK*` in production APIs" rule once the replacement
+  surface exists.
+
+#### M2 — Core Bitmap/Canvas Raster Features
+
+**Primary owners:** rendering owner
+
+- [ ] Implement bitmap allocation, pixel access, canvas clear, transforms,
+  clipping, fills, strokes, and opacity/blend primitives in the custom backend.
+- [ ] Replay the existing display-list path through the new canvas primitives
+  without changing layout behavior.
+- [ ] Bring the diff pipeline up on the custom bitmap model for non-text pages.
+- [ ] Validate the backend on layout-dominant and shape-heavy fixtures before
+  enabling text rendering work.
+
+#### M3 — Text, Fonts, and Layout-Sensitive Fidelity
+
+**Primary owners:** text/fidelity owner + rendering owner
+
+- [ ] Lift font loading and family fallback policy into backend-neutral services
+  so the current generic-family mappings can be preserved.
+- [ ] Decide whether shaping remains custom or is delegated behind a Broiler API,
+  and prototype the selected path against representative text-heavy pages.
+- [ ] Establish layout, baseline, and pixel-diff thresholds for text-heavy
+  regression suites before broad rollout.
+- [ ] Compare current SkiaSharp text behavior against the custom backend and
+  capture known acceptable differences explicitly.
+- [ ] Keep local font loading and Ahem/WPT-style font workflows working through
+  the new abstraction layer.
+
+#### M4 — Tooling, SVG, and WPF Migration
+
+**Primary owners:** tooling owner + rendering owner
+
+- [ ] Decide and document whether SVG ships as a Broiler-owned module or a
+  temporary fallback behind the graphics abstraction.
+- [ ] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
+  utilities with backend-neutral bitmap handling.
+- [ ] Migrate the WPF bridge away from direct SkiaSharp bitmap/SVG conversion.
+- [ ] Ensure diagnostics and artifact generation label which backend produced the
+  image so parity triage remains actionable.
+
+#### M5 — Cutover, Stabilization, Package Removal
+
+**Primary owners:** reviewer/maintainer + rendering owner
+
+- [ ] Switch the default backend to the Broiler-owned implementation while
+  keeping an explicit fallback path for one stabilization window if needed.
+- [ ] Run the curated parity suite and performance checks against the default
+  backend until rollback criteria are either cleared or exercised.
+- [ ] Remove runtime SkiaSharp package references and native assets only after
+  the fallback window and packaging validation are complete.
+- [ ] Publish release notes and migration guidance for any consumer-visible API
+  changes or fidelity caveats.
+
 ### Recommended Role Split
 
 - **Rendering owner** — backend design, raster primitives, paint semantics
@@ -478,13 +595,35 @@ Documentation should be updated in parallel with implementation, not after it.
    release?
 6. Should CI run a dual-backend comparison matrix during the migration window?
 
+### Ambiguities Requiring Team Coordination
+
+- **Project layout decision (M0 deadline)** — settle whether the first
+  implementation lands as namespaces in existing projects or as a new
+  `Broiler.Graphics.*` project family before M1 API work starts.
+- **Public compatibility decision (M0/M1 deadline)** — document which
+  `HtmlRender` and image-diff APIs must remain source-compatible for downstream
+  consumers before signatures begin changing.
+- **SVG fallback decision (M1 deadline)** — decide whether SVG stays delegated
+  temporarily or is part of the first custom graphics deliverable, because WPF
+  and tooling tasks depend on that branch point.
+- **Text shaping decision (before M3)** — choose between a Broiler-owned shaping
+  path and an external shaping component behind a Broiler API before typography
+  parity work expands.
+- **Validation/CI decision (M0 deadline)** — align on how much dual-backend CI,
+  artifact retention, and parity reporting the team is willing to carry during
+  the migration window.
+
 ---
 
 ## Suggested Next Steps for the Tracking Issue
 
-1. Convert the capability inventory and API audit into a checked list linked from
-   the issue.
-2. Assign owners for M0 discovery, M1 abstractions, and M3 text fidelity up
-   front.
-3. Decide whether the first implementation target is full runtime replacement or
-   an internal preview backend behind a feature flag.
+1. Convert the capability inventory and API audit into linked checklists and
+   attach them to M0.
+2. Assign owners for M0 discovery, M1 abstractions/API decoupling, M3 text
+   fidelity, and M4 tooling/WPF migration up front.
+3. Schedule a short architecture review to settle project layout and downstream
+   API compatibility before M1 starts.
+4. Schedule a fidelity/tooling review to settle SVG fallback scope, shaping
+   strategy, and dual-backend CI expectations.
+5. Decide whether the first implementation target is a preview backend behind a
+   feature flag or a full runtime replacement path from the start.
