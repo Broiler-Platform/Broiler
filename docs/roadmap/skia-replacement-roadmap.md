@@ -59,15 +59,20 @@ as a platform migration rather than a single-package swap:
 - **Package dependencies**
   - `Broiler.HTML.Image` references `SkiaSharp` and
     `SkiaSharp.NativeAssets.Linux`
-  - `Broiler.HTML.WPF` references `SkiaSharp`
+  - `Broiler.HTML.Image` still references `Svg.Skia` for the temporary
+    `BSvgRasterizer` fallback
+  - `Broiler.HTML.WPF` no longer references `SkiaSharp` directly; it consumes the
+    shared `Broiler.HTML.Image` fallback boundary instead
 - **Production source usage**
-  - the current audit confirms **19 production files** currently import
-    `SkiaSharp`
-  - the most concentrated usage is in `Broiler.HTML.Image`
+  - the current audit confirms **16 production files** currently import
+    `SkiaSharp`, with **15 of them under `Broiler.HTML.Image`** and the
+    remaining import in `src/Broiler.Cli/CaptureService.cs`
+  - `Broiler.HTML.WPF`, `Broiler.DevSite`, and `Broiler.Wpt` currently have
+    **no direct `SK*` source usage**
 - **Test usage**
-  - the current audit confirms **16 test files** currently import `SkiaSharp`
-    directly, with additional test touch points still present through shared
-    helpers and downstream bitmap consumers
+  - the current audit confirms **21 test files** currently import `SkiaSharp`
+    directly, with the concentration now in image-comparison and compatibility
+    coverage rather than production adapters
   - many image-comparison and rendering tests use `SKBitmap` directly
 
 ### 2.2 Primary Integration Points
@@ -76,11 +81,11 @@ Current integration points that must be covered by the roadmap:
 
 | Area | Current dependency shape | Why it matters |
 |---|---|---|
-| `Broiler.HTML.Image/HtmlRender` | Returns `SKBitmap`, accepts `SKColor`, encodes via `SKEncodedImageFormat` | Public rendering surface for CLI/dev tooling |
+| `Broiler.HTML.Image/HtmlRender` | Primary API is now `BBitmap`/`BColor`/`BImageFormat`; compatibility overloads still return `SKBitmap`, accept `SKColor`, and encode via `SKEncodedImageFormat` | Public rendering surface still defines the migration pace for consumers |
 | `Broiler.HTML.Image/Adapters/*` | Skia-backed implementation of `RAdapter`, brushes, pens, images, fonts, paths, canvas | Core raster implementation |
-| `PixelDiffRunner` / `PixelDiffResult` | Uses `SKBitmap` for normalization and diff images | Visual regression infrastructure |
-| `Broiler.HTML.WPF/WpfAdapter` | Uses SkiaSharp for SVG rasterization and image conversion | WPF compatibility path |
-| `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | Consume `SKBitmap`-based APIs | External tooling and workflow coupling |
+| `PixelDiffRunner` / `PixelDiffResult` | Primary API is `BBitmap`; `Compare(SKBitmap, SKBitmap)` and `DiffImage` remain as compatibility shims | Visual regression infrastructure still has a narrow compatibility seam |
+| `Broiler.HTML.WPF/WpfAdapter` | No direct SkiaSharp usage; routes SVG loading through `BSvgRasterizer` | WPF compatibility path now depends on the shared abstraction boundary instead of Skia APIs |
+| `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | DevSite and WPT now consume `BBitmap`-first APIs; CLI still has one internal Skia import in capture compatibility code | External tooling migration is mostly complete, with CLI as the last direct production tool-side touch point |
 | Rendering tests | Construct and inspect `SKBitmap` values directly | Large migration surface for validation |
 
 ### 2.3 Existing Architectural Seams
@@ -378,18 +383,85 @@ PRs.
 
 **Primary owners:** rendering owner + reviewer
 
-- [ ] Produce a checked inventory of every `SK*` type/member used in
+- [x] Produce a checked inventory of every `SK*` type/member used in
   `Broiler.HTML.Image`, `Broiler.HTML.WPF`, `Broiler.Cli`, `Broiler.DevSite`,
   and `Broiler.Wpt`.
-- [ ] Publish an API exposure matrix for `HtmlRender`, `PixelDiffRunner`,
+- [x] Publish an API exposure matrix for `HtmlRender`, `PixelDiffRunner`,
   `PixelDiffResult`, and downstream wrappers that currently leak `SKBitmap`,
   `SKColor`, or `SKEncodedImageFormat`.
 - [ ] Capture render time, memory, and PNG encode/decode baselines for CLI
   sample pages, acid fixtures, and a representative WPT subset.
-- [ ] Record the current native/package footprint and proposed removal order for
+- [x] Record the current native/package footprint and proposed removal order for
   `SkiaSharp`, `SkiaSharp.NativeAssets.Linux`, and any SVG-specific fallback.
-- [ ] Decide whether backend comparison runs in CI from M1 onward or begins as a
+- [x] Decide whether backend comparison runs in CI from M1 onward or begins as a
   local/dev-only diagnostic path.
+
+##### M0 inventory snapshot (2026-04-27)
+
+| Area | Current `SK*` usage snapshot |
+|---|---|
+| `Broiler.HTML.Image` | `HtmlRender`, `HtmlContainer`, `BBitmap`, `BSvgRasterizer`, `SkiaCompat`, `PixelDiffRunner`, `PixelDiffResult`, `Utilities/Utils`, and the Skia-backed adapter types still use `SKBitmap`, `SKCanvas`, `SKColor`, `SKEncodedImageFormat`, font primitives, shaders, and path/paint types. |
+| `Broiler.HTML.WPF` | No direct `SK*` type/member usage remains in source. |
+| `Broiler.Cli` | One production file (`src/Broiler.Cli/CaptureService.cs`) still imports `SkiaSharp`; no public CLI rendering surface currently exposes `SKBitmap`, `SKColor`, or `SKEncodedImageFormat`. |
+| `Broiler.DevSite` | No direct `SK*` type/member usage remains in source. |
+| `Broiler.Wpt` | No direct `SK*` type/member usage remains in source. |
+
+**Checked `SK*` symbol inventory**
+
+- `Broiler.HTML.Image`: `SKAlphaType`, `SKBitmap`, `SKBlendMode`,
+  `SKCanvas`, `SKClipOperation`, `SKColor`, `SKColorType`, `SKColors`,
+  `SKData`, `SKEncodedImageFormat`, `SKFilterQuality`, `SKFont`,
+  `SKFontEdging`, `SKFontManager`, `SKFontStyle`, `SKFontStyleSlant`,
+  `SKFontStyleWeight`, `SKFontStyleWidth`, `SKMatrix`, `SKPaint`,
+  `SKPaintStyle`, `SKPath`, `SKPathEffect`, `SKPoint`, `SKRect`,
+  `SKRoundRect`, `SKShader`, `SKShaderTileMode`, `SKSvg`, `SKTypeface`
+- `Broiler.HTML.WPF`: none
+- `Broiler.Cli`: no `SK*` symbol usage outside the single `SkiaSharp` import in
+  `CaptureService`
+- `Broiler.DevSite`: none
+- `Broiler.Wpt`: none
+
+##### M0 API exposure matrix (2026-04-27)
+
+| Surface | Broiler-owned path available now | Remaining public/compatibility `SK*` exposure | Current downstream status |
+|---|---|---|---|
+| `HtmlRender` | Yes — `BBitmap`, `BColor`, `BImageFormat`, and anchor-render helpers are present | `RenderToImage(...)` / `RenderToImageAutoSized(...)` return `SKBitmap`; overloads still accept `SKColor`; `RenderToFile(...)` still exposes `SKEncodedImageFormat` | DevSite and WPT use the Broiler-owned path; CLI uses Broiler-owned save/anchor helpers |
+| `PixelDiffRunner` | Yes — `Compare(BBitmap, BBitmap, ...)` is the primary path | `Compare(SKBitmap, SKBitmap, ...)` remains as a compatibility shim | Downstream production callers are already on `BBitmap`; compatibility remains for incremental cleanup and tests |
+| `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | `DiffImage` still returns `SKBitmap` copies | DevSite compare/test pages use `DiffBitmap`; older callers/tests can still consume `DiffImage` |
+| Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Mostly yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat`; the remaining tool-side Skia touch point is internal CLI compatibility code | Tooling migration is effectively complete outside the last internal CLI import |
+
+##### M0 package footprint and removal order (2026-04-27)
+
+Current package footprint:
+
+- `Broiler.HTML.Image` references `SkiaSharp`
+- `Broiler.HTML.Image` references `SkiaSharp.NativeAssets.Linux`
+- `Broiler.HTML.Image` references `Svg.Skia`
+- `Broiler.HTML.WPF` no longer carries direct SkiaSharp or Svg.Skia package
+  references; it consumes the shared `Broiler.HTML.Image` boundary instead
+
+Proposed removal order:
+
+1. Remove `Svg.Skia` after `BSvgRasterizer` no longer depends on the Skia-based
+   SVG fallback.
+2. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
+   `Broiler.HTML.Image` requires Skia on Linux.
+3. Remove `SkiaSharp` after the remaining compatibility shims in `HtmlRender`,
+   `PixelDiffRunner`, `PixelDiffResult`, `BBitmap`, and the Skia adapter layer
+   are either deleted or isolated behind a non-runtime compatibility package.
+
+##### M0 CI/backend-comparison decision (2026-04-27)
+
+Current decision: keep backend comparison **local/dev-only** until a second
+Broiler-owned backend is runnable enough to justify CI cost.
+
+Evidence driving the decision today:
+
+- the only current workflow is `.github/workflows/wpt-tests.yml`
+- that workflow runs a single backend path and publishes triage artifacts, but
+  does not run a dual-backend matrix
+- backend-labelled JSON/Markdown artifacts already exist, so local/dev parity
+  diagnostics can mature before CI carries a matrix
 
 #### M1 — Graphics Abstractions and API Decoupling
 
@@ -595,7 +667,9 @@ Documentation should be updated in parallel with implementation, not after it.
 4. Which APIs must remain source-compatible for downstream consumers, if any?
 5. What performance regression budget is acceptable for the first non-Skia
    release?
-6. Should CI run a dual-backend comparison matrix during the migration window?
+6. CI comparison decision (resolved for M0): begin with local/dev-only backend
+   comparison diagnostics, and revisit a dual-backend CI matrix once a second
+   backend is stable enough to justify the cost.
 
 ### Ambiguities Requiring Team Coordination
 
@@ -611,9 +685,10 @@ Documentation should be updated in parallel with implementation, not after it.
 - **Text shaping decision (before M3)** — choose between a Broiler-owned shaping
   path and an external shaping component behind a Broiler API before typography
   parity work expands.
-- **Validation/CI decision (M0 deadline)** — align on how much dual-backend CI,
-  artifact retention, and parity reporting the team is willing to carry during
-  the migration window.
+- **Validation/CI decision (resolved for M0)** — keep CI on the existing
+  single-backend workflow while backend-labelled artifacts support local/dev
+  parity diagnostics; revisit a dual-backend matrix after the non-Skia backend
+  is runnable and worth the CI cost.
 
 ---
 
