@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using SkiaSharp;
 
 namespace Broiler.HTML.Image;
@@ -50,6 +51,7 @@ public sealed class PixelDiffResult : IDisposable
     /// <see cref="SKBitmap"/> diff image. Each access returns a copy; the
     /// caller owns and must dispose the returned bitmap.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public SKBitmap? DiffImage => DiffBitmap?.ToSkBitmapCopy();
 
     /// <summary>Whether the images are considered matching (diff ≤ threshold).</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using Broiler.HTML.Core.Core.IR;
 using SkiaSharp;
 
@@ -122,6 +123,7 @@ public static class PixelDiffRunner
     /// Compares two bitmaps per-pixel and returns a <see cref="PixelDiffResult"/>
     /// including a diff bitmap highlighting changed pixels.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static PixelDiffResult Compare(
         SKBitmap actual,
         SKBitmap baseline,

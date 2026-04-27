@@ -428,6 +428,10 @@ PRs.
 | `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | `DiffImage` still returns `SKBitmap` copies | DevSite compare/test pages use `DiffBitmap`; older callers/tests can still consume `DiffImage` |
 | Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat` | Tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 
+The remaining high-level `SK*` members above are now explicitly hidden from
+IntelliSense as compatibility shims, and `SkiaDecouplingGuardTests` freezes that
+allowlist so new high-level `SK*` public APIs do not creep back in unnoticed.
+
 ##### M0 package footprint and removal order (2026-04-27)
 
 Current package footprint:
@@ -473,8 +477,9 @@ Evidence driving the decision today:
   backend-neutral bitmap contract.
 - [ ] Add temporary adapters so CLI, DevSite, WPT, and existing tests can
   migrate incrementally instead of requiring a single all-at-once rewrite.
-- [ ] Freeze a "no new `SK*` in production APIs" rule once the replacement
-  surface exists.
+- [x] Freeze a "no new `SK*` in production APIs" rule once the replacement
+  surface exists, with `SkiaDecouplingGuardTests` guarding the allowed
+  high-level compatibility shim list.
 
 #### M2 — Core Bitmap/Canvas Raster Features
 

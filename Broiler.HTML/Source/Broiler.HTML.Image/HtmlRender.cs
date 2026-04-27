@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using SkiaSharp;
 using System.Drawing;
@@ -19,6 +20,7 @@ public static class HtmlRender
         string baseUrl = null) =>
         RenderToImageCore(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, baseUrl);
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static SKBitmap RenderToImage(string html, int width, int height,
         SKColor backgroundColor = default,
         CssData cssData = null,
@@ -54,6 +56,7 @@ public static class HtmlRender
             imageLoad,
             baseUrl);
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static SKBitmap RenderToImageAutoSized(string html, int maxWidth = 0, int maxHeight = 0,
         SKColor backgroundColor = default,
         CssData cssData = null,
@@ -71,6 +74,7 @@ public static class HtmlRender
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
         => RenderToPngCore(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad);
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static byte[] RenderToPng(string html, int width, int height,
         SKColor backgroundColor = default,
         CssData cssData = null,
@@ -100,6 +104,7 @@ public static class HtmlRender
         bitmap.Save(filePath, format, quality);
     }
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static void RenderToFile(string html, int width, int height, string filePath,
         SKEncodedImageFormat format = SKEncodedImageFormat.Png,
         int quality = 90,
