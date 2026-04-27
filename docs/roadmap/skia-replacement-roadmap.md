@@ -430,7 +430,7 @@ PRs.
   regression suites before broad rollout.
 - [ ] Compare current SkiaSharp text behavior against the custom backend and
   capture known acceptable differences explicitly.
-- [ ] Keep local font loading and Ahem/WPT-style font workflows working through
+- [x] Keep local font loading and Ahem/WPT-style font workflows working through
   the new abstraction layer.
 
 #### M4 — Tooling, SVG, and WPF Migration

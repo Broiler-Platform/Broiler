@@ -21,15 +21,7 @@ internal sealed class FontsHandler
 
     public bool IsFontExists(string family)
     {
-        bool exists = _existingFontFamilies.ContainsKey(family);
-
-        if (!exists)
-        {
-            if (_fontsMapping.TryGetValue(family, out string mappedFamily))
-                exists = _existingFontFamilies.ContainsKey(mappedFamily);
-        }
-
-        return exists;
+        return TryResolveAvailableFamily(family, out _);
     }
 
     public void AddFontFamily(RFontFamily fontFamily)
@@ -49,28 +41,62 @@ internal sealed class FontsHandler
 
     public RFont GetCachedFont(string family, double size, FontStyle style)
     {
-        var font = TryGetFont(family, size, style);
+        var resolvedFamily = ResolveFontFamily(family);
+        var font = TryGetFont(resolvedFamily, size, style);
 
         if (font != null)
             return font;
 
-        if (!_existingFontFamilies.ContainsKey(family))
+        font = CreateFont(resolvedFamily, size, style);
+        _fontsCache[resolvedFamily][size][style] = font;
+
+        return font;
+    }
+
+    private string ResolveFontFamily(string family)
+    {
+        if (TryResolveAvailableFamily(family, out var resolvedFamily))
+            return resolvedFamily;
+
+        foreach (var candidate in EnumerateFamilyCandidates(family))
+            return candidate;
+
+        return family;
+    }
+
+    private bool TryResolveAvailableFamily(string family, out string resolvedFamily)
+    {
+        foreach (var candidate in EnumerateFamilyCandidates(family))
         {
-            if (_fontsMapping.TryGetValue(family, out string mappedFamily))
+            if (_existingFontFamilies.ContainsKey(candidate))
             {
-                font = TryGetFont(mappedFamily, size, style);
-                if (font == null)
-                {
-                    font = CreateFont(mappedFamily, size, style);
-                    _fontsCache[mappedFamily][size][style] = font;
-                }
+                resolvedFamily = candidate;
+                return true;
+            }
+
+            if (_fontsMapping.TryGetValue(candidate, out string mappedFamily)
+                && _existingFontFamilies.ContainsKey(mappedFamily))
+            {
+                resolvedFamily = mappedFamily;
+                return true;
             }
         }
 
-        font ??= CreateFont(family, size, style);
-        _fontsCache[family][size][style] = font;
+        resolvedFamily = family;
+        return false;
+    }
 
-        return font;
+    private static IEnumerable<string> EnumerateFamilyCandidates(string family)
+    {
+        if (string.IsNullOrWhiteSpace(family))
+            yield break;
+
+        foreach (var rawCandidate in family.Split(','))
+        {
+            var candidate = rawCandidate.Trim().Trim('\'', '"');
+            if (!string.IsNullOrWhiteSpace(candidate))
+                yield return candidate;
+        }
     }
 
     private RFont TryGetFont(string family, double size, FontStyle style)
