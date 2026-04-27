@@ -375,11 +375,11 @@ internal sealed class SkiaImageAdapter : RAdapter
         int rasterWidth = width * rasterScale;
         int rasterHeight = height * rasterScale;
 
-        SKBitmap? bitmap;
+        BBitmap? bitmap;
         if (hasDegenerateViewBox)
         {
-            bitmap = new SKBitmap(rasterWidth, rasterHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-            bitmap.Erase(SKColors.Transparent);
+            bitmap = new BBitmap(rasterWidth, rasterHeight);
+            bitmap.Erase(BColor.Transparent);
         }
         else if (suppressPartialIntrinsicDimensions)
         {
@@ -440,7 +440,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         double intrinsicRatio = hasBothDimensions
             ? svgWidth / svgHeight
             : (preserveAspectRatioNone ? 0 : vbRatio);
-        return new ImageAdapter(BBitmap.Wrap(bitmap, ownsBitmap: true),
+        return new ImageAdapter(bitmap,
             hasIntrinsicRatio: hasIntrinsicRatio,
             hasIntrinsicWidth: parsedIntrinsicWidth && !suppressPartialIntrinsicDimensions,
             hasIntrinsicHeight: parsedIntrinsicHeight && !suppressPartialIntrinsicDimensions,
@@ -461,7 +461,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         return Math.Clamp((int)Math.Ceiling((double)MinSvgRasterLongestSide / longestSide), 1, MaxSvgRasterScale);
     }
 
-    private static SKBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
+    private static BBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
     {
         using var svg = new Svg.Skia.SKSvg();
         svg.FromSvg(svgContent);
@@ -469,8 +469,8 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (svg.Picture == null)
             return null;
 
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
+        var bitmap = new BBitmap(width, height);
+        using var canvas = bitmap.OpenCanvas();
         canvas.Clear(SKColors.Transparent);
 
         var cullRect = svg.Picture.CullRect;
@@ -487,7 +487,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         return bitmap;
     }
 
-    private static SKBitmap NormalizeSvgContentBounds(SKBitmap bitmap, int width, int height)
+    private static BBitmap NormalizeSvgContentBounds(BBitmap bitmap, int width, int height)
     {
         var rowHasOpaque = new bool[bitmap.Height];
         var colHasOpaque = new bool[bitmap.Width];
@@ -499,7 +499,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         {
             for (int x = 0; x < bitmap.Width; x++)
             {
-                if (bitmap.GetPixel(x, y).Alpha == 0)
+                if (bitmap.GetPixel(x, y).A == 0)
                     continue;
 
                 rowHasOpaque[y] = true;
@@ -534,7 +534,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (nonEmptyCols.Count == 0 || nonEmptyRows.Count == 0)
             return bitmap;
 
-        using var condensed = new SKBitmap(nonEmptyCols.Count, nonEmptyRows.Count, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var condensed = new BBitmap(nonEmptyCols.Count, nonEmptyRows.Count);
         for (int destY = 0; destY < nonEmptyRows.Count; destY++)
         {
             int srcY = nonEmptyRows[destY];
@@ -544,15 +544,15 @@ internal sealed class SkiaImageAdapter : RAdapter
             }
         }
 
-        var normalized = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(normalized);
+        var normalized = new BBitmap(width, height);
+        using var canvas = normalized.OpenCanvas();
         canvas.Clear(SKColors.Transparent);
         using var paint = new SKPaint
         {
             FilterQuality = SKFilterQuality.None,
             IsAntialias = false,
         };
-        canvas.DrawBitmap(condensed, new SKRect(0, 0, width, height), paint);
+        canvas.DrawBitmap(condensed.AsSkBitmap(), new SKRect(0, 0, width, height), paint);
         bitmap.Dispose();
         return normalized;
     }
@@ -706,13 +706,13 @@ internal sealed class SkiaImageAdapter : RAdapter
             System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0 ? v : -1;
     }
 
-    private static bool IsBitmapFullyTransparent(SKBitmap bitmap)
+    private static bool IsBitmapFullyTransparent(BBitmap bitmap)
     {
         for (int y = 0; y < bitmap.Height; y++)
         {
             for (int x = 0; x < bitmap.Width; x++)
             {
-                if (bitmap.GetPixel(x, y).Alpha != 0)
+                if (bitmap.GetPixel(x, y).A != 0)
                     return false;
             }
         }
@@ -720,9 +720,9 @@ internal sealed class SkiaImageAdapter : RAdapter
         return true;
     }
 
-    private static bool TryParseSolidViewportFill(string svgContent, out SKColor color)
+    private static bool TryParseSolidViewportFill(string svgContent, out BColor color)
     {
-        color = SKColors.Transparent;
+        color = BColor.Transparent;
 
         var rectMatches = System.Text.RegularExpressions.Regex.Matches(
             svgContent,
@@ -749,7 +749,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         try
         {
             var parsed = System.Drawing.ColorTranslator.FromHtml(fillValue);
-            color = new SKColor(parsed.R, parsed.G, parsed.B, parsed.A);
+            color = new BColor(parsed.R, parsed.G, parsed.B, parsed.A);
             return true;
         }
         catch

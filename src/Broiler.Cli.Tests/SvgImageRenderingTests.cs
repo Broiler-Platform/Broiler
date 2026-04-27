@@ -319,4 +319,23 @@ public class SvgImageRenderingTests
         Assert.True(interiorPixel.Red < 50, $"Expected red channel < 50, got {interiorPixel.Red}");
         Assert.True(interiorPixel.Blue < 50, $"Expected blue channel < 50, got {interiorPixel.Blue}");
     }
+
+    [Fact]
+    public void HtmlRender_SvgImage_With_Degenerate_ViewBox_Does_Not_Paint_Over_Background()
+    {
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\" viewBox=\"0 0 0 0\">" +
+                "<rect fill=\"lime\" width=\"40\" height=\"30\"/></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;background:#123456"">" +
+                   $@"<img src=""{svgDataUri}"" width=""40"" height=""30""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 80, 60);
+
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.InRange(pixel.Red, 0x10, 0x14);
+        Assert.InRange(pixel.Green, 0x32, 0x36);
+        Assert.InRange(pixel.Blue, 0x54, 0x58);
+    }
 }
