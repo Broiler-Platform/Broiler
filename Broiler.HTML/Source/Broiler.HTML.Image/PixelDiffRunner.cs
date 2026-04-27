@@ -123,7 +123,7 @@ public static class PixelDiffRunner
         {
             return BBitmap.Decode(source.Encode(BImageFormat.Png, 100));
         }
-        catch
+        catch (InvalidOperationException)
         {
             return source.Copy();
         }

@@ -35,6 +35,9 @@ public sealed class BBitmap : IDisposable
     public byte[] Encode(BImageFormat format = BImageFormat.Png, int quality = 100)
     {
         using var data = _bitmap.Encode(format.ToSkEncodedImageFormat(), quality);
+        if (data is null)
+            throw new InvalidOperationException("Failed to encode bitmap data.");
+
         return data.ToArray();
     }
 
@@ -43,6 +46,9 @@ public sealed class BBitmap : IDisposable
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
         using var data = _bitmap.Encode(format.ToSkEncodedImageFormat(), quality);
+        if (data is null)
+            throw new InvalidOperationException($"Failed to encode bitmap file: {filePath}");
+
         using var stream = File.OpenWrite(filePath);
         data.SaveTo(stream);
     }
