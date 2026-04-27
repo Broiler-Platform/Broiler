@@ -54,6 +54,17 @@ public class SvgImageRenderingTests
     }
 
     [Fact]
+    public void DetectFormatFromBytes_Returns_Svg_With_Comment_And_Doctype_Preamble()
+    {
+        var svg = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- generated --><!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" " +
+            "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">" +
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
+
+        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+    }
+
+    [Fact]
     public void DetectFormatFromBytes_Returns_Unknown_For_NonSvg_Xml()
     {
         var xml = System.Text.Encoding.UTF8.GetBytes(
@@ -179,6 +190,15 @@ public class SvgImageRenderingTests
         Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
         Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
         Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
+    }
+
+    [Fact]
+    public void BSvgRasterizer_IsSvgData_Accepts_Commented_Svg_Preamble()
+    {
+        var svgBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- generated --><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\"></svg>");
+
+        Assert.True(BSvgRasterizer.IsSvgData(svgBytes));
     }
 
     [Fact]

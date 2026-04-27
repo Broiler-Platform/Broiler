@@ -351,7 +351,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             data = copy.ToArray();
         }
 
-        if (IsSvgData(data))
+        if (BSvgRasterizer.IsSvgData(data))
         {
             return RasterizeSvg(data);
         }
@@ -783,39 +783,6 @@ internal sealed class SkiaImageAdapter : RAdapter
         {
             return false;
         }
-    }
-
-    /// <summary>
-    /// Determines whether the given byte array contains SVG image data by
-    /// looking for an XML declaration (&lt;?xml) or an &lt;svg root element
-    /// within the first 1 KB of content (after skipping leading whitespace
-    /// and any UTF-8 BOM).
-    /// </summary>
-    private static bool IsSvgData(byte[] data)
-    {
-        if (data == null || data.Length < 4)
-            return false;
-
-        // Skip UTF-8 BOM if present
-        int offset = 0;
-        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
-            offset = 3;
-
-        // Skip leading whitespace
-        while (offset < data.Length && (data[offset] == ' ' || data[offset] == '\t' ||
-               data[offset] == '\r' || data[offset] == '\n'))
-            offset++;
-
-        if (offset >= data.Length)
-            return false;
-
-        // Scan the first 1 KB for SVG markers
-        int scanLength = Math.Min(data.Length, offset + 1024);
-        var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
-
-        // Accept SVG content even when the file starts with comments or
-        // DOCTYPE declarations before the root <svg> tag.
-        return header.Contains("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)

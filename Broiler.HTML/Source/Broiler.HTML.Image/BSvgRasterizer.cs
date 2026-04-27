@@ -6,6 +6,8 @@ namespace Broiler.HTML.Image;
 
 /// <summary>
 /// Rasterizes SVG image data through the current Broiler image backend.
+/// During the Skia replacement migration this remains the temporary SVG fallback
+/// boundary behind the Broiler-owned bitmap abstraction.
 /// </summary>
 public static class BSvgRasterizer
 {
@@ -33,9 +35,7 @@ public static class BSvgRasterizer
         int scanLength = Math.Min(data.Length, offset + 1024);
         var header = Encoding.UTF8.GetString(data, offset, scanLength - offset);
 
-        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
-               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
-               header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
+        return header.Contains("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

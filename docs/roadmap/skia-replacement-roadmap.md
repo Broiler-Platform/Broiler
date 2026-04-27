@@ -437,7 +437,7 @@ PRs.
 
 **Primary owners:** tooling owner + rendering owner
 
-- [ ] Decide and document whether SVG ships as a Broiler-owned module or a
+- [x] Decide and document whether SVG ships as a Broiler-owned module or a
   temporary fallback behind the graphics abstraction.
 - [x] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
   utilities with backend-neutral bitmap handling.
@@ -605,9 +605,9 @@ Documentation should be updated in parallel with implementation, not after it.
 - **Public compatibility decision (M0/M1 deadline)** — document which
   `HtmlRender` and image-diff APIs must remain source-compatible for downstream
   consumers before signatures begin changing.
-- **SVG fallback decision (M1 deadline)** — decide whether SVG stays delegated
-  temporarily or is part of the first custom graphics deliverable, because WPF
-  and tooling tasks depend on that branch point.
+- **SVG fallback decision (resolved)** — keep SVG delegated temporarily behind
+  `Broiler.HTML.Image/BSvgRasterizer` as the Broiler-owned abstraction boundary
+  until the first non-Skia raster backend is ready to replace that fallback.
 - **Text shaping decision (before M3)** — choose between a Broiler-owned shaping
   path and an external shaping component behind a Broiler API before typography
   parity work expands.
