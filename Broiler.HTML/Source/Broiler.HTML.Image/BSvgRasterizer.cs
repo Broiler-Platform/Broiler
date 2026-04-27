@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image;
 
@@ -119,11 +118,11 @@ public static class BSvgRasterizer
         if (width <= 0) width = 300;
         if (height <= 0) height = 150;
 
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.Transparent);
+        var bitmap = new BBitmap(width, height);
+        using var canvas = bitmap.OpenCanvas();
+        canvas.Clear(BColor.Transparent.ToSkColor());
         canvas.DrawPicture(svg.Picture);
 
-        return BBitmap.Wrap(bitmap, ownsBitmap: true);
+        return bitmap;
     }
 }

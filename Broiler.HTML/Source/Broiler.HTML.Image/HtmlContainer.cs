@@ -111,8 +111,8 @@ public sealed class HtmlContainer : IDisposable
         int width = Math.Max(1, (int)Math.Ceiling(clip.Width));
         int height = Math.Max(1, (int)Math.Ceiling(clip.Height));
 
-        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
+        using var bitmap = new BBitmap(width, height);
+        using var canvas = bitmap.OpenCanvas();
         PerformLayout(canvas, clip);
     }
 

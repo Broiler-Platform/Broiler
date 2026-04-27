@@ -399,7 +399,7 @@ PRs.
 
 | Area | Current `SK*` usage snapshot |
 |---|---|
-| `Broiler.HTML.Image` | `HtmlRender`, `HtmlContainer`, `BBitmap`, `BSvgRasterizer`, `SkiaCompat`, `PixelDiffRunner`, `PixelDiffResult`, `Utilities/Utils`, and the Skia-backed adapter types still use `SKBitmap`, `SKCanvas`, `SKColor`, `SKEncodedImageFormat`, font primitives, shaders, and path/paint types. |
+| `Broiler.HTML.Image` | `HtmlContainer`, `BBitmap`, `SkiaCompat`, `PixelDiffRunner`, `PixelDiffResult`, `Utilities/Utils`, and the Skia-backed adapter types still use `SKBitmap`, `SKCanvas`, `SKColor`, `SKEncodedImageFormat`, font primitives, shaders, and path/paint types. |
 | `Broiler.HTML.WPF` | No direct `SK*` type/member usage remains in source. |
 | `Broiler.Cli` | No direct `SK*` type/member usage remains in source. |
 | `Broiler.DevSite` | No direct `SK*` type/member usage remains in source. |
@@ -449,8 +449,8 @@ Proposed removal order:
    SVG fallback.
 2. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
    `Broiler.HTML.Image` requires Skia on Linux.
-3. Remove `SkiaSharp` after the remaining compatibility shims in `HtmlRender`,
-   `BBitmap`, and the Skia adapter layer are either deleted or isolated behind a
+3. Remove `SkiaSharp` after the remaining compatibility shims in `BBitmap` and
+   the Skia adapter layer are either deleted or isolated behind a
    non-runtime compatibility package.
 
 ##### M0 CI/backend-comparison decision (2026-04-27)

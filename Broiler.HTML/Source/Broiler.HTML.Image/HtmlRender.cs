@@ -1,5 +1,4 @@
 using System;
-using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Core.Core;
@@ -133,10 +132,9 @@ public static class HtmlRender
         EventHandler<HtmlImageLoadEventArgs> imageLoad,
         string baseUrl)
     {
-        var bgColor = backgroundColor?.ToSkColor() ?? SKColors.White;
-
-        var skBitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var skCanvas = new SKCanvas(skBitmap);
+        var bgColor = backgroundColor ?? BColor.White;
+        var bitmap = new BBitmap(width, height);
+        using var canvas = bitmap.OpenCanvas();
 
         if (!string.IsNullOrEmpty(html))
         {
@@ -156,18 +154,18 @@ public static class HtmlRender
             if (backgroundColor is null)
                 bgColor = ResolveCanvasBackground(container, bgColor);
 
-            skCanvas.Clear(bgColor);
+            canvas.Clear(bgColor.ToSkColor());
 
             var clip = new RectangleF(0, 0, width, height);
-            container.PerformLayout(skCanvas, clip);
-            container.PerformPaint(skCanvas, clip);
+            container.PerformLayout(canvas, clip);
+            container.PerformPaint(canvas, clip);
         }
         else
         {
-            skCanvas.Clear(bgColor);
+            canvas.Clear(bgColor.ToSkColor());
         }
 
-        return BBitmap.Wrap(skBitmap, ownsBitmap: true);
+        return bitmap;
     }
 
     private static BBitmap RenderToImageAutoSizedCore(string html, int maxWidth, int maxHeight,
@@ -179,7 +177,7 @@ public static class HtmlRender
         if (string.IsNullOrEmpty(html))
             return new BBitmap(1, 1);
 
-        var bgColor = backgroundColor?.ToSkColor() ?? SKColors.White;
+        var bgColor = backgroundColor ?? BColor.White;
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
@@ -210,14 +208,14 @@ public static class HtmlRender
 
         container.MaxSize = new SizeF(w, h);
 
-        var skBitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(skBitmap);
-        canvas.Clear(bgColor);
+        var bitmap = new BBitmap(w, h);
+        using var canvas = bitmap.OpenCanvas();
+        canvas.Clear(bgColor.ToSkColor());
 
         var clip = new RectangleF(0, 0, w, h);
         container.PerformPaint(canvas, clip);
 
-        return BBitmap.Wrap(skBitmap, ownsBitmap: true);
+        return bitmap;
     }
 
     private static byte[] RenderToPngCore(string html, int width, int height,
@@ -245,7 +243,7 @@ public static class HtmlRender
         const int LayoutMaxHeight = 99999;
         const int LayoutBitmapHeight = 2000;
 
-        var bgColor = backgroundColor?.ToSkColor() ?? SKColors.White;
+        var bgColor = backgroundColor ?? BColor.White;
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
@@ -262,9 +260,9 @@ public static class HtmlRender
         if (backgroundColor is null)
             bgColor = ResolveCanvasBackground(container, bgColor);
 
-        using var layoutBitmap = new SKBitmap(width, LayoutBitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var layoutCanvas = new SKCanvas(layoutBitmap);
-        layoutCanvas.Clear(bgColor);
+        using var layoutBitmap = new BBitmap(width, LayoutBitmapHeight);
+        using var layoutCanvas = layoutBitmap.OpenCanvas();
+        layoutCanvas.Clear(bgColor.ToSkColor());
         container.PerformLayout(layoutCanvas, new RectangleF(0, 0, width, LayoutMaxHeight));
 
         var anchorRect = container.GetElementRectangle(elementId);
@@ -275,22 +273,22 @@ public static class HtmlRender
         container.Location = new PointF(0, scrollY);
         container.MaxSize = new SizeF(width, height);
 
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(bgColor);
+        var bitmap = new BBitmap(width, height);
+        using var canvas = bitmap.OpenCanvas();
+        canvas.Clear(bgColor.ToSkColor());
         canvas.Save();
         canvas.Translate(0, -scrollY);
         container.PerformPaint(canvas, new RectangleF(0, scrollY, width, height));
         canvas.Restore();
 
-        return BBitmap.Wrap(bitmap, ownsBitmap: true);
+        return bitmap;
     }
 
     private static SizeF MeasureHtml(HtmlContainer container, SizeF minSize, SizeF maxSize)
     {
         // Create a small temporary surface for measurement
-        using var measureBitmap = new SKBitmap(1, 1);
-        using var measureCanvas = new SKCanvas(measureBitmap);
+        using var measureBitmap = new BBitmap(1, 1);
+        using var measureCanvas = measureBitmap.OpenCanvas();
         var clip = new RectangleF(0, 0, 99999, 99999);
 
         using var g = new GraphicsAdapter(measureCanvas, clip);
@@ -298,15 +296,15 @@ public static class HtmlRender
     }
 
     /// <summary>
-    /// Reads the root element's computed background color from the container
-    /// and converts it to an <see cref="SKColor"/>.  Returns the supplied
+    /// Reads the root element's computed background color from the container.
+    /// Returns the supplied
     /// <paramref name="fallback"/> when the root has no explicit background.
     /// </summary>
-    private static SKColor ResolveCanvasBackground(HtmlContainer container, SKColor fallback)
+    private static BColor ResolveCanvasBackground(HtmlContainer container, BColor fallback)
     {
         var rootBg = container.GetRootBackgroundColor();
         if (!rootBg.IsEmpty && rootBg.A > 0)
-            return new SKColor(rootBg.R, rootBg.G, rootBg.B, rootBg.A);
+            return new BColor(rootBg.R, rootBg.G, rootBg.B, rootBg.A);
 
         return fallback;
     }
