@@ -347,8 +347,8 @@ public class CaptureService
         html = HtmlPostProcessor.Process(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
-            ? SKEncodedImageFormat.Jpeg
-            : SKEncodedImageFormat.Png;
+            ? BImageFormat.Jpeg
+            : BImageFormat.Png;
 
         // Extract fragment identifier (e.g. "#top") for anchor-based rendering.
         string? fragment = uri.Fragment;
@@ -359,11 +359,9 @@ public class CaptureService
         }
         else if (options.FullPage)
         {
-            using var bitmap = HtmlRender.RenderToImageAutoSized(html,
-                maxWidth: options.Width, maxHeight: options.Height);
-            using var data = bitmap.Encode(format, 90);
-            using var stream = File.OpenWrite(options.OutputPath);
-            data.SaveTo(stream);
+            HtmlRender.RenderToFileAutoSized(html, options.OutputPath,
+                maxWidth: options.Width, maxHeight: options.Height,
+                format: format, quality: 90);
         }
         else
         {
@@ -380,7 +378,7 @@ public class CaptureService
     /// viewport-sized region starting at the anchor's Y position.
     /// </summary>
     private static void RenderAtAnchor(string html, string elementId, ImageCaptureOptions options,
-        SKEncodedImageFormat format)
+        BImageFormat format)
     {
         // Maximum layout height used for initial full-page measurement.
         const int LayoutMaxHeight = 99999;
@@ -426,7 +424,10 @@ public class CaptureService
         container.PerformPaint(canvas, new System.Drawing.RectangleF(0, scrollY, w, h));
         canvas.Restore();
 
-        using var data = bitmap.Encode(format, 90);
+        var skiaFormat = format == BImageFormat.Jpeg
+            ? SKEncodedImageFormat.Jpeg
+            : SKEncodedImageFormat.Png;
+        using var data = bitmap.Encode(skiaFormat, 90);
         using var stream = File.OpenWrite(options.OutputPath);
         data.SaveTo(stream);
     }

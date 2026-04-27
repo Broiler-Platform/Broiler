@@ -15,7 +15,7 @@ public sealed class RenderingService
     /// </summary>
     public byte[] RenderHtmlToPng(string html, int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToPng(html, width, height, SKColors.White);
+        return HtmlRender.RenderToPng(html, width, height, BColor.White);
     }
 
     /// <summary>
@@ -23,7 +23,7 @@ public sealed class RenderingService
     /// </summary>
     public SKBitmap RenderHtmlToImage(string html, int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToImage(html, width, height, SKColors.White);
+        return HtmlRender.RenderToImage(html, width, height, BColor.White);
     }
 
     /// <summary>
@@ -33,7 +33,7 @@ public sealed class RenderingService
     /// </summary>
     public PixelDiffResult CompareWithReference(string html, SKBitmap reference, int width = 1024, int height = 768)
     {
-        using var actual = HtmlRender.RenderToImage(html, width, height, SKColors.White);
+        using var actual = HtmlRender.RenderToImage(html, width, height, BColor.White);
         return PixelDiffRunner.Compare(actual, reference);
     }
 
