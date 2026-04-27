@@ -79,7 +79,7 @@ public class SkiaDecouplingGuardTests
                     }
 
                     if (SkiaTokenPattern.IsMatch(line))
-                        violations.Add($"{relativePath}:{i + 1}: {lines[i].Trim()}");
+                        violations.Add($"{relativePath}:{i + 1}: {line}");
                 }
             }
         }
