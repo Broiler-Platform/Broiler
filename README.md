@@ -112,6 +112,13 @@ A cross-platform command-line tool for capturing website screenshots.
 See the [CLI Roadmap](docs/roadmap/cli-website-capture.md) and
 [ADR-004](docs/adr/004-os-independent-cli-capture-tool.md) for details.
 
+### Graphics Backend Replacement
+
+A roadmap for replacing SkiaSharp with a Broiler-owned graphics
+implementation while preserving rendering, tooling, and test workflows.
+See the [Skia Replacement Roadmap](docs/roadmap/skia-replacement-roadmap.md)
+for details.
+
 PDF conversion now lives in the standalone `Broiler.Pdf` app, which can be
 developed and versioned independently from the main website-capture CLI.
 Use it directly for PDF-to-Word conversion:
