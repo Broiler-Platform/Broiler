@@ -855,39 +855,57 @@ internal sealed class WptTestRunner
                 };
             }
 
-            using var reference = BBitmap.Decode(referencePath);
-
-            using var diff = PixelDiffRunner.Compare(rendered, reference);
-
-            // Compute percent match for every comparison so it can be
-            // included in the logfile output and used for sorting.
-            double matchPct = (1.0 - diff.DiffRatio) * 100;
-
-            if (diff.IsMatch)
+            BBitmap reference;
+            try
+            {
+                reference = BBitmap.Decode(referencePath);
+            }
+            catch (Exception ex)
             {
                 return new WptTestResult
                 {
                     TestPath = testPath,
-                    Passed = true,
-                    MatchPercent = matchPct,
+                    Passed = false,
+                    Message = $"Failed to decode reference image: {referencePath} ({ex.Message})",
+                    Category = FailureCategory.ReferenceDecodeError,
+                    StackTrace = ex.StackTrace,
                 };
             }
 
-            // Classify the mismatch to provide actionable diagnostics.
-            var diagnostics = MismatchClassifier.Classify(
-                diff,
-                rendered.Width, rendered.Height,
-                reference.Width, reference.Height);
-
-            return new WptTestResult
+            using (reference)
             {
-                TestPath = testPath,
-                Passed = false,
-                MatchPercent = matchPct,
-                Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
-                Category = FailureCategory.PixelMismatch,
-                MismatchDiagnostics = diagnostics,
-            };
+                using var diff = PixelDiffRunner.Compare(rendered, reference);
+
+                // Compute percent match for every comparison so it can be
+                // included in the logfile output and used for sorting.
+                double matchPct = (1.0 - diff.DiffRatio) * 100;
+
+                if (diff.IsMatch)
+                {
+                    return new WptTestResult
+                    {
+                        TestPath = testPath,
+                        Passed = true,
+                        MatchPercent = matchPct,
+                    };
+                }
+
+                // Classify the mismatch to provide actionable diagnostics.
+                var diagnostics = MismatchClassifier.Classify(
+                    diff,
+                    rendered.Width, rendered.Height,
+                    reference.Width, reference.Height);
+
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    MatchPercent = matchPct,
+                    Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
+                    Category = FailureCategory.PixelMismatch,
+                    MismatchDiagnostics = diagnostics,
+                };
+            }
         }
     }
 
