@@ -380,56 +380,26 @@ public class CaptureService
     private static void RenderAtAnchor(string html, string elementId, ImageCaptureOptions options,
         BImageFormat format)
     {
-        // Maximum layout height used for initial full-page measurement.
-        const int LayoutMaxHeight = 99999;
-        // Bitmap height for the initial layout pass (must be large enough to
-        // contain the visible content but does not need to match LayoutMaxHeight).
-        const int LayoutBitmapHeight = 2000;
+        using var bitmap = HtmlRender.RenderToImageAtAnchor(
+            html,
+            elementId,
+            options.Width,
+            options.Height,
+            baseUrl: options.Url);
 
-        int w = options.Width, h = options.Height;
+        if (bitmap is null)
+        {
+            HtmlRender.RenderToFile(
+                html,
+                options.Width,
+                options.Height,
+                options.OutputPath,
+                format,
+                baseUrl: options.Url);
+            return;
+        }
 
-        // 1. Layout with a tall viewport so the full page is measured.
-        using var container = new HtmlContainer();
-        container.AvoidAsyncImagesLoading = true;
-        container.AvoidImagesLateLoading = true;
-        container.MaxSize = new System.Drawing.SizeF(w, LayoutMaxHeight);
-        container.SetHtml(html);
-
-        // Resolve the root element's background color so the canvas matches
-        // CSS :root styling instead of always being white.
-        var rootBg = container.GetRootBackgroundColor();
-        var bgColor = (!rootBg.IsEmpty && rootBg.A > 0)
-            ? new SKColor(rootBg.R, rootBg.G, rootBg.B, rootBg.A)
-            : SKColors.White;
-
-        using var layoutBmp = new SKBitmap(w, LayoutBitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var layoutCanvas = new SKCanvas(layoutBmp);
-        layoutCanvas.Clear(bgColor);
-        container.PerformLayout(layoutCanvas, new System.Drawing.RectangleF(0, 0, w, LayoutMaxHeight));
-
-        // 2. Find the anchor element position.
-        var anchorRect = container.GetElementRectangle(elementId);
-        float scrollY = anchorRect?.Y ?? 0;
-
-        // 3. Constrain viewport and set Location to scroll position.
-        container.Location = new System.Drawing.PointF(0, scrollY);
-        container.MaxSize = new System.Drawing.SizeF(w, h);
-
-        // 4. Render with canvas translation to map scroll region to bitmap.
-        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(bgColor);
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
-        container.PerformPaint(canvas, new System.Drawing.RectangleF(0, scrollY, w, h));
-        canvas.Restore();
-
-        var skiaFormat = format == BImageFormat.Jpeg
-            ? SKEncodedImageFormat.Jpeg
-            : SKEncodedImageFormat.Png;
-        using var data = bitmap.Encode(skiaFormat, 90);
-        using var stream = File.OpenWrite(options.OutputPath);
-        data.SaveTo(stream);
+        bitmap.Save(options.OutputPath, format, 90);
     }
 
     /// <summary>

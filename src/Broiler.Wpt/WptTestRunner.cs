@@ -1049,7 +1049,8 @@ internal sealed class WptTestRunner
     internal SKBitmap RenderHtmlFilePublic(string htmlPath, string? wptRoot)
     {
         using var bitmap = RenderHtmlFileBitmapPublic(htmlPath, wptRoot);
-        return bitmap.ToSkBitmapCopy();
+        var encoded = bitmap.Encode(BImageFormat.Png, 100);
+        return SKBitmap.Decode(encoded) ?? throw new InvalidOperationException("Failed to decode compatibility bitmap.");
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using Broiler.Cli;
 using Broiler.HTML.Image;
 using SkiaSharp;
 
@@ -97,6 +98,76 @@ public class GraphicsAbstractionTests
 
         Assert.True(bitmap.Width >= 40);
         Assert.True(bitmap.Height >= 30);
+    }
+
+    [Fact]
+    public void RenderToImageAtAnchor_With_BColor_Background_Returns_Anchored_BBitmap()
+    {
+        const string html = """
+            <html><body style='margin:0'>
+            <div style='height:20px;background:#ffffff'></div>
+            <div id='target' style='width:20px;height:20px;background:#123456'></div>
+            </body></html>
+            """;
+
+        using var bitmap = HtmlRender.RenderToImageAtAnchor(html, "target", 20, 20, BColor.White);
+
+        Assert.NotNull(bitmap);
+        var pixel = bitmap!.GetPixel(0, 0);
+        Assert.Equal((byte)0x12, pixel.R);
+        Assert.Equal((byte)0x34, pixel.G);
+        Assert.Equal((byte)0x56, pixel.B);
+        Assert.Equal((byte)0xFF, pixel.A);
+    }
+
+    [Fact]
+    public void RenderToImageAtAnchor_With_Missing_Anchor_Returns_Null()
+    {
+        using var bitmap = HtmlRender.RenderToImageAtAnchor("<html><body>test</body></html>", "missing", 20, 20, BColor.White);
+
+        Assert.Null(bitmap);
+    }
+
+    [Fact]
+    public async Task CaptureImageAsync_With_Fragment_Renders_Anchored_Viewport()
+    {
+        var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
+        var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+
+        const string html = """
+            <html><body style='margin:0'>
+            <div style='height:20px;background:#ffffff'></div>
+            <div id='target' style='width:20px;height:20px;background:#123456'></div>
+            </body></html>
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(htmlPath, html);
+
+            var captureService = new CaptureService();
+            await captureService.CaptureImageAsync(new ImageCaptureOptions
+            {
+                Url = new Uri(htmlPath).AbsoluteUri + "#target",
+                OutputPath = outputPath,
+                Width = 20,
+                Height = 20,
+            });
+
+            using var bitmap = BBitmap.Decode(outputPath);
+            var pixel = bitmap.GetPixel(0, 0);
+            Assert.Equal((byte)0x12, pixel.R);
+            Assert.Equal((byte)0x34, pixel.G);
+            Assert.Equal((byte)0x56, pixel.B);
+            Assert.Equal((byte)0xFF, pixel.A);
+        }
+        finally
+        {
+            if (File.Exists(htmlPath))
+                File.Delete(htmlPath);
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
     }
 
     [Fact]

@@ -37,6 +37,23 @@ public static class HtmlRender
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null) =>
         RenderToImageAutoSizedCore(html, maxWidth, maxHeight, backgroundColor, cssData, stylesheetLoad, imageLoad);
 
+    public static BBitmap? RenderToImageAtAnchor(string html, string elementId, int width, int height,
+        BColor backgroundColor = default,
+        CssData cssData = null,
+        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
+        EventHandler<HtmlImageLoadEventArgs> imageLoad = null,
+        string baseUrl = null) =>
+        RenderToImageAtAnchorCore(
+            html,
+            elementId,
+            width,
+            height,
+            backgroundColor == default ? null : backgroundColor,
+            cssData,
+            stylesheetLoad,
+            imageLoad,
+            baseUrl);
+
     public static SKBitmap RenderToImageAutoSized(string html, int maxWidth = 0, int maxHeight = 0,
         SKColor backgroundColor = default,
         CssData cssData = null,
@@ -241,6 +258,62 @@ public static class HtmlRender
     {
         using var bitmap = RenderToImageCore(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, null);
         return bitmap.Encode(BImageFormat.Png, 100);
+    }
+
+    private static BBitmap? RenderToImageAtAnchorCore(string html, string elementId, int width, int height,
+        BColor? backgroundColor,
+        CssData cssData,
+        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad,
+        EventHandler<HtmlImageLoadEventArgs> imageLoad,
+        string baseUrl)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(elementId);
+
+        if (string.IsNullOrEmpty(html))
+            return null;
+
+        const int LayoutMaxHeight = 99999;
+        const int LayoutBitmapHeight = 2000;
+
+        var bgColor = backgroundColor?.ToSkColor() ?? SKColors.White;
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(width, LayoutMaxHeight);
+
+        if (stylesheetLoad != null)
+            container.StylesheetLoad += stylesheetLoad;
+        if (imageLoad != null)
+            container.ImageLoad += imageLoad;
+
+        container.SetHtml(html, cssData, baseUrl);
+
+        if (backgroundColor is null)
+            bgColor = ResolveCanvasBackground(container, bgColor);
+
+        using var layoutBitmap = new SKBitmap(width, LayoutBitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var layoutCanvas = new SKCanvas(layoutBitmap);
+        layoutCanvas.Clear(bgColor);
+        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, width, LayoutMaxHeight));
+
+        var anchorRect = container.GetElementRectangle(elementId);
+        if (anchorRect is null)
+            return null;
+
+        float scrollY = anchorRect.Value.Y;
+        container.Location = new PointF(0, scrollY);
+        container.MaxSize = new SizeF(width, height);
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(bgColor);
+        canvas.Save();
+        canvas.Translate(0, -scrollY);
+        container.PerformPaint(canvas, new RectangleF(0, scrollY, width, height));
+        canvas.Restore();
+
+        return BBitmap.Wrap(bitmap, ownsBitmap: true);
     }
 
     private static SizeF MeasureHtml(HtmlContainer container, SizeF minSize, SizeF maxSize)
