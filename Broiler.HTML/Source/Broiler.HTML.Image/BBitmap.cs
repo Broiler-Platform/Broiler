@@ -84,6 +84,8 @@ public sealed class BBitmap : IDisposable
 
     internal SKCanvas OpenCanvas() => new(_bitmap);
 
+    internal SKBitmap AsSkBitmap() => _bitmap;
+
     internal SKBitmap ToSkBitmapCopy() => _bitmap.Copy();
 
     public void Dispose()

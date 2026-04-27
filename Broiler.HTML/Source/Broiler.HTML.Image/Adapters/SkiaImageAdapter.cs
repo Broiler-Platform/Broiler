@@ -300,7 +300,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         return new BrushAdapter(paint, true);
     }
 
-    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter((SKBitmap)image) : null;
+    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(BBitmap.Wrap((SKBitmap)image, ownsBitmap: true)) : null;
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
@@ -330,7 +330,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         }
 
         var bitmap = SKBitmap.Decode(data);
-        return bitmap != null ? new ImageAdapter(bitmap) : null;
+        return bitmap != null ? new ImageAdapter(BBitmap.Wrap(bitmap, ownsBitmap: true)) : null;
     }
 
     /// <summary>
@@ -440,7 +440,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         double intrinsicRatio = hasBothDimensions
             ? svgWidth / svgHeight
             : (preserveAspectRatioNone ? 0 : vbRatio);
-        return new ImageAdapter(bitmap,
+        return new ImageAdapter(BBitmap.Wrap(bitmap, ownsBitmap: true),
             hasIntrinsicRatio: hasIntrinsicRatio,
             hasIntrinsicWidth: parsedIntrinsicWidth && !suppressPartialIntrinsicDimensions,
             hasIntrinsicHeight: parsedIntrinsicHeight && !suppressPartialIntrinsicDimensions,

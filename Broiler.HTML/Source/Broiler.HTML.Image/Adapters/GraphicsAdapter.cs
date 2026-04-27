@@ -174,7 +174,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         var imgAdapter = (ImageAdapter)image;
         var paint = new SKPaint();
         var shader = SKShader.CreateBitmap(
-            imgAdapter.Bitmap,
+            imgAdapter.Bitmap.AsSkBitmap(),
             SKShaderTileMode.Repeat,
             SKShaderTileMode.Repeat,
             SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
@@ -193,13 +193,13 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override void DrawImage(RImage image, RectangleF destRect, RectangleF srcRect)
     {
         var imgAdapter = (ImageAdapter)image;
-        canvas.DrawBitmap(imgAdapter.Bitmap, Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
+        canvas.DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
     }
 
     public override void DrawImage(RImage image, RectangleF destRect)
     {
         var imgAdapter = (ImageAdapter)image;
-        canvas.DrawBitmap(imgAdapter.Bitmap, Utilities.Utils.Convert(destRect));
+        canvas.DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(destRect));
     }
 
     public override void DrawPath(RPen pen, RGraphicsPath path) => canvas.DrawPath(((GraphicsPathAdapter)path).Path, ((PenAdapter)pen).Paint);
@@ -276,8 +276,8 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         if (width <= 0 || height <= 0 || colors == null || colors.Length == 0)
             return null;
 
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var tileCanvas = new SKCanvas(bitmap);
+        var bitmap = new BBitmap(width, height);
+        using var tileCanvas = bitmap.OpenCanvas();
 
         // Convert angle (CSS: 0=to top, 90=to right, 180=to bottom) to
         // SkiaSharp linear gradient start/end points.
