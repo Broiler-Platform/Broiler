@@ -66,6 +66,8 @@ as a platform migration rather than a single-package swap:
   - the most concentrated usage is in `Broiler.HTML.Image`
 - **Test usage**
   - the current audit confirms **16 test files** currently import `SkiaSharp`
+    directly, with additional test touch points still present through shared
+    helpers and downstream bitmap consumers
   - many image-comparison and rendering tests use `SKBitmap` directly
 
 ### 2.2 Primary Integration Points
