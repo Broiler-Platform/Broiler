@@ -441,7 +441,7 @@ PRs.
   temporary fallback behind the graphics abstraction.
 - [ ] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
   utilities with backend-neutral bitmap handling.
-- [ ] Migrate the WPF bridge away from direct SkiaSharp bitmap/SVG conversion.
+- [x] Migrate the WPF bridge away from direct SkiaSharp bitmap/SVG conversion.
 - [ ] Ensure diagnostics and artifact generation label which backend produced the
   image so parity triage remains actionable.
 

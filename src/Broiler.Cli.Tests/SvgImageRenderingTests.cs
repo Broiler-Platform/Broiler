@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using Broiler.HtmlBridge;
-using SkiaSharp;
+using Broiler.HTML.Image;
 using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
 
 namespace Broiler.Cli.Tests;
@@ -160,6 +160,25 @@ public class SvgImageRenderingTests
         using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
+    }
+
+    [Fact]
+    public void BSvgRasterizer_RasterizeToBitmap_Returns_BackendNeutral_Bitmap()
+    {
+        var svgBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\">" +
+            "<rect fill=\"red\" width=\"40\" height=\"30\"/></svg>");
+
+        using var bitmap = BSvgRasterizer.RasterizeToBitmap(svgBytes);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(40, bitmap.Width);
+        Assert.Equal(30, bitmap.Height);
+
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
+        Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
+        Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
     }
 
     [Fact]
