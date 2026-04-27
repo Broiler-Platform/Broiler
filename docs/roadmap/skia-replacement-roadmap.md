@@ -442,7 +442,7 @@ PRs.
 - [x] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
   utilities with backend-neutral bitmap handling.
 - [x] Migrate the WPF bridge away from direct SkiaSharp bitmap/SVG conversion.
-- [ ] Ensure diagnostics and artifact generation label which backend produced the
+- [x] Ensure diagnostics and artifact generation label which backend produced the
   image so parity triage remains actionable.
 
 #### M5 — Cutover, Stabilization, Package Removal
