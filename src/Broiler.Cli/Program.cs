@@ -409,6 +409,8 @@ internal static class CaptureArtifactMetadata
 
     internal static void WriteImageSidecar(string outputPath)
     {
+        ArgumentException.ThrowIfNullOrEmpty(outputPath);
+
         var renderBackend = CurrentRenderBackend;
         var metadata = new Dictionary<string, object?>
         {
