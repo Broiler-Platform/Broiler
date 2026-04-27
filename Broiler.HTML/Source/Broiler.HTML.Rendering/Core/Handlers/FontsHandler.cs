@@ -2,6 +2,7 @@ using Broiler.HTML.Adapters.Adapters;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 
 namespace Broiler.HTML.Rendering.Core.Handlers;
 
@@ -58,10 +59,7 @@ internal sealed class FontsHandler
         if (TryResolveAvailableFamily(family, out var resolvedFamily))
             return resolvedFamily;
 
-        foreach (var candidate in EnumerateFamilyCandidates(family))
-            return candidate;
-
-        return family;
+        return EnumerateFamilyCandidates(family).FirstOrDefault() ?? family;
     }
 
     private bool TryResolveAvailableFamily(string family, out string resolvedFamily)
