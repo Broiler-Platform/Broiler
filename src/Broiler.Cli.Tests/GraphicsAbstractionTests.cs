@@ -1,6 +1,7 @@
 using Broiler.Cli;
 using Broiler.HTML.Image;
 using SkiaSharp;
+using RectangleF = System.Drawing.RectangleF;
 
 namespace Broiler.Cli.Tests;
 
@@ -168,6 +169,21 @@ public class GraphicsAbstractionTests
             if (File.Exists(outputPath))
                 File.Delete(outputPath);
         }
+    }
+
+    [Fact]
+    public void HtmlContainer_PerformLayout_Without_Explicit_Skia_Surface_Builds_FragmentTree()
+    {
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new System.Drawing.SizeF(50, 50);
+        container.SetHtml("<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>");
+
+        container.PerformLayout(new RectangleF(0, 0, 50, 50));
+
+        Assert.NotNull(container.LatestFragmentTree);
+        Assert.NotNull(container.GetElementRectangle("target"));
     }
 
     [Fact]

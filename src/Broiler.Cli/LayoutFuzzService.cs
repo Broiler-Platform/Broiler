@@ -1,7 +1,6 @@
 using System.Drawing;
 using Broiler.HTML.Core.Core.IR;
 using Broiler.HTML.Image;
-using SkiaSharp;
 
 namespace Broiler.Cli;
 
@@ -89,12 +88,8 @@ internal sealed class LayoutFuzzService
             container.AvoidImagesLateLoading = true;
             container.SetHtml(html);
 
-            using var bitmap = new SKBitmap(500, 500);
-            using var canvas = new SKCanvas(bitmap);
-            canvas.Clear(SKColors.White);
-
             var clip = new RectangleF(0, 0, 500, 500);
-            container.PerformLayout(canvas, clip);
+            container.PerformLayout(clip);
 
             return container.LatestFragmentTree;
         }

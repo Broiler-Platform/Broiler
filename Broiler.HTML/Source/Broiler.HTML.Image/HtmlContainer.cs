@@ -101,6 +101,21 @@ public sealed class HtmlContainer : IDisposable
         HtmlContainerInt.PerformLayout(g);
     }
 
+    /// <summary>
+    /// Performs layout using an internal temporary surface so callers that only
+    /// need layout side effects (for example <see cref="LatestFragmentTree"/> or
+    /// <see cref="GetElementRectangle(string)"/>) do not need to construct Skia objects.
+    /// </summary>
+    public void PerformLayout(RectangleF clip)
+    {
+        int width = Math.Max(1, (int)Math.Ceiling(clip.Width));
+        int height = Math.Max(1, (int)Math.Ceiling(clip.Height));
+
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        PerformLayout(canvas, clip);
+    }
+
     public void PerformPaint(SKCanvas canvas, RectangleF clip)
     {
         using var g = new GraphicsAdapter(canvas, clip);

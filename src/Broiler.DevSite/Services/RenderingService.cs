@@ -1,6 +1,4 @@
-using System.Drawing;
 using Broiler.HTML.Image;
-using SkiaSharp;
 
 namespace Broiler.DevSite.Services;
 
@@ -24,26 +22,6 @@ public sealed class RenderingService
     public BBitmap RenderHtmlToBitmap(string html, int width = 1024, int height = 768)
     {
         return HtmlRender.RenderToImage(html, width, height, BColor.White);
-    }
-
-    /// <summary>
-    /// Temporary compatibility shim that still renders HTML to an <see cref="SKBitmap"/>.
-    /// The caller owns the returned bitmap and must dispose it.
-    /// </summary>
-    public SKBitmap RenderHtmlToImage(string html, int width = 1024, int height = 768)
-    {
-        return HtmlRender.RenderToImage(html, width, height, SKColors.White);
-    }
-
-    /// <summary>
-    /// Renders the given HTML and compares the result pixel-by-pixel against a
-    /// <paramref name="reference"/> bitmap, returning a <see cref="PixelDiffResult"/>.
-    /// The caller is responsible for disposing the returned result.
-    /// </summary>
-    public PixelDiffResult CompareWithReference(string html, SKBitmap reference, int width = 1024, int height = 768)
-    {
-        using var actual = RenderHtmlToImage(html, width, height);
-        return PixelDiffRunner.Compare(actual, reference);
     }
 
     /// <summary>
