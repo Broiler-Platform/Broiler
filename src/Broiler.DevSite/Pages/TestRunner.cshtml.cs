@@ -2,7 +2,6 @@ using Broiler.DevSite.Services;
 using Broiler.HTML.Image;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SkiaSharp;
 
 namespace Broiler.DevSite.Pages;
 
@@ -62,7 +61,7 @@ public class TestRunnerModel : PageModel
         int height = 768;
 
         // Render via Broiler
-        SKBitmap rendered;
+        BBitmap rendered;
         if (anchor != null)
         {
             byte[]? pngData = _renderer.RenderAtAnchor(html, anchor, width, height);
@@ -71,11 +70,11 @@ public class TestRunnerModel : PageModel
                 TestName = $"{name} — Anchor '#{anchor}' not found";
                 return;
             }
-            rendered = SKBitmap.Decode(pngData);
+            rendered = BBitmap.Decode(pngData);
         }
         else
         {
-            rendered = _renderer.RenderHtmlToImage(html, width, height);
+            rendered = _renderer.RenderHtmlToBitmap(html, width, height);
         }
 
         using (rendered)
@@ -87,7 +86,7 @@ public class TestRunnerModel : PageModel
             // Load reference image
             if (System.IO.File.Exists(referencePath))
             {
-                using var reference = SKBitmap.Decode(referencePath);
+                using var reference = BBitmap.Decode(referencePath);
                 ReferenceImageBase64 = BitmapToBase64(reference);
 
                 // Compute pixel diff
@@ -108,12 +107,6 @@ public class TestRunnerModel : PageModel
                 TotalPixelCount = rendered.Width * rendered.Height;
             }
         }
-    }
-
-    private static string BitmapToBase64(SKBitmap bitmap)
-    {
-        using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
-        return Convert.ToBase64String(data.ToArray());
     }
 
     private static string BitmapToBase64(BBitmap bitmap) =>

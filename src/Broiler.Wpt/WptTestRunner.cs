@@ -810,10 +810,10 @@ internal sealed class WptTestRunner
         }
 
         // Render via Broiler HTML stack.
-        SKBitmap rendered;
+        BBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+            rendered = HtmlRender.RenderToImage(html, _width, _height, BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
@@ -855,17 +855,7 @@ internal sealed class WptTestRunner
                 };
             }
 
-            using var reference = SKBitmap.Decode(referencePath);
-            if (reference is null)
-            {
-                return new WptTestResult
-                {
-                    TestPath = testPath,
-                    Passed = false,
-                    Message = $"Failed to decode reference image: {referencePath}",
-                    Category = FailureCategory.ReferenceDecodeError,
-                };
-            }
+            using var reference = BBitmap.Decode(referencePath);
 
             using var diff = PixelDiffRunner.Compare(rendered, reference);
 
@@ -922,12 +912,12 @@ internal sealed class WptTestRunner
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
 
-        SKBitmap? rendered = null;
-        SKBitmap? reference = null;
+        BBitmap? rendered = null;
+        BBitmap? reference = null;
         try
         {
-            rendered = RenderHtmlFile(testPath, wptRoot);
-            reference = RenderHtmlFile(refHtmlPath, wptRoot);
+            rendered = RenderHtmlFileBitmap(testPath, wptRoot);
+            reference = RenderHtmlFileBitmap(refHtmlPath, wptRoot);
 
             using var diff = PixelDiffRunner.Compare(rendered, reference);
             double matchPct = (1.0 - diff.DiffRatio) * 100;
@@ -989,7 +979,7 @@ internal sealed class WptTestRunner
     /// Renders an HTML file through the full Broiler pipeline (script execution,
     /// anchor resolution, rendering) and returns the resulting bitmap.
     /// </summary>
-    private SKBitmap RenderHtmlFile(string htmlPath, string? wptRoot)
+    private BBitmap RenderHtmlFileBitmap(string htmlPath, string? wptRoot)
     {
         var html = File.ReadAllText(htmlPath);
 
@@ -1021,21 +1011,27 @@ internal sealed class WptTestRunner
             };
         }
 
-        return HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+        return HtmlRender.RenderToImage(html, _width, _height, BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
     }
 
+    internal BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
+    {
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+        return RenderHtmlFileBitmap(htmlPath, wptRoot);
+    }
+
     /// <summary>
-    /// Public wrapper for <see cref="RenderHtmlFile"/> that allows test code
+    /// Public wrapper for <see cref="RenderHtmlFileBitmap"/> that allows test code
     /// to render a single HTML file through the full WPT pipeline and inspect
     /// the resulting bitmap directly (e.g. for visual-inspection tests that
     /// lack a <c>rel="match"</c> reference).
     /// </summary>
     internal SKBitmap RenderHtmlFilePublic(string htmlPath, string? wptRoot)
     {
-        if (wptRoot != null)
-            EnsureWptFontsLoaded(wptRoot);
-        return RenderHtmlFile(htmlPath, wptRoot);
+        using var bitmap = RenderHtmlFileBitmapPublic(htmlPath, wptRoot);
+        return bitmap.ToSkBitmapCopy();
     }
 
     /// <summary>

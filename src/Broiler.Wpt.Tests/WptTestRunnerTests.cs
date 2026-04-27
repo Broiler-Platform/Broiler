@@ -10351,7 +10351,7 @@ div {{ width: 256px; height: 768px; }}
 
         var runner = new WptTestRunner(1024, 768);
         // Render via the full WPT pipeline (JS execution, resource loading).
-        var rendered = runner.RenderHtmlFilePublic(testFile, wptRoot);
+        var rendered = runner.RenderHtmlFileBitmapPublic(testFile, wptRoot);
         using (rendered)
         {
             // The root element has background: url('support/1x1-green.png'), red
@@ -10364,10 +10364,29 @@ div {{ width: 256px; height: 768px; }}
             var topLeft = rendered.GetPixel(5, 5);
             // The canvas should NOT be white (which would mean no background).
             // Check: not (R>250 && G>250 && B>250)
-            Assert.False(topLeft.Red > 250 && topLeft.Green > 250 && topLeft.Blue > 250,
+            Assert.False(topLeft.R > 250 && topLeft.G > 250 && topLeft.B > 250,
                 $"background-clip-root: canvas should not be white. " +
-                $"pixel(5,5) = R={topLeft.Red} G={topLeft.Green} B={topLeft.Blue}");
+                $"pixel(5,5) = R={topLeft.R} G={topLeft.G} B={topLeft.B}");
         }
+    }
+
+    [Fact]
+    public void Wpt_BackgroundClipRoot_CompatibilityWrapper_StillReturnsSkBitmap()
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-clip-root.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var runner = new WptTestRunner(1024, 768);
+        using var rendered = runner.RenderHtmlFilePublic(testFile, wptRoot);
+
+        var topLeft = rendered.GetPixel(5, 5);
+        Assert.False(topLeft.Red > 250 && topLeft.Green > 250 && topLeft.Blue > 250,
+            $"background-clip-root compatibility wrapper should not render a white canvas. " +
+            $"pixel(5,5) = R={topLeft.Red} G={topLeft.Green} B={topLeft.Blue}");
     }
 
     // ── CSS Backgrounds: background-clip visual tests ──────────────────────
