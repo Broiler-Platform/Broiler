@@ -19,11 +19,20 @@ public sealed class RenderingService
     }
 
     /// <summary>
-    /// Renders HTML to an <see cref="SKBitmap"/>. The caller owns the returned bitmap and must dispose it.
+    /// Renders HTML to a <see cref="BBitmap"/>. The caller owns the returned bitmap and must dispose it.
+    /// </summary>
+    public BBitmap RenderHtmlToBitmap(string html, int width = 1024, int height = 768)
+    {
+        return HtmlRender.RenderToImage(html, width, height, BColor.White);
+    }
+
+    /// <summary>
+    /// Temporary compatibility shim that still renders HTML to an <see cref="SKBitmap"/>.
+    /// The caller owns the returned bitmap and must dispose it.
     /// </summary>
     public SKBitmap RenderHtmlToImage(string html, int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToImage(html, width, height, BColor.White);
+        return HtmlRender.RenderToImage(html, width, height, SKColors.White);
     }
 
     /// <summary>
@@ -33,7 +42,7 @@ public sealed class RenderingService
     /// </summary>
     public PixelDiffResult CompareWithReference(string html, SKBitmap reference, int width = 1024, int height = 768)
     {
-        using var actual = HtmlRender.RenderToImage(html, width, height, BColor.White);
+        using var actual = RenderHtmlToImage(html, width, height);
         return PixelDiffRunner.Compare(actual, reference);
     }
 

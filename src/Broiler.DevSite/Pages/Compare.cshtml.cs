@@ -2,8 +2,6 @@ using Broiler.DevSite.Services;
 using Broiler.HTML.Image;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using SkiaSharp;
-
 namespace Broiler.DevSite.Pages;
 
 public class CompareModel : PageModel
@@ -46,13 +44,13 @@ public class CompareModel : PageModel
         using var reader = new StreamReader(htmlFile.OpenReadStream());
         string html = await reader.ReadToEndAsync();
 
-        using var rendered = _renderer.RenderHtmlToImage(html, width, height);
+        using var rendered = _renderer.RenderHtmlToBitmap(html, width, height);
         RenderedImageBase64 = BitmapToBase64(rendered);
 
         if (referenceImage != null && referenceImage.Length > 0)
         {
             using var refStream = referenceImage.OpenReadStream();
-            using var reference = SKBitmap.Decode(refStream);
+            using var reference = BBitmap.Decode(refStream);
             ReferenceImageBase64 = BitmapToBase64(reference);
 
             using var result = PixelDiffRunner.Compare(rendered, reference);
@@ -65,12 +63,6 @@ public class CompareModel : PageModel
         }
 
         return Page();
-    }
-
-    private static string BitmapToBase64(SKBitmap bitmap)
-    {
-        using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
-        return Convert.ToBase64String(data.ToArray());
     }
 
     private static string BitmapToBase64(BBitmap bitmap) =>

@@ -21,6 +21,30 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void RenderToImage_With_BColor_Background_Returns_BBitmap()
+    {
+        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal((byte)12, pixel.R);
+        Assert.Equal((byte)34, pixel.G);
+        Assert.Equal((byte)56, pixel.B);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void RenderToImage_With_SKColor_Background_Still_Returns_SKBitmap()
+    {
+        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new SKColor(12, 34, 56, 255));
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal((byte)12, pixel.Red);
+        Assert.Equal((byte)34, pixel.Green);
+        Assert.Equal((byte)56, pixel.Blue);
+        Assert.Equal((byte)255, pixel.Alpha);
+    }
+
+    [Fact]
     public void RenderToFile_With_BImageFormat_Jpeg_Writes_Jpeg_File()
     {
         var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.jpg");
@@ -62,6 +86,17 @@ public class GraphicsAbstractionTests
             if (File.Exists(outputPath))
                 File.Delete(outputPath);
         }
+    }
+
+    [Fact]
+    public void RenderToImageAutoSized_With_BColor_Background_Returns_BBitmap()
+    {
+        const string html = "<html><body style='margin:0'><div style='width:40px;height:30px;background:#123456'></div></body></html>";
+
+        using var bitmap = HtmlRender.RenderToImageAutoSized(html, 200, 200, BColor.White);
+
+        Assert.True(bitmap.Width >= 40);
+        Assert.True(bitmap.Height >= 30);
     }
 
     [Fact]
