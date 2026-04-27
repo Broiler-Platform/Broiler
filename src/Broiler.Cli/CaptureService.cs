@@ -4,7 +4,6 @@ using Broiler.HtmlBridge;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Null;
-using SkiaSharp;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;

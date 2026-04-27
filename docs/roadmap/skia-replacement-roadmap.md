@@ -64,11 +64,10 @@ as a platform migration rather than a single-package swap:
   - `Broiler.HTML.WPF` no longer references `SkiaSharp` directly; it consumes the
     shared `Broiler.HTML.Image` fallback boundary instead
 - **Production source usage**
-  - the current audit confirms **16 production files** currently import
-    `SkiaSharp`, with **15 of them under `Broiler.HTML.Image`** and the
-    remaining import in `src/Broiler.Cli/CaptureService.cs`
-  - `Broiler.HTML.WPF`, `Broiler.DevSite`, and `Broiler.Wpt` currently have
-    **no direct `SK*` source usage**
+  - the current audit confirms **15 production files** currently import
+    `SkiaSharp`, and all of them now live under `Broiler.HTML.Image`
+  - `Broiler.Cli`, `Broiler.HTML.WPF`, `Broiler.DevSite`, and `Broiler.Wpt`
+    currently have **no direct `SK*` source usage**
 - **Test usage**
   - the current audit confirms **21 test files** currently import `SkiaSharp`
     directly, with the concentration now in image-comparison and compatibility
@@ -85,7 +84,7 @@ Current integration points that must be covered by the roadmap:
 | `Broiler.HTML.Image/Adapters/*` | Skia-backed implementation of `RAdapter`, brushes, pens, images, fonts, paths, canvas | Core raster implementation |
 | `PixelDiffRunner` / `PixelDiffResult` | Primary API is `BBitmap`; `Compare(SKBitmap, SKBitmap)` and `DiffImage` remain as compatibility shims | Visual regression infrastructure still has a narrow compatibility seam |
 | `Broiler.HTML.WPF/WpfAdapter` | No direct SkiaSharp usage; routes SVG loading through `BSvgRasterizer` | WPF compatibility path now depends on the shared abstraction boundary instead of Skia APIs |
-| `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | DevSite and WPT now consume `BBitmap`-first APIs; CLI still has one internal Skia import in capture compatibility code | External tooling migration is mostly complete, with CLI as the last direct production tool-side touch point |
+| `Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt` | DevSite, WPT, and CLI now consume `BBitmap`-first APIs without direct Skia imports | External tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 | Rendering tests | Construct and inspect `SKBitmap` values directly | Large migration surface for validation |
 
 ### 2.3 Existing Architectural Seams
@@ -402,7 +401,7 @@ PRs.
 |---|---|
 | `Broiler.HTML.Image` | `HtmlRender`, `HtmlContainer`, `BBitmap`, `BSvgRasterizer`, `SkiaCompat`, `PixelDiffRunner`, `PixelDiffResult`, `Utilities/Utils`, and the Skia-backed adapter types still use `SKBitmap`, `SKCanvas`, `SKColor`, `SKEncodedImageFormat`, font primitives, shaders, and path/paint types. |
 | `Broiler.HTML.WPF` | No direct `SK*` type/member usage remains in source. |
-| `Broiler.Cli` | One production file (`src/Broiler.Cli/CaptureService.cs`) still imports `SkiaSharp`; no public CLI rendering surface currently exposes `SKBitmap`, `SKColor`, or `SKEncodedImageFormat`. |
+| `Broiler.Cli` | No direct `SK*` type/member usage remains in source. |
 | `Broiler.DevSite` | No direct `SK*` type/member usage remains in source. |
 | `Broiler.Wpt` | No direct `SK*` type/member usage remains in source. |
 
@@ -416,8 +415,7 @@ PRs.
   `SKPaintStyle`, `SKPath`, `SKPathEffect`, `SKPoint`, `SKRect`,
   `SKRoundRect`, `SKShader`, `SKShaderTileMode`, `SKSvg`, `SKTypeface`
 - `Broiler.HTML.WPF`: none
-- `Broiler.Cli`: no `SK*` symbol usage outside the single `SkiaSharp` import in
-  `CaptureService`
+- `Broiler.Cli`: none
 - `Broiler.DevSite`: none
 - `Broiler.Wpt`: none
 
@@ -428,7 +426,7 @@ PRs.
 | `HtmlRender` | Yes — `BBitmap`, `BColor`, `BImageFormat`, and anchor-render helpers are present | `RenderToImage(...)` / `RenderToImageAutoSized(...)` return `SKBitmap`; overloads still accept `SKColor`; `RenderToFile(...)` still exposes `SKEncodedImageFormat` | DevSite and WPT use the Broiler-owned path; CLI uses Broiler-owned save/anchor helpers |
 | `PixelDiffRunner` | Yes — `Compare(BBitmap, BBitmap, ...)` is the primary path | `Compare(SKBitmap, SKBitmap, ...)` remains as a compatibility shim | Downstream production callers are already on `BBitmap`; compatibility remains for incremental cleanup and tests |
 | `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | `DiffImage` still returns `SKBitmap` copies | DevSite compare/test pages use `DiffBitmap`; older callers/tests can still consume `DiffImage` |
-| Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Mostly yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat`; the remaining tool-side Skia touch point is internal CLI compatibility code | Tooling migration is effectively complete outside the last internal CLI import |
+| Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat` | Tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 
 ##### M0 package footprint and removal order (2026-04-27)
 
