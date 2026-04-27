@@ -63,4 +63,41 @@ public class GraphicsAbstractionTests
                 File.Delete(outputPath);
         }
     }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_With_BBitmap_Returns_BackendNeutral_DiffBitmap()
+    {
+        using var actual = new BBitmap(1, 1);
+        using var baseline = new BBitmap(1, 1);
+        actual.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        baseline.SetPixel(0, 0, new BColor(0, 255, 0, 255));
+
+        using var result = PixelDiffRunner.Compare(actual, baseline);
+
+        Assert.NotNull(result.DiffBitmap);
+        var pixel = result.DiffBitmap!.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.R);
+        Assert.Equal((byte)0, pixel.G);
+        Assert.Equal((byte)255, pixel.B);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void PixelDiffResult_DiffImage_Compatibility_Shims_From_DiffBitmap()
+    {
+        using var actual = new BBitmap(1, 1);
+        using var baseline = new BBitmap(1, 1);
+        actual.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        baseline.SetPixel(0, 0, new BColor(0, 255, 0, 255));
+
+        using var result = PixelDiffRunner.Compare(actual, baseline);
+        using var diffImage = result.DiffImage;
+
+        Assert.NotNull(diffImage);
+        var pixel = diffImage!.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.Red);
+        Assert.Equal((byte)0, pixel.Green);
+        Assert.Equal((byte)255, pixel.Blue);
+        Assert.Equal((byte)255, pixel.Alpha);
+    }
 }

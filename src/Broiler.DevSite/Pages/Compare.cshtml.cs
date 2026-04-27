@@ -60,8 +60,8 @@ public class CompareModel : PageModel
             DiffPixelCount = result.DiffPixelCount;
             TotalPixelCount = result.TotalPixelCount;
 
-            if (result.DiffImage != null)
-                DiffImageBase64 = BitmapToBase64(result.DiffImage);
+            if (result.DiffBitmap != null)
+                DiffImageBase64 = BitmapToBase64(result.DiffBitmap);
         }
 
         return Page();
@@ -72,4 +72,7 @@ public class CompareModel : PageModel
         using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
         return Convert.ToBase64String(data.ToArray());
     }
+
+    private static string BitmapToBase64(BBitmap bitmap) =>
+        Convert.ToBase64String(bitmap.Encode(BImageFormat.Png, 100));
 }

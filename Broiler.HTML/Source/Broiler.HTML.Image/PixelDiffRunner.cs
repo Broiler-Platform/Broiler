@@ -12,13 +12,16 @@ public static class PixelDiffRunner
 {
     /// <summary>
     /// Compares two bitmaps per-pixel and returns a <see cref="PixelDiffResult"/>
-    /// including a diff image highlighting changed pixels.
+    /// including a diff bitmap highlighting changed pixels.
     /// </summary>
     public static PixelDiffResult Compare(
-        SKBitmap actual,
-        SKBitmap baseline,
+        BBitmap actual,
+        BBitmap baseline,
         DeterministicRenderConfig? config = null)
     {
+        ArgumentNullException.ThrowIfNull(actual);
+        ArgumentNullException.ThrowIfNull(baseline);
+
         config ??= DeterministicRenderConfig.Default;
 
         using var normalizedActual = NormalizeForComparison(actual);
@@ -49,7 +52,7 @@ public static class PixelDiffRunner
 
         int tolerance = config.ColorTolerance;
         int diffCount = 0;
-        var diffBitmap = new SKBitmap(normalizedActual.Width, normalizedActual.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        var diffBitmap = new BBitmap(normalizedActual.Width, normalizedActual.Height);
         var mismatches = new List<PixelMismatch>();
 
         for (int y = 0; y < normalizedActual.Height; y++)
@@ -59,31 +62,30 @@ public static class PixelDiffRunner
                 var p1 = normalizedActual.GetPixel(x, y);
                 var p2 = normalizedBaseline.GetPixel(x, y);
 
-                bool match = Math.Abs(p1.Red - p2.Red) <= tolerance &&
-                             Math.Abs(p1.Green - p2.Green) <= tolerance &&
-                             Math.Abs(p1.Blue - p2.Blue) <= tolerance &&
-                             Math.Abs(p1.Alpha - p2.Alpha) <= tolerance;
+                bool match = Math.Abs(p1.R - p2.R) <= tolerance &&
+                             Math.Abs(p1.G - p2.G) <= tolerance &&
+                             Math.Abs(p1.B - p2.B) <= tolerance &&
+                             Math.Abs(p1.A - p2.A) <= tolerance;
 
                 if (!match)
                 {
                     diffCount++;
-                    diffBitmap.SetPixel(x, y, new SKColor(255, 0, 255, 255)); // magenta
+                    diffBitmap.SetPixel(x, y, new BColor(255, 0, 255, 255));
 
                     if (mismatches.Count < PixelDiffResult.MaxMismatchEntries)
                     {
                         mismatches.Add(new PixelMismatch(
                             x, y,
-                            p1.Red, p1.Green, p1.Blue, p1.Alpha,
-                            p2.Red, p2.Green, p2.Blue, p2.Alpha));
+                            p1.R, p1.G, p1.B, p1.A,
+                            p2.R, p2.G, p2.B, p2.A));
                     }
                 }
                 else
                 {
-                    // Dim copy of actual
-                    diffBitmap.SetPixel(x, y, new SKColor(
-                        (byte)(p1.Red / 3),
-                        (byte)(p1.Green / 3),
-                        (byte)(p1.Blue / 3),
+                    diffBitmap.SetPixel(x, y, new BColor(
+                        (byte)(p1.R / 3),
+                        (byte)(p1.G / 3),
+                        (byte)(p1.B / 3),
                         255));
                 }
             }
@@ -110,16 +112,38 @@ public static class PixelDiffRunner
             DiffRatio = ratio,
             DiffPixelCount = diffCount,
             TotalPixelCount = totalPixels,
-            DiffImage = diffBitmap,
+            DiffBitmap = diffBitmap,
             IsMatch = false,
             Mismatches = mismatches
         };
     }
 
-    private static SKBitmap NormalizeForComparison(SKBitmap source)
+    /// <summary>
+    /// Compares two bitmaps per-pixel and returns a <see cref="PixelDiffResult"/>
+    /// including a diff bitmap highlighting changed pixels.
+    /// </summary>
+    public static PixelDiffResult Compare(
+        SKBitmap actual,
+        SKBitmap baseline,
+        DeterministicRenderConfig? config = null)
     {
-        using var image = SKImage.FromBitmap(source);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return SKBitmap.Decode(data) ?? source.Copy();
+        ArgumentNullException.ThrowIfNull(actual);
+        ArgumentNullException.ThrowIfNull(baseline);
+
+        using var actualBitmap = BBitmap.Wrap(actual);
+        using var baselineBitmap = BBitmap.Wrap(baseline);
+        return Compare(actualBitmap, baselineBitmap, config);
+    }
+
+    private static BBitmap NormalizeForComparison(BBitmap source)
+    {
+        try
+        {
+            return BBitmap.Decode(source.Encode(BImageFormat.Png, 100));
+        }
+        catch
+        {
+            return source.Copy();
+        }
     }
 }

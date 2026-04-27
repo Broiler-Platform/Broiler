@@ -96,9 +96,9 @@ public class TestRunnerModel : PageModel
                 DiffPixelCount = result.DiffPixelCount;
                 TotalPixelCount = result.TotalPixelCount;
 
-                if (result.DiffImage != null)
+                if (result.DiffBitmap != null)
                 {
-                    DiffImageBase64 = BitmapToBase64(result.DiffImage);
+                    DiffImageBase64 = BitmapToBase64(result.DiffBitmap);
                 }
             }
             else
@@ -115,6 +115,9 @@ public class TestRunnerModel : PageModel
         using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
         return Convert.ToBase64String(data.ToArray());
     }
+
+    private static string BitmapToBase64(BBitmap bitmap) =>
+        Convert.ToBase64String(bitmap.Encode(BImageFormat.Png, 100));
 
     private string AcidDirectory =>
         Path.GetFullPath(Path.Combine(_env.ContentRootPath, "..", "..", "acid"));
