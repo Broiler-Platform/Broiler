@@ -202,6 +202,16 @@ public class SvgImageRenderingTests
     }
 
     [Fact]
+    public void BSvgRasterizer_IsSvgData_Rejects_Comment_That_Mentions_Svg_But_Has_NonSvg_Root()
+    {
+        var xmlBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- mentions <svg> but is not svg --><root></root>");
+
+        Assert.False(BSvgRasterizer.IsSvgData(xmlBytes));
+        Assert.Equal(RenderImageFormat.Unknown, ImageDecoder.DetectFormatFromBytes(xmlBytes));
+    }
+
+    [Fact]
     public void HtmlRender_NonSvg_Image_Still_Works()
     {
         // A minimal 1×1 red PNG encoded as base64 data URI.

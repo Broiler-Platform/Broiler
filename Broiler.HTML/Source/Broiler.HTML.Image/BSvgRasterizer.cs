@@ -35,7 +35,65 @@ public static class BSvgRasterizer
         int scanLength = Math.Min(data.Length, offset + 1024);
         var header = Encoding.UTF8.GetString(data, offset, scanLength - offset);
 
-        return header.Contains("<svg", StringComparison.OrdinalIgnoreCase);
+        int index = 0;
+        while (index < header.Length)
+        {
+            while (index < header.Length && char.IsWhiteSpace(header[index]))
+                index++;
+
+            if (index >= header.Length)
+                return false;
+
+            if (StartsWith(header, index, "<!--"))
+            {
+                int end = header.IndexOf("-->", index, StringComparison.Ordinal);
+                if (end < 0)
+                    return false;
+
+                index = end + 3;
+                continue;
+            }
+
+            if (StartsWith(header, index, "<?"))
+            {
+                int end = header.IndexOf("?>", index, StringComparison.Ordinal);
+                if (end < 0)
+                    return false;
+
+                index = end + 2;
+                continue;
+            }
+
+            if (StartsWith(header, index, "<!DOCTYPE"))
+            {
+                int end = header.IndexOf('>', index);
+                if (end < 0)
+                    return false;
+
+                index = end + 1;
+                continue;
+            }
+
+            return StartsWithSvgElement(header, index);
+        }
+
+        return false;
+    }
+
+    private static bool StartsWith(string source, int index, string value) =>
+        source.AsSpan(index).StartsWith(value, StringComparison.OrdinalIgnoreCase);
+
+    private static bool StartsWithSvgElement(string source, int index)
+    {
+        if (!StartsWith(source, index, "<svg"))
+            return false;
+
+        int nextIndex = index + 4;
+        if (nextIndex >= source.Length)
+            return true;
+
+        char next = source[nextIndex];
+        return char.IsWhiteSpace(next) || next is '>' or '/';
     }
 
     /// <summary>
