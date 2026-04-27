@@ -422,7 +422,7 @@ PRs.
 
 **Primary owners:** text/fidelity owner + rendering owner
 
-- [ ] Lift font loading and family fallback policy into backend-neutral services
+- [x] Lift font loading and family fallback policy into backend-neutral services
   so the current generic-family mappings can be preserved.
 - [ ] Decide whether shaping remains custom or is delegated behind a Broiler API,
   and prototype the selected path against representative text-heavy pages.

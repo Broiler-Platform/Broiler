@@ -33,37 +33,10 @@ internal sealed class SkiaImageAdapter : RAdapter
             AddFontFamily(new FontFamilyAdapter(familyName));
         }
 
-        // CSS 2.1 §15.3 generic font family mappings.
-        // SkiaSharp does not resolve CSS generic family names; map them to the
-        // first available system font from a prioritised fallback list.
-        MapGenericFamily("sans-serif", systemFonts, "Arial", "Helvetica", "Liberation Sans", "DejaVu Sans");
-        MapGenericFamily("serif", systemFonts, "Times New Roman", "Liberation Serif", "DejaVu Serif");
-        MapGenericFamily("monospace", systemFonts, "Courier New", "Liberation Mono", "DejaVu Sans Mono");
-        MapGenericFamily("cursive", systemFonts, "Comic Sans MS", "URW Chancery L");
-        MapGenericFamily("fantasy", systemFonts, "Impact");
-
-        // Common alias: web content often uses "Helvetica" expecting Arial-like metrics.
-        if (!systemFonts.Contains("Helvetica"))
+        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(systemFonts))
         {
-            var arialLike = FirstAvailable(systemFonts, "Arial", "Liberation Sans", "DejaVu Sans");
-            if (arialLike != null)
-                AddFontFamilyMapping("Helvetica", arialLike);
+            AddFontFamilyMapping(mapping.Key, mapping.Value);
         }
-    }
-
-    /// <summary>
-    /// Maps a CSS generic font family name to the first available system font.
-    /// </summary>
-    private void MapGenericFamily(string genericName, HashSet<string> systemFonts, params string[] candidates)
-    {
-        var resolved = FirstAvailable(systemFonts, candidates);
-        if (resolved != null)
-            AddFontFamilyMapping(genericName, resolved);
-    }
-
-    private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates)
-    {
-        return Array.Find(candidates, systemFonts.Contains);
     }
 
     public static SkiaImageAdapter Instance { get; } = new();
