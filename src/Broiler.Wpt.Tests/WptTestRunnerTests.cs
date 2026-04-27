@@ -10379,7 +10379,7 @@ div {{ width: 256px; height: 768px; }}
     }
 
     [Fact]
-    public void Wpt_BackgroundClipRoot_CompatibilityWrapper_StillReturnsSkBitmap()
+    public void Wpt_BackgroundClipRoot_RenderHtmlFileBitmapPublic_ReturnsBackendNeutralBitmap()
     {
         var root = FindRepoRoot();
         var wptRoot = Path.Combine(root, "tests", "wpt");
@@ -10389,12 +10389,12 @@ div {{ width: 256px; height: 768px; }}
             throw new FileNotFoundException($"WPT test file not found: {testFile}");
 
         var runner = new WptTestRunner(1024, 768);
-        using var rendered = runner.RenderHtmlFilePublic(testFile, wptRoot);
+        using var rendered = runner.RenderHtmlFileBitmapPublic(testFile, wptRoot);
 
         var topLeft = rendered.GetPixel(5, 5);
-        Assert.False(topLeft.Red > 250 && topLeft.Green > 250 && topLeft.Blue > 250,
-            $"background-clip-root compatibility wrapper should not render a white canvas. " +
-            $"pixel(5,5) = R={topLeft.Red} G={topLeft.Green} B={topLeft.Blue}");
+        Assert.False(topLeft.R > 250 && topLeft.G > 250 && topLeft.B > 250,
+            $"background-clip-root bitmap path should not render a white canvas. " +
+            $"pixel(5,5) = R={topLeft.R} G={topLeft.G} B={topLeft.B}");
     }
 
     // ── CSS Backgrounds: background-clip visual tests ──────────────────────

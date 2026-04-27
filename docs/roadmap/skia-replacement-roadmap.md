@@ -439,7 +439,7 @@ PRs.
 
 - [ ] Decide and document whether SVG ships as a Broiler-owned module or a
   temporary fallback behind the graphics abstraction.
-- [ ] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
+- [x] Replace DevSite compare/test pages, CLI capture helpers, and WPT image
   utilities with backend-neutral bitmap handling.
 - [x] Migrate the WPF bridge away from direct SkiaSharp bitmap/SVG conversion.
 - [ ] Ensure diagnostics and artifact generation label which backend produced the

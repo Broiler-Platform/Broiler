@@ -5,7 +5,6 @@ using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
-using SkiaSharp;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -1052,19 +1051,6 @@ internal sealed class WptTestRunner
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
         return RenderHtmlFileBitmap(htmlPath, wptRoot);
-    }
-
-    /// <summary>
-    /// Public wrapper for <see cref="RenderHtmlFileBitmap"/> that allows test code
-    /// to render a single HTML file through the full WPT pipeline and inspect
-    /// the resulting bitmap directly (e.g. for visual-inspection tests that
-    /// lack a <c>rel="match"</c> reference).
-    /// </summary>
-    internal SKBitmap RenderHtmlFilePublic(string htmlPath, string? wptRoot)
-    {
-        using var bitmap = RenderHtmlFileBitmapPublic(htmlPath, wptRoot);
-        var encoded = bitmap.Encode(BImageFormat.Png, 100);
-        return SKBitmap.Decode(encoded) ?? throw new InvalidOperationException("Failed to decode compatibility bitmap.");
     }
 
     /// <summary>
