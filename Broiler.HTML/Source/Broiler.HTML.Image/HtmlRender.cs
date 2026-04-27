@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Core.Core.Entities;
@@ -12,24 +11,20 @@ namespace Broiler.HTML.Image;
 public static class HtmlRender
 {
     public static BBitmap RenderToImage(string html, int width, int height,
-        BColor backgroundColor,
+        BColor backgroundColor = default,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null,
         string baseUrl = null) =>
-        RenderToImageCore(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, baseUrl);
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SKBitmap RenderToImage(string html, int width, int height,
-        SKColor backgroundColor = default,
-        CssData cssData = null,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null,
-        string baseUrl = null)
-    {
-        using var bitmap = RenderToImageCore(html, width, height, backgroundColor == default ? null : backgroundColor.ToBColor(), cssData, stylesheetLoad, imageLoad, baseUrl);
-        return bitmap.ToSkBitmapCopy();
-    }
+        RenderToImageCore(
+            html,
+            width,
+            height,
+            backgroundColor == default ? null : backgroundColor,
+            cssData,
+            stylesheetLoad,
+            imageLoad,
+            baseUrl);
 
     public static BBitmap RenderToImageAutoSized(string html, int maxWidth = 0, int maxHeight = 0,
         BColor backgroundColor = default,

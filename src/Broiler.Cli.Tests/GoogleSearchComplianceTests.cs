@@ -90,7 +90,7 @@ public class GoogleSearchComplianceTests
     /// <summary>
     /// Render the Google-like page at the standard 1024×768 viewport.
     /// </summary>
-    private static SKBitmap RenderGoogleLike(int width = 1024, int height = 768)
+    private static BBitmap RenderGoogleLike(int width = 1024, int height = 768)
     {
         return HtmlRender.RenderToImage(GoogleLikeHtml, width, height);
     }
@@ -100,7 +100,7 @@ public class GoogleSearchComplianceTests
     /// A non-white pixel has at least one RGB channel below
     /// <paramref name="threshold"/>.
     /// </summary>
-    private static int CountContentPixels(SKBitmap bitmap, int yStart, int yEnd,
+    private static int CountContentPixels(BBitmap bitmap, int yStart, int yEnd,
         int threshold = 245)
     {
         int count = 0;

@@ -22,12 +22,8 @@ public class SkiaDecouplingGuardTests
         @"using\s+SkiaSharp\s*;|SkiaSharp\.|\bSK[A-Z][A-Za-z0-9_]*\b",
         RegexOptions.Compiled);
 
-    // This allowlist intentionally preserves only the last temporary high-level
-    // HtmlRender SK* shim, which must remain hidden from IntelliSense via
-    // [EditorBrowsable(EditorBrowsableState.Never)] until the migration completes.
     private static readonly string[] AllowedHighLevelSkiaCompatibilityMembers =
     [
-        "HtmlRender.RenderToImage(String, Int32, Int32, SKColor, CssData, EventHandler<HtmlStylesheetLoadEventArgs>, EventHandler<HtmlImageLoadEventArgs>, String) -> SKBitmap",
     ];
 
     [Fact]

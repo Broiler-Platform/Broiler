@@ -1,4 +1,3 @@
-using SkiaSharp;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge;
 
@@ -69,13 +68,12 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        var red = new SKColor(255, 0, 0);
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100, backgroundColor: red);
+        using var bitmap = HtmlRender.RenderToImage(html, 100, 100, backgroundColor: new BColor(255, 0, 0, 255));
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(255, pixel.Red);
-        Assert.Equal(0, pixel.Green);
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(255, pixel.R);
+        Assert.Equal(0, pixel.G);
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>

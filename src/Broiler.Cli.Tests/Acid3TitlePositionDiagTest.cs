@@ -62,7 +62,7 @@ div { background: white; width: 50px; height: 50px; }
             $"div should be white, found ({px.Red},{px.Green},{px.Blue})");
     }
 
-    private static int FindTopDark(SkiaSharp.SKBitmap bitmap)
+    private static int FindTopDark(BBitmap bitmap)
     {
         for (int y = 0; y < 250; y++)
         for (int x = 50; x < 400; x++)

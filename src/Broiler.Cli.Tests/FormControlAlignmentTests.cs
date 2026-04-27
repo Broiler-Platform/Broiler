@@ -17,7 +17,7 @@ public class FormControlAlignmentTests
     /// Finds the horizontal extent of non-white pixels in a bitmap.
     /// Returns (leftMost, rightMost) or (-1, -1) if no non-white pixels found.
     /// </summary>
-    private static (int left, int right) FindHorizontalExtent(SKBitmap bmp)
+    private static (int left, int right) FindHorizontalExtent(BBitmap bmp)
     {
         int left = -1, right = -1;
         for (int x = 0; x < bmp.Width; x++)

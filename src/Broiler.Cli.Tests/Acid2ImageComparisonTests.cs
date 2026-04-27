@@ -50,7 +50,7 @@ public class Acid2ImageComparisonTests
     /// Render the Acid2 page at 1024×768 — the standard viewport size
     /// used by both Broiler CLI and the Chromium reference.
     /// </summary>
-    private static SKBitmap RenderAcid2(int width = 1024, int height = 768)
+    private static BBitmap RenderAcid2(int width = 1024, int height = 768)
     {
         var html = LoadAcid2Html();
         return HtmlRender.RenderToImage(html, width, height);

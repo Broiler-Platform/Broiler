@@ -46,7 +46,7 @@ h1 { margin: 0; padding: 0; font-size: 5em; font-weight: bold; line-height: 1.2;
             $"Text position differs by {Math.Abs(yBg - yNoBg)}px (bg={yBg}, noBg={yNoBg})");
     }
 
-    private static int FindFirstDarkRow(SKBitmap bmp)
+    private static int FindFirstDarkRow(BBitmap bmp)
     {
         for (int y = 0; y < bmp.Height; y++)
             for (int x = 0; x < bmp.Width; x++)

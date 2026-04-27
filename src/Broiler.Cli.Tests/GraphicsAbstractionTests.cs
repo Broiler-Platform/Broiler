@@ -35,15 +35,15 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void RenderToImage_With_SKColor_Background_Still_Returns_SKBitmap()
+    public void RenderToImage_With_Defaultable_BColor_Background_Returns_BBitmap()
     {
-        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new SKColor(12, 34, 56, 255));
+        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal((byte)12, pixel.Red);
-        Assert.Equal((byte)34, pixel.Green);
-        Assert.Equal((byte)56, pixel.Blue);
-        Assert.Equal((byte)255, pixel.Alpha);
+        Assert.Equal((byte)12, pixel.R);
+        Assert.Equal((byte)34, pixel.G);
+        Assert.Equal((byte)56, pixel.B);
+        Assert.Equal((byte)255, pixel.A);
     }
 
     [Fact]

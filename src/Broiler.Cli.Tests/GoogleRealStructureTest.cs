@@ -48,9 +48,7 @@ public class GoogleRealStructureTest
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 200);
-        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_buttons.png"));
-        data.SaveTo(f);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_buttons.png"), bmp.Encode(BImageFormat.Png, 100));
         
         // Analyze button area (y=30-100)
         int btnLeft = bmp.Width, btnRight = 0;
@@ -129,9 +127,7 @@ a{color:#4b11a8;text-decoration:none}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 600);
-        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_fullpage.png"));
-        data.SaveTo(f);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_fullpage.png"), bmp.Encode(BImageFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (roughly y=200-350)
         int darkPixels = 0;
@@ -260,9 +256,7 @@ a{color:#4b11a8;text-decoration:none}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 120);
-        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"));
-        data.SaveTo(f);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"), bmp.Encode(BImageFormat.Png, 100));
 
         int darkPixels = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -380,9 +374,7 @@ input{font-family:inherit}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 200);
-        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_real_html.png"));
-        data.SaveTo(f);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_real_html.png"), bmp.Encode(BImageFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (y=30-100)
         int darkInBtnArea = 0;

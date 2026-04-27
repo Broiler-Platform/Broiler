@@ -80,7 +80,7 @@ Current integration points that must be covered by the roadmap:
 
 | Area | Current dependency shape | Why it matters |
 |---|---|---|
-| `Broiler.HTML.Image/HtmlRender` | Primary API is now `BBitmap`/`BColor`/`BImageFormat`; only a narrow `RenderToImage(..., SKColor, ...)` compatibility shim remains | Public rendering surface still defines the migration pace for consumers |
+| `Broiler.HTML.Image/HtmlRender` | Primary API is now fully `BBitmap`/`BColor`/`BImageFormat` at the high-level public surface | Public rendering surface still defines the migration pace for consumers |
 | `Broiler.HTML.Image/Adapters/*` | Skia-backed implementation of `RAdapter`, brushes, pens, images, fonts, paths, canvas | Core raster implementation |
 | `PixelDiffRunner` / `PixelDiffResult` | Primary API is `BBitmap`; the high-level public diff surface no longer exposes `SKBitmap` compatibility shims | Visual regression infrastructure is now on the backend-neutral bitmap API at the public entry-point layer |
 | `Broiler.HTML.WPF/WpfAdapter` | No direct SkiaSharp usage; routes SVG loading through `BSvgRasterizer` | WPF compatibility path now depends on the shared abstraction boundary instead of Skia APIs |
@@ -423,7 +423,7 @@ PRs.
 
 | Surface | Broiler-owned path available now | Remaining public/compatibility `SK*` exposure | Current downstream status |
 |---|---|---|---|
-| `HtmlRender` | Yes — `BBitmap`, `BColor`, `BImageFormat`, and anchor-render helpers are present | Only `RenderToImage(...)` still returns `SKBitmap` and accepts `SKColor` as a high-level compatibility shim | DevSite and WPT use the Broiler-owned path; CLI uses Broiler-owned save/anchor helpers |
+| `HtmlRender` | Yes — `BBitmap`, `BColor`, `BImageFormat`, and anchor-render helpers are present | None at the high-level public API layer | DevSite and WPT use the Broiler-owned path; CLI uses Broiler-owned save/anchor helpers |
 | `PixelDiffRunner` | Yes — `Compare(BBitmap, BBitmap, ...)` is the primary path | None at the high-level public API layer | Downstream production callers are already on `BBitmap`; no high-level `SKBitmap` compare shim remains |
 | `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | None at the high-level public API layer | DevSite compare/test pages use `DiffBitmap`; no high-level `SKBitmap` diff-image shim remains |
 | Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat` | Tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
