@@ -2134,10 +2134,9 @@ internal static class PaintWalker
             // For 'scroll' attachment: position relative to the background
             // positioning area represented by fillRect.
             bool isFixed = attachStr.Equals("fixed", StringComparison.OrdinalIgnoreCase);
-            var tileOrigin = new PointF(fillRect.X, fillRect.Y);
-
-            if (isFixed)
-                tileOrigin = new PointF(viewport.X, viewport.Y);
+            var tileOrigin = isFixed
+                ? new PointF(viewport.X, viewport.Y)
+                : new PointF(fillRect.X, fillRect.Y);
 
             // Apply background-position offset.
             var posParts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
