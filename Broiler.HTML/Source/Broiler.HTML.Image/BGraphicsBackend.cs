@@ -9,7 +9,6 @@ namespace Broiler.HTML.Image;
 /// </summary>
 public static class BGraphicsBackend
 {
-    internal const string BackendEnvironmentVariable = "BROILER_GRAPHICS_BACKEND";
     internal const string BroilerRasterId = "broiler";
     internal const string SkiaFallbackId = "skia";
 
@@ -41,11 +40,7 @@ public static class BGraphicsBackend
 
     private static BackendDefinition ResolveCurrent()
     {
-        var configuredBackend = BackendOverride.Value;
-        if (string.IsNullOrWhiteSpace(configuredBackend))
-            configuredBackend = Environment.GetEnvironmentVariable(BackendEnvironmentVariable);
-
-        return Resolve(configuredBackend);
+        return Resolve(BackendOverride.Value);
     }
 
     private static BackendDefinition Resolve(string? configuredBackend) =>

@@ -1,21 +1,22 @@
 # Graphics backend cutover and fallback
 
 Broiler now defaults its `BBitmap` rendering path to the Broiler-owned raster
-pipeline (`broiler`) while keeping an explicit Skia fallback mode (`skia`) for
-the stabilization window.
+pipeline (`broiler`). The external `BROILER_GRAPHICS_BACKEND=skia` escape hatch
+used during the stabilization window has been retired; only the internal
+per-thread override used by tests and controlled tooling can still force the
+Skia compatibility path while the last package cleanup work remains pending.
 
 ## Backend selection
 
 The active backend is selected in this order:
 
 1. an internal per-thread override used by tests and controlled tooling;
-2. the `BROILER_GRAPHICS_BACKEND` environment variable;
-3. the default Broiler raster mode.
+2. the default Broiler raster mode.
 
-Supported values:
+Supported values for the internal override:
 
 - `broiler` — default Broiler raster pipeline
-- `skia` — explicit SkiaSharp fallback path
+- `skia` — internal SkiaSharp compatibility path
 
 ## What changes between modes
 
@@ -34,7 +35,8 @@ CLI capture artifacts and WPT results already record:
 - backend `label`
 
 This metadata should be used during stabilization to confirm whether a result
-came from the default Broiler raster path or the explicit Skia fallback.
+came from the default Broiler raster path or the internal Skia compatibility
+path used by tests/tooling.
 
 ## Stabilization suite and rollback gates
 
@@ -53,5 +55,5 @@ Rollback gating for the default backend currently uses:
 - aggregate Broiler runtime across the curated suite no worse than
   `max(4x Skia, Skia + 400 ms)`
 
-If either gate fails, the explicit `skia` mode remains the rollback path while
-the failing fixtures are triaged.
+If either gate fails, the internal `skia` override remains available to tests
+and controlled tooling while the failing fixtures are triaged.

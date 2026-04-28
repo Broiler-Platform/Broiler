@@ -15,6 +15,26 @@ public class GraphicsBackendCutoverTests
         Assert.True(BGraphicsBackend.UseBroilerRasterPipeline);
     }
 
+    [Fact]
+    public void BGraphicsBackend_Ignores_The_Legacy_Environment_Variable_Fallback()
+    {
+        const string legacyVariable = "BROILER_GRAPHICS_BACKEND";
+        var previous = Environment.GetEnvironmentVariable(legacyVariable);
+
+        try
+        {
+            Environment.SetEnvironmentVariable(legacyVariable, BGraphicsBackend.SkiaFallbackId);
+
+            Assert.Equal(BGraphicsBackend.BroilerRasterId, BGraphicsBackend.CurrentId);
+            Assert.Equal("Broiler raster", BGraphicsBackend.CurrentDisplayName);
+            Assert.True(BGraphicsBackend.UseBroilerRasterPipeline);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(legacyVariable, previous);
+        }
+    }
+
     [Theory]
     [InlineData(BGraphicsBackend.BroilerRasterId, "Broiler raster", true)]
     [InlineData(BGraphicsBackend.SkiaFallbackId, "SkiaSharp fallback", false)]
