@@ -410,5 +410,9 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         }
     }
 
+    // The raster canvas maintains its own opacity/blend layer stack, but this adapter
+    // can still mix Skia-only operations (for example text and complex brushes) inside
+    // the same compositing group. Keep raster replay disabled while a layer is active so
+    // those mixed groups continue to compose through the single Skia layer implementation.
     private bool CanUseRaster => rasterCanvas is not null && _layerDepth == 0;
 }
