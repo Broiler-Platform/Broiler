@@ -34,3 +34,23 @@ CLI capture artifacts and WPT results already record:
 
 This metadata should be used during stabilization to confirm whether a result
 came from the default Broiler raster path or the explicit Skia fallback.
+
+## Stabilization suite and rollback gates
+
+The M5 stabilization suite now runs representative cases for:
+
+- Acid fixtures (`acid2.html`)
+- WPT subsets (`css-anchor-position/position-visibility-anchors-visible.html`)
+- CLI screenshot capture
+- SVG sample pages
+- text-heavy regression pages
+
+Rollback gating for the default backend currently uses:
+
+- pixel parity within the default deterministic diff threshold
+  (`PixelDiffThreshold = 0.001`, `ColorTolerance = 5`)
+- aggregate Broiler runtime across the curated suite no worse than
+  `max(4x Skia, Skia + 400 ms)`
+
+If either gate fails, the explicit `skia` mode remains the rollback path while
+the failing fixtures are triaged.
