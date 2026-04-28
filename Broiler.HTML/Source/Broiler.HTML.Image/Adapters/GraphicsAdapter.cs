@@ -5,7 +5,7 @@ using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
-internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, bool dispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
+internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
 {
     public override void PopClip()
     {
@@ -307,6 +307,9 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
 
     public override void Dispose()
     {
+        if (restoreOnDispose)
+            canvas.Restore();
+
         if (dispose)
             canvas.Dispose();
     }

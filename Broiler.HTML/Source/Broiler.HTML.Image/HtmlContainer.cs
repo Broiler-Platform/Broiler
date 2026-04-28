@@ -144,12 +144,8 @@ public sealed class HtmlContainer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(bitmap);
 
-        using var canvas = bitmap.OpenCanvas();
-        canvas.Save();
-        canvas.Translate(translation.X, translation.Y);
-        using var g = new GraphicsAdapter(canvas, clip);
+        using var g = bitmap.OpenGraphics(clip, translation);
         HtmlContainerInt.PerformPaint(g);
-        canvas.Restore();
     }
 
     /// <summary>

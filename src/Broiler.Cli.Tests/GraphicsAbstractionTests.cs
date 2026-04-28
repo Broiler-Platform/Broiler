@@ -208,7 +208,7 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void HtmlContainer_PerformPaint_With_BBitmap_Translation_Renders_Offset_Content()
+    public void HtmlContainer_PerformPaint_With_BBitmap_Translation_Helper_Renders_Offset_Content()
     {
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;

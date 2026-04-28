@@ -116,6 +116,14 @@ public sealed class BBitmap : IDisposable
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, dispose: true);
 
+    internal GraphicsAdapter OpenGraphics(RectangleF clip, PointF translation)
+    {
+        var canvas = OpenCanvas();
+        canvas.Save();
+        canvas.Translate(translation.X, translation.Y);
+        return new GraphicsAdapter(canvas, clip, dispose: true, restoreOnDispose: true);
+    }
+
     internal SKBitmap AsSkBitmap() => _bitmap;
 
     internal SKBitmap ToSkBitmapCopy() => _bitmap.Copy();
