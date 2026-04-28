@@ -470,13 +470,13 @@ Evidence driving the decision today:
 
 **Primary owners:** rendering owner + reviewer, with tooling owner support
 
-- [ ] Introduce Broiler-owned bitmap/color/image-format contracts plus a
+- [x] Introduce Broiler-owned bitmap/color/image-format contracts plus a
   Skia-backed implementation that satisfies the new interfaces.
-- [ ] Move `HtmlRender` off `SKBitmap`, `SKColor`, and `SKEncodedImageFormat`
+- [x] Move `HtmlRender` off `SKBitmap`, `SKColor`, and `SKEncodedImageFormat`
   in favor of Broiler-owned types or tightly scoped compatibility shims.
 - [x] Refactor `PixelDiffRunner` and `PixelDiffResult` to operate on a
   backend-neutral bitmap contract at the high-level public API layer.
-- [ ] Add temporary adapters so CLI, DevSite, WPT, and existing tests can
+- [x] Add temporary adapters so CLI, DevSite, WPT, and existing tests can
   migrate incrementally instead of requiring a single all-at-once rewrite.
 - [x] Freeze a "no new `SK*` in production APIs" rule once the replacement
   surface exists, with `SkiaDecouplingGuardTests` guarding the allowed

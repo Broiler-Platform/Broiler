@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using System.ComponentModel;
 using System.Reflection;
+using System.Xml.Linq;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;
@@ -26,6 +27,16 @@ public class SkiaDecouplingGuardTests
     [
         "HtmlContainer.PerformLayout(SKCanvas, RectangleF) -> Void",
         "HtmlContainer.PerformPaint(SKCanvas, RectangleF) -> Void",
+    ];
+
+    private static readonly string ImageProjectRelativePath = Path.Combine(
+        "Broiler.HTML", "Source", "Broiler.HTML.Image", "Broiler.HTML.Image.csproj");
+
+    private static readonly string[] AllowedSkiaPackageReferences =
+    [
+        "SkiaSharp",
+        "SkiaSharp.NativeAssets.Linux",
+        "Svg.Skia",
     ];
 
     [Fact]
@@ -106,6 +117,43 @@ public class SkiaDecouplingGuardTests
             Assert.NotNull(attribute);
             Assert.Equal(EditorBrowsableState.Never, attribute!.State);
         }
+    }
+
+    [Fact]
+    public void Only_Image_Project_Carries_Skia_And_Svg_Package_References()
+    {
+        var actual = Directory.EnumerateFiles(RepoRoot, "*.csproj", SearchOption.AllDirectories)
+            .Select(path => new
+            {
+                RelativePath = Path.GetRelativePath(RepoRoot, path),
+                Packages = XDocument.Load(path)
+                    .Descendants()
+                    .Where(element => element.Name.LocalName == "PackageReference")
+                    .Select(element => element.Attribute("Include")?.Value)
+                    .Where(static value => !string.IsNullOrWhiteSpace(value))
+                    .Select(static value => value!)
+                    .Where(AllowedSkiaPackageReferences.Contains)
+                    .OrderBy(static value => value, StringComparer.Ordinal)
+                    .ToArray(),
+            })
+            .Where(project => project.Packages.Length > 0)
+            .OrderBy(project => project.RelativePath, StringComparer.Ordinal)
+            .ToArray();
+
+        var expected = new[]
+        {
+            new
+            {
+                RelativePath = ImageProjectRelativePath,
+                Packages = AllowedSkiaPackageReferences
+                    .OrderBy(static value => value, StringComparer.Ordinal)
+                    .ToArray(),
+            },
+        };
+
+        Assert.Equal(
+            expected.Select(project => $"{project.RelativePath}: {string.Join(", ", project.Packages)}"),
+            actual.Select(project => $"{project.RelativePath}: {string.Join(", ", project.Packages)}"));
     }
 
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
