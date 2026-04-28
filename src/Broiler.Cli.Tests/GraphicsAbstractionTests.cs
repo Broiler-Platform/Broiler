@@ -522,6 +522,56 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_OpenGraphics_Creates_Linear_Gradient_Tile_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 1, 1));
+        using var tile = graphics.CreateLinearGradientTile(4, 1, [Color.Red, Color.Blue], [0f, 1f], 90f);
+
+        var image = Assert.IsType<ImageAdapter>(tile);
+        var left = image.Bitmap.GetPixel(0, 0);
+        var middle = image.Bitmap.GetPixel(1, 0);
+        var right = image.Bitmap.GetPixel(3, 0);
+
+        Assert.True(left.R > left.B);
+        Assert.True(middle.R > 0 && middle.B > 0);
+        Assert.True(right.B > right.R);
+        Assert.Equal((byte)255, left.A);
+        Assert.Equal((byte)255, right.A);
+    }
+
+    [Fact]
+    public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_NonUniform_Gradient_Background()
+    {
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(4, 4);
+        container.SetHtml("""
+            <html><body style='margin:0'>
+            <div style='width:4px;height:4px;background-image:linear-gradient(#ff0000, #0000ff);background-repeat:no-repeat'></div>
+            </body></html>
+            """);
+
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(BColor.White);
+        var clip = new RectangleF(0, 0, 4, 4);
+
+        container.PerformLayout(bitmap, clip);
+        container.PerformPaint(bitmap, clip);
+
+        var top = bitmap.GetPixel(2, 0);
+        var middle = bitmap.GetPixel(2, 1);
+        var bottom = bitmap.GetPixel(2, 3);
+
+        Assert.True(top.R > top.B);
+        Assert.True(middle.R > 0 && middle.B > 0);
+        Assert.True(bottom.B > bottom.R);
+        Assert.Equal((byte)255, top.A);
+        Assert.Equal((byte)255, bottom.A);
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Routes_Simple_Path_Strokes_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(7, 7);

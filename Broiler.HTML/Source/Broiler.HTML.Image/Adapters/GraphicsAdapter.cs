@@ -374,30 +374,12 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
             return null;
 
         var bitmap = new BBitmap(width, height);
-        using var tileCanvas = bitmap.OpenCanvas();
-
-        // Convert angle (CSS: 0=to top, 90=to right, 180=to bottom) to
-        // SkiaSharp linear gradient start/end points.
-        var radians = angle * Math.PI / 180.0;
-        float cx = width / 2f;
-        float cy = height / 2f;
-        float halfDiag = (float)Math.Max(width, height) / 2f;
-
-        // CSS gradient angles: 0deg = bottom→top, 90deg = left→right, 180deg = top→bottom
-        // SkiaSharp: start and end points define the gradient line
-        float sin = (float)Math.Sin(radians);
-        float cos = (float)Math.Cos(radians);
-        var startPoint = new SKPoint(cx - sin * halfDiag, cy + cos * halfDiag);
-        var endPoint = new SKPoint(cx + sin * halfDiag, cy - cos * halfDiag);
-
-        var skColors = new SKColor[colors.Length];
+        using var tileCanvas = bitmap.OpenRasterCanvas();
+        var gradientColors = new BColor[colors.Length];
         for (int i = 0; i < colors.Length; i++)
-            skColors[i] = Utilities.Utils.Convert(colors[i]);
+            gradientColors[i] = new BColor(colors[i].R, colors[i].G, colors[i].B, colors[i].A);
 
-        using var shader = SKShader.CreateLinearGradient(
-            startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);
-        using var paint = new SKPaint { Shader = shader, IsAntialias = true };
-        tileCanvas.DrawRect(0, 0, width, height, paint);
+        tileCanvas.FillLinearGradientRect(new RectangleF(0, 0, width, height), gradientColors, positions, angle);
 
         return new ImageAdapter(bitmap);
     }
