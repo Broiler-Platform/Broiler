@@ -2,7 +2,6 @@ using Broiler.HTML.Dom.Core.Dom;
 using Broiler.HTML.Dom.Core.Utils;
 using Broiler.HTML.Image;
 using Broiler.HTML.Orchestration.Core;
-using SkiaSharp;
 using System.Drawing;
 using Xunit;
 
@@ -29,10 +28,9 @@ public class FormControlClickTests
         container.AvoidImagesLateLoading = true;
         container.SetHtml(html, null);
 
-        using var bmp = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bmp);
+        using var bmp = new BBitmap(width, height);
         var clip = new RectangleF(0, 0, width, height);
-        container.PerformLayout(canvas, clip);
+        container.PerformLayout(bmp, clip);
 
         return container.HtmlContainerInt.Root;
     }

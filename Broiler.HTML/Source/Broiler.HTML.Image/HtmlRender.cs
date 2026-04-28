@@ -134,7 +134,6 @@ public static class HtmlRender
     {
         var bgColor = backgroundColor ?? BColor.White;
         var bitmap = new BBitmap(width, height);
-        using var canvas = bitmap.OpenCanvas();
 
         if (!string.IsNullOrEmpty(html))
         {
@@ -154,15 +153,15 @@ public static class HtmlRender
             if (backgroundColor is null)
                 bgColor = ResolveCanvasBackground(container, bgColor);
 
-            canvas.Clear(bgColor.ToSkColor());
+            bitmap.Erase(bgColor);
 
             var clip = new RectangleF(0, 0, width, height);
-            container.PerformLayout(canvas, clip);
-            container.PerformPaint(canvas, clip);
+            container.PerformLayout(bitmap, clip);
+            container.PerformPaint(bitmap, clip);
         }
         else
         {
-            canvas.Clear(bgColor.ToSkColor());
+            bitmap.Erase(bgColor);
         }
 
         return bitmap;
@@ -209,11 +208,10 @@ public static class HtmlRender
         container.MaxSize = new SizeF(w, h);
 
         var bitmap = new BBitmap(w, h);
-        using var canvas = bitmap.OpenCanvas();
-        canvas.Clear(bgColor.ToSkColor());
+        bitmap.Erase(bgColor);
 
         var clip = new RectangleF(0, 0, w, h);
-        container.PerformPaint(canvas, clip);
+        container.PerformPaint(bitmap, clip);
 
         return bitmap;
     }
@@ -261,9 +259,8 @@ public static class HtmlRender
             bgColor = ResolveCanvasBackground(container, bgColor);
 
         using var layoutBitmap = new BBitmap(width, LayoutBitmapHeight);
-        using var layoutCanvas = layoutBitmap.OpenCanvas();
-        layoutCanvas.Clear(bgColor.ToSkColor());
-        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, width, LayoutMaxHeight));
+        layoutBitmap.Erase(bgColor);
+        container.PerformLayout(layoutBitmap, new RectangleF(0, 0, width, LayoutMaxHeight));
 
         var anchorRect = container.GetElementRectangle(elementId);
         if (anchorRect is null)
@@ -274,8 +271,8 @@ public static class HtmlRender
         container.MaxSize = new SizeF(width, height);
 
         var bitmap = new BBitmap(width, height);
+        bitmap.Erase(bgColor);
         using var canvas = bitmap.OpenCanvas();
-        canvas.Clear(bgColor.ToSkColor());
         canvas.Save();
         canvas.Translate(0, -scrollY);
         container.PerformPaint(canvas, new RectangleF(0, scrollY, width, height));

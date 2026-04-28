@@ -101,6 +101,14 @@ public sealed class HtmlContainer : IDisposable
         HtmlContainerInt.PerformLayout(g);
     }
 
+    public void PerformLayout(BBitmap bitmap, RectangleF clip)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var canvas = bitmap.OpenCanvas();
+        PerformLayout(canvas, clip);
+    }
+
     /// <summary>
     /// Performs layout using an internal temporary surface so callers that only
     /// need layout side effects (for example <see cref="LatestFragmentTree"/> or
@@ -112,14 +120,21 @@ public sealed class HtmlContainer : IDisposable
         int height = Math.Max(1, (int)Math.Ceiling(clip.Height));
 
         using var bitmap = new BBitmap(width, height);
-        using var canvas = bitmap.OpenCanvas();
-        PerformLayout(canvas, clip);
+        PerformLayout(bitmap, clip);
     }
 
     public void PerformPaint(SKCanvas canvas, RectangleF clip)
     {
         using var g = new GraphicsAdapter(canvas, clip);
         HtmlContainerInt.PerformPaint(g);
+    }
+
+    public void PerformPaint(BBitmap bitmap, RectangleF clip)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var canvas = bitmap.OpenCanvas();
+        PerformPaint(canvas, clip);
     }
 
     /// <summary>

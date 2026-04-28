@@ -187,6 +187,29 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Content()
+    {
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new System.Drawing.SizeF(40, 40);
+        container.SetHtml("<html><body style='margin:0;background:#123456'></body></html>");
+
+        using var bitmap = new BBitmap(40, 40);
+        bitmap.Erase(BColor.White);
+        var clip = new RectangleF(0, 0, 40, 40);
+
+        container.PerformLayout(bitmap, clip);
+        container.PerformPaint(bitmap, clip);
+
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.Equal((byte)0x12, pixel.R);
+        Assert.Equal((byte)0x34, pixel.G);
+        Assert.Equal((byte)0x56, pixel.B);
+        Assert.Equal((byte)0xFF, pixel.A);
+    }
+
+    [Fact]
     public void PixelDiffRunner_Compare_With_BBitmap_Returns_BackendNeutral_DiffBitmap()
     {
         using var actual = new BBitmap(1, 1);
