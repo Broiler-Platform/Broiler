@@ -9,6 +9,7 @@ namespace Broiler.HTML.Image.Adapters;
 internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, BCanvas? rasterCanvas = null, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
 {
     private readonly Stack<bool> _rasterLayerStack = new();
+    private readonly ITextShaper _textShaper = SkiaTextShaper.Instance;
     private int _activeSkiaLayerDepth;
     private bool _nextLayerCanUseRaster;
 
@@ -86,31 +87,11 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
 
     public override SizeF MeasureString(string str, RFont font)
     {
-        var fontAdapter = (FontAdapter)font;
-        var skFont = fontAdapter.Font;
-        var width = skFont.MeasureText(str);
-        return new SizeF(width, (float)font.Height);
+        return _textShaper.MeasureString((FontAdapter)font, str);
     }
 
     public override void MeasureString(string str, RFont font, double maxWidth, out int charFit, out double charFitWidth)
-    {
-        charFit = 0;
-        charFitWidth = 0;
-
-        var fontAdapter = (FontAdapter)font;
-        var skFont = fontAdapter.Font;
-
-        // Measure character by character to find how many fit
-        for (int i = 1; i <= str.Length; i++)
-        {
-            var substr = str.Substring(0, i);
-            var w = skFont.MeasureText(substr);
-            if (w > maxWidth)
-                break;
-            charFit = i;
-            charFitWidth = w;
-        }
-    }
+        => _textShaper.MeasureString((FontAdapter)font, str, maxWidth, out charFit, out charFitWidth);
 
     public override void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl)
     {
@@ -123,11 +104,9 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         // Baseline positioning uses the render font's own metrics so the
         // top of the text aligns with point.Y.
         var renderFont = fontAdapter.RenderFont;
-        var metrics = renderFont.Metrics;
-        float y = (float)point.Y - metrics.Ascent;
-        float x = (float)point.X;
+        var origin = _textShaper.GetDrawOrigin(fontAdapter, point);
 
-        canvas.DrawText(str, x, y, renderFont, paint);
+        canvas.DrawText(str, origin.X, origin.Y, renderFont, paint);
     }
 
     public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
@@ -137,10 +116,8 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
 
         var fontAdapter = (FontAdapter)font;
         var renderFont = fontAdapter.RenderFont;
-        var metrics = renderFont.Metrics;
-        float y = point.Y - metrics.Ascent;
-        float x = point.X;
-        float shaderWidth = Math.Max(rect.Width, renderFont.MeasureText(str));
+        var origin = _textShaper.GetDrawOrigin(fontAdapter, point);
+        float shaderWidth = Math.Max(rect.Width, _textShaper.MeasureRenderedText(fontAdapter, str));
         float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
         var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
 
@@ -160,7 +137,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         canvas.SaveLayer();
         using (var maskPaint = new SKPaint { Color = SKColors.White, IsAntialias = false })
         {
-            canvas.DrawText(str, x, y, renderFont, maskPaint);
+            canvas.DrawText(str, origin.X, origin.Y, renderFont, maskPaint);
         }
 
         using var shader = SKShader.CreateLinearGradient(startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);

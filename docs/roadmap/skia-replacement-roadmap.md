@@ -500,14 +500,20 @@ Evidence driving the decision today:
 
 - [x] Lift font loading and family fallback policy into backend-neutral services
   so the current generic-family mappings can be preserved.
-- [ ] Decide whether shaping remains custom or is delegated behind a Broiler API,
+- [x] Decide whether shaping remains custom or is delegated behind a Broiler API,
   and prototype the selected path against representative text-heavy pages.
-- [ ] Establish layout, baseline, and pixel-diff thresholds for text-heavy
+- [x] Establish layout, baseline, and pixel-diff thresholds for text-heavy
   regression suites before broad rollout.
-- [ ] Compare current SkiaSharp text behavior against the custom backend and
+- [x] Compare current SkiaSharp text behavior against the custom backend and
   capture known acceptable differences explicitly.
 - [x] Keep local font loading and Ahem/WPT-style font workflows working through
   the new abstraction layer.
+
+Current M3 decision: shaping remains delegated behind a Broiler-owned text
+shaper seam, with the current Skia-backed implementation defining the baseline
+prototype. Text-heavy parity work now treats bundled/local-font Ahem fixtures as
+exact-match pixel diffs, while anti-aliased bundled-font pages must keep ink
+bounds and baseline placement within 2 px before broader rollout.
 
 #### M4 — Tooling, SVG, and WPF Migration
 
