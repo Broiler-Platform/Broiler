@@ -194,6 +194,15 @@ internal sealed class BCanvas : IDisposable
         }
     }
 
+    public void DrawPathStroke(IReadOnlyList<PointF> points, BColor color, float strokeWidth = 1f)
+    {
+        if (points == null || points.Count < 2)
+            return;
+
+        for (int i = 1; i < points.Count; i++)
+            DrawLine(points[i - 1], points[i], color, strokeWidth);
+    }
+
     public void SaveOpacityLayer(float opacity)
     {
         _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), opacity, "normal"));

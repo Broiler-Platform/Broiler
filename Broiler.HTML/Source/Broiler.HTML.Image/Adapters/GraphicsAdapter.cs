@@ -259,7 +259,18 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         canvas.DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(destRect));
     }
 
-    public override void DrawPath(RPen pen, RGraphicsPath path) => canvas.DrawPath(((GraphicsPathAdapter)path).Path, ((PenAdapter)pen).Paint);
+    public override void DrawPath(RPen pen, RGraphicsPath path)
+    {
+        var penAdapter = (PenAdapter)pen;
+        var pathAdapter = (GraphicsPathAdapter)path;
+        if (CanUseRaster && penAdapter.HasSimpleStroke && pathAdapter.FlattenedPoints.Count > 1)
+        {
+            rasterCanvas!.DrawPathStroke(pathAdapter.FlattenedPoints, penAdapter.SolidColor!.Value, (float)pen.Width);
+            return;
+        }
+
+        canvas.DrawPath(pathAdapter.Path, penAdapter.Paint);
+    }
 
     public override void DrawPath(RBrush brush, RGraphicsPath path) => canvas.DrawPath(((GraphicsPathAdapter)path).Path, ((BrushAdapter)brush).Paint);
 
