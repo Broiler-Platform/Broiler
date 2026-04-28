@@ -486,12 +486,12 @@ Evidence driving the decision today:
 
 **Primary owners:** rendering owner
 
-- [ ] Implement bitmap allocation, pixel access, canvas clear, transforms,
+- [x] Implement bitmap allocation, pixel access, canvas clear, transforms,
   clipping, fills, strokes, and opacity/blend primitives in the custom backend.
-- [ ] Replay the existing display-list path through the new canvas primitives
+- [x] Replay the existing display-list path through the new canvas primitives
   without changing layout behavior.
-- [ ] Bring the diff pipeline up on the custom bitmap model for non-text pages.
-- [ ] Validate the backend on layout-dominant and shape-heavy fixtures before
+- [x] Bring the diff pipeline up on the custom bitmap model for non-text pages.
+- [x] Validate the backend on layout-dominant and shape-heavy fixtures before
   enabling text rendering work.
 
 #### M3 — Text, Fonts, and Layout-Sensitive Fidelity

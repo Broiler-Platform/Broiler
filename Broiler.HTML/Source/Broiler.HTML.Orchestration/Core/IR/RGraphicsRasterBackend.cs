@@ -137,7 +137,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         DrawBorderItem border => IsRasterCompatibleBorder(border),
         DrawImageItem => true,
         DrawTiledImageItem => true,
-        DrawTiledGradientItem => false,
+        DrawTiledGradientItem => true,
         DrawLineItem => true,
         DrawSvgRectItem => true,
         DrawSvgEllipseItem => true,
