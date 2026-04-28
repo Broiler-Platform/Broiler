@@ -193,6 +193,25 @@ public class SvgImageRenderingTests
     }
 
     [Fact]
+    public void BSvgRasterizer_RasterizeToBitmap_With_Explicit_Size_Scales_Content()
+    {
+        const string svgMarkup =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\">" +
+            "<rect fill=\"red\" width=\"10\" height=\"10\"/></svg>";
+
+        using var bitmap = BSvgRasterizer.RasterizeToBitmap(svgMarkup, 20, 10);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(20, bitmap.Width);
+        Assert.Equal(10, bitmap.Height);
+
+        var pixel = bitmap.GetPixel(15, 5);
+        Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
+        Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
+        Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
+    }
+
+    [Fact]
     public void BSvgRasterizer_IsSvgData_Accepts_Commented_Svg_Preamble()
     {
         var svgBytes = System.Text.Encoding.UTF8.GetBytes(

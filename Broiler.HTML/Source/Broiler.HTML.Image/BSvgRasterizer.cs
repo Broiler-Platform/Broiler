@@ -104,7 +104,6 @@ public static class BSvgRasterizer
         ArgumentNullException.ThrowIfNull(data);
 
         var svgContent = Encoding.UTF8.GetString(data);
-
         using var svg = new Svg.Skia.SKSvg();
         svg.FromSvg(svgContent);
 
@@ -118,9 +117,42 @@ public static class BSvgRasterizer
         if (width <= 0) width = 300;
         if (height <= 0) height = 150;
 
+        return RasterizeToBitmap(svg, width, height);
+    }
+
+    internal static BBitmap? RasterizeToBitmap(string svgContent, int width, int height)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(svgContent);
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height));
+
+        using var svg = new Svg.Skia.SKSvg();
+        svg.FromSvg(svgContent);
+
+        if (svg.Picture == null)
+            return null;
+
+        return RasterizeToBitmap(svg, width, height);
+    }
+
+    private static BBitmap RasterizeToBitmap(Svg.Skia.SKSvg svg, int width, int height)
+    {
         var bitmap = new BBitmap(width, height);
+        bitmap.Clear(BColor.Transparent);
         using var canvas = bitmap.OpenCanvas();
-        canvas.Clear(BColor.Transparent.ToSkColor());
+
+        var cullRect = svg.Picture!.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != width
+                || (int)Math.Ceiling(cullRect.Height) != height))
+        {
+            float scaleX = width / cullRect.Width;
+            float scaleY = height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
         canvas.DrawPicture(svg.Picture);
 
         return bitmap;

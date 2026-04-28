@@ -462,30 +462,7 @@ internal sealed class SkiaImageAdapter : RAdapter
     }
 
     private static BBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
-    {
-        using var svg = new Svg.Skia.SKSvg();
-        svg.FromSvg(svgContent);
-
-        if (svg.Picture == null)
-            return null;
-
-        var bitmap = new BBitmap(width, height);
-        using var canvas = bitmap.OpenCanvas();
-        canvas.Clear(SKColors.Transparent);
-
-        var cullRect = svg.Picture.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != width
-                || (int)Math.Ceiling(cullRect.Height) != height))
-        {
-            float scaleX = width / cullRect.Width;
-            float scaleY = height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
-        }
-
-        canvas.DrawPicture(svg.Picture);
-        return bitmap;
-    }
+        => BSvgRasterizer.RasterizeToBitmap(svgContent, width, height);
 
     private static BBitmap NormalizeSvgContentBounds(BBitmap bitmap, int width, int height)
     {
