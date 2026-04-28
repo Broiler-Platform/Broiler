@@ -290,7 +290,18 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         canvas.DrawPath(pathAdapter.Path, penAdapter.Paint);
     }
 
-    public override void DrawPath(RBrush brush, RGraphicsPath path) => canvas.DrawPath(((GraphicsPathAdapter)path).Path, ((BrushAdapter)brush).Paint);
+    public override void DrawPath(RBrush brush, RGraphicsPath path)
+    {
+        var brushAdapter = (BrushAdapter)brush;
+        var pathAdapter = (GraphicsPathAdapter)path;
+        if (CanUseRaster && brushAdapter.SolidColor is BColor solidColor && pathAdapter.FlattenedPoints.Count > 2)
+        {
+            rasterCanvas!.FillPolygon([.. pathAdapter.FlattenedPoints], solidColor);
+            return;
+        }
+
+        canvas.DrawPath(pathAdapter.Path, brushAdapter.Paint);
+    }
 
     public override void DrawPolygon(RBrush brush, PointF[] points)
     {

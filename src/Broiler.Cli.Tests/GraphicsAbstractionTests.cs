@@ -626,6 +626,25 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_OpenGraphics_Routes_Solid_Path_Fills_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(7, 7);
+        bitmap.Clear(BColor.White);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7));
+        using var brush = graphics.GetSolidBrush(Color.Blue);
+        using var path = graphics.GetGraphicsPath();
+        path.Start(1, 5);
+        path.LineTo(3, 1);
+        path.LineTo(5, 5);
+
+        graphics.DrawPath(brush, path);
+
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 3));
+        Assert.Equal(BColor.White, bitmap.GetPixel(0, 0));
+        Assert.Equal(BColor.White, bitmap.GetPixel(6, 6));
+    }
+
+    [Fact]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Rounded_Border_Path()
     {
         using var container = new HtmlContainer();
