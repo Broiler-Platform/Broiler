@@ -266,4 +266,87 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, resized.GetPixel(3, 0).B);
     }
 
+    [Fact]
+    public void BCanvas_FillRect_Respects_Translation_And_Clip()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(BColor.White);
+        canvas.PushClip(new RectangleF(2, 2, 3, 3));
+        canvas.Translate(1, 1);
+
+        canvas.FillRect(new RectangleF(1, 1, 3, 3), new BColor(255, 0, 0, 255));
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(2, 2));
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(4, 4));
+        Assert.Equal(BColor.White, bitmap.GetPixel(1, 1));
+        Assert.Equal(BColor.White, bitmap.GetPixel(5, 5));
+    }
+
+    [Fact]
+    public void BCanvas_PushClipExclude_Skips_Excluded_Pixels()
+    {
+        using var bitmap = new BBitmap(5, 5);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(BColor.White);
+        canvas.PushClip(new RectangleF(0, 0, 5, 5));
+        canvas.PushClipExclude(new RectangleF(2, 2, 2, 2));
+
+        canvas.FillRect(new RectangleF(0, 0, 5, 5), new BColor(255, 0, 0, 255));
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
+        Assert.Equal(BColor.White, bitmap.GetPixel(2, 2));
+        Assert.Equal(BColor.White, bitmap.GetPixel(3, 3));
+    }
+
+    [Fact]
+    public void BCanvas_DrawLine_Renders_Stroke_Without_Skia_Canvas()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(BColor.White);
+
+        canvas.DrawLine(new System.Drawing.PointF(1, 3.5f), new System.Drawing.PointF(4, 3.5f), new BColor(0, 0, 0, 255));
+
+        Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(1, 3));
+        Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 3));
+        Assert.Equal(BColor.White, bitmap.GetPixel(0, 1));
+    }
+
+    [Fact]
+    public void BCanvas_SaveOpacityLayer_Composites_With_Opacity()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(BColor.White);
+        canvas.SaveOpacityLayer(0.5f);
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreOpacityLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.R);
+        Assert.InRange(pixel.G, (byte)127, (byte)128);
+        Assert.InRange(pixel.B, (byte)127, (byte)128);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void BCanvas_SaveBlendLayer_Multiply_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("multiply");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.InRange(pixel.R, (byte)127, (byte)128);
+        Assert.Equal((byte)0, pixel.G);
+        Assert.Equal((byte)0, pixel.B);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
 }

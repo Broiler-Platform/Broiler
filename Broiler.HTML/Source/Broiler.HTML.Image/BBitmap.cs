@@ -34,7 +34,16 @@ public sealed class BBitmap : IDisposable
 
     public void SetPixel(int x, int y, BColor color) => _bitmap.SetPixel(x, y, color.ToSkColor());
 
-    public void Clear(BColor color) => _bitmap.Erase(color.ToSkColor());
+    public void Clear(BColor color) => ErasePixels(color);
+
+    internal void ErasePixels(BColor color)
+    {
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+                SetPixel(x, y, color);
+        }
+    }
 
     internal void Erase(BColor color) => Clear(color);
 
@@ -115,6 +124,8 @@ public sealed class BBitmap : IDisposable
     internal SKCanvas OpenCanvas() => new(_bitmap);
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, dispose: true);
+
+    internal BCanvas OpenRasterCanvas() => new(this);
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip, PointF translation)
     {
