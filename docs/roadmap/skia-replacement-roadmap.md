@@ -546,7 +546,10 @@ fallback mode for the stabilization window. Focused parity coverage now compares
 the default cutover path against the fallback on curated non-text and Ahem text
 fixtures, and the stabilization suite now adds representative acid, WPT, CLI,
 SVG, and text-heavy cases plus an aggregate rollback performance budget.
-Runtime package removal remains pending until the fallback window is complete.
+Runtime package removal remains pending until the fallback window is complete,
+and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
+`SkiaSharp.NativeAssets.Linux` 3.119.2 + `Svg.Skia` 2.0.0.4 pairing until the
+temporary SVG fallback is gone.
 
 ### Recommended Role Split
 

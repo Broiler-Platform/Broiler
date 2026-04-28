@@ -156,6 +156,26 @@ public class SkiaDecouplingGuardTests
             actual.Select(project => $"{project.RelativePath}: {string.Join(", ", project.Packages)}"));
     }
 
+    [Fact]
+    public void Image_Project_Uses_The_Known_Good_Skia_Compatibility_Package_Versions()
+    {
+        var projectPath = Path.Combine(RepoRoot, ImageProjectRelativePath);
+        var packages = XDocument.Load(projectPath)
+            .Descendants()
+            .Where(element => element.Name.LocalName == "PackageReference")
+            .Select(element => new
+            {
+                Include = element.Attribute("Include")?.Value,
+                Version = element.Attribute("Version")?.Value,
+            })
+            .Where(static package => !string.IsNullOrWhiteSpace(package.Include))
+            .ToDictionary(static package => package.Include!, static package => package.Version, StringComparer.Ordinal);
+
+        Assert.Equal("3.119.2", packages["SkiaSharp"]);
+        Assert.Equal("3.119.2", packages["SkiaSharp.NativeAssets.Linux"]);
+        Assert.Equal("2.0.0.4", packages["Svg.Skia"]);
+    }
+
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
     [
         .. typeof(HtmlContainer).GetMethods(BindingFlags.Public | BindingFlags.Instance)

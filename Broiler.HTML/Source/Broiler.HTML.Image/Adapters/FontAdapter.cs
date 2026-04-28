@@ -10,7 +10,6 @@ internal sealed class FontAdapter : RFont
     /// Ratio to convert typographic points to CSS pixels (96 DPI / 72 DPI).
     /// </summary>
     private const double PtToCssPx = 96.0 / 72.0;
-
     private readonly double _size;
     private double _height = -1;
     private double _underlineOffset = -1;
