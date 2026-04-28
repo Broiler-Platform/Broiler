@@ -147,7 +147,8 @@ public sealed class HtmlContainer : IDisposable
         using var canvas = bitmap.OpenCanvas();
         canvas.Save();
         canvas.Translate(translation.X, translation.Y);
-        PerformPaint(canvas, clip);
+        using var g = new GraphicsAdapter(canvas, clip);
+        HtmlContainerInt.PerformPaint(g);
         canvas.Restore();
     }
 
