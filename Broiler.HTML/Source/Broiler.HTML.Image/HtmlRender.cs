@@ -281,10 +281,9 @@ public static class HtmlRender
     {
         // Create a small temporary surface for measurement
         using var measureBitmap = new BBitmap(1, 1);
-        using var measureCanvas = measureBitmap.OpenCanvas();
         var clip = new RectangleF(0, 0, 99999, 99999);
 
-        using var g = new GraphicsAdapter(measureCanvas, clip);
+        using var g = measureBitmap.OpenGraphics(clip);
         return HtmlRendererUtils.MeasureHtmlByRestrictions(g, container.HtmlContainerInt, minSize, maxSize);
     }
 

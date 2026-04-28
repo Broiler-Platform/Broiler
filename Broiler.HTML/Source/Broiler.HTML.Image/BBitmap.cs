@@ -1,5 +1,7 @@
 using System;
+using System.Drawing;
 using System.IO;
+using Broiler.HTML.Image.Adapters;
 using SkiaSharp;
 
 namespace Broiler.HTML.Image;
@@ -87,6 +89,8 @@ public sealed class BBitmap : IDisposable
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
 
     internal SKCanvas OpenCanvas() => new(_bitmap);
+
+    internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, dispose: true);
 
     internal SKBitmap AsSkBitmap() => _bitmap;
 

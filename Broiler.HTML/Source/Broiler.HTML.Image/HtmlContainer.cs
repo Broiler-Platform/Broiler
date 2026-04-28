@@ -107,8 +107,8 @@ public sealed class HtmlContainer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(bitmap);
 
-        using var canvas = bitmap.OpenCanvas();
-        PerformLayout(canvas, clip);
+        using var g = bitmap.OpenGraphics(clip);
+        HtmlContainerInt.PerformLayout(g);
     }
 
     /// <summary>
@@ -136,8 +136,8 @@ public sealed class HtmlContainer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(bitmap);
 
-        using var canvas = bitmap.OpenCanvas();
-        PerformPaint(canvas, clip);
+        using var g = bitmap.OpenGraphics(clip);
+        HtmlContainerInt.PerformPaint(g);
     }
 
     public void PerformPaint(BBitmap bitmap, RectangleF clip, PointF translation)
