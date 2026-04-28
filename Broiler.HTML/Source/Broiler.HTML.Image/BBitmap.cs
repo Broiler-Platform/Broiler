@@ -7,8 +7,8 @@ using SkiaSharp;
 namespace Broiler.HTML.Image;
 
 /// <summary>
-/// Broiler-owned bitmap abstraction backed by the current SkiaSharp
-/// implementation during the migration period.
+/// Broiler-owned bitmap abstraction that routes rendering through the
+/// currently selected migration backend.
 /// </summary>
 public sealed class BBitmap : IDisposable
 {
@@ -123,7 +123,11 @@ public sealed class BBitmap : IDisposable
 
     internal SKCanvas OpenCanvas() => new(_bitmap);
 
-    internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, OpenRasterCanvas(), dispose: true);
+    internal GraphicsAdapter OpenGraphics(RectangleF clip)
+    {
+        var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
+        return new GraphicsAdapter(OpenCanvas(), clip, rasterCanvas, dispose: true);
+    }
 
     internal BCanvas OpenRasterCanvas() => new(this);
 
@@ -132,9 +136,13 @@ public sealed class BBitmap : IDisposable
         var canvas = OpenCanvas();
         canvas.Save();
         canvas.Translate(translation.X, translation.Y);
-        var rasterCanvas = OpenRasterCanvas();
-        rasterCanvas.Save();
-        rasterCanvas.Translate(translation.X, translation.Y);
+        var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
+        if (rasterCanvas is not null)
+        {
+            rasterCanvas.Save();
+            rasterCanvas.Translate(translation.X, translation.Y);
+        }
+
         return new GraphicsAdapter(canvas, clip, rasterCanvas, dispose: true, restoreOnDispose: true);
     }
 

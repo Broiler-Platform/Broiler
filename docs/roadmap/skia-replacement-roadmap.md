@@ -531,14 +531,20 @@ bounds and baseline placement within 2 px before broader rollout.
 
 **Primary owners:** reviewer/maintainer + rendering owner
 
-- [ ] Switch the default backend to the Broiler-owned implementation while
+- [x] Switch the default backend to the Broiler-owned implementation while
   keeping an explicit fallback path for one stabilization window if needed.
 - [ ] Run the curated parity suite and performance checks against the default
   backend until rollback criteria are either cleared or exercised.
 - [ ] Remove runtime SkiaSharp package references and native assets only after
   the fallback window and packaging validation are complete.
-- [ ] Publish release notes and migration guidance for any consumer-visible API
+- [x] Publish release notes and migration guidance for any consumer-visible API
   changes or fidelity caveats.
+
+Current M5 cutover: `BBitmap` rendering now defaults to the Broiler raster
+pipeline (`broiler`) and keeps an explicit `BROILER_GRAPHICS_BACKEND=skia`
+fallback mode for the stabilization window. Focused parity coverage now compares
+the default cutover path against the fallback on curated non-text and Ahem text
+fixtures, while package removal and broader performance gating remain pending.
 
 ### Recommended Role Split
 

@@ -410,6 +410,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Solid_Border_And_Fill()
     {
+        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.BroilerRasterId);
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;

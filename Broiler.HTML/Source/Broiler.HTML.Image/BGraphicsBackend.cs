@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+
 namespace Broiler.HTML.Image;
 
 /// <summary>
@@ -6,18 +9,54 @@ namespace Broiler.HTML.Image;
 /// </summary>
 public static class BGraphicsBackend
 {
+    internal const string BackendEnvironmentVariable = "BROILER_GRAPHICS_BACKEND";
+    internal const string BroilerRasterId = "broiler";
+    internal const string SkiaFallbackId = "skia";
+
+    private static readonly AsyncLocal<string?> BackendOverride = new();
+
     /// <summary>
     /// Stable machine-readable identifier for the current backend.
     /// </summary>
-    public static string CurrentId => "skia";
+    public static string CurrentId => ResolveCurrent().Id;
 
     /// <summary>
     /// Human-readable name for the current backend implementation.
     /// </summary>
-    public static string CurrentDisplayName => "SkiaSharp";
+    public static string CurrentDisplayName => ResolveCurrent().DisplayName;
 
     /// <summary>
     /// Human-readable combined backend label for diagnostics and artifacts.
     /// </summary>
     public static string CurrentLabel => $"{CurrentId} ({CurrentDisplayName})";
+
+    internal static bool UseBroilerRasterPipeline => string.Equals(CurrentId, BroilerRasterId, StringComparison.Ordinal);
+
+    internal static IDisposable OverrideForCurrentThread(string? backendId)
+    {
+        var previous = BackendOverride.Value;
+        BackendOverride.Value = backendId;
+        return new BackendOverrideScope(previous);
+    }
+
+    private static BackendDefinition ResolveCurrent()
+    {
+        var configuredBackend = BackendOverride.Value;
+        if (string.IsNullOrWhiteSpace(configuredBackend))
+            configuredBackend = Environment.GetEnvironmentVariable(BackendEnvironmentVariable);
+
+        return Resolve(configuredBackend);
+    }
+
+    private static BackendDefinition Resolve(string? configuredBackend) =>
+        string.Equals(configuredBackend, SkiaFallbackId, StringComparison.OrdinalIgnoreCase)
+            ? new BackendDefinition(SkiaFallbackId, "SkiaSharp fallback")
+            : new BackendDefinition(BroilerRasterId, "Broiler raster");
+
+    private readonly record struct BackendDefinition(string Id, string DisplayName);
+
+    private sealed class BackendOverrideScope(string? previous) : IDisposable
+    {
+        public void Dispose() => BackendOverride.Value = previous;
+    }
 }
