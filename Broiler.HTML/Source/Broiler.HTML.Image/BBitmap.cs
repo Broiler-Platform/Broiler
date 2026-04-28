@@ -61,6 +61,30 @@ public sealed class BBitmap : IDisposable
 
     public BBitmap Copy() => new(_bitmap.Copy(), ownsBitmap: true);
 
+    internal BBitmap ResizeNearest(int width, int height)
+    {
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height));
+
+        if (width == Width && height == Height)
+            return Copy();
+
+        var resized = new BBitmap(width, height);
+        for (int y = 0; y < height; y++)
+        {
+            int srcY = Math.Min(Height - 1, (int)((long)y * Height / height));
+            for (int x = 0; x < width; x++)
+            {
+                int srcX = Math.Min(Width - 1, (int)((long)x * Width / width));
+                resized.SetPixel(x, y, GetPixel(srcX, srcY));
+            }
+        }
+
+        return resized;
+    }
+
     public static BBitmap Decode(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);

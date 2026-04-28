@@ -251,4 +251,19 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
+    [Fact]
+    public void BBitmap_ResizeNearest_Scales_Source_Pixels_Without_Skia_Surface_Access()
+    {
+        using var source = new BBitmap(2, 1);
+        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
+
+        using var resized = source.ResizeNearest(4, 1);
+
+        Assert.Equal((byte)255, resized.GetPixel(0, 0).R);
+        Assert.Equal((byte)255, resized.GetPixel(1, 0).R);
+        Assert.Equal((byte)255, resized.GetPixel(2, 0).B);
+        Assert.Equal((byte)255, resized.GetPixel(3, 0).B);
+    }
+
 }

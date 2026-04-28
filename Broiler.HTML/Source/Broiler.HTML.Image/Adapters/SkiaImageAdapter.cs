@@ -544,15 +544,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             }
         }
 
-        var normalized = new BBitmap(width, height);
-        using var canvas = normalized.OpenCanvas();
-        canvas.Clear(SKColors.Transparent);
-        using var paint = new SKPaint
-        {
-            FilterQuality = SKFilterQuality.None,
-            IsAntialias = false,
-        };
-        canvas.DrawBitmap(condensed.AsSkBitmap(), new SKRect(0, 0, width, height), paint);
+        var normalized = condensed.ResizeNearest(width, height);
         bitmap.Dispose();
         return normalized;
     }
