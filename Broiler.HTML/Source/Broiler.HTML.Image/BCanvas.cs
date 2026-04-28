@@ -203,6 +203,42 @@ internal sealed class BCanvas : IDisposable
             DrawLine(points[i - 1], points[i], color, strokeWidth);
     }
 
+    public void FillRectTiled(BBitmap source, RectangleF destRect, RectangleF srcRect, PointF tileOrigin)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (destRect.Width <= 0 || destRect.Height <= 0 || srcRect.Width <= 0 || srcRect.Height <= 0)
+            return;
+
+        var translatedDest = Translate(destRect);
+        var translatedOrigin = Translate(tileOrigin);
+        int minX = Math.Max(0, (int)Math.Floor(translatedDest.Left));
+        int minY = Math.Max(0, (int)Math.Floor(translatedDest.Top));
+        int maxX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(translatedDest.Right) - 1);
+        int maxY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(translatedDest.Bottom) - 1);
+
+        for (int y = minY; y <= maxY; y++)
+        {
+            for (int x = minX; x <= maxX; x++)
+            {
+                if (!IsVisible(x, y))
+                    continue;
+
+                float sampleX = x + 0.5f;
+                float sampleY = y + 0.5f;
+                int srcX = Math.Clamp(
+                    (int)Math.Floor(srcRect.Left + PositiveModulo(sampleX - translatedOrigin.X, srcRect.Width)),
+                    0,
+                    source.Width - 1);
+                int srcY = Math.Clamp(
+                    (int)Math.Floor(srcRect.Top + PositiveModulo(sampleY - translatedOrigin.Y, srcRect.Height)),
+                    0,
+                    source.Height - 1);
+                BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
+            }
+        }
+    }
+
     public void SaveOpacityLayer(float opacity)
     {
         _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), opacity, "normal"));
@@ -318,6 +354,14 @@ internal sealed class BCanvas : IDisposable
         }
 
         return source;
+    }
+
+    private static float PositiveModulo(float value, float modulus)
+    {
+        float result = value % modulus;
+        if (result < 0)
+            result += modulus;
+        return result;
     }
 
     private static BColor CompositeSourceOver(BColor source, BColor destination)

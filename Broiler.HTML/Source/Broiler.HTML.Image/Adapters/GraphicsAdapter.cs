@@ -191,7 +191,12 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
             SKShaderTileMode.Repeat,
             SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
         paint.Shader = shader;
-        return new BrushAdapter(paint, true);
+        return new BrushAdapter(paint, true)
+        {
+            TextureBitmap = imgAdapter.Bitmap,
+            TextureSourceRect = dstRect,
+            TextureOrigin = translateTransformLocation,
+        };
     }
 
     public override RGraphicsPath GetGraphicsPath() => new GraphicsPathAdapter();
@@ -223,6 +228,19 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
     public override void DrawRectangle(RBrush brush, double x, double y, double width, double height)
     {
         var brushAdapter = (BrushAdapter)brush;
+        if (CanUseRaster
+            && brushAdapter.TextureBitmap is BBitmap textureBitmap
+            && brushAdapter.TextureSourceRect is RectangleF textureSourceRect
+            && brushAdapter.TextureOrigin is PointF textureOrigin)
+        {
+            rasterCanvas!.FillRectTiled(
+                textureBitmap,
+                new RectangleF((float)x, (float)y, (float)width, (float)height),
+                textureSourceRect,
+                textureOrigin);
+            return;
+        }
+
         if (CanUseRaster && brushAdapter.SolidColor is BColor solidColor)
         {
             rasterCanvas!.FillRect(new RectangleF((float)x, (float)y, (float)width, (float)height), solidColor);
