@@ -352,6 +352,26 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_OpenGraphics_Routes_Hinted_Opacity_Layer_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(BColor.White);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+
+        graphics.HintNextLayerCanUseRaster(true);
+        graphics.SaveOpacityLayer(0.5f);
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        graphics.RestoreOpacityLayer();
+
+        var pixel = bitmap.GetPixel(1, 1);
+        Assert.Equal((byte)255, pixel.R);
+        Assert.InRange(pixel.G, (byte)127, (byte)128);
+        Assert.InRange(pixel.B, (byte)127, (byte)128);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Routes_Solid_Fills_And_Strokes_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -683,6 +703,30 @@ public class GraphicsAbstractionTests
         expected.Clear(BColor.White);
         FillRect(expected, 0, 0, 12, 12, new BColor(255, 0, 0, 255));
         FillRect(expected, 2, 2, 8, 8, new BColor(0, 0, 255, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_Clipped_NonText_Opacity_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#ffffff'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;overflow:hidden;opacity:0.5'>
+              <div style='width:6px;height:6px;background:#ff0000'></div>
+            </div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 8, 8, BColor.White);
+        using var expected = new BBitmap(8, 8);
+        expected.Clear(BColor.White);
+        FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
 
         using var diff = PixelDiffRunner.Compare(rendered, expected);
 

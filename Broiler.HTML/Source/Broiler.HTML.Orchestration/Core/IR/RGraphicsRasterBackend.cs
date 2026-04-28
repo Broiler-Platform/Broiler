@@ -74,6 +74,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     g.PopClip();
                     break;
                 case OpacityItem opacityItem:
+                    g.HintNextLayerCanUseRaster(IsRasterCompatibleOpacityLayer(list.Items, index));
                     g.SaveOpacityLayer(opacityItem.Opacity);
                     break;
                 case RestoreOpacityItem:
@@ -89,6 +90,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             }
         }
     }
+
+    private static bool IsRasterCompatibleOpacityLayer(IReadOnlyList<DisplayItem> items, int startIndex) =>
+        IsRasterCompatibleLayer(items, startIndex, typeof(OpacityItem), typeof(RestoreOpacityItem));
 
     private static bool IsRasterCompatibleBlendLayer(IReadOnlyList<DisplayItem> items, int startIndex, string? blendMode) =>
         IsRasterBlendModeSupported(blendMode)
