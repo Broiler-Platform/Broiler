@@ -692,13 +692,28 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
 
     private static void RenderSvgEllipse(RGraphics g, DrawSvgEllipseItem item)
     {
-        // RGraphics has no native ellipse; approximate with the bounding rectangle fill.
-        double x = item.Bounds.X + item.Cx - item.Rx;
-        double y = item.Bounds.Y + item.Cy - item.Ry;
-        double w = item.Rx * 2;
-        double h = item.Ry * 2;
+        if (item.Rx <= 0 || item.Ry <= 0)
+            return;
+
+        var points = CreateEllipsePoints(
+            item.Bounds.X + item.Cx,
+            item.Bounds.Y + item.Cy,
+            item.Rx,
+            item.Ry);
+
         if (!item.Fill.IsEmpty && item.Fill.A > 0)
-            g.DrawRectangle(g.GetSolidBrush(item.Fill), x, y, w, h);
+            g.DrawPolygon(g.GetSolidBrush(item.Fill), points);
+
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+
+            for (int i = 1; i < points.Length; i++)
+                g.DrawLine(pen, points[i - 1].X, points[i - 1].Y, points[i].X, points[i].Y);
+
+            g.DrawLine(pen, points[^1].X, points[^1].Y, points[0].X, points[0].Y);
+        }
     }
 
     private static void RenderSvgText(RGraphics g, DrawSvgTextItem item)
@@ -739,4 +754,20 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
     }
 
     private static bool IsBorderStyleVisible(string style) => !string.IsNullOrEmpty(style) && style != "none" && style != "hidden";
+
+    private static PointF[] CreateEllipsePoints(float centerX, float centerY, float radiusX, float radiusY)
+    {
+        int segmentCount = Math.Clamp((int)Math.Ceiling(Math.PI * Math.Max(radiusX, radiusY)), 16, 128);
+        var points = new PointF[segmentCount];
+
+        for (int i = 0; i < segmentCount; i++)
+        {
+            double angle = (Math.PI * 2d * i) / segmentCount;
+            points[i] = new PointF(
+                centerX + (float)(Math.Cos(angle) * radiusX),
+                centerY + (float)(Math.Sin(angle) * radiusY));
+        }
+
+        return points;
+    }
 }

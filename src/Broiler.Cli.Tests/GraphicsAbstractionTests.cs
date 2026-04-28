@@ -572,6 +572,32 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Inline_Svg_Ellipse_As_Shape_Not_Rectangle()
+    {
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(20, 20);
+        container.SetHtml("""
+            <html><body style='margin:0'>
+            <svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' style='display:block'>
+              <ellipse cx='10' cy='10' rx='8' ry='5' fill='#0000ff'/>
+            </svg>
+            </body></html>
+            """);
+
+        using var bitmap = new BBitmap(20, 20);
+        bitmap.Clear(BColor.White);
+        var clip = new RectangleF(0, 0, 20, 20);
+
+        container.PerformLayout(bitmap, clip);
+        container.PerformPaint(bitmap, clip);
+
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(10, 10));
+        Assert.Equal(BColor.White, bitmap.GetPixel(2, 5));
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Routes_Simple_Path_Strokes_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(7, 7);
