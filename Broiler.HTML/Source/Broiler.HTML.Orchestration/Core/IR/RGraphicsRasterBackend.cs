@@ -21,8 +21,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         if (surface is not RGraphics g)
             throw new ArgumentException("Surface must be an RGraphics instance.", nameof(surface));
 
-        foreach (var item in list.Items)
+        for (int index = 0; index < list.Items.Count; index++)
         {
+            var item = list.Items[index];
             switch (item)
             {
                 case FillRectItem fill:
@@ -79,6 +80,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     g.RestoreOpacityLayer();
                     break;
                 case BlendModeItem blendItem:
+                    g.HintNextLayerCanUseRaster(IsRasterCompatibleBlendLayer(list.Items, index, blendItem.Mode));
                     g.SaveBlendLayer(blendItem.Mode);
                     break;
                 case RestoreBlendModeItem:
@@ -87,6 +89,85 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             }
         }
     }
+
+    private static bool IsRasterCompatibleBlendLayer(IReadOnlyList<DisplayItem> items, int startIndex, string? blendMode) =>
+        IsRasterBlendModeSupported(blendMode)
+        && IsRasterCompatibleLayer(items, startIndex, typeof(BlendModeItem), typeof(RestoreBlendModeItem));
+
+    private static bool IsRasterCompatibleLayer(
+        IReadOnlyList<DisplayItem> items,
+        int startIndex,
+        Type openType,
+        Type closeType)
+    {
+        int depth = 0;
+        for (int index = startIndex + 1; index < items.Count; index++)
+        {
+            var item = items[index];
+            var itemType = item.GetType();
+            if (itemType == openType)
+            {
+                depth++;
+                continue;
+            }
+
+            if (itemType == closeType)
+            {
+                if (depth == 0)
+                    return true;
+
+                depth--;
+                continue;
+            }
+
+            if (!IsRasterCompatibleItem(item))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static bool IsRasterCompatibleItem(DisplayItem item) => item switch
+    {
+        FillRectItem => true,
+        DrawBorderItem border => IsRasterCompatibleBorder(border),
+        DrawImageItem => true,
+        DrawTiledImageItem => true,
+        DrawTiledGradientItem => false,
+        DrawLineItem => true,
+        DrawSvgRectItem => true,
+        DrawSvgEllipseItem => true,
+        DrawSvgLineItem => true,
+        ClipItem => true,
+        RestoreItem => true,
+        OpacityItem => true,
+        RestoreOpacityItem => true,
+        BlendModeItem blend => IsRasterBlendModeSupported(blend.Mode),
+        RestoreBlendModeItem => true,
+        DrawTextItem => false,
+        DrawSvgTextItem => false,
+        _ => false,
+    };
+
+    private static bool IsRasterCompatibleBorder(DrawBorderItem item)
+    {
+        var widths = item.Widths;
+        return IsRasterCompatibleBorderSide(widths.Top, item.TopColor, item.TopStyle)
+            && IsRasterCompatibleBorderSide(widths.Right, item.RightColor, item.RightStyle)
+            && IsRasterCompatibleBorderSide(widths.Bottom, item.BottomColor, item.BottomStyle)
+            && IsRasterCompatibleBorderSide(widths.Left, item.LeftColor, item.LeftStyle);
+    }
+
+    private static bool IsRasterCompatibleBorderSide(double width, Color color, string? style) =>
+        width <= 0
+        || color.A <= 0
+        || string.IsNullOrEmpty(style)
+        || style.Equals("solid", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRasterBlendModeSupported(string? blendMode) =>
+        string.IsNullOrEmpty(blendMode)
+        || blendMode.Equals("normal", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("multiply", StringComparison.OrdinalIgnoreCase);
 
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {

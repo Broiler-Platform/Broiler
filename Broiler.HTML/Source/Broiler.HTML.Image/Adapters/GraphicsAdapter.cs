@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
@@ -7,7 +8,9 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, BCanvas? rasterCanvas = null, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
 {
-    private int _layerDepth;
+    private readonly Stack<bool> _rasterLayerStack = new();
+    private int _activeSkiaLayerDepth;
+    private bool _nextLayerCanUseRaster;
 
     public override void PopClip()
     {
@@ -325,9 +328,21 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         canvas.DrawPath(path, brushAdapter.Paint);
     }
 
+    public override void HintNextLayerCanUseRaster(bool canUseRaster) =>
+        _nextLayerCanUseRaster = canUseRaster;
+
     public override void SaveOpacityLayer(float opacity)
     {
-        _layerDepth++;
+        bool useRaster = rasterCanvas is not null && _activeSkiaLayerDepth == 0 && _nextLayerCanUseRaster;
+        _nextLayerCanUseRaster = false;
+        _rasterLayerStack.Push(useRaster);
+        if (useRaster)
+        {
+            rasterCanvas!.SaveOpacityLayer(opacity);
+            return;
+        }
+
+        _activeSkiaLayerDepth++;
         // SkiaSharp SaveLayer uses only the alpha channel of the paint's
         // color to modulate the layer during compositing; RGB values are
         // irrelevant when no shader/color-filter is applied.
@@ -338,13 +353,31 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
 
     public override void RestoreOpacityLayer()
     {
+        bool usedRaster = _rasterLayerStack.Count > 0 && _rasterLayerStack.Pop();
+        if (usedRaster)
+        {
+            rasterCanvas!.RestoreOpacityLayer();
+            return;
+        }
+
         canvas.Restore();
-        _layerDepth = Math.Max(0, _layerDepth - 1);
+        _activeSkiaLayerDepth = Math.Max(0, _activeSkiaLayerDepth - 1);
     }
 
     public override void SaveBlendLayer(string blendMode)
     {
-        _layerDepth++;
+        bool useRaster = rasterCanvas is not null
+            && _activeSkiaLayerDepth == 0
+            && _nextLayerCanUseRaster;
+        _nextLayerCanUseRaster = false;
+        _rasterLayerStack.Push(useRaster);
+        if (useRaster)
+        {
+            rasterCanvas!.SaveBlendLayer(blendMode);
+            return;
+        }
+
+        _activeSkiaLayerDepth++;
         var skBlendMode = blendMode?.ToLowerInvariant() switch
         {
             "multiply" => SKBlendMode.Multiply,
@@ -372,8 +405,15 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
 
     public override void RestoreBlendLayer()
     {
+        bool usedRaster = _rasterLayerStack.Count > 0 && _rasterLayerStack.Pop();
+        if (usedRaster)
+        {
+            rasterCanvas!.RestoreBlendLayer();
+            return;
+        }
+
         canvas.Restore();
-        _layerDepth = Math.Max(0, _layerDepth - 1);
+        _activeSkiaLayerDepth = Math.Max(0, _activeSkiaLayerDepth - 1);
     }
 
     /// <summary>
@@ -410,9 +450,8 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
         }
     }
 
-    // The raster canvas maintains its own opacity/blend layer stack, but this adapter
-    // can still mix Skia-only operations (for example text and complex brushes) inside
-    // the same compositing group. Keep raster replay disabled while a layer is active so
-    // those mixed groups continue to compose through the single Skia layer implementation.
-    private bool CanUseRaster => rasterCanvas is not null && _layerDepth == 0;
+    // Display-list replay can hint when a compositing group contains only raster-capable
+    // non-text items. Those groups can stay on BCanvas end-to-end; any unhinted layer
+    // continues through Skia so mixed text/complex-brush groups keep their existing behavior.
+    private bool CanUseRaster => rasterCanvas is not null && _activeSkiaLayerDepth == 0;
 }

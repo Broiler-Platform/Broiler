@@ -693,6 +693,50 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Opacity_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#ffffff'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;opacity:0.5'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(BColor.White);
+        FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Multiply_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:multiply'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(128, 0, 0, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Rounded_Border_Path()
     {
         using var container = new HtmlContainer();
