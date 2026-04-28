@@ -51,16 +51,12 @@ public class WptTestRunnerTests : IDisposable
         File.WriteAllText(fullPath, content);
     }
 
-    private static void CreateSolidReferencePng(string path, SkiaSharp.SKColor color)
+    private static void CreateSolidReferencePng(string path, BColor color)
     {
-        using var bitmap = new SkiaSharp.SKBitmap(
-            1024,
-            768,
-            SkiaSharp.SKColorType.Rgba8888,
-            SkiaSharp.SKAlphaType.Premul);
-        bitmap.Erase(color);
-        using var stream = File.OpenWrite(path);
-        bitmap.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var bitmap = new BBitmap(1024, 768);
+        bitmap.Clear(color);
+        bitmap.Save(path);
     }
 
     [Fact]
@@ -2672,7 +2668,7 @@ input {
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
         Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
-        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+        CreateSolidReferencePng(greenImagePath, new BColor(0, 255, 0, 255));
 
         var testHtml = @"<!doctype html>
 <meta charset=utf-8>
@@ -2729,7 +2725,7 @@ input {
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
         Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
-        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+        CreateSolidReferencePng(greenImagePath, new BColor(0, 255, 0, 255));
 
         var testHtml = @"<!doctype html>
 <meta charset=utf-8>
@@ -5448,12 +5444,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(refDir);
         File.WriteAllText(Path.Combine(refDir, "decode.png"), "not-a-png");
 
-        using (var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul))
-        using (var stream = File.OpenWrite(Path.Combine(refDir, "mismatch.png")))
-        {
-            refBmp.Erase(SkiaSharp.SKColors.Blue);
-            refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
-        }
+        CreateSolidReferencePng(Path.Combine(refDir, "mismatch.png"), new BColor(0, 0, 255, 255));
 
         var originalOut = Console.Out;
         var sw = new StringWriter();
@@ -5525,13 +5516,13 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(Path.Combine(refDir, "css", "css-view-transitions"));
         Directory.CreateDirectory(Path.Combine(refDir, "css", "filter-effects"));
         Directory.CreateDirectory(Path.Combine(refDir, "css", "css-values", "calc-size"));
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-view-transitions", "vt-gap.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "filter-effects", "filter-gap.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-1.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-2.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-3.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-4.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-5.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-view-transitions", "vt-gap.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "filter-effects", "filter-gap.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-1.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-2.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-3.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-4.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-5.png"), BColor.White);
 
         var originalOut = Console.Out;
         var consoleOutput = new StringWriter();
@@ -5664,10 +5655,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(refDir);
 
         // Create a valid but different reference image (all blue).
-        using var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul);
-        refBmp.Erase(SkiaSharp.SKColors.Blue);
-        using var stream = File.OpenWrite(Path.Combine(refDir, "m.png"));
-        refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        CreateSolidReferencePng(Path.Combine(refDir, "m.png"), new BColor(0, 0, 255, 255));
 
         var originalOut = Console.Out;
         var sw = new StringWriter();

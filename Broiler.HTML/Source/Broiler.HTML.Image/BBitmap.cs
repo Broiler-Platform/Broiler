@@ -32,7 +32,9 @@ public sealed class BBitmap : IDisposable
 
     public void SetPixel(int x, int y, BColor color) => _bitmap.SetPixel(x, y, color.ToSkColor());
 
-    internal void Erase(BColor color) => _bitmap.Erase(color.ToSkColor());
+    public void Clear(BColor color) => _bitmap.Erase(color.ToSkColor());
+
+    internal void Erase(BColor color) => Clear(color);
 
     public byte[] Encode(BImageFormat format = BImageFormat.Png, int quality = 100)
     {

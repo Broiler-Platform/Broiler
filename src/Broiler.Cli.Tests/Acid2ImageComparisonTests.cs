@@ -1,6 +1,5 @@
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
-using SkiaSharp;
 using System.Drawing;
 
 namespace Broiler.Cli.Tests;
@@ -56,13 +55,12 @@ public class Acid2ImageComparisonTests
         return HtmlRender.RenderToImage(html, width, height);
     }
 
-    private static string CreateSolidTempPng(SKColor color, int width = 300, int height = 300)
+    private static string CreateSolidTempPng(BColor color, int width = 300, int height = 300)
     {
         var path = Path.Combine(Path.GetTempPath(), $"broiler-acid2-{Guid.NewGuid():N}.png");
-        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        bitmap.Erase(color);
-        using var stream = File.OpenWrite(path);
-        bitmap.Encode(stream, SKEncodedImageFormat.Png, 100);
+        using var bitmap = new BBitmap(width, height);
+        bitmap.Clear(color);
+        bitmap.Save(path);
         return path;
     }
 
@@ -1019,7 +1017,7 @@ public class Acid2ImageComparisonTests
     [Fact]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
-        var greenImagePath = CreateSolidTempPng(SKColors.Lime);
+        var greenImagePath = CreateSolidTempPng(new BColor(0, 255, 0, 255));
         try
         {
             const string html = """
