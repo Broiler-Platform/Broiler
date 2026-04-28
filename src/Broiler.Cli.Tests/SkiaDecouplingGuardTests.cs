@@ -24,6 +24,8 @@ public class SkiaDecouplingGuardTests
 
     private static readonly string[] AllowedHighLevelSkiaCompatibilityMembers =
     [
+        "HtmlContainer.PerformLayout(SKCanvas, RectangleF) -> Void",
+        "HtmlContainer.PerformPaint(SKCanvas, RectangleF) -> Void",
     ];
 
     [Fact]
