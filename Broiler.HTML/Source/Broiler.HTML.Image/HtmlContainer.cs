@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using SkiaSharp;
 using System.Drawing;
@@ -95,6 +96,7 @@ public sealed class HtmlContainer : IDisposable
 
     public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData, baseUrl);
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public void PerformLayout(SKCanvas canvas, RectangleF clip)
     {
         using var g = new GraphicsAdapter(canvas, clip);
@@ -123,6 +125,7 @@ public sealed class HtmlContainer : IDisposable
         PerformLayout(bitmap, clip);
     }
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public void PerformPaint(SKCanvas canvas, RectangleF clip)
     {
         using var g = new GraphicsAdapter(canvas, clip);

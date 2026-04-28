@@ -108,6 +108,10 @@ public class SkiaDecouplingGuardTests
 
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
     [
+        .. typeof(HtmlContainer).GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(method => !method.IsSpecialName)
+            .Where(HasSkiaExposure)
+            .Cast<MemberInfo>(),
         .. typeof(HtmlRender).GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(HasSkiaExposure)
             .Cast<MemberInfo>(),
