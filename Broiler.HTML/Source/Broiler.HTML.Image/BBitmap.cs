@@ -124,6 +124,24 @@ public sealed class BBitmap : IDisposable
         return new GraphicsAdapter(canvas, clip, dispose: true, restoreOnDispose: true);
     }
 
+    internal void DrawPictureToFit(SKPicture picture)
+    {
+        ArgumentNullException.ThrowIfNull(picture);
+
+        using var canvas = OpenCanvas();
+        var cullRect = picture.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != Width
+                || (int)Math.Ceiling(cullRect.Height) != Height))
+        {
+            float scaleX = Width / cullRect.Width;
+            float scaleY = Height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
+        canvas.DrawPicture(picture);
+    }
+
     internal SKBitmap AsSkBitmap() => _bitmap;
 
     internal SKBitmap ToSkBitmapCopy() => _bitmap.Copy();

@@ -141,19 +141,7 @@ public static class BSvgRasterizer
     {
         var bitmap = new BBitmap(width, height);
         bitmap.Clear(BColor.Transparent);
-        using var canvas = bitmap.OpenCanvas();
-
-        var cullRect = svg.Picture!.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != width
-                || (int)Math.Ceiling(cullRect.Height) != height))
-        {
-            float scaleX = width / cullRect.Width;
-            float scaleY = height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
-        }
-
-        canvas.DrawPicture(svg.Picture);
+        bitmap.DrawPictureToFit(svg.Picture!);
 
         return bitmap;
     }
