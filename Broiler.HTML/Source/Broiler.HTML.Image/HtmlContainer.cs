@@ -137,6 +137,17 @@ public sealed class HtmlContainer : IDisposable
         PerformPaint(canvas, clip);
     }
 
+    public void PerformPaint(BBitmap bitmap, RectangleF clip, PointF translation)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var canvas = bitmap.OpenCanvas();
+        canvas.Save();
+        canvas.Translate(translation.X, translation.Y);
+        PerformPaint(canvas, clip);
+        canvas.Restore();
+    }
+
     /// <summary>
     /// Returns the bounding rectangle of the element with the specified <paramref name="elementId"/>,
     /// or <c>null</c> if no such element exists.  Useful for scrolling to an anchor target

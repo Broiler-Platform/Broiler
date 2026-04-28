@@ -272,11 +272,7 @@ public static class HtmlRender
 
         var bitmap = new BBitmap(width, height);
         bitmap.Erase(bgColor);
-        using var canvas = bitmap.OpenCanvas();
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
-        container.PerformPaint(canvas, new RectangleF(0, scrollY, width, height));
-        canvas.Restore();
+        container.PerformPaint(bitmap, new RectangleF(0, scrollY, width, height), new PointF(0, -scrollY));
 
         return bitmap;
     }
