@@ -36,7 +36,6 @@ public class SkiaDecouplingGuardTests
     [
         "SkiaSharp",
         "SkiaSharp.NativeAssets.Linux",
-        "Svg.Skia",
     ];
 
     [Fact]
@@ -173,7 +172,6 @@ public class SkiaDecouplingGuardTests
 
         Assert.Equal("3.119.2", packages["SkiaSharp"]);
         Assert.Equal("3.119.2", packages["SkiaSharp.NativeAssets.Linux"]);
-        Assert.Equal("2.0.0.4", packages["Svg.Skia"]);
     }
 
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>

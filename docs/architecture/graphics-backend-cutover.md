@@ -21,8 +21,9 @@ Supported values:
 
 - `broiler` enables the `BCanvas`-backed raster pipeline on `BBitmap` surfaces.
 - `skia` keeps the legacy Skia-only painting path on `BBitmap` surfaces.
-- Text, font loading, and SVG compatibility still route through the existing
-  Skia-backed compatibility seams during the fallback window.
+- Text and font loading still route through the existing Skia-backed
+  compatibility seams during the fallback window; external SVG image
+  rasterization now uses the Broiler-owned `BSvgRasterizer`.
 
 ## Diagnostics
 

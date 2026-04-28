@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// Tests for SVG image detection and rendering.
 /// Verifies that SVG data is properly detected by <see cref="ImageDecoder.DetectFormatFromBytes"/>
 /// and that <c>SkiaImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
-/// via Svg.Skia instead of silently returning null.
+/// via the Broiler-owned SVG rasterizer instead of silently returning null.
 /// </summary>
 public class SvgImageRenderingTests
 {
@@ -91,13 +91,13 @@ public class SvgImageRenderingTests
         Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormat("data:image/svg+xml;base64,PHN2Zw=="));
     }
 
-    // ────────────────────── SVG rasterization via Svg.Skia ──────────────────────
+    // ────────────────────── SVG rasterization via BSvgRasterizer ──────────────────────
 
     [Fact]
     public void HtmlRender_SvgImage_Is_Rendered_As_Bitmap()
     {
         // A red 50×50 SVG as a data-URI.  The rendering engine should
-        // rasterize it via Svg.Skia and display it in the output bitmap.
+        // rasterize it through the Broiler-owned SVG path and display it in the output bitmap.
         var svgDataUri = "data:image/svg+xml;base64," +
             Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\">" +

@@ -59,8 +59,8 @@ as a platform migration rather than a single-package swap:
 - **Package dependencies**
   - `Broiler.HTML.Image` references `SkiaSharp` and
     `SkiaSharp.NativeAssets.Linux`
-  - `Broiler.HTML.Image` still references `Svg.Skia` for the temporary
-    `BSvgRasterizer` fallback
+  - `Broiler.HTML.Image` no longer references `Svg.Skia`; `BSvgRasterizer`
+    now owns the temporary SVG image fallback path directly
   - `Broiler.HTML.WPF` no longer references `SkiaSharp` directly; it consumes the
     shared `Broiler.HTML.Image` fallback boundary instead
 - **Production source usage**
@@ -439,17 +439,14 @@ Current package footprint:
 
 - `Broiler.HTML.Image` references `SkiaSharp`
 - `Broiler.HTML.Image` references `SkiaSharp.NativeAssets.Linux`
-- `Broiler.HTML.Image` references `Svg.Skia`
 - `Broiler.HTML.WPF` no longer carries direct SkiaSharp or Svg.Skia package
   references; it consumes the shared `Broiler.HTML.Image` boundary instead
 
 Proposed removal order:
 
-1. Remove `Svg.Skia` after `BSvgRasterizer` no longer depends on the Skia-based
-   SVG fallback.
-2. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
+1. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
    `Broiler.HTML.Image` requires Skia on Linux.
-3. Remove `SkiaSharp` after the remaining compatibility shims in `BBitmap` and
+2. Remove `SkiaSharp` after the remaining compatibility shims in `BBitmap` and
    the Skia adapter layer are either deleted or isolated behind a
    non-runtime compatibility package.
 
@@ -548,8 +545,8 @@ fixtures, and the stabilization suite now adds representative acid, WPT, CLI,
 SVG, and text-heavy cases plus an aggregate rollback performance budget.
 Runtime package removal remains pending until the fallback window is complete,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
-`SkiaSharp.NativeAssets.Linux` 3.119.2 + `Svg.Skia` 2.0.0.4 pairing until the
-temporary SVG fallback is gone.
+`SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
+compatibility shims are retired.
 
 ### Recommended Role Split
 

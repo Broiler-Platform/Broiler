@@ -334,7 +334,7 @@ internal sealed class SkiaImageAdapter : RAdapter
     }
 
     /// <summary>
-    /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
+    /// Rasterizes SVG data to a backend-neutral bitmap through <see cref="BSvgRasterizer"/>.
     /// Parses width/height from the SVG root element to determine output
     /// dimensions.  Per the HTML spec, when the SVG does not specify both
     /// explicit width AND height the intrinsic size is 300×150 (the default
@@ -554,7 +554,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         bool needsViewportDimensions = parsedWidth <= 0 || parsedHeight <= 0;
         if (needsViewportDimensions)
         {
-            // When either intrinsic dimension is missing, Svg.Skia needs a
+            // When either intrinsic dimension is missing, SVG rasterization needs a
             // concrete viewport size for percentage children. Preserve any
             // parsed absolute dimension on the other axis, but always inject
             // an explicit width/height pair so partial-dimension SVGs have a
