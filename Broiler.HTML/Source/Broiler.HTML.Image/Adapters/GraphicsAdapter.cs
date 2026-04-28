@@ -5,11 +5,14 @@ using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
-internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
+internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, BCanvas? rasterCanvas = null, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
 {
+    private int _layerDepth;
+
     public override void PopClip()
     {
         canvas.Restore();
+        rasterCanvas?.PopClip();
         _clipStack.Pop();
     }
 
@@ -18,6 +21,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         _clipStack.Push(rect);
         canvas.Save();
         canvas.ClipRect(Utilities.Utils.Convert(rect));
+        rasterCanvas?.PushClip(rect);
     }
 
     public override void PushClipExclude(RectangleF rect)
@@ -25,6 +29,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         _clipStack.Push(_clipStack.Peek());
         canvas.Save();
         canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
+        rasterCanvas?.PushClipExclude(rect);
     }
 
     public override void PushClipRounded(RectangleF rect,
@@ -58,6 +63,13 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
             rrect.SetRectRadii(skRect, radii);
             canvas.ClipRoundRect(rrect);
         }
+
+        rasterCanvas?.PushClipRounded(
+            rect,
+            cornerNw, cornerNwY,
+            cornerNe, cornerNeY,
+            cornerSe, cornerSeY,
+            cornerSw, cornerSwY);
     }
 
     public override object SetAntiAliasSmoothingMode() =>
@@ -184,11 +196,41 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
 
     public override RGraphicsPath GetGraphicsPath() => new GraphicsPathAdapter();
 
-    public override void DrawLine(RPen pen, double x1, double y1, double x2, double y2) => canvas.DrawLine((float)x1, (float)y1, (float)x2, (float)y2, ((PenAdapter)pen).Paint);
+    public override void DrawLine(RPen pen, double x1, double y1, double x2, double y2)
+    {
+        var penAdapter = (PenAdapter)pen;
+        if (CanUseRaster && penAdapter.HasSimpleStroke)
+        {
+            rasterCanvas!.DrawLine(new PointF((float)x1, (float)y1), new PointF((float)x2, (float)y2), penAdapter.SolidColor!.Value, (float)pen.Width);
+            return;
+        }
 
-    public override void DrawRectangle(RPen pen, double x, double y, double width, double height) => canvas.DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), ((PenAdapter)pen).Paint);
+        canvas.DrawLine((float)x1, (float)y1, (float)x2, (float)y2, penAdapter.Paint);
+    }
 
-    public override void DrawRectangle(RBrush brush, double x, double y, double width, double height) => canvas.DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), ((BrushAdapter)brush).Paint);
+    public override void DrawRectangle(RPen pen, double x, double y, double width, double height)
+    {
+        var penAdapter = (PenAdapter)pen;
+        if (CanUseRaster && penAdapter.HasSimpleStroke)
+        {
+            rasterCanvas!.DrawRectangleStroke(new RectangleF((float)x, (float)y, (float)width, (float)height), penAdapter.SolidColor!.Value, (float)pen.Width);
+            return;
+        }
+
+        canvas.DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), penAdapter.Paint);
+    }
+
+    public override void DrawRectangle(RBrush brush, double x, double y, double width, double height)
+    {
+        var brushAdapter = (BrushAdapter)brush;
+        if (CanUseRaster && brushAdapter.SolidColor is BColor solidColor)
+        {
+            rasterCanvas!.FillRect(new RectangleF((float)x, (float)y, (float)width, (float)height), solidColor);
+            return;
+        }
+
+        canvas.DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), brushAdapter.Paint);
+    }
 
     public override void DrawImage(RImage image, RectangleF destRect, RectangleF srcRect)
     {
@@ -211,6 +253,13 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         if (points == null || points.Length == 0)
             return;
 
+        var brushAdapter = (BrushAdapter)brush;
+        if (CanUseRaster && brushAdapter.SolidColor is BColor solidColor)
+        {
+            rasterCanvas!.FillPolygon(points, solidColor);
+            return;
+        }
+
         using var path = new SKPath();
         path.MoveTo(Utilities.Utils.Convert(points[0]));
 
@@ -218,11 +267,12 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
             path.LineTo(Utilities.Utils.Convert(points[i]));
 
         path.Close();
-        canvas.DrawPath(path, ((BrushAdapter)brush).Paint);
+        canvas.DrawPath(path, brushAdapter.Paint);
     }
 
     public override void SaveOpacityLayer(float opacity)
     {
+        _layerDepth++;
         // SkiaSharp SaveLayer uses only the alpha channel of the paint's
         // color to modulate the layer during compositing; RGB values are
         // irrelevant when no shader/color-filter is applied.
@@ -234,10 +284,12 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override void RestoreOpacityLayer()
     {
         canvas.Restore();
+        _layerDepth = Math.Max(0, _layerDepth - 1);
     }
 
     public override void SaveBlendLayer(string blendMode)
     {
+        _layerDepth++;
         var skBlendMode = blendMode?.ToLowerInvariant() switch
         {
             "multiply" => SKBlendMode.Multiply,
@@ -266,6 +318,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override void RestoreBlendLayer()
     {
         canvas.Restore();
+        _layerDepth = Math.Max(0, _layerDepth - 1);
     }
 
     /// <summary>
@@ -308,9 +361,17 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override void Dispose()
     {
         if (restoreOnDispose)
+        {
             canvas.Restore();
+            rasterCanvas?.Restore();
+        }
 
         if (dispose)
+        {
             canvas.Dispose();
+            rasterCanvas?.Dispose();
+        }
     }
+
+    private bool CanUseRaster => rasterCanvas is not null && _layerDepth == 0;
 }

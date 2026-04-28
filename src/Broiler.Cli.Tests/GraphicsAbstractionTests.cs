@@ -1,5 +1,6 @@
 using Broiler.Cli;
 using Broiler.HTML.Image;
+using System.Drawing;
 using RectangleF = System.Drawing.RectangleF;
 
 namespace Broiler.Cli.Tests;
@@ -347,6 +348,49 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)0, pixel.G);
         Assert.Equal((byte)0, pixel.B);
         Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Solid_Fills_And_Strokes_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        bitmap.Clear(BColor.White);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        var pen = graphics.GetPen(Color.FromArgb(255, 0, 0, 255));
+        pen.Width = 1;
+
+        graphics.DrawRectangle(brush, 1, 1, 3, 3);
+        graphics.DrawLine(pen, 0, 5, 5, 5);
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(2, 2));
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 5));
+        Assert.Equal(BColor.White, bitmap.GetPixel(0, 0));
+    }
+
+    [Fact]
+    public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Solid_Border_And_Fill()
+    {
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(8, 8);
+        container.SetHtml("""
+            <html><body style='margin:0'>
+            <div style='width:4px;height:4px;border:2px solid #ff0000;background:#0000ff'></div>
+            </body></html>
+            """);
+
+        using var bitmap = new BBitmap(8, 8);
+        bitmap.Clear(BColor.White);
+        var clip = new RectangleF(0, 0, 8, 8);
+
+        container.PerformLayout(bitmap, clip);
+        container.PerformPaint(bitmap, clip);
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 3));
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(7, 7));
     }
 
 }

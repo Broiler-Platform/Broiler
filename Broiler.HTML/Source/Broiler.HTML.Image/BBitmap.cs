@@ -123,7 +123,7 @@ public sealed class BBitmap : IDisposable
 
     internal SKCanvas OpenCanvas() => new(_bitmap);
 
-    internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, dispose: true);
+    internal GraphicsAdapter OpenGraphics(RectangleF clip) => new(OpenCanvas(), clip, OpenRasterCanvas(), dispose: true);
 
     internal BCanvas OpenRasterCanvas() => new(this);
 
@@ -132,7 +132,10 @@ public sealed class BBitmap : IDisposable
         var canvas = OpenCanvas();
         canvas.Save();
         canvas.Translate(translation.X, translation.Y);
-        return new GraphicsAdapter(canvas, clip, dispose: true, restoreOnDispose: true);
+        var rasterCanvas = OpenRasterCanvas();
+        rasterCanvas.Save();
+        rasterCanvas.Translate(translation.X, translation.Y);
+        return new GraphicsAdapter(canvas, clip, rasterCanvas, dispose: true, restoreOnDispose: true);
     }
 
     internal void DrawPictureToFit(SKPicture picture)

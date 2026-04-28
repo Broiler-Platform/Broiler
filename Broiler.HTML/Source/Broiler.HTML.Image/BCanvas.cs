@@ -39,9 +39,9 @@ internal sealed class BCanvas : IDisposable
         CurrentTarget.ErasePixels(color);
     }
 
-    public void PushClip(RectangleF rect) => _clipOperations.Add(ClipOperation.Include(rect));
+    public void PushClip(RectangleF rect) => _clipOperations.Add(ClipOperation.Include(Translate(rect)));
 
-    public void PushClipExclude(RectangleF rect) => _clipOperations.Add(ClipOperation.Exclude(rect));
+    public void PushClipExclude(RectangleF rect) => _clipOperations.Add(ClipOperation.Exclude(Translate(rect)));
 
     public void PushClipRounded(
         RectangleF rect,
@@ -54,7 +54,7 @@ internal sealed class BCanvas : IDisposable
         double cornerSw,
         double cornerSwY) =>
         _clipOperations.Add(ClipOperation.IncludeRounded(
-            rect,
+            Translate(rect),
             (float)cornerNw, (float)cornerNwY,
             (float)cornerNe, (float)cornerNeY,
             (float)cornerSe, (float)cornerSeY,
@@ -106,6 +106,54 @@ internal sealed class BCanvas : IDisposable
 
                 float distance = DistanceToSegment(x + 0.5f, y + 0.5f, p1, p2);
                 if (distance <= radius)
+                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
+            }
+        }
+    }
+
+    public void DrawRectangleStroke(RectangleF rect, BColor color, float strokeWidth = 1f)
+    {
+        strokeWidth = Math.Max(1f, strokeWidth);
+        FillRect(new RectangleF(rect.X, rect.Y, rect.Width, strokeWidth), color);
+        FillRect(new RectangleF(rect.X, rect.Bottom - strokeWidth, rect.Width, strokeWidth), color);
+        FillRect(new RectangleF(rect.X, rect.Y, strokeWidth, rect.Height), color);
+        FillRect(new RectangleF(rect.Right - strokeWidth, rect.Y, strokeWidth, rect.Height), color);
+    }
+
+    public void FillPolygon(PointF[] points, BColor color)
+    {
+        if (points == null || points.Length < 3)
+            return;
+
+        var translated = new PointF[points.Length];
+        float minX = float.PositiveInfinity;
+        float minY = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity;
+        float maxY = float.NegativeInfinity;
+
+        for (int i = 0; i < points.Length; i++)
+        {
+            var point = Translate(points[i]);
+            translated[i] = point;
+            minX = Math.Min(minX, point.X);
+            minY = Math.Min(minY, point.Y);
+            maxX = Math.Max(maxX, point.X);
+            maxY = Math.Max(maxY, point.Y);
+        }
+
+        int startX = Math.Max(0, (int)Math.Floor(minX));
+        int startY = Math.Max(0, (int)Math.Floor(minY));
+        int endX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(maxX));
+        int endY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(maxY));
+
+        for (int y = startY; y <= endY; y++)
+        {
+            for (int x = startX; x <= endX; x++)
+            {
+                if (!IsVisible(x, y))
+                    continue;
+
+                if (ContainsPolygonPoint(translated, x + 0.5f, y + 0.5f))
                     BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
             }
         }
@@ -272,6 +320,22 @@ internal sealed class BCanvas : IDisposable
         float dx = x2 - x1;
         float dy = y2 - y1;
         return (float)Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    private static bool ContainsPolygonPoint(PointF[] polygon, float x, float y)
+    {
+        bool inside = false;
+        for (int i = 0, j = polygon.Length - 1; i < polygon.Length; j = i++)
+        {
+            var pi = polygon[i];
+            var pj = polygon[j];
+            bool intersects = ((pi.Y > y) != (pj.Y > y))
+                              && (x < (pj.X - pi.X) * (y - pi.Y) / ((pj.Y - pi.Y) + float.Epsilon) + pi.X);
+            if (intersects)
+                inside = !inside;
+        }
+
+        return inside;
     }
 
     private readonly record struct CanvasState(PointF Translation, int ClipOperationCount);

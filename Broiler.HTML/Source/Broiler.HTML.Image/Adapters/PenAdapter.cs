@@ -8,6 +8,10 @@ internal sealed class PenAdapter(SKPaint paint) : RPen
 {
     public SKPaint Paint { get; } = paint;
 
+    public BColor? SolidColor { get; init; }
+
+    public bool HasSimpleStroke => SolidColor.HasValue && Paint.PathEffect is null;
+
     public override double Width
     {
         get => Paint.StrokeWidth;

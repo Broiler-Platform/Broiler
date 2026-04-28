@@ -258,7 +258,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             IsAntialias = true,
             StrokeWidth = 1
         };
-        return new PenAdapter(paint);
+        return new PenAdapter(paint) { SolidColor = new BColor(color.R, color.G, color.B, color.A) };
     }
 
     protected override RBrush CreateSolidBrush(Color color)
@@ -269,7 +269,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             Style = SKPaintStyle.Fill,
             IsAntialias = true
         };
-        return new BrushAdapter(paint, false);
+        return new BrushAdapter(paint, false) { SolidColor = new BColor(color.R, color.G, color.B, color.A) };
     }
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
