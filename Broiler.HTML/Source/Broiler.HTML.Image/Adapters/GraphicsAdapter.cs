@@ -6,7 +6,13 @@ using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
-internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, BCanvas? rasterCanvas = null, bool dispose = false, bool restoreOnDispose = false) : RGraphics(SkiaImageAdapter.Instance, initialClip)
+internal sealed class GraphicsAdapter(
+    SKCanvas canvas,
+    RectangleF initialClip,
+    BCanvas? rasterCanvas = null,
+    bool dispose = false,
+    bool restoreOnDispose = false,
+    Action? onDispose = null) : RGraphics(SkiaImageAdapter.Instance, initialClip)
 {
     private readonly Stack<bool> _rasterLayerStack = new();
     private readonly ITextShaper _textShaper = SkiaTextShaper.Instance;
@@ -425,6 +431,8 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
             canvas.Dispose();
             rasterCanvas?.Dispose();
         }
+
+        onDispose?.Invoke();
     }
 
     // Display-list replay can hint when a compositing group contains only raster-capable

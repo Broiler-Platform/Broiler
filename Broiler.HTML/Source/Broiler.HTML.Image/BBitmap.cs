@@ -12,44 +12,80 @@ namespace Broiler.HTML.Image;
 /// </summary>
 public sealed class BBitmap : IDisposable
 {
-    private readonly SKBitmap _bitmap;
-    private readonly bool _ownsBitmap;
+    private readonly byte[] _pixels;
+    private readonly bool _ownsCompatBitmap;
+    private SKBitmap? _compatBitmap;
 
     public BBitmap(int width, int height)
-        : this(new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul), ownsBitmap: true)
+        : this(width, height, new byte[checked(width * height * 4)], compatBitmap: null, ownsCompatBitmap: true)
     {
     }
 
     internal BBitmap(SKBitmap bitmap, bool ownsBitmap)
     {
-        _bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
-        _ownsBitmap = ownsBitmap;
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        Width = bitmap.Width;
+        Height = bitmap.Height;
+        _pixels = CreatePixelBuffer(bitmap);
+        _compatBitmap = ownsBitmap ? bitmap : bitmap.Copy();
+        _ownsCompatBitmap = true;
     }
 
-    public int Width => _bitmap.Width;
+    private BBitmap(int width, int height, byte[] pixels, SKBitmap? compatBitmap, bool ownsCompatBitmap)
+    {
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height));
 
-    public int Height => _bitmap.Height;
+        Width = width;
+        Height = height;
+        _pixels = pixels ?? throw new ArgumentNullException(nameof(pixels));
+        _compatBitmap = compatBitmap;
+        _ownsCompatBitmap = ownsCompatBitmap;
+    }
 
-    public BColor GetPixel(int x, int y) => _bitmap.GetPixel(x, y).ToBColor();
+    public int Width { get; }
 
-    public void SetPixel(int x, int y, BColor color) => _bitmap.SetPixel(x, y, color.ToSkColor());
+    public int Height { get; }
+
+    public BColor GetPixel(int x, int y)
+    {
+        int index = GetPixelIndex(x, y);
+        return new BColor(_pixels[index], _pixels[index + 1], _pixels[index + 2], _pixels[index + 3]);
+    }
+
+    public void SetPixel(int x, int y, BColor color)
+    {
+        int index = GetPixelIndex(x, y);
+        _pixels[index] = color.R;
+        _pixels[index + 1] = color.G;
+        _pixels[index + 2] = color.B;
+        _pixels[index + 3] = color.A;
+        _compatBitmap?.SetPixel(x, y, color.ToSkColor());
+    }
 
     public void Clear(BColor color) => ErasePixels(color);
 
     internal void ErasePixels(BColor color)
     {
-        for (int y = 0; y < Height; y++)
+        for (int i = 0; i < _pixels.Length; i += 4)
         {
-            for (int x = 0; x < Width; x++)
-                SetPixel(x, y, color);
+            _pixels[i] = color.R;
+            _pixels[i + 1] = color.G;
+            _pixels[i + 2] = color.B;
+            _pixels[i + 3] = color.A;
         }
+
+        _compatBitmap?.Erase(color.ToSkColor());
     }
 
     internal void Erase(BColor color) => Clear(color);
 
     public byte[] Encode(BImageFormat format = BImageFormat.Png, int quality = 100)
     {
-        using var data = _bitmap.Encode(format.ToSkEncodedImageFormat(), quality);
+        using var data = EnsureCompatBitmap().Encode(format.ToSkEncodedImageFormat(), quality);
         if (data is null)
             throw new InvalidOperationException("Failed to encode bitmap data.");
 
@@ -60,7 +96,7 @@ public sealed class BBitmap : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        using var data = _bitmap.Encode(format.ToSkEncodedImageFormat(), quality);
+        using var data = EnsureCompatBitmap().Encode(format.ToSkEncodedImageFormat(), quality);
         if (data is null)
             throw new InvalidOperationException($"Failed to encode bitmap file: {filePath}");
 
@@ -68,7 +104,7 @@ public sealed class BBitmap : IDisposable
         data.SaveTo(stream);
     }
 
-    public BBitmap Copy() => new(_bitmap.Copy(), ownsBitmap: true);
+    public BBitmap Copy() => new(Width, Height, (byte[])_pixels.Clone(), _compatBitmap?.Copy(), ownsCompatBitmap: true);
 
     internal BBitmap ResizeNearest(int width, int height)
     {
@@ -121,12 +157,12 @@ public sealed class BBitmap : IDisposable
 
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
 
-    internal SKCanvas OpenCanvas() => new(_bitmap);
+    internal SKCanvas OpenCanvas() => new(EnsureCompatBitmap());
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip)
     {
         var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
-        return new GraphicsAdapter(OpenCanvas(), clip, rasterCanvas, dispose: true);
+        return new GraphicsAdapter(OpenCanvas(), clip, rasterCanvas, dispose: true, onDispose: SyncPixelsFromCompatBitmap);
     }
 
     internal BCanvas OpenRasterCanvas() => new(this);
@@ -143,7 +179,7 @@ public sealed class BBitmap : IDisposable
             rasterCanvas.Translate(translation.X, translation.Y);
         }
 
-        return new GraphicsAdapter(canvas, clip, rasterCanvas, dispose: true, restoreOnDispose: true);
+        return new GraphicsAdapter(canvas, clip, rasterCanvas, dispose: true, restoreOnDispose: true, onDispose: SyncPixelsFromCompatBitmap);
     }
 
     internal void DrawPictureToFit(SKPicture picture)
@@ -162,15 +198,72 @@ public sealed class BBitmap : IDisposable
         }
 
         canvas.DrawPicture(picture);
+        SyncPixelsFromCompatBitmap();
     }
 
-    internal SKBitmap AsSkBitmap() => _bitmap;
+    internal SKBitmap AsSkBitmap() => EnsureCompatBitmap();
 
-    internal SKBitmap ToSkBitmapCopy() => _bitmap.Copy();
+    internal SKBitmap ToSkBitmapCopy() => EnsureCompatBitmap().Copy();
 
     public void Dispose()
     {
-        if (_ownsBitmap)
-            _bitmap.Dispose();
+        if (_ownsCompatBitmap)
+            _compatBitmap?.Dispose();
+    }
+
+    private int GetPixelIndex(int x, int y) => checked(((y * Width) + x) * 4);
+
+    private SKBitmap EnsureCompatBitmap()
+    {
+        if (_compatBitmap is not null)
+            return _compatBitmap;
+
+        var bitmap = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+                bitmap.SetPixel(x, y, GetPixel(x, y).ToSkColor());
+        }
+
+        _compatBitmap = bitmap;
+        return bitmap;
+    }
+
+    private void SyncPixelsFromCompatBitmap()
+    {
+        if (_compatBitmap is null)
+            return;
+
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                var color = _compatBitmap.GetPixel(x, y);
+                int index = GetPixelIndex(x, y);
+                _pixels[index] = color.Red;
+                _pixels[index + 1] = color.Green;
+                _pixels[index + 2] = color.Blue;
+                _pixels[index + 3] = color.Alpha;
+            }
+        }
+    }
+
+    private static byte[] CreatePixelBuffer(SKBitmap bitmap)
+    {
+        var pixels = new byte[checked(bitmap.Width * bitmap.Height * 4)];
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                var color = bitmap.GetPixel(x, y);
+                int index = ((y * bitmap.Width) + x) * 4;
+                pixels[index] = color.Red;
+                pixels[index + 1] = color.Green;
+                pixels[index + 2] = color.Blue;
+                pixels[index + 3] = color.Alpha;
+            }
+        }
+
+        return pixels;
     }
 }

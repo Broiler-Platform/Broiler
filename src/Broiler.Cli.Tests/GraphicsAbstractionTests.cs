@@ -269,6 +269,39 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_Copy_And_EncodeDecode_Roundtrip_Preserve_Pixels()
+    {
+        using var source = new BBitmap(2, 2);
+        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        source.SetPixel(1, 0, new BColor(0, 255, 0, 255));
+        source.SetPixel(0, 1, new BColor(0, 0, 255, 255));
+        source.SetPixel(1, 1, new BColor(255, 255, 0, 128));
+
+        using var copy = source.Copy();
+        using var roundTripped = BBitmap.Decode(copy.Encode(BImageFormat.Png));
+
+        Assert.Equal(source.GetPixel(0, 0), roundTripped.GetPixel(0, 0));
+        Assert.Equal(source.GetPixel(1, 0), roundTripped.GetPixel(1, 0));
+        Assert.Equal(source.GetPixel(0, 1), roundTripped.GetPixel(0, 1));
+        Assert.Equal(source.GetPixel(1, 1), roundTripped.GetPixel(1, 1));
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Syncs_SkiaOverride_Drawing_Back_Into_Primary_Pixel_Buffer()
+    {
+        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.SkiaFallbackId);
+        using var bitmap = new BBitmap(4, 4);
+        using (var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)))
+        {
+            using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+            graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        }
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(3, 3));
+    }
+
+    [Fact]
     public void BCanvas_FillRect_Respects_Translation_And_Clip()
     {
         using var bitmap = new BBitmap(6, 6);
