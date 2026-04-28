@@ -171,7 +171,8 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
     private static bool IsRasterBlendModeSupported(string? blendMode) =>
         string.IsNullOrEmpty(blendMode)
         || blendMode.Equals("normal", StringComparison.OrdinalIgnoreCase)
-        || blendMode.Equals("multiply", StringComparison.OrdinalIgnoreCase);
+        || blendMode.Equals("multiply", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("screen", StringComparison.OrdinalIgnoreCase);
 
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {

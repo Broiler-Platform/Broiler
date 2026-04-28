@@ -352,6 +352,24 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BCanvas_SaveBlendLayer_Screen_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("screen");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.R);
+        Assert.InRange(pixel.G, (byte)127, (byte)128);
+        Assert.InRange(pixel.B, (byte)127, (byte)128);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Routes_Hinted_Opacity_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -771,6 +789,28 @@ public class GraphicsAbstractionTests
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(128, 0, 0, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Screen_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:screen'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
 
         using var diff = PixelDiffRunner.Compare(rendered, expected);
 

@@ -397,6 +397,15 @@ internal sealed class BCanvas : IDisposable
                 source.A);
         }
 
+        if (string.Equals(blendMode, "screen", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                (byte)(255 - (((255 - source.R) * (255 - destination.R) + 127) / 255)),
+                (byte)(255 - (((255 - source.G) * (255 - destination.G) + 127) / 255)),
+                (byte)(255 - (((255 - source.B) * (255 - destination.B) + 127) / 255)),
+                source.A);
+        }
+
         return source;
     }
 
