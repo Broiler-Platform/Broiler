@@ -235,12 +235,27 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, B
     public override void DrawImage(RImage image, RectangleF destRect, RectangleF srcRect)
     {
         var imgAdapter = (ImageAdapter)image;
+        if (CanUseRaster)
+        {
+            rasterCanvas!.DrawBitmap(imgAdapter.Bitmap, destRect, srcRect);
+            return;
+        }
+
         canvas.DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
     }
 
     public override void DrawImage(RImage image, RectangleF destRect)
     {
         var imgAdapter = (ImageAdapter)image;
+        if (CanUseRaster)
+        {
+            rasterCanvas!.DrawBitmap(
+                imgAdapter.Bitmap,
+                destRect,
+                new RectangleF(0, 0, imgAdapter.Bitmap.Width, imgAdapter.Bitmap.Height));
+            return;
+        }
+
         canvas.DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(destRect));
     }
 

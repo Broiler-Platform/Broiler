@@ -159,6 +159,41 @@ internal sealed class BCanvas : IDisposable
         }
     }
 
+    public void DrawBitmap(BBitmap source, RectangleF destRect, RectangleF srcRect)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (destRect.Width <= 0 || destRect.Height <= 0 || srcRect.Width <= 0 || srcRect.Height <= 0)
+            return;
+
+        var translatedDest = Translate(destRect);
+        int startX = Math.Max(0, (int)Math.Floor(translatedDest.Left));
+        int startY = Math.Max(0, (int)Math.Floor(translatedDest.Top));
+        int endX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(translatedDest.Right) - 1);
+        int endY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(translatedDest.Bottom) - 1);
+
+        if (startX > endX || startY > endY)
+            return;
+
+        for (int y = startY; y <= endY; y++)
+        {
+            for (int x = startX; x <= endX; x++)
+            {
+                if (!IsVisible(x, y))
+                    continue;
+
+                float normalizedX = ((x + 0.5f) - translatedDest.Left) / translatedDest.Width;
+                float normalizedY = ((y + 0.5f) - translatedDest.Top) / translatedDest.Height;
+                if (normalizedX < 0f || normalizedX >= 1f || normalizedY < 0f || normalizedY >= 1f)
+                    continue;
+
+                int srcX = Math.Clamp((int)Math.Floor(srcRect.Left + (normalizedX * srcRect.Width)), 0, source.Width - 1);
+                int srcY = Math.Clamp((int)Math.Floor(srcRect.Top + (normalizedY * srcRect.Height)), 0, source.Height - 1);
+                BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
+            }
+        }
+    }
+
     public void SaveOpacityLayer(float opacity)
     {
         _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), opacity, "normal"));

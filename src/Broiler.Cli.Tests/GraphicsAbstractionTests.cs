@@ -1,5 +1,6 @@
 using Broiler.Cli;
 using Broiler.HTML.Image;
+using Broiler.HTML.Image.Adapters;
 using System.Drawing;
 using RectangleF = System.Drawing.RectangleF;
 
@@ -391,6 +392,57 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
         Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 3));
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(7, 7));
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Image_Blit_Through_Backend_Neutral_Primitives()
+    {
+        using var source = new BBitmap(2, 1);
+        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
+
+        using var dest = new BBitmap(4, 2);
+        dest.Clear(BColor.White);
+        using var graphics = dest.OpenGraphics(new RectangleF(0, 0, 4, 2));
+        using var image = new ImageAdapter(source.Copy());
+
+        graphics.DrawImage(image, new RectangleF(0, 0, 4, 2));
+
+        Assert.Equal(new BColor(255, 0, 0, 255), dest.GetPixel(0, 0));
+        Assert.Equal(new BColor(255, 0, 0, 255), dest.GetPixel(1, 1));
+        Assert.Equal(new BColor(0, 0, 255, 255), dest.GetPixel(2, 0));
+        Assert.Equal(new BColor(0, 0, 255, 255), dest.GetPixel(3, 1));
+    }
+
+    [Fact]
+    public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Background_Image()
+    {
+        using var source = new BBitmap(2, 1);
+        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
+        string pngBase64 = Convert.ToBase64String(source.Encode(BImageFormat.Png, 100));
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(4, 2);
+        container.SetHtml($"""
+            <html><body style='margin:0'>
+            <div style="width:4px;height:2px;background-image:url(data:image/png;base64,{pngBase64});background-repeat:no-repeat;background-size:4px 2px"></div>
+            </body></html>
+            """);
+
+        using var bitmap = new BBitmap(4, 2);
+        bitmap.Clear(BColor.White);
+        var clip = new RectangleF(0, 0, 4, 2);
+
+        container.PerformLayout(bitmap, clip);
+        container.PerformPaint(bitmap, clip);
+
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(0, 0));
+        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(2, 0));
+        Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 1));
     }
 
 }
