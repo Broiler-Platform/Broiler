@@ -757,6 +757,8 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
 
     private static PointF[] CreateEllipsePoints(float centerX, float centerY, float radiusX, float radiusY)
     {
+        // Use roughly half a point per output pixel along the larger radius, with
+        // a floor for small shapes and a ceiling to keep replay costs bounded.
         int segmentCount = Math.Clamp((int)Math.Ceiling(Math.PI * Math.Max(radiusX, radiusY)), 16, 128);
         var points = new PointF[segmentCount];
 
