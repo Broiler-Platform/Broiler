@@ -645,6 +645,54 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void PixelDiffRunner_Compare_Matches_LayoutDominant_NonText_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#ffffff'>
+            <div style='width:12px;height:3px;background:#ff0000'></div>
+            <div style='height:2px'></div>
+            <div style='width:8px;height:4px;margin-left:2px;background:#0000ff'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 12, 12, BColor.White);
+        using var expected = new BBitmap(12, 12);
+        expected.Clear(BColor.White);
+        FillRect(expected, 0, 0, 12, 3, new BColor(255, 0, 0, 255));
+        FillRect(expected, 2, 5, 8, 4, new BColor(0, 0, 255, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_ShapeHeavy_NonText_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#ffffff'>
+            <div style='width:8px;height:8px;border:2px solid #ff0000;background:#0000ff'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 12, 12, BColor.White);
+        using var expected = new BBitmap(12, 12);
+        expected.Clear(BColor.White);
+        FillRect(expected, 0, 0, 12, 12, new BColor(255, 0, 0, 255));
+        FillRect(expected, 2, 2, 8, 8, new BColor(0, 0, 255, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Rounded_Border_Path()
     {
         using var container = new HtmlContainer();
@@ -667,6 +715,15 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(0, 0));
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(4, 1));
         Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(5, 5));
+    }
+
+    private static void FillRect(BBitmap bitmap, int x, int y, int width, int height, BColor color)
+    {
+        for (int py = y; py < y + height; py++)
+        {
+            for (int px = x; px < x + width; px++)
+                bitmap.SetPixel(px, py, color);
+        }
     }
 
 }
