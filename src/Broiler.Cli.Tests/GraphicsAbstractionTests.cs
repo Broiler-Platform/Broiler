@@ -719,11 +719,8 @@ public class GraphicsAbstractionTests
 
     private static void FillRect(BBitmap bitmap, int x, int y, int width, int height, BColor color)
     {
-        for (int py = y; py < y + height; py++)
-        {
-            for (int px = x; px < x + width; px++)
-                bitmap.SetPixel(px, py, color);
-        }
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.FillRect(new RectangleF(x, y, width, height), color);
     }
 
 }
