@@ -406,6 +406,24 @@ internal sealed class BCanvas : IDisposable
                 source.A);
         }
 
+        if (string.Equals(blendMode, "darken", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                Math.Min(source.R, destination.R),
+                Math.Min(source.G, destination.G),
+                Math.Min(source.B, destination.B),
+                source.A);
+        }
+
+        if (string.Equals(blendMode, "lighten", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                Math.Max(source.R, destination.R),
+                Math.Max(source.G, destination.G),
+                Math.Max(source.B, destination.B),
+                source.A);
+        }
+
         if (string.Equals(blendMode, "overlay", StringComparison.OrdinalIgnoreCase))
         {
             return new BColor(

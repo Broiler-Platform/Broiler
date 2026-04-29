@@ -1067,6 +1067,62 @@ body { margin: 0; }
     }
 
     /// <summary>
+    /// Verifies that mix-blend-mode: darken chooses the darker component
+    /// from the backdrop and source for each channel.
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Darken_Produces_Darker_Output()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { margin: 0; }
+.parent { width: 100px; height: 100px; background: #FF0000; }
+.child { width: 100px; height: 100px; background: #0000FF; mix-blend-mode: darken; }
+</style></head>
+<body>
+<div class=""parent"">
+  <div class=""child""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Red < 30, $"Expected near-zero red but got {pixel.Red}");
+        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
+        Assert.True(pixel.Blue < 30, $"Expected near-zero blue but got {pixel.Blue}");
+    }
+
+    /// <summary>
+    /// Verifies that mix-blend-mode: lighten chooses the lighter component
+    /// from the backdrop and source for each channel.
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Lighten_Produces_Lighter_Output()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { margin: 0; }
+.parent { width: 100px; height: 100px; background: #FF0000; }
+.child { width: 100px; height: 100px; background: #0000FF; mix-blend-mode: lighten; }
+</style></head>
+<body>
+<div class=""parent"">
+  <div class=""child""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Red > 200, $"Expected high red but got {pixel.Red}");
+        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
+        Assert.True(pixel.Blue > 200, $"Expected high blue but got {pixel.Blue}");
+    }
+
+    /// <summary>
     /// Verifies that mix-blend-mode: overlay on the rotated-clip test
     /// produces the expected lime-colored output (overlay of red on lime
     /// results in lime because the backdrop is > 0.5 in the green channel).
