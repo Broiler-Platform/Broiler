@@ -748,6 +748,32 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void SkiaTextShaper_NonAhem_Measurement_Delegates_Through_Text_Metrics_Compat_Seam()
+    {
+        var textMetricsCompat = new RecordingTextMetricsCompat();
+        var textShaper = new SkiaTextShaper(textMetricsCompat);
+        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        var size = textShaper.MeasureString(font, "measure");
+        textShaper.MeasureString(font, "measure", 13, out var charFit, out var charFitWidth);
+
+        Assert.Equal(new SizeF(17, (float)font.Height), size);
+        Assert.Equal(2, charFit);
+        Assert.Equal(11d, charFitWidth);
+        Assert.Equal(
+            [
+                "MeasureTextWidth",
+                "MeasureTextWidthMaxWidth",
+            ],
+            textMetricsCompat.Calls);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+    }
+
+    [Fact]
     public void SkiaImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
     {
         var paintCompat = new RecordingPaintCompatFactory();
@@ -1746,6 +1772,24 @@ public class GraphicsAbstractionTests
             _deferredFamilies.Add(family);
             _materializedFamilies.Add(family);
             return SKTypeface.Default;
+        }
+    }
+
+    private sealed class RecordingTextMetricsCompat : ITextMetricsCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public float MeasureTextWidth(FontAdapter font, string text)
+        {
+            Calls.Add("MeasureTextWidth");
+            return 17f;
+        }
+
+        public void MeasureTextWidth(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
+        {
+            Calls.Add("MeasureTextWidthMaxWidth");
+            charFit = 2;
+            charFitWidth = 11d;
         }
     }
 

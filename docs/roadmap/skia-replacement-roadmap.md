@@ -590,6 +590,9 @@ through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
 remaining Skia fallback path,
 and deterministic `Ahem` text measurement plus max-width char-fit probing now
 also stay on the Broiler-owned metrics path,
+and the remaining non-`Ahem` Skia-backed text measurement compatibility
+details now also route through an internal `ITextMetricsCompat` seam inside
+`SkiaTextShaper`,
 and raster-compatible layer compositing now also keeps `multiply`, `screen`,
 `darken`, `lighten`, `overlay`, `difference`, and `plus-lighter` blend modes on
 the Broiler-owned canvas path instead of escalating those layers to the

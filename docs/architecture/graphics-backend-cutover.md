@@ -66,6 +66,9 @@ Supported values for the internal override:
   no longer require an `SKCanvas` materialization just to paint glyphs.
 - Deterministic `Ahem` text measurement, including max-width char-fit probing,
   now also stays on the Broiler-owned metrics path.
+- The remaining non-`Ahem` Skia-backed text measurement compatibility details
+  now route through the internal `ITextMetricsCompat` seam inside
+  `SkiaTextShaper`.
 - Raster-compatible layer compositing now also keeps `multiply`, `screen`,
   `darken`, `lighten`, `overlay`, `difference`, and `plus-lighter` blend modes
   on the Broiler-owned canvas path instead of forcing those cases onto the

@@ -15,8 +15,10 @@ internal sealed class SkiaTextShaper : ITextShaper
 {
     private const double DegreesToRadians = Math.PI / 180.0;
     private const string DeterministicFixtureFontFamily = "Ahem";
+    private readonly ITextMetricsCompat _textMetricsCompat;
 
-    private SkiaTextShaper() { }
+    internal SkiaTextShaper(ITextMetricsCompat? textMetricsCompat = null) =>
+        _textMetricsCompat = textMetricsCompat ?? SkiaTextMetricsCompat.Instance;
 
     public static SkiaTextShaper Instance { get; } = new();
 
@@ -28,7 +30,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             return new SizeF(broilerSize.Width, (float)font.Height);
         }
 
-        var width = font.Font.MeasureText(text);
+        var width = _textMetricsCompat.MeasureTextWidth(font, text);
         return new SizeF(width, (float)font.Height);
     }
 
@@ -53,16 +55,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             return;
         }
 
-        for (int i = 1; i <= text.Length; i++)
-        {
-            var substring = text.Substring(0, i);
-            var width = font.Font.MeasureText(substring);
-            if (width > maxWidth)
-                break;
-
-            charFit = i;
-            charFitWidth = width;
-        }
+        _textMetricsCompat.MeasureTextWidth(font, text, maxWidth, out charFit, out charFitWidth);
     }
 
     public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point)
