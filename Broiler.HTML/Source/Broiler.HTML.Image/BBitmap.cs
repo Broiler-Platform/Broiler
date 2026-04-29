@@ -2,6 +2,10 @@ using System;
 using System.Drawing;
 using System.IO;
 using Broiler.HTML.Image.Adapters;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 
 namespace Broiler.HTML.Image;
@@ -85,23 +89,19 @@ public sealed class BBitmap : IDisposable
 
     public byte[] Encode(BImageFormat format = BImageFormat.Png, int quality = 100)
     {
-        using var data = EnsureCompatBitmap().Encode(format.ToSkEncodedImageFormat(), quality);
-        if (data is null)
-            throw new InvalidOperationException("Failed to encode bitmap data.");
-
-        return data.ToArray();
+        using var image = CreateImageSharpImage();
+        using var stream = new MemoryStream();
+        image.Save(stream, CreateEncoder(format, quality));
+        return stream.ToArray();
     }
 
     public void Save(string filePath, BImageFormat format = BImageFormat.Png, int quality = 100)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        using var data = EnsureCompatBitmap().Encode(format.ToSkEncodedImageFormat(), quality);
-        if (data is null)
-            throw new InvalidOperationException($"Failed to encode bitmap file: {filePath}");
-
-        using var stream = File.OpenWrite(filePath);
-        data.SaveTo(stream);
+        using var image = CreateImageSharpImage();
+        using var stream = File.Open(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        image.Save(stream, CreateEncoder(format, quality));
     }
 
     public BBitmap Copy() => new(Width, Height, (byte[])_pixels.Clone(), _compatBitmap?.Copy(), ownsCompatBitmap: true);
@@ -134,25 +134,24 @@ public sealed class BBitmap : IDisposable
     {
         ArgumentNullException.ThrowIfNull(data);
 
-        using var skData = SKData.CreateCopy(data);
-        var bitmap = SKBitmap.Decode(skData) ?? throw new InvalidOperationException("Failed to decode bitmap data.");
-        return new BBitmap(bitmap, ownsBitmap: true);
+        using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(data);
+        return CreateFromImageSharpImage(image);
     }
 
     public static BBitmap Decode(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        var bitmap = SKBitmap.Decode(stream) ?? throw new InvalidOperationException("Failed to decode bitmap stream.");
-        return new BBitmap(bitmap, ownsBitmap: true);
+        using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(stream);
+        return CreateFromImageSharpImage(image);
     }
 
     public static BBitmap Decode(string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        var bitmap = SKBitmap.Decode(path) ?? throw new InvalidOperationException($"Failed to decode bitmap file: {path}");
-        return new BBitmap(bitmap, ownsBitmap: true);
+        using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(path);
+        return CreateFromImageSharpImage(image);
     }
 
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
@@ -213,6 +212,30 @@ public sealed class BBitmap : IDisposable
 
     private int GetPixelIndex(int x, int y) => checked(((y * Width) + x) * 4);
 
+    private IImageEncoder CreateEncoder(BImageFormat format, int quality) => format switch
+    {
+        BImageFormat.Jpeg => new JpegEncoder
+        {
+            Quality = Math.Clamp(quality, 1, 100),
+        },
+        _ => new PngEncoder(),
+    };
+
+    private SixLabors.ImageSharp.Image<Rgba32> CreateImageSharpImage()
+    {
+        var image = new SixLabors.ImageSharp.Image<Rgba32>(Width, Height);
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                int index = GetPixelIndex(x, y);
+                image[x, y] = new Rgba32(_pixels[index], _pixels[index + 1], _pixels[index + 2], _pixels[index + 3]);
+            }
+        }
+
+        return image;
+    }
+
     private SKBitmap EnsureCompatBitmap()
     {
         if (_compatBitmap is not null)
@@ -227,6 +250,25 @@ public sealed class BBitmap : IDisposable
 
         _compatBitmap = bitmap;
         return bitmap;
+    }
+
+    private static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
+    {
+        var pixels = new byte[checked(image.Width * image.Height * 4)];
+        for (int y = 0; y < image.Height; y++)
+        {
+            for (int x = 0; x < image.Width; x++)
+            {
+                var color = image[x, y];
+                int index = ((y * image.Width) + x) * 4;
+                pixels[index] = color.R;
+                pixels[index + 1] = color.G;
+                pixels[index + 2] = color.B;
+                pixels[index + 3] = color.A;
+            }
+        }
+
+        return new BBitmap(image.Width, image.Height, pixels, compatBitmap: null, ownsCompatBitmap: true);
     }
 
     private void SyncPixelsFromCompatBitmap()

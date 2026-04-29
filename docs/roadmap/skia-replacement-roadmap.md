@@ -545,6 +545,7 @@ WPT, CLI, SVG, and text-heavy cases plus an aggregate rollback performance
 budget. `BBitmap` now keeps Broiler-owned pixel storage as its primary backing
 store while synchronizing the remaining internal `SKBitmap` compatibility seam.
 The last high-level public `SKCanvas` compatibility overloads are now gone.
+Bitmap encode/decode/save now also use a backend-neutral codec path.
 Runtime package removal remains pending until the remaining internal
 Skia compatibility seams are retired,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +

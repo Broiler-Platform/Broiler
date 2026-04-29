@@ -287,6 +287,24 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_EncodeDecode_Jpeg_Roundtrip_Preserves_Size_Without_Skia_Codec()
+    {
+        using var source = new BBitmap(2, 2);
+        source.Clear(new BColor(220, 30, 40, 255));
+
+        using var roundTripped = BBitmap.Decode(source.Encode(BImageFormat.Jpeg, 100));
+
+        Assert.Equal(source.Width, roundTripped.Width);
+        Assert.Equal(source.Height, roundTripped.Height);
+
+        var pixel = roundTripped.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.A);
+        Assert.InRange(pixel.R, (byte)150, byte.MaxValue);
+        Assert.InRange(pixel.G, byte.MinValue, (byte)120);
+        Assert.InRange(pixel.B, byte.MinValue, (byte)120);
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Syncs_SkiaOverride_Drawing_Back_Into_Primary_Pixel_Buffer()
     {
         using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.SkiaFallbackId);
