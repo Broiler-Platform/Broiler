@@ -14,6 +14,7 @@ namespace Broiler.HTML.Image.Adapters;
 internal sealed class SkiaTextShaper : ITextShaper
 {
     private const double DegreesToRadians = Math.PI / 180.0;
+    private const string DeterministicFixtureFontFamily = "Ahem";
 
     private SkiaTextShaper() { }
 
@@ -35,6 +36,22 @@ internal sealed class SkiaTextShaper : ITextShaper
     {
         charFit = 0;
         charFitWidth = 0;
+
+        if (font.TryGetBroilerLayoutFont(out var broilerFont) && CanUseBroilerMeasurement(broilerFont))
+        {
+            for (int i = 1; i <= text.Length; i++)
+            {
+                var substring = text.Substring(0, i);
+                var width = MeasureTextSize(broilerFont, substring).Width;
+                if (width > maxWidth)
+                    break;
+
+                charFit = i;
+                charFitWidth = width;
+            }
+
+            return;
+        }
 
         for (int i = 1; i <= text.Length; i++)
         {
@@ -159,7 +176,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             IsAntialias = false,
         };
 
-        if (string.Equals(font.Typeface.FamilyName, "Ahem", StringComparison.OrdinalIgnoreCase)
+        if (IsDeterministicFixtureFont(font.Typeface.FamilyName)
             && !text.Contains(' '))
         {
             gradientPaint.BlendMode = SKBlendMode.SrcOver;
@@ -240,5 +257,8 @@ internal sealed class SkiaTextShaper : ITextShaper
     // remaining M5 cutover window while the text-fidelity gates in
     // TextFidelityThresholdTests stay pinned to the legacy layout baseline.
     private static bool CanUseBroilerMeasurement(SixLaborsFont font) =>
-        string.Equals(font.Family.Name, "Ahem", StringComparison.OrdinalIgnoreCase);
+        IsDeterministicFixtureFont(font.Family.Name);
+
+    private static bool IsDeterministicFixtureFont(string? familyName) =>
+        string.Equals(familyName, DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
 }

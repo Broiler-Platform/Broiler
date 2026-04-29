@@ -540,6 +540,28 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Broiler_Ahem_CharFit_Measurement_Does_Not_Materialize_Skia_For_Loaded_Fonts()
+    {
+        var alias = $"RasterCharFit_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        using var bitmap = new BBitmap(48, 24);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
+
+        var singleWidth = graphics.MeasureString("X", font).Width;
+        graphics.MeasureString("XX", font, singleWidth + 0.1f, out var charFit, out var charFitWidth);
+
+        Assert.Equal(1, charFit);
+        Assert.InRange(Math.Abs(charFitWidth - singleWidth), 0, 0.01d);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+    }
+
+    [Fact]
     public void Broiler_Render_Font_Reuses_The_Registered_Font_Size_For_Loaded_Fonts()
     {
         var alias = $"RasterRenderSize_{Guid.NewGuid():N}";

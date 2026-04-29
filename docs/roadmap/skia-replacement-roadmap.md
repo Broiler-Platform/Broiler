@@ -585,6 +585,8 @@ and the default `broiler` backend now routes text and gradient-text paint
 through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
 `SixLabors.ImageSharp.Drawing` for registered/system fonts before touching the
 remaining Skia fallback path,
+and deterministic `Ahem` text measurement plus max-width char-fit probing now
+also stay on the Broiler-owned metrics path,
 and raster-compatible layer compositing now also keeps `multiply`, `screen`,
 `darken`, `lighten`, `overlay`, `difference`, and `plus-lighter` blend modes on
 the Broiler-owned canvas path instead of escalating those layers to the
