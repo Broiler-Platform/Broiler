@@ -585,6 +585,9 @@ and the default `broiler` backend now routes text and gradient-text paint
 through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
 `SixLabors.ImageSharp.Drawing` for registered/system fonts before touching the
 remaining Skia fallback path,
+and raster-compatible layer compositing now also keeps `multiply`, `screen`,
+`overlay`, `difference`, and `plus-lighter` blend modes on the Broiler-owned
+canvas path instead of escalating those layers to the internal Skia fallback,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.
