@@ -22,6 +22,8 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// </summary>
     private readonly Dictionary<string, SKTypeface> _loadedTypefaces
         = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _loadedTypefacePaths
+        = new(StringComparer.OrdinalIgnoreCase);
 
     private SkiaImageAdapter()
     {
@@ -41,6 +43,12 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     public static SkiaImageAdapter Instance { get; } = new();
 
+    internal bool HasDeferredLoadedTypefacePath(string family) =>
+        _loadedTypefacePaths.ContainsKey(family);
+
+    internal bool HasMaterializedLoadedTypeface(string family) =>
+        _loadedTypefaces.ContainsKey(family);
+
     /// <summary>
     /// Loads a TrueType/OpenType font from a file path and registers it as
     /// an available font family.  Optionally maps a CSS name to the loaded
@@ -49,12 +57,26 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// </summary>
     /// <param name="path">Absolute path to a .ttf or .otf font file.</param>
     /// <param name="mapFromName">
-    /// When non-null, adds a font-family mapping from this name to the
-    /// loaded font's family name (e.g. <c>"sans-serif"</c>).
+    /// When non-null, registers the font under this CSS family alias instead
+    /// of eagerly probing the file for its embedded family name.
     /// </param>
-    /// <returns>The family name of the loaded font, or <c>null</c> on failure.</returns>
+    /// <returns>
+    /// The registered family name (the alias when provided), or <c>null</c> on failure.
+    /// </returns>
     public override string LoadFontFromFile(string path, string mapFromName = null)
     {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return null;
+
+        if (!string.IsNullOrWhiteSpace(mapFromName))
+        {
+            var alias = mapFromName!;
+            AddFontFamily(new FontFamilyAdapter(alias));
+            _loadedTypefacePaths[alias] = path;
+            _loadedTypefaces.Remove(alias);
+            return alias;
+        }
+
         var typeface = SKTypeface.FromFile(path);
         if (typeface == null)
             return null;
@@ -66,15 +88,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         // SKFontManager.Default cannot find typefaces loaded from files,
         // so we maintain our own lookup dictionary.
         _loadedTypefaces[familyName] = typeface;
-
-        if (!string.IsNullOrEmpty(mapFromName))
-        {
-            AddFontFamilyMapping(mapFromName!, familyName);
-            // Also register under the alias name so that CSS font-family
-            // lookups with the alias (e.g. "Ahem") resolve to this typeface
-            // even before the mapping is applied.
-            _loadedTypefaces[mapFromName!] = typeface;
-        }
+        _loadedTypefacePaths[familyName] = path;
 
         // Do not dispose the typeface — SkiaSharp's font manager retains
         // a reference so that subsequent SKTypeface.FromFamilyName lookups
@@ -774,6 +788,15 @@ internal sealed class SkiaImageAdapter : RAdapter
         // the native OS font manager).
         if (_loadedTypefaces.TryGetValue(family, out var loaded))
             return new FontAdapter(loaded, size, style);
+        if (_loadedTypefacePaths.TryGetValue(family, out var loadedPath))
+        {
+            var loadedTypeface = SKTypeface.FromFile(loadedPath);
+            if (loadedTypeface != null)
+            {
+                _loadedTypefaces[family] = loadedTypeface;
+                return new FontAdapter(loadedTypeface, size, style);
+            }
+        }
         var typeface = SKTypeface.FromFamilyName(family, skStyle) ?? SKTypeface.Default;
         return new FontAdapter(typeface, size, style);
     }

@@ -484,6 +484,32 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
+    {
+        var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "acid", "fonts", "DejaVuSans.ttf");
+
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+
+        Assert.Equal(alias, family);
+        Assert.True(SkiaImageAdapter.Instance.HasDeferredLoadedTypefacePath(alias));
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+
+        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        using var bitmap = new BBitmap(32, 32);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
+        var size = graphics.MeasureString("abc", font);
+
+        Assert.True(size.Width > 0);
+        Assert.True(font.HasMaterializedLayoutFont);
+    }
+
+    [Fact]
     public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -917,6 +943,9 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(10, 10));
         Assert.Equal(BColor.White, bitmap.GetPixel(2, 5));
     }
+
+    private static string GetRepoRoot() => Path.GetFullPath(Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
 
     [Fact]
     public void BBitmap_OpenGraphics_Routes_Simple_Path_Strokes_Through_Backend_Neutral_Primitives()

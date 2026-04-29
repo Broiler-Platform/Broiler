@@ -41,9 +41,11 @@ Supported values for the internal override:
   SkiaSharp image codecs.
 - Adapter-level raster image stream loading now also routes through the
   backend-neutral `BBitmap.Decode` path instead of `SKBitmap.Decode`.
-- Text and font loading still route through the existing Skia-backed
-  compatibility seams during the fallback window; external SVG image
-  rasterization now uses the Broiler-owned `BSvgRasterizer`.
+- Alias-backed font-file registration now defers `SKTypeface.FromFile` until
+  font creation resolves the loaded family, while text shaping and rendering
+  still route through the remaining Skia-backed compatibility seams during the
+  fallback window; external SVG image rasterization now uses the Broiler-owned
+  `BSvgRasterizer`.
 
 ## Diagnostics
 

@@ -558,6 +558,8 @@ and `BBitmap.OpenGraphics` now also defers `SKCanvas`/`SKBitmap`
 materialization until a true fallback draw needs the compatibility surface,
 and `FontAdapter` now defers `SKFont` creation until text measurement or draw
 work needs layout/render font state,
+and alias-backed font-file registration now also defers `SKTypeface.FromFile`
+until font creation resolves the loaded family,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
