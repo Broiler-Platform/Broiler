@@ -559,6 +559,30 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_Compatibility_Surface_Operations_Delegate_Through_Bitmap_Compat_Seam()
+    {
+        using var compatSurface = new RecordingBitmapCompatSurface(4, 4);
+        using var bitmap = new BBitmap(4, 4, new byte[4 * 4 * 4], compatSurface);
+
+        bitmap.SetPixel(1, 1, new BColor(10, 20, 30, 255));
+        bitmap.Clear(new BColor(40, 50, 60, 255));
+
+        using var canvas = bitmap.OpenCanvas();
+        using var bitmapCopy = bitmap.ToSkBitmapCopy();
+        using var compatBitmap = bitmap.AsSkBitmap();
+        using var recorder = new SKPictureRecorder();
+        recorder.BeginRecording(new SKRect(0, 0, 4, 4)).DrawRect(new SKRect(0, 0, 4, 4), new SKPaint { Color = SKColors.Red });
+        using var picture = recorder.EndRecording();
+
+        bitmap.DrawPictureToFit(picture);
+
+        Assert.Equal(1, bitmap.CompatSyncInvocationCount);
+        Assert.Equal(
+            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "OpenCanvas", "SyncToPrimaryBuffer"],
+            compatSurface.Calls);
+    }
+
+    [Fact]
     public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
@@ -1380,6 +1404,52 @@ public class GraphicsAbstractionTests
         {
             Calls.Add("SaveBlendLayer");
         }
+    }
+
+    private sealed class RecordingBitmapCompatSurface(int width, int height) : IBitmapCompatSurface
+    {
+        private readonly SKBitmap _bitmap = new(width, height);
+
+        public List<string> Calls { get; } = [];
+
+        public bool IsMaterialized => true;
+
+        public void SetPixel(int x, int y, BColor color)
+        {
+            Calls.Add("SetPixel");
+            _bitmap.SetPixel(x, y, color.ToSkColor());
+        }
+
+        public void Clear(BColor color)
+        {
+            Calls.Add("Clear");
+            _bitmap.Erase(color.ToSkColor());
+        }
+
+        public SKBitmap AsBitmap()
+        {
+            Calls.Add("AsBitmap");
+            return _bitmap;
+        }
+
+        public SKBitmap ToBitmapCopy()
+        {
+            Calls.Add("ToBitmapCopy");
+            return _bitmap.Copy();
+        }
+
+        public SKCanvas OpenCanvas()
+        {
+            Calls.Add("OpenCanvas");
+            return new SKCanvas(_bitmap);
+        }
+
+        public void SyncToPrimaryBuffer()
+        {
+            Calls.Add("SyncToPrimaryBuffer");
+        }
+
+        public void Dispose() => _bitmap.Dispose();
     }
 
 }

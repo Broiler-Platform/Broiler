@@ -22,9 +22,9 @@ Supported values for the internal override:
 
 - `broiler` enables the `BCanvas`-backed raster pipeline on `BBitmap` surfaces.
 - `skia` keeps the legacy Skia-only painting path on `BBitmap` surfaces.
-- `BBitmap` now stores its primary pixels in a Broiler-owned buffer and keeps the
-  remaining `SKBitmap` surface synchronized only for the internal compatibility
-  seam.
+- `BBitmap` now stores its primary pixels in a Broiler-owned buffer and routes
+  the remaining `SKBitmap`/`SKCanvas` compatibility-surface lifecycle through
+  the internal `IBitmapCompatSurface` seam.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path, and raster-only graphics disposal now
@@ -49,8 +49,10 @@ Supported values for the internal override:
   polygon-fill, and layer-save fallback details now route through the internal
   `ICanvasCompat` seam during the fallback window, and the remaining
   `SkiaImageAdapter` typeface/font-manager details now route through the
-  internal `IFontTypefaceResolver` seam; external SVG image rasterization now
-  uses the Broiler-owned `BSvgRasterizer`.
+  internal `IFontTypefaceResolver` seam, while the remaining `BBitmap`
+  compatibility-surface lifecycle now also routes through the internal
+  `IBitmapCompatSurface` seam; external SVG image rasterization now uses the
+  Broiler-owned `BSvgRasterizer`.
 
 ## Diagnostics
 

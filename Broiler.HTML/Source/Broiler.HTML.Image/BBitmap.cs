@@ -17,12 +17,15 @@ namespace Broiler.HTML.Image;
 public sealed class BBitmap : IDisposable
 {
     private readonly byte[] _pixels;
-    private readonly bool _ownsCompatBitmap;
-    private SKBitmap? _compatBitmap;
+    private readonly IBitmapCompatSurface _compatSurface;
 
     public BBitmap(int width, int height)
-        : this(width, height, new byte[checked(width * height * 4)], compatBitmap: null, ownsCompatBitmap: true)
     {
+        ValidateDimensions(width, height);
+        Width = width;
+        Height = height;
+        _pixels = new byte[checked(width * height * 4)];
+        _compatSurface = CreateDefaultCompatSurface();
     }
 
     internal BBitmap(SKBitmap bitmap, bool ownsBitmap)
@@ -32,22 +35,17 @@ public sealed class BBitmap : IDisposable
         Width = bitmap.Width;
         Height = bitmap.Height;
         _pixels = CreatePixelBuffer(bitmap);
-        _compatBitmap = ownsBitmap ? bitmap : bitmap.Copy();
-        _ownsCompatBitmap = true;
+        _compatSurface = CreateDefaultCompatSurface(bitmap, ownsBitmap);
     }
 
-    private BBitmap(int width, int height, byte[] pixels, SKBitmap? compatBitmap, bool ownsCompatBitmap)
+    internal BBitmap(int width, int height, byte[] pixels, IBitmapCompatSurface? compatSurface = null)
     {
-        if (width <= 0)
-            throw new ArgumentOutOfRangeException(nameof(width));
-        if (height <= 0)
-            throw new ArgumentOutOfRangeException(nameof(height));
+        ValidateDimensions(width, height);
 
         Width = width;
         Height = height;
         _pixels = pixels ?? throw new ArgumentNullException(nameof(pixels));
-        _compatBitmap = compatBitmap;
-        _ownsCompatBitmap = ownsCompatBitmap;
+        _compatSurface = compatSurface ?? CreateDefaultCompatSurface();
     }
 
     public int Width { get; }
@@ -56,18 +54,13 @@ public sealed class BBitmap : IDisposable
 
     public BColor GetPixel(int x, int y)
     {
-        int index = GetPixelIndex(x, y);
-        return new BColor(_pixels[index], _pixels[index + 1], _pixels[index + 2], _pixels[index + 3]);
+        return ReadPrimaryPixel(x, y);
     }
 
     public void SetPixel(int x, int y, BColor color)
     {
-        int index = GetPixelIndex(x, y);
-        _pixels[index] = color.R;
-        _pixels[index + 1] = color.G;
-        _pixels[index + 2] = color.B;
-        _pixels[index + 3] = color.A;
-        _compatBitmap?.SetPixel(x, y, color.ToSkColor());
+        WritePrimaryPixel(x, y, color);
+        _compatSurface.SetPixel(x, y, color);
     }
 
     public void Clear(BColor color) => ErasePixels(color);
@@ -82,7 +75,7 @@ public sealed class BBitmap : IDisposable
             _pixels[i + 3] = color.A;
         }
 
-        _compatBitmap?.Erase(color.ToSkColor());
+        _compatSurface.Clear(color);
     }
 
     internal void Erase(BColor color) => Clear(color);
@@ -104,7 +97,7 @@ public sealed class BBitmap : IDisposable
         image.Save(stream, CreateEncoder(format, quality));
     }
 
-    public BBitmap Copy() => new(Width, Height, (byte[])_pixels.Clone(), _compatBitmap?.Copy(), ownsCompatBitmap: true);
+    public BBitmap Copy() => new(Width, Height, (byte[])_pixels.Clone());
 
     internal BBitmap ResizeNearest(int width, int height)
     {
@@ -154,12 +147,12 @@ public sealed class BBitmap : IDisposable
         return CreateFromImageSharpImage(image);
     }
 
-    internal bool HasMaterializedCompatBitmap => _compatBitmap is not null;
+    internal bool HasMaterializedCompatBitmap => _compatSurface.IsMaterialized;
     internal int CompatSyncInvocationCount { get; private set; }
 
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
 
-    internal SKCanvas OpenCanvas() => new(EnsureCompatBitmap());
+    internal SKCanvas OpenCanvas() => _compatSurface.OpenCanvas();
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip)
     {
@@ -215,13 +208,9 @@ public sealed class BBitmap : IDisposable
 
     internal SKBitmap AsSkBitmap() => EnsureCompatBitmap();
 
-    internal SKBitmap ToSkBitmapCopy() => EnsureCompatBitmap().Copy();
+    internal SKBitmap ToSkBitmapCopy() => _compatSurface.ToBitmapCopy();
 
-    public void Dispose()
-    {
-        if (_ownsCompatBitmap)
-            _compatBitmap?.Dispose();
-    }
+    public void Dispose() => _compatSurface.Dispose();
 
     private int GetPixelIndex(int x, int y) => checked(((y * Width) + x) * 4);
 
@@ -249,21 +238,7 @@ public sealed class BBitmap : IDisposable
         return image;
     }
 
-    private SKBitmap EnsureCompatBitmap()
-    {
-        if (_compatBitmap is not null)
-            return _compatBitmap;
-
-        var bitmap = new SKBitmap(Width, Height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        for (int y = 0; y < Height; y++)
-        {
-            for (int x = 0; x < Width; x++)
-                bitmap.SetPixel(x, y, GetPixel(x, y).ToSkColor());
-        }
-
-        _compatBitmap = bitmap;
-        return bitmap;
-    }
+    private SKBitmap EnsureCompatBitmap() => _compatSurface.AsBitmap();
 
     private static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
     {
@@ -281,12 +256,12 @@ public sealed class BBitmap : IDisposable
             }
         }
 
-        return new BBitmap(image.Width, image.Height, pixels, compatBitmap: null, ownsCompatBitmap: true);
+        return new BBitmap(image.Width, image.Height, pixels);
     }
 
     private void SyncPixelsFromCompatBitmapIfMaterialized()
     {
-        if (_compatBitmap is null)
+        if (!HasMaterializedCompatBitmap)
             return;
 
         SyncPixelsFromCompatBitmap();
@@ -295,21 +270,7 @@ public sealed class BBitmap : IDisposable
     private void SyncPixelsFromCompatBitmap()
     {
         CompatSyncInvocationCount++;
-        if (_compatBitmap is null)
-            return;
-
-        for (int y = 0; y < Height; y++)
-        {
-            for (int x = 0; x < Width; x++)
-            {
-                var color = _compatBitmap.GetPixel(x, y);
-                int index = GetPixelIndex(x, y);
-                _pixels[index] = color.Red;
-                _pixels[index + 1] = color.Green;
-                _pixels[index + 2] = color.Blue;
-                _pixels[index + 3] = color.Alpha;
-            }
-        }
+        _compatSurface.SyncToPrimaryBuffer();
     }
 
     private static byte[] CreatePixelBuffer(SKBitmap bitmap)
@@ -329,5 +290,31 @@ public sealed class BBitmap : IDisposable
         }
 
         return pixels;
+    }
+
+    private static void ValidateDimensions(int width, int height)
+    {
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height));
+    }
+
+    private IBitmapCompatSurface CreateDefaultCompatSurface(SKBitmap? initialBitmap = null, bool ownsBitmap = true)
+        => new SkiaBitmapCompatSurface(Width, Height, ReadPrimaryPixel, WritePrimaryPixel, initialBitmap, ownsBitmap);
+
+    private BColor ReadPrimaryPixel(int x, int y)
+    {
+        int index = GetPixelIndex(x, y);
+        return new BColor(_pixels[index], _pixels[index + 1], _pixels[index + 2], _pixels[index + 3]);
+    }
+
+    private void WritePrimaryPixel(int x, int y, BColor color)
+    {
+        int index = GetPixelIndex(x, y);
+        _pixels[index] = color.R;
+        _pixels[index + 1] = color.G;
+        _pixels[index + 2] = color.B;
+        _pixels[index + 3] = color.A;
     }
 }

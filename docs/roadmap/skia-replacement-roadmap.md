@@ -543,7 +543,9 @@ default cutover path against the internal Skia override on curated non-text and
 Ahem text fixtures, and the stabilization suite now adds representative acid,
 WPT, CLI, SVG, and text-heavy cases plus an aggregate rollback performance
 budget. `BBitmap` now keeps Broiler-owned pixel storage as its primary backing
-store while synchronizing the remaining internal `SKBitmap` compatibility seam.
+store while routing the remaining internal `SKBitmap`/`SKCanvas`
+compatibility-surface lifecycle through the internal `IBitmapCompatSurface`
+seam.
 The last high-level public `SKCanvas` compatibility overloads are now gone.
 Bitmap encode/decode/save now also use a backend-neutral codec path.
 Runtime package removal remains pending until the remaining internal
@@ -571,6 +573,9 @@ internal `ICanvasCompat` seam,
 and the remaining `SkiaImageAdapter` system-font enumeration, deferred
 font-file registration, and typeface resolution details now also route through
 an internal `IFontTypefaceResolver` seam,
+and the remaining `BBitmap` compatibility-surface materialization, canvas
+opening, copy, and sync details now also route through an internal
+`IBitmapCompatSurface` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
