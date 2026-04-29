@@ -329,8 +329,8 @@ internal sealed class SkiaImageAdapter : RAdapter
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
         // Read the stream into a byte array so we can inspect the content
-        // before attempting a bitmap decode.  SKBitmap.Decode silently
-        // returns null for formats it cannot handle (e.g. SVG).
+        // before attempting a bitmap decode and can still route SVG input
+        // through the dedicated Broiler rasterizer.
         byte[] data;
         if (memoryStream is MemoryStream ms)
         {
@@ -353,8 +353,22 @@ internal sealed class SkiaImageAdapter : RAdapter
             return RasterizeSvg(data);
         }
 
-        var bitmap = SKBitmap.Decode(data);
-        return bitmap != null ? new ImageAdapter(BBitmap.Wrap(bitmap, ownsBitmap: true)) : null;
+        try
+        {
+            return new ImageAdapter(BBitmap.Decode(data));
+        }
+        catch (SixLabors.ImageSharp.UnknownImageFormatException)
+        {
+            return null;
+        }
+        catch (SixLabors.ImageSharp.InvalidImageContentException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

@@ -548,6 +548,8 @@ The last high-level public `SKCanvas` compatibility overloads are now gone.
 Bitmap encode/decode/save now also use a backend-neutral codec path.
 Runtime package removal remains pending until the remaining internal
 Skia compatibility seams are retired,
+and adapter-level raster image stream loading now also uses the
+backend-neutral `BBitmap.Decode` codec path instead of `SKBitmap.Decode`,
 and solid brush/pen plus texture-brush adapter state now defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and linear-gradient brush adapter state now also defers

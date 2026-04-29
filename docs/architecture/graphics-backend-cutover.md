@@ -39,6 +39,8 @@ Supported values for the internal override:
   overloads; the remaining Skia usage is internal to the image/runtime layer.
 - `BBitmap` encode/decode/save now use a backend-neutral codec path instead of
   SkiaSharp image codecs.
+- Adapter-level raster image stream loading now also routes through the
+  backend-neutral `BBitmap.Decode` path instead of `SKBitmap.Decode`.
 - Text and font loading still route through the existing Skia-backed
   compatibility seams during the fallback window; external SVG image
   rasterization now uses the Broiler-owned `BSvgRasterizer`.

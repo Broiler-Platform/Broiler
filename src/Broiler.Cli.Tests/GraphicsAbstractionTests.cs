@@ -307,6 +307,42 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Raster_Stream_Image_Load_Uses_BackendNeutral_Bitmap_Without_Materializing_Skia_Compat_Bitmap()
+    {
+        using var source = new BBitmap(2, 2);
+        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
+        source.SetPixel(1, 0, new BColor(0, 255, 0, 255));
+        source.SetPixel(0, 1, new BColor(0, 0, 255, 255));
+        source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
+
+        using var loaded = Assert.IsType<ImageAdapter>(
+            SkiaImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(BImageFormat.Png))));
+        using var target = new BBitmap(4, 4);
+        using var graphics = Assert.IsType<GraphicsAdapter>(target.OpenGraphics(new RectangleF(0, 0, 4, 4)));
+
+        Assert.False(loaded.Bitmap.HasMaterializedCompatBitmap);
+        Assert.False(target.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+
+        graphics.DrawImage(loaded, new RectangleF(0, 0, 4, 4));
+
+        Assert.False(loaded.Bitmap.HasMaterializedCompatBitmap);
+        Assert.False(target.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.Equal(new BColor(255, 0, 0, 255), target.GetPixel(0, 0));
+        Assert.Equal(new BColor(255, 0, 0, 255), target.GetPixel(1, 1));
+        Assert.Equal(new BColor(255, 255, 0, 255), target.GetPixel(3, 3));
+    }
+
+    [Fact]
+    public void Invalid_Raster_Stream_Image_Load_Returns_Null()
+    {
+        using var stream = new MemoryStream([0x01, 0x02, 0x03, 0x04]);
+
+        Assert.Null(SkiaImageAdapter.Instance.ImageFromStream(stream));
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Syncs_SkiaOverride_Drawing_Back_Into_Primary_Pixel_Buffer()
     {
         using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.SkiaFallbackId);
