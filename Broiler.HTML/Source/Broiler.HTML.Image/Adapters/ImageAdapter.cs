@@ -1,5 +1,4 @@
 using Broiler.HTML.Adapters.Adapters;
-using SkiaSharp;
 using System.Drawing;
 using System;
 

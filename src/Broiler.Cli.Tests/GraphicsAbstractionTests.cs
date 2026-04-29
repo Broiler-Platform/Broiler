@@ -1750,13 +1750,13 @@ public class GraphicsAbstractionTests
         public void SetPixel(int x, int y, BColor color)
         {
             Calls.Add("SetPixel");
-            _bitmap.SetPixel(x, y, color.ToSkColor());
+            _bitmap.SetPixel(x, y, new SKColor(color.R, color.G, color.B, color.A));
         }
 
         public void Clear(BColor color)
         {
             Calls.Add("Clear");
-            _bitmap.Erase(color.ToSkColor());
+            _bitmap.Erase(new SKColor(color.R, color.G, color.B, color.A));
         }
 
         public SKBitmap AsBitmap()
