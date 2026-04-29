@@ -1,7 +1,5 @@
 using System;
-using System.ComponentModel;
 using System.Collections.Generic;
-using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Orchestration.Core;
@@ -96,13 +94,6 @@ public sealed class HtmlContainer : IDisposable
 
     public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData, baseUrl);
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void PerformLayout(SKCanvas canvas, RectangleF clip)
-    {
-        using var g = new GraphicsAdapter(canvas, clip);
-        HtmlContainerInt.PerformLayout(g);
-    }
-
     public void PerformLayout(BBitmap bitmap, RectangleF clip)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
@@ -123,13 +114,6 @@ public sealed class HtmlContainer : IDisposable
 
         using var bitmap = new BBitmap(width, height);
         PerformLayout(bitmap, clip);
-    }
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public void PerformPaint(SKCanvas canvas, RectangleF clip)
-    {
-        using var g = new GraphicsAdapter(canvas, clip);
-        HtmlContainerInt.PerformPaint(g);
     }
 
     public void PerformPaint(BBitmap bitmap, RectangleF clip)

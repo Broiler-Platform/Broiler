@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using System.ComponentModel;
 using System.Reflection;
 using System.Xml.Linq;
 using Broiler.HTML.Image;
@@ -22,12 +21,6 @@ public class SkiaDecouplingGuardTests
     private static readonly Regex SkiaTokenPattern = new(
         @"using\s+SkiaSharp\s*;|SkiaSharp\.|\bSK[A-Z][A-Za-z0-9_]*\b",
         RegexOptions.Compiled);
-
-    private static readonly string[] AllowedHighLevelSkiaCompatibilityMembers =
-    [
-        "HtmlContainer.PerformLayout(SKCanvas, RectangleF) -> Void",
-        "HtmlContainer.PerformPaint(SKCanvas, RectangleF) -> Void",
-    ];
 
     private static readonly string ImageProjectRelativePath = Path.Combine(
         "Broiler.HTML", "Source", "Broiler.HTML.Image", "Broiler.HTML.Image.csproj");
@@ -95,27 +88,14 @@ public class SkiaDecouplingGuardTests
     }
 
     [Fact]
-    public void HighLevel_Rendering_Skia_Compatibility_Surface_Is_Frozen()
+    public void HighLevel_Rendering_Surface_Does_Not_Expose_SkiaSharp()
     {
         var members = GetHighLevelSkiaCompatibilityMembers();
 
-        var actual = members
-            .Select(DescribeMember)
-            .OrderBy(static x => x, StringComparer.Ordinal)
-            .ToArray();
-
-        var expected = AllowedHighLevelSkiaCompatibilityMembers
-            .OrderBy(static x => x, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(expected, actual);
-
-        foreach (var member in members)
-        {
-            var attribute = member.GetCustomAttribute<EditorBrowsableAttribute>();
-            Assert.NotNull(attribute);
-            Assert.Equal(EditorBrowsableState.Never, attribute!.State);
-        }
+        Assert.True(
+            members.Length == 0,
+            "High-level rendering surface should stay Skia-free.\n" +
+            string.Join(Environment.NewLine, members.Select(DescribeMember)));
     }
 
     [Fact]

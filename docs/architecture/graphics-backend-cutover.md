@@ -25,6 +25,8 @@ Supported values for the internal override:
 - `BBitmap` now stores its primary pixels in a Broiler-owned buffer and keeps the
   remaining `SKBitmap` surface synchronized only for the internal compatibility
   seam.
+- The high-level `HtmlContainer` rendering API no longer exposes `SKCanvas`
+  overloads; the remaining Skia usage is internal to the image/runtime layer.
 - Text and font loading still route through the existing Skia-backed
   compatibility seams during the fallback window; external SVG image
   rasterization now uses the Broiler-owned `BSvgRasterizer`.

@@ -428,10 +428,9 @@ PRs.
 | `PixelDiffResult` | Yes — `DiffBitmap` exposes `BBitmap` | None at the high-level public API layer | DevSite compare/test pages use `DiffBitmap`; no high-level `SKBitmap` diff-image shim remains |
 | Downstream wrappers (`Broiler.Cli`, `Broiler.DevSite`, `Broiler.Wpt`) | Yes — current wrappers render and save via `BBitmap`/`BImageFormat` | No current public wrapper API leaks `SKBitmap`, `SKColor`, or `SKEncodedImageFormat` | Tooling migration is complete outside the remaining compatibility surface in `Broiler.HTML.Image` |
 
-The remaining high-level `SK*` members above are now explicitly hidden from
-IntelliSense as compatibility shims, and `SkiaDecouplingGuardTests` freezes the
-reduced allowlist so new high-level `SK*` public APIs do not creep back in
-unnoticed.
+The remaining high-level `SK*` members above have now been retired, and
+`SkiaDecouplingGuardTests` requires the high-level public rendering surface to
+stay free of new `SK*` API exposures.
 
 ##### M0 package footprint and removal order (2026-04-27)
 
@@ -446,8 +445,8 @@ Proposed removal order:
 
 1. Remove `SkiaSharp.NativeAssets.Linux` once no runtime path in
    `Broiler.HTML.Image` requires Skia on Linux.
-2. Remove `SkiaSharp` after the remaining compatibility shims in `BBitmap` and
-   the Skia adapter layer are either deleted or isolated behind a
+2. Remove `SkiaSharp` after the remaining internal compatibility shims in
+   `BBitmap` and the Skia adapter layer are either deleted or isolated behind a
    non-runtime compatibility package.
 
 ##### M0 CI/backend-comparison decision (2026-04-27)
@@ -545,6 +544,7 @@ Ahem text fixtures, and the stabilization suite now adds representative acid,
 WPT, CLI, SVG, and text-heavy cases plus an aggregate rollback performance
 budget. `BBitmap` now keeps Broiler-owned pixel storage as its primary backing
 store while synchronizing the remaining internal `SKBitmap` compatibility seam.
+The last high-level public `SKCanvas` compatibility overloads are now gone.
 Runtime package removal remains pending until the remaining internal
 Skia compatibility seams are retired,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
