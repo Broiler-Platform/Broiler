@@ -5,9 +5,17 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal interface ICanvasCompat
 {
+    void PushClip(SKCanvas canvas, RectangleF rect);
+
+    void PushClipExclude(SKCanvas canvas, RectangleF rect);
+
     void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint);
 
     void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint);
+
+    void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect);
+
+    void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect);
 
     void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint);
 

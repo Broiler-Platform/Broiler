@@ -60,7 +60,7 @@ internal sealed class GraphicsAdapter : RGraphics
         ApplyCanvasOperation(canvas =>
         {
             canvas.Save();
-            canvas.ClipRect(Utilities.Utils.Convert(rect));
+            _canvasCompat.PushClip(canvas, rect);
         });
         _rasterCanvas?.PushClip(rect);
     }
@@ -71,7 +71,7 @@ internal sealed class GraphicsAdapter : RGraphics
         ApplyCanvasOperation(canvas =>
         {
             canvas.Save();
-            canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
+            _canvasCompat.PushClipExclude(canvas, rect);
         });
         _rasterCanvas?.PushClipExclude(rect);
     }
@@ -209,7 +209,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
+        _canvasCompat.DrawImage(EnsureCanvas(), imgAdapter.Bitmap, destRect, srcRect);
     }
 
     public override void DrawImage(RImage image, RectangleF destRect)
@@ -224,7 +224,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(destRect));
+        _canvasCompat.DrawImage(EnsureCanvas(), imgAdapter.Bitmap, destRect);
     }
 
     public override void DrawPath(RPen pen, RGraphicsPath path)

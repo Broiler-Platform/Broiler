@@ -613,9 +613,13 @@ public class GraphicsAbstractionTests
         Assert.False(textureBrush.HasMaterializedPaint);
 
         _ = textureBrush.Paint;
+        graphics.PushClip(new RectangleF(2, 3, 4, 5));
+        graphics.PushClipExclude(new RectangleF(3, 4, 5, 6));
         graphics.DrawLine(pen, 1, 2, 3, 4);
         graphics.DrawRectangle(pen, 1, 2, 3, 4);
         graphics.DrawRectangle(solidBrush, 5, 6, 7, 8);
+        graphics.DrawImage(image, new RectangleF(6, 7, 8, 9), new RectangleF(0, 0, 1, 1));
+        graphics.DrawImage(image, new RectangleF(7, 8, 9, 10));
         path.Start(1, 1);
         path.LineTo(4, 1);
         path.LineTo(4, 4);
@@ -628,7 +632,7 @@ public class GraphicsAbstractionTests
 
         Assert.True(textureBrush.HasMaterializedPaint);
         Assert.Equal(
-            ["CreateTexturePaint", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
+            ["CreateTexturePaint", "PushClip", "PushClipExclude", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawImageWithSource", "DrawImage", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
             canvasCompat.Calls);
     }
 
@@ -1687,6 +1691,16 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
+        public void PushClip(SKCanvas canvas, RectangleF rect)
+        {
+            Calls.Add("PushClip");
+        }
+
+        public void PushClipExclude(SKCanvas canvas, RectangleF rect)
+        {
+            Calls.Add("PushClipExclude");
+        }
+
         public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint)
         {
             Calls.Add("DrawLine");
@@ -1695,6 +1709,16 @@ public class GraphicsAbstractionTests
         public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint)
         {
             Calls.Add("DrawRectangle");
+        }
+
+        public void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect)
+        {
+            Calls.Add("DrawImageWithSource");
+        }
+
+        public void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect)
+        {
+            Calls.Add("DrawImage");
         }
 
         public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint)

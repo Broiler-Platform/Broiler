@@ -567,9 +567,9 @@ until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
 internal `ITextShaper` seam instead of leaving the remaining text-rendering
 details inside `GraphicsAdapter`,
-and the remaining non-text line, rectangle, path, rounded-clip, texture-paint,
-polygon-fill, and layer-save fallback details inside `GraphicsAdapter` now also
-route through an internal `ICanvasCompat` seam,
+and the remaining non-text clip, image, line, rectangle, path, rounded-clip,
+texture-paint, polygon-fill, and layer-save fallback details inside
+`GraphicsAdapter` now also route through an internal `ICanvasCompat` seam,
 and `SkiaImageAdapter` system-font enumeration now comes from the
 Broiler-owned `BroilerFontRegistry` instead of `SKFontManager`, while the
 remaining deferred font-file registration and typeface-resolution details now
