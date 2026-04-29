@@ -48,6 +48,26 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
+    [Theory]
+    [InlineData("#123456", 0x12, 0x34, 0x56, 0xFF)]
+    [InlineData("#12345678", 0x12, 0x34, 0x56, 0x78)]
+    [InlineData("#abc", 0xAA, 0xBB, 0xCC, 0xFF)]
+    [InlineData("#abcd", 0xAA, 0xBB, 0xCC, 0xDD)]
+    public void SkiaImageAdapter_GetColor_Parses_Hex_Colors_Without_Skia_Color_Parser(
+        string color,
+        int expectedRed,
+        int expectedGreen,
+        int expectedBlue,
+        int expectedAlpha)
+    {
+        var parsed = SkiaImageAdapter.Instance.GetColor(color);
+
+        Assert.Equal(expectedRed, parsed.R);
+        Assert.Equal(expectedGreen, parsed.G);
+        Assert.Equal(expectedBlue, parsed.B);
+        Assert.Equal(expectedAlpha, parsed.A);
+    }
+
     [Fact]
     public void RenderToFile_With_BImageFormat_Jpeg_Writes_Jpeg_File()
     {

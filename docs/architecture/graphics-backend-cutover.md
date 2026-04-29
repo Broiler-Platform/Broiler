@@ -53,7 +53,8 @@ Supported values for the internal override:
   internal `IFontTypefaceResolver` seam, while the remaining `BBitmap`
   compatibility-surface lifecycle now also routes through the internal
   `IBitmapCompatSurface` seam; external SVG image rasterization now uses the
-  Broiler-owned `BSvgRasterizer`.
+  Broiler-owned `BSvgRasterizer`, and CSS hex color parsing now uses a
+  Broiler-owned parser instead of SkiaSharp's color parser.
 
 ## Diagnostics
 

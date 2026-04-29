@@ -66,8 +66,8 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override Color GetColorInt(string colorName)
     {
-        if (SKColor.TryParse(colorName, out var color))
-            return Utilities.Utils.Convert(color);
+        if (TryParseHexColor(colorName, out var color))
+            return color;
 
         // Fallback: try common color names (CSS 2.1 basic + CSS Color Level 3 extended)
         return colorName.ToLowerInvariant() switch
@@ -229,6 +229,73 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (c.IsKnownColor)
             return Color.FromArgb(c.A, c.R, c.G, c.B);
         return Color.FromArgb(255, 0, 0, 0);
+    }
+
+    private static bool TryParseHexColor(string colorName, out Color color)
+    {
+        color = Color.Empty;
+        if (string.IsNullOrWhiteSpace(colorName) || colorName[0] != '#')
+            return false;
+
+        return colorName.Length switch
+        {
+            4 => TryParseHexColor(colorName, 1, 1, hasAlpha: false, out color),
+            5 => TryParseHexColor(colorName, 1, 1, hasAlpha: true, out color),
+            7 => TryParseHexColor(colorName, 1, 2, hasAlpha: false, out color),
+            9 => TryParseHexColor(colorName, 1, 2, hasAlpha: true, out color),
+            _ => false,
+        };
+    }
+
+    private static bool TryParseHexColor(string colorName, int start, int digitsPerChannel, bool hasAlpha, out Color color)
+    {
+        color = Color.Empty;
+        if (!TryParseHexChannel(colorName, start, digitsPerChannel, out var r)
+            || !TryParseHexChannel(colorName, start + digitsPerChannel, digitsPerChannel, out var g)
+            || !TryParseHexChannel(colorName, start + (digitsPerChannel * 2), digitsPerChannel, out var b))
+        {
+            return false;
+        }
+
+        var alpha = 255;
+        if (hasAlpha
+            && !TryParseHexChannel(colorName, start + (digitsPerChannel * 3), digitsPerChannel, out alpha))
+        {
+            return false;
+        }
+
+        color = Color.FromArgb(alpha, r, g, b);
+        return true;
+    }
+
+    private static bool TryParseHexChannel(string colorName, int start, int digits, out int value)
+    {
+        value = 0;
+        for (int i = 0; i < digits; i++)
+        {
+            var digit = ConvertHexDigit(colorName[start + i]);
+            if (digit < 0)
+                return false;
+
+            value = (value << 4) + digit;
+        }
+
+        if (digits == 1)
+            value = (value << 4) + value;
+
+        return true;
+    }
+
+    private static int ConvertHexDigit(char c)
+    {
+        if (c is >= '0' and <= '9')
+            return c - '0';
+        if (c is >= 'a' and <= 'f')
+            return c - 'a' + 10;
+        if (c is >= 'A' and <= 'F')
+            return c - 'A' + 10;
+
+        return -1;
     }
 
     protected override RPen CreatePen(Color color)

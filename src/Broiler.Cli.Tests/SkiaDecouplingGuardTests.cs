@@ -154,6 +154,22 @@ public class SkiaDecouplingGuardTests
         Assert.Equal("3.119.2", packages["SkiaSharp.NativeAssets.Linux"]);
     }
 
+    [Fact]
+    public void Image_Color_Parsing_Does_Not_Call_SkiaSharp_Color_Parser()
+    {
+        var adapterPath = Path.Combine(
+            RepoRoot,
+            "Broiler.HTML",
+            "Source",
+            "Broiler.HTML.Image",
+            "Adapters",
+            "SkiaImageAdapter.cs");
+
+        var source = File.ReadAllText(adapterPath);
+
+        Assert.DoesNotContain("SKColor.TryParse", source, StringComparison.Ordinal);
+    }
+
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
     [
         .. typeof(HtmlContainer).GetMethods(BindingFlags.Public | BindingFlags.Instance)

@@ -578,6 +578,8 @@ opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
+and CSS hex color parsing now uses a Broiler-owned parser instead of
+`SKColor.TryParse`,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.
