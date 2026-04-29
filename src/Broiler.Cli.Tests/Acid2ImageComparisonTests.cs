@@ -1,6 +1,5 @@
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
-using SkiaSharp;
 using System.Drawing;
 
 namespace Broiler.Cli.Tests;
@@ -50,19 +49,18 @@ public class Acid2ImageComparisonTests
     /// Render the Acid2 page at 1024×768 — the standard viewport size
     /// used by both Broiler CLI and the Chromium reference.
     /// </summary>
-    private static SKBitmap RenderAcid2(int width = 1024, int height = 768)
+    private static BBitmap RenderAcid2(int width = 1024, int height = 768)
     {
         var html = LoadAcid2Html();
         return HtmlRender.RenderToImage(html, width, height);
     }
 
-    private static string CreateSolidTempPng(SKColor color, int width = 300, int height = 300)
+    private static string CreateSolidTempPng(BColor color, int width = 300, int height = 300)
     {
         var path = Path.Combine(Path.GetTempPath(), $"broiler-acid2-{Guid.NewGuid():N}.png");
-        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        bitmap.Erase(color);
-        using var stream = File.OpenWrite(path);
-        bitmap.Encode(stream, SKEncodedImageFormat.Png, 100);
+        using var bitmap = new BBitmap(width, height);
+        bitmap.Clear(color);
+        bitmap.Save(path);
         return path;
     }
 
@@ -259,10 +257,9 @@ public class Acid2ImageComparisonTests
         container.MaxSize = new SizeF(w, 99999);
         container.SetHtml(html);
 
-        using var layoutBmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var layoutCanvas = new SKCanvas(layoutBmp);
-        layoutCanvas.Clear(SKColors.White);
-        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, w, 99999));
+        using var layoutBmp = new BBitmap(w, 2000);
+        layoutBmp.Erase(BColor.White);
+        container.PerformLayout(layoutBmp, new RectangleF(0, 0, w, 99999));
 
         var rect = container.GetElementRectangle("top");
         Assert.NotNull(rect);
@@ -271,20 +268,16 @@ public class Acid2ImageComparisonTests
         container.Location = new System.Drawing.PointF(0, scrollY);
         container.MaxSize = new SizeF(w, h);
 
-        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
-        container.PerformPaint(canvas, new RectangleF(0, scrollY, w, h));
-        canvas.Restore();
+        using var bitmap = new BBitmap(w, h);
+        bitmap.Erase(BColor.White);
+        container.PerformPaint(bitmap, new RectangleF(0, scrollY, w, h), new PointF(0, -scrollY));
 
         int nonWhitePixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+            if (px.R < 250 || px.G < 250 || px.B < 250)
                 nonWhitePixels++;
         }
 
@@ -624,10 +617,9 @@ public class Acid2ImageComparisonTests
         container.MaxSize = new SizeF(w, 99999);
         container.SetHtml(html);
 
-        using var layoutBmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var layoutCanvas = new SKCanvas(layoutBmp);
-        layoutCanvas.Clear(SKColors.White);
-        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, w, 99999));
+        using var layoutBmp = new BBitmap(w, 2000);
+        layoutBmp.Erase(BColor.White);
+        container.PerformLayout(layoutBmp, new RectangleF(0, 0, w, 99999));
 
         var rect = container.GetElementRectangle("top");
         Assert.NotNull(rect);
@@ -636,13 +628,9 @@ public class Acid2ImageComparisonTests
         container.Location = new System.Drawing.PointF(0, scrollY);
         container.MaxSize = new SizeF(w, h);
 
-        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
-        container.PerformPaint(canvas, new RectangleF(0, scrollY, w, h));
-        canvas.Restore();
+        using var bitmap = new BBitmap(w, h);
+        bitmap.Erase(BColor.White);
+        container.PerformPaint(bitmap, new RectangleF(0, scrollY, w, h), new PointF(0, -scrollY));
 
         // The smile region renders somewhere in the face area after the
         // nose and eyes.  The exact y-range depends on multiple layout
@@ -654,8 +642,8 @@ public class Acid2ImageComparisonTests
         for (int x = 50; x < 500 && x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            bool isWhite = px.Red > 250 && px.Green > 250 && px.Blue > 250;
-            bool isRed = px.Red > 200 && px.Green < 50 && px.Blue < 50;
+            bool isWhite = px.R > 250 && px.G > 250 && px.B > 250;
+            bool isRed = px.R > 200 && px.G < 50 && px.B < 50;
 
             if (!isWhite && !isRed)
                 smileContentPixels++;
@@ -1029,7 +1017,7 @@ public class Acid2ImageComparisonTests
     [Fact]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
-        var greenImagePath = CreateSolidTempPng(SKColors.Lime);
+        var greenImagePath = CreateSolidTempPng(new BColor(0, 255, 0, 255));
         try
         {
             const string html = """

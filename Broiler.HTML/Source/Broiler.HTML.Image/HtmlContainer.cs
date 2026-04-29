@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Orchestration.Core;
@@ -95,15 +94,41 @@ public sealed class HtmlContainer : IDisposable
 
     public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData, baseUrl);
 
-    public void PerformLayout(SKCanvas canvas, RectangleF clip)
+    public void PerformLayout(BBitmap bitmap, RectangleF clip)
     {
-        using var g = new GraphicsAdapter(canvas, clip);
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var g = bitmap.OpenGraphics(clip);
         HtmlContainerInt.PerformLayout(g);
     }
 
-    public void PerformPaint(SKCanvas canvas, RectangleF clip)
+    /// <summary>
+    /// Performs layout using an internal temporary surface so callers that only
+    /// need layout side effects (for example <see cref="LatestFragmentTree"/> or
+    /// <see cref="GetElementRectangle(string)"/>) do not need to construct Skia objects.
+    /// </summary>
+    public void PerformLayout(RectangleF clip)
     {
-        using var g = new GraphicsAdapter(canvas, clip);
+        int width = Math.Max(1, (int)Math.Ceiling(clip.Width));
+        int height = Math.Max(1, (int)Math.Ceiling(clip.Height));
+
+        using var bitmap = new BBitmap(width, height);
+        PerformLayout(bitmap, clip);
+    }
+
+    public void PerformPaint(BBitmap bitmap, RectangleF clip)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var g = bitmap.OpenGraphics(clip);
+        HtmlContainerInt.PerformPaint(g);
+    }
+
+    public void PerformPaint(BBitmap bitmap, RectangleF clip, PointF translation)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        using var g = bitmap.OpenGraphics(clip, translation);
         HtmlContainerInt.PerformPaint(g);
     }
 

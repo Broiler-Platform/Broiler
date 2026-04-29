@@ -5,7 +5,6 @@ using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
-using SkiaSharp;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -49,6 +48,16 @@ internal enum SkipReason
 /// </summary>
 internal sealed class WptTestResult
 {
+    /// <summary>
+    /// Stable machine-readable identifier of the backend that produced the rendered image.
+    /// </summary>
+    public string RenderBackendId { get; init; } = BGraphicsBackend.CurrentId;
+
+    /// <summary>
+    /// Human-readable name of the backend that produced the rendered image.
+    /// </summary>
+    public string RenderBackendDisplayName { get; init; } = BGraphicsBackend.CurrentDisplayName;
+
     /// <summary>Full path to the test file.</summary>
     public required string TestPath { get; init; }
 
@@ -100,14 +109,18 @@ internal sealed class WptTestResult
         var obj = new Dictionary<string, object?>
         {
             ["testPath"] = TestPath,
+            ["renderBackendId"] = RenderBackendId,
+            ["renderBackendDisplayName"] = RenderBackendDisplayName,
             ["passed"] = Passed,
             ["skipped"] = Skipped,
-            ["skipReason"] = SkipReason != SkipReason.None ? SkipReason.ToString() : null,
             ["matchPercent"] = MatchPercent,
             ["category"] = Category.ToString(),
             ["message"] = Message,
             ["stackTrace"] = StackTrace,
         };
+
+        if (SkipReason != SkipReason.None)
+            obj["skipReason"] = SkipReason.ToString();
 
         if (!string.IsNullOrWhiteSpace(wptPath))
         {
@@ -810,10 +823,10 @@ internal sealed class WptTestRunner
         }
 
         // Render via Broiler HTML stack.
-        SKBitmap rendered;
+        BBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+            rendered = HtmlRender.RenderToImage(html, _width, _height, BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
@@ -855,49 +868,57 @@ internal sealed class WptTestRunner
                 };
             }
 
-            using var reference = SKBitmap.Decode(referencePath);
-            if (reference is null)
+            BBitmap reference;
+            try
+            {
+                reference = BBitmap.Decode(referencePath);
+            }
+            catch (Exception ex)
             {
                 return new WptTestResult
                 {
                     TestPath = testPath,
                     Passed = false,
-                    Message = $"Failed to decode reference image: {referencePath}",
+                    Message = $"Failed to decode reference image: {referencePath} ({ex.Message})",
                     Category = FailureCategory.ReferenceDecodeError,
+                    StackTrace = ex.StackTrace,
                 };
             }
 
-            using var diff = PixelDiffRunner.Compare(rendered, reference);
-
-            // Compute percent match for every comparison so it can be
-            // included in the logfile output and used for sorting.
-            double matchPct = (1.0 - diff.DiffRatio) * 100;
-
-            if (diff.IsMatch)
+            using (reference)
             {
+                using var diff = PixelDiffRunner.Compare(rendered, reference);
+
+                // Compute percent match for every comparison so it can be
+                // included in the logfile output and used for sorting.
+                double matchPct = (1.0 - diff.DiffRatio) * 100;
+
+                if (diff.IsMatch)
+                {
+                    return new WptTestResult
+                    {
+                        TestPath = testPath,
+                        Passed = true,
+                        MatchPercent = matchPct,
+                    };
+                }
+
+                // Classify the mismatch to provide actionable diagnostics.
+                var diagnostics = MismatchClassifier.Classify(
+                    diff,
+                    rendered.Width, rendered.Height,
+                    reference.Width, reference.Height);
+
                 return new WptTestResult
                 {
                     TestPath = testPath,
-                    Passed = true,
+                    Passed = false,
                     MatchPercent = matchPct,
+                    Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
+                    Category = FailureCategory.PixelMismatch,
+                    MismatchDiagnostics = diagnostics,
                 };
             }
-
-            // Classify the mismatch to provide actionable diagnostics.
-            var diagnostics = MismatchClassifier.Classify(
-                diff,
-                rendered.Width, rendered.Height,
-                reference.Width, reference.Height);
-
-            return new WptTestResult
-            {
-                TestPath = testPath,
-                Passed = false,
-                MatchPercent = matchPct,
-                Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
-                Category = FailureCategory.PixelMismatch,
-                MismatchDiagnostics = diagnostics,
-            };
         }
     }
 
@@ -922,12 +943,12 @@ internal sealed class WptTestRunner
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
 
-        SKBitmap? rendered = null;
-        SKBitmap? reference = null;
+        BBitmap? rendered = null;
+        BBitmap? reference = null;
         try
         {
-            rendered = RenderHtmlFile(testPath, wptRoot);
-            reference = RenderHtmlFile(refHtmlPath, wptRoot);
+            rendered = RenderHtmlFileBitmap(testPath, wptRoot);
+            reference = RenderHtmlFileBitmap(refHtmlPath, wptRoot);
 
             using var diff = PixelDiffRunner.Compare(rendered, reference);
             double matchPct = (1.0 - diff.DiffRatio) * 100;
@@ -989,7 +1010,7 @@ internal sealed class WptTestRunner
     /// Renders an HTML file through the full Broiler pipeline (script execution,
     /// anchor resolution, rendering) and returns the resulting bitmap.
     /// </summary>
-    private SKBitmap RenderHtmlFile(string htmlPath, string? wptRoot)
+    private BBitmap RenderHtmlFileBitmap(string htmlPath, string? wptRoot)
     {
         var html = File.ReadAllText(htmlPath);
 
@@ -1021,21 +1042,15 @@ internal sealed class WptTestRunner
             };
         }
 
-        return HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+        return HtmlRender.RenderToImage(html, _width, _height, BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
     }
 
-    /// <summary>
-    /// Public wrapper for <see cref="RenderHtmlFile"/> that allows test code
-    /// to render a single HTML file through the full WPT pipeline and inspect
-    /// the resulting bitmap directly (e.g. for visual-inspection tests that
-    /// lack a <c>rel="match"</c> reference).
-    /// </summary>
-    internal SKBitmap RenderHtmlFilePublic(string htmlPath, string? wptRoot)
+    internal BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
     {
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
-        return RenderHtmlFile(htmlPath, wptRoot);
+        return RenderHtmlFileBitmap(htmlPath, wptRoot);
     }
 
     /// <summary>

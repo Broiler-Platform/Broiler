@@ -6,7 +6,7 @@ using System;
 namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class ImageAdapter(
-    SKBitmap bitmap,
+    BBitmap bitmap,
     bool hasIntrinsicRatio = true,
     bool hasIntrinsicWidth = true,
     bool hasIntrinsicHeight = true,
@@ -14,7 +14,7 @@ internal sealed class ImageAdapter(
     double? intrinsicWidth = null,
     double? intrinsicHeight = null) : RImage
 {
-    public SKBitmap Bitmap { get; } = bitmap;
+    public BBitmap Bitmap { get; } = bitmap;
 
     public override double Width => Bitmap.Width;
     public override double Height => Bitmap.Height;
@@ -49,7 +49,7 @@ internal sealed class ImageAdapter(
             }
         }
 
-        color = Color.FromArgb(first.Alpha, first.Red, first.Green, first.Blue);
+        color = Color.FromArgb(first.A, first.R, first.G, first.B);
         return true;
     }
 
@@ -66,7 +66,7 @@ internal sealed class ImageAdapter(
         int x = Math.Clamp((int)Math.Floor(sampleX), 0, Bitmap.Width - 1);
         int y = Math.Clamp((int)Math.Floor(sampleY), 0, Bitmap.Height - 1);
         var pixel = Bitmap.GetPixel(x, y);
-        color = Color.FromArgb(pixel.Alpha, pixel.Red, pixel.Green, pixel.Blue);
+        color = Color.FromArgb(pixel.A, pixel.R, pixel.G, pixel.B);
         return true;
     }
 

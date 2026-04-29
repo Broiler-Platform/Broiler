@@ -560,6 +560,12 @@ public class Program
         var report = new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.UtcNow.ToString("o"),
+            ["renderBackend"] = new Dictionary<string, object?>
+            {
+                ["id"] = BGraphicsBackend.CurrentId,
+                ["displayName"] = BGraphicsBackend.CurrentDisplayName,
+                ["label"] = BGraphicsBackend.CurrentLabel,
+            },
             ["summary"] = new Dictionary<string, object>
             {
                 ["passed"] = passed,
@@ -671,6 +677,7 @@ public class Program
         writer.WriteLine("# WPT Triage Summary");
         writer.WriteLine();
         writer.WriteLine($"- Generated: {DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}");
+        writer.WriteLine($"- Render backend: {BGraphicsBackend.CurrentLabel}");
         writer.WriteLine($"- Subset: {(string.IsNullOrWhiteSpace(subset) ? "(all)" : subset)}");
         writer.WriteLine();
         writer.WriteLine("## Totals");

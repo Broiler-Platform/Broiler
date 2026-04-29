@@ -57,6 +57,13 @@ public abstract class RGraphics : IDisposable
     public abstract void DrawPolygon(RBrush brush, PointF[] points);
 
     /// <summary>
+    /// Hints that the next opacity/blend layer contains only backend-neutral raster operations,
+    /// allowing adapters with a custom bitmap backend to keep that compositing group off Skia.
+    /// Default implementation ignores the hint.
+    /// </summary>
+    public virtual void HintNextLayerCanUseRaster(bool canUseRaster) { }
+
+    /// <summary>
     /// Saves the canvas state and begins a new compositing layer with the given opacity (0.0–1.0).
     /// All drawing operations until <see cref="RestoreOpacityLayer"/> are composited as a group
     /// at the specified opacity. Default implementation is a no-op (platform may not support layers).

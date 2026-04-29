@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image;
 
@@ -39,11 +38,11 @@ public sealed class PixelDiffResult : IDisposable
     public int TotalPixelCount { get; init; }
 
     /// <summary>
-    /// Diff image highlighting changed pixels in magenta.
+    /// Diff bitmap highlighting changed pixels in magenta.
     /// Null when images are identical or have different dimensions.
     /// Caller is responsible for disposal via <see cref="Dispose"/>.
     /// </summary>
-    public SKBitmap? DiffImage { get; init; }
+    public BBitmap? DiffBitmap { get; init; }
 
     /// <summary>Whether the images are considered matching (diff ≤ threshold).</summary>
     public bool IsMatch { get; init; }
@@ -55,5 +54,5 @@ public sealed class PixelDiffResult : IDisposable
     /// </summary>
     public IReadOnlyList<PixelMismatch> Mismatches { get; init; } = [];
 
-    public void Dispose() => DiffImage?.Dispose();
+    public void Dispose() => DiffBitmap?.Dispose();
 }

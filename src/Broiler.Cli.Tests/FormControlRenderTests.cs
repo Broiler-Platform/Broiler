@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class FormControlRenderTests
 {
-    private static int CountNonWhitePixels(SKBitmap bmp)
+    private static int CountNonWhitePixels(BBitmap bmp)
     {
         int count = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -37,7 +37,7 @@ public class FormControlRenderTests
     /// min/max coordinates and total matching pixel count for pixels whose
     /// green channel dominates while red/blue stay comparatively low.
     /// </summary>
-    private static (int minX, int maxX, int minY, int maxY, int count) FindFillBounds(SKBitmap bmp)
+    private static (int minX, int maxX, int minY, int maxY, int count) FindFillBounds(BBitmap bmp)
     {
         int minX = bmp.Width;
         int minY = bmp.Height;

@@ -12,8 +12,8 @@ using Microsoft.Win32;
 using RectangleF = System.Drawing.RectangleF;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Image;
 using Broiler.HTML.WPF.Utilities;
-using SkiaSharp;
 
 namespace Broiler.HTML.WPF.Adapters;
 
@@ -46,33 +46,11 @@ internal sealed class WpfAdapter : RAdapter
             }
         }
 
-        // CSS 2.1 §15.3 generic font family mappings.
-        MapGenericFamily("sans-serif", systemFonts, "Arial", "Helvetica", "Liberation Sans", "DejaVu Sans");
-        MapGenericFamily("serif", systemFonts, "Times New Roman", "Liberation Serif", "DejaVu Serif");
-        MapGenericFamily("monospace", systemFonts, "Courier New", "Liberation Mono", "DejaVu Sans Mono");
-        MapGenericFamily("cursive", systemFonts, "Comic Sans MS", "URW Chancery L");
-        MapGenericFamily("fantasy", systemFonts, "Impact");
-
-        // Common alias: web content often uses "Helvetica" expecting Arial-like metrics.
-        if (!systemFonts.Contains("Helvetica"))
+        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(systemFonts))
         {
-            var arialLike = FirstAvailable(systemFonts, "Arial", "Liberation Sans", "DejaVu Sans");
-            if (arialLike != null)
-                AddFontFamilyMapping("Helvetica", arialLike);
+            AddFontFamilyMapping(mapping.Key, mapping.Value);
         }
     }
-
-    /// <summary>
-    /// Maps a CSS generic font family name to the first available system font.
-    /// </summary>
-    private void MapGenericFamily(string genericName, HashSet<string> systemFonts, params string[] candidates)
-    {
-        var resolved = FirstAvailable(systemFonts, candidates);
-        if (resolved != null)
-            AddFontFamilyMapping(genericName, resolved);
-    }
-
-    private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates) => Array.Find(candidates, systemFonts.Contains);
 
     public static WpfAdapter Instance { get; } = new();
 
@@ -105,10 +83,6 @@ internal sealed class WpfAdapter : RAdapter
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
-        // Read the stream into a byte array so we can inspect the content
-        // before attempting a bitmap decode.  WPF's BitmapImage does not
-        // support SVG, so we detect SVG data and rasterize it via Svg.Skia
-        // (matching the approach used by SkiaImageAdapter).
         byte[] data;
         if (memoryStream is MemoryStream ms)
         {
@@ -126,11 +100,17 @@ internal sealed class WpfAdapter : RAdapter
             data = copy.ToArray();
         }
 
-        if (IsSvgData(data))
+        if (BSvgRasterizer.IsSvgData(data))
         {
-            return RasterizeSvgToBitmapImage(data);
+            using var bitmap = BSvgRasterizer.RasterizeToBitmap(data);
+            return bitmap != null ? CreateBitmapImage(bitmap.Encode(BImageFormat.Png, 100)) : null;
         }
 
+        return CreateBitmapImage(data);
+    }
+
+    private static ImageAdapter CreateBitmapImage(byte[] data)
+    {
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.StreamSource = new MemoryStream(data);
@@ -139,82 +119,6 @@ internal sealed class WpfAdapter : RAdapter
         bitmap.Freeze();
 
         return new ImageAdapter(bitmap);
-    }
-
-    /// <summary>
-    /// Rasterizes SVG data to a WPF <see cref="BitmapImage"/> by first
-    /// rendering through Svg.Skia into an <see cref="SKBitmap"/>, encoding
-    /// the result as PNG, and then loading the PNG bytes into a BitmapImage.
-    /// </summary>
-    private static RImage RasterizeSvgToBitmapImage(byte[] data)
-    {
-        var svgContent = System.Text.Encoding.UTF8.GetString(data);
-
-        using var svg = new Svg.Skia.SKSvg();
-        svg.FromSvg(svgContent);
-
-        if (svg.Picture == null)
-            return null;
-
-        var bounds = svg.Picture.CullRect;
-        int width = (int)Math.Ceiling(bounds.Width);
-        int height = (int)Math.Ceiling(bounds.Height);
-
-        // HTML spec default for replaced elements with no intrinsic size.
-        if (width <= 0) width = 300;
-        if (height <= 0) height = 150;
-
-        using var skBitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(skBitmap);
-        canvas.Clear(SKColors.Transparent);
-        canvas.DrawPicture(svg.Picture);
-
-        using var image = SKImage.FromBitmap(skBitmap);
-        using var pngData = image.Encode(SKEncodedImageFormat.Png, 100);
-        var pngStream = new MemoryStream(pngData.ToArray());
-
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.StreamSource = pngStream;
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.EndInit();
-        bitmap.Freeze();
-
-        return new ImageAdapter(bitmap);
-    }
-
-    /// <summary>
-    /// Determines whether the given byte array contains SVG image data by
-    /// looking for an XML declaration (&lt;?xml) or an &lt;svg root element
-    /// within the first 1 KB of content (after skipping leading whitespace
-    /// and any UTF-8 BOM).
-    /// </summary>
-    private static bool IsSvgData(byte[] data)
-    {
-        if (data == null || data.Length < 4)
-            return false;
-
-        // Skip UTF-8 BOM if present
-        int offset = 0;
-        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
-            offset = 3;
-
-        // Skip leading whitespace
-        while (offset < data.Length && (data[offset] == ' ' || data[offset] == '\t' ||
-               data[offset] == '\r' || data[offset] == '\n'))
-            offset++;
-
-        if (offset >= data.Length)
-            return false;
-
-        // Scan the first 1 KB for SVG markers
-        int scanLength = Math.Min(data.Length, offset + 1024);
-        var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
-
-        // Check for XML declaration followed by <svg, or a direct <svg element
-        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
-               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
-               header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)

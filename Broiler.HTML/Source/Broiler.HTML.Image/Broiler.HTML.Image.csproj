@@ -14,8 +14,8 @@
     <ProjectReference Include="..\Broiler.HTML\Broiler.HTML.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
-    <PackageReference Include="Svg.Skia" Version="2.0.0.4" />
   </ItemGroup>
 </Project>

@@ -13,60 +13,32 @@ internal sealed class SkiaImageAdapter : RAdapter
     private const int MinSvgRasterLongestSide = 128;
     private const int MaxSvgRasterScale = 8;
 
-    /// <summary>
-    /// Typefaces loaded from font files via <see cref="LoadFontFromFile"/>,
-    /// keyed by CSS family name (case-insensitive).  SkiaSharp's system
-    /// <see cref="SKFontManager"/> does not expose fonts loaded with
-    /// <see cref="SKTypeface.FromFile"/>; this dictionary allows
-    /// <see cref="CreateFontInt"/> to resolve them by name.
-    /// </summary>
-    private readonly Dictionary<string, SKTypeface> _loadedTypefaces
-        = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IFontTypefaceResolver _typefaceResolver;
 
-    private SkiaImageAdapter()
+    internal SkiaImageAdapter(IFontTypefaceResolver typefaceResolver = null)
     {
+        _typefaceResolver = typefaceResolver ?? new SkiaFontTypefaceResolver();
+
         // Register system fonts first so we can probe availability below.
-        var fontManager = SKFontManager.Default;
-        var systemFonts = new HashSet<string>(fontManager.FontFamilies, StringComparer.OrdinalIgnoreCase);
+        var systemFonts = new HashSet<string>(_typefaceResolver.GetSystemFontFamilies(), StringComparer.OrdinalIgnoreCase);
         foreach (var familyName in systemFonts)
         {
             AddFontFamily(new FontFamilyAdapter(familyName));
         }
 
-        // CSS 2.1 §15.3 generic font family mappings.
-        // SkiaSharp does not resolve CSS generic family names; map them to the
-        // first available system font from a prioritised fallback list.
-        MapGenericFamily("sans-serif", systemFonts, "Arial", "Helvetica", "Liberation Sans", "DejaVu Sans");
-        MapGenericFamily("serif", systemFonts, "Times New Roman", "Liberation Serif", "DejaVu Serif");
-        MapGenericFamily("monospace", systemFonts, "Courier New", "Liberation Mono", "DejaVu Sans Mono");
-        MapGenericFamily("cursive", systemFonts, "Comic Sans MS", "URW Chancery L");
-        MapGenericFamily("fantasy", systemFonts, "Impact");
-
-        // Common alias: web content often uses "Helvetica" expecting Arial-like metrics.
-        if (!systemFonts.Contains("Helvetica"))
+        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(systemFonts))
         {
-            var arialLike = FirstAvailable(systemFonts, "Arial", "Liberation Sans", "DejaVu Sans");
-            if (arialLike != null)
-                AddFontFamilyMapping("Helvetica", arialLike);
+            AddFontFamilyMapping(mapping.Key, mapping.Value);
         }
     }
 
-    /// <summary>
-    /// Maps a CSS generic font family name to the first available system font.
-    /// </summary>
-    private void MapGenericFamily(string genericName, HashSet<string> systemFonts, params string[] candidates)
-    {
-        var resolved = FirstAvailable(systemFonts, candidates);
-        if (resolved != null)
-            AddFontFamilyMapping(genericName, resolved);
-    }
-
-    private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates)
-    {
-        return Array.Find(candidates, systemFonts.Contains);
-    }
-
     public static SkiaImageAdapter Instance { get; } = new();
+
+    internal bool HasDeferredLoadedTypefacePath(string family) =>
+        _typefaceResolver.HasDeferredLoadedTypefacePath(family);
+
+    internal bool HasMaterializedLoadedTypeface(string family) =>
+        _typefaceResolver.HasMaterializedLoadedTypeface(family);
 
     /// <summary>
     /// Loads a TrueType/OpenType font from a file path and registers it as
@@ -76,36 +48,19 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// </summary>
     /// <param name="path">Absolute path to a .ttf or .otf font file.</param>
     /// <param name="mapFromName">
-    /// When non-null, adds a font-family mapping from this name to the
-    /// loaded font's family name (e.g. <c>"sans-serif"</c>).
+    /// When non-null, registers the font under this CSS family alias instead
+    /// of eagerly probing the file for its embedded family name.
     /// </param>
-    /// <returns>The family name of the loaded font, or <c>null</c> on failure.</returns>
+    /// <returns>
+    /// The registered family name (the alias when provided), or <c>null</c> on failure.
+    /// </returns>
     public override string LoadFontFromFile(string path, string mapFromName = null)
     {
-        var typeface = SKTypeface.FromFile(path);
-        if (typeface == null)
+        var familyName = _typefaceResolver.RegisterFontFile(path, mapFromName);
+        if (string.IsNullOrWhiteSpace(familyName))
             return null;
 
-        var familyName = typeface.FamilyName;
         AddFontFamily(new FontFamilyAdapter(familyName));
-
-        // Cache the typeface so CreateFontInt can use it directly.
-        // SKFontManager.Default cannot find typefaces loaded from files,
-        // so we maintain our own lookup dictionary.
-        _loadedTypefaces[familyName] = typeface;
-
-        if (!string.IsNullOrEmpty(mapFromName))
-        {
-            AddFontFamilyMapping(mapFromName!, familyName);
-            // Also register under the alias name so that CSS font-family
-            // lookups with the alias (e.g. "Ahem") resolve to this typeface
-            // even before the mapping is applied.
-            _loadedTypefaces[mapFromName!] = typeface;
-        }
-
-        // Do not dispose the typeface — SkiaSharp's font manager retains
-        // a reference so that subsequent SKTypeface.FromFamilyName lookups
-        // can resolve the loaded family.  Disposing would invalidate it.
         return familyName;
     }
 
@@ -278,62 +233,86 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RPen CreatePen(Color color)
     {
-        var paint = new SKPaint
+        return new PenAdapter((strokeWidth, dashStyle) => CreatePenPaint(color, strokeWidth, dashStyle))
         {
-            Color = Utilities.Utils.Convert(color),
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeWidth = 1
+            SolidColor = new BColor(color.R, color.G, color.B, color.A),
         };
-        return new PenAdapter(paint);
     }
 
     protected override RBrush CreateSolidBrush(Color color)
     {
-        var paint = new SKPaint
+        return new BrushAdapter(
+            () => new SKPaint
+            {
+                Color = Utilities.Utils.Convert(color),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true,
+            },
+            dispose: true)
         {
-            Color = Utilities.Utils.Convert(color),
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true
+            SolidColor = new BColor(color.R, color.G, color.B, color.A),
         };
-        return new BrushAdapter(paint, false);
     }
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
     {
-        var radians = angle * Math.PI / 180.0;
-        var cos = (float)Math.Cos(radians);
-        var sin = (float)Math.Sin(radians);
-        var cx = (float)(rect.X + rect.Width / 2);
-        var cy = (float)(rect.Y + rect.Height / 2);
-        var halfDiag = (float)Math.Max(rect.Width, rect.Height) / 2;
+        return new BrushAdapter(
+            () =>
+            {
+                var radians = angle * Math.PI / 180.0;
+                var cos = (float)Math.Cos(radians);
+                var sin = (float)Math.Sin(radians);
+                var cx = (float)(rect.X + rect.Width / 2);
+                var cy = (float)(rect.Y + rect.Height / 2);
+                var halfDiag = (float)Math.Max(rect.Width, rect.Height) / 2;
 
-        var startPoint = new SKPoint(cx - cos * halfDiag, cy - sin * halfDiag);
-        var endPoint = new SKPoint(cx + cos * halfDiag, cy + sin * halfDiag);
+                var startPoint = new SKPoint(cx - cos * halfDiag, cy - sin * halfDiag);
+                var endPoint = new SKPoint(cx + cos * halfDiag, cy + sin * halfDiag);
 
-        var shader = SKShader.CreateLinearGradient(
-            startPoint,
-            endPoint,
-            new[] { Utilities.Utils.Convert(color1), Utilities.Utils.Convert(color2) },
-            null,
-            SKShaderTileMode.Clamp);
+                var paint = new SKPaint
+                {
+                    Shader = SKShader.CreateLinearGradient(
+                        startPoint,
+                        endPoint,
+                        new[] { Utilities.Utils.Convert(color1), Utilities.Utils.Convert(color2) },
+                        null,
+                        SKShaderTileMode.Clamp),
+                    Style = SKPaintStyle.Fill,
+                    IsAntialias = true,
+                };
 
-        var paint = new SKPaint
-        {
-            Shader = shader,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true
-        };
-        return new BrushAdapter(paint, true);
+                return paint;
+            },
+            dispose: true);
     }
 
-    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter((SKBitmap)image) : null;
+    private static SKPaint CreatePenPaint(Color color, float strokeWidth, System.Drawing.Drawing2D.DashStyle dashStyle) =>
+        new()
+        {
+            Color = Utilities.Utils.Convert(color),
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+            StrokeWidth = strokeWidth,
+            PathEffect = dashStyle switch
+            {
+                System.Drawing.Drawing2D.DashStyle.Solid => null,
+                System.Drawing.Drawing2D.DashStyle.Dash => strokeWidth < 2f
+                    ? SKPathEffect.CreateDash([4f, 4f], 0)
+                    : SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.Dot => SKPathEffect.CreateDash([strokeWidth, strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.DashDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.DashDotDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
+                _ => null,
+            },
+        };
+
+    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(BBitmap.Wrap((SKBitmap)image, ownsBitmap: true)) : null;
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
         // Read the stream into a byte array so we can inspect the content
-        // before attempting a bitmap decode.  SKBitmap.Decode silently
-        // returns null for formats it cannot handle (e.g. SVG).
+        // before attempting a bitmap decode and can still route SVG input
+        // through the dedicated Broiler rasterizer.
         byte[] data;
         if (memoryStream is MemoryStream ms)
         {
@@ -351,17 +330,31 @@ internal sealed class SkiaImageAdapter : RAdapter
             data = copy.ToArray();
         }
 
-        if (IsSvgData(data))
+        if (BSvgRasterizer.IsSvgData(data))
         {
             return RasterizeSvg(data);
         }
 
-        var bitmap = SKBitmap.Decode(data);
-        return bitmap != null ? new ImageAdapter(bitmap) : null;
+        try
+        {
+            return new ImageAdapter(BBitmap.Decode(data));
+        }
+        catch (SixLabors.ImageSharp.UnknownImageFormatException)
+        {
+            return null;
+        }
+        catch (SixLabors.ImageSharp.InvalidImageContentException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
-    /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
+    /// Rasterizes SVG data to a backend-neutral bitmap through <see cref="BSvgRasterizer"/>.
     /// Parses width/height from the SVG root element to determine output
     /// dimensions.  Per the HTML spec, when the SVG does not specify both
     /// explicit width AND height the intrinsic size is 300×150 (the default
@@ -402,11 +395,11 @@ internal sealed class SkiaImageAdapter : RAdapter
         int rasterWidth = width * rasterScale;
         int rasterHeight = height * rasterScale;
 
-        SKBitmap? bitmap;
+        BBitmap? bitmap;
         if (hasDegenerateViewBox)
         {
-            bitmap = new SKBitmap(rasterWidth, rasterHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-            bitmap.Erase(SKColors.Transparent);
+            bitmap = new BBitmap(rasterWidth, rasterHeight);
+            bitmap.Erase(BColor.Transparent);
         }
         else if (suppressPartialIntrinsicDimensions)
         {
@@ -488,33 +481,10 @@ internal sealed class SkiaImageAdapter : RAdapter
         return Math.Clamp((int)Math.Ceiling((double)MinSvgRasterLongestSide / longestSide), 1, MaxSvgRasterScale);
     }
 
-    private static SKBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
-    {
-        using var svg = new Svg.Skia.SKSvg();
-        svg.FromSvg(svgContent);
+    private static BBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
+        => BSvgRasterizer.RasterizeToBitmap(svgContent, width, height);
 
-        if (svg.Picture == null)
-            return null;
-
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.Transparent);
-
-        var cullRect = svg.Picture.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != width
-                || (int)Math.Ceiling(cullRect.Height) != height))
-        {
-            float scaleX = width / cullRect.Width;
-            float scaleY = height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
-        }
-
-        canvas.DrawPicture(svg.Picture);
-        return bitmap;
-    }
-
-    private static SKBitmap NormalizeSvgContentBounds(SKBitmap bitmap, int width, int height)
+    private static BBitmap NormalizeSvgContentBounds(BBitmap bitmap, int width, int height)
     {
         var rowHasOpaque = new bool[bitmap.Height];
         var colHasOpaque = new bool[bitmap.Width];
@@ -526,7 +496,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         {
             for (int x = 0; x < bitmap.Width; x++)
             {
-                if (bitmap.GetPixel(x, y).Alpha == 0)
+                if (bitmap.GetPixel(x, y).A == 0)
                     continue;
 
                 rowHasOpaque[y] = true;
@@ -561,7 +531,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (nonEmptyCols.Count == 0 || nonEmptyRows.Count == 0)
             return bitmap;
 
-        using var condensed = new SKBitmap(nonEmptyCols.Count, nonEmptyRows.Count, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var condensed = new BBitmap(nonEmptyCols.Count, nonEmptyRows.Count);
         for (int destY = 0; destY < nonEmptyRows.Count; destY++)
         {
             int srcY = nonEmptyRows[destY];
@@ -571,15 +541,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             }
         }
 
-        var normalized = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(normalized);
-        canvas.Clear(SKColors.Transparent);
-        using var paint = new SKPaint
-        {
-            FilterQuality = SKFilterQuality.None,
-            IsAntialias = false,
-        };
-        canvas.DrawBitmap(condensed, new SKRect(0, 0, width, height), paint);
+        var normalized = condensed.ResizeNearest(width, height);
         bitmap.Dispose();
         return normalized;
     }
@@ -612,7 +574,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         bool needsViewportDimensions = parsedWidth <= 0 || parsedHeight <= 0;
         if (needsViewportDimensions)
         {
-            // When either intrinsic dimension is missing, Svg.Skia needs a
+            // When either intrinsic dimension is missing, SVG rasterization needs a
             // concrete viewport size for percentage children. Preserve any
             // parsed absolute dimension on the other axis, but always inject
             // an explicit width/height pair so partial-dimension SVGs have a
@@ -733,13 +695,13 @@ internal sealed class SkiaImageAdapter : RAdapter
             System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0 ? v : -1;
     }
 
-    private static bool IsBitmapFullyTransparent(SKBitmap bitmap)
+    private static bool IsBitmapFullyTransparent(BBitmap bitmap)
     {
         for (int y = 0; y < bitmap.Height; y++)
         {
             for (int x = 0; x < bitmap.Width; x++)
             {
-                if (bitmap.GetPixel(x, y).Alpha != 0)
+                if (bitmap.GetPixel(x, y).A != 0)
                     return false;
             }
         }
@@ -747,9 +709,9 @@ internal sealed class SkiaImageAdapter : RAdapter
         return true;
     }
 
-    private static bool TryParseSolidViewportFill(string svgContent, out SKColor color)
+    private static bool TryParseSolidViewportFill(string svgContent, out BColor color)
     {
-        color = SKColors.Transparent;
+        color = BColor.Transparent;
 
         var rectMatches = System.Text.RegularExpressions.Regex.Matches(
             svgContent,
@@ -776,7 +738,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         try
         {
             var parsed = System.Drawing.ColorTranslator.FromHtml(fillValue);
-            color = new SKColor(parsed.R, parsed.G, parsed.B, parsed.A);
+            color = new BColor(parsed.R, parsed.G, parsed.B, parsed.A);
             return true;
         }
         catch
@@ -785,58 +747,10 @@ internal sealed class SkiaImageAdapter : RAdapter
         }
     }
 
-    /// <summary>
-    /// Determines whether the given byte array contains SVG image data by
-    /// looking for an XML declaration (&lt;?xml) or an &lt;svg root element
-    /// within the first 1 KB of content (after skipping leading whitespace
-    /// and any UTF-8 BOM).
-    /// </summary>
-    private static bool IsSvgData(byte[] data)
-    {
-        if (data == null || data.Length < 4)
-            return false;
-
-        // Skip UTF-8 BOM if present
-        int offset = 0;
-        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
-            offset = 3;
-
-        // Skip leading whitespace
-        while (offset < data.Length && (data[offset] == ' ' || data[offset] == '\t' ||
-               data[offset] == '\r' || data[offset] == '\n'))
-            offset++;
-
-        if (offset >= data.Length)
-            return false;
-
-        // Scan the first 1 KB for SVG markers
-        int scanLength = Math.Min(data.Length, offset + 1024);
-        var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
-
-        // Accept SVG content even when the file starts with comments or
-        // DOCTYPE declarations before the root <svg> tag.
-        return header.Contains("<svg", StringComparison.OrdinalIgnoreCase);
-    }
-
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {
-        var skStyle = ConvertFontStyle(style);
-        // Prefer typefaces loaded from files over the system font manager,
-        // because SKFontManager.Default cannot resolve fonts that were
-        // loaded with SKTypeface.FromFile (they are not registered with
-        // the native OS font manager).
-        if (_loadedTypefaces.TryGetValue(family, out var loaded))
-            return new FontAdapter(loaded, size, style);
-        var typeface = SKTypeface.FromFamilyName(family, skStyle) ?? SKTypeface.Default;
-        return new FontAdapter(typeface, size, style);
+        return new FontAdapter(_typefaceResolver.ResolveTypeface(family, style), size, style);
     }
 
     protected override RFont CreateFontInt(RFontFamily family, double size, FontStyle style) => CreateFontInt(family.Name, size, style);
-
-    private static SKFontStyle ConvertFontStyle(FontStyle style)
-    {
-        var weight = (style & FontStyle.Bold) != 0 ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-        var slant = (style & FontStyle.Italic) != 0 ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
-        return new SKFontStyle(weight, SKFontStyleWidth.Normal, slant);
-    }
 }

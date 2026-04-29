@@ -51,16 +51,12 @@ public class WptTestRunnerTests : IDisposable
         File.WriteAllText(fullPath, content);
     }
 
-    private static void CreateSolidReferencePng(string path, SkiaSharp.SKColor color)
+    private static void CreateSolidReferencePng(string path, BColor color)
     {
-        using var bitmap = new SkiaSharp.SKBitmap(
-            1024,
-            768,
-            SkiaSharp.SKColorType.Rgba8888,
-            SkiaSharp.SKAlphaType.Premul);
-        bitmap.Erase(color);
-        using var stream = File.OpenWrite(path);
-        bitmap.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var bitmap = new BBitmap(1024, 768);
+        bitmap.Clear(color);
+        bitmap.Save(path);
     }
 
     [Fact]
@@ -2672,7 +2668,7 @@ input {
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
         Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
-        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+        CreateSolidReferencePng(greenImagePath, new BColor(0, 255, 0, 255));
 
         var testHtml = @"<!doctype html>
 <meta charset=utf-8>
@@ -2729,7 +2725,7 @@ input {
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
         Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
-        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+        CreateSolidReferencePng(greenImagePath, new BColor(0, 255, 0, 255));
 
         var testHtml = @"<!doctype html>
 <meta charset=utf-8>
@@ -4584,8 +4580,13 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         ]);
 
         using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var backend = doc.RootElement.GetProperty("renderBackend");
         var result = doc.RootElement.GetProperty("results").EnumerateArray().Single();
 
+        Assert.Equal(BGraphicsBackend.CurrentId, backend.GetProperty("id").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, backend.GetProperty("displayName").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentId, result.GetProperty("renderBackendId").GetString());
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, result.GetProperty("renderBackendDisplayName").GetString());
         Assert.Equal("Timeout", result.GetProperty("category").GetString());
         Assert.Contains("Test timed out after 0.05 second(s)", result.GetProperty("message").GetString());
         Assert.Contains("Timeout detection stack", result.GetProperty("stackTrace").GetString());
@@ -4665,6 +4666,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         var markdown = File.ReadAllText(markdownPath);
         Assert.Contains("## Timeout failures", markdown);
+        Assert.Contains($"- Render backend: {BGraphicsBackend.CurrentLabel}", markdown);
         Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html`", markdown);
         Assert.Contains("`css/css-tables/html5-table-formatting-3.html`", markdown);
         Assert.Contains("### Suggested timeout subset commands", markdown);
@@ -5442,12 +5444,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(refDir);
         File.WriteAllText(Path.Combine(refDir, "decode.png"), "not-a-png");
 
-        using (var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul))
-        using (var stream = File.OpenWrite(Path.Combine(refDir, "mismatch.png")))
-        {
-            refBmp.Erase(SkiaSharp.SKColors.Blue);
-            refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
-        }
+        CreateSolidReferencePng(Path.Combine(refDir, "mismatch.png"), new BColor(0, 0, 255, 255));
 
         var originalOut = Console.Out;
         var sw = new StringWriter();
@@ -5519,13 +5516,13 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(Path.Combine(refDir, "css", "css-view-transitions"));
         Directory.CreateDirectory(Path.Combine(refDir, "css", "filter-effects"));
         Directory.CreateDirectory(Path.Combine(refDir, "css", "css-values", "calc-size"));
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-view-transitions", "vt-gap.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "filter-effects", "filter-gap.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-1.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-2.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-3.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-4.png"), SkiaSharp.SKColors.White);
-        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-5.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-view-transitions", "vt-gap.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "filter-effects", "filter-gap.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-1.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-2.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-3.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-4.png"), BColor.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-5.png"), BColor.White);
 
         var originalOut = Console.Out;
         var consoleOutput = new StringWriter();
@@ -5658,10 +5655,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Directory.CreateDirectory(refDir);
 
         // Create a valid but different reference image (all blue).
-        using var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul);
-        refBmp.Erase(SkiaSharp.SKColors.Blue);
-        using var stream = File.OpenWrite(Path.Combine(refDir, "m.png"));
-        refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        CreateSolidReferencePng(Path.Combine(refDir, "m.png"), new BColor(0, 0, 255, 255));
 
         var originalOut = Console.Out;
         var sw = new StringWriter();
@@ -5707,6 +5701,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         var json = result.ToJsonObject();
 
         Assert.Equal("/test.html", json["testPath"]);
+        Assert.Equal(BGraphicsBackend.CurrentId, json["renderBackendId"]);
+        Assert.Equal(BGraphicsBackend.CurrentDisplayName, json["renderBackendDisplayName"]);
         Assert.Equal(false, json["passed"]);
         Assert.Equal(85.5, json["matchPercent"]);
         Assert.Equal("PixelMismatch", json["category"]);
@@ -10351,7 +10347,7 @@ div {{ width: 256px; height: 768px; }}
 
         var runner = new WptTestRunner(1024, 768);
         // Render via the full WPT pipeline (JS execution, resource loading).
-        var rendered = runner.RenderHtmlFilePublic(testFile, wptRoot);
+        var rendered = runner.RenderHtmlFileBitmapPublic(testFile, wptRoot);
         using (rendered)
         {
             // The root element has background: url('support/1x1-green.png'), red
@@ -10364,10 +10360,29 @@ div {{ width: 256px; height: 768px; }}
             var topLeft = rendered.GetPixel(5, 5);
             // The canvas should NOT be white (which would mean no background).
             // Check: not (R>250 && G>250 && B>250)
-            Assert.False(topLeft.Red > 250 && topLeft.Green > 250 && topLeft.Blue > 250,
+            Assert.False(topLeft.R > 250 && topLeft.G > 250 && topLeft.B > 250,
                 $"background-clip-root: canvas should not be white. " +
-                $"pixel(5,5) = R={topLeft.Red} G={topLeft.Green} B={topLeft.Blue}");
+                $"pixel(5,5) = R={topLeft.R} G={topLeft.G} B={topLeft.B}");
         }
+    }
+
+    [Fact]
+    public void Wpt_BackgroundClipRoot_RenderHtmlFileBitmapPublic_ReturnsBackendNeutralBitmap()
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-clip-root.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var runner = new WptTestRunner(1024, 768);
+        using var rendered = runner.RenderHtmlFileBitmapPublic(testFile, wptRoot);
+
+        var topLeft = rendered.GetPixel(5, 5);
+        Assert.False(topLeft.R > 250 && topLeft.G > 250 && topLeft.B > 250,
+            $"background-clip-root bitmap path should not render a white canvas. " +
+            $"pixel(5,5) = R={topLeft.R} G={topLeft.G} B={topLeft.B}");
     }
 
     // ── CSS Backgrounds: background-clip visual tests ──────────────────────

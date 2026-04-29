@@ -77,7 +77,7 @@ input{font-family:inherit}
     /// <summary>
     /// Helper: count pixels where text colour is visible (dark enough to read).
     /// </summary>
-    private static int CountDarkPixels(SKBitmap bmp, int yFrom, int yTo)
+    private static int CountDarkPixels(BBitmap bmp, int yFrom, int yTo)
     {
         int count = 0;
         for (int y = yFrom; y < yTo && y < bmp.Height; y++)
@@ -92,7 +92,7 @@ input{font-family:inherit}
     /// <summary>
     /// Helper: count rows where non-white content spans more than threshold width.
     /// </summary>
-    private static int CountFullWidthLines(SKBitmap bmp, int threshold)
+    private static int CountFullWidthLines(BBitmap bmp, int threshold)
     {
         int count = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -117,7 +117,7 @@ input{font-family:inherit}
     /// which corresponds to the .lsbb button wrappers.
     /// </summary>
     private static (int top, int bottom, int left, int right) FindGrayRegion(
-        SKBitmap bmp, int yFrom, int yTo)
+        BBitmap bmp, int yFrom, int yTo)
     {
         int top = -1, bottom = -1, left = bmp.Width, right = 0;
         for (int y = yFrom; y < yTo && y < bmp.Height; y++)

@@ -94,7 +94,11 @@ internal static class PaintWalker
             if (needsOpacity)
                 items.Add(new OpacityItem { Bounds = viewport, Opacity = rootOpacity });
 
-            EmitGradientLayers(gradientSource, viewport, viewport, items);
+            var gradientClipRect = GetBackgroundClipRect(
+                gradientSource.Bounds,
+                gradientSource,
+                gradientSource.Style.BackgroundClip);
+            EmitGradientLayers(gradientSource, gradientClipRect, viewport, items);
 
             if (needsOpacity)
                 items.Add(new RestoreOpacityItem { Bounds = viewport });
@@ -2127,23 +2131,12 @@ internal static class PaintWalker
 
             // Determine tile origin based on attachment and position.
             // For 'fixed' attachment: position relative to viewport.
-            // For 'scroll' attachment on root: position relative to root element's box
-            // (which may be offset by margin).
+            // For 'scroll' attachment: position relative to the background
+            // positioning area represented by fillRect.
             bool isFixed = attachStr.Equals("fixed", StringComparison.OrdinalIgnoreCase);
-            var tileOrigin = new PointF(fillRect.X, fillRect.Y);
-
-            if (isFixed)
-            {
-                tileOrigin = new PointF(viewport.X, viewport.Y);
-            }
-            else
-            {
-                // For scroll attachment on root element, position relative to
-                // the root element's box (accounting for margin).
-                float marginLeft = (float)fragment.Margin.Left;
-                float marginTop = (float)fragment.Margin.Top;
-                tileOrigin = new PointF(fillRect.X + marginLeft, fillRect.Y + marginTop);
-            }
+            var tileOrigin = isFixed
+                ? new PointF(viewport.X, viewport.Y)
+                : new PointF(fillRect.X, fillRect.Y);
 
             // Apply background-position offset.
             var posParts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);

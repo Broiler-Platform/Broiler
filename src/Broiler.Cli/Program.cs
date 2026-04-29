@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Broiler.HtmlBridge;
+using Broiler.HTML.Image;
 
 namespace Broiler.Cli;
 
@@ -210,8 +211,9 @@ public class Program
                     {
                         var service = new CaptureService();
                         await service.CaptureImageAsync(imageOptions);
+                        CaptureArtifactMetadata.WriteImageSidecar(output);
 
-                        Console.WriteLine($"Image capture saved to {output}");
+                        Console.WriteLine($"Image capture saved to {output} ({CaptureArtifactMetadata.CurrentRenderBackend.Label})");
                         exitCode = 0;
                     }
                     catch (HttpRequestException ex)
@@ -371,6 +373,7 @@ public class Program
         if (snapshot.Length == 0)
             return;
 
+        var renderBackend = CaptureArtifactMetadata.CurrentRenderBackend;
         var jsonEntries = snapshot.Select(e => new
         {
             timestamp = e.Timestamp.ToString("o"),
@@ -379,10 +382,54 @@ public class Program
             context = e.Context,
             message = e.Message,
             exception = e.Exception?.ToString(),
+            renderBackendId = renderBackend.Id,
+            renderBackendDisplayName = renderBackend.DisplayName,
+            renderBackendLabel = renderBackend.Label,
         });
 
         var json = JsonSerializer.Serialize(jsonEntries, new JsonSerializerOptions { WriteIndented = true });
         Console.WriteLine(json);
+    }
+}
+
+internal sealed record CaptureRenderBackendMetadata(
+    string Id,
+    string DisplayName,
+    string Label);
+
+internal static class CaptureArtifactMetadata
+{
+    internal static CaptureRenderBackendMetadata CurrentRenderBackend =>
+        new(
+            BGraphicsBackend.CurrentId,
+            BGraphicsBackend.CurrentDisplayName,
+            BGraphicsBackend.CurrentLabel);
+
+    internal static string GetSidecarPath(string outputPath) => $"{outputPath}.metadata.json";
+
+    internal static void WriteImageSidecar(string outputPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(outputPath);
+
+        var renderBackend = CurrentRenderBackend;
+        var metadata = new Dictionary<string, object?>
+        {
+            ["generatedAt"] = DateTime.UtcNow.ToString("o"),
+            ["imagePath"] = Path.GetFileName(outputPath),
+            ["renderBackend"] = new Dictionary<string, string>
+            {
+                ["id"] = renderBackend.Id,
+                ["displayName"] = renderBackend.DisplayName,
+                ["label"] = renderBackend.Label,
+            },
+        };
+
+        var json = JsonSerializer.Serialize(metadata, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+        });
+
+        File.WriteAllText(GetSidecarPath(outputPath), json);
     }
 }
 

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using Broiler.HtmlBridge;
-using SkiaSharp;
+using Broiler.HTML.Image;
 using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
 
 namespace Broiler.Cli.Tests;
@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// Tests for SVG image detection and rendering.
 /// Verifies that SVG data is properly detected by <see cref="ImageDecoder.DetectFormatFromBytes"/>
 /// and that <c>SkiaImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
-/// via Svg.Skia instead of silently returning null.
+/// via the Broiler-owned SVG rasterizer instead of silently returning null.
 /// </summary>
 public class SvgImageRenderingTests
 {
@@ -54,6 +54,17 @@ public class SvgImageRenderingTests
     }
 
     [Fact]
+    public void DetectFormatFromBytes_Returns_Svg_With_Comment_And_Doctype_Preamble()
+    {
+        var svg = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- generated --><!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" " +
+            "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">" +
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
+
+        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+    }
+
+    [Fact]
     public void DetectFormatFromBytes_Returns_Unknown_For_NonSvg_Xml()
     {
         var xml = System.Text.Encoding.UTF8.GetBytes(
@@ -80,13 +91,13 @@ public class SvgImageRenderingTests
         Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormat("data:image/svg+xml;base64,PHN2Zw=="));
     }
 
-    // ────────────────────── SVG rasterization via Svg.Skia ──────────────────────
+    // ────────────────────── SVG rasterization via BSvgRasterizer ──────────────────────
 
     [Fact]
     public void HtmlRender_SvgImage_Is_Rendered_As_Bitmap()
     {
         // A red 50×50 SVG as a data-URI.  The rendering engine should
-        // rasterize it via Svg.Skia and display it in the output bitmap.
+        // rasterize it through the Broiler-owned SVG path and display it in the output bitmap.
         var svgDataUri = "data:image/svg+xml;base64," +
             Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\">" +
@@ -160,6 +171,63 @@ public class SvgImageRenderingTests
         using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
+    }
+
+    [Fact]
+    public void BSvgRasterizer_RasterizeToBitmap_Returns_BackendNeutral_Bitmap()
+    {
+        var svgBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\">" +
+            "<rect fill=\"red\" width=\"40\" height=\"30\"/></svg>");
+
+        using var bitmap = BSvgRasterizer.RasterizeToBitmap(svgBytes);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(40, bitmap.Width);
+        Assert.Equal(30, bitmap.Height);
+
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
+        Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
+        Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
+    }
+
+    [Fact]
+    public void BSvgRasterizer_RasterizeToBitmap_With_Explicit_Size_Scales_Content()
+    {
+        const string svgMarkup =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\">" +
+            "<rect fill=\"red\" width=\"10\" height=\"10\"/></svg>";
+
+        using var bitmap = BSvgRasterizer.RasterizeToBitmap(svgMarkup, 20, 10);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(20, bitmap.Width);
+        Assert.Equal(10, bitmap.Height);
+
+        var pixel = bitmap.GetPixel(15, 5);
+        Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
+        Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
+        Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
+    }
+
+    [Fact]
+    public void BSvgRasterizer_IsSvgData_Accepts_Commented_Svg_Preamble()
+    {
+        var svgBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- generated --><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\"></svg>");
+
+        Assert.True(BSvgRasterizer.IsSvgData(svgBytes));
+    }
+
+    [Fact]
+    public void BSvgRasterizer_IsSvgData_Rejects_Comment_That_Mentions_Svg_But_Has_NonSvg_Root()
+    {
+        var xmlBytes = System.Text.Encoding.UTF8.GetBytes(
+            "<!-- mentions <svg> but is not svg --><root></root>");
+
+        Assert.False(BSvgRasterizer.IsSvgData(xmlBytes));
+        Assert.Equal(RenderImageFormat.Unknown, ImageDecoder.DetectFormatFromBytes(xmlBytes));
     }
 
     [Fact]
@@ -269,5 +337,24 @@ public class SvgImageRenderingTests
             $"Expected contain background interior to be green, got R={interiorPixel.Red} G={interiorPixel.Green} B={interiorPixel.Blue}");
         Assert.True(interiorPixel.Red < 50, $"Expected red channel < 50, got {interiorPixel.Red}");
         Assert.True(interiorPixel.Blue < 50, $"Expected blue channel < 50, got {interiorPixel.Blue}");
+    }
+
+    [Fact]
+    public void HtmlRender_SvgImage_With_Degenerate_ViewBox_Does_Not_Paint_Over_Background()
+    {
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\" viewBox=\"0 0 0 0\">" +
+                "<rect fill=\"lime\" width=\"40\" height=\"30\"/></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;background:#123456"">" +
+                   $@"<img src=""{svgDataUri}"" width=""40"" height=""30""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 80, 60);
+
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.InRange(pixel.Red, 0x10, 0x14);
+        Assert.InRange(pixel.Green, 0x32, 0x36);
+        Assert.InRange(pixel.Blue, 0x54, 0x58);
     }
 }

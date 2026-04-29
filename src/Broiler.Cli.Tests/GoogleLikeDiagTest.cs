@@ -16,7 +16,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class GoogleLikeDiagTest(ITestOutputHelper output)
 {
-    private static (int left, int right) FindHorizontalExtent(SKBitmap bmp, int y)
+    private static (int left, int right) FindHorizontalExtent(BBitmap bmp, int y)
     {
         int left = -1, right = -1;
         for (int x = 0; x < bmp.Width; x++)
@@ -31,7 +31,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         return (left, right);
     }
 
-    private static int CountDarkPixelsInRow(SKBitmap bmp, int y)
+    private static int CountDarkPixelsInRow(BBitmap bmp, int y)
     {
         int count = 0;
         for (int x = 0; x < bmp.Width; x++)

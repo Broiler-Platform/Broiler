@@ -21,8 +21,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         if (surface is not RGraphics g)
             throw new ArgumentException("Surface must be an RGraphics instance.", nameof(surface));
 
-        foreach (var item in list.Items)
+        for (int index = 0; index < list.Items.Count; index++)
         {
+            var item = list.Items[index];
             switch (item)
             {
                 case FillRectItem fill:
@@ -73,12 +74,14 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     g.PopClip();
                     break;
                 case OpacityItem opacityItem:
+                    g.HintNextLayerCanUseRaster(IsRasterCompatibleOpacityLayer(list.Items, index));
                     g.SaveOpacityLayer(opacityItem.Opacity);
                     break;
                 case RestoreOpacityItem:
                     g.RestoreOpacityLayer();
                     break;
                 case BlendModeItem blendItem:
+                    g.HintNextLayerCanUseRaster(IsRasterCompatibleBlendLayer(list.Items, index, blendItem.Mode));
                     g.SaveBlendLayer(blendItem.Mode);
                     break;
                 case RestoreBlendModeItem:
@@ -87,6 +90,89 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             }
         }
     }
+
+    private static bool IsRasterCompatibleOpacityLayer(IReadOnlyList<DisplayItem> items, int startIndex) =>
+        IsRasterCompatibleLayer(items, startIndex, typeof(OpacityItem), typeof(RestoreOpacityItem));
+
+    private static bool IsRasterCompatibleBlendLayer(IReadOnlyList<DisplayItem> items, int startIndex, string? blendMode) =>
+        IsRasterBlendModeSupported(blendMode)
+        && IsRasterCompatibleLayer(items, startIndex, typeof(BlendModeItem), typeof(RestoreBlendModeItem));
+
+    private static bool IsRasterCompatibleLayer(
+        IReadOnlyList<DisplayItem> items,
+        int startIndex,
+        Type openType,
+        Type closeType)
+    {
+        int depth = 0;
+        for (int index = startIndex + 1; index < items.Count; index++)
+        {
+            var item = items[index];
+            var itemType = item.GetType();
+            if (itemType == openType)
+            {
+                depth++;
+                continue;
+            }
+
+            if (itemType == closeType)
+            {
+                if (depth == 0)
+                    return true;
+
+                depth--;
+                continue;
+            }
+
+            if (!IsRasterCompatibleItem(item))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static bool IsRasterCompatibleItem(DisplayItem item) => item switch
+    {
+        FillRectItem => true,
+        DrawBorderItem border => IsRasterCompatibleBorder(border),
+        DrawImageItem => true,
+        DrawTiledImageItem => true,
+        DrawTiledGradientItem => true,
+        DrawLineItem => true,
+        DrawSvgRectItem => true,
+        DrawSvgEllipseItem => true,
+        DrawSvgLineItem => true,
+        ClipItem => true,
+        RestoreItem => true,
+        OpacityItem => true,
+        RestoreOpacityItem => true,
+        BlendModeItem blend => IsRasterBlendModeSupported(blend.Mode),
+        RestoreBlendModeItem => true,
+        DrawTextItem => false,
+        DrawSvgTextItem => false,
+        _ => false,
+    };
+
+    private static bool IsRasterCompatibleBorder(DrawBorderItem item)
+    {
+        var widths = item.Widths;
+        return IsRasterCompatibleBorderSide(widths.Top, item.TopColor, item.TopStyle)
+            && IsRasterCompatibleBorderSide(widths.Right, item.RightColor, item.RightStyle)
+            && IsRasterCompatibleBorderSide(widths.Bottom, item.BottomColor, item.BottomStyle)
+            && IsRasterCompatibleBorderSide(widths.Left, item.LeftColor, item.LeftStyle);
+    }
+
+    private static bool IsRasterCompatibleBorderSide(double width, Color color, string? style) =>
+        width <= 0
+        || color.A <= 0
+        || string.IsNullOrEmpty(style)
+        || style.Equals("solid", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRasterBlendModeSupported(string? blendMode) =>
+        string.IsNullOrEmpty(blendMode)
+        || blendMode.Equals("normal", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("multiply", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("screen", StringComparison.OrdinalIgnoreCase);
 
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {
@@ -692,13 +778,28 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
 
     private static void RenderSvgEllipse(RGraphics g, DrawSvgEllipseItem item)
     {
-        // RGraphics has no native ellipse; approximate with the bounding rectangle fill.
-        double x = item.Bounds.X + item.Cx - item.Rx;
-        double y = item.Bounds.Y + item.Cy - item.Ry;
-        double w = item.Rx * 2;
-        double h = item.Ry * 2;
+        if (item.Rx <= 0 || item.Ry <= 0)
+            return;
+
+        var points = CreateEllipsePoints(
+            item.Bounds.X + item.Cx,
+            item.Bounds.Y + item.Cy,
+            item.Rx,
+            item.Ry);
+
         if (!item.Fill.IsEmpty && item.Fill.A > 0)
-            g.DrawRectangle(g.GetSolidBrush(item.Fill), x, y, w, h);
+            g.DrawPolygon(g.GetSolidBrush(item.Fill), points);
+
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+
+            for (int i = 1; i < points.Length; i++)
+                g.DrawLine(pen, points[i - 1].X, points[i - 1].Y, points[i].X, points[i].Y);
+
+            g.DrawLine(pen, points[^1].X, points[^1].Y, points[0].X, points[0].Y);
+        }
     }
 
     private static void RenderSvgText(RGraphics g, DrawSvgTextItem item)
@@ -739,4 +840,22 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
     }
 
     private static bool IsBorderStyleVisible(string style) => !string.IsNullOrEmpty(style) && style != "none" && style != "hidden";
+
+    private static PointF[] CreateEllipsePoints(float centerX, float centerY, float radiusX, float radiusY)
+    {
+        // Use roughly half a point per output pixel along the larger radius, with
+        // a floor for small shapes and a ceiling to keep replay costs bounded.
+        int segmentCount = Math.Clamp((int)Math.Ceiling(Math.PI * Math.Max(radiusX, radiusY)), 16, 128);
+        var points = new PointF[segmentCount];
+
+        for (int i = 0; i < segmentCount; i++)
+        {
+            double angle = (Math.PI * 2d * i) / segmentCount;
+            points[i] = new PointF(
+                centerX + (float)(Math.Cos(angle) * radiusX),
+                centerY + (float)(Math.Sin(angle) * radiusY));
+        }
+
+        return points;
+    }
 }

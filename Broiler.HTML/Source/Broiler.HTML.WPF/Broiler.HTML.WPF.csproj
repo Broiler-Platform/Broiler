@@ -16,15 +16,12 @@
     <ProjectReference Include="..\Broiler.HTML\Broiler.HTML.csproj" />
     <ProjectReference Include="..\Broiler.HTML.Core\Broiler.HTML.Core.csproj" />
     <ProjectReference Include="..\Broiler.HTML.CSS\Broiler.HTML.CSS.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <None Include="README.md" Pack="true" PackagePath="\"/>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="Svg.Skia" Version="2.0.0.4" />
   </ItemGroup>
 </Project>
