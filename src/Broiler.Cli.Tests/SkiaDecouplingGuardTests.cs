@@ -18,6 +18,14 @@ public class SkiaDecouplingGuardTests
         Path.Combine(RepoRoot, "Broiler.HTML", "Source", "Broiler.HTML.WPF"),
     ];
 
+    private static readonly string CliTestsDirectory = Path.Combine(RepoRoot, "src", "Broiler.Cli.Tests");
+
+    private static readonly HashSet<string> AllowedCliTestFilesWithSkiaReferences =
+    [
+        "GraphicsAbstractionTests.cs",
+        "SkiaDecouplingGuardTests.cs",
+    ];
+
     private static readonly Regex SkiaTokenPattern = new(
         @"using\s+SkiaSharp\s*;|SkiaSharp\.|\bSK[A-Z][A-Za-z0-9_]*\b",
         RegexOptions.Compiled);
@@ -96,6 +104,19 @@ public class SkiaDecouplingGuardTests
             members.Length == 0,
             "High-level rendering surface should stay Skia-free.\n" +
             string.Join(Environment.NewLine, members.Select(DescribeMember)));
+    }
+
+    [Fact]
+    public void NonAbstraction_Cli_Tests_Do_Not_Reference_SkiaSharp()
+    {
+        var violations = FindSkiaSourceViolations(
+            CliTestsDirectory,
+            static relativePath => !AllowedCliTestFilesWithSkiaReferences.Contains(Path.GetFileName(relativePath)));
+
+        Assert.True(
+            violations.Count == 0,
+            "Only the explicit Skia seam tests should reference SkiaSharp inside Broiler.Cli.Tests.\n" +
+            string.Join(Environment.NewLine, violations));
     }
 
     [Fact]
@@ -229,6 +250,57 @@ public class SkiaDecouplingGuardTests
         PropertyInfo property => $"{property.DeclaringType!.Name}.{property.Name} -> {DescribeType(property.PropertyType)}",
         _ => member.Name,
     };
+
+    private static List<string> FindSkiaSourceViolations(string rootDirectory, Func<string, bool> includeFile)
+    {
+        var violations = new List<string>();
+        Assert.True(Directory.Exists(rootDirectory), $"Source directory not found: {rootDirectory}");
+
+        foreach (var path in Directory.EnumerateFiles(rootDirectory, "*.cs", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(RepoRoot, path);
+            if (relativePath.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || relativePath.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || !includeFile(relativePath))
+            {
+                continue;
+            }
+
+            var lines = File.ReadAllLines(path);
+            var inBlockComment = false;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+
+                if (inBlockComment)
+                {
+                    if (line.Contains("*/", StringComparison.Ordinal))
+                        inBlockComment = false;
+
+                    continue;
+                }
+
+                if (line.StartsWith("/*", StringComparison.Ordinal))
+                {
+                    if (!line.Contains("*/", StringComparison.Ordinal))
+                        inBlockComment = true;
+
+                    continue;
+                }
+
+                if (line.StartsWith("//", StringComparison.Ordinal)
+                    || line.StartsWith("///", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (SkiaTokenPattern.IsMatch(line))
+                    violations.Add($"{relativePath}:{i + 1}: {line}");
+            }
+        }
+
+        return violations;
+    }
 
     private static string DescribeType(Type type)
     {

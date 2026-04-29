@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text;
-using SkiaSharp;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;

@@ -1,4 +1,3 @@
-using SkiaSharp;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;
