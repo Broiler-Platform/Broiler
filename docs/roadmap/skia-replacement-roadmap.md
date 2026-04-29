@@ -556,6 +556,8 @@ and linear-gradient brush adapter state now also defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and `BBitmap.OpenGraphics` now also defers `SKCanvas`/`SKBitmap`
 materialization until a true fallback draw needs the compatibility surface,
+and raster-only `BBitmap.OpenGraphics` disposal now skips compat-surface sync
+work unless a fallback canvas was actually materialized,
 and `FontAdapter` now defers `SKFont` creation until text measurement or draw
 work needs layout/render font state,
 and alias-backed font-file registration now also defers `SKTypeface.FromFile`

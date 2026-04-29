@@ -155,6 +155,7 @@ public sealed class BBitmap : IDisposable
     }
 
     internal bool HasMaterializedCompatBitmap => _compatBitmap is not null;
+    internal int CompatSyncInvocationCount { get; private set; }
 
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
 
@@ -163,7 +164,7 @@ public sealed class BBitmap : IDisposable
     internal GraphicsAdapter OpenGraphics(RectangleF clip)
     {
         var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
-        return new GraphicsAdapter(OpenCanvas, clip, rasterCanvas, disposeCanvas: true, onDispose: SyncPixelsFromCompatBitmap);
+        return new GraphicsAdapter(OpenCanvas, clip, rasterCanvas, disposeCanvas: true, onDispose: SyncPixelsFromCompatBitmapIfMaterialized);
     }
 
     internal BCanvas OpenRasterCanvas() => new(this);
@@ -183,7 +184,7 @@ public sealed class BBitmap : IDisposable
             rasterCanvas,
             disposeCanvas: true,
             restoreOnDispose: true,
-            onDispose: SyncPixelsFromCompatBitmap,
+            onDispose: SyncPixelsFromCompatBitmapIfMaterialized,
             initialCanvasOperation: static (canvas, state) =>
             {
                 var offset = (PointF)state;
@@ -283,8 +284,17 @@ public sealed class BBitmap : IDisposable
         return new BBitmap(image.Width, image.Height, pixels, compatBitmap: null, ownsCompatBitmap: true);
     }
 
+    private void SyncPixelsFromCompatBitmapIfMaterialized()
+    {
+        if (_compatBitmap is null)
+            return;
+
+        SyncPixelsFromCompatBitmap();
+    }
+
     private void SyncPixelsFromCompatBitmap()
     {
+        CompatSyncInvocationCount++;
         if (_compatBitmap is null)
             return;
 

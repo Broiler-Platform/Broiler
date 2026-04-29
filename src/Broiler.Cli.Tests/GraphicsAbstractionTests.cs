@@ -361,7 +361,7 @@ public class GraphicsAbstractionTests
     public void RasterCapable_Solid_Brush_And_Pen_Drawing_Do_Not_Materialize_Skia_Paint()
     {
         using var bitmap = new BBitmap(6, 6);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
+        var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
         using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.FromArgb(255, 123, 45, 67)));
         var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 17, 33, 197)));
 
@@ -377,6 +377,11 @@ public class GraphicsAbstractionTests
         Assert.False(graphics.HasMaterializedCanvas);
         Assert.False(brush.HasMaterializedPaint);
         Assert.False(pen.HasMaterializedPaint);
+
+        graphics.Dispose();
+
+        Assert.Equal(0, bitmap.CompatSyncInvocationCount);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
     [Fact]
@@ -409,7 +414,7 @@ public class GraphicsAbstractionTests
     public void NonRaster_Fallback_Drawing_Materializes_Skia_Paint_On_Demand()
     {
         using var bitmap = new BBitmap(6, 6);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
+        var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
         var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 211, 19, 173)));
         pen.DashStyle = DashStyle.Dash;
 
@@ -422,6 +427,10 @@ public class GraphicsAbstractionTests
         Assert.True(bitmap.HasMaterializedCompatBitmap);
         Assert.True(graphics.HasMaterializedCanvas);
         Assert.True(pen.HasMaterializedPaint);
+
+        graphics.Dispose();
+
+        Assert.Equal(1, bitmap.CompatSyncInvocationCount);
     }
 
     [Fact]

@@ -27,7 +27,8 @@ Supported values for the internal override:
   seam.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
-  falls back to the internal Skia path.
+  falls back to the internal Skia path, and raster-only graphics disposal now
+  skips compat-surface sync work when no fallback canvas was ever materialized.
 - `FontAdapter` now also defers `SKFont` creation until text measurement or
   drawing actually needs layout/render font state.
 - `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
