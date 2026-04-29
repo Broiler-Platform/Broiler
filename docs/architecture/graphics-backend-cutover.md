@@ -36,6 +36,9 @@ Supported values for the internal override:
 - Solid, texture, and linear-gradient brush adapters plus pen adapters now
   defer `SKPaint`/`SKShader` materialization until a draw call actually falls
   back to the internal Skia compatibility path.
+- The remaining solid-brush, linear-gradient, and pen paint creation plus pen
+  style update details now route through the internal `IPaintCompatFactory`
+  seam instead of living directly inside `SkiaImageAdapter` and `PenAdapter`.
 - The high-level `HtmlContainer` rendering API no longer exposes `SKCanvas`
   overloads; the remaining Skia usage is internal to the image/runtime layer.
 - `BBitmap` encode/decode/save now use a backend-neutral codec path instead of

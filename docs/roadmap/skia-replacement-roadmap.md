@@ -556,6 +556,9 @@ and solid brush/pen plus texture-brush adapter state now defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and linear-gradient brush adapter state now also defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
+and the remaining solid-brush, linear-gradient, and pen paint creation plus
+pen style update details now also route through an internal
+`IPaintCompatFactory` seam,
 and `BBitmap.OpenGraphics` now also defers `SKCanvas`/`SKBitmap`
 materialization until a true fallback draw needs the compatibility surface,
 and raster-only `BBitmap.OpenGraphics` disposal now skips compat-surface sync

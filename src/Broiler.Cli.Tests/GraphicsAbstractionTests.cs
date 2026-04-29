@@ -748,6 +748,40 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void SkiaImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
+    {
+        var paintCompat = new RecordingPaintCompatFactory();
+        var adapter = new SkiaImageAdapter(paintCompatFactory: paintCompat);
+        using var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
+        using var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(
+            new RectangleF(1, 2, 3, 4),
+            Color.Red,
+            Color.Blue,
+            45));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Green));
+
+        Assert.False(solidBrush.HasMaterializedPaint);
+        Assert.False(gradientBrush.HasMaterializedPaint);
+        Assert.False(pen.HasMaterializedPaint);
+
+        _ = solidBrush.Paint;
+        _ = gradientBrush.Paint;
+        _ = pen.Paint;
+        pen.Width = 3;
+        pen.DashStyle = DashStyle.Dash;
+
+        Assert.True(solidBrush.HasMaterializedPaint);
+        Assert.True(gradientBrush.HasMaterializedPaint);
+        Assert.True(pen.HasMaterializedPaint);
+        Assert.Equal(
+            ["CreateSolidBrushPaint", "CreateLinearGradientBrushPaint", "CreatePenPaint", "UpdatePenPaint", "UpdatePenPaint"],
+            paintCompat.Calls);
+        Assert.Equal(
+            [(3f, DashStyle.Solid), (3f, DashStyle.Dash)],
+            paintCompat.PenUpdates);
+    }
+
+    [Fact]
     public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -1706,6 +1740,38 @@ public class GraphicsAbstractionTests
             _deferredFamilies.Add(family);
             _materializedFamilies.Add(family);
             return SKTypeface.Default;
+        }
+    }
+
+    private sealed class RecordingPaintCompatFactory : IPaintCompatFactory
+    {
+        public List<string> Calls { get; } = [];
+
+        public List<(float StrokeWidth, DashStyle DashStyle)> PenUpdates { get; } = [];
+
+        public SKPaint CreateSolidBrushPaint(Color color)
+        {
+            Calls.Add("CreateSolidBrushPaint");
+            return new SKPaint();
+        }
+
+        public SKPaint CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
+        {
+            Calls.Add("CreateLinearGradientBrushPaint");
+            return new SKPaint();
+        }
+
+        public SKPaint CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
+        {
+            Calls.Add("CreatePenPaint");
+            return new SKPaint { StrokeWidth = strokeWidth };
+        }
+
+        public void UpdatePenPaint(SKPaint paint, float strokeWidth, DashStyle dashStyle)
+        {
+            Calls.Add("UpdatePenPaint");
+            PenUpdates.Add((strokeWidth, dashStyle));
+            paint.StrokeWidth = strokeWidth;
         }
     }
 
