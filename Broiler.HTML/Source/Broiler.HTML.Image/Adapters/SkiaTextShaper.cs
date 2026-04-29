@@ -13,6 +13,8 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaTextShaper : ITextShaper
 {
+    private const double DegreesToRadians = Math.PI / 180.0;
+
     private SkiaTextShaper() { }
 
     public static SkiaTextShaper Instance { get; } = new();
@@ -60,6 +62,7 @@ internal sealed class SkiaTextShaper : ITextShaper
         if (!font.TryGetBroilerRenderFont(out var broilerFont))
             return false;
 
+        var measuredSize = MeasureTextSize(broilerFont, text);
         using var textBitmap = RenderTextBitmap(
             broilerFont,
             text,
@@ -71,7 +74,7 @@ internal sealed class SkiaTextShaper : ITextShaper
                     return;
                 }
 
-                float shaderWidth = Math.Max(gradientState.Rect.Width, TextMeasurer.MeasureSize(textValue, options).Width);
+                float shaderWidth = Math.Max(gradientState.Rect.Width, gradientState.MeasuredSize.Width);
                 float shaderHeight = Math.Max(gradientState.Rect.Height > 0 ? gradientState.Rect.Height : gradientState.Size.Height, broilerFont.Size);
                 var shaderRect = new RectangleF(
                     gradientState.Rect.X - gradientState.Point.X,
@@ -96,7 +99,7 @@ internal sealed class SkiaTextShaper : ITextShaper
                 context.DrawText(options, textValue, brush);
             },
             text,
-            (Rect: rect, Point: point, Size: size, Colors: colors, Positions: positions, Angle: angle));
+            (Rect: rect, Point: point, Size: size, Colors: colors, Positions: positions, Angle: angle, MeasuredSize: measuredSize));
         DrawBitmap(canvas, textBitmap, point);
         return true;
     }
@@ -121,7 +124,7 @@ internal sealed class SkiaTextShaper : ITextShaper
         float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
         var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
 
-        var radians = angle * Math.PI / 180.0;
+        var radians = angle * DegreesToRadians;
         float cx = shaderRect.X + shaderRect.Width / 2f;
         float cy = shaderRect.Y + shaderRect.Height / 2f;
         float halfDiag = Math.Max(shaderRect.Width, shaderRect.Height) / 2f;
@@ -177,7 +180,7 @@ internal sealed class SkiaTextShaper : ITextShaper
         TState state)
     {
         var options = CreateTextOptions(font);
-        var size = TextMeasurer.MeasureSize(text, options);
+        var size = MeasureTextSize(font, text);
         var bounds = TextMeasurer.MeasureBounds(text, options);
         int width = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Width, bounds.Right)));
         int height = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Height, bounds.Bottom)));
@@ -198,6 +201,9 @@ internal sealed class SkiaTextShaper : ITextShaper
             KerningMode = KerningMode.None,
         };
 
+    private static SixLabors.Fonts.FontRectangle MeasureTextSize(SixLaborsFont font, string text) =>
+        TextMeasurer.MeasureSize(text, CreateTextOptions(font));
+
     private static PointF GetDrawOrigin(FontAdapter font, PointF topLeft)
     {
         var metrics = font.RenderFont.Metrics;
@@ -206,7 +212,7 @@ internal sealed class SkiaTextShaper : ITextShaper
 
     private static (PointF StartPoint, PointF EndPoint) GetGradientEndpoints(RectangleF rect, float angle)
     {
-        var radians = angle * Math.PI / 180.0;
+        var radians = angle * DegreesToRadians;
         float cx = rect.X + rect.Width / 2f;
         float cy = rect.Y + rect.Height / 2f;
         float halfDiag = Math.Max(rect.Width, rect.Height) / 2f;

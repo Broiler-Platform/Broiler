@@ -30,7 +30,6 @@ internal sealed class FontAdapter : RFont
     public FontAdapter(SKTypeface typeface, double size, DrawingFontStyle style)
         : this(typeface?.FamilyName ?? string.Empty, size, style, () => typeface ?? SKTypeface.Default)
     {
-        _typeface = typeface;
     }
 
     public FontAdapter(string family, double size, DrawingFontStyle style, Func<SKTypeface>? compatTypefaceFactory = null)

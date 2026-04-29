@@ -16,7 +16,9 @@ internal static class BroilerFontRegistry
     private static readonly FontCollection LoadedFonts = new();
     private static readonly Dictionary<string, SixLaborsFontFamily> LoadedFamilies = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Lazy<IReadOnlyCollection<string>> SystemFamilies = new(
-        static () => new HashSet<string>(SixLabors.Fonts.SystemFonts.Families.Select(static family => family.Name), StringComparer.OrdinalIgnoreCase));
+        static () => new HashSet<string>(
+            SixLabors.Fonts.SystemFonts.Families.Select(static family => family.Name),
+            StringComparer.OrdinalIgnoreCase));
 
     public static IReadOnlyCollection<string> GetSystemFontFamilies() => SystemFamilies.Value;
 
