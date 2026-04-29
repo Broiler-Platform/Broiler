@@ -47,8 +47,10 @@ Supported values for the internal override:
   draw dispatch now route through the internal `ITextShaper` compatibility seam
   and the remaining non-text `GraphicsAdapter` rounded-clip, texture-paint,
   polygon-fill, and layer-save fallback details now route through the internal
-  `ICanvasCompat` seam during the fallback window; external SVG image
-  rasterization now uses the Broiler-owned `BSvgRasterizer`.
+  `ICanvasCompat` seam during the fallback window, and the remaining
+  `SkiaImageAdapter` typeface/font-manager details now route through the
+  internal `IFontTypefaceResolver` seam; external SVG image rasterization now
+  uses the Broiler-owned `BSvgRasterizer`.
 
 ## Diagnostics
 

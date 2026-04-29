@@ -13,23 +13,14 @@ internal sealed class SkiaImageAdapter : RAdapter
     private const int MinSvgRasterLongestSide = 128;
     private const int MaxSvgRasterScale = 8;
 
-    /// <summary>
-    /// Typefaces loaded from font files via <see cref="LoadFontFromFile"/>,
-    /// keyed by CSS family name (case-insensitive).  SkiaSharp's system
-    /// <see cref="SKFontManager"/> does not expose fonts loaded with
-    /// <see cref="SKTypeface.FromFile"/>; this dictionary allows
-    /// <see cref="CreateFontInt"/> to resolve them by name.
-    /// </summary>
-    private readonly Dictionary<string, SKTypeface> _loadedTypefaces
-        = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, string> _loadedTypefacePaths
-        = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IFontTypefaceResolver _typefaceResolver;
 
-    private SkiaImageAdapter()
+    internal SkiaImageAdapter(IFontTypefaceResolver typefaceResolver = null)
     {
+        _typefaceResolver = typefaceResolver ?? new SkiaFontTypefaceResolver();
+
         // Register system fonts first so we can probe availability below.
-        var fontManager = SKFontManager.Default;
-        var systemFonts = new HashSet<string>(fontManager.FontFamilies, StringComparer.OrdinalIgnoreCase);
+        var systemFonts = new HashSet<string>(_typefaceResolver.GetSystemFontFamilies(), StringComparer.OrdinalIgnoreCase);
         foreach (var familyName in systemFonts)
         {
             AddFontFamily(new FontFamilyAdapter(familyName));
@@ -44,10 +35,10 @@ internal sealed class SkiaImageAdapter : RAdapter
     public static SkiaImageAdapter Instance { get; } = new();
 
     internal bool HasDeferredLoadedTypefacePath(string family) =>
-        _loadedTypefacePaths.ContainsKey(family);
+        _typefaceResolver.HasDeferredLoadedTypefacePath(family);
 
     internal bool HasMaterializedLoadedTypeface(string family) =>
-        _loadedTypefaces.ContainsKey(family);
+        _typefaceResolver.HasMaterializedLoadedTypeface(family);
 
     /// <summary>
     /// Loads a TrueType/OpenType font from a file path and registers it as
@@ -65,34 +56,11 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// </returns>
     public override string LoadFontFromFile(string path, string mapFromName = null)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        var familyName = _typefaceResolver.RegisterFontFile(path, mapFromName);
+        if (string.IsNullOrWhiteSpace(familyName))
             return null;
 
-        if (!string.IsNullOrWhiteSpace(mapFromName))
-        {
-            var alias = mapFromName!;
-            AddFontFamily(new FontFamilyAdapter(alias));
-            _loadedTypefacePaths[alias] = path;
-            _loadedTypefaces.Remove(alias);
-            return alias;
-        }
-
-        var typeface = SKTypeface.FromFile(path);
-        if (typeface == null)
-            return null;
-
-        var familyName = typeface.FamilyName;
         AddFontFamily(new FontFamilyAdapter(familyName));
-
-        // Cache the typeface so CreateFontInt can use it directly.
-        // SKFontManager.Default cannot find typefaces loaded from files,
-        // so we maintain our own lookup dictionary.
-        _loadedTypefaces[familyName] = typeface;
-        _loadedTypefacePaths[familyName] = path;
-
-        // Do not dispose the typeface — SkiaSharp's font manager retains
-        // a reference so that subsequent SKTypeface.FromFamilyName lookups
-        // can resolve the loaded family.  Disposing would invalidate it.
         return familyName;
     }
 
@@ -781,32 +749,8 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {
-        var skStyle = ConvertFontStyle(style);
-        // Prefer typefaces loaded from files over the system font manager,
-        // because SKFontManager.Default cannot resolve fonts that were
-        // loaded with SKTypeface.FromFile (they are not registered with
-        // the native OS font manager).
-        if (_loadedTypefaces.TryGetValue(family, out var loaded))
-            return new FontAdapter(loaded, size, style);
-        if (_loadedTypefacePaths.TryGetValue(family, out var loadedPath))
-        {
-            var loadedTypeface = SKTypeface.FromFile(loadedPath);
-            if (loadedTypeface != null)
-            {
-                _loadedTypefaces[family] = loadedTypeface;
-                return new FontAdapter(loadedTypeface, size, style);
-            }
-        }
-        var typeface = SKTypeface.FromFamilyName(family, skStyle) ?? SKTypeface.Default;
-        return new FontAdapter(typeface, size, style);
+        return new FontAdapter(_typefaceResolver.ResolveTypeface(family, style), size, style);
     }
 
     protected override RFont CreateFontInt(RFontFamily family, double size, FontStyle style) => CreateFontInt(family.Name, size, style);
-
-    private static SKFontStyle ConvertFontStyle(FontStyle style)
-    {
-        var weight = (style & FontStyle.Bold) != 0 ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal;
-        var slant = (style & FontStyle.Italic) != 0 ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright;
-        return new SKFontStyle(weight, SKFontStyleWidth.Normal, slant);
-    }
 }

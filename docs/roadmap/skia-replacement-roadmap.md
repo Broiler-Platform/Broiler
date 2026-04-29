@@ -568,6 +568,9 @@ text-rendering details inside `GraphicsAdapter`,
 and the remaining non-text rounded-clip, texture-paint, polygon-fill, and
 layer-save fallback details inside `GraphicsAdapter` now also route through an
 internal `ICanvasCompat` seam,
+and the remaining `SkiaImageAdapter` system-font enumeration, deferred
+font-file registration, and typeface resolution details now also route through
+an internal `IFontTypefaceResolver` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +

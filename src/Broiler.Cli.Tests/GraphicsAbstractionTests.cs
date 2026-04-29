@@ -585,6 +585,37 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void SkiaImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
+    {
+        var resolver = new RecordingFontTypefaceResolver(["SystemUi"]);
+        var adapter = new SkiaImageAdapter(resolver);
+
+        Assert.True(adapter.IsFontExists("SystemUi"));
+
+        var family = adapter.LoadFontFromFile("/tmp/fonts/SeamSans.ttf", "SeamSans");
+
+        Assert.Equal("SeamSans", family);
+        Assert.True(adapter.HasDeferredLoadedTypefacePath("SeamSans"));
+        Assert.False(adapter.HasMaterializedLoadedTypeface("SeamSans"));
+
+        var font = Assert.IsType<FontAdapter>(adapter.GetFont("SeamSans", 12, FontStyle.Bold | FontStyle.Italic));
+
+        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+        Assert.Equal(
+            [
+                "GetSystemFontFamilies",
+                "RegisterFontFile",
+                "HasDeferredLoadedTypefacePath",
+                "HasMaterializedLoadedTypeface",
+                "ResolveTypeface",
+                "HasMaterializedLoadedTypeface",
+            ],
+            resolver.Calls);
+    }
+
+    [Fact]
     public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -1263,6 +1294,50 @@ public class GraphicsAbstractionTests
         public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
+        }
+    }
+
+    private sealed class RecordingFontTypefaceResolver(IEnumerable<string> systemFamilies) : IFontTypefaceResolver
+    {
+        private readonly HashSet<string> _deferredFamilies = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _materializedFamilies = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _systemFamilies = [.. systemFamilies];
+
+        internal List<string> Calls { get; } = [];
+
+        public IReadOnlyCollection<string> GetSystemFontFamilies()
+        {
+            Calls.Add("GetSystemFontFamilies");
+            return _systemFamilies;
+        }
+
+        public string RegisterFontFile(string path, string alias = null)
+        {
+            Calls.Add("RegisterFontFile");
+            var family = alias ?? "RegisteredTypeface";
+            _deferredFamilies.Add(family);
+            _materializedFamilies.Remove(family);
+            return family;
+        }
+
+        public bool HasDeferredLoadedTypefacePath(string family)
+        {
+            Calls.Add("HasDeferredLoadedTypefacePath");
+            return _deferredFamilies.Contains(family);
+        }
+
+        public bool HasMaterializedLoadedTypeface(string family)
+        {
+            Calls.Add("HasMaterializedLoadedTypeface");
+            return _materializedFamilies.Contains(family);
+        }
+
+        public SKTypeface ResolveTypeface(string family, FontStyle style)
+        {
+            Calls.Add("ResolveTypeface");
+            _deferredFamilies.Add(family);
+            _materializedFamilies.Add(family);
+            return SKTypeface.Default;
         }
     }
 
