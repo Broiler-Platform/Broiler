@@ -1,6 +1,13 @@
 using System;
 using System.Drawing;
 using SkiaSharp;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using ImageSharpColor = SixLabors.ImageSharp.Color;
+using ImageSharpPointF = SixLabors.ImageSharp.PointF;
+using SixLaborsFont = SixLabors.Fonts.Font;
 
 namespace Broiler.HTML.Image.Adapters;
 
@@ -31,6 +38,67 @@ internal sealed class SkiaTextShaper : ITextShaper
             charFit = i;
             charFitWidth = width;
         }
+    }
+
+    public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+    {
+        if (!font.TryGetBroilerRenderFont(out var broilerFont))
+            return false;
+
+        using var textBitmap = RenderTextBitmap(
+            broilerFont,
+            text,
+            static (context, options, textValue, colorValue) => context.DrawText(options, textValue, ToImageSharpColor(colorValue)),
+            text,
+            color);
+        DrawBitmap(canvas, textBitmap, point);
+        return true;
+    }
+
+    public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+    {
+        if (!font.TryGetBroilerRenderFont(out var broilerFont))
+            return false;
+
+        using var textBitmap = RenderTextBitmap(
+            broilerFont,
+            text,
+            (context, options, textValue, gradientState) =>
+            {
+                if (gradientState.Colors.Length == 1)
+                {
+                    context.DrawText(options, textValue, ToImageSharpColor(gradientState.Colors[0]));
+                    return;
+                }
+
+                float shaderWidth = Math.Max(gradientState.Rect.Width, TextMeasurer.MeasureSize(textValue, options).Width);
+                float shaderHeight = Math.Max(gradientState.Rect.Height > 0 ? gradientState.Rect.Height : gradientState.Size.Height, broilerFont.Size);
+                var shaderRect = new RectangleF(
+                    gradientState.Rect.X - gradientState.Point.X,
+                    gradientState.Rect.Y - gradientState.Point.Y,
+                    shaderWidth,
+                    shaderHeight);
+                var (startPoint, endPoint) = GetGradientEndpoints(shaderRect, gradientState.Angle);
+                var stops = new ColorStop[gradientState.Colors.Length];
+                for (int i = 0; i < gradientState.Colors.Length; i++)
+                {
+                    float offset = gradientState.Positions != null && i < gradientState.Positions.Length
+                        ? Math.Clamp(gradientState.Positions[i], 0f, 1f)
+                        : (float)i / (gradientState.Colors.Length - 1);
+                    stops[i] = new ColorStop(offset, ToImageSharpColor(gradientState.Colors[i]));
+                }
+
+                var brush = new LinearGradientBrush(
+                    new ImageSharpPointF(startPoint.X, startPoint.Y),
+                    new ImageSharpPointF(endPoint.X, endPoint.Y),
+                    GradientRepetitionMode.None,
+                    stops);
+                context.DrawText(options, textValue, brush);
+            },
+            text,
+            (Rect: rect, Point: point, Size: size, Colors: colors, Positions: positions, Angle: angle));
+        DrawBitmap(canvas, textBitmap, point);
+        return true;
     }
 
     public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)
@@ -93,9 +161,59 @@ internal sealed class SkiaTextShaper : ITextShaper
         canvas.Restore();
     }
 
+    private static void DrawBitmap(BCanvas canvas, BBitmap textBitmap, PointF point)
+    {
+        canvas.DrawBitmap(
+            textBitmap,
+            new RectangleF(point.X, point.Y, textBitmap.Width, textBitmap.Height),
+            new RectangleF(0, 0, textBitmap.Width, textBitmap.Height));
+    }
+
+    private static BBitmap RenderTextBitmap<TState>(
+        SixLaborsFont font,
+        string text,
+        Action<IImageProcessingContext, RichTextOptions, string, TState> drawAction,
+        string textValue,
+        TState state)
+    {
+        var options = CreateTextOptions(font);
+        var size = TextMeasurer.MeasureSize(text, options);
+        var bounds = TextMeasurer.MeasureBounds(text, options);
+        int width = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Width, bounds.Right)));
+        int height = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Height, bounds.Bottom)));
+
+        using var image = new SixLabors.ImageSharp.Image<Rgba32>(width, height, ImageSharpColor.Transparent);
+        image.Mutate(context => drawAction(context, options, textValue, state));
+        return BBitmap.CreateFromImageSharpImage(image);
+    }
+
+    private static ImageSharpColor ToImageSharpColor(Color color) =>
+        ImageSharpColor.FromRgba(color.R, color.G, color.B, color.A);
+
+    private static RichTextOptions CreateTextOptions(SixLaborsFont font) =>
+        new(font)
+        {
+            Origin = new ImageSharpPointF(0, 0),
+            Dpi = 96,
+            KerningMode = KerningMode.None,
+        };
+
     private static PointF GetDrawOrigin(FontAdapter font, PointF topLeft)
     {
         var metrics = font.RenderFont.Metrics;
         return new PointF(topLeft.X, topLeft.Y - metrics.Ascent);
+    }
+
+    private static (PointF StartPoint, PointF EndPoint) GetGradientEndpoints(RectangleF rect, float angle)
+    {
+        var radians = angle * Math.PI / 180.0;
+        float cx = rect.X + rect.Width / 2f;
+        float cy = rect.Y + rect.Height / 2f;
+        float halfDiag = Math.Max(rect.Width, rect.Height) / 2f;
+        float sin = (float)Math.Sin(radians);
+        float cos = (float)Math.Cos(radians);
+        return (
+            new PointF(cx - sin * halfDiag, cy + cos * halfDiag),
+            new PointF(cx + sin * halfDiag, cy - cos * halfDiag));
     }
 }

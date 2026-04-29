@@ -513,6 +513,31 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Broiler_Text_Draw_Does_Not_Materialize_Skia_Canvas_For_Loaded_Fonts()
+    {
+        var alias = $"RasterText_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        using var bitmap = new BBitmap(48, 24);
+        bitmap.Clear(BColor.White);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
+
+        var size = graphics.MeasureString("XX", font);
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+
+        graphics.DrawString("XX", font, Color.Black, new PointF(4, 4), size, rtl: false);
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 4));
+    }
+
+    [Fact]
     public void GraphicsAdapter_Text_Operations_Delegate_Through_Text_Shaper_Seam()
     {
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
@@ -626,7 +651,7 @@ public class GraphicsAbstractionTests
 
         var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
 
-        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
 
@@ -635,6 +660,7 @@ public class GraphicsAbstractionTests
         var size = graphics.MeasureString("abc", font);
 
         Assert.True(size.Width > 0);
+        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.True(font.HasMaterializedLayoutFont);
     }
 
@@ -654,14 +680,22 @@ public class GraphicsAbstractionTests
 
         var font = Assert.IsType<FontAdapter>(adapter.GetFont("SeamSans", 12, FontStyle.Bold | FontStyle.Italic));
 
-        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
+        Assert.False(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
+
+        using var bitmap = new BBitmap(32, 32);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
+        var size = graphics.MeasureString("abc", font);
+
+        Assert.True(size.Width > 0);
+        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.Equal(
             [
                 "GetSystemFontFamilies",
                 "RegisterFontFile",
                 "HasDeferredLoadedTypefacePath",
+                "HasMaterializedLoadedTypeface",
                 "HasMaterializedLoadedTypeface",
                 "ResolveTypeface",
                 "HasMaterializedLoadedTypeface",
@@ -1338,6 +1372,18 @@ public class GraphicsAbstractionTests
             Calls.Add("MeasureStringMaxWidth");
             charFit = 3;
             charFitWidth = 9;
+        }
+
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+        {
+            Calls.Add("TryDrawString");
+            return false;
+        }
+
+        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        {
+            Calls.Add("TryDrawGradientString");
+            return false;
         }
 
         public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)

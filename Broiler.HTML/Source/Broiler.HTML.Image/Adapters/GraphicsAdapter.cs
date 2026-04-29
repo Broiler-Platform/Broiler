@@ -117,6 +117,9 @@ internal sealed class GraphicsAdapter : RGraphics
 
     public override void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl)
     {
+        if (CanUseRaster && _textShaper.TryDrawString(_rasterCanvas!, (FontAdapter)font, str, color, point))
+            return;
+
         var canvas = EnsureCanvas();
         _textShaper.DrawString(canvas, (FontAdapter)font, str, color, point);
     }
@@ -124,6 +127,9 @@ internal sealed class GraphicsAdapter : RGraphics
     public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
     {
         if (colors == null || colors.Length == 0)
+            return;
+
+        if (CanUseRaster && _textShaper.TryDrawGradientString(_rasterCanvas!, (FontAdapter)font, str, rect, point, size, colors, positions, angle))
             return;
 
         var canvas = EnsureCanvas();

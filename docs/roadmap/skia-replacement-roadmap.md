@@ -580,6 +580,10 @@ and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and CSS hex color parsing now uses a Broiler-owned parser instead of
 `SKColor.TryParse`,
+and the default `broiler` backend now routes text and gradient-text paint
+through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
+`SixLabors.ImageSharp.Drawing` for registered/system fonts before touching the
+remaining Skia fallback path,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.

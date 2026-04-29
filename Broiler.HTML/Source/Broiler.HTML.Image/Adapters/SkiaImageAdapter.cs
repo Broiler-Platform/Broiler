@@ -60,6 +60,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (string.IsNullOrWhiteSpace(familyName))
             return null;
 
+        BroilerFontRegistry.RegisterFontFile(path, familyName);
         AddFontFamily(new FontFamilyAdapter(familyName));
         return familyName;
     }
@@ -816,7 +817,7 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {
-        return new FontAdapter(_typefaceResolver.ResolveTypeface(family, style), size, style);
+        return new FontAdapter(family, size, style, () => _typefaceResolver.ResolveTypeface(family, style));
     }
 
     protected override RFont CreateFontInt(RFontFamily family, double size, FontStyle style) => CreateFontInt(family.Name, size, style);

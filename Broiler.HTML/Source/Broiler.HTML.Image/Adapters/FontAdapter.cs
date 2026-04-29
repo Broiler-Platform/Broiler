@@ -1,6 +1,10 @@
+using System;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
+using SixLabors.Fonts;
+using DrawingFontStyle = System.Drawing.FontStyle;
+using SixLaborsFont = SixLabors.Fonts.Font;
 
 namespace Broiler.HTML.Image.Adapters;
 
@@ -11,16 +15,30 @@ internal sealed class FontAdapter : RFont
     /// </summary>
     private const double PtToCssPx = 96.0 / 72.0;
     private readonly double _size;
+    private readonly string _family;
+    private readonly DrawingFontStyle _style;
+    private readonly Func<SKTypeface>? _compatTypefaceFactory;
     private double _height = -1;
     private double _underlineOffset = -1;
     private double _whitespaceWidth = -1;
+    private SixLaborsFont? _broilerLayoutFont;
+    private SixLaborsFont? _broilerRenderFont;
+    private SKTypeface? _typeface;
     private SKFont? _font;
     private SKFont? _renderFont;
 
-    public FontAdapter(SKTypeface typeface, double size, FontStyle style)
+    public FontAdapter(SKTypeface typeface, double size, DrawingFontStyle style)
+        : this(typeface?.FamilyName ?? string.Empty, size, style, () => typeface ?? SKTypeface.Default)
     {
-        Typeface = typeface;
+        _typeface = typeface;
+    }
+
+    public FontAdapter(string family, double size, DrawingFontStyle style, Func<SKTypeface>? compatTypefaceFactory = null)
+    {
+        _family = family;
         _size = size;
+        _style = style;
+        _compatTypefaceFactory = compatTypefaceFactory;
     }
 
     /// <summary>Layout font (pt-based) – used for metrics and text measurement.</summary>
@@ -29,7 +47,7 @@ internal sealed class FontAdapter : RFont
     /// <summary>Render font (CSS px-based) – used for drawing glyphs at correct size.</summary>
     public SKFont RenderFont => _renderFont ??= CreateConfiguredFont((float)(_size * PtToCssPx));
 
-    public SKTypeface Typeface { get; }
+    public SKTypeface Typeface => _typeface ??= _compatTypefaceFactory?.Invoke() ?? SKTypeface.Default;
 
     public override double Size => _size;
     public override double Height
@@ -52,9 +70,9 @@ internal sealed class FontAdapter : RFont
 
     public override double LeftPadding => Height / 6.0;
 
-    internal bool HasMaterializedLayoutFont => _font is not null;
+    internal bool HasMaterializedLayoutFont => _broilerLayoutFont is not null || _font is not null;
 
-    internal bool HasMaterializedRenderFont => _renderFont is not null;
+    internal bool HasMaterializedRenderFont => _broilerRenderFont is not null || _renderFont is not null;
 
     public override double GetWhitespaceWidth(RGraphics graphics)
     {
@@ -69,9 +87,53 @@ internal sealed class FontAdapter : RFont
         if (_height >= 0 && _underlineOffset >= 0)
             return;
 
-        var metrics = Font.Metrics;
-        _height = metrics.Descent - metrics.Ascent;
-        _underlineOffset = -metrics.Ascent + metrics.UnderlinePosition.GetValueOrDefault(metrics.Descent - metrics.Ascent * 0.87f);
+        if (TryGetBroilerLayoutFont(out var broilerFont))
+        {
+            var broilerMetrics = broilerFont.FontMetrics;
+            var vertical = broilerMetrics.VerticalMetrics;
+            float scale = broilerFont.Size / broilerMetrics.UnitsPerEm;
+            _height = vertical.LineHeight * scale;
+            _underlineOffset = (vertical.Ascender - broilerMetrics.UnderlinePosition) * scale;
+            return;
+        }
+
+        var skiaMetrics = Font.Metrics;
+        _height = skiaMetrics.Descent - skiaMetrics.Ascent;
+        _underlineOffset = -skiaMetrics.Ascent + skiaMetrics.UnderlinePosition.GetValueOrDefault(skiaMetrics.Descent - skiaMetrics.Ascent * 0.87f);
+    }
+
+    internal bool TryGetBroilerLayoutFont(out SixLaborsFont font)
+    {
+        if (_broilerLayoutFont is not null)
+        {
+            font = _broilerLayoutFont;
+            return true;
+        }
+
+        if (BroilerFontRegistry.TryCreateFont(_family, (float)_size, _style, out font))
+        {
+            _broilerLayoutFont = font;
+            return true;
+        }
+
+        return false;
+    }
+
+    internal bool TryGetBroilerRenderFont(out SixLaborsFont font)
+    {
+        if (_broilerRenderFont is not null)
+        {
+            font = _broilerRenderFont;
+            return true;
+        }
+
+        if (BroilerFontRegistry.TryCreateFont(_family, (float)_size, _style, out font))
+        {
+            _broilerRenderFont = font;
+            return true;
+        }
+
+        return false;
     }
 
     private SKFont CreateConfiguredFont(float size) =>

@@ -240,7 +240,7 @@ public sealed class BBitmap : IDisposable
 
     private SKBitmap EnsureCompatBitmap() => _compatSurface.AsBitmap();
 
-    private static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
+    internal static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
     {
         var pixels = new byte[checked(image.Width * image.Height * 4)];
         for (int y = 0; y < image.Height; y++)
