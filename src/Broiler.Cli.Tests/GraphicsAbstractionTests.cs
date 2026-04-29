@@ -540,6 +540,23 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Broiler_Render_Font_Reuses_The_Registered_Font_Size_For_Loaded_Fonts()
+    {
+        var alias = $"RasterRenderSize_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+
+        Assert.True(font.TryGetBroilerLayoutFont(out var layoutFont));
+        Assert.True(font.TryGetBroilerRenderFont(out var renderFont));
+        Assert.Equal(12f, layoutFont.Size);
+        Assert.Equal(12f, renderFont.Size);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+    }
+
+    [Fact]
     public void GraphicsAdapter_Text_Operations_Delegate_Through_Text_Shaper_Seam()
     {
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
@@ -640,7 +657,7 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void Aliased_Font_File_Load_Does_Not_Materialize_Skia_Typeface_For_Broiler_Measurement()
+    public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "acid", "fonts", "DejaVuSans.ttf");
@@ -660,12 +677,9 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
         var size = graphics.MeasureString("abc", font);
-        graphics.MeasureString("abcdef", font, 24, out var charFit, out var charFitWidth);
 
         Assert.True(size.Width > 0);
-        Assert.True(charFit > 0);
-        Assert.True(charFitWidth > 0);
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.True(font.HasMaterializedLayoutFont);
     }
 

@@ -21,7 +21,7 @@ internal sealed class SkiaTextShaper : ITextShaper
 
     public SizeF MeasureString(FontAdapter font, string text)
     {
-        if (font.TryGetBroilerLayoutFont(out var broilerFont))
+        if (font.TryGetBroilerLayoutFont(out var broilerFont) && CanUseBroilerMeasurement(broilerFont))
         {
             var broilerSize = MeasureTextSize(broilerFont, text);
             return new SizeF(broilerSize.Width, (float)font.Height);
@@ -36,33 +36,10 @@ internal sealed class SkiaTextShaper : ITextShaper
         charFit = 0;
         charFitWidth = 0;
 
-        if (font.TryGetBroilerLayoutFont(out var broilerFont))
-        {
-            MeasureString(broilerFont, text, maxWidth, out charFit, out charFitWidth);
-            return;
-        }
-
         for (int i = 1; i <= text.Length; i++)
         {
             var substring = text.Substring(0, i);
             var width = font.Font.MeasureText(substring);
-            if (width > maxWidth)
-                break;
-
-            charFit = i;
-            charFitWidth = width;
-        }
-    }
-
-    private static void MeasureString(SixLaborsFont font, string text, double maxWidth, out int charFit, out double charFitWidth)
-    {
-        charFit = 0;
-        charFitWidth = 0;
-
-        for (int i = 1; i <= text.Length; i++)
-        {
-            var substring = text.Substring(0, i);
-            var width = MeasureTextSize(font, substring).Width;
             if (width > maxWidth)
                 break;
 
@@ -76,13 +53,14 @@ internal sealed class SkiaTextShaper : ITextShaper
         if (!font.TryGetBroilerRenderFont(out var broilerFont))
             return false;
 
-        using var textBitmap = RenderTextBitmap(
+        var rendered = RenderTextBitmap(
             broilerFont,
             text,
             static (context, options, textValue, colorValue) => context.DrawText(options, textValue, ToImageSharpColor(colorValue)),
             text,
             color);
-        DrawBitmap(canvas, textBitmap, point);
+        using var textBitmap = rendered.Bitmap;
+        DrawBitmap(canvas, textBitmap, new PointF(point.X + rendered.DrawOffset.X, point.Y + rendered.DrawOffset.Y));
         return true;
     }
 
@@ -92,7 +70,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             return false;
 
         var measuredSize = MeasureTextSize(broilerFont, text);
-        using var textBitmap = RenderTextBitmap(
+        var rendered = RenderTextBitmap(
             broilerFont,
             text,
             (context, options, textValue, gradientState) =>
@@ -129,7 +107,8 @@ internal sealed class SkiaTextShaper : ITextShaper
             },
             text,
             (Rect: rect, Point: point, Size: size, Colors: colors, Positions: positions, Angle: angle, MeasuredSize: measuredSize));
-        DrawBitmap(canvas, textBitmap, point);
+        using var textBitmap = rendered.Bitmap;
+        DrawBitmap(canvas, textBitmap, new PointF(point.X + rendered.DrawOffset.X, point.Y + rendered.DrawOffset.Y));
         return true;
     }
 
@@ -201,7 +180,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             new RectangleF(0, 0, textBitmap.Width, textBitmap.Height));
     }
 
-    private static BBitmap RenderTextBitmap<TState>(
+    private static (BBitmap Bitmap, PointF DrawOffset) RenderTextBitmap<TState>(
         SixLaborsFont font,
         string text,
         Action<IImageProcessingContext, RichTextOptions, string, TState> drawAction,
@@ -211,12 +190,15 @@ internal sealed class SkiaTextShaper : ITextShaper
         var options = CreateTextOptions(font);
         var size = MeasureTextSize(font, text);
         var bounds = TextMeasurer.MeasureBounds(text, options);
-        int width = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Width, bounds.Right)));
-        int height = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Height, bounds.Bottom)));
+        float originX = bounds.Left < 0 ? -bounds.Left : 0;
+        float originY = bounds.Top < 0 ? -bounds.Top : 0;
+        options.Origin = new ImageSharpPointF(originX, originY);
+        int width = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Width, bounds.Width)));
+        int height = Math.Max(1, (int)Math.Ceiling(Math.Max(size.Height, bounds.Height)));
 
         using var image = new SixLabors.ImageSharp.Image<Rgba32>(width, height, ImageSharpColor.Transparent);
         image.Mutate(context => drawAction(context, options, textValue, state));
-        return BBitmap.CreateFromImageSharpImage(image);
+        return (BBitmap.CreateFromImageSharpImage(image), new PointF(-originX, -originY));
     }
 
     private static ImageSharpColor ToImageSharpColor(Color color) =>
@@ -251,4 +233,7 @@ internal sealed class SkiaTextShaper : ITextShaper
             new PointF(cx - sin * halfDiag, cy + cos * halfDiag),
             new PointF(cx + sin * halfDiag, cy - cos * halfDiag));
     }
+
+    private static bool CanUseBroilerMeasurement(SixLaborsFont font) =>
+        string.Equals(font.Family.Name, "Ahem", StringComparison.OrdinalIgnoreCase);
 }

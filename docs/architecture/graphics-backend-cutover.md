@@ -57,14 +57,13 @@ Supported values for the internal override:
   `IBitmapCompatSurface` seam; external SVG image rasterization now uses the
   Broiler-owned `BSvgRasterizer`, and CSS hex color parsing now uses a
   Broiler-owned parser instead of SkiaSharp's color parser.
-- In the default `broiler` backend, text measurement plus text draw and
-  gradient-text draw now first attempt Broiler-owned font metrics/raster paths
-  backed by
+- In the default `broiler` backend, text draw and gradient-text draw now first
+  attempt a Broiler-owned raster text path backed by
   `SixLabors.Fonts`/`SixLabors.ImageSharp.Drawing`, so registered/system fonts
-  no longer require Skia font materialization just to measure or paint glyphs.
-- The explicit internal `skia` override plus any fonts the Broiler registry
-  cannot resolve still keep the remaining Skia-backed font metrics compatibility
-  path during the final M5 cleanup window.
+  no longer require an `SKCanvas` materialization just to paint glyphs.
+- Text measurement and the explicit internal `skia` override still keep the
+  remaining Skia-backed font metrics compatibility path during the final M5
+  cleanup window.
 
 ## Diagnostics
 
