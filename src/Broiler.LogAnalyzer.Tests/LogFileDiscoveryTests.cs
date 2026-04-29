@@ -128,26 +128,28 @@ public class LogFileDiscoveryTests : IDisposable
             "access.log.15.2.gz",
             "access.log.15.3.gz",
             "access.log.15.4.gz",
-            "access.log.15.5",
             "access.log.15.5.gz",
-            "access.log.15.6",
             "access.log.15.6.gz",
             "access.log.15.7.gz",
             "access.log.16.1.gz",
-            "access.log.16.2",
             "access.log.16.2.gz",
-            "access.log.16.3",
             "access.log.16.3.gz",
-            "access.log.16.4",
             "access.log.16.4.gz",
-            "access.log.16.5",
             "access.log.16.5.gz",
             "access.log.16.6.gz",
             "access.log.16.7",
             "access.log.current",
         ];
 
-        foreach (var file in expectedFiles)
+        foreach (var file in expectedFiles.Concat(
+        [
+            "access.log.15.5",
+            "access.log.15.6",
+            "access.log.16.2",
+            "access.log.16.3",
+            "access.log.16.4",
+            "access.log.16.5",
+        ]))
             CreateLogFile(file);
 
         CreateFile("error.log", "err");
@@ -199,10 +201,27 @@ public class LogFileDiscoveryTests : IDisposable
             "access.log.14.gz",
             "access.log.14.1.gz",
             "access.log.14.2.gz",
-            "access.log.15.5",
             "access.log.15.5.gz",
-            "access.log.16.2",
             "access.log.16.2.gz",
+        ], result);
+    }
+
+    [Fact]
+    public void Resolve_DirectoryWithPlainAndGzipCopies_PrefersGzipVariant()
+    {
+        CreateFile("access.log.1", "plain");
+        CreateGzipFile("access.log.1.gz", "gzip");
+        CreateFile("access_log.2", "plain underscore");
+        CreateGzipFile("access_log.2.gz", "gzip underscore");
+
+        var result = LogFileDiscovery.Resolve(_tempDir)
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.Equal(
+        [
+            "access.log.1.gz",
+            "access_log.2.gz",
         ], result);
     }
 
