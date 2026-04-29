@@ -752,6 +752,14 @@ public class GraphicsAbstractionTests
     {
         var paintCompat = new RecordingPaintCompatFactory();
         var adapter = new SkiaImageAdapter(paintCompatFactory: paintCompat);
+        var expectedCalls = new[]
+        {
+            "CreateSolidBrushPaint",
+            "CreateLinearGradientBrushPaint",
+            "CreatePenPaint",
+            "UpdatePenPaint",
+            "UpdatePenPaint",
+        };
         using var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
         using var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(
             new RectangleF(1, 2, 3, 4),
@@ -773,9 +781,7 @@ public class GraphicsAbstractionTests
         Assert.True(solidBrush.HasMaterializedPaint);
         Assert.True(gradientBrush.HasMaterializedPaint);
         Assert.True(pen.HasMaterializedPaint);
-        Assert.Equal(
-            ["CreateSolidBrushPaint", "CreateLinearGradientBrushPaint", "CreatePenPaint", "UpdatePenPaint", "UpdatePenPaint"],
-            paintCompat.Calls);
+        Assert.Equal(expectedCalls, paintCompat.Calls);
         Assert.Equal(
             [(3f, DashStyle.Solid), (3f, DashStyle.Dash)],
             paintCompat.PenUpdates);
