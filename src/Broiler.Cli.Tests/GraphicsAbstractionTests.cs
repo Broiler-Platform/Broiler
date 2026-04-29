@@ -513,7 +513,7 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void Broiler_Text_Draw_Does_Not_Materialize_Skia_Canvas_For_Loaded_Fonts()
+    public void Broiler_Text_Draw_And_Measurement_Do_Not_Materialize_Skia_For_Loaded_Fonts()
     {
         var alias = $"RasterText_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
@@ -529,11 +529,13 @@ public class GraphicsAbstractionTests
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
 
         graphics.DrawString("XX", font, Color.Black, new PointF(4, 4), size, rtl: false);
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 4));
     }
 
@@ -638,7 +640,7 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
+    public void Aliased_Font_File_Load_Does_Not_Materialize_Skia_Typeface_For_Broiler_Measurement()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "acid", "fonts", "DejaVuSans.ttf");
@@ -658,9 +660,12 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
         var size = graphics.MeasureString("abc", font);
+        graphics.MeasureString("abcdef", font, 24, out var charFit, out var charFitWidth);
 
         Assert.True(size.Width > 0);
-        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.True(charFit > 0);
+        Assert.True(charFitWidth > 0);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.True(font.HasMaterializedLayoutFont);
     }
 

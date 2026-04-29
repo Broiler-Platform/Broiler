@@ -565,8 +565,10 @@ work needs layout/render font state,
 and alias-backed font-file registration now also defers `SKTypeface.FromFile`
 until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
-internal `ITextShaper` seam instead of leaving the remaining Skia-backed
-text-rendering details inside `GraphicsAdapter`,
+internal `ITextShaper` seam instead of leaving the remaining text-rendering
+details inside `GraphicsAdapter`, with the default backend now measuring
+registered/system fonts through Broiler-owned font metrics before touching the
+remaining Skia fallback path,
 and the remaining non-text line, rectangle, path, rounded-clip, texture-paint,
 polygon-fill, and layer-save fallback details inside `GraphicsAdapter` now also
 route through an internal `ICanvasCompat` seam,

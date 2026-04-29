@@ -21,6 +21,12 @@ internal sealed class SkiaTextShaper : ITextShaper
 
     public SizeF MeasureString(FontAdapter font, string text)
     {
+        if (font.TryGetBroilerLayoutFont(out var broilerFont))
+        {
+            var broilerSize = MeasureTextSize(broilerFont, text);
+            return new SizeF(broilerSize.Width, (float)font.Height);
+        }
+
         var width = font.Font.MeasureText(text);
         return new SizeF(width, (float)font.Height);
     }
@@ -30,10 +36,33 @@ internal sealed class SkiaTextShaper : ITextShaper
         charFit = 0;
         charFitWidth = 0;
 
+        if (font.TryGetBroilerLayoutFont(out var broilerFont))
+        {
+            MeasureString(broilerFont, text, maxWidth, out charFit, out charFitWidth);
+            return;
+        }
+
         for (int i = 1; i <= text.Length; i++)
         {
             var substring = text.Substring(0, i);
             var width = font.Font.MeasureText(substring);
+            if (width > maxWidth)
+                break;
+
+            charFit = i;
+            charFitWidth = width;
+        }
+    }
+
+    private static void MeasureString(SixLaborsFont font, string text, double maxWidth, out int charFit, out double charFitWidth)
+    {
+        charFit = 0;
+        charFitWidth = 0;
+
+        for (int i = 1; i <= text.Length; i++)
+        {
+            var substring = text.Substring(0, i);
+            var width = MeasureTextSize(font, substring).Width;
             if (width > maxWidth)
                 break;
 
