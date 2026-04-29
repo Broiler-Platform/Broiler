@@ -12,7 +12,8 @@ public static class LogFileDiscovery
     /// <summary>
     /// Given a path that is either a single file or a directory, returns all
     /// access log files found, sorted in natural log-rotation order
-    /// (current log first, then .1, .2, … then .1.gz, .2.gz, …).
+    /// (current log first, then .1, .2, …), preferring gzip-compressed
+    /// copies when both plain and compressed variants of the same log exist.
     /// </summary>
     public static IReadOnlyList<string> Resolve(string path)
     {
@@ -27,6 +28,8 @@ public static class LogFileDiscovery
         //   access_log, access_log.1, etc.
         var files = Directory.GetFiles(path)
             .Where(IsAccessLogFile)
+            .GroupBy(GetLogIdentity, StringComparer.OrdinalIgnoreCase)
+            .Select(PreferCompressedVariant)
             .OrderBy(GetSortKey)
             .ToList();
 
@@ -45,6 +48,19 @@ public static class LogFileDiscovery
     /// </summary>
     public static bool IsGzipFile(string filePath) =>
         filePath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetLogIdentity(string filePath)
+    {
+        var name = Path.GetFileName(filePath);
+        return IsGzipFile(name) ? name[..^3] : name;
+    }
+
+    private static string PreferCompressedVariant(IGrouping<string, string> variants)
+    {
+        return variants.FirstOrDefault(IsGzipFile)
+            ?? variants.FirstOrDefault()
+            ?? throw new InvalidOperationException("Log variant groups should never be empty.");
+    }
 
     /// <summary>
     /// Opens a stream reader for the file, decompressing gzip files automatically.
