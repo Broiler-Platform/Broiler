@@ -8,6 +8,15 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
 {
     public static ICanvasCompat Instance { get; } = new SkiaCanvasCompat();
 
+    public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint) =>
+        canvas.DrawLine(x1, y1, x2, y2, paint);
+
+    public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint) =>
+        canvas.DrawRect(Utilities.Utils.Convert(rect), paint);
+
+    public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint) =>
+        canvas.DrawPath(path.Path, paint);
+
     public void ClipRounded(
         SKCanvas canvas,
         RectangleF rect,

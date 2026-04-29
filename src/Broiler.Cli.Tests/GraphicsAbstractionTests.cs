@@ -543,10 +543,20 @@ public class GraphicsAbstractionTests
             new RectangleF(0, 0, 2, 1),
             new PointF(3, 4)));
         using var solidBrush = graphics.GetSolidBrush(Color.Red);
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.Blue));
+        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
 
         Assert.False(textureBrush.HasMaterializedPaint);
 
         _ = textureBrush.Paint;
+        graphics.DrawLine(pen, 1, 2, 3, 4);
+        graphics.DrawRectangle(pen, 1, 2, 3, 4);
+        graphics.DrawRectangle(solidBrush, 5, 6, 7, 8);
+        path.Start(1, 1);
+        path.LineTo(4, 1);
+        path.LineTo(4, 4);
+        graphics.DrawPath(pen, path);
+        graphics.DrawPath(solidBrush, path);
         graphics.PushClipRounded(new RectangleF(1, 2, 10, 11), 1, 2, 3, 4, 5, 6, 7, 8);
         graphics.DrawPolygon(solidBrush, [new PointF(1, 1), new PointF(5, 1), new PointF(3, 4)]);
         graphics.SaveOpacityLayer(0.5f);
@@ -554,7 +564,7 @@ public class GraphicsAbstractionTests
 
         Assert.True(textureBrush.HasMaterializedPaint);
         Assert.Equal(
-            ["CreateTexturePaint", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
+            ["CreateTexturePaint", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
             canvasCompat.Calls);
     }
 
@@ -1368,6 +1378,21 @@ public class GraphicsAbstractionTests
     private sealed class RecordingCanvasCompat : ICanvasCompat
     {
         public List<string> Calls { get; } = [];
+
+        public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint)
+        {
+            Calls.Add("DrawLine");
+        }
+
+        public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint)
+        {
+            Calls.Add("DrawRectangle");
+        }
+
+        public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint)
+        {
+            Calls.Add("DrawPath");
+        }
 
         public void ClipRounded(
             SKCanvas canvas,

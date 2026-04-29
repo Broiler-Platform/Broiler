@@ -567,9 +567,9 @@ until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
 internal `ITextShaper` seam instead of leaving the remaining Skia-backed
 text-rendering details inside `GraphicsAdapter`,
-and the remaining non-text rounded-clip, texture-paint, polygon-fill, and
-layer-save fallback details inside `GraphicsAdapter` now also route through an
-internal `ICanvasCompat` seam,
+and the remaining non-text line, rectangle, path, rounded-clip, texture-paint,
+polygon-fill, and layer-save fallback details inside `GraphicsAdapter` now also
+route through an internal `ICanvasCompat` seam,
 and the remaining `SkiaImageAdapter` system-font enumeration, deferred
 font-file registration, and typeface resolution details now also route through
 an internal `IFontTypefaceResolver` seam,

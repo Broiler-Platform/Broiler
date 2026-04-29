@@ -154,7 +154,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawLine((float)x1, (float)y1, (float)x2, (float)y2, penAdapter.Paint);
+        _canvasCompat.DrawLine(EnsureCanvas(), (float)x1, (float)y1, (float)x2, (float)y2, penAdapter.Paint);
     }
 
     public override void DrawRectangle(RPen pen, double x, double y, double width, double height)
@@ -166,7 +166,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), penAdapter.Paint);
+        _canvasCompat.DrawRectangle(EnsureCanvas(), new RectangleF((float)x, (float)y, (float)width, (float)height), penAdapter.Paint);
     }
 
     public override void DrawRectangle(RBrush brush, double x, double y, double width, double height)
@@ -191,7 +191,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawRect(SKRect.Create((float)x, (float)y, (float)width, (float)height), brushAdapter.Paint);
+        _canvasCompat.DrawRectangle(EnsureCanvas(), new RectangleF((float)x, (float)y, (float)width, (float)height), brushAdapter.Paint);
     }
 
     public override void DrawImage(RImage image, RectangleF destRect, RectangleF srcRect)
@@ -231,7 +231,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawPath(pathAdapter.Path, penAdapter.Paint);
+        _canvasCompat.DrawPath(EnsureCanvas(), pathAdapter, penAdapter.Paint);
     }
 
     public override void DrawPath(RBrush brush, RGraphicsPath path)
@@ -244,7 +244,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawPath(pathAdapter.Path, brushAdapter.Paint);
+        _canvasCompat.DrawPath(EnsureCanvas(), pathAdapter, brushAdapter.Paint);
     }
 
     public override void DrawPolygon(RBrush brush, PointF[] points)

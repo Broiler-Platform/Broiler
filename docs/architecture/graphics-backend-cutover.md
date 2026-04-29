@@ -45,9 +45,10 @@ Supported values for the internal override:
 - Alias-backed font-file registration now defers `SKTypeface.FromFile` until
   font creation resolves the loaded family, while text shaping plus text/gradient
   draw dispatch now route through the internal `ITextShaper` compatibility seam
-  and the remaining non-text `GraphicsAdapter` rounded-clip, texture-paint,
-  polygon-fill, and layer-save fallback details now route through the internal
-  `ICanvasCompat` seam during the fallback window, and the remaining
+  and the remaining non-text `GraphicsAdapter` line, rectangle, path,
+  rounded-clip, texture-paint, polygon-fill, and layer-save fallback details
+  now route through the internal `ICanvasCompat` seam during the fallback
+  window, and the remaining
   `SkiaImageAdapter` typeface/font-manager details now route through the
   internal `IFontTypefaceResolver` seam, while the remaining `BBitmap`
   compatibility-surface lifecycle now also routes through the internal
