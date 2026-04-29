@@ -236,8 +236,9 @@ internal sealed class SkiaTextShaper : ITextShaper
 
     // The deterministic Ahem fixtures are the only text cases where the current
     // Broiler width measurement exactly matches the legacy Skia layout path.
-    // Keep broader font measurement on the Skia compatibility path until the
-    // representative text-fidelity thresholds are retired or re-baselined.
+    // Keep broader font measurement on the Skia compatibility path for the
+    // remaining M5 cutover window while the text-fidelity gates in
+    // TextFidelityThresholdTests stay pinned to the legacy layout baseline.
     private static bool CanUseBroilerMeasurement(SixLaborsFont font) =>
         string.Equals(font.Family.Name, "Ahem", StringComparison.OrdinalIgnoreCase);
 }
