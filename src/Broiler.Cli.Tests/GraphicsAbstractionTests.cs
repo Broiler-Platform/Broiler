@@ -528,6 +528,37 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void GraphicsAdapter_NonText_Fallback_Operations_Delegate_Through_Canvas_Compat_Seam()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        var canvasCompat = new RecordingCanvasCompat();
+        using var graphics = new GraphicsAdapter(
+            () => surface.Canvas,
+            new RectangleF(0, 0, 32, 32),
+            canvasCompat: canvasCompat);
+        using var textureBitmap = new BBitmap(2, 1);
+        using var image = new ImageAdapter(textureBitmap.Copy());
+        using var textureBrush = Assert.IsType<BrushAdapter>(graphics.GetTextureBrush(
+            image,
+            new RectangleF(0, 0, 2, 1),
+            new PointF(3, 4)));
+        using var solidBrush = graphics.GetSolidBrush(Color.Red);
+
+        Assert.False(textureBrush.HasMaterializedPaint);
+
+        _ = textureBrush.Paint;
+        graphics.PushClipRounded(new RectangleF(1, 2, 10, 11), 1, 2, 3, 4, 5, 6, 7, 8);
+        graphics.DrawPolygon(solidBrush, [new PointF(1, 1), new PointF(5, 1), new PointF(3, 4)]);
+        graphics.SaveOpacityLayer(0.5f);
+        graphics.SaveBlendLayer("screen");
+
+        Assert.True(textureBrush.HasMaterializedPaint);
+        Assert.Equal(
+            ["CreateTexturePaint", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
+            canvasCompat.Calls);
+    }
+
+    [Fact]
     public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
@@ -1232,6 +1263,47 @@ public class GraphicsAbstractionTests
         public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
+        }
+    }
+
+    private sealed class RecordingCanvasCompat : ICanvasCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public void ClipRounded(
+            SKCanvas canvas,
+            RectangleF rect,
+            double cornerNw,
+            double cornerNwY,
+            double cornerNe,
+            double cornerNeY,
+            double cornerSe,
+            double cornerSeY,
+            double cornerSw,
+            double cornerSwY)
+        {
+            Calls.Add("ClipRounded");
+        }
+
+        public SKPaint CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
+        {
+            Calls.Add("CreateTexturePaint");
+            return new SKPaint();
+        }
+
+        public void DrawPolygon(SKCanvas canvas, PointF[] points, SKPaint paint)
+        {
+            Calls.Add("DrawPolygon");
+        }
+
+        public void SaveOpacityLayer(SKCanvas canvas, float opacity)
+        {
+            Calls.Add("SaveOpacityLayer");
+        }
+
+        public void SaveBlendLayer(SKCanvas canvas, string blendMode)
+        {
+            Calls.Add("SaveBlendLayer");
         }
     }
 

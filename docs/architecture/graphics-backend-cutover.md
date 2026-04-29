@@ -45,8 +45,10 @@ Supported values for the internal override:
 - Alias-backed font-file registration now defers `SKTypeface.FromFile` until
   font creation resolves the loaded family, while text shaping plus text/gradient
   draw dispatch now route through the internal `ITextShaper` compatibility seam
-  during the fallback window; external SVG image rasterization now uses the
-  Broiler-owned `BSvgRasterizer`.
+  and the remaining non-text `GraphicsAdapter` rounded-clip, texture-paint,
+  polygon-fill, and layer-save fallback details now route through the internal
+  `ICanvasCompat` seam during the fallback window; external SVG image
+  rasterization now uses the Broiler-owned `BSvgRasterizer`.
 
 ## Diagnostics
 

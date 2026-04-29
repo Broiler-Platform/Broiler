@@ -565,6 +565,9 @@ until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
 internal `ITextShaper` seam instead of leaving the remaining Skia-backed
 text-rendering details inside `GraphicsAdapter`,
+and the remaining non-text rounded-clip, texture-paint, polygon-fill, and
+layer-save fallback details inside `GraphicsAdapter` now also route through an
+internal `ICanvasCompat` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +

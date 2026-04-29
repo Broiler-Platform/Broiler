@@ -16,6 +16,7 @@ internal sealed class GraphicsAdapter : RGraphics
     private readonly List<Action<SKCanvas>> _deferredCanvasOperations = [];
     private readonly Stack<bool> _rasterLayerStack = new();
     private readonly ITextShaper _textShaper;
+    private readonly ICanvasCompat _canvasCompat;
     private SKCanvas? _canvas;
     private int _activeSkiaLayerDepth;
     private bool _nextLayerCanUseRaster;
@@ -28,6 +29,7 @@ internal sealed class GraphicsAdapter : RGraphics
         bool restoreOnDispose = false,
         Action? onDispose = null,
         ITextShaper? textShaper = null,
+        ICanvasCompat? canvasCompat = null,
         Action<SKCanvas, object?>? initialCanvasOperation = null,
         object? initialCanvasOperationState = null)
         : base(SkiaImageAdapter.Instance, initialClip)
@@ -38,6 +40,7 @@ internal sealed class GraphicsAdapter : RGraphics
         _restoreOnDispose = restoreOnDispose;
         _onDispose = onDispose;
         _textShaper = textShaper ?? SkiaTextShaper.Instance;
+        _canvasCompat = canvasCompat ?? SkiaCanvasCompat.Instance;
         if (initialCanvasOperation is not null)
             _deferredCanvasOperations.Add(canvas => initialCanvasOperation(canvas, initialCanvasOperationState));
     }
@@ -83,26 +86,13 @@ internal sealed class GraphicsAdapter : RGraphics
         ApplyCanvasOperation(canvas =>
         {
             canvas.Save();
-            if ((cornerNw <= 0 && cornerNwY <= 0)
-                && (cornerNe <= 0 && cornerNeY <= 0)
-                && (cornerSe <= 0 && cornerSeY <= 0)
-                && (cornerSw <= 0 && cornerSwY <= 0))
-            {
-                canvas.ClipRect(Utilities.Utils.Convert(rect));
-                return;
-            }
-
-            var skRect = Utilities.Utils.Convert(rect);
-            var radii = new[]
-            {
-                new SKPoint((float)cornerNw, (float)cornerNwY),
-                new SKPoint((float)cornerNe, (float)cornerNeY),
-                new SKPoint((float)cornerSe, (float)cornerSeY),
-                new SKPoint((float)cornerSw, (float)cornerSwY),
-            };
-            var rrect = new SKRoundRect();
-            rrect.SetRectRadii(skRect, radii);
-            canvas.ClipRoundRect(rrect);
+            _canvasCompat.ClipRounded(
+                canvas,
+                rect,
+                cornerNw, cornerNwY,
+                cornerNe, cornerNeY,
+                cornerSe, cornerSeY,
+                cornerSw, cornerSwY);
         });
 
         _rasterCanvas?.PushClipRounded(
@@ -144,16 +134,7 @@ internal sealed class GraphicsAdapter : RGraphics
     {
         var imgAdapter = (ImageAdapter)image;
         return new BrushAdapter(
-            () =>
-            {
-                var paint = new SKPaint();
-                paint.Shader = SKShader.CreateBitmap(
-                    imgAdapter.Bitmap.AsSkBitmap(),
-                    SKShaderTileMode.Repeat,
-                    SKShaderTileMode.Repeat,
-                    SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
-                return paint;
-            },
+            () => _canvasCompat.CreateTexturePaint(imgAdapter.Bitmap, translateTransformLocation),
             dispose: true)
         {
             TextureBitmap = imgAdapter.Bitmap,
@@ -278,14 +259,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        using var path = new SKPath();
-        path.MoveTo(Utilities.Utils.Convert(points[0]));
-
-        for (int i = 1; i < points.Length; i++)
-            path.LineTo(Utilities.Utils.Convert(points[i]));
-
-        path.Close();
-        EnsureCanvas().DrawPath(path, brushAdapter.Paint);
+        _canvasCompat.DrawPolygon(EnsureCanvas(), points, brushAdapter.Paint);
     }
 
     public override void HintNextLayerCanUseRaster(bool canUseRaster) =>
@@ -303,7 +277,7 @@ internal sealed class GraphicsAdapter : RGraphics
         }
 
         _activeSkiaLayerDepth++;
-        ApplyCanvasOperation(canvas => SaveOpacityLayerOnCanvas(canvas, opacity));
+        ApplyCanvasOperation(canvas => _canvasCompat.SaveOpacityLayer(canvas, opacity));
     }
 
     public override void RestoreOpacityLayer()
@@ -333,7 +307,7 @@ internal sealed class GraphicsAdapter : RGraphics
         }
 
         _activeSkiaLayerDepth++;
-        ApplyCanvasOperation(canvas => SaveBlendLayerOnCanvas(canvas, blendMode));
+        ApplyCanvasOperation(canvas => _canvasCompat.SaveBlendLayer(canvas, blendMode));
     }
 
     public override void RestoreBlendLayer()
@@ -406,39 +380,5 @@ internal sealed class GraphicsAdapter : RGraphics
         }
 
         _deferredCanvasOperations.Add(operation);
-    }
-
-    private static void SaveOpacityLayerOnCanvas(SKCanvas canvas, float opacity)
-    {
-        byte alpha = (byte)Math.Clamp((int)(opacity * 255), 0, 255);
-        using var paint = new SKPaint { Color = new SKColor(0, 0, 0, alpha) };
-        canvas.SaveLayer(paint);
-    }
-
-    private static void SaveBlendLayerOnCanvas(SKCanvas canvas, string blendMode)
-    {
-        var skBlendMode = blendMode?.ToLowerInvariant() switch
-        {
-            "multiply" => SKBlendMode.Multiply,
-            "screen" => SKBlendMode.Screen,
-            "overlay" => SKBlendMode.Overlay,
-            "darken" => SKBlendMode.Darken,
-            "lighten" => SKBlendMode.Lighten,
-            "color-dodge" => SKBlendMode.ColorDodge,
-            "color-burn" => SKBlendMode.ColorBurn,
-            "hard-light" => SKBlendMode.HardLight,
-            "soft-light" => SKBlendMode.SoftLight,
-            "difference" => SKBlendMode.Difference,
-            "exclusion" => SKBlendMode.Exclusion,
-            "hue" => SKBlendMode.Hue,
-            "saturation" => SKBlendMode.Saturation,
-            "color" => SKBlendMode.Color,
-            "luminosity" => SKBlendMode.Luminosity,
-            "plus-lighter" => SKBlendMode.Plus,
-            _ => SKBlendMode.SrcOver,
-        };
-
-        using var paint = new SKPaint { BlendMode = skBlendMode };
-        canvas.SaveLayer(paint);
     }
 }
