@@ -28,6 +28,8 @@ Supported values for the internal override:
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path.
+- `FontAdapter` now also defers `SKFont` creation until text measurement or
+  drawing actually needs layout/render font state.
 - Solid brush/pen adapters and texture brushes now defer `SKPaint`/`SKShader`
   materialization until a draw call actually falls back to the internal Skia
   compatibility path.

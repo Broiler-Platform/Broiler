@@ -552,6 +552,8 @@ and solid brush/pen plus texture-brush adapter state now defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and `BBitmap.OpenGraphics` now also defers `SKCanvas`/`SKBitmap`
 materialization until a true fallback draw needs the compatibility surface,
+and `FontAdapter` now defers `SKFont` creation until text measurement or draw
+work needs layout/render font state,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.

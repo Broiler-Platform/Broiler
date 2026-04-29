@@ -1,6 +1,7 @@
 using Broiler.Cli;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
+using SkiaSharp;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using RectangleF = System.Drawing.RectangleF;
@@ -385,6 +386,27 @@ public class GraphicsAbstractionTests
         Assert.True(bitmap.HasMaterializedCompatBitmap);
         Assert.True(graphics.HasMaterializedCanvas);
         Assert.True(pen.HasMaterializedPaint);
+    }
+
+    [Fact]
+    public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
+    {
+        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        using var bitmap = new BBitmap(32, 32);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        var size = graphics.MeasureString("abc", font);
+
+        Assert.True(size.Width > 0);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        graphics.DrawString("abc", font, Color.Black, new PointF(0, 0), size, rtl: false);
+
+        Assert.True(font.HasMaterializedRenderFont);
     }
 
     [Fact]
