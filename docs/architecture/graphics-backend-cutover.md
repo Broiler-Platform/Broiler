@@ -30,6 +30,8 @@ Supported values for the internal override:
   falls back to the internal Skia path.
 - `FontAdapter` now also defers `SKFont` creation until text measurement or
   drawing actually needs layout/render font state.
+- `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
+  draw actually needs the compatibility path object.
 - Solid brush/pen adapters and texture brushes now defer `SKPaint`/`SKShader`
   materialization until a draw call actually falls back to the internal Skia
   compatibility path.

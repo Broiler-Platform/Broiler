@@ -410,6 +410,51 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
+    {
+        using var bitmap = new BBitmap(7, 7);
+        bitmap.Clear(BColor.White);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7)));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.Blue));
+        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
+        path.Start(1, 5);
+        path.LineTo(3, 1);
+        path.LineTo(5, 5);
+
+        Assert.False(path.HasMaterializedPath);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+
+        graphics.DrawPath(brush, path);
+
+        Assert.False(path.HasMaterializedPath);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+    }
+
+    [Fact]
+    public void NonRaster_Fallback_Path_Drawing_Materializes_Skia_Path_On_Demand()
+    {
+        using var bitmap = new BBitmap(7, 7);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7)));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.Black));
+        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
+        pen.DashStyle = DashStyle.Dash;
+        path.Start(1, 1);
+        path.LineTo(5, 5);
+
+        Assert.False(path.HasMaterializedPath);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+
+        graphics.DrawPath(pen, path);
+
+        Assert.True(path.HasMaterializedPath);
+        Assert.True(bitmap.HasMaterializedCompatBitmap);
+        Assert.True(graphics.HasMaterializedCanvas);
+    }
+
+    [Fact]
     public void RasterCapable_OpenGraphics_With_Translation_And_Clip_Does_Not_Materialize_Skia_Compatibility_Surface()
     {
         using var bitmap = new BBitmap(6, 6);
