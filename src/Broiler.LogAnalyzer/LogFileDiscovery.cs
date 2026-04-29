@@ -55,12 +55,11 @@ public static class LogFileDiscovery
         return IsGzipFile(name) ? name[..^3] : name;
     }
 
-    private static string PreferCompressedVariant(IEnumerable<string> variants)
+    private static string PreferCompressedVariant(IGrouping<string, string> variants)
     {
-        return variants
-            .OrderByDescending(IsGzipFile)
-            .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-            .First();
+        return variants.FirstOrDefault(IsGzipFile)
+            ?? variants.FirstOrDefault()
+            ?? throw new InvalidOperationException("Log variant groups should never be empty.");
     }
 
     /// <summary>
