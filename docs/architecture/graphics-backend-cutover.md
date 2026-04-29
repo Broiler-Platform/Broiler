@@ -32,9 +32,9 @@ Supported values for the internal override:
   drawing actually needs layout/render font state.
 - `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
   draw actually needs the compatibility path object.
-- Solid brush/pen adapters and texture brushes now defer `SKPaint`/`SKShader`
-  materialization until a draw call actually falls back to the internal Skia
-  compatibility path.
+- Solid, texture, and linear-gradient brush adapters plus pen adapters now
+  defer `SKPaint`/`SKShader` materialization until a draw call actually falls
+  back to the internal Skia compatibility path.
 - The high-level `HtmlContainer` rendering API no longer exposes `SKCanvas`
   overloads; the remaining Skia usage is internal to the image/runtime layer.
 - `BBitmap` encode/decode/save now use a backend-neutral codec path instead of

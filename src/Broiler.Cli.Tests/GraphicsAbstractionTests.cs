@@ -389,6 +389,44 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void Linear_Gradient_Brush_Creation_Defers_Skia_Paint_Until_Draw()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetLinearGradientBrush(
+            new RectangleF(0, 0, 6, 6),
+            Color.Red,
+            Color.Blue,
+            90));
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(brush.HasMaterializedPaint);
+    }
+
+    [Fact]
+    public void Linear_Gradient_Brush_Fallback_Drawing_Materializes_Skia_Paint_On_Demand()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetLinearGradientBrush(
+            new RectangleF(0, 0, 6, 6),
+            Color.Red,
+            Color.Blue,
+            90));
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(brush.HasMaterializedPaint);
+
+        graphics.DrawRectangle(brush, 0, 0, 6, 6);
+
+        Assert.True(bitmap.HasMaterializedCompatBitmap);
+        Assert.True(graphics.HasMaterializedCanvas);
+        Assert.True(brush.HasMaterializedPaint);
+    }
+
+    [Fact]
     public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
     {
         var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);

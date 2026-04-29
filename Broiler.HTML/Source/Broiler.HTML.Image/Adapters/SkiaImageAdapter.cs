@@ -274,30 +274,34 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
     {
-        var radians = angle * Math.PI / 180.0;
-        var cos = (float)Math.Cos(radians);
-        var sin = (float)Math.Sin(radians);
-        var cx = (float)(rect.X + rect.Width / 2);
-        var cy = (float)(rect.Y + rect.Height / 2);
-        var halfDiag = (float)Math.Max(rect.Width, rect.Height) / 2;
+        return new BrushAdapter(
+            () =>
+            {
+                var radians = angle * Math.PI / 180.0;
+                var cos = (float)Math.Cos(radians);
+                var sin = (float)Math.Sin(radians);
+                var cx = (float)(rect.X + rect.Width / 2);
+                var cy = (float)(rect.Y + rect.Height / 2);
+                var halfDiag = (float)Math.Max(rect.Width, rect.Height) / 2;
 
-        var startPoint = new SKPoint(cx - cos * halfDiag, cy - sin * halfDiag);
-        var endPoint = new SKPoint(cx + cos * halfDiag, cy + sin * halfDiag);
+                var startPoint = new SKPoint(cx - cos * halfDiag, cy - sin * halfDiag);
+                var endPoint = new SKPoint(cx + cos * halfDiag, cy + sin * halfDiag);
 
-        var shader = SKShader.CreateLinearGradient(
-            startPoint,
-            endPoint,
-            new[] { Utilities.Utils.Convert(color1), Utilities.Utils.Convert(color2) },
-            null,
-            SKShaderTileMode.Clamp);
+                var paint = new SKPaint
+                {
+                    Shader = SKShader.CreateLinearGradient(
+                        startPoint,
+                        endPoint,
+                        new[] { Utilities.Utils.Convert(color1), Utilities.Utils.Convert(color2) },
+                        null,
+                        SKShaderTileMode.Clamp),
+                    Style = SKPaintStyle.Fill,
+                    IsAntialias = true,
+                };
 
-        var paint = new SKPaint
-        {
-            Shader = shader,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true
-        };
-        return new BrushAdapter(paint, true);
+                return paint;
+            },
+            dispose: true);
     }
 
     private static SKPaint CreatePenPaint(Color color, float strokeWidth, System.Drawing.Drawing2D.DashStyle dashStyle) =>
