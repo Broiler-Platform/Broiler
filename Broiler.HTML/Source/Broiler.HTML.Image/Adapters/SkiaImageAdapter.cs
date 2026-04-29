@@ -251,25 +251,25 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RPen CreatePen(Color color)
     {
-        var paint = new SKPaint
+        return new PenAdapter((strokeWidth, dashStyle) => CreatePenPaint(color, strokeWidth, dashStyle))
         {
-            Color = Utilities.Utils.Convert(color),
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeWidth = 1
+            SolidColor = new BColor(color.R, color.G, color.B, color.A),
         };
-        return new PenAdapter(paint) { SolidColor = new BColor(color.R, color.G, color.B, color.A) };
     }
 
     protected override RBrush CreateSolidBrush(Color color)
     {
-        var paint = new SKPaint
+        return new BrushAdapter(
+            () => new SKPaint
+            {
+                Color = Utilities.Utils.Convert(color),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true,
+            },
+            dispose: true)
         {
-            Color = Utilities.Utils.Convert(color),
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true
+            SolidColor = new BColor(color.R, color.G, color.B, color.A),
         };
-        return new BrushAdapter(paint, false) { SolidColor = new BColor(color.R, color.G, color.B, color.A) };
     }
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
@@ -299,6 +299,26 @@ internal sealed class SkiaImageAdapter : RAdapter
         };
         return new BrushAdapter(paint, true);
     }
+
+    private static SKPaint CreatePenPaint(Color color, float strokeWidth, System.Drawing.Drawing2D.DashStyle dashStyle) =>
+        new()
+        {
+            Color = Utilities.Utils.Convert(color),
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+            StrokeWidth = strokeWidth,
+            PathEffect = dashStyle switch
+            {
+                System.Drawing.Drawing2D.DashStyle.Solid => null,
+                System.Drawing.Drawing2D.DashStyle.Dash => strokeWidth < 2f
+                    ? SKPathEffect.CreateDash([4f, 4f], 0)
+                    : SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.Dot => SKPathEffect.CreateDash([strokeWidth, strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.DashDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
+                System.Drawing.Drawing2D.DashStyle.DashDotDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
+                _ => null,
+            },
+        };
 
     protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(BBitmap.Wrap((SKBitmap)image, ownsBitmap: true)) : null;
 

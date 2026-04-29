@@ -2,6 +2,7 @@ using Broiler.Cli;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using RectangleF = System.Drawing.RectangleF;
 
 namespace Broiler.Cli.Tests;
@@ -317,6 +318,61 @@ public class GraphicsAbstractionTests
 
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(3, 3));
+    }
+
+    [Fact]
+    public void RasterCapable_Solid_Brush_And_Pen_Drawing_Do_Not_Materialize_Skia_Paint()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.FromArgb(255, 123, 45, 67)));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 17, 33, 197)));
+
+        Assert.False(brush.HasMaterializedPaint);
+        Assert.False(pen.HasMaterializedPaint);
+
+        graphics.DrawRectangle(brush, 0, 0, 6, 6);
+        graphics.DrawLine(pen, 0, 0, 5, 5);
+
+        Assert.False(brush.HasMaterializedPaint);
+        Assert.False(pen.HasMaterializedPaint);
+    }
+
+    [Fact]
+    public void RasterCapable_Texture_Brush_Drawing_Does_Not_Materialize_Skia_Paint()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        using var texture = new BBitmap(1, 1);
+        texture.SetPixel(0, 0, new BColor(0, 255, 0, 255));
+
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4));
+        using var image = new ImageAdapter(texture.Copy());
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetTextureBrush(
+            image,
+            new RectangleF(0, 0, 1, 1),
+            new PointF(0, 0)));
+
+        Assert.False(brush.HasMaterializedPaint);
+
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+
+        Assert.False(brush.HasMaterializedPaint);
+        Assert.Equal(new BColor(0, 255, 0, 255), bitmap.GetPixel(2, 2));
+    }
+
+    [Fact]
+    public void NonRaster_Fallback_Drawing_Materializes_Skia_Paint_On_Demand()
+    {
+        using var bitmap = new BBitmap(6, 6);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 211, 19, 173)));
+        pen.DashStyle = DashStyle.Dash;
+
+        Assert.False(pen.HasMaterializedPaint);
+
+        graphics.DrawLine(pen, 0, 3, 5, 3);
+
+        Assert.True(pen.HasMaterializedPaint);
     }
 
     [Fact]

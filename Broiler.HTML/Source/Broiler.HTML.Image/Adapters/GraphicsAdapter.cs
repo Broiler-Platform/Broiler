@@ -170,14 +170,18 @@ internal sealed class GraphicsAdapter(
     public override RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation)
     {
         var imgAdapter = (ImageAdapter)image;
-        var paint = new SKPaint();
-        var shader = SKShader.CreateBitmap(
-            imgAdapter.Bitmap.AsSkBitmap(),
-            SKShaderTileMode.Repeat,
-            SKShaderTileMode.Repeat,
-            SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
-        paint.Shader = shader;
-        return new BrushAdapter(paint, true)
+        return new BrushAdapter(
+            () =>
+            {
+                var paint = new SKPaint();
+                paint.Shader = SKShader.CreateBitmap(
+                    imgAdapter.Bitmap.AsSkBitmap(),
+                    SKShaderTileMode.Repeat,
+                    SKShaderTileMode.Repeat,
+                    SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
+                return paint;
+            },
+            dispose: true)
         {
             TextureBitmap = imgAdapter.Bitmap,
             TextureSourceRect = dstRect,

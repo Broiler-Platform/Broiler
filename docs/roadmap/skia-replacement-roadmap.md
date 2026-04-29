@@ -548,6 +548,8 @@ The last high-level public `SKCanvas` compatibility overloads are now gone.
 Bitmap encode/decode/save now also use a backend-neutral codec path.
 Runtime package removal remains pending until the remaining internal
 Skia compatibility seams are retired,
+and solid brush/pen plus texture-brush adapter state now defers
+`SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.

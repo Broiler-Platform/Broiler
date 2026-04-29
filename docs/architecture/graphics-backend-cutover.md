@@ -25,6 +25,9 @@ Supported values for the internal override:
 - `BBitmap` now stores its primary pixels in a Broiler-owned buffer and keeps the
   remaining `SKBitmap` surface synchronized only for the internal compatibility
   seam.
+- Solid brush/pen adapters and texture brushes now defer `SKPaint`/`SKShader`
+  materialization until a draw call actually falls back to the internal Skia
+  compatibility path.
 - The high-level `HtmlContainer` rendering API no longer exposes `SKCanvas`
   overloads; the remaining Skia usage is internal to the image/runtime layer.
 - `BBitmap` encode/decode/save now use a backend-neutral codec path instead of
