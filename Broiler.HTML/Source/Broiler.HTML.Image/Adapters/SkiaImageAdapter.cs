@@ -15,18 +15,22 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     private readonly IFontTypefaceResolver _typefaceResolver;
 
-    internal SkiaImageAdapter(IFontTypefaceResolver typefaceResolver = null)
+    internal SkiaImageAdapter(
+        IFontTypefaceResolver typefaceResolver = null,
+        IReadOnlyCollection<string> systemFonts = null)
     {
         _typefaceResolver = typefaceResolver ?? new SkiaFontTypefaceResolver();
 
         // Register system fonts first so we can probe availability below.
-        var systemFonts = new HashSet<string>(_typefaceResolver.GetSystemFontFamilies(), StringComparer.OrdinalIgnoreCase);
-        foreach (var familyName in systemFonts)
+        var distinctSystemFonts = new HashSet<string>(
+            systemFonts ?? BroilerFontRegistry.GetSystemFontFamilies(),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var familyName in distinctSystemFonts)
         {
             AddFontFamily(new FontFamilyAdapter(familyName));
         }
 
-        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(systemFonts))
+        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(distinctSystemFonts))
         {
             AddFontFamilyMapping(mapping.Key, mapping.Value);
         }

@@ -667,8 +667,8 @@ public class GraphicsAbstractionTests
     [Fact]
     public void SkiaImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
     {
-        var resolver = new RecordingFontTypefaceResolver(["SystemUi"]);
-        var adapter = new SkiaImageAdapter(resolver);
+        var resolver = new RecordingFontTypefaceResolver();
+        var adapter = new SkiaImageAdapter(resolver, ["SystemUi"]);
 
         Assert.True(adapter.IsFontExists("SystemUi"));
 
@@ -692,7 +692,6 @@ public class GraphicsAbstractionTests
         Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.Equal(
             [
-                "GetSystemFontFamilies",
                 "RegisterFontFile",
                 "HasDeferredLoadedTypefacePath",
                 "HasMaterializedLoadedTypeface",
@@ -1397,19 +1396,12 @@ public class GraphicsAbstractionTests
         }
     }
 
-    private sealed class RecordingFontTypefaceResolver(IEnumerable<string> systemFamilies) : IFontTypefaceResolver
+    private sealed class RecordingFontTypefaceResolver : IFontTypefaceResolver
     {
         private readonly HashSet<string> _deferredFamilies = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _materializedFamilies = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<string> _systemFamilies = [.. systemFamilies];
 
         internal List<string> Calls { get; } = [];
-
-        public IReadOnlyCollection<string> GetSystemFontFamilies()
-        {
-            Calls.Add("GetSystemFontFamilies");
-            return _systemFamilies;
-        }
 
         public string RegisterFontFile(string path, string alias = null)
         {

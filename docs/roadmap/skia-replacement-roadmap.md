@@ -570,9 +570,10 @@ text-rendering details inside `GraphicsAdapter`,
 and the remaining non-text line, rectangle, path, rounded-clip, texture-paint,
 polygon-fill, and layer-save fallback details inside `GraphicsAdapter` now also
 route through an internal `ICanvasCompat` seam,
-and the remaining `SkiaImageAdapter` system-font enumeration, deferred
-font-file registration, and typeface resolution details now also route through
-an internal `IFontTypefaceResolver` seam,
+and `SkiaImageAdapter` system-font enumeration now comes from the
+Broiler-owned `BroilerFontRegistry` instead of `SKFontManager`, while the
+remaining deferred font-file registration and typeface-resolution details now
+also route through an internal `IFontTypefaceResolver` seam,
 and the remaining `BBitmap` compatibility-surface materialization, canvas
 opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,

@@ -13,9 +13,6 @@ internal sealed class SkiaFontTypefaceResolver : IFontTypefaceResolver
     private readonly Dictionary<string, string> _loadedTypefacePaths
         = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyCollection<string> GetSystemFontFamilies() =>
-        new HashSet<string>(SKFontManager.Default.FontFamilies, StringComparer.OrdinalIgnoreCase);
-
     public string RegisterFontFile(string path, string alias = null)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))

@@ -49,8 +49,10 @@ Supported values for the internal override:
   rounded-clip, texture-paint, polygon-fill, and layer-save fallback details
   now route through the internal `ICanvasCompat` seam during the fallback
   window, and the remaining
-  `SkiaImageAdapter` typeface/font-manager details now route through the
-  internal `IFontTypefaceResolver` seam, while the remaining `BBitmap`
+  `SkiaImageAdapter` deferred font-file registration and typeface-resolution
+  details now route through the internal `IFontTypefaceResolver` seam, while
+  system-font enumeration now comes from the Broiler-owned `BroilerFontRegistry`
+  instead of `SKFontManager`, and the remaining `BBitmap`
   compatibility-surface lifecycle now also routes through the internal
   `IBitmapCompatSurface` seam; external SVG image rasterization now uses the
   Broiler-owned `BSvgRasterizer`, and CSS hex color parsing now uses a

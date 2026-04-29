@@ -170,6 +170,23 @@ public class SkiaDecouplingGuardTests
         Assert.DoesNotContain("SKColor.TryParse", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Image_System_Font_Enumeration_Does_Not_Call_Skia_Font_Manager()
+    {
+        var adapterPath = Path.Combine(
+            RepoRoot,
+            "Broiler.HTML",
+            "Source",
+            "Broiler.HTML.Image",
+            "Adapters",
+            "SkiaImageAdapter.cs");
+
+        var source = File.ReadAllText(adapterPath);
+
+        Assert.DoesNotContain("_typefaceResolver.GetSystemFontFamilies()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SKFontManager.Default.FontFamilies", source, StringComparison.Ordinal);
+    }
+
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
     [
         .. typeof(HtmlContainer).GetMethods(BindingFlags.Public | BindingFlags.Instance)
