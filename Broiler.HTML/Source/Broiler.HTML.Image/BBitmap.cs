@@ -154,6 +154,8 @@ public sealed class BBitmap : IDisposable
         return CreateFromImageSharpImage(image);
     }
 
+    internal bool HasMaterializedCompatBitmap => _compatBitmap is not null;
+
     internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
 
     internal SKCanvas OpenCanvas() => new(EnsureCompatBitmap());
@@ -161,16 +163,13 @@ public sealed class BBitmap : IDisposable
     internal GraphicsAdapter OpenGraphics(RectangleF clip)
     {
         var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
-        return new GraphicsAdapter(OpenCanvas(), clip, rasterCanvas, dispose: true, onDispose: SyncPixelsFromCompatBitmap);
+        return new GraphicsAdapter(OpenCanvas, clip, rasterCanvas, disposeCanvas: true, onDispose: SyncPixelsFromCompatBitmap);
     }
 
     internal BCanvas OpenRasterCanvas() => new(this);
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip, PointF translation)
     {
-        var canvas = OpenCanvas();
-        canvas.Save();
-        canvas.Translate(translation.X, translation.Y);
         var rasterCanvas = BGraphicsBackend.UseBroilerRasterPipeline ? OpenRasterCanvas() : null;
         if (rasterCanvas is not null)
         {
@@ -178,7 +177,20 @@ public sealed class BBitmap : IDisposable
             rasterCanvas.Translate(translation.X, translation.Y);
         }
 
-        return new GraphicsAdapter(canvas, clip, rasterCanvas, dispose: true, restoreOnDispose: true, onDispose: SyncPixelsFromCompatBitmap);
+        return new GraphicsAdapter(
+            OpenCanvas,
+            clip,
+            rasterCanvas,
+            disposeCanvas: true,
+            restoreOnDispose: true,
+            onDispose: SyncPixelsFromCompatBitmap,
+            initialCanvasOperation: static (canvas, state) =>
+            {
+                var offset = (PointF)state;
+                canvas.Save();
+                canvas.Translate(offset.X, offset.Y);
+            },
+            initialCanvasOperationState: translation);
     }
 
     internal void DrawPictureToFit(SKPicture picture)

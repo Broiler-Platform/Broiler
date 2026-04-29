@@ -25,6 +25,9 @@ Supported values for the internal override:
 - `BBitmap` now stores its primary pixels in a Broiler-owned buffer and keeps the
   remaining `SKBitmap` surface synchronized only for the internal compatibility
   seam.
+- `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
+  creation and only materializes the compatibility surface if a draw actually
+  falls back to the internal Skia path.
 - Solid brush/pen adapters and texture brushes now defer `SKPaint`/`SKShader`
   materialization until a draw call actually falls back to the internal Skia
   compatibility path.
