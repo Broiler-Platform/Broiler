@@ -15,7 +15,7 @@ internal sealed class GraphicsAdapter : RGraphics
     private readonly Action? _onDispose;
     private readonly List<Action<SKCanvas>> _deferredCanvasOperations = [];
     private readonly Stack<bool> _rasterLayerStack = new();
-    private readonly ITextShaper _textShaper = SkiaTextShaper.Instance;
+    private readonly ITextShaper _textShaper;
     private SKCanvas? _canvas;
     private int _activeSkiaLayerDepth;
     private bool _nextLayerCanUseRaster;
@@ -27,6 +27,7 @@ internal sealed class GraphicsAdapter : RGraphics
         bool disposeCanvas = false,
         bool restoreOnDispose = false,
         Action? onDispose = null,
+        ITextShaper? textShaper = null,
         Action<SKCanvas, object?>? initialCanvasOperation = null,
         object? initialCanvasOperationState = null)
         : base(SkiaImageAdapter.Instance, initialClip)
@@ -36,6 +37,7 @@ internal sealed class GraphicsAdapter : RGraphics
         _disposeCanvas = disposeCanvas;
         _restoreOnDispose = restoreOnDispose;
         _onDispose = onDispose;
+        _textShaper = textShaper ?? SkiaTextShaper.Instance;
         if (initialCanvasOperation is not null)
             _deferredCanvasOperations.Add(canvas => initialCanvasOperation(canvas, initialCanvasOperationState));
     }
@@ -126,16 +128,7 @@ internal sealed class GraphicsAdapter : RGraphics
     public override void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl)
     {
         var canvas = EnsureCanvas();
-        var fontAdapter = (FontAdapter)font;
-        using var paint = new SKPaint
-        {
-            Color = Utilities.Utils.Convert(color),
-            IsAntialias = true,
-        };
-
-        var renderFont = fontAdapter.RenderFont;
-        var origin = _textShaper.GetDrawOrigin(fontAdapter, point);
-        canvas.DrawText(str, origin.X, origin.Y, renderFont, paint);
+        _textShaper.DrawString(canvas, (FontAdapter)font, str, color, point);
     }
 
     public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
@@ -144,51 +137,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
 
         var canvas = EnsureCanvas();
-        var fontAdapter = (FontAdapter)font;
-        var renderFont = fontAdapter.RenderFont;
-        var origin = _textShaper.GetDrawOrigin(fontAdapter, point);
-        float shaderWidth = Math.Max(rect.Width, _textShaper.MeasureRenderedText(fontAdapter, str));
-        float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
-        var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
-
-        var radians = angle * Math.PI / 180.0;
-        float cx = shaderRect.X + shaderRect.Width / 2f;
-        float cy = shaderRect.Y + shaderRect.Height / 2f;
-        float halfDiag = Math.Max(shaderRect.Width, shaderRect.Height) / 2f;
-        float sin = (float)Math.Sin(radians);
-        float cos = (float)Math.Cos(radians);
-        var startPoint = new SKPoint(cx - sin * halfDiag, cy + cos * halfDiag);
-        var endPoint = new SKPoint(cx + sin * halfDiag, cy - cos * halfDiag);
-
-        var skColors = new SKColor[colors.Length];
-        for (int i = 0; i < colors.Length; i++)
-            skColors[i] = Utilities.Utils.Convert(colors[i]);
-
-        canvas.SaveLayer();
-        using (var maskPaint = new SKPaint { Color = SKColors.White, IsAntialias = false })
-        {
-            canvas.DrawText(str, origin.X, origin.Y, renderFont, maskPaint);
-        }
-
-        using var shader = SKShader.CreateLinearGradient(startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);
-        using var gradientPaint = new SKPaint
-        {
-            Shader = shader,
-            BlendMode = SKBlendMode.SrcIn,
-            IsAntialias = false,
-        };
-
-        if (string.Equals(fontAdapter.Typeface.FamilyName, "Ahem", StringComparison.OrdinalIgnoreCase)
-            && !str.Contains(' '))
-        {
-            gradientPaint.BlendMode = SKBlendMode.SrcOver;
-            canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
-            canvas.Restore();
-            return;
-        }
-
-        canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
-        canvas.Restore();
+        _textShaper.DrawGradientString(canvas, (FontAdapter)font, str, rect, point, size, colors, positions, angle);
     }
 
     public override RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation)

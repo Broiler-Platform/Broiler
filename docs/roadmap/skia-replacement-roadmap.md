@@ -562,6 +562,9 @@ and `FontAdapter` now defers `SKFont` creation until text measurement or draw
 work needs layout/render font state,
 and alias-backed font-file registration now also defers `SKTypeface.FromFile`
 until font creation resolves the loaded family,
+and text measurement plus text/gradient draw dispatch now route through the
+internal `ITextShaper` seam instead of leaving the remaining Skia-backed
+text-rendering details inside `GraphicsAdapter`,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +

@@ -493,6 +493,41 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void GraphicsAdapter_Text_Operations_Delegate_Through_Text_Shaper_Seam()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        var textShaper = new RecordingTextShaper();
+        using var graphics = new GraphicsAdapter(
+            () => surface.Canvas,
+            new RectangleF(0, 0, 32, 32),
+            textShaper: textShaper);
+        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+
+        var measureSize = graphics.MeasureString("measure", font);
+        graphics.MeasureString("limit", font, 12, out var charFit, out var charFitWidth);
+        graphics.DrawString("draw", font, Color.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
+        graphics.DrawGradientString(
+            "gradient",
+            font,
+            new RectangleF(0, 0, 8, 9),
+            new PointF(5, 6),
+            new SizeF(7, 8),
+            rtl: false,
+            colors: [Color.Red, Color.Blue],
+            positions: [0f, 1f],
+            angle: 45f);
+
+        Assert.Equal(new SizeF(7, 11), measureSize);
+        Assert.Equal(3, charFit);
+        Assert.Equal(9, charFitWidth);
+        Assert.Equal(
+            ["MeasureString", "MeasureStringMaxWidth", "DrawString", "DrawGradientString"],
+            textShaper.Calls);
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+    }
+
+    [Fact]
     public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
@@ -1170,6 +1205,34 @@ public class GraphicsAbstractionTests
     {
         using var canvas = bitmap.OpenRasterCanvas();
         canvas.FillRect(new RectangleF(x, y, width, height), color);
+    }
+
+    private sealed class RecordingTextShaper : ITextShaper
+    {
+        public List<string> Calls { get; } = [];
+
+        public SizeF MeasureString(FontAdapter font, string text)
+        {
+            Calls.Add("MeasureString");
+            return new SizeF(7, 11);
+        }
+
+        public void MeasureString(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
+        {
+            Calls.Add("MeasureStringMaxWidth");
+            charFit = 3;
+            charFitWidth = 9;
+        }
+
+        public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+        {
+            Calls.Add("DrawString");
+        }
+
+        public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        {
+            Calls.Add("DrawGradientString");
+        }
     }
 
 }
