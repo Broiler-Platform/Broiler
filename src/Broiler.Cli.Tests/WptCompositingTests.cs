@@ -1089,9 +1089,9 @@ body { margin: 0; }
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Red < 30, $"Expected near-zero red but got {pixel.Red}");
-        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
-        Assert.True(pixel.Blue < 30, $"Expected near-zero blue but got {pixel.Blue}");
+        Assert.Equal((byte)0, pixel.Red);
+        Assert.Equal((byte)0, pixel.Green);
+        Assert.Equal((byte)0, pixel.Blue);
     }
 
     /// <summary>
