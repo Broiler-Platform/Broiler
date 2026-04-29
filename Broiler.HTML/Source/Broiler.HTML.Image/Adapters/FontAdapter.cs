@@ -28,7 +28,7 @@ internal sealed class FontAdapter : RFont
     private SKFont? _renderFont;
 
     public FontAdapter(SKTypeface typeface, double size, DrawingFontStyle style)
-        : this(typeface?.FamilyName ?? string.Empty, size, style, () => typeface ?? SKTypeface.Default)
+        : this((typeface ?? SKTypeface.Default).FamilyName, size, style, () => typeface ?? SKTypeface.Default)
     {
     }
 
