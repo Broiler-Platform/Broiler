@@ -1243,6 +1243,9 @@ public sealed partial class DomBridge
             (KeyString)"value",
             new JSFunction((in Arguments a) =>
             {
+                if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
+                    return new JSString(GetSelectValue(element));
+
                 if (element.DomProperties.TryGetValue("_value", out var domVal) && domVal is string sv)
                     return new JSString(sv);
                 if (element.Attributes.TryGetValue("value", out var val))
@@ -1255,6 +1258,8 @@ public sealed partial class DomBridge
                 var v = a.Length > 0 ? a[0].ToString() : string.Empty;
                 if (tag == "input")
                     element.DomProperties["_value"] = v; // IDL value, not reflected
+                else if (tag == "select")
+                    SetSelectValue(element, v);
                 else
                     element.Attributes["value"] = v;
                 return JSUndefined.Value;
@@ -1866,6 +1871,63 @@ public sealed partial class DomBridge
                 }, "get cells"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddValue(
+                (KeyString)"insertCell",
+                new JSFunction((in Arguments a) =>
+                {
+                    var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
+                    var td = new DomElement("td", null, null, string.Empty);
+                    bridge._elements.Add(td);
+                    td.Parent = element;
+
+                    var cells = element.Children
+                        .Where(c => !c.IsTextNode && IsTableCellElement(c))
+                        .ToList();
+
+                    if (index < 0 || index >= cells.Count)
+                    {
+                        element.Children.Add(td);
+                    }
+                    else
+                    {
+                        var referenceCell = cells[index];
+                        var childIndex = element.Children.IndexOf(referenceCell);
+                        if (childIndex < 0)
+                            element.Children.Add(td);
+                        else
+                            element.Children.Insert(childIndex, td);
+                    }
+
+                    return ToJSObject(td);
+                }, "insertCell", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"deleteCell",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0)
+                        return JSUndefined.Value;
+
+                    var index = (int)Math.Truncate(a[0].DoubleValue);
+                    var cells = element.Children
+                        .Where(c => !c.IsTextNode && IsTableCellElement(c))
+                        .ToList();
+
+                    if (index < 0)
+                        index = cells.Count + index;
+
+                    if (index >= 0 && index < cells.Count)
+                    {
+                        var cell = cells[index];
+                        cell.Parent = null;
+                        element.Children.Remove(cell);
+                    }
+
+                    return JSUndefined.Value;
+                }, "deleteCell", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // HTMLFormElement interface
@@ -2056,21 +2118,16 @@ public sealed partial class DomBridge
             obj.FastAddProperty(
                 (KeyString)"selectedIndex",
                 new JSFunction((in Arguments _) =>
+                    new JSNumber(GetSelectSelectedIndex(element)),
+                    "get selectedIndex"),
+                new JSFunction((in Arguments a) =>
                 {
-                    var idx = 0;
-                    foreach (var c in element.Children)
-                    {
-                        if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (c.Attributes.ContainsKey("selected") ||
-                                (c.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true))
-                                return new JSNumber(idx);
-                            idx++;
-                        }
-                    }
-                    return new JSNumber(0); // default: first option is selected
-                }, "get selectedIndex"),
-                null,
+                    var index = a.Length == 0
+                        ? -1
+                        : (int)Math.Truncate(a[0].DoubleValue);
+                    SetSelectSelectedIndex(element, index);
+                    return JSUndefined.Value;
+                }, "set selectedIndex"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             obj.FastAddProperty(
@@ -4483,6 +4540,99 @@ public sealed partial class DomBridge
         }
 
         return count;
+    }
+
+    private static List<DomElement> CollectSelectOptions(DomElement element)
+    {
+        var options = new List<DomElement>();
+        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        {
+            if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
+            {
+                options.Add(child);
+                continue;
+            }
+
+            options.AddRange(CollectSelectOptions(child));
+        }
+
+        return options;
+    }
+
+    private static int GetSelectSelectedIndex(DomElement element)
+    {
+        var options = CollectSelectOptions(element);
+        if (options.Count == 0)
+            return -1;
+
+        if (element.DomProperties.TryGetValue("_selectedIndex", out var explicitIndex) &&
+            explicitIndex is int dirtyIndex)
+        {
+            return dirtyIndex >= 0 && dirtyIndex < options.Count ? dirtyIndex : -1;
+        }
+
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            if (option.Attributes.ContainsKey("selected") ||
+                (option.DomProperties.TryGetValue("_defaultSelected", out var defaultSelected) && defaultSelected is true))
+            {
+                return index;
+            }
+        }
+
+        return 0;
+    }
+
+    private static void SetSelectSelectedIndex(DomElement element, int index)
+    {
+        var options = CollectSelectOptions(element);
+        if (options.Count == 0)
+        {
+            element.DomProperties["_selectedIndex"] = -1;
+            return;
+        }
+
+        if (index < 0 || index >= options.Count)
+            index = -1;
+
+        element.DomProperties["_selectedIndex"] = index;
+    }
+
+    private static string GetSelectValue(DomElement element)
+    {
+        var options = CollectSelectOptions(element);
+        var selectedIndex = GetSelectSelectedIndex(element);
+        if (selectedIndex < 0 || selectedIndex >= options.Count)
+            return string.Empty;
+
+        var option = options[selectedIndex];
+        if (option.DomProperties.TryGetValue("_value", out var domValue) && domValue is string stringValue)
+            return stringValue;
+
+        if (option.Attributes.TryGetValue("value", out var attrValue))
+            return attrValue;
+
+        return option.TextContent;
+    }
+
+    private static void SetSelectValue(DomElement element, string value)
+    {
+        var options = CollectSelectOptions(element);
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            var optionValue = option.Attributes.TryGetValue("value", out var attrValue)
+                ? attrValue
+                : option.TextContent;
+            if (string.Equals(optionValue, value, StringComparison.Ordinal))
+            {
+                element.DomProperties["_selectedIndex"] = index;
+                return;
+            }
+        }
+
+        element.DomProperties["_selectedIndex"] = -1;
     }
 
     private IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)

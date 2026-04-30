@@ -578,6 +578,12 @@ sub-issues was filed or re-prioritized.
   and fixed style-rule extraction so comma-separated selector groups are not
   split inside functional pseudo-class arguments. Focused regressions now pass
   via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~SelectorsLevel4SpecificityTests`.
+- **2026-04-30** — HTML/HtmlBridge DOM continuation: wired
+  `HTMLTableRowElement.insertCell()` / `deleteCell()` and completed
+  `HTMLSelectElement.selectedIndex` assignment plus selection-backed `value`
+  reads/writes so the previously skipped Acid3 table/select regressions now run
+  green. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3HtmlElementRegressionTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

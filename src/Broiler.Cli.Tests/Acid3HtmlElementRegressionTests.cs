@@ -92,7 +92,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("tr|1|true", result);
     }
 
-    [Fact(Skip = "insertCell() not yet wired in CLI DOM engine — implementation gap")]
+    [Fact]
     public void Acid3_Test53_TableRow_InsertCell()
     {
         var html = @"<!DOCTYPE html>
@@ -259,7 +259,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("1|h|Hello", result);
     }
 
-    [Fact(Skip = "selectedIndex assignment not yet implemented — implementation gap")]
+    [Fact]
     public void Acid3_Test60_Select_SelectedIndex()
     {
         var html = @"<!DOCTYPE html>
@@ -282,6 +282,30 @@ document.getElementById('result').textContent = r.join('|');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("1|2|c", result);
+    }
+
+    [Fact]
+    public void Acid3_Test60b_Select_Value_Selects_Matching_Option()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sel = document.createElement('select');
+var o1 = document.createElement('option'); o1.value = 'a'; o1.text = 'A';
+var o2 = document.createElement('option'); o2.value = 'b'; o2.text = 'B';
+var o3 = document.createElement('option'); o3.value = 'c'; o3.text = 'C';
+sel.appendChild(o1); sel.appendChild(o2); sel.appendChild(o3);
+sel.value = 'b';
+r.push(sel.selectedIndex);
+r.push(sel.value);
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1|b", result);
     }
 
     [Fact]
