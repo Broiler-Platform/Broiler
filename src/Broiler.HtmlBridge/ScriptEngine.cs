@@ -51,6 +51,8 @@ public sealed class ScriptEngine : IScriptEngine
                 {
                     context.Eval(source);
                 }
+
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -83,6 +85,7 @@ public sealed class ScriptEngine : IScriptEngine
         using var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
         if (!string.IsNullOrEmpty(url))
             bridge.Attach(context, html, url);
@@ -113,6 +116,8 @@ public sealed class ScriptEngine : IScriptEngine
                 {
                     context.Eval(source);
                 }
+
+                DrainAsyncWork(bridge);
             }
             catch (Exception ex)
             {
@@ -129,6 +134,7 @@ public sealed class ScriptEngine : IScriptEngine
             {
                 var source = PrepareSource(script);
                 context.Eval(source);
+                DrainAsyncWork(bridge);
             }
             catch (Exception ex)
             {
@@ -141,12 +147,7 @@ public sealed class ScriptEngine : IScriptEngine
         // This is critical for test harnesses like Acid3 that bootstrap
         // the test runner via <body onload="update()">.
         bridge.FireWindowLoadEvent();
-
-        // Flush all pending timers and rAF callbacks so that
-        // setTimeout-chained test harnesses run to completion.
-        bridge.FlushTimers();
-
-        MicroTasks.Drain();
+        DrainAsyncWork(bridge);
         return bridge.SerializeToHtml();
     }
 
@@ -161,6 +162,7 @@ public sealed class ScriptEngine : IScriptEngine
         var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
         if (!string.IsNullOrEmpty(url))
             bridge.Attach(context, html, url);
@@ -184,6 +186,7 @@ public sealed class ScriptEngine : IScriptEngine
             {
                 var source = PrepareSource(scripts[i]);
                 context.Eval(source);
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -198,6 +201,7 @@ public sealed class ScriptEngine : IScriptEngine
             {
                 var source = PrepareSource(script);
                 context.Eval(source);
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -234,6 +238,8 @@ public sealed class ScriptEngine : IScriptEngine
                 {
                     context.Eval(source);
                 }
+
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -253,6 +259,34 @@ public sealed class ScriptEngine : IScriptEngine
             Success = errors.Count == 0,
             Errors = errors
         };
+    }
+
+    /// <summary>
+    /// Drain queued microtasks and timer tasks until the bridge-backed execution
+    /// environment settles, matching the checkpointing used by the WPT harness.
+    /// </summary>
+    private void DrainAsyncWork(DomBridge bridge)
+    {
+        const int maxIterations = 1000;
+        for (var iteration = 0; iteration < maxIterations; iteration++)
+        {
+            var hadWork = false;
+
+            if (MicroTasks.Count > 0)
+            {
+                MicroTasks.Drain();
+                hadWork = true;
+            }
+
+            if (bridge.HasPendingTimers)
+            {
+                bridge.FlushTimerStep();
+                hadWork = true;
+            }
+
+            if (!hadWork)
+                break;
+        }
     }
 
     /// <summary>

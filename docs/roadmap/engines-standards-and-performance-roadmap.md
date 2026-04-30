@@ -552,6 +552,12 @@ sub-issues was filed or re-prioritized.
   `Event.composedPath()` across bridge-dispatched DOM events, then covered the
   behavior in focused DOM-event regressions. `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEvents`
   now passes with 43 tests green and 2 existing skips.
+- **2026-04-30** — HtmlBridge microtask continuation: moved the CLI capture
+  path off inline `queueMicrotask` execution, added per-task microtask
+  checkpoints to bridge timer flushing, and aligned `ScriptEngine` /
+  `InteractiveSession` script sequencing with that checkpoint model. Focused
+  regression coverage for same-script, cross-script, and timer-task ordering now
+  passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~QueueMicrotask|FullyQualifiedName~Microtasks_Between"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

@@ -1205,6 +1205,7 @@ internal sealed class WptTestRunner
 
         using var context = new JSContext();
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
             if (a.Length > 0 && a[0] is JSFunction fn)

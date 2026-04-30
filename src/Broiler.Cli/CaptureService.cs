@@ -496,9 +496,11 @@ public class CaptureService
         if (scripts.Count == 0 && deferredScripts.Count == 0)
             return html;
 
+        var microTasks = new MicroTaskQueue();
         using var context = new JSContext();
-        RegisterRuntimeExtensions(context);
+        RegisterRuntimeExtensions(context, microTasks);
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => microTasks.Drain();
         bridge.Attach(context, html, url);
 
         // Set local base path for sub-resource resolution (e.g. iframe src)
@@ -513,6 +515,30 @@ public class CaptureService
             .Where(t => string.Equals(t.el.TagName, "script", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
+        {
+            const int maxIterations = 1000;
+            for (var iteration = 0; iteration < maxIterations; iteration++)
+            {
+                var hadWork = false;
+
+                if (microTasks.Count > 0)
+                {
+                    microTasks.Drain();
+                    hadWork = true;
+                }
+
+                if (bridge.HasPendingTimers)
+                {
+                    bridge.FlushTimerStep();
+                    hadWork = true;
+                }
+
+                if (!hadWork)
+                    break;
+            }
+        }
+
         for (int si = 0; si < scripts.Count; si++)
         {
             if (si < scriptElements.Count)
@@ -520,6 +546,7 @@ public class CaptureService
             try
             {
                 context.Eval(scripts[si]);
+                DrainAsyncWork(bridge, microTasks);
             }
             catch (Exception ex)
             {
@@ -535,6 +562,7 @@ public class CaptureService
             try
             {
                 context.Eval(script);
+                DrainAsyncWork(bridge, microTasks);
             }
             catch (Exception ex)
             {
@@ -548,8 +576,8 @@ public class CaptureService
         // the test runner via <body onload="update()">.
         bridge.FireWindowLoadEvent();
 
-        // Flush all pending timers and rAF callbacks before capture
-        bridge.FlushTimers();
+        // Drain queued microtasks and timer work before capture.
+        DrainAsyncWork(bridge, microTasks);
         bridge.ResolveAnimationSnapshots();
 
         return bridge.SerializeToHtml();
@@ -856,19 +884,22 @@ public class CaptureService
     /// the CLI script-execution environment matches the App's
     /// <see cref="ScriptEngine.RegisterRuntimeExtensions"/> setup.
     /// </summary>
-    private static void RegisterRuntimeExtensions(JSContext context)
+    private static void RegisterRuntimeExtensions(JSContext context, MicroTaskQueue microTasks)
     {
-        // queueMicrotask(fn) — execute callback (no-op queue; runs inline)
+        // queueMicrotask(fn) — queue callback for the next microtask checkpoint
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
             if (a.Length > 0 && a[0] is JSFunction fn)
             {
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                catch (Exception ex)
+                microTasks.Enqueue(() =>
                 {
-                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.queueMicrotask",
-                        $"Callback error: {ex.Message}", ex);
-                }
+                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.queueMicrotask",
+                            $"Callback error: {ex.Message}", ex);
+                    }
+                });
             }
             return JSUndefined.Value;
         }, "queueMicrotask", 1);

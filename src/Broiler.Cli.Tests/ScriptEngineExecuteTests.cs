@@ -506,6 +506,37 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts()
+    {
+        var engine = new ScriptEngine();
+
+        var scripts = new List<string>
+        {
+            """
+            window.order = [];
+            queueMicrotask(function() {
+                window.order.push('micro');
+            });
+            window.order.push('script-1');
+            """,
+            """
+            document.getElementById('out').setAttribute('data-order-before-script-2', window.order.join(','));
+            window.order.push('script-2');
+            """
+        };
+
+        var html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        var output = engine.Execute(scripts, Array.Empty<string>(), html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("data-order-before-script-2=\"script-1,micro\"", output);
+    }
+
+    [Fact]
     public void ScriptExtractor_FetchExternalScript_FileUrl()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "broiler-test-" + Guid.NewGuid().ToString("N"));
@@ -1012,6 +1043,36 @@ document.write('<p id=""injected"">written</p>');
         var finalHtml = session.Complete();
         Assert.Contains("final", finalHtml);
         Assert.False(session.HasPendingWork);
+        session.Dispose();
+    }
+
+    [Fact]
+    public void InteractiveSession_Step_Runs_Microtasks_Between_Timer_Tasks()
+    {
+        var engine = new ScriptEngine();
+        var html = "<html><body><div id='out'></div></body></html>";
+        var scripts = new List<string>
+        {
+            @"
+            var order = [];
+            setTimeout(function() {
+                order.push('timeout-1');
+                queueMicrotask(function() { order.push('micro'); });
+            }, 0);
+            setTimeout(function() {
+                order.push('timeout-2');
+                document.getElementById('out').textContent = order.join(',');
+            }, 0);
+            "
+        };
+
+        var session = engine.ExecuteInteractive(scripts, Array.Empty<string>(), html, null);
+        Assert.NotNull(session);
+
+        var stepHtml = session.Step();
+
+        Assert.NotNull(stepHtml);
+        Assert.Contains("timeout-1,micro,timeout-2", stepHtml);
         session.Dispose();
     }
 

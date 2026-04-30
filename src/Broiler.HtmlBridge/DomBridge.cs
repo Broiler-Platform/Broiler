@@ -75,6 +75,12 @@ public sealed partial class DomBridge
     private int _viewportHeight = 768;
     private bool _serializationTransformsApplied;
 
+    /// <summary>
+    /// Optional callback invoked after each queued timer, interval, animation-frame,
+    /// or frame action task. Callers use this to run spec-like microtask checkpoints.
+    /// </summary>
+    public Action? TaskCheckpointCallback { get; set; }
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;
@@ -222,6 +228,18 @@ public sealed partial class DomBridge
     /// </summary>
     public bool FlushTimerStep()
     {
+        void RunTaskCheckpoint()
+        {
+            try
+            {
+                TaskCheckpointCallback?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"Task checkpoint error: {ex.Message}", ex);
+            }
+        }
+
         var pending = new List<(int Id, JSFunction Fn)>();
 
         // Collect timeout callbacks
@@ -258,6 +276,7 @@ public sealed partial class DomBridge
             if (_clearedTimerIds.Contains(id)) continue;
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setTimeout callback error: {ex.Message}", ex); }
+            finally { RunTaskCheckpoint(); }
         }
 
         // Execute interval callbacks (one tick per step)
@@ -266,6 +285,7 @@ public sealed partial class DomBridge
             if (_clearedTimerIds.Contains(id)) continue;
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setInterval callback error: {ex.Message}", ex); }
+            finally { RunTaskCheckpoint(); }
         }
 
         // Execute rAF callbacks
@@ -273,12 +293,14 @@ public sealed partial class DomBridge
         {
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"rAF callback error: {ex.Message}", ex); }
+            finally { RunTaskCheckpoint(); }
         }
 
         foreach (var action in frameActionSnapshot)
         {
             try { action(); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"frame action error: {ex.Message}", ex); }
+            finally { RunTaskCheckpoint(); }
         }
 
         return true;
