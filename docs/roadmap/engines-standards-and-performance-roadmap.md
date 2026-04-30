@@ -596,6 +596,13 @@ sub-issues was filed or re-prioritized.
   remaining skipped Acid3 numeric-coercion regression around live collection
   lengths. Focused coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SpecialRegressionTests`.
+- **2026-04-30** — HTML engine cascade continuation: started preserving
+  computed specificity and stylesheet source order for per-bucket CSS block
+  application in the image/rendering pipeline, which clears the skipped Acid3
+  debug regression where a later low-specificity selector incorrectly beat an
+  earlier higher-specificity one without `!important`. Focused coverage now
+  passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3CascadeDebugTests`
+  and `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~CssImportantCascadeTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
