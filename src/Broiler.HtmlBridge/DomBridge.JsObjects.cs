@@ -1908,7 +1908,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length == 0)
-                        return JSUndefined.Value;
+                        throw new JSException("Failed to execute 'deleteCell' on 'HTMLTableRowElement': 1 argument required, but only 0 present.");
 
                     var index = (int)Math.Truncate(a[0].DoubleValue);
                     var cells = element.Children
@@ -1918,12 +1918,12 @@ public sealed partial class DomBridge
                     if (index < 0)
                         index = cells.Count + index;
 
-                    if (index >= 0 && index < cells.Count)
-                    {
-                        var cell = cells[index];
-                        cell.Parent = null;
-                        element.Children.Remove(cell);
-                    }
+                    if (index < 0 || index >= cells.Count)
+                        throw new JSException("INDEX_SIZE_ERR");
+
+                    var cell = cells[index];
+                    cell.Parent = null;
+                    element.Children.Remove(cell);
 
                     return JSUndefined.Value;
                 }, "deleteCell", 1),
