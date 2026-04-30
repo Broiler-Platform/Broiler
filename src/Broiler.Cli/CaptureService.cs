@@ -517,8 +517,7 @@ public class CaptureService
 
         static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
         {
-            const int maxIterations = 1000;
-            for (var iteration = 0; iteration < maxIterations; iteration++)
+            for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
             {
                 var hadWork = false;
 

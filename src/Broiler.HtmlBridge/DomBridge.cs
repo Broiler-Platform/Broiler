@@ -23,6 +23,12 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    /// <summary>
+    /// Safety cap for draining bridge-backed microtask/timer work so promise/timer
+    /// chains can settle without risking an infinite loop in test and capture paths.
+    /// </summary>
+    public const int AsyncDrainIterationLimit = 1000;
+
     private const int FetchTimeoutSeconds = 30;
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",

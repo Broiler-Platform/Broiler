@@ -267,8 +267,7 @@ public sealed class ScriptEngine : IScriptEngine
     /// </summary>
     private void DrainAsyncWork(DomBridge bridge)
     {
-        const int maxIterations = 1000;
-        for (var iteration = 0; iteration < maxIterations; iteration++)
+        for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
         {
             var hadWork = false;
 
