@@ -547,6 +547,11 @@ sub-issues was filed or re-prioritized.
   ES2025 coverage for Iterator helpers, `Promise.try`, `RegExp.escape`, and the
   remaining Set methods. `dotnet test Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj`
   now passes with 68/68 tests green.
+- **2026-04-30** — HtmlBridge event-audit continuation: added support for
+  `addEventListener` option objects (`capture`, `once`, `passive`) and
+  `Event.composedPath()` across bridge-dispatched DOM events, then covered the
+  behavior in focused DOM-event regressions. `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEvents`
+  now passes with 43 tests green and 2 existing skips.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

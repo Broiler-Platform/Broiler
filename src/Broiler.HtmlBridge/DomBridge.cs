@@ -50,7 +50,7 @@ public sealed partial class DomBridge
     private readonly Dictionary<int, Action> _frameActions = new();
     private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
-    private readonly Dictionary<string, List<(JSValue Listener, bool Capture)>> _windowEventListeners =
+    private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -387,6 +387,7 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
 
         var prevented = false;
+        var currentListenerPassive = false;
         evt.FastAddValue((KeyString)"stopPropagation",
             new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -396,17 +397,24 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) =>
             {
-                prevented = true;
-                evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                if (!currentListenerPassive)
+                {
+                    prevented = true;
+                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                }
                 return JSUndefined.Value;
             }, "preventDefault", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"composedPath",
+            new JSFunction((in Arguments _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         if (_windowEventListeners.TryGetValue(eventType, out var listeners))
         {
-            foreach (var (listener, _) in listeners.ToList())
+            foreach (var registration in listeners.ToList())
             {
-                if (listener is not JSFunction fn)
+                currentListenerPassive = registration.Passive;
+                if (registration.Listener is not JSFunction fn)
                     continue;
 
                 try
@@ -417,6 +425,11 @@ public sealed partial class DomBridge
                 {
                     RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.window.dispatchEvent", $"Window event listener error: {ex.Message}", ex);
                 }
+
+                currentListenerPassive = false;
+
+                if (registration.Once)
+                    listeners.Remove(registration);
             }
         }
 
@@ -861,9 +874,8 @@ public sealed class DomElement(
     /// (e.g. input.value, option.defaultSelected). Keyed by property name.</summary>
     public Dictionary<string, object?> DomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").
-    /// Each entry stores the listener and whether it was registered for the capture phase.</summary>
-    public Dictionary<string, List<(JSValue Listener, bool Capture)>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").</summary>
+    public Dictionary<string, List<EventListenerRegistration>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Inline event handler properties keyed by event type (e.g. "click" for onclick).</summary>
     public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -878,6 +890,8 @@ public sealed class DomElement(
     /// <summary>Maps (namespace, localName) → qualifiedName for namespace-aware attribute methods.</summary>
     public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = new();
 }
+
+public readonly record struct EventListenerRegistration(JSValue Listener, bool Capture, bool Once = false, bool Passive = false);
 
 /// <summary>Options for MutationObserver.observe().</summary>
 public sealed class MutationObserverOptions

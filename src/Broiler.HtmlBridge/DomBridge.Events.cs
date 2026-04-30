@@ -1,4 +1,5 @@
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Array;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,46 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private static EventListenerRegistration CreateEventListenerRegistration(JSValue listener, JSValue options)
+    {
+        if (options is JSObject optionsObject)
+        {
+            return new EventListenerRegistration(
+                listener,
+                GetBooleanOption(optionsObject, "capture"),
+                GetBooleanOption(optionsObject, "once"),
+                GetBooleanOption(optionsObject, "passive"));
+        }
+
+        return new EventListenerRegistration(listener, options.BooleanValue);
+    }
+
+    private static bool GetCaptureForRemoval(JSValue options)
+        => options is JSObject optionsObject ? GetBooleanOption(optionsObject, "capture") : options.BooleanValue;
+
+    private static bool GetBooleanOption(JSObject options, string name)
+    {
+        var value = options[(KeyString)name];
+        return value != null && !value.IsNullOrUndefined && value.BooleanValue;
+    }
+
+    private JSValue BuildComposedPathValue(DomElement target, IReadOnlyList<DomElement> path)
+    {
+        var values = new List<JSValue> { target == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(target) };
+
+        for (int i = path.Count - 1; i >= 0; i--)
+        {
+            values.Add(path[i] == _documentNode
+                ? (_documentJSObject ?? JSNull.Value)
+                : ToJSObject(path[i]));
+        }
+
+        if (_windowJSObject != null)
+            values.Add(_windowJSObject);
+
+        return new JSArray(values.ToArray());
+    }
+
     private static bool CheckElementValidity(DomElement element)
     {
         if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
@@ -72,6 +113,7 @@ public sealed partial class DomBridge
         var stopped = false;
         var immediateStopped = false;
         var prevented = false;
+        var currentListenerPassive = false;
 
         // Set up event object properties
         evt[(KeyString)"target"] = target == _documentNode
@@ -86,7 +128,18 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) => { stopped = true; immediateStopped = true; return JSUndefined.Value; }, "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in Arguments _) => { prevented = true; evt[(KeyString)"defaultPrevented"] = JSBoolean.True; return JSUndefined.Value; }, "preventDefault", 0),
+            new JSFunction((in Arguments _) =>
+            {
+                if (!currentListenerPassive)
+                {
+                    prevented = true;
+                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                }
+                return JSUndefined.Value;
+            }, "preventDefault", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"composedPath",
+            new JSFunction((in Arguments _) => BuildComposedPathValue(target, path), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Phase 1: Capture (root → parent of target)
@@ -97,7 +150,7 @@ public sealed partial class DomBridge
             evt[(KeyString)"currentTarget"] = ancestor == _documentNode
                 ? (_documentJSObject ?? JSNull.Value)
                 : ToJSObject(ancestor);
-            FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped);
+            FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
         // Phase 2: Target — fire ALL listeners (both capture and bubble) in registration order
@@ -107,7 +160,7 @@ public sealed partial class DomBridge
             evt[(KeyString)"currentTarget"] = target == _documentNode
                 ? (_documentJSObject ?? JSNull.Value)
                 : ToJSObject(target);
-            FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped);
+            FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
         // Phase 3: Bubble (parent of target → root) — only if event.bubbles is true
@@ -122,7 +175,7 @@ public sealed partial class DomBridge
                 evt[(KeyString)"currentTarget"] = path[i] == _documentNode
                     ? (_documentJSObject ?? JSNull.Value)
                     : ToJSObject(path[i]);
-                FireListeners(path[i], eventType, evt, capturePhase: false, ref stopped, ref immediateStopped);
+                FireListeners(path[i], eventType, evt, capturePhase: false, ref stopped, ref immediateStopped, ref currentListenerPassive);
             }
         }
 
@@ -136,21 +189,26 @@ public sealed partial class DomBridge
     /// When <c>null</c> (target phase), all listeners fire in registration order plus the inline handler.
     /// </summary>
     private static void FireListeners(DomElement el, string eventType, JSObject evt,
-        bool? capturePhase, ref bool stopped, ref bool immediateStopped)
+        bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
     {
         if (el.EventListeners.TryGetValue(eventType, out var listeners))
         {
-            foreach (var (listener, capture) in listeners.ToList())
+            foreach (var registration in listeners.ToList())
             {
                 if (immediateStopped) break;
                 // In capture/bubble phases, only fire matching listeners.
                 // In target phase (capturePhase == null), fire all listeners.
-                if (capturePhase.HasValue && capture != capturePhase.Value) continue;
-                if (listener is JSFunction fn)
+                if (capturePhase.HasValue && registration.Capture != capturePhase.Value) continue;
+                currentListenerPassive = registration.Passive;
+                if (registration.Listener is JSFunction fn)
                 {
                     try { fn.InvokeFunction(new Arguments(fn, evt)); }
                     catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Event listener error: {ex.Message}", ex); }
                 }
+                currentListenerPassive = false;
+
+                if (registration.Once)
+                    listeners.Remove(registration);
             }
         }
 
@@ -160,6 +218,7 @@ public sealed partial class DomBridge
         {
             if (el.InlineEventHandlers.TryGetValue(eventType, out var inlineHandler) && inlineHandler is JSFunction inlineFn)
             {
+                currentListenerPassive = false;
                 try { inlineFn.InvokeFunction(new Arguments(inlineFn, evt)); }
                 catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Inline handler error: {ex.Message}", ex); }
             }

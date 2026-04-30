@@ -152,6 +152,135 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("doc-capture,target,doc-bubble", result);
     }
 
+    [Fact]
+    public void AddEventListener_OptionsObject_Capture_And_Remove_Work()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+var handler = function(e) { r.push('capture'); };
+parent.addEventListener('test', handler, { capture: true });
+parent.removeEventListener('test', handler, { capture: true });
+parent.addEventListener('test', function(e) { r.push('bubble'); }, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+child.dispatchEvent(evt);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">bubble<", result);
+        Assert.DoesNotContain(">capture<", result);
+    }
+
+    [Fact]
+    public void AddEventListener_Once_Option_Fires_Only_Once()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var count = 0;
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) { count++; }, { once: true });
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">1<", result);
+    }
+
+    [Fact]
+    public void Passive_Listener_PreventDefault_Does_Not_Cancel_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, true);
+target.addEventListener('test', function(e) { e.preventDefault(); }, { passive: true });
+var r = [];
+r.push('' + target.dispatchEvent(evt));
+r.push('' + evt.defaultPrevented);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,false", result);
+    }
+
+    [Fact]
+    public void Event_ComposedPath_Includes_Target_Ancestors_Document_And_Window()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('test', function(e) {
+    var path = e.composedPath();
+    var names = [];
+    for (var i = 0; i < path.length; i++) {
+        var node = path[i];
+        if (node === window) names.push('window');
+        else names.push((node.id || node.nodeName || '').toLowerCase());
+    }
+    document.getElementById('result').textContent = path.length + '|' + names.slice(0, 5).join('>');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+child.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("6|child&gt;parent&gt;body&gt;html&gt;#document", result);
+    }
+
+    [Fact]
+    public void Window_AddEventListener_Once_Option_Fires_Only_Once()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var count = 0;
+window.addEventListener('test', function(e) { count++; }, { once: true });
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+window.dispatchEvent(evt);
+window.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">1<", result);
+    }
+
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
 
     [Fact]
