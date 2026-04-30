@@ -564,6 +564,14 @@ sub-issues was filed or re-prioritized.
   aligned by routing it through the same response/header primitives. Focused
   bridge network coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~NetworkAndHttpTests`.
+- **2026-04-30** — HtmlBridge CSP continuation: expanded
+  `ContentSecurityPolicy` beyond eval-only parsing to honor the currently wired
+  script directives (`default-src`, `script-src`, `script-src-elem`) for
+  inline-script, external-script, nonce, hash, `self`, and eval decisions,
+  applied that policy during CLI/App script extraction and runtime eval
+  registration, and documented the still-unimplemented CSP3 gaps inline in the
+  bridge policy model. Focused regression coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~ContentSecurityPolicyTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

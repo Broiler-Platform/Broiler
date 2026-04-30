@@ -451,15 +451,20 @@ public class CaptureService
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+        var csp = ContentSecurityPolicy.FromHtml(html);
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
             var isDefer = DeferAttrPattern.IsMatch(attrs);
+            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
             string? scriptContent = null;
 
             var srcMatch = SrcAttrPattern.Match(attrs);
             if (srcMatch.Success)
             {
+                if (csp != null && !csp.AllowsExternalScript(srcMatch.Groups["uri"].Value, url, nonce))
+                    continue;
+
                 // data: URI script
                 var decoded = DecodeDataUri(srcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
@@ -472,6 +477,9 @@ public class CaptureService
                 if (anySrcMatch.Success)
                 {
                     var srcUri = anySrcMatch.Groups["uri"].Value;
+                    if (csp != null && !csp.AllowsExternalScript(srcUri, url, nonce))
+                        continue;
+
                     var fetched = FetchExternalScript(srcUri, url);
                     if (!string.IsNullOrEmpty(fetched))
                         scriptContent = fetched;
@@ -480,7 +488,7 @@ public class CaptureService
                 {
                     // Inline script
                     var content = match.Groups["content"].Value.Trim();
-                    if (!string.IsNullOrEmpty(content))
+                    if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
                         scriptContent = content;
                 }
             }
@@ -498,7 +506,7 @@ public class CaptureService
 
         var microTasks = new MicroTaskQueue();
         using var context = new JSContext();
-        RegisterRuntimeExtensions(context, microTasks);
+        RegisterRuntimeExtensions(context, microTasks, csp);
         var bridge = new DomBridge();
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         bridge.Attach(context, html, url);
@@ -883,7 +891,7 @@ public class CaptureService
     /// the CLI script-execution environment matches the App's
     /// <see cref="ScriptEngine.RegisterRuntimeExtensions"/> setup.
     /// </summary>
-    private static void RegisterRuntimeExtensions(JSContext context, MicroTaskQueue microTasks)
+    private static void RegisterRuntimeExtensions(JSContext context, MicroTaskQueue microTasks, ContentSecurityPolicy? csp = null)
     {
         // queueMicrotask(fn) — queue callback for the next microtask checkpoint
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
@@ -902,6 +910,15 @@ public class CaptureService
             }
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
+
+        if (csp != null && !csp.AllowsEval)
+        {
+            context["eval"] = new JSFunction((in Arguments _) =>
+            {
+                throw new InvalidOperationException(
+                    "Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source in the Content Security Policy.");
+            }, "eval", 1);
+        }
 
         // WeakRef polyfill
         RegisterWeakRefPolyfill(context);
