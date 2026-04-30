@@ -542,6 +542,11 @@ sub-issues was filed or re-prioritized.
 - **2026-04-30** — Execution kickoff: converted this document from a pure draft
   into an execution tracker by adding a ready-to-file sub-issue backlog, a
   milestone filing order, and a milestone checklist aligned to `#1064`.
+- **2026-04-30** — JavaScript roadmap continuation: repaired the focused
+  `Broiler.JavaScript.BuiltIns.Tests` project after namespace drift and added
+  ES2025 coverage for Iterator helpers, `Promise.try`, `RegExp.escape`, and the
+  remaining Set methods. `dotnet test Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj`
+  now passes with 68/68 tests green.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

@@ -1,7 +1,7 @@
 using Broiler.JavaScript.BuiltIns.Boolean;
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.BuiltIns.Tests;
@@ -567,6 +567,106 @@ public class BuiltInsTests
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         var result = ctx.Eval("var a = new Set([1,2,3]); var b = new Set([2,3,4]); a.intersection(b).size;");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Set_Difference()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var result = new Set([1,2,3]).difference(new Set([2,4]));
+            [result.has(1), result.has(2), result.has(3), result.size].join('|');
+        ");
+        Assert.Equal("true|false|true|2", result.ToString());
+    }
+
+    [Fact]
+    public void Set_SymmetricDifference()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var result = new Set([1,2,3]).symmetricDifference(new Set([2,4]));
+            [result.has(1), result.has(2), result.has(3), result.has(4), result.size].join('|');
+        ");
+        Assert.Equal("true|false|true|true|3", result.ToString());
+    }
+
+    [Fact]
+    public void Set_Subset_Superset_And_Disjoint_Methods()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var a = new Set([1, 2]);
+            var b = new Set([1, 2, 3]);
+            var c = new Set([4, 5]);
+            [a.isSubsetOf(b), b.isSupersetOf(a), a.isDisjointFrom(c)].join('|');
+        ");
+        Assert.Equal("true|true|true", result.ToString());
+    }
+
+    // ── M3: ES2025 built-in coverage ──────────────────────────────────
+
+    [Fact]
+    public async Task Promise_Try_Resolves_Return_Value()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Promise.try((a, b) => a + b, 19, 23);");
+        var promise = Assert.IsType<JSPromise>(result);
+        var resolved = await promise.Task;
+        Assert.Equal(42.0, resolved.DoubleValue);
+    }
+
+    [Fact]
+    public async Task Promise_Try_Rejects_Synchronous_Exception()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Promise.try(() => { throw new Error('boom'); });");
+        var promise = Assert.IsType<JSPromise>(result);
+        await Assert.ThrowsAsync<JSException>(async () => await promise.Task);
+    }
+
+    [Fact]
+    public void RegExp_Escape_Escapes_Syntax_Characters()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"RegExp.escape('hello.world?+[test]{x}(y)|/\\^$');");
+        Assert.Equal(@"hello\.world\?\+\[test\]\{x\}\(y\)\|\/\\\^\$", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_From_Map_Filter_Take_ToArray()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Iterator.from([1,2,3,4]).map(v => v * 2).filter(v => v > 4).take(2).toArray().join(',');");
+        Assert.Equal("6,8", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_Concat_Reduce_Across_Iterables()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Iterator.concat([1,2], new Set([3,4]).values()).reduce((sum, value) => sum + value, 0);");
+        Assert.Equal(10.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Generator_Instances_Inherit_Iterator_Helpers()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            function* values() { yield 1; yield 2; yield 3; }
+            values().drop(1).find(v => v === 2);
+        ");
         Assert.Equal(2.0, result.DoubleValue);
     }
 
