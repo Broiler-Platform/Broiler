@@ -558,6 +558,12 @@ sub-issues was filed or re-prioritized.
   `InteractiveSession` script sequencing with that checkpoint model. Focused
   regression coverage for same-script, cross-script, and timer-task ordering now
   passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~QueueMicrotask|FullyQualifiedName~Microtasks_Between"`.
+- **2026-04-30** — HtmlBridge Fetch continuation: added bridge-level
+  `Headers`, `Request`, and `Response` constructors, taught `fetch()` to accept
+  `Request` instances and constructor-backed headers, and kept `XMLHttpRequest`
+  aligned by routing it through the same response/header primitives. Focused
+  bridge network coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~NetworkAndHttpTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

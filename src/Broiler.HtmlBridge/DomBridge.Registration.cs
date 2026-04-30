@@ -1193,6 +1193,291 @@ public sealed partial class DomBridge
             console,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        static IEnumerable<(string Key, string Value)> EnumerateObjectStringEntries(JSObject obj)
+        {
+            foreach (var (key, value) in obj.Entries)
+            {
+                if (string.IsNullOrEmpty(key) || key[0] == '_' || value is JSFunction || value.IsUndefined || value.IsNull)
+                    continue;
+
+                yield return (key, value.ToString());
+            }
+        }
+
+        static string? TryGetJsPropertyString(JSObject obj, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var value = obj[(KeyString)name];
+                if (value != null && !value.IsUndefined && !value.IsNull)
+                    return value.ToString();
+            }
+
+            return null;
+        }
+
+        static JSObject CreateThenable(Func<JSValue> resolver)
+        {
+            var thenable = new JSObject();
+            thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                    cb.InvokeFunction(new Arguments(cb, resolver()));
+
+                return thenable;
+            }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return thenable;
+        }
+
+        static JSObject CreateHeadersObject(JSValue? initValue = null)
+        {
+            var headersObject = new JSObject();
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var originalNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            void SyncHeader(string name)
+            {
+                if (!values.TryGetValue(name, out var currentValue))
+                    currentValue = string.Empty;
+
+                var originalName = originalNames.TryGetValue(name, out var storedName) ? storedName : name;
+                headersObject[(KeyString)originalName] = new JSString(currentValue);
+                headersObject[(KeyString)name.ToLowerInvariant()] = new JSString(currentValue);
+            }
+
+            void SetHeader(string name, string value)
+            {
+                values[name] = value;
+                originalNames[name] = name;
+                SyncHeader(name);
+            }
+
+            void AppendHeader(string name, string value)
+            {
+                if (values.TryGetValue(name, out var existing) && !string.IsNullOrEmpty(existing))
+                    values[name] = $"{existing}, {value}";
+                else
+                    values[name] = value;
+
+                originalNames[name] = name;
+                SyncHeader(name);
+            }
+
+            if (initValue is JSObject initObject)
+            {
+                foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                    AppendHeader(key, value);
+            }
+
+            headersObject.FastAddValue((KeyString)"get", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSNull.Value;
+
+                var name = a[0].ToString();
+                return values.TryGetValue(name, out var currentValue)
+                    ? new JSString(currentValue)
+                    : JSNull.Value;
+            }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"has", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                return values.ContainsKey(a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+            }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"set", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    SetHeader(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"append", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    AppendHeader(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"delete", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    values.Remove(name);
+                    originalNames.Remove(name);
+                    headersObject[(KeyString)name] = JSUndefined.Value;
+                    headersObject[(KeyString)name.ToLowerInvariant()] = JSUndefined.Value;
+                }
+
+                return JSUndefined.Value;
+            }, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                {
+                    foreach (var header in values)
+                    {
+                        var name = originalNames.TryGetValue(header.Key, out var originalName)
+                            ? originalName
+                            : header.Key;
+                        cb.InvokeFunction(new Arguments(cb, new JSString(header.Value), new JSString(name), headersObject));
+                    }
+                }
+
+                return JSUndefined.Value;
+            }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return headersObject;
+        }
+
+        JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
+        {
+            string url;
+            string method;
+            string? body;
+            JSObject headersObject;
+
+            if (inputValue is JSObject inputObject && !string.IsNullOrEmpty(TryGetJsPropertyString(inputObject, "url", "href")))
+            {
+                url = TryGetJsPropertyString(inputObject, "url", "href") ?? string.Empty;
+                method = (TryGetJsPropertyString(inputObject, "method") ?? "GET").ToUpperInvariant();
+                body = TryGetJsPropertyString(inputObject, "_bodyInit", "body");
+                headersObject = inputObject[(KeyString)"headers"] is JSObject inputHeaders
+                    ? CreateHeadersObject(inputHeaders)
+                    : CreateHeadersObject();
+            }
+            else
+            {
+                url = inputValue.ToString();
+                method = "GET";
+                body = null;
+                headersObject = CreateHeadersObject();
+            }
+
+            if (initValue is JSObject initObject)
+            {
+                method = (TryGetJsPropertyString(initObject, "method") ?? method).ToUpperInvariant();
+                if (TryGetJsPropertyString(initObject, "body") is string initBody)
+                    body = initBody;
+                if (initObject[(KeyString)"headers"] is JSObject initHeaders)
+                    headersObject = CreateHeadersObject(initHeaders);
+            }
+
+            var requestObject = new JSObject();
+            requestObject[(KeyString)"url"] = new JSString(url);
+            requestObject[(KeyString)"method"] = new JSString(method);
+            requestObject[(KeyString)"headers"] = headersObject;
+            requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
+            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => CreateRequestObject(requestObject), "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return body == null ? new JSString(string.Empty) : new JSString(body);
+                });
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return requestObject;
+        }
+
+        JSValue CreateResponse(string body, int statusCode, string statusText, string responseUrl, string type, bool redirected, Dictionary<string, string> headers)
+        {
+            var responseHeaders = new JSObject();
+            foreach (var header in headers)
+                responseHeaders[(KeyString)header.Key] = new JSString(header.Value);
+
+            var headersObject = CreateHeadersObject(responseHeaders);
+            var responseObject = new JSObject();
+            responseObject[(KeyString)"ok"] = statusCode >= 200 && statusCode < 300 ? JSBoolean.True : JSBoolean.False;
+            responseObject[(KeyString)"status"] = new JSNumber(statusCode);
+            responseObject[(KeyString)"statusText"] = new JSString(statusText);
+            responseObject[(KeyString)"url"] = new JSString(responseUrl);
+            responseObject[(KeyString)"redirected"] = redirected ? JSBoolean.True : JSBoolean.False;
+            responseObject[(KeyString)"type"] = new JSString(type);
+            responseObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            responseObject[(KeyString)"headers"] = headersObject;
+            responseObject[(KeyString)"_bodyText"] = new JSString(body);
+            responseObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return new JSString(body);
+                });
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    var escaped = body
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("\n", "\\n")
+                        .Replace("\r", "\\r")
+                        .Replace("\t", "\\t")
+                        .Replace("\b", "\\b")
+                        .Replace("\f", "\\f");
+                    return context.Eval($"JSON.parse(\"{escaped}\")");
+                });
+            }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return new JSObject();
+                });
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
+                CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
+                "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return responseObject;
+        }
+
+        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
+        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
+        var responseCtor = new JSFunction((in Arguments a) =>
+        {
+            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
+            var status = 200;
+            var statusText = string.Empty;
+            var url = string.Empty;
+            var type = "basic";
+            var redirected = false;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (a.Length > 1 && a[1] is JSObject initObject)
+            {
+                if (TryGetJsPropertyString(initObject, "status") is string statusValue && int.TryParse(statusValue, out var parsedStatus))
+                    status = parsedStatus;
+                statusText = TryGetJsPropertyString(initObject, "statusText") ?? string.Empty;
+                url = TryGetJsPropertyString(initObject, "url") ?? string.Empty;
+                type = TryGetJsPropertyString(initObject, "type") ?? "basic";
+                redirected = string.Equals(TryGetJsPropertyString(initObject, "redirected"), "true", StringComparison.OrdinalIgnoreCase);
+
+                if (initObject[(KeyString)"headers"] is JSObject initHeaders)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(initHeaders))
+                        headers[key] = value;
+                }
+            }
+
+            return CreateResponse(body, status, statusText, url, type, redirected, headers);
+        }, "Response", 2);
+        window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["Headers"] = headersCtor;
+        context["Request"] = requestCtor;
+        context["Response"] = responseCtor;
+
         // fetch(url, options) — polyfill backed by HttpClient with headers, method support
         var fetchFn = new JSFunction((in Arguments a) =>
         {
@@ -1200,36 +1485,37 @@ public sealed partial class DomBridge
                 throw new JSException("Failed to execute 'fetch': 1 argument required.");
 
             var fetchUrl = a[0].ToString();
-            var responseObj = new JSObject();
+            if (a[0] is JSObject requestInput)
+            {
+                fetchUrl = TryGetJsPropertyString(requestInput, "url", "href") ?? fetchUrl;
+            }
+
+            JSValue responseObj = new JSObject();
 
             // Parse options (method, headers, body)
             var method = "GET";
             string? requestBody = null;
             var requestHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (a[0] is JSObject requestObject)
+            {
+                method = (TryGetJsPropertyString(requestObject, "method") ?? method).ToUpperInvariant();
+                requestBody = TryGetJsPropertyString(requestObject, "_bodyInit", "body");
+                if (requestObject[(KeyString)"headers"] is JSObject requestHeadersObject)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(requestHeadersObject))
+                        requestHeaders[key] = value;
+                }
+            }
+
             if (a.Length > 1 && a[1] is JSObject opts)
             {
-                var mVal = opts[(KeyString)"method"];
-                if (mVal is JSString mStr)
-                    method = mStr.ToString().ToUpperInvariant();
-                var bVal = opts[(KeyString)"body"];
-                if (bVal is JSString bStr)
-                    requestBody = bStr.ToString();
-                var hVal = opts[(KeyString)"headers"];
-                if (hVal is JSObject hObj)
+                method = (TryGetJsPropertyString(opts, "method") ?? method).ToUpperInvariant();
+                requestBody = TryGetJsPropertyString(opts, "body") ?? requestBody;
+                if (opts[(KeyString)"headers"] is JSObject optionsHeadersObject)
                 {
-                    // Enumerate known request header names.
-                    // Note: YantraJS does not support Object.keys/for-in on all object
-                    // types reliably, so we probe a fixed set of common HTTP headers.
-                    // Custom headers outside this list will not be forwarded.
-                    var commonHeaders = new[] { "Content-Type", "Accept", "Authorization",
-                        "X-Requested-With", "Cache-Control", "Pragma", "If-Modified-Since",
-                        "If-None-Match", "Range" };
-                    foreach (var name in commonHeaders)
-                    {
-                        var v = hObj[(KeyString)name];
-                        if (v is JSString sv)
-                            requestHeaders[name] = sv.ToString();
-                    }
+                    foreach (var (key, value) in EnumerateObjectStringEntries(optionsHeadersObject))
+                        requestHeaders[key] = value;
                 }
             }
 
@@ -1249,15 +1535,6 @@ public sealed partial class DomBridge
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
 
-                responseObj.FastAddValue((KeyString)"ok", response.IsSuccessStatusCode ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"status", new JSNumber(statusCode), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"statusText", new JSString(response.ReasonPhrase ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"redirected", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"type", new JSString("basic"), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"bodyUsed", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.headers — Headers-like object with get(), has(), forEach()
                 var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var h in response.Headers)
                     allHeaders[h.Key] = string.Join(", ", h.Value);
@@ -1266,108 +1543,26 @@ public sealed partial class DomBridge
                     foreach (var h in response.Content.Headers)
                         allHeaders[h.Key] = string.Join(", ", h.Value);
                 }
-
-                var headersObj = new JSObject();
-                headersObj.FastAddValue((KeyString)"get", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length == 0) return JSNull.Value;
-                    var name = hArgs[0].ToString();
-                    return allHeaders.TryGetValue(name, out var val) ? new JSString(val) : JSNull.Value;
-                }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                headersObj.FastAddValue((KeyString)"has", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length == 0) return JSBoolean.False;
-                    return allHeaders.ContainsKey(hArgs[0].ToString()) ? JSBoolean.True : JSBoolean.False;
-                }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                headersObj.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length > 0 && hArgs[0] is JSFunction cb)
-                    {
-                        foreach (var kv in allHeaders)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSString(kv.Value), new JSString(kv.Key))); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.headers.forEach", $"Callback error: {ex.Message}", ex); }
-                        }
-                    }
-                    return JSUndefined.Value;
-                }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"headers", headersObj, JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.text() — returns a thenable with the body text
-                responseObj.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSString(body))); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.text", $"Callback error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.json() — returns a thenable with parsed JSON
-                responseObj.FastAddValue((KeyString)"json", new JSFunction((in Arguments jsonArgs) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try
-                            {
-                                var escaped = body
-                                    .Replace("\\", "\\\\")
-                                    .Replace("\"", "\\\"")
-                                    .Replace("\n", "\\n")
-                                    .Replace("\r", "\\r")
-                                    .Replace("\t", "\\t")
-                                    .Replace("\b", "\\b")
-                                    .Replace("\f", "\\f");
-                                var parsed = context.Eval($"JSON.parse(\"{escaped}\")");
-                                cb.InvokeFunction(new Arguments(cb, parsed));
-                            }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.json", $"JSON parse error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.arrayBuffer() — returns a thenable with empty array buffer stub
-                responseObj.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSObject())); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.arrayBuffer", $"Callback error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.clone() — returns a shallow copy
-                responseObj.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => responseObj, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj = CreateResponse(
+                    body,
+                    statusCode,
+                    response.ReasonPhrase ?? string.Empty,
+                    fetchUrl,
+                    "basic",
+                    false,
+                    allHeaders);
             }
             catch (Exception ex)
             {
                 RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.fetch", $"Fetch error: {ex.Message}", ex);
-                responseObj.FastAddValue((KeyString)"ok", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"status", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"statusText", new JSString(ex.Message), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
-                var emptyHeaders = new JSObject();
-                emptyHeaders.FastAddValue((KeyString)"get", new JSFunction((in Arguments _) => JSNull.Value, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                emptyHeaders.FastAddValue((KeyString)"has", new JSFunction((in Arguments _) => JSBoolean.False, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                emptyHeaders.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments _) => JSUndefined.Value, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"headers", emptyHeaders, JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj = CreateResponse(
+                    string.Empty,
+                    0,
+                    ex.Message,
+                    fetchUrl,
+                    "error",
+                    false,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             }
 
             // Return a thenable (Promise-like) that resolves immediately
