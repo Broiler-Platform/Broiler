@@ -43,14 +43,13 @@ public sealed partial class DomBridge
 
     private JSValue BuildComposedPathValue(DomElement target, IReadOnlyList<DomElement> path)
     {
-        var values = new List<JSValue> { target == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(target) };
+        JSValue ToEventPathObject(DomElement node)
+            => node == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(node);
+
+        var values = new List<JSValue> { ToEventPathObject(target) };
 
         for (int i = path.Count - 1; i >= 0; i--)
-        {
-            values.Add(path[i] == _documentNode
-                ? (_documentJSObject ?? JSNull.Value)
-                : ToJSObject(path[i]));
-        }
+            values.Add(ToEventPathObject(path[i]));
 
         if (_windowJSObject != null)
             values.Add(_windowJSObject);
@@ -218,6 +217,7 @@ public sealed partial class DomBridge
         {
             if (el.InlineEventHandlers.TryGetValue(eventType, out var inlineHandler) && inlineHandler is JSFunction inlineFn)
             {
+                // Inline on* handlers behave like regular non-passive listeners.
                 currentListenerPassive = false;
                 try { inlineFn.InvokeFunction(new Arguments(inlineFn, evt)); }
                 catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Inline handler error: {ex.Message}", ex); }
