@@ -513,6 +513,35 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void FontAdapter_Compat_Font_Work_Delegates_Through_Font_Compat_Seam()
+    {
+        var compatFactory = new RecordingFontCompatFactory();
+        var font = new FontAdapter(
+            "CompatOnly",
+            12,
+            FontStyle.Regular,
+            compatTypefaceFactory: () => SKTypeface.Default,
+            fontCompatFactory: compatFactory);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        var height = font.Height;
+        var underlineOffset = font.UnderlineOffset;
+
+        Assert.Equal(18d, height);
+        Assert.Equal(7d, underlineOffset);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+        Assert.Equal(["CreateFont:12", "GetMetrics"], compatFactory.Calls);
+
+        _ = font.RenderFont;
+
+        Assert.True(font.HasMaterializedRenderFont);
+        Assert.Equal(["CreateFont:12", "GetMetrics", $"CreateFont:{12 * (96f / 72f):0.####}"], compatFactory.Calls);
+    }
+
+    [Fact]
     public void Broiler_Text_Draw_And_Measurement_Do_Not_Materialize_Skia_For_Loaded_Fonts()
     {
         var alias = $"RasterText_{Guid.NewGuid():N}";
@@ -1790,6 +1819,23 @@ public class GraphicsAbstractionTests
             Calls.Add("MeasureTextWidthMaxWidth");
             charFit = 2;
             charFitWidth = 11d;
+        }
+    }
+
+    private sealed class RecordingFontCompatFactory : IFontCompatFactory
+    {
+        public List<string> Calls { get; } = [];
+
+        public SKFont CreateFont(SKTypeface typeface, float size)
+        {
+            Calls.Add($"CreateFont:{size:0.####}");
+            return new SKFont(typeface, size);
+        }
+
+        public FontCompatMetrics GetMetrics(SKFont font)
+        {
+            Calls.Add("GetMetrics");
+            return new FontCompatMetrics(18d, 7d);
         }
     }
 

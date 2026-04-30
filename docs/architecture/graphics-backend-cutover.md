@@ -31,6 +31,8 @@ Supported values for the internal override:
   skips compat-surface sync work when no fallback canvas was ever materialized.
 - `FontAdapter` now also defers `SKFont` creation until text measurement or
   drawing actually needs layout/render font state.
+- The remaining `FontAdapter` `SKFont` creation and fallback metric projection
+  details now route through the internal `IFontCompatFactory` seam.
 - `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
   draw actually needs the compatibility path object.
 - Solid, texture, and linear-gradient brush adapters plus pen adapters now

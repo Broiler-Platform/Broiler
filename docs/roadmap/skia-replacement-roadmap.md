@@ -565,6 +565,9 @@ and raster-only `BBitmap.OpenGraphics` disposal now skips compat-surface sync
 work unless a fallback canvas was actually materialized,
 and `FontAdapter` now defers `SKFont` creation until text measurement or draw
 work needs layout/render font state,
+and the remaining `FontAdapter` `SKFont` creation plus fallback font-metric
+projection details now also route through an internal `IFontCompatFactory`
+seam,
 and alias-backed font-file registration now also defers `SKTypeface.FromFile`
 until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
