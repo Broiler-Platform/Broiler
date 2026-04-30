@@ -305,7 +305,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 78: SVGLength type constants ──────────────────────
 
-    [Fact(Skip = "SVGLength type constants (SVG_LENGTHTYPE_NUMBER etc.) not yet exposed on SVGLength instances")]
+    [Fact]
     public void Acid3_Test78_SVGLength_Type_Constants()
     {
         var html = @"<!DOCTYPE html>

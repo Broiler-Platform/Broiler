@@ -584,6 +584,12 @@ sub-issues was filed or re-prioritized.
   reads/writes so the previously skipped Acid3 table/select regressions now run
   green. Focused coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3HtmlElementRegressionTests`.
+- **2026-04-30** — HTML/HtmlBridge SVG continuation: exposed
+  `SVG_LENGTHTYPE_*` constants on bridge-created `SVGLength` instance objects so
+  `SVGAnimatedLength.baseVal` / `animVal` match the existing global
+  `SVGLength` registration closely enough for the skipped Acid3 constant check
+  to run green. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SvgAndParsingRegressionTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
