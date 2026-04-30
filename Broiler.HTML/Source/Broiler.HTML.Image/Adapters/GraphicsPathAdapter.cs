@@ -15,7 +15,7 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
     private SKPath? _path;
 
     internal GraphicsPathAdapter(IPathCompat? pathCompat = null) =>
-        _pathCompat = pathCompat ?? SkiaPathCompat.Instance;
+        _pathCompat = pathCompat ?? SkiaCompatProvider.PathCompat;
 
     public SKPath Path => EnsurePath();
 

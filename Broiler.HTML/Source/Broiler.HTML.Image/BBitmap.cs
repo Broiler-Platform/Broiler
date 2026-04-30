@@ -289,7 +289,7 @@ public sealed class BBitmap : IDisposable
     }
 
     private IBitmapCompatSurface CreateDefaultCompatSurface(SKBitmap? initialBitmap = null, bool ownsBitmap = true)
-        => new SkiaBitmapCompatSurface(Width, Height, ReadPrimaryPixel, WritePrimaryPixel, initialBitmap, ownsBitmap);
+        => SkiaCompatProvider.CreateBitmapCompatSurface(Width, Height, ReadPrimaryPixel, WritePrimaryPixel, initialBitmap, ownsBitmap);
 
     private BColor ReadPrimaryPixel(int x, int y)
     {

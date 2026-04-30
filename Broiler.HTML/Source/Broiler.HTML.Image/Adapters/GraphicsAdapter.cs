@@ -39,8 +39,8 @@ internal sealed class GraphicsAdapter : RGraphics
         _disposeCanvas = disposeCanvas;
         _restoreOnDispose = restoreOnDispose;
         _onDispose = onDispose;
-        _textShaper = textShaper ?? SkiaTextShaper.Instance;
-        _canvasCompat = canvasCompat ?? SkiaCanvasCompat.Instance;
+        _textShaper = textShaper ?? SkiaCompatProvider.TextShaper;
+        _canvasCompat = canvasCompat ?? SkiaCompatProvider.CanvasCompat;
         if (initialCanvasOperation is not null)
             _deferredCanvasOperations.Add(canvas => initialCanvasOperation(canvas, initialCanvasOperationState));
     }

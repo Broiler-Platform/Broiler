@@ -712,6 +712,75 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        using var bitmap = new BBitmap(4, 4);
+
+        bitmap.SetPixel(1, 1, new BColor(0, 0, 0, 255));
+        bitmap.Clear(BColor.White);
+
+        Assert.Equal(1, provider.BitmapCompatSurfaceFactoryCallCount);
+        Assert.Equal(["SetPixel", "Clear"], provider.BitmapCompatSurface!.Calls);
+    }
+
+    [Fact]
+    public void Graphics_Default_Compat_Dependencies_Come_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider();
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        using var graphics = new GraphicsAdapter(
+            () => surface.Canvas,
+            new RectangleF(0, 0, 32, 32));
+        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        using var imageBitmap = new BBitmap(2, 2);
+        using var image = new ImageAdapter(imageBitmap);
+        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
+
+        _ = graphics.MeasureString("measure", font);
+        _ = font.Height;
+        _ = font.Font;
+        _ = font.RenderFont;
+        graphics.DrawString("draw", font, Color.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
+        graphics.PushClip(new RectangleF(2, 3, 4, 5));
+        graphics.DrawImage(image, new RectangleF(4, 5, 6, 7));
+        path.Start(1, 1);
+        path.LineTo(3, 4);
+        _ = path.Path;
+
+        Assert.Equal(["MeasureString", "DrawString"], provider.TextShaper.Calls);
+        Assert.Equal(["PushClip", "DrawImage"], provider.CanvasCompat.Calls);
+        Assert.Equal(["CreateFont:12", "CreateFont:16"], provider.FontCompatFactory.Calls);
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo"], provider.PathCompat.Calls);
+    }
+
+    [Fact]
+    public void SkiaImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider();
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        var adapter = new SkiaImageAdapter();
+
+        var family = adapter.LoadFontFromFile("/tmp/fake-font.ttf", "AliasFont");
+        var font = Assert.IsType<FontAdapter>(adapter.GetFont("AliasFont", 12, FontStyle.Regular));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Blue));
+        var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
+        var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(new RectangleF(0, 0, 10, 10), Color.Red, Color.Blue, 45));
+
+        Assert.Equal("AliasFont", family);
+        _ = font.Typeface;
+        _ = pen.Paint;
+        _ = solidBrush.Paint;
+        _ = gradientBrush.Paint;
+
+        Assert.Equal(1, provider.FontTypefaceResolverFactoryCallCount);
+        Assert.Equal(["RegisterFontFile", "ResolveTypeface"], provider.FontTypefaceResolver.Calls);
+        Assert.Equal(["CreatePenPaint", "CreateSolidBrushPaint", "CreateLinearGradientBrushPaint"], provider.PaintCompatFactory.Calls);
+    }
+
+    [Fact]
     public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
     {
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
@@ -2109,6 +2178,60 @@ public class GraphicsAbstractionTests
         }
 
         public void Dispose() => _bitmap.Dispose();
+    }
+
+    private sealed class RecordingSkiaCompatProvider(Func<IBitmapCompatSurface>? bitmapCompatSurfaceFactory = null) : ISkiaCompatProvider
+    {
+        private readonly Func<IBitmapCompatSurface> _bitmapCompatSurfaceFactory =
+            bitmapCompatSurfaceFactory ?? (() => new RecordingBitmapCompatSurface(4, 4));
+
+        public RecordingTextShaper TextShaper { get; } = new();
+
+        ITextShaper ISkiaCompatProvider.TextShaper => TextShaper;
+
+        public RecordingCanvasCompat CanvasCompat { get; } = new();
+
+        ICanvasCompat ISkiaCompatProvider.CanvasCompat => CanvasCompat;
+
+        public RecordingPathCompat PathCompat { get; } = new();
+
+        IPathCompat ISkiaCompatProvider.PathCompat => PathCompat;
+
+        public RecordingFontCompatFactory FontCompatFactory { get; } = new();
+
+        IFontCompatFactory ISkiaCompatProvider.FontCompatFactory => FontCompatFactory;
+
+        public RecordingPaintCompatFactory PaintCompatFactory { get; } = new();
+
+        IPaintCompatFactory ISkiaCompatProvider.PaintCompatFactory => PaintCompatFactory;
+
+        public RecordingFontTypefaceResolver FontTypefaceResolver { get; } = new();
+
+        public int FontTypefaceResolverFactoryCallCount { get; private set; }
+
+        public int BitmapCompatSurfaceFactoryCallCount { get; private set; }
+
+        public RecordingBitmapCompatSurface? BitmapCompatSurface { get; private set; }
+
+        public IFontTypefaceResolver CreateFontTypefaceResolver()
+        {
+            FontTypefaceResolverFactoryCallCount++;
+            return FontTypefaceResolver;
+        }
+
+        public IBitmapCompatSurface CreateBitmapCompatSurface(
+            int width,
+            int height,
+            Func<int, int, BColor> readPrimaryPixel,
+            Action<int, int, BColor> writePrimaryPixel,
+            SKBitmap? initialBitmap = null,
+            bool ownsBitmap = true)
+        {
+            BitmapCompatSurfaceFactoryCallCount++;
+            var compatSurface = _bitmapCompatSurfaceFactory();
+            BitmapCompatSurface = Assert.IsType<RecordingBitmapCompatSurface>(compatSurface);
+            return compatSurface;
+        }
     }
 
 }

@@ -21,8 +21,8 @@ internal sealed class SkiaImageAdapter : RAdapter
         IReadOnlyCollection<string> systemFonts = null,
         IPaintCompatFactory paintCompatFactory = null)
     {
-        _typefaceResolver = typefaceResolver ?? new SkiaFontTypefaceResolver();
-        _paintCompatFactory = paintCompatFactory ?? SkiaPaintCompatFactory.Instance;
+        _typefaceResolver = typefaceResolver ?? SkiaCompatProvider.CreateFontTypefaceResolver();
+        _paintCompatFactory = paintCompatFactory ?? SkiaCompatProvider.PaintCompatFactory;
 
         // Register system fonts first so we can probe availability below.
         var distinctSystemFonts = new HashSet<string>(

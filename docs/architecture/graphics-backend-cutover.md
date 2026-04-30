@@ -27,6 +27,10 @@ Supported values for the internal override:
   the internal `IBitmapCompatSurface` seam.
 - `BBitmap.DrawPictureToFit` now also routes compat picture playback/scaling
   through the internal `IBitmapCompatSurface` seam.
+- Core image-layer defaults now resolve the remaining compat implementations
+  through an internal provider seam so the eventual package split only needs to
+  move one centralized Skia registration point instead of many hard-wired
+  constructor defaults.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path, and raster-only graphics disposal now

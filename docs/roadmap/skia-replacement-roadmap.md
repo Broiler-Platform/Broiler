@@ -585,6 +585,10 @@ opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,
 and `BBitmap.DrawPictureToFit` now also routes compat picture
 playback/scaling through that internal `IBitmapCompatSurface` seam,
+and the core image-layer default wiring for bitmap, graphics, path, font, and
+adapter compat implementations now also centralizes through an internal
+provider seam as package-split prep instead of hard-wiring concrete `Skia*`
+defaults across constructors,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment

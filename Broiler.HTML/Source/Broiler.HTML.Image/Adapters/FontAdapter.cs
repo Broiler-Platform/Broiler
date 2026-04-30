@@ -35,7 +35,7 @@ internal sealed class FontAdapter : RFont
         _size = size;
         _style = style;
         _compatTypefaceFactory = () => compatTypeface;
-        _fontCompatFactory = SkiaFontCompatFactory.Instance;
+        _fontCompatFactory = SkiaCompatProvider.FontCompatFactory;
     }
 
     public FontAdapter(
@@ -49,7 +49,7 @@ internal sealed class FontAdapter : RFont
         _size = size;
         _style = style;
         _compatTypefaceFactory = compatTypefaceFactory;
-        _fontCompatFactory = fontCompatFactory ?? SkiaFontCompatFactory.Instance;
+        _fontCompatFactory = fontCompatFactory ?? SkiaCompatProvider.FontCompatFactory;
     }
 
     /// <summary>Layout font (pt-based) – used for metrics and text measurement.</summary>
