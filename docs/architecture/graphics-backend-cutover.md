@@ -66,6 +66,8 @@ Supported values for the internal override:
   attempt a Broiler-owned raster text path backed by
   `SixLabors.Fonts`/`SixLabors.ImageSharp.Drawing`, so registered/system fonts
   no longer require an `SKCanvas` materialization just to paint glyphs.
+- The remaining Skia fallback text draw and gradient-text draw details now route
+  through the internal `ITextCanvasCompat` seam inside `SkiaTextShaper`.
 - Deterministic `Ahem` text measurement, including max-width char-fit probing,
   now also stays on the Broiler-owned metrics path.
 - The remaining non-`Ahem` Skia-backed text measurement compatibility details

@@ -803,6 +803,34 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void SkiaTextShaper_Fallback_Draw_Operations_Delegate_Through_Text_Canvas_Compat_Seam()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        var textCanvasCompat = new RecordingTextCanvasCompat();
+        var textShaper = new SkiaTextShaper(textCanvasCompat: textCanvasCompat);
+        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        textShaper.DrawString(surface.Canvas, font, "draw", Color.Black, new PointF(1, 2));
+        textShaper.DrawGradientString(
+            surface.Canvas,
+            font,
+            "gradient",
+            new RectangleF(0, 0, 8, 9),
+            new PointF(5, 6),
+            new SizeF(7, 8),
+            [Color.Red, Color.Blue],
+            [0f, 1f],
+            45f);
+
+        Assert.Equal(["DrawString", "DrawGradientString"], textCanvasCompat.Calls);
+        Assert.True(font.HasMaterializedRenderFont);
+        Assert.False(font.HasMaterializedLayoutFont);
+    }
+
+    [Fact]
     public void SkiaImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
     {
         var paintCompat = new RecordingPaintCompatFactory();
@@ -1819,6 +1847,23 @@ public class GraphicsAbstractionTests
             Calls.Add("MeasureTextWidthMaxWidth");
             charFit = 2;
             charFitWidth = 11d;
+        }
+    }
+
+    private sealed class RecordingTextCanvasCompat : ITextCanvasCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public void DrawString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, Color color, PointF point)
+        {
+            Calls.Add("DrawString");
+            Assert.Same(font.RenderFont, renderFont);
+        }
+
+        public void DrawGradientString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        {
+            Calls.Add("DrawGradientString");
+            Assert.Same(font.RenderFont, renderFont);
         }
     }
 

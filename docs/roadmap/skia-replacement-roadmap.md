@@ -591,6 +591,9 @@ and the default `broiler` backend now routes text and gradient-text paint
 through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
 `SixLabors.ImageSharp.Drawing` for registered/system fonts before touching the
 remaining Skia fallback path,
+and the remaining Skia fallback text draw and gradient-text draw details now
+also route through an internal `ITextCanvasCompat` seam inside
+`SkiaTextShaper`,
 and deterministic `Ahem` text measurement plus max-width char-fit probing now
 also stay on the Broiler-owned metrics path,
 and the remaining non-`Ahem` Skia-backed text measurement compatibility
