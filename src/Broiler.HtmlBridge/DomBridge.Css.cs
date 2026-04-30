@@ -155,10 +155,6 @@ public sealed partial class DomBridge
         @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex PseudoSpecificityPattern = new(
-        @"::?[a-zA-Z-]+(?:\([^)]*\))?",
-        RegexOptions.Compiled);
-
     private static readonly Regex LengthAttrFunctionPattern = new(
         @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -224,75 +220,262 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Calculates CSS Specificity (Level 3) for a simple selector.
-    /// Returns a single integer encoding (a, b, c) where a = ID selectors,
-    /// b = class / attribute / pseudo-class selectors, c = type selectors.
-    /// Inline styles use specificity 1000 (handled externally).
+    /// Calculates CSS specificity for a selector, including Selectors L4
+    /// pseudo-class functions such as <c>:is()</c>, <c>:where()</c>,
+    /// <c>:has()</c>, and <c>:nth-child(... of ...)</c>.
+    /// Returns a sortable integer encoding of (a, b, c) where a = ID selectors,
+    /// b = class / attribute / pseudo-class selectors, and c = type selectors /
+    /// pseudo-elements. Inline styles are handled separately.
     /// </summary>
     public static int CalculateSpecificity(string selector)
     {
-        int a = 0, b = 0, c = 0;
-        var s = selector.Trim();
+        var (a, b, c) = CalculateSpecificityComponents(selector);
+        return EncodeSpecificity(a, b, c);
+    }
 
-        // Remove attribute selectors and count them
-        s = AttributeSelectorPattern.Replace(s, m => { b++; return string.Empty; });
+    private static int EncodeSpecificity(int a, int b, int c) => (a * 1_000_000) + (b * 1_000) + c;
 
-        // Count pseudo-classes and pseudo-elements
-        s = PseudoSpecificityPattern.Replace(s, m =>
+    private static (int A, int B, int C) CalculateSpecificityComponents(string selector)
+    {
+        var max = (A: 0, B: 0, C: 0);
+        foreach (var candidate in SplitCommaSelectors(selector))
         {
-            var token = m.Value;
-            if (token.StartsWith("::", StringComparison.Ordinal))
+            var trimmed = candidate.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            var components = CalculateComplexSelectorSpecificity(trimmed);
+            if (EncodeSpecificity(components.A, components.B, components.C) >
+                EncodeSpecificity(max.A, max.B, max.C))
             {
-                c++; // pseudo-elements contribute to c
+                max = components;
             }
-            else
-            {
-                // :not() — specificity is that of its argument
-                if (token.StartsWith(":not(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
-                {
-                    var inner = token[5..^1].Trim();
-                    var innerSpec = CalculateSpecificity(inner);
-                    a += innerSpec / 100;
-                    b += (innerSpec / 10) % 10;
-                    c += innerSpec % 10;
-                }
-                else
-                {
-                    b++; // pseudo-classes contribute to b
-                }
-            }
+        }
+
+        return max;
+    }
+
+    private static (int A, int B, int C) CalculateComplexSelectorSpecificity(string selector)
+    {
+        int a = 0, b = 0, c = 0;
+        foreach (var (_, compound) in SplitSelectorParts(selector))
+        {
+            var (ca, cb, cc) = CalculateCompoundSpecificity(compound);
+            a += ca;
+            b += cb;
+            c += cc;
+        }
+
+        return (a, b, c);
+    }
+
+    private static (int A, int B, int C) CalculateCompoundSpecificity(string compound)
+    {
+        if (string.IsNullOrWhiteSpace(compound))
+            return (0, 0, 0);
+
+        int a = 0, b = 0, c = 0;
+        var working = compound.Trim();
+
+        working = Regex.Replace(working, @"::[A-Za-z-]+", _ =>
+        {
+            c++;
             return string.Empty;
         });
 
-        foreach (var ch in s)
+        working = AttributeSelectorPattern.Replace(working, _ =>
         {
-            if (ch == '#') a++;
-            else if (ch == '.') b++;
+            b++;
+            return string.Empty;
+        });
+
+        var pseudoClasses = ExtractPseudoClasses(working);
+        foreach (var pseudo in pseudoClasses)
+        {
+            var (pa, pb, pc) = CalculatePseudoSpecificity(pseudo.Name, pseudo.Argument);
+            a += pa;
+            b += pb;
+            c += pc;
         }
 
-        // Count type selectors: letter-only tokens not preceded by # or .
-        var pos = 0;
-        while (pos < s.Length)
+        working = RemovePseudoClasses(working, pseudoClasses);
+
+        for (int i = 0; i < working.Length; i++)
         {
-            if (s[pos] == '#' || s[pos] == '.')
+            var current = working[i];
+            switch (current)
             {
-                pos++;
-                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
-            }
-            else if (char.IsLetter(s[pos]))
-            {
-                var start = pos;
-                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
-                var token = s[start..pos].ToLowerInvariant();
-                if (token != "*") c++;
-            }
-            else
-            {
-                pos++;
+                case '#':
+                    a++;
+                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
+                    break;
+                case '.':
+                    b++;
+                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
+                    break;
+                case '*':
+                case '|':
+                    break;
+                default:
+                    if (IsTypeSelectorStart(working, i))
+                    {
+                        c++;
+                        i = ConsumeTypeSelectorName(working, i) - 1;
+                    }
+                    break;
             }
         }
 
-        return a * 100 + b * 10 + c;
+        return (a, b, c);
+    }
+
+    private static (int A, int B, int C) CalculatePseudoSpecificity(string name, string? argument)
+    {
+        var pseudoName = name.ToLowerInvariant();
+        if (pseudoName is "before" or "after" or "first-line" or "first-letter")
+            return (0, 0, 1);
+
+        return pseudoName switch
+        {
+            "is" or "not" or "has" => CalculateSpecificityComponents(argument ?? string.Empty),
+            "where" => (0, 0, 0),
+            "nth-child" or "nth-last-child" => AddSpecificity((0, 1, 0), GetNthOfSelectorSpecificity(argument)),
+            "nth-of-type" or "nth-last-of-type" => (0, 1, 0),
+            _ => (0, 1, 0)
+        };
+    }
+
+    private static (int A, int B, int C) GetNthOfSelectorSpecificity(string? argument)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+            return (0, 0, 0);
+
+        var selectorList = ExtractNthOfSelectorList(argument);
+        return string.IsNullOrWhiteSpace(selectorList)
+            ? (0, 0, 0)
+            : CalculateSpecificityComponents(selectorList);
+    }
+
+    private static string? ExtractNthOfSelectorList(string argument)
+    {
+        int parenDepth = 0;
+        int bracketDepth = 0;
+        bool inString = false;
+        char stringDelimiter = '\0';
+
+        for (int i = 0; i < argument.Length; i++)
+        {
+            var c = argument[i];
+            if (inString)
+            {
+                if (c == '\\')
+                {
+                    i++;
+                    continue;
+                }
+
+                if (c == stringDelimiter)
+                    inString = false;
+
+                continue;
+            }
+
+            if (c == '"' || c == '\'')
+            {
+                inString = true;
+                stringDelimiter = c;
+                continue;
+            }
+
+            switch (c)
+            {
+                case '(':
+                    parenDepth++;
+                    continue;
+                case ')':
+                    parenDepth = Math.Max(0, parenDepth - 1);
+                    continue;
+                case '[':
+                    bracketDepth++;
+                    continue;
+                case ']':
+                    bracketDepth = Math.Max(0, bracketDepth - 1);
+                    continue;
+            }
+
+            if (parenDepth != 0 || bracketDepth != 0 || !IsStandaloneOfKeyword(argument, i))
+                continue;
+
+            return argument[(i + 2)..].Trim();
+        }
+
+        return null;
+    }
+
+    private static bool IsStandaloneOfKeyword(string text, int index)
+    {
+        if (index + 1 >= text.Length ||
+            char.ToLowerInvariant(text[index]) != 'o' ||
+            char.ToLowerInvariant(text[index + 1]) != 'f')
+            return false;
+
+        var hasLeadingBoundary = index == 0 || char.IsWhiteSpace(text[index - 1]);
+        var trailingIndex = index + 2;
+        var hasTrailingBoundary = trailingIndex >= text.Length || char.IsWhiteSpace(text[trailingIndex]);
+        return hasLeadingBoundary && hasTrailingBoundary;
+    }
+
+    private static (int A, int B, int C) AddSpecificity((int A, int B, int C) left, (int A, int B, int C) right)
+        => (left.A + right.A, left.B + right.B, left.C + right.C);
+
+    private static bool IsTypeSelectorStart(string text, int index)
+    {
+        var current = text[index];
+        if (!char.IsLetter(current) && current != '_')
+            return false;
+
+        if (index > 0)
+        {
+            var previous = text[index - 1];
+            if (char.IsLetterOrDigit(previous) || previous is '-' or '_' or '#' or '.' or ':')
+                return false;
+        }
+
+        return true;
+    }
+
+    private static int ConsumeSimpleSelectorName(string text, int index)
+    {
+        while (index < text.Length)
+        {
+            var c = text[index];
+            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '\\')
+            {
+                index++;
+                continue;
+            }
+
+            break;
+        }
+
+        return index;
+    }
+
+    private static int ConsumeTypeSelectorName(string text, int index)
+    {
+        while (index < text.Length)
+        {
+            var c = text[index];
+            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '|' || c == '\\')
+            {
+                index++;
+                continue;
+            }
+
+            break;
+        }
+
+        return index;
     }
 
     /// <summary>
@@ -450,7 +633,7 @@ public sealed partial class DomBridge
             var selectorGroup = ruleMatch.Groups["selector"].Value.Trim();
             var declarations = ParseStyle(ruleMatch.Groups["declarations"].Value);
 
-            foreach (var sel in selectorGroup.Split(','))
+            foreach (var sel in SplitCommaSelectors(selectorGroup))
             {
                 var selector = sel.Trim();
                 if (string.IsNullOrEmpty(selector)) continue;
