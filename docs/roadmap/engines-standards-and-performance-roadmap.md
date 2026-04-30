@@ -1,7 +1,7 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: Draft for team review  
-> **Tracking issue**: Create a detailed roadmap for advancing broiler engines to full standard-compliance and performance  
+> **Status**: Execution kickoff in progress
+> **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
 ---
@@ -20,8 +20,10 @@
 10. [Bottlenecks and Major Challenges](#10-bottlenecks-and-major-challenges)
 11. [Estimated Timelines and Resourcing](#11-estimated-timelines-and-resourcing)
 12. [Governance, Tracking, and Review Cadence](#12-governance-tracking-and-review-cadence)
-13. [Related Roadmaps](#13-related-roadmaps)
-14. [Open Questions](#14-open-questions)
+13. [Execution Backlog and Proposed Sub-Issues](#13-execution-backlog-and-proposed-sub-issues)
+14. [Implementation Notes and Key Decisions](#14-implementation-notes-and-key-decisions)
+15. [Related Roadmaps](#15-related-roadmaps)
+16. [Open Questions](#16-open-questions)
 
 ---
 
@@ -47,7 +49,7 @@ It does **not** restate the deep, per-area roadmaps that already exist in the
 repository. Instead, it links them, fills gaps they do not cover (notably
 HtmlBridge), and provides the cross-cutting milestones, exit criteria, and
 performance targets that bind them together. See
-[Section 13](#13-related-roadmaps) for the existing roadmaps this plan
+[Section 15](#15-related-roadmaps) for the existing roadmaps this plan
 incorporates by reference.
 
 The recommended strategy is **specification-first, seam-driven, and
@@ -481,7 +483,92 @@ have a single accountable owner each** for the duration of the roadmap.
 
 ---
 
-## 13. Related Roadmaps
+## 13. Execution Backlog and Proposed Sub-Issues
+
+The umbrella tracker for execution is [issue #1064](https://github.com/MaiRat/Broiler/issues/1064).
+The items below are the **ready-to-file sub-issue queue** for the major
+deliverables in this roadmap. Existing area-specific roadmap documents remain
+the source of truth for detailed task lists; these issue seeds define the
+cross-engine milestone framing, labels, and dependencies needed to execute the
+plan.
+
+| Proposed sub-issue | Workstreams | Milestone window | Suggested labels | Depends on | Deliverable / exit signal |
+|---|---|---|---|---|---|
+| **Stand up the unified conformance dashboard** | W1 | M0 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance` | #1064 | Publish PR/nightly reporting for Test262, WPT, and Acid3 deltas from one place |
+| **Establish baseline benchmark harness and budgets** | W6 | M0 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | #1064 | Capture the M0 baseline of record for JS, HTML, bridge, and end-to-end capture metrics |
+| **Document and harden JS ↔ Bridge ↔ HTML boundaries** | W2 | M1 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance` | dashboard + benchmark baselines | Produce a versioned bridge-surface/spec map and remove leaking engine-internal types from public seams |
+| **Close the ES2025 compliance gap in `Broiler.JavaScript`** | W3 | M2 | `engine:js`, `area:conformance` | dashboard, boundary map | Land the ratified ES2025 features tracked in `ECMASCRIPT_ROADMAP.md` with Test262 trend reporting |
+| **Execute the targeted HTML/CSS compliance push** | W4 | M2–M3 | `engine:html`, `area:conformance` | dashboard, boundary map | Retire the highest-value Acid/WPT failures and publish a single HTML/CSS pass-rate signal |
+| **Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets** | W5 | M2–M3 | `engine:bridge`, `area:conformance` | boundary map, dashboard | Close the bridge-level gaps for events, CSSOM, microtasks, CSP, Fetch subset, and structured clone |
+| **Finish the graphics backend cutover and remove legacy default paths** | W7 | M1–M4 | `engine:html`, `area:perf` | dashboard, benchmark baselines | Complete the Skia-replacement roadmap through default-build cutover without reintroducing backend-specific public APIs |
+| **Hit roadmap performance budgets and wire per-PR regression gates** | W6 | M1–M4 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | baseline benchmark harness, boundary hardening | Enforce the roadmap budget bands in CI and close the M4 optimization goals |
+| **Adopt steady-state standards tracking and support-matrix governance** | W1–W6 | M5 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance`, `area:perf` | M0–M4 complete | Convert the roadmap from catch-up execution to release-by-release sustaining work |
+
+### 13.1 Recommended filing order
+
+File the sub-issues in the sequence below so baseline work lands before
+behavioral or performance-sensitive changes:
+
+1. Unified conformance dashboard (W1 / M0)
+2. Baseline benchmark harness and budgets (W6 / M0)
+3. Engine-boundary hardening + bridge surface/spec map (W2 / M1)
+4. Graphics backend completion continuation (W7 / M1–M4)
+5. JavaScript ES2025 compliance push (W3 / M2)
+6. HTML/CSS compliance push (W4 / M2–M3)
+7. HtmlBridge DOM/Web API compliance push (W5 / M2–M3)
+8. Performance hardening and CI regression gates (W6 / M1–M4)
+9. Steady-state governance/support matrix follow-up (M5)
+
+### 13.2 Milestone-to-sub-issue checklist
+
+- [ ] **M0** — file and start the W1/W6 baseline issues; publish the baseline of record
+- [ ] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
+- [ ] **M2** — file and start W3/W4/W5 targeted compliance issues with spec-cited scopes
+- [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
+- [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
+- [ ] **M5** — file sustaining-governance issue(s) for standards feed intake and support-matrix publication
+
+---
+
+## 14. Implementation Notes and Key Decisions
+
+These notes are the in-repo companion to issue
+[#1064](https://github.com/MaiRat/Broiler/issues/1064). Keep them short,
+dated, and decision-oriented so contributors can see why the next set of
+sub-issues was filed or re-prioritized.
+
+### 14.1 Implementation notes
+
+- **2026-04-30** — Execution kickoff: converted this document from a pure draft
+  into an execution tracker by adding a ready-to-file sub-issue backlog, a
+  milestone filing order, and a milestone checklist aligned to `#1064`.
+- **2026-04-30** — Baseline verification before roadmap changes:
+  `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
+  surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
+  `src/Broiler.Cli.Tests/`. Follow-up roadmap work should therefore use
+  targeted validation for touched areas until the broader baseline is cleaned up.
+
+### 14.2 Key decisions
+
+- **Decision:** Keep `#1064` as the umbrella issue and file execution work as
+  workstream-scoped sub-issues rather than creating one issue per paragraph in
+  this document.
+  **Why:** The roadmap is already organized around workstreams and milestone
+  gates, so this preserves traceability without fragmenting the backlog.
+- **Decision:** Treat existing area-specific roadmap documents as the detailed
+  task source of truth, and use this document only for cross-engine sequencing,
+  gating, and prioritization.
+  **Why:** It avoids duplicating lower-level TODO lists that already exist in
+  `ECMASCRIPT_ROADMAP.md`, the Skia roadmap, WPT triage, Acid3 tracking, and
+  related docs.
+- **Decision:** Baseline infrastructure work (W1/W6) must be filed and started
+  before the M2 compliance pushes are treated as milestone work.
+  **Why:** The roadmap's stated exit criteria require published pass-rate and
+  benchmark signals before later milestones can be objectively graded.
+
+---
+
+## 15. Related Roadmaps
 
 This roadmap composes and sequences the following existing documents. They
 remain the authoritative source for area-level task lists; this roadmap owns
@@ -510,7 +597,7 @@ their **inter-engine ordering and gating**.
 
 ---
 
-## 14. Open Questions
+## 16. Open Questions
 
 1. Which **Test262** subset (categories, feature flags) constitutes the
    per-PR gate? Full nightly is settled; the PR subset is not.
@@ -535,3 +622,5 @@ their **inter-engine ordering and gating**.
 
 - **2026-04-30** — Initial draft created in response to the cross-engine
   roadmap tracking issue.
+- **2026-04-30** — Added the execution backlog, milestone filing order, and
+  implementation-notes log for issue `#1064`.
