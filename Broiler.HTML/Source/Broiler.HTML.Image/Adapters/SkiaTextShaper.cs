@@ -13,8 +13,6 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaTextShaper : ITextShaper
 {
-    private const double DegreesToRadians = Math.PI / 180.0;
-    private const string DeterministicFixtureFontFamily = "Ahem";
     private readonly ITextMetricsCompat _textMetricsCompat;
     private readonly ITextCanvasCompat _textCanvasCompat;
 
@@ -177,7 +175,7 @@ internal sealed class SkiaTextShaper : ITextShaper
 
     private static (PointF StartPoint, PointF EndPoint) GetGradientEndpoints(RectangleF rect, float angle)
     {
-        var radians = angle * DegreesToRadians;
+        var radians = angle * TextCompatConstants.DegreesToRadians;
         float cx = rect.X + rect.Width / 2f;
         float cy = rect.Y + rect.Height / 2f;
         float halfDiag = Math.Max(rect.Width, rect.Height) / 2f;
@@ -197,5 +195,5 @@ internal sealed class SkiaTextShaper : ITextShaper
         IsDeterministicFixtureFont(font.Family.Name);
 
     private static bool IsDeterministicFixtureFont(string? familyName) =>
-        string.Equals(familyName, DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
+        string.Equals(familyName, TextCompatConstants.DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
 }

@@ -6,9 +6,6 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
 {
-    private const double DegreesToRadians = Math.PI / 180.0;
-    private const string DeterministicFixtureFontFamily = "Ahem";
-
     public static ITextCanvasCompat Instance { get; } = new SkiaTextCanvasCompat();
 
     public void DrawString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, Color color, PointF point)
@@ -80,7 +77,7 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
 
     private static (SKPoint StartPoint, SKPoint EndPoint) GetGradientEndpoints(RectangleF rect, float angle)
     {
-        var radians = angle * DegreesToRadians;
+        var radians = angle * TextCompatConstants.DegreesToRadians;
         float cx = rect.X + rect.Width / 2f;
         float cy = rect.Y + rect.Height / 2f;
         float halfDiag = Math.Max(rect.Width, rect.Height) / 2f;
@@ -92,5 +89,5 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
     }
 
     private static bool IsDeterministicFixtureFont(string? familyName) =>
-        string.Equals(familyName, DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
+        string.Equals(familyName, TextCompatConstants.DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
 }
