@@ -190,19 +190,7 @@ public sealed class BBitmap : IDisposable
     internal void DrawPictureToFit(SKPicture picture)
     {
         ArgumentNullException.ThrowIfNull(picture);
-
-        using var canvas = OpenCanvas();
-        var cullRect = picture.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != Width
-                || (int)Math.Ceiling(cullRect.Height) != Height))
-        {
-            float scaleX = Width / cullRect.Width;
-            float scaleY = Height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
-        }
-
-        canvas.DrawPicture(picture);
+        _compatSurface.DrawPictureToFit(picture, Width, Height);
         SyncPixelsFromCompatBitmap();
     }
 

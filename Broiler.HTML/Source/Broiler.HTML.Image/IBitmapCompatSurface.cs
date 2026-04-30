@@ -17,5 +17,7 @@ internal interface IBitmapCompatSurface : IDisposable
 
     SKCanvas OpenCanvas();
 
+    void DrawPictureToFit(SKPicture picture, int width, int height);
+
     void SyncToPrimaryBuffer();
 }

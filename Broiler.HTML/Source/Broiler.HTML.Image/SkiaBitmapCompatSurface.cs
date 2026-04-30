@@ -55,6 +55,24 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
 
     public SKCanvas OpenCanvas() => new(EnsureBitmap());
 
+    public void DrawPictureToFit(SKPicture picture, int width, int height)
+    {
+        ArgumentNullException.ThrowIfNull(picture);
+
+        using var canvas = new SKCanvas(EnsureBitmap());
+        var cullRect = picture.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != width
+                || (int)Math.Ceiling(cullRect.Height) != height))
+        {
+            float scaleX = width / cullRect.Width;
+            float scaleY = height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
+        canvas.DrawPicture(picture);
+    }
+
     public void SyncToPrimaryBuffer()
     {
         if (_bitmap is null)

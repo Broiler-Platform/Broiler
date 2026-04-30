@@ -583,6 +583,8 @@ also route through an internal `IFontTypefaceResolver` seam,
 and the remaining `BBitmap` compatibility-surface materialization, canvas
 opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,
+and `BBitmap.DrawPictureToFit` now also routes compat picture
+playback/scaling through that internal `IBitmapCompatSurface` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment

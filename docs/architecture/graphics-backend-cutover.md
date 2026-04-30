@@ -25,6 +25,8 @@ Supported values for the internal override:
 - `BBitmap` now stores its primary pixels in a Broiler-owned buffer and routes
   the remaining `SKBitmap`/`SKCanvas` compatibility-surface lifecycle through
   the internal `IBitmapCompatSurface` seam.
+- `BBitmap.DrawPictureToFit` now also routes compat picture playback/scaling
+  through the internal `IBitmapCompatSurface` seam.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path, and raster-only graphics disposal now

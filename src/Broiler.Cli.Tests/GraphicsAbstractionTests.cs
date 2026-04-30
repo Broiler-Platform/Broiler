@@ -707,7 +707,7 @@ public class GraphicsAbstractionTests
 
         Assert.Equal(1, bitmap.CompatSyncInvocationCount);
         Assert.Equal(
-            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "OpenCanvas", "SyncToPrimaryBuffer"],
+            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "DrawPictureToFit", "SyncToPrimaryBuffer"],
             compatSurface.Calls);
     }
 
@@ -2086,6 +2086,21 @@ public class GraphicsAbstractionTests
         {
             Calls.Add("OpenCanvas");
             return new SKCanvas(_bitmap);
+        }
+
+        public void DrawPictureToFit(SKPicture picture, int width, int height)
+        {
+            Calls.Add("DrawPictureToFit");
+            using var canvas = new SKCanvas(_bitmap);
+            var cullRect = picture.CullRect;
+            if (cullRect.Width > 0 && cullRect.Height > 0
+                && ((int)Math.Ceiling(cullRect.Width) != width
+                    || (int)Math.Ceiling(cullRect.Height) != height))
+            {
+                canvas.Scale(width / cullRect.Width, height / cullRect.Height);
+            }
+
+            canvas.DrawPicture(picture);
         }
 
         public void SyncToPrimaryBuffer()
