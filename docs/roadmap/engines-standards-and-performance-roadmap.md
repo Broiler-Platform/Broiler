@@ -590,6 +590,12 @@ sub-issues was filed or re-prioritized.
   `SVGLength` registration closely enough for the skipped Acid3 constant check
   to run green. Focused coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SvgAndParsingRegressionTests`.
+- **2026-04-30** — HTML/HtmlBridge DOM collection continuation: taught
+  document/element `getElementsByTagName('*')` paths to treat `'*'` as the
+  wildcard element selector instead of an exact tag-name match, which clears the
+  remaining skipped Acid3 numeric-coercion regression around live collection
+  lengths. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SpecialRegressionTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

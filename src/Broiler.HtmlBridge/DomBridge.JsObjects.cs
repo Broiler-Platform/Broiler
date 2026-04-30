@@ -7738,7 +7738,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+            if (!child.IsTextNode && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
                 results.Add(ToJSObject(child));
             CollectByTagName(child, tag, results);
         }

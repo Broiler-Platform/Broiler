@@ -122,7 +122,7 @@ public sealed partial class DomBridge
                 var results = new List<JSValue>();
                 foreach (var el in _elements)
                 {
-                    if (el.TagName == tag)
+                    if (tag == "*" || el.TagName == tag)
                         results.Add(ToJSObject(el));
                 }
                 return new JSArray(results);

@@ -556,7 +556,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+            if (tagName == "*" || string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
                 results.Add(bridge.ToJSObject(child));
             CollectDescendantsByTag(child, tagName, results, bridge);
         }

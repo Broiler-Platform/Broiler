@@ -294,7 +294,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true|true|true", result);
     }
 
-    [Fact(Skip = "getElementsByTagName('*').length numeric coercion not yet fully supported")]
+    [Fact]
     public void Acid3_Test99_NumericPropertyCoercion()
     {
         var html = @"<!DOCTYPE html>
