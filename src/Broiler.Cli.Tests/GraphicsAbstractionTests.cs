@@ -1,4 +1,5 @@
 using Broiler.Cli;
+using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
 using SkiaSharp;
@@ -46,6 +47,26 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)34, pixel.G);
         Assert.Equal((byte)56, pixel.B);
         Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Theory]
+    [InlineData("#123456", 0x12, 0x34, 0x56, 0xFF)]
+    [InlineData("#12345678", 0x12, 0x34, 0x56, 0x78)]
+    [InlineData("#abc", 0xAA, 0xBB, 0xCC, 0xFF)]
+    [InlineData("#abcd", 0xAA, 0xBB, 0xCC, 0xDD)]
+    public void SkiaImageAdapter_GetColor_Parses_Hex_Colors_Without_Skia_Color_Parser(
+        string color,
+        int expectedRed,
+        int expectedGreen,
+        int expectedBlue,
+        int expectedAlpha)
+    {
+        var parsed = SkiaImageAdapter.Instance.GetColor(color);
+
+        Assert.Equal(expectedRed, parsed.R);
+        Assert.Equal(expectedGreen, parsed.G);
+        Assert.Equal(expectedBlue, parsed.B);
+        Assert.Equal(expectedAlpha, parsed.A);
     }
 
     [Fact]
@@ -474,7 +495,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
     {
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
 
@@ -493,6 +514,101 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void FontAdapter_Compat_Font_Work_Delegates_Through_Font_Compat_Seam()
+    {
+        var compatFactory = new RecordingFontCompatFactory();
+        var font = new FontAdapter(
+            "CompatOnly",
+            12,
+            FontStyle.Regular,
+            compatTypefaceFactory: () => SKTypeface.Default,
+            fontCompatFactory: compatFactory);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        var height = font.Height;
+        var underlineOffset = font.UnderlineOffset;
+
+        Assert.Equal(18d, height);
+        Assert.Equal(7d, underlineOffset);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+        Assert.Equal(["CreateFont:12", "GetMetrics"], compatFactory.Calls);
+
+        _ = font.RenderFont;
+
+        Assert.True(font.HasMaterializedRenderFont);
+        Assert.Equal(["CreateFont:12", "GetMetrics", $"CreateFont:{12 * (96f / 72f):0.####}"], compatFactory.Calls);
+    }
+
+    [Fact]
+    public void Broiler_Text_Draw_And_Measurement_Do_Not_Materialize_Skia_For_Loaded_Fonts()
+    {
+        var alias = $"RasterText_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        using var bitmap = new BBitmap(48, 24);
+        bitmap.Clear(BColor.White);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
+
+        var size = graphics.MeasureString("XX", font);
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+
+        graphics.DrawString("XX", font, Color.Black, new PointF(4, 4), size, rtl: false);
+
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 4));
+    }
+
+    [Fact]
+    public void Broiler_Ahem_CharFit_Measurement_Does_Not_Materialize_Skia_For_Loaded_Fonts()
+    {
+        var alias = $"RasterCharFit_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        using var bitmap = new BBitmap(48, 24);
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
+
+        var singleWidth = graphics.MeasureString("X", font).Width;
+        graphics.MeasureString("XX", font, singleWidth + 0.1f, out var charFit, out var charFitWidth);
+
+        Assert.Equal(1, charFit);
+        Assert.InRange(Math.Abs(charFitWidth - singleWidth), 0, 0.01d);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+    }
+
+    [Fact]
+    public void Broiler_Render_Font_Reuses_The_Registered_Font_Size_For_Loaded_Fonts()
+    {
+        var alias = $"RasterRenderSize_{Guid.NewGuid():N}";
+        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
+        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        Assert.Equal(alias, family);
+
+        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+
+        Assert.True(font.TryGetBroilerLayoutFont(out var layoutFont));
+        Assert.True(font.TryGetBroilerRenderFont(out var renderFont));
+        Assert.Equal(12f, layoutFont.Size);
+        Assert.Equal(12f, renderFont.Size);
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+    }
+
+    [Fact]
     public void GraphicsAdapter_Text_Operations_Delegate_Through_Text_Shaper_Seam()
     {
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
@@ -501,7 +617,7 @@ public class GraphicsAbstractionTests
             () => surface.Canvas,
             new RectangleF(0, 0, 32, 32),
             textShaper: textShaper);
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
 
         var measureSize = graphics.MeasureString("measure", font);
         graphics.MeasureString("limit", font, 12, out var charFit, out var charFitWidth);
@@ -549,9 +665,13 @@ public class GraphicsAbstractionTests
         Assert.False(textureBrush.HasMaterializedPaint);
 
         _ = textureBrush.Paint;
+        graphics.PushClip(new RectangleF(2, 3, 4, 5));
+        graphics.PushClipExclude(new RectangleF(3, 4, 5, 6));
         graphics.DrawLine(pen, 1, 2, 3, 4);
         graphics.DrawRectangle(pen, 1, 2, 3, 4);
         graphics.DrawRectangle(solidBrush, 5, 6, 7, 8);
+        graphics.DrawImage(image, new RectangleF(6, 7, 8, 9), new RectangleF(0, 0, 1, 1));
+        graphics.DrawImage(image, new RectangleF(7, 8, 9, 10));
         path.Start(1, 1);
         path.LineTo(4, 1);
         path.LineTo(4, 4);
@@ -564,7 +684,7 @@ public class GraphicsAbstractionTests
 
         Assert.True(textureBrush.HasMaterializedPaint);
         Assert.Equal(
-            ["CreateTexturePaint", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
+            ["CreateTexturePaint", "PushClip", "PushClipExclude", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawImageWithSource", "DrawImage", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
             canvasCompat.Calls);
     }
 
@@ -577,9 +697,9 @@ public class GraphicsAbstractionTests
         bitmap.SetPixel(1, 1, new BColor(10, 20, 30, 255));
         bitmap.Clear(new BColor(40, 50, 60, 255));
 
-        using var canvas = bitmap.OpenCanvas();
-        using var bitmapCopy = bitmap.ToSkBitmapCopy();
-        using var compatBitmap = bitmap.AsSkBitmap();
+        using var canvas = Assert.IsType<SKCanvas>(bitmap.OpenCanvas());
+        using var bitmapCopy = Assert.IsType<SKBitmap>(bitmap.ToCompatBitmapCopy());
+        using var compatBitmap = Assert.IsType<SKBitmap>(bitmap.AsCompatBitmap());
         using var recorder = new SKPictureRecorder();
         recorder.BeginRecording(new SKRect(0, 0, 4, 4)).DrawRect(new SKRect(0, 0, 4, 4), new SKPaint { Color = SKColors.Red });
         using var picture = recorder.EndRecording();
@@ -588,8 +708,77 @@ public class GraphicsAbstractionTests
 
         Assert.Equal(1, bitmap.CompatSyncInvocationCount);
         Assert.Equal(
-            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "OpenCanvas", "SyncToPrimaryBuffer"],
+            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "DrawPictureToFit", "SyncToPrimaryBuffer"],
             compatSurface.Calls);
+    }
+
+    [Fact]
+    public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        using var bitmap = new BBitmap(4, 4);
+
+        bitmap.SetPixel(1, 1, new BColor(0, 0, 0, 255));
+        bitmap.Clear(BColor.White);
+
+        Assert.Equal(1, provider.BitmapCompatSurfaceFactoryCallCount);
+        Assert.Equal(["SetPixel", "Clear"], provider.BitmapCompatSurface!.Calls);
+    }
+
+    [Fact]
+    public void Graphics_Default_Compat_Dependencies_Come_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider();
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        using var graphics = new GraphicsAdapter(
+            () => surface.Canvas,
+            new RectangleF(0, 0, 32, 32));
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        using var imageBitmap = new BBitmap(2, 2);
+        using var image = new ImageAdapter(imageBitmap);
+        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
+
+        _ = graphics.MeasureString("measure", font);
+        _ = font.Height;
+        _ = font.Font;
+        _ = font.RenderFont;
+        graphics.DrawString("draw", font, Color.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
+        graphics.PushClip(new RectangleF(2, 3, 4, 5));
+        graphics.DrawImage(image, new RectangleF(4, 5, 6, 7));
+        path.Start(1, 1);
+        path.LineTo(3, 4);
+        _ = path.Path;
+
+        Assert.Equal(["MeasureString", "DrawString"], provider.TextShaper.Calls);
+        Assert.Equal(["PushClip", "DrawImage"], provider.CanvasCompat.Calls);
+        Assert.Equal(["CreateFont:12", "CreateFont:16"], provider.FontCompatFactory.Calls);
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo"], provider.PathCompat.Calls);
+    }
+
+    [Fact]
+    public void SkiaImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
+    {
+        var provider = new RecordingSkiaCompatProvider();
+        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        var adapter = new SkiaImageAdapter();
+
+        var family = adapter.LoadFontFromFile("/tmp/fake-font.ttf", "AliasFont");
+        var font = Assert.IsType<FontAdapter>(adapter.GetFont("AliasFont", 12, FontStyle.Regular));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Blue));
+        var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
+        var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(new RectangleF(0, 0, 10, 10), Color.Red, Color.Blue, 45));
+
+        Assert.Equal("AliasFont", family);
+        _ = font.Typeface;
+        _ = pen.Paint;
+        _ = solidBrush.Paint;
+        _ = gradientBrush.Paint;
+
+        Assert.Equal(1, provider.FontTypefaceResolverFactoryCallCount);
+        Assert.Equal(["RegisterFontFile", "ResolveTypeface"], provider.FontTypefaceResolver.Calls);
+        Assert.Equal(["CreatePenPaint", "CreateSolidBrushPaint", "CreateLinearGradientBrushPaint"], provider.PaintCompatFactory.Calls);
     }
 
     [Fact]
@@ -606,7 +795,7 @@ public class GraphicsAbstractionTests
 
         var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
 
-        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
 
@@ -615,14 +804,15 @@ public class GraphicsAbstractionTests
         var size = graphics.MeasureString("abc", font);
 
         Assert.True(size.Width > 0);
+        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.True(font.HasMaterializedLayoutFont);
     }
 
     [Fact]
     public void SkiaImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
     {
-        var resolver = new RecordingFontTypefaceResolver(["SystemUi"]);
-        var adapter = new SkiaImageAdapter(resolver);
+        var resolver = new RecordingFontTypefaceResolver();
+        var adapter = new SkiaImageAdapter(resolver, ["SystemUi"]);
 
         Assert.True(adapter.IsFontExists("SystemUi"));
 
@@ -634,19 +824,143 @@ public class GraphicsAbstractionTests
 
         var font = Assert.IsType<FontAdapter>(adapter.GetFont("SeamSans", 12, FontStyle.Bold | FontStyle.Italic));
 
-        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
+        Assert.False(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
+
+        using var bitmap = new BBitmap(32, 32);
+        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
+        var size = graphics.MeasureString("abc", font);
+
+        Assert.True(size.Width > 0);
+        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.Equal(
             [
-                "GetSystemFontFamilies",
                 "RegisterFontFile",
                 "HasDeferredLoadedTypefacePath",
+                "HasMaterializedLoadedTypeface",
                 "HasMaterializedLoadedTypeface",
                 "ResolveTypeface",
                 "HasMaterializedLoadedTypeface",
             ],
             resolver.Calls);
+    }
+
+    [Fact]
+    public void SkiaTextShaper_NonAhem_Measurement_Delegates_Through_Text_Metrics_Compat_Seam()
+    {
+        var textMetricsCompat = new RecordingTextMetricsCompat();
+        var textShaper = new SkiaTextShaper(textMetricsCompat);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        var size = textShaper.MeasureString(font, "measure");
+        textShaper.MeasureString(font, "measure", 13, out var charFit, out var charFitWidth);
+
+        Assert.Equal(new SizeF(17, (float)font.Height), size);
+        Assert.Equal(2, charFit);
+        Assert.Equal(11d, charFitWidth);
+        Assert.Equal(
+            [
+                "MeasureTextWidth",
+                "MeasureTextWidthMaxWidth",
+            ],
+            textMetricsCompat.Calls);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+    }
+
+    [Fact]
+    public void SkiaTextShaper_Fallback_Draw_Operations_Delegate_Through_Text_Canvas_Compat_Seam()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
+        var textCanvasCompat = new RecordingTextCanvasCompat();
+        var textShaper = new SkiaTextShaper(textCanvasCompat: textCanvasCompat);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        textShaper.DrawString(surface.Canvas, font, "draw", Color.Black, new PointF(1, 2));
+        textShaper.DrawGradientString(
+            surface.Canvas,
+            font,
+            "gradient",
+            new RectangleF(0, 0, 8, 9),
+            new PointF(5, 6),
+            new SizeF(7, 8),
+            [Color.Red, Color.Blue],
+            [0f, 1f],
+            45f);
+
+        Assert.Equal(["DrawString", "DrawGradientString"], textCanvasCompat.Calls);
+        Assert.True(font.HasMaterializedRenderFont);
+        Assert.False(font.HasMaterializedLayoutFont);
+    }
+
+    [Fact]
+    public void SkiaImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
+    {
+        var paintCompat = new RecordingPaintCompatFactory();
+        var adapter = new SkiaImageAdapter(paintCompatFactory: paintCompat);
+        var expectedCalls = new[]
+        {
+            "CreateSolidBrushPaint",
+            "CreateLinearGradientBrushPaint",
+            "CreatePenPaint",
+            "UpdatePenPaint",
+            "UpdatePenPaint",
+        };
+        using var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
+        using var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(
+            new RectangleF(1, 2, 3, 4),
+            Color.Red,
+            Color.Blue,
+            45));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Green));
+
+        Assert.False(solidBrush.HasMaterializedPaint);
+        Assert.False(gradientBrush.HasMaterializedPaint);
+        Assert.False(pen.HasMaterializedPaint);
+
+        _ = solidBrush.Paint;
+        _ = gradientBrush.Paint;
+        _ = pen.Paint;
+        pen.Width = 3;
+        pen.DashStyle = DashStyle.Dash;
+
+        Assert.True(solidBrush.HasMaterializedPaint);
+        Assert.True(gradientBrush.HasMaterializedPaint);
+        Assert.True(pen.HasMaterializedPaint);
+        Assert.Equal(expectedCalls, paintCompat.Calls);
+        Assert.Equal(
+            [(3f, DashStyle.Solid), (3f, DashStyle.Dash)],
+            paintCompat.PenUpdates);
+    }
+
+    [Fact]
+    public void GraphicsPathAdapter_Path_Operations_Delegate_Through_Path_Compat_Seam()
+    {
+        var pathCompat = new RecordingPathCompat();
+        using var path = new GraphicsPathAdapter(pathCompat);
+
+        path.Start(1, 2);
+        path.LineTo(3, 4);
+        path.ArcTo(5, 6, 2, Broiler.HTML.Adapters.Adapters.RGraphicsPath.Corner.TopRight);
+
+        Assert.False(path.HasMaterializedPath);
+        Assert.Empty(pathCompat.Calls);
+
+        _ = path.Path;
+
+        Assert.True(path.HasMaterializedPath);
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo"], pathCompat.Calls);
+
+        path.Start(7, 8);
+
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo", "Reset", "MoveTo"], pathCompat.Calls);
     }
 
     [Fact]
@@ -818,6 +1132,72 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void BCanvas_SaveBlendLayer_Darken_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("darken");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal(new BColor(128, 0, 0, 255), pixel);
+    }
+
+    [Fact]
+    public void BCanvas_SaveBlendLayer_Lighten_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("lighten");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal(new BColor(255, 128, 128, 255), pixel);
+    }
+
+    [Fact]
+    public void BCanvas_SaveBlendLayer_Overlay_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("overlay");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.Equal((byte)255, pixel.R);
+        Assert.InRange(pixel.G, (byte)0, (byte)1);
+        Assert.InRange(pixel.B, (byte)0, (byte)1);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void BCanvas_SaveBlendLayer_Difference_Composites_Into_Base_Bitmap()
+    {
+        using var bitmap = new BBitmap(1, 1);
+        using var canvas = bitmap.OpenRasterCanvas();
+        canvas.Clear(new BColor(128, 128, 128, 255));
+        canvas.SaveBlendLayer("difference");
+
+        canvas.FillRect(new RectangleF(0, 0, 1, 1), new BColor(255, 0, 0, 255));
+        canvas.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(0, 0);
+        Assert.InRange(pixel.R, (byte)127, (byte)128);
+        Assert.InRange(pixel.G, (byte)127, (byte)128);
+        Assert.InRange(pixel.B, (byte)127, (byte)128);
+        Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
     public void BBitmap_OpenGraphics_Routes_Hinted_Opacity_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -835,6 +1215,83 @@ public class GraphicsAbstractionTests
         Assert.InRange(pixel.G, (byte)127, (byte)128);
         Assert.InRange(pixel.B, (byte)127, (byte)128);
         Assert.Equal((byte)255, pixel.A);
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Hinted_Darken_Blend_Layer_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(new BColor(128, 128, 128, 255));
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+
+        graphics.HintNextLayerCanUseRaster(true);
+        graphics.SaveBlendLayer("darken");
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        graphics.RestoreBlendLayer();
+
+        Assert.Equal(new BColor(128, 0, 0, 255), bitmap.GetPixel(1, 1));
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Hinted_Lighten_Blend_Layer_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(new BColor(128, 128, 128, 255));
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+
+        graphics.HintNextLayerCanUseRaster(true);
+        graphics.SaveBlendLayer("lighten");
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        graphics.RestoreBlendLayer();
+
+        Assert.Equal(new BColor(255, 128, 128, 255), bitmap.GetPixel(1, 1));
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Hinted_Overlay_Blend_Layer_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(new BColor(128, 128, 128, 255));
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+
+        graphics.HintNextLayerCanUseRaster(true);
+        graphics.SaveBlendLayer("overlay");
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        graphics.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(1, 1);
+        Assert.Equal(new BColor(255, 1, 1, 255), pixel);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
+    }
+
+    [Fact]
+    public void BBitmap_OpenGraphics_Routes_Hinted_Difference_Blend_Layer_Through_Backend_Neutral_Primitives()
+    {
+        using var bitmap = new BBitmap(4, 4);
+        bitmap.Clear(new BColor(128, 128, 128, 255));
+        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
+        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+
+        graphics.HintNextLayerCanUseRaster(true);
+        graphics.SaveBlendLayer("difference");
+        graphics.DrawRectangle(brush, 0, 0, 4, 4);
+        graphics.RestoreBlendLayer();
+
+        var pixel = bitmap.GetPixel(1, 1);
+        Assert.InRange(pixel.R, (byte)127, (byte)128);
+        Assert.InRange(pixel.G, (byte)127, (byte)128);
+        Assert.InRange(pixel.B, (byte)127, (byte)128);
+        Assert.Equal((byte)255, pixel.A);
+        Assert.False(graphics.HasMaterializedCanvas);
+        Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
     [Fact]
@@ -1273,6 +1730,94 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Darken_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:darken'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(128, 0, 0, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Lighten_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:lighten'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Overlay_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:overlay'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(255, 1, 1, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
+    public void PixelDiffRunner_Compare_Matches_NonText_Difference_Blend_Fixture()
+    {
+        const string html = """
+            <html><body style='margin:0;background:#808080'>
+            <div style='width:4px;height:4px;margin-left:1px;margin-top:1px;background:#ff0000;mix-blend-mode:difference'></div>
+            </body></html>
+            """;
+
+        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var expected = new BBitmap(6, 6);
+        expected.Clear(new BColor(128, 128, 128, 255));
+        FillRect(expected, 1, 1, 4, 4, new BColor(127, 128, 128, 255));
+
+        using var diff = PixelDiffRunner.Compare(rendered, expected);
+
+        Assert.True(diff.IsMatch);
+        Assert.Equal(0, diff.DiffPixelCount);
+        Assert.Equal(0d, diff.DiffRatio);
+        Assert.Null(diff.DiffBitmap);
+    }
+
+    [Fact]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Rounded_Border_Path()
     {
         using var container = new HtmlContainer();
@@ -1320,30 +1865,37 @@ public class GraphicsAbstractionTests
             charFitWidth = 9;
         }
 
-        public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point)
         {
-            Calls.Add("DrawString");
+            Calls.Add("TryDrawString");
+            return false;
         }
 
-        public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        {
+            Calls.Add("TryDrawGradientString");
+            return false;
+        }
+
+        public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point)
+        {
+            Calls.Add("DrawString");
+            Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
+            Assert.IsType<SKCanvas>(canvas);
         }
     }
 
-    private sealed class RecordingFontTypefaceResolver(IEnumerable<string> systemFamilies) : IFontTypefaceResolver
+    private sealed class RecordingFontTypefaceResolver : IFontTypefaceResolver
     {
         private readonly HashSet<string> _deferredFamilies = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _materializedFamilies = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<string> _systemFamilies = [.. systemFamilies];
 
         internal List<string> Calls { get; } = [];
-
-        public IReadOnlyCollection<string> GetSystemFontFamilies()
-        {
-            Calls.Add("GetSystemFontFamilies");
-            return _systemFamilies;
-        }
 
         public string RegisterFontFile(string path, string alias = null)
         {
@@ -1366,7 +1918,7 @@ public class GraphicsAbstractionTests
             return _materializedFamilies.Contains(family);
         }
 
-        public SKTypeface ResolveTypeface(string family, FontStyle style)
+        public object ResolveTypeface(string family, FontStyle style)
         {
             Calls.Add("ResolveTypeface");
             _deferredFamilies.Add(family);
@@ -1375,27 +1927,179 @@ public class GraphicsAbstractionTests
         }
     }
 
+    private sealed class RecordingTextMetricsCompat : ITextMetricsCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public float MeasureTextWidth(FontAdapter font, string text)
+        {
+            Calls.Add("MeasureTextWidth");
+            return 17f;
+        }
+
+        public void MeasureTextWidth(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
+        {
+            Calls.Add("MeasureTextWidthMaxWidth");
+            charFit = 2;
+            charFitWidth = 11d;
+        }
+    }
+
+    private sealed class RecordingTextCanvasCompat : ITextCanvasCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public void DrawString(object canvas, FontAdapter font, object renderFont, string text, Color color, PointF point)
+        {
+            Calls.Add("DrawString");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.Same(font.RenderFont, renderFont);
+        }
+
+        public void DrawGradientString(object canvas, FontAdapter font, object renderFont, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        {
+            Calls.Add("DrawGradientString");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.Same(font.RenderFont, renderFont);
+        }
+    }
+
+    private sealed class RecordingFontCompatFactory : IFontCompatFactory
+    {
+        public List<string> Calls { get; } = [];
+
+        public object CreateFont(object typeface, float size)
+        {
+            Calls.Add($"CreateFont:{size:0.####}");
+            return new SKFont(Assert.IsAssignableFrom<SKTypeface>(typeface), size);
+        }
+
+        public FontCompatMetrics GetMetrics(object font)
+        {
+            Calls.Add("GetMetrics");
+            Assert.IsType<SKFont>(font);
+            return new FontCompatMetrics(18d, 7d);
+        }
+    }
+
+    private sealed class RecordingPaintCompatFactory : IPaintCompatFactory
+    {
+        public List<string> Calls { get; } = [];
+
+        public List<(float StrokeWidth, DashStyle DashStyle)> PenUpdates { get; } = [];
+
+        public object CreateSolidBrushPaint(Color color)
+        {
+            Calls.Add("CreateSolidBrushPaint");
+            return new SKPaint();
+        }
+
+        public object CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
+        {
+            Calls.Add("CreateLinearGradientBrushPaint");
+            return new SKPaint();
+        }
+
+        public object CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
+        {
+            Calls.Add("CreatePenPaint");
+            return new SKPaint { StrokeWidth = strokeWidth };
+        }
+
+        public void UpdatePenPaint(object paint, float strokeWidth, DashStyle dashStyle)
+        {
+            Calls.Add("UpdatePenPaint");
+            PenUpdates.Add((strokeWidth, dashStyle));
+            Assert.IsType<SKPaint>(paint).StrokeWidth = strokeWidth;
+        }
+    }
+
+    private sealed class RecordingPathCompat : IPathCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public object CreatePath()
+        {
+            Calls.Add("CreatePath");
+            return new SKPath();
+        }
+
+        public void Reset(object path)
+        {
+            Calls.Add("Reset");
+            Assert.IsType<SKPath>(path).Reset();
+        }
+
+        public void MoveTo(object path, float x, float y)
+        {
+            Calls.Add("MoveTo");
+            Assert.IsType<SKPath>(path).MoveTo(x, y);
+        }
+
+        public void LineTo(object path, float x, float y)
+        {
+            Calls.Add("LineTo");
+            Assert.IsType<SKPath>(path).LineTo(x, y);
+        }
+
+        public void ArcTo(object path, float left, float top, float width, float height, float startAngle, float sweepAngle, bool forceMoveTo)
+        {
+            Calls.Add("ArcTo");
+            Assert.IsType<SKPath>(path).ArcTo(SKRect.Create(left, top, width, height), startAngle, sweepAngle, forceMoveTo);
+        }
+    }
+
     private sealed class RecordingCanvasCompat : ICanvasCompat
     {
         public List<string> Calls { get; } = [];
 
-        public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint)
+        public void PushClip(object canvas, RectangleF rect)
+        {
+            Calls.Add("PushClip");
+            Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public void PushClipExclude(object canvas, RectangleF rect)
+        {
+            Calls.Add("PushClipExclude");
+            Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public void DrawLine(object canvas, float x1, float y1, float x2, float y2, object paint)
         {
             Calls.Add("DrawLine");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint)
+        public void DrawRectangle(object canvas, RectangleF rect, object paint)
         {
             Calls.Add("DrawRectangle");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint)
+        public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect)
+        {
+            Calls.Add("DrawImageWithSource");
+            Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect)
+        {
+            Calls.Add("DrawImage");
+            Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public void DrawPath(object canvas, GraphicsPathAdapter path, object paint)
         {
             Calls.Add("DrawPath");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
         public void ClipRounded(
-            SKCanvas canvas,
+            object canvas,
             RectangleF rect,
             double cornerNw,
             double cornerNwY,
@@ -1407,27 +2111,32 @@ public class GraphicsAbstractionTests
             double cornerSwY)
         {
             Calls.Add("ClipRounded");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public SKPaint CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
+        public object CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
         {
             Calls.Add("CreateTexturePaint");
             return new SKPaint();
         }
 
-        public void DrawPolygon(SKCanvas canvas, PointF[] points, SKPaint paint)
+        public void DrawPolygon(object canvas, PointF[] points, object paint)
         {
             Calls.Add("DrawPolygon");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void SaveOpacityLayer(SKCanvas canvas, float opacity)
+        public void SaveOpacityLayer(object canvas, float opacity)
         {
             Calls.Add("SaveOpacityLayer");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void SaveBlendLayer(SKCanvas canvas, string blendMode)
+        public void SaveBlendLayer(object canvas, string blendMode)
         {
             Calls.Add("SaveBlendLayer");
+            Assert.IsType<SKCanvas>(canvas);
         }
     }
 
@@ -1442,31 +2151,47 @@ public class GraphicsAbstractionTests
         public void SetPixel(int x, int y, BColor color)
         {
             Calls.Add("SetPixel");
-            _bitmap.SetPixel(x, y, color.ToSkColor());
+            _bitmap.SetPixel(x, y, new SKColor(color.R, color.G, color.B, color.A));
         }
 
         public void Clear(BColor color)
         {
             Calls.Add("Clear");
-            _bitmap.Erase(color.ToSkColor());
+            _bitmap.Erase(new SKColor(color.R, color.G, color.B, color.A));
         }
 
-        public SKBitmap AsBitmap()
+        public object AsBitmap()
         {
             Calls.Add("AsBitmap");
             return _bitmap;
         }
 
-        public SKBitmap ToBitmapCopy()
+        public object ToBitmapCopy()
         {
             Calls.Add("ToBitmapCopy");
             return _bitmap.Copy();
         }
 
-        public SKCanvas OpenCanvas()
+        public object OpenCanvas()
         {
             Calls.Add("OpenCanvas");
             return new SKCanvas(_bitmap);
+        }
+
+        public void DrawPictureToFit(object picture, int width, int height)
+        {
+            Calls.Add("DrawPictureToFit");
+            var skPicture = Assert.IsType<SKPicture>(picture);
+            using var canvas = new SKCanvas(_bitmap);
+            var cullRect = skPicture.CullRect;
+            if (cullRect.Width > 0 && cullRect.Height > 0
+                && ((int)Math.Ceiling(cullRect.Width) != width
+                    || (int)Math.Ceiling(cullRect.Height) != height))
+            {
+                canvas.Scale(width / cullRect.Width, height / cullRect.Height);
+            }
+
+            canvas.DrawPicture(skPicture);
         }
 
         public void SyncToPrimaryBuffer()
@@ -1475,6 +2200,65 @@ public class GraphicsAbstractionTests
         }
 
         public void Dispose() => _bitmap.Dispose();
+    }
+
+    private sealed class RecordingSkiaCompatProvider(Func<IBitmapCompatSurface>? bitmapCompatSurfaceFactory = null) : ISkiaCompatProvider
+    {
+        private readonly Func<IBitmapCompatSurface> _bitmapCompatSurfaceFactory =
+            bitmapCompatSurfaceFactory ?? (() => new RecordingBitmapCompatSurface(4, 4));
+        private SkiaImageAdapter? _imageAdapter;
+
+        public RAdapter ImageAdapter => _imageAdapter ??= new SkiaImageAdapter(FontTypefaceResolver, ["SystemUi"], PaintCompatFactory);
+
+        public RecordingTextShaper TextShaper { get; } = new();
+
+        RAdapter ISkiaCompatProvider.ImageAdapter => ImageAdapter;
+
+        ITextShaper ISkiaCompatProvider.TextShaper => TextShaper;
+
+        public RecordingCanvasCompat CanvasCompat { get; } = new();
+
+        ICanvasCompat ISkiaCompatProvider.CanvasCompat => CanvasCompat;
+
+        public RecordingPathCompat PathCompat { get; } = new();
+
+        IPathCompat ISkiaCompatProvider.PathCompat => PathCompat;
+
+        public RecordingFontCompatFactory FontCompatFactory { get; } = new();
+
+        IFontCompatFactory ISkiaCompatProvider.FontCompatFactory => FontCompatFactory;
+
+        public RecordingPaintCompatFactory PaintCompatFactory { get; } = new();
+
+        IPaintCompatFactory ISkiaCompatProvider.PaintCompatFactory => PaintCompatFactory;
+
+        public RecordingFontTypefaceResolver FontTypefaceResolver { get; } = new();
+
+        public int FontTypefaceResolverFactoryCallCount { get; private set; }
+
+        public int BitmapCompatSurfaceFactoryCallCount { get; private set; }
+
+        public RecordingBitmapCompatSurface? BitmapCompatSurface { get; private set; }
+
+        public IFontTypefaceResolver CreateFontTypefaceResolver()
+        {
+            FontTypefaceResolverFactoryCallCount++;
+            return FontTypefaceResolver;
+        }
+
+        public IBitmapCompatSurface CreateBitmapCompatSurface(
+            int width,
+            int height,
+            Func<int, int, BColor> readPrimaryPixel,
+            Action<int, int, BColor> writePrimaryPixel,
+            object? initialBitmap = null,
+            bool ownsBitmap = true)
+        {
+            BitmapCompatSurfaceFactoryCallCount++;
+            var compatSurface = _bitmapCompatSurfaceFactory();
+            BitmapCompatSurface = Assert.IsType<RecordingBitmapCompatSurface>(compatSurface);
+            return compatSurface;
+        }
     }
 
 }

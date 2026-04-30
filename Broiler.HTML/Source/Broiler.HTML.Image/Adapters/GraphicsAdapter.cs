@@ -2,27 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class GraphicsAdapter : RGraphics
 {
-    private readonly Func<SKCanvas> _canvasFactory;
+    private readonly Func<object> _canvasFactory;
     private readonly BCanvas? _rasterCanvas;
     private readonly bool _disposeCanvas;
     private readonly bool _restoreOnDispose;
     private readonly Action? _onDispose;
-    private readonly List<Action<SKCanvas>> _deferredCanvasOperations = [];
+    private readonly List<Action<object>> _deferredCanvasOperations = [];
     private readonly Stack<bool> _rasterLayerStack = new();
     private readonly ITextShaper _textShaper;
     private readonly ICanvasCompat _canvasCompat;
-    private SKCanvas? _canvas;
+    private object? _canvas;
     private int _activeSkiaLayerDepth;
     private bool _nextLayerCanUseRaster;
 
     public GraphicsAdapter(
-        Func<SKCanvas> canvasFactory,
+        Func<object> canvasFactory,
         RectangleF initialClip,
         BCanvas? rasterCanvas = null,
         bool disposeCanvas = false,
@@ -30,17 +29,17 @@ internal sealed class GraphicsAdapter : RGraphics
         Action? onDispose = null,
         ITextShaper? textShaper = null,
         ICanvasCompat? canvasCompat = null,
-        Action<SKCanvas, object?>? initialCanvasOperation = null,
+        Action<object, object?>? initialCanvasOperation = null,
         object? initialCanvasOperationState = null)
-        : base(SkiaImageAdapter.Instance, initialClip)
+        : base(SkiaCompatProvider.ImageAdapter, initialClip)
     {
         _canvasFactory = canvasFactory ?? throw new ArgumentNullException(nameof(canvasFactory));
         _rasterCanvas = rasterCanvas;
         _disposeCanvas = disposeCanvas;
         _restoreOnDispose = restoreOnDispose;
         _onDispose = onDispose;
-        _textShaper = textShaper ?? SkiaTextShaper.Instance;
-        _canvasCompat = canvasCompat ?? SkiaCanvasCompat.Instance;
+        _textShaper = textShaper ?? SkiaCompatProvider.TextShaper;
+        _canvasCompat = canvasCompat ?? SkiaCompatProvider.CanvasCompat;
         if (initialCanvasOperation is not null)
             _deferredCanvasOperations.Add(canvas => initialCanvasOperation(canvas, initialCanvasOperationState));
     }
@@ -49,7 +48,7 @@ internal sealed class GraphicsAdapter : RGraphics
 
     public override void PopClip()
     {
-        ApplyCanvasOperation(static canvas => canvas.Restore());
+        ApplyCanvasOperation(CompatCanvasOperations.Restore);
         _rasterCanvas?.PopClip();
         _clipStack.Pop();
     }
@@ -59,8 +58,8 @@ internal sealed class GraphicsAdapter : RGraphics
         _clipStack.Push(rect);
         ApplyCanvasOperation(canvas =>
         {
-            canvas.Save();
-            canvas.ClipRect(Utilities.Utils.Convert(rect));
+            CompatCanvasOperations.Save(canvas);
+            _canvasCompat.PushClip(canvas, rect);
         });
         _rasterCanvas?.PushClip(rect);
     }
@@ -70,8 +69,8 @@ internal sealed class GraphicsAdapter : RGraphics
         _clipStack.Push(_clipStack.Peek());
         ApplyCanvasOperation(canvas =>
         {
-            canvas.Save();
-            canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
+            CompatCanvasOperations.Save(canvas);
+            _canvasCompat.PushClipExclude(canvas, rect);
         });
         _rasterCanvas?.PushClipExclude(rect);
     }
@@ -85,7 +84,7 @@ internal sealed class GraphicsAdapter : RGraphics
         _clipStack.Push(rect);
         ApplyCanvasOperation(canvas =>
         {
-            canvas.Save();
+            CompatCanvasOperations.Save(canvas);
             _canvasCompat.ClipRounded(
                 canvas,
                 rect,
@@ -117,6 +116,9 @@ internal sealed class GraphicsAdapter : RGraphics
 
     public override void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl)
     {
+        if (CanUseRaster && _textShaper.TryDrawString(_rasterCanvas!, (FontAdapter)font, str, color, point))
+            return;
+
         var canvas = EnsureCanvas();
         _textShaper.DrawString(canvas, (FontAdapter)font, str, color, point);
     }
@@ -124,6 +126,9 @@ internal sealed class GraphicsAdapter : RGraphics
     public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
     {
         if (colors == null || colors.Length == 0)
+            return;
+
+        if (CanUseRaster && _textShaper.TryDrawGradientString(_rasterCanvas!, (FontAdapter)font, str, rect, point, size, colors, positions, angle))
             return;
 
         var canvas = EnsureCanvas();
@@ -203,7 +208,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
+        _canvasCompat.DrawImage(EnsureCanvas(), imgAdapter.Bitmap, destRect, srcRect);
     }
 
     public override void DrawImage(RImage image, RectangleF destRect)
@@ -218,7 +223,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        EnsureCanvas().DrawBitmap(imgAdapter.Bitmap.AsSkBitmap(), Utilities.Utils.Convert(destRect));
+        _canvasCompat.DrawImage(EnsureCanvas(), imgAdapter.Bitmap, destRect);
     }
 
     public override void DrawPath(RPen pen, RGraphicsPath path)
@@ -289,7 +294,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        ApplyCanvasOperation(static canvas => canvas.Restore());
+        ApplyCanvasOperation(CompatCanvasOperations.Restore);
         _activeSkiaLayerDepth = Math.Max(0, _activeSkiaLayerDepth - 1);
     }
 
@@ -319,7 +324,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        ApplyCanvasOperation(static canvas => canvas.Restore());
+        ApplyCanvasOperation(CompatCanvasOperations.Restore);
         _activeSkiaLayerDepth = Math.Max(0, _activeSkiaLayerDepth - 1);
     }
 
@@ -343,13 +348,14 @@ internal sealed class GraphicsAdapter : RGraphics
     {
         if (_restoreOnDispose)
         {
-            _canvas?.Restore();
+            if (_canvas is not null)
+                CompatCanvasOperations.Restore(_canvas);
             _rasterCanvas?.Restore();
         }
 
         if (_disposeCanvas)
         {
-            _canvas?.Dispose();
+            (_canvas as IDisposable)?.Dispose();
             _rasterCanvas?.Dispose();
         }
 
@@ -358,7 +364,7 @@ internal sealed class GraphicsAdapter : RGraphics
 
     private bool CanUseRaster => _rasterCanvas is not null && _activeSkiaLayerDepth == 0;
 
-    private SKCanvas EnsureCanvas()
+    private object EnsureCanvas()
     {
         if (_canvas is not null)
             return _canvas;
@@ -371,7 +377,7 @@ internal sealed class GraphicsAdapter : RGraphics
         return _canvas;
     }
 
-    private void ApplyCanvasOperation(Action<SKCanvas> operation)
+    private void ApplyCanvasOperation(Action<object> operation)
     {
         if (_canvas is not null)
         {

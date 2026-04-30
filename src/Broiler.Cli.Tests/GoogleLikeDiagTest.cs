@@ -1,5 +1,4 @@
 using Broiler.HTML.Image;
-using SkiaSharp;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -14,19 +14,26 @@ internal sealed class SkiaImageAdapter : RAdapter
     private const int MaxSvgRasterScale = 8;
 
     private readonly IFontTypefaceResolver _typefaceResolver;
+    private readonly IPaintCompatFactory _paintCompatFactory;
 
-    internal SkiaImageAdapter(IFontTypefaceResolver typefaceResolver = null)
+    internal SkiaImageAdapter(
+        IFontTypefaceResolver typefaceResolver = null,
+        IReadOnlyCollection<string> systemFonts = null,
+        IPaintCompatFactory paintCompatFactory = null)
     {
-        _typefaceResolver = typefaceResolver ?? new SkiaFontTypefaceResolver();
+        _typefaceResolver = typefaceResolver ?? SkiaCompatProvider.CreateFontTypefaceResolver();
+        _paintCompatFactory = paintCompatFactory ?? SkiaCompatProvider.PaintCompatFactory;
 
         // Register system fonts first so we can probe availability below.
-        var systemFonts = new HashSet<string>(_typefaceResolver.GetSystemFontFamilies(), StringComparer.OrdinalIgnoreCase);
-        foreach (var familyName in systemFonts)
+        var distinctSystemFonts = new HashSet<string>(
+            systemFonts ?? BroilerFontRegistry.GetSystemFontFamilies(),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var familyName in distinctSystemFonts)
         {
             AddFontFamily(new FontFamilyAdapter(familyName));
         }
 
-        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(systemFonts))
+        foreach (var mapping in FontFamilyFallbackPolicy.ResolveDefaultMappings(distinctSystemFonts))
         {
             AddFontFamilyMapping(mapping.Key, mapping.Value);
         }
@@ -60,14 +67,15 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (string.IsNullOrWhiteSpace(familyName))
             return null;
 
+        BroilerFontRegistry.RegisterFontFile(path, familyName);
         AddFontFamily(new FontFamilyAdapter(familyName));
         return familyName;
     }
 
     protected override Color GetColorInt(string colorName)
     {
-        if (SKColor.TryParse(colorName, out var color))
-            return Utilities.Utils.Convert(color);
+        if (TryParseHexColor(colorName, out var color))
+            return color;
 
         // Fallback: try common color names (CSS 2.1 basic + CSS Color Level 3 extended)
         return colorName.ToLowerInvariant() switch
@@ -231,9 +239,78 @@ internal sealed class SkiaImageAdapter : RAdapter
         return Color.FromArgb(255, 0, 0, 0);
     }
 
+    private static bool TryParseHexColor(string colorName, out Color color)
+    {
+        color = Color.Empty;
+        if (string.IsNullOrWhiteSpace(colorName) || colorName[0] != '#')
+            return false;
+
+        return colorName.Length switch
+        {
+            4 => TryParseHexColor(colorName, 1, 1, hasAlpha: false, out color),
+            5 => TryParseHexColor(colorName, 1, 1, hasAlpha: true, out color),
+            7 => TryParseHexColor(colorName, 1, 2, hasAlpha: false, out color),
+            9 => TryParseHexColor(colorName, 1, 2, hasAlpha: true, out color),
+            _ => false,
+        };
+    }
+
+    private static bool TryParseHexColor(string colorName, int start, int digitsPerChannel, bool hasAlpha, out Color color)
+    {
+        color = Color.Empty;
+        if (!TryParseHexChannel(colorName, start, digitsPerChannel, out var r)
+            || !TryParseHexChannel(colorName, start + digitsPerChannel, digitsPerChannel, out var g)
+            || !TryParseHexChannel(colorName, start + (digitsPerChannel * 2), digitsPerChannel, out var b))
+        {
+            return false;
+        }
+
+        var alpha = 255;
+        if (hasAlpha
+            && !TryParseHexChannel(colorName, start + (digitsPerChannel * 3), digitsPerChannel, out alpha))
+        {
+            return false;
+        }
+
+        color = Color.FromArgb(alpha, r, g, b);
+        return true;
+    }
+
+    private static bool TryParseHexChannel(string colorName, int start, int digits, out int value)
+    {
+        value = 0;
+        for (int i = 0; i < digits; i++)
+        {
+            var digit = ConvertHexDigit(colorName[start + i]);
+            if (digit < 0)
+                return false;
+
+            value = (value << 4) + digit;
+        }
+
+        if (digits == 1)
+            value = (value << 4) + value;
+
+        return true;
+    }
+
+    private static int ConvertHexDigit(char c)
+    {
+        if (c is >= '0' and <= '9')
+            return c - '0';
+        if (c is >= 'a' and <= 'f')
+            return c - 'a' + 10;
+        if (c is >= 'A' and <= 'F')
+            return c - 'A' + 10;
+
+        return -1;
+    }
+
     protected override RPen CreatePen(Color color)
     {
-        return new PenAdapter((strokeWidth, dashStyle) => CreatePenPaint(color, strokeWidth, dashStyle))
+        return new PenAdapter(
+            (strokeWidth, dashStyle) => _paintCompatFactory.CreatePenPaint(color, strokeWidth, dashStyle),
+            (paint, strokeWidth, dashStyle) => _paintCompatFactory.UpdatePenPaint(paint, strokeWidth, dashStyle))
         {
             SolidColor = new BColor(color.R, color.G, color.B, color.A),
         };
@@ -242,12 +319,7 @@ internal sealed class SkiaImageAdapter : RAdapter
     protected override RBrush CreateSolidBrush(Color color)
     {
         return new BrushAdapter(
-            () => new SKPaint
-            {
-                Color = Utilities.Utils.Convert(color),
-                Style = SKPaintStyle.Fill,
-                IsAntialias = true,
-            },
+            () => _paintCompatFactory.CreateSolidBrushPaint(color),
             dispose: true)
         {
             SolidColor = new BColor(color.R, color.G, color.B, color.A),
@@ -257,56 +329,11 @@ internal sealed class SkiaImageAdapter : RAdapter
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
     {
         return new BrushAdapter(
-            () =>
-            {
-                var radians = angle * Math.PI / 180.0;
-                var cos = (float)Math.Cos(radians);
-                var sin = (float)Math.Sin(radians);
-                var cx = (float)(rect.X + rect.Width / 2);
-                var cy = (float)(rect.Y + rect.Height / 2);
-                var halfDiag = (float)Math.Max(rect.Width, rect.Height) / 2;
-
-                var startPoint = new SKPoint(cx - cos * halfDiag, cy - sin * halfDiag);
-                var endPoint = new SKPoint(cx + cos * halfDiag, cy + sin * halfDiag);
-
-                var paint = new SKPaint
-                {
-                    Shader = SKShader.CreateLinearGradient(
-                        startPoint,
-                        endPoint,
-                        new[] { Utilities.Utils.Convert(color1), Utilities.Utils.Convert(color2) },
-                        null,
-                        SKShaderTileMode.Clamp),
-                    Style = SKPaintStyle.Fill,
-                    IsAntialias = true,
-                };
-
-                return paint;
-            },
+            () => _paintCompatFactory.CreateLinearGradientBrushPaint(rect, color1, color2, angle),
             dispose: true);
     }
 
-    private static SKPaint CreatePenPaint(Color color, float strokeWidth, System.Drawing.Drawing2D.DashStyle dashStyle) =>
-        new()
-        {
-            Color = Utilities.Utils.Convert(color),
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeWidth = strokeWidth,
-            PathEffect = dashStyle switch
-            {
-                System.Drawing.Drawing2D.DashStyle.Solid => null,
-                System.Drawing.Drawing2D.DashStyle.Dash => strokeWidth < 2f
-                    ? SKPathEffect.CreateDash([4f, 4f], 0)
-                    : SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth], 0),
-                System.Drawing.Drawing2D.DashStyle.Dot => SKPathEffect.CreateDash([strokeWidth, strokeWidth], 0),
-                System.Drawing.Drawing2D.DashStyle.DashDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
-                System.Drawing.Drawing2D.DashStyle.DashDotDot => SKPathEffect.CreateDash([4f * strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth, strokeWidth, 2f * strokeWidth], 0),
-                _ => null,
-            },
-        };
-
-    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(BBitmap.Wrap((SKBitmap)image, ownsBitmap: true)) : null;
+    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(SkiaCompatObjects.CreateBitmap((SKBitmap)image, ownsBitmap: true)) : null;
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
@@ -749,7 +776,7 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {
-        return new FontAdapter(_typefaceResolver.ResolveTypeface(family, style), size, style);
+        return new FontAdapter(family, size, style, () => _typefaceResolver.ResolveTypeface(family, style));
     }
 
     protected override RFont CreateFontInt(RFontFamily family, double size, FontStyle style) => CreateFontInt(family.Name, size, style);

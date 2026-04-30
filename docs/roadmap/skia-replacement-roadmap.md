@@ -531,7 +531,7 @@ bounds and baseline placement within 2 px before broader rollout.
   keeping an explicit fallback path for one stabilization window if needed.
 - [x] Run the curated parity suite and performance checks against the default
   backend until rollback criteria are either cleared or exercised.
-- [ ] Remove runtime SkiaSharp package references and native assets only after
+- [x] Remove runtime SkiaSharp package references and native assets only after
   the fallback window and packaging validation are complete.
 - [x] Publish release notes and migration guidance for any consumer-visible API
   changes or fidelity caveats.
@@ -556,28 +556,63 @@ and solid brush/pen plus texture-brush adapter state now defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
 and linear-gradient brush adapter state now also defers
 `SKPaint`/`SKShader` creation until a true Skia fallback draw needs it,
+and the remaining solid-brush, linear-gradient, and pen paint creation plus
+pen style update details now also route through an internal
+`IPaintCompatFactory` seam,
 and `BBitmap.OpenGraphics` now also defers `SKCanvas`/`SKBitmap`
 materialization until a true fallback draw needs the compatibility surface,
 and raster-only `BBitmap.OpenGraphics` disposal now skips compat-surface sync
 work unless a fallback canvas was actually materialized,
 and `FontAdapter` now defers `SKFont` creation until text measurement or draw
 work needs layout/render font state,
+and the remaining `FontAdapter` `SKFont` creation plus fallback font-metric
+projection details now also route through an internal `IFontCompatFactory`
+seam,
 and alias-backed font-file registration now also defers `SKTypeface.FromFile`
 until font creation resolves the loaded family,
 and text measurement plus text/gradient draw dispatch now route through the
-internal `ITextShaper` seam instead of leaving the remaining Skia-backed
-text-rendering details inside `GraphicsAdapter`,
-and the remaining non-text line, rectangle, path, rounded-clip, texture-paint,
-polygon-fill, and layer-save fallback details inside `GraphicsAdapter` now also
-route through an internal `ICanvasCompat` seam,
-and the remaining `SkiaImageAdapter` system-font enumeration, deferred
-font-file registration, and typeface resolution details now also route through
-an internal `IFontTypefaceResolver` seam,
+internal `ITextShaper` seam instead of leaving the remaining text-rendering
+details inside `GraphicsAdapter`,
+and the remaining non-text clip, image, line, rectangle, path, rounded-clip,
+texture-paint, polygon-fill, and layer-save fallback details inside
+`GraphicsAdapter` now also route through an internal `ICanvasCompat` seam,
+and `SkiaImageAdapter` system-font enumeration now comes from the
+Broiler-owned `BroilerFontRegistry` instead of `SKFontManager`, while the
+remaining deferred font-file registration and typeface-resolution details now
+also route through an internal `IFontTypefaceResolver` seam,
 and the remaining `BBitmap` compatibility-surface materialization, canvas
 opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,
+and `BBitmap.DrawPictureToFit` now also routes compat picture
+playback/scaling through that internal `IBitmapCompatSurface` seam,
+and the core image-layer default wiring for bitmap, graphics, path, font, and
+adapter compat implementations now also centralizes through an internal
+provider seam instead of hard-wiring concrete `Skia*` defaults across
+constructors, and the remaining Skia implementation code plus SkiaSharp package
+references now live in the separate `Broiler.HTML.Image.Compat` assembly rather
+than the core `Broiler.HTML.Image` project,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
+and the remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment
+application details now also route through an internal `IPathCompat` seam,
+and CSS hex color parsing now uses a Broiler-owned parser instead of
+`SKColor.TryParse`,
+and the default `broiler` backend now routes text and gradient-text paint
+through a Broiler-owned raster text path backed by `SixLabors.Fonts` and
+`SixLabors.ImageSharp.Drawing` for registered/system fonts before touching the
+remaining Skia fallback path,
+and the remaining Skia fallback text draw and gradient-text draw details now
+also route through an internal `ITextCanvasCompat` seam inside
+`SkiaTextShaper`,
+and deterministic `Ahem` text measurement plus max-width char-fit probing now
+also stay on the Broiler-owned metrics path,
+and the remaining non-`Ahem` Skia-backed text measurement compatibility
+details now also route through an internal `ITextMetricsCompat` seam inside
+`SkiaTextShaper`,
+and raster-compatible layer compositing now also keeps `multiply`, `screen`,
+`darken`, `lighten`, `overlay`, `difference`, and `plus-lighter` blend modes on
+the Broiler-owned canvas path instead of escalating those layers to the
+internal Skia fallback,
 and the current guardrail freezes the known-good `SkiaSharp` 3.119.2 +
 `SkiaSharp.NativeAssets.Linux` 3.119.2 pairing while the remaining fallback
 compatibility shims are retired.

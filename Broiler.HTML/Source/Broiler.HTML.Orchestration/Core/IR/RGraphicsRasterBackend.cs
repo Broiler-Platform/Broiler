@@ -172,7 +172,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         string.IsNullOrEmpty(blendMode)
         || blendMode.Equals("normal", StringComparison.OrdinalIgnoreCase)
         || blendMode.Equals("multiply", StringComparison.OrdinalIgnoreCase)
-        || blendMode.Equals("screen", StringComparison.OrdinalIgnoreCase);
+        || blendMode.Equals("screen", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("darken", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("lighten", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("overlay", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("difference", StringComparison.OrdinalIgnoreCase)
+        || blendMode.Equals("plus-lighter", StringComparison.OrdinalIgnoreCase);
 
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {

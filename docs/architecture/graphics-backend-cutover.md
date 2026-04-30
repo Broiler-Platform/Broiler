@@ -25,17 +25,34 @@ Supported values for the internal override:
 - `BBitmap` now stores its primary pixels in a Broiler-owned buffer and routes
   the remaining `SKBitmap`/`SKCanvas` compatibility-surface lifecycle through
   the internal `IBitmapCompatSurface` seam.
+- `BBitmap.DrawPictureToFit` now also routes compat picture playback/scaling
+  through the internal `IBitmapCompatSurface` seam.
+- Core image-layer defaults now resolve the remaining compat implementations
+  through an internal provider seam so the eventual package split only needs to
+  move one centralized Skia registration point instead of many hard-wired
+  constructor defaults.
+- That centralized registration point now lives in the separate
+  `Broiler.HTML.Image.Compat` assembly, which owns the remaining SkiaSharp
+  implementation files and package/native-asset references while the core
+  `Broiler.HTML.Image` assembly stays package-free.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path, and raster-only graphics disposal now
   skips compat-surface sync work when no fallback canvas was ever materialized.
 - `FontAdapter` now also defers `SKFont` creation until text measurement or
   drawing actually needs layout/render font state.
+- The remaining `FontAdapter` `SKFont` creation and fallback metric projection
+  details now route through the internal `IFontCompatFactory` seam.
 - `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
   draw actually needs the compatibility path object.
+- The remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment
+  application details now route through the internal `IPathCompat` seam.
 - Solid, texture, and linear-gradient brush adapters plus pen adapters now
   defer `SKPaint`/`SKShader` materialization until a draw call actually falls
   back to the internal Skia compatibility path.
+- The remaining solid-brush, linear-gradient, and pen paint creation plus pen
+  style update details now route through the internal `IPaintCompatFactory`
+  seam instead of living directly inside `SkiaImageAdapter` and `PenAdapter`.
 - The high-level `HtmlContainer` rendering API no longer exposes `SKCanvas`
   overloads; the remaining Skia usage is internal to the image/runtime layer.
 - `BBitmap` encode/decode/save now use a backend-neutral codec path instead of
@@ -45,15 +62,36 @@ Supported values for the internal override:
 - Alias-backed font-file registration now defers `SKTypeface.FromFile` until
   font creation resolves the loaded family, while text shaping plus text/gradient
   draw dispatch now route through the internal `ITextShaper` compatibility seam
-  and the remaining non-text `GraphicsAdapter` line, rectangle, path,
-  rounded-clip, texture-paint, polygon-fill, and layer-save fallback details
-  now route through the internal `ICanvasCompat` seam during the fallback
-  window, and the remaining
-  `SkiaImageAdapter` typeface/font-manager details now route through the
-  internal `IFontTypefaceResolver` seam, while the remaining `BBitmap`
+  and the remaining non-text `GraphicsAdapter` clip, image, line, rectangle,
+  path, rounded-clip, texture-paint, polygon-fill, and layer-save fallback
+  details now route through the internal `ICanvasCompat` seam during the
+  fallback window, and the remaining
+  `SkiaImageAdapter` deferred font-file registration and typeface-resolution
+  details now route through the internal `IFontTypefaceResolver` seam, while
+  system-font enumeration now comes from the Broiler-owned `BroilerFontRegistry`
+  instead of `SKFontManager`, and the remaining `BBitmap`
   compatibility-surface lifecycle now also routes through the internal
   `IBitmapCompatSurface` seam; external SVG image rasterization now uses the
-  Broiler-owned `BSvgRasterizer`.
+  Broiler-owned `BSvgRasterizer`, and CSS hex color parsing now uses a
+  Broiler-owned parser instead of SkiaSharp's color parser.
+- In the default `broiler` backend, text draw and gradient-text draw now first
+  attempt a Broiler-owned raster text path backed by
+  `SixLabors.Fonts`/`SixLabors.ImageSharp.Drawing`, so registered/system fonts
+  no longer require an `SKCanvas` materialization just to paint glyphs.
+- The remaining Skia fallback text draw and gradient-text draw details now route
+  through the internal `ITextCanvasCompat` seam inside `SkiaTextShaper`.
+- Deterministic `Ahem` text measurement, including max-width char-fit probing,
+  now also stays on the Broiler-owned metrics path.
+- The remaining non-`Ahem` Skia-backed text measurement compatibility details
+  now route through the internal `ITextMetricsCompat` seam inside
+  `SkiaTextShaper`.
+- Raster-compatible layer compositing now also keeps `multiply`, `screen`,
+  `darken`, `lighten`, `overlay`, `difference`, and `plus-lighter` blend modes
+  on the Broiler-owned canvas path instead of forcing those cases onto the
+  internal Skia layer fallback.
+- General text measurement and the explicit internal `skia` override still keep
+  the remaining Skia-backed font metrics compatibility path during the final M5
+  cleanup window.
 
 ## Diagnostics
 

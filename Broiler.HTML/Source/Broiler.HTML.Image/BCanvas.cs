@@ -406,6 +406,51 @@ internal sealed class BCanvas : IDisposable
                 source.A);
         }
 
+        if (string.Equals(blendMode, "darken", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                Math.Min(source.R, destination.R),
+                Math.Min(source.G, destination.G),
+                Math.Min(source.B, destination.B),
+                source.A);
+        }
+
+        if (string.Equals(blendMode, "lighten", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                Math.Max(source.R, destination.R),
+                Math.Max(source.G, destination.G),
+                Math.Max(source.B, destination.B),
+                source.A);
+        }
+
+        if (string.Equals(blendMode, "overlay", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                OverlayChannel(source.R, destination.R),
+                OverlayChannel(source.G, destination.G),
+                OverlayChannel(source.B, destination.B),
+                source.A);
+        }
+
+        if (string.Equals(blendMode, "difference", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                (byte)Math.Abs(source.R - destination.R),
+                (byte)Math.Abs(source.G - destination.G),
+                (byte)Math.Abs(source.B - destination.B),
+                source.A);
+        }
+
+        if (string.Equals(blendMode, "plus-lighter", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BColor(
+                AdditiveClampChannel(source.R, destination.R),
+                AdditiveClampChannel(source.G, destination.G),
+                AdditiveClampChannel(source.B, destination.B),
+                source.A);
+        }
+
         return source;
     }
 
@@ -508,6 +553,20 @@ internal sealed class BCanvas : IDisposable
         float value = (source * srcA + destination * dstA * (1f - srcA)) / outA;
         return (byte)Math.Clamp((int)Math.Round(value), 0, 255);
     }
+
+    private static byte OverlayChannel(byte source, byte destination)
+    {
+        if (destination < 128)
+            return (byte)Math.Clamp((2 * source * destination + 127) / 255, 0, 255);
+
+        return (byte)Math.Clamp(
+            255 - ((2 * (255 - source) * (255 - destination) + 127) / 255),
+            0,
+            255);
+    }
+
+    private static byte AdditiveClampChannel(byte source, byte destination) =>
+        (byte)Math.Min(255, source + destination);
 
     private static float DistanceToSegment(float px, float py, PointF start, PointF end)
     {

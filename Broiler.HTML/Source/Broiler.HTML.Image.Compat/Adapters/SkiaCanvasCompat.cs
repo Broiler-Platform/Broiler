@@ -8,17 +8,32 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
 {
     public static ICanvasCompat Instance { get; } = new SkiaCanvasCompat();
 
-    public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint) =>
-        canvas.DrawLine(x1, y1, x2, y2, paint);
+    public void PushClip(object canvas, RectangleF rect) =>
+        SkiaCompatObjects.Canvas(canvas).ClipRect(Utilities.Utils.Convert(rect));
 
-    public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint) =>
-        canvas.DrawRect(Utilities.Utils.Convert(rect), paint);
+    public void PushClipExclude(object canvas, RectangleF rect) =>
+        SkiaCompatObjects.Canvas(canvas).ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
 
-    public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint) =>
-        canvas.DrawPath(path.Path, paint);
+    public void DrawLine(object canvas, float x1, float y1, float x2, float y2, object paint) =>
+        SkiaCompatObjects.Canvas(canvas).DrawLine(x1, y1, x2, y2, SkiaCompatObjects.Paint(paint));
+
+    public void DrawRectangle(object canvas, RectangleF rect, object paint) =>
+        SkiaCompatObjects.Canvas(canvas).DrawRect(Utilities.Utils.Convert(rect), SkiaCompatObjects.Paint(paint));
+
+    public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect) =>
+        SkiaCompatObjects.Canvas(canvas).DrawBitmap(
+            SkiaCompatObjects.Bitmap(bitmap.AsCompatBitmap()),
+            Utilities.Utils.Convert(srcRect),
+            Utilities.Utils.Convert(destRect));
+
+    public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect) =>
+        SkiaCompatObjects.Canvas(canvas).DrawBitmap(SkiaCompatObjects.Bitmap(bitmap.AsCompatBitmap()), Utilities.Utils.Convert(destRect));
+
+    public void DrawPath(object canvas, GraphicsPathAdapter path, object paint) =>
+        SkiaCompatObjects.Canvas(canvas).DrawPath(SkiaCompatObjects.Path(path.Path), SkiaCompatObjects.Paint(paint));
 
     public void ClipRounded(
-        SKCanvas canvas,
+        object canvas,
         RectangleF rect,
         double cornerNw,
         double cornerNwY,
@@ -29,12 +44,13 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
         double cornerSw,
         double cornerSwY)
     {
+        var skCanvas = SkiaCompatObjects.Canvas(canvas);
         if ((cornerNw <= 0 && cornerNwY <= 0)
             && (cornerNe <= 0 && cornerNeY <= 0)
             && (cornerSe <= 0 && cornerSeY <= 0)
             && (cornerSw <= 0 && cornerSwY <= 0))
         {
-            canvas.ClipRect(Utilities.Utils.Convert(rect));
+            skCanvas.ClipRect(Utilities.Utils.Convert(rect));
             return;
         }
 
@@ -48,21 +64,21 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
         };
         var rrect = new SKRoundRect();
         rrect.SetRectRadii(skRect, radii);
-        canvas.ClipRoundRect(rrect);
+        skCanvas.ClipRoundRect(rrect);
     }
 
-    public SKPaint CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
+    public object CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
     {
         var paint = new SKPaint();
         paint.Shader = SKShader.CreateBitmap(
-            bitmap.AsSkBitmap(),
+            SkiaCompatObjects.Bitmap(bitmap.AsCompatBitmap()),
             SKShaderTileMode.Repeat,
             SKShaderTileMode.Repeat,
             SKMatrix.CreateTranslation((float)translateTransformLocation.X, (float)translateTransformLocation.Y));
         return paint;
     }
 
-    public void DrawPolygon(SKCanvas canvas, PointF[] points, SKPaint paint)
+    public void DrawPolygon(object canvas, PointF[] points, object paint)
     {
         using var path = new SKPath();
         path.MoveTo(Utilities.Utils.Convert(points[0]));
@@ -71,17 +87,17 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
             path.LineTo(Utilities.Utils.Convert(points[i]));
 
         path.Close();
-        canvas.DrawPath(path, paint);
+        SkiaCompatObjects.Canvas(canvas).DrawPath(path, SkiaCompatObjects.Paint(paint));
     }
 
-    public void SaveOpacityLayer(SKCanvas canvas, float opacity)
+    public void SaveOpacityLayer(object canvas, float opacity)
     {
         byte alpha = (byte)Math.Clamp((int)(opacity * 255), 0, 255);
         using var paint = new SKPaint { Color = new SKColor(0, 0, 0, alpha) };
-        canvas.SaveLayer(paint);
+        SkiaCompatObjects.Canvas(canvas).SaveLayer(paint);
     }
 
-    public void SaveBlendLayer(SKCanvas canvas, string blendMode)
+    public void SaveBlendLayer(object canvas, string blendMode)
     {
         var skBlendMode = blendMode?.ToLowerInvariant() switch
         {
@@ -105,6 +121,6 @@ internal sealed class SkiaCanvasCompat : ICanvasCompat
         };
 
         using var paint = new SKPaint { BlendMode = skBlendMode };
-        canvas.SaveLayer(paint);
+        SkiaCompatObjects.Canvas(canvas).SaveLayer(paint);
     }
 }

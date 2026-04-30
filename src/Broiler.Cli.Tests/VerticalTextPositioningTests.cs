@@ -1,7 +1,6 @@
 using System;
 using Xunit;
 using Broiler.HTML.Image;
-using SkiaSharp;
 
 namespace Broiler.Cli.Tests;
 

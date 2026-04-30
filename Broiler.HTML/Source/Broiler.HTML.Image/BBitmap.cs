@@ -6,7 +6,6 @@ using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image;
 
@@ -26,16 +25,6 @@ public sealed class BBitmap : IDisposable
         Height = height;
         _pixels = new byte[checked(width * height * 4)];
         _compatSurface = CreateDefaultCompatSurface();
-    }
-
-    internal BBitmap(SKBitmap bitmap, bool ownsBitmap)
-    {
-        ArgumentNullException.ThrowIfNull(bitmap);
-
-        Width = bitmap.Width;
-        Height = bitmap.Height;
-        _pixels = CreatePixelBuffer(bitmap);
-        _compatSurface = CreateDefaultCompatSurface(bitmap, ownsBitmap);
     }
 
     internal BBitmap(int width, int height, byte[] pixels, IBitmapCompatSurface? compatSurface = null)
@@ -150,9 +139,7 @@ public sealed class BBitmap : IDisposable
     internal bool HasMaterializedCompatBitmap => _compatSurface.IsMaterialized;
     internal int CompatSyncInvocationCount { get; private set; }
 
-    internal static BBitmap Wrap(SKBitmap bitmap, bool ownsBitmap = false) => new(bitmap, ownsBitmap);
-
-    internal SKCanvas OpenCanvas() => _compatSurface.OpenCanvas();
+    internal object OpenCanvas() => _compatSurface.OpenCanvas();
 
     internal GraphicsAdapter OpenGraphics(RectangleF clip)
     {
@@ -181,34 +168,22 @@ public sealed class BBitmap : IDisposable
             initialCanvasOperation: static (canvas, state) =>
             {
                 var offset = (PointF)state;
-                canvas.Save();
-                canvas.Translate(offset.X, offset.Y);
+                CompatCanvasOperations.Save(canvas);
+                CompatCanvasOperations.Translate(canvas, offset.X, offset.Y);
             },
             initialCanvasOperationState: translation);
     }
 
-    internal void DrawPictureToFit(SKPicture picture)
+    internal void DrawPictureToFit(object picture)
     {
         ArgumentNullException.ThrowIfNull(picture);
-
-        using var canvas = OpenCanvas();
-        var cullRect = picture.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != Width
-                || (int)Math.Ceiling(cullRect.Height) != Height))
-        {
-            float scaleX = Width / cullRect.Width;
-            float scaleY = Height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
-        }
-
-        canvas.DrawPicture(picture);
+        _compatSurface.DrawPictureToFit(picture, Width, Height);
         SyncPixelsFromCompatBitmap();
     }
 
-    internal SKBitmap AsSkBitmap() => EnsureCompatBitmap();
+    internal object AsCompatBitmap() => EnsureCompatBitmap();
 
-    internal SKBitmap ToSkBitmapCopy() => _compatSurface.ToBitmapCopy();
+    internal object ToCompatBitmapCopy() => _compatSurface.ToBitmapCopy();
 
     public void Dispose() => _compatSurface.Dispose();
 
@@ -238,9 +213,9 @@ public sealed class BBitmap : IDisposable
         return image;
     }
 
-    private SKBitmap EnsureCompatBitmap() => _compatSurface.AsBitmap();
+    private object EnsureCompatBitmap() => _compatSurface.AsBitmap();
 
-    private static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
+    internal static BBitmap CreateFromImageSharpImage(SixLabors.ImageSharp.Image<Rgba32> image)
     {
         var pixels = new byte[checked(image.Width * image.Height * 4)];
         for (int y = 0; y < image.Height; y++)
@@ -273,25 +248,6 @@ public sealed class BBitmap : IDisposable
         _compatSurface.SyncToPrimaryBuffer();
     }
 
-    private static byte[] CreatePixelBuffer(SKBitmap bitmap)
-    {
-        var pixels = new byte[checked(bitmap.Width * bitmap.Height * 4)];
-        for (int y = 0; y < bitmap.Height; y++)
-        {
-            for (int x = 0; x < bitmap.Width; x++)
-            {
-                var color = bitmap.GetPixel(x, y);
-                int index = ((y * bitmap.Width) + x) * 4;
-                pixels[index] = color.Red;
-                pixels[index + 1] = color.Green;
-                pixels[index + 2] = color.Blue;
-                pixels[index + 3] = color.Alpha;
-            }
-        }
-
-        return pixels;
-    }
-
     private static void ValidateDimensions(int width, int height)
     {
         if (width <= 0)
@@ -300,8 +256,8 @@ public sealed class BBitmap : IDisposable
             throw new ArgumentOutOfRangeException(nameof(height));
     }
 
-    private IBitmapCompatSurface CreateDefaultCompatSurface(SKBitmap? initialBitmap = null, bool ownsBitmap = true)
-        => new SkiaBitmapCompatSurface(Width, Height, ReadPrimaryPixel, WritePrimaryPixel, initialBitmap, ownsBitmap);
+    private IBitmapCompatSurface CreateDefaultCompatSurface(object? initialBitmap = null, bool ownsBitmap = true)
+        => SkiaCompatProvider.CreateBitmapCompatSurface(Width, Height, ReadPrimaryPixel, WritePrimaryPixel, initialBitmap, ownsBitmap);
 
     private BColor ReadPrimaryPixel(int x, int y)
     {

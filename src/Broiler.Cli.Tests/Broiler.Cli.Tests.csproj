@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Cli\Broiler.Cli.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image.Compat\Broiler.HTML.Image.Compat.csproj" />
   </ItemGroup>
 
   <ItemGroup>

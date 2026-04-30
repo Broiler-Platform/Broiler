@@ -18,12 +18,23 @@ public class SkiaDecouplingGuardTests
         Path.Combine(RepoRoot, "Broiler.HTML", "Source", "Broiler.HTML.WPF"),
     ];
 
+    private static readonly string CliTestsDirectory = Path.Combine(RepoRoot, "src", "Broiler.Cli.Tests");
+
+    private static readonly HashSet<string> AllowedCliTestFilesWithSkiaReferences =
+    [
+        "GraphicsAbstractionTests.cs",
+        "SkiaDecouplingGuardTests.cs",
+    ];
+
     private static readonly Regex SkiaTokenPattern = new(
         @"using\s+SkiaSharp\s*;|SkiaSharp\.|\bSK[A-Z][A-Za-z0-9_]*\b",
         RegexOptions.Compiled);
 
     private static readonly string ImageProjectRelativePath = Path.Combine(
         "Broiler.HTML", "Source", "Broiler.HTML.Image", "Broiler.HTML.Image.csproj");
+
+    private static readonly string ImageCompatProjectRelativePath = Path.Combine(
+        "Broiler.HTML", "Source", "Broiler.HTML.Image.Compat", "Broiler.HTML.Image.Compat.csproj");
 
     private static readonly string[] AllowedSkiaPackageReferences =
     [
@@ -99,6 +110,19 @@ public class SkiaDecouplingGuardTests
     }
 
     [Fact]
+    public void NonAbstraction_Cli_Tests_Do_Not_Reference_SkiaSharp()
+    {
+        var violations = FindSkiaSourceViolations(
+            CliTestsDirectory,
+            static relativePath => !AllowedCliTestFilesWithSkiaReferences.Contains(Path.GetFileName(relativePath)));
+
+        Assert.True(
+            violations.Count == 0,
+            "Only the explicit Skia seam tests should reference SkiaSharp inside Broiler.Cli.Tests.\n" +
+            string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
     public void Only_Image_Project_Carries_Skia_And_Svg_Package_References()
     {
         var actual = Directory.EnumerateFiles(RepoRoot, "*.csproj", SearchOption.AllDirectories)
@@ -123,7 +147,7 @@ public class SkiaDecouplingGuardTests
         {
             new
             {
-                RelativePath = ImageProjectRelativePath,
+                RelativePath = ImageCompatProjectRelativePath,
                 Packages = AllowedSkiaPackageReferences
                     .OrderBy(static value => value, StringComparer.Ordinal)
                     .ToArray(),
@@ -138,7 +162,7 @@ public class SkiaDecouplingGuardTests
     [Fact]
     public void Image_Project_Uses_The_Known_Good_Skia_Compatibility_Package_Versions()
     {
-        var projectPath = Path.Combine(RepoRoot, ImageProjectRelativePath);
+        var projectPath = Path.Combine(RepoRoot, ImageCompatProjectRelativePath);
         var packages = XDocument.Load(projectPath)
             .Descendants()
             .Where(element => element.Name.LocalName == "PackageReference")
@@ -152,6 +176,39 @@ public class SkiaDecouplingGuardTests
 
         Assert.Equal("3.119.2", packages["SkiaSharp"]);
         Assert.Equal("3.119.2", packages["SkiaSharp.NativeAssets.Linux"]);
+    }
+
+    [Fact]
+    public void Image_Color_Parsing_Does_Not_Call_SkiaSharp_Color_Parser()
+    {
+        var adapterPath = Path.Combine(
+            RepoRoot,
+            "Broiler.HTML",
+            "Source",
+            "Broiler.HTML.Image.Compat",
+            "Adapters",
+            "SkiaImageAdapter.cs");
+
+        var source = File.ReadAllText(adapterPath);
+
+        Assert.DoesNotContain("SKColor.TryParse", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Image_System_Font_Enumeration_Does_Not_Call_Skia_Font_Manager()
+    {
+        var adapterPath = Path.Combine(
+            RepoRoot,
+            "Broiler.HTML",
+            "Source",
+            "Broiler.HTML.Image.Compat",
+            "Adapters",
+            "SkiaImageAdapter.cs");
+
+        var source = File.ReadAllText(adapterPath);
+
+        Assert.DoesNotContain("_typefaceResolver.GetSystemFontFamilies()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SKFontManager.Default.FontFamilies", source, StringComparison.Ordinal);
     }
 
     private static MemberInfo[] GetHighLevelSkiaCompatibilityMembers() =>
@@ -196,6 +253,57 @@ public class SkiaDecouplingGuardTests
         PropertyInfo property => $"{property.DeclaringType!.Name}.{property.Name} -> {DescribeType(property.PropertyType)}",
         _ => member.Name,
     };
+
+    private static List<string> FindSkiaSourceViolations(string rootDirectory, Func<string, bool> includeFile)
+    {
+        var violations = new List<string>();
+        Assert.True(Directory.Exists(rootDirectory), $"Source directory not found: {rootDirectory}");
+
+        foreach (var path in Directory.EnumerateFiles(rootDirectory, "*.cs", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(RepoRoot, path);
+            if (relativePath.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || relativePath.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || !includeFile(relativePath))
+            {
+                continue;
+            }
+
+            var lines = File.ReadAllLines(path);
+            var inBlockComment = false;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+
+                if (inBlockComment)
+                {
+                    if (line.Contains("*/", StringComparison.Ordinal))
+                        inBlockComment = false;
+
+                    continue;
+                }
+
+                if (line.StartsWith("/*", StringComparison.Ordinal))
+                {
+                    if (!line.Contains("*/", StringComparison.Ordinal))
+                        inBlockComment = true;
+
+                    continue;
+                }
+
+                if (line.StartsWith("//", StringComparison.Ordinal)
+                    || line.StartsWith("///", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (SkiaTokenPattern.IsMatch(line))
+                    violations.Add($"{relativePath}:{i + 1}: {line}");
+            }
+        }
+
+        return violations;
+    }
 
     private static string DescribeType(Type type)
     {

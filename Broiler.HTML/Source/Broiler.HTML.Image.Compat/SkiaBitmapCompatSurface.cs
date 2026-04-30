@@ -41,19 +41,38 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
 
     public void SetPixel(int x, int y, BColor color)
     {
-        _bitmap?.SetPixel(x, y, color.ToSkColor());
+        _bitmap?.SetPixel(x, y, new SKColor(color.R, color.G, color.B, color.A));
     }
 
     public void Clear(BColor color)
     {
-        _bitmap?.Erase(color.ToSkColor());
+        _bitmap?.Erase(new SKColor(color.R, color.G, color.B, color.A));
     }
 
-    public SKBitmap AsBitmap() => EnsureBitmap();
+    public object AsBitmap() => EnsureBitmap();
 
-    public SKBitmap ToBitmapCopy() => EnsureBitmap().Copy();
+    public object ToBitmapCopy() => EnsureBitmap().Copy();
 
-    public SKCanvas OpenCanvas() => new(EnsureBitmap());
+    public object OpenCanvas() => new SKCanvas(EnsureBitmap());
+
+    public void DrawPictureToFit(object picture, int width, int height)
+    {
+        ArgumentNullException.ThrowIfNull(picture);
+        var skPicture = SkiaCompatObjects.Picture(picture);
+
+        using var canvas = new SKCanvas(EnsureBitmap());
+        var cullRect = skPicture.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != width
+                || (int)Math.Ceiling(cullRect.Height) != height))
+        {
+            float scaleX = width / cullRect.Width;
+            float scaleY = height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
+        canvas.DrawPicture(skPicture);
+    }
 
     public void SyncToPrimaryBuffer()
     {
@@ -63,7 +82,10 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
         for (int y = 0; y < _height; y++)
         {
             for (int x = 0; x < _width; x++)
-                _writePrimaryPixel(x, y, _bitmap.GetPixel(x, y).ToBColor());
+            {
+                var color = _bitmap.GetPixel(x, y);
+                _writePrimaryPixel(x, y, new BColor(color.Red, color.Green, color.Blue, color.Alpha));
+            }
         }
     }
 
@@ -82,7 +104,10 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
         for (int y = 0; y < _height; y++)
         {
             for (int x = 0; x < _width; x++)
-                bitmap.SetPixel(x, y, _readPrimaryPixel(x, y).ToSkColor());
+            {
+                var color = _readPrimaryPixel(x, y);
+                bitmap.SetPixel(x, y, new SKColor(color.R, color.G, color.B, color.A));
+            }
         }
 
         _bitmap = bitmap;

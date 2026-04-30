@@ -1,5 +1,4 @@
 using System;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image;
 
@@ -11,11 +10,13 @@ internal interface IBitmapCompatSurface : IDisposable
 
     void Clear(BColor color);
 
-    SKBitmap AsBitmap();
+    object AsBitmap();
 
-    SKBitmap ToBitmapCopy();
+    object ToBitmapCopy();
 
-    SKCanvas OpenCanvas();
+    object OpenCanvas();
+
+    void DrawPictureToFit(object picture, int width, int height);
 
     void SyncToPrimaryBuffer();
 }
