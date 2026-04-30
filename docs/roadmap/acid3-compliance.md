@@ -930,8 +930,8 @@ The table below maps each test to its regression test coverage status.
 | 23 | `createElementNS()` invalid names | ✅ | `Acid3_Test22_23_CreateElement_Invalid_Names_Throw` |
 | 24 | Event handler attributes | ✅ | `Acid3_Test24_SetAttribute_OnClick_Compiles_And_Fires` |
 | 25 | `createDocumentType` / `createDocument` | ✅ | `Acid3_Test25_CreateDocumentType_And_CreateDocument` |
-| 26 | Document tree lifecycle | ⏭️ | (cross-document adoption not implemented — `Acid3_Test26` skipped) |
-| 27 | Continuation of test 26 | ⏭️ | (cross-document adoption not implemented — `Acid3_Test27` skipped) |
+| 26 | Document tree lifecycle | ✅ | `Acid3_Test26_Document_Tree_Lifecycle_Cross_Document_Move` |
+| 27 | Continuation of test 26 | ✅ | `Acid3_Test27_Cross_Document_Subtree_Preserves_Structure` |
 | 28 | `getElementById()` | ✅ | `PhaseF_Test28_GetElementById_Does_Not_Match_Name` |
 | 29 | Whitespace survives cloning | ✅ | `Acid3_Test29_CloneNode_Deep_Preserves_Whitespace_Text_Nodes` |
 | 30 | `dispatchEvent()` | ✅ | `PhaseF_Test30_DispatchEvent_AddRemoveListener` |
@@ -1422,8 +1422,8 @@ gap is attributable to:
 - [x] **Add regression tests for remaining Bucket 2 gaps**
   - [x] Test 20 — Null bytes in various places
   - [x] Test 24 — Event handler attributes
-  - [x] Test 26 — Document tree lifecycle (skipped: cross-document adoption gap)
-  - [x] Test 27 — Continuation of test 26 (skipped: cross-document adoption gap)
+  - [x] Test 26 — Document tree lifecycle
+  - [x] Test 27 — Continuation of test 26
   - [x] Test 29 — Whitespace survives cloning
   - [x] Test 32 — Events bubbling through Document
 - [x] **Add regression tests for Bucket 3 (CSS Selectors, tests 33–48)**

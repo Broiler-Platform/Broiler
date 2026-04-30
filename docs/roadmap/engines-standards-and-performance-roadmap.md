@@ -603,6 +603,14 @@ sub-issues was filed or re-prioritized.
   earlier higher-specificity one without `!important`. Focused coverage now
   passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3CascadeDebugTests`
   and `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~CssImportantCascadeTests`.
+- **2026-04-30** — HtmlBridge DOM lifecycle continuation: taught bridge node
+  insertion paths to adopt moved subtrees into the destination document by
+  propagating the destination `ownerDocument` root across cross-document
+  `appendChild`, `insertBefore`, `replaceChild`, and document-level append
+  operations. The previously skipped Acid3 cross-document lifecycle regressions
+  now run green via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Acid3_Test26|FullyQualifiedName~Acid3_Test27"`
+  and the focused edge-case suite remains green via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

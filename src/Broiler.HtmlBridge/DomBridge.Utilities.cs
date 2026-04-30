@@ -312,6 +312,25 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Updates the owning document root for <paramref name="node"/> and its
+    /// descendants when the subtree is inserted into another document.
+    /// Nested sub-document roots remain isolated browsing contexts and are not
+    /// re-owned by the outer document.
+    /// </summary>
+    private static void AdoptSubtreeIntoDocument(DomElement node, DomElement? ownerDocRoot)
+    {
+        node.OwnerDocRoot = ownerDocRoot;
+
+        foreach (var child in node.Children)
+        {
+            if (IsSubDocRoot(child))
+                continue;
+
+            AdoptSubtreeIntoDocument(child, ownerDocRoot);
+        }
+    }
+
+    /// <summary>
     /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
     /// all descendants are recursively cloned.
     /// </summary>

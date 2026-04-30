@@ -780,6 +780,7 @@ public sealed partial class DomBridge
                 {
                     newEl.Parent?.Children.Remove(newEl);
                     newEl.Parent = element;
+                    AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                     element.Children.Add(newEl);
                     bridgeForInsert.InvalidateStyleScope(element);
 
@@ -803,6 +804,7 @@ public sealed partial class DomBridge
 
                 newEl.Parent?.Children.Remove(newEl);
                 newEl.Parent = element;
+                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 // Re-find index: removing newEl from its old parent may have shifted
                 // indices if newEl was a sibling of refEl within this same parent.
                 idx = element.Children.IndexOf(refEl);
@@ -956,6 +958,7 @@ public sealed partial class DomBridge
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
+                AdoptSubtreeIntoDocument(childEl, element.OwnerDocRoot);
                 element.Children.Add(childEl);
                 bridgeForAppend.InvalidateStyleScope(element);
 
@@ -1027,6 +1030,7 @@ public sealed partial class DomBridge
 
                 oldEl.Parent = null;
                 newEl.Parent = element;
+                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 element.Children[idx] = newEl;
                 bridgeForAppend.InvalidateStyleScope(element);
                 return a[1]; // returns the old child
@@ -6964,6 +6968,7 @@ public sealed partial class DomBridge
                         if (child.Parent != null)
                             child.Parent.Children.Remove(child);
                         child.Parent = docRoot;
+                        AdoptSubtreeIntoDocument(child, docRoot);
                         docRoot.Children.Add(child);
                         return childObj;
                     }

@@ -448,7 +448,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("fired:true", result);
     }
 
-    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    [Fact]
     public void Acid3_Test26_Document_Tree_Lifecycle_Cross_Document_Move()
     {
         // Moving nodes between documents: create in one doc, append in another
@@ -458,27 +458,28 @@ document.getElementById('result').textContent = r.join('|');
 <script>
 var r = [];
 var newDoc = document.implementation.createDocument(null, 'root', null);
-r.push('D' + (newDoc.documentElement.tagName === 'root' ? '1' : '0'));
+        r.push('D' + (newDoc.documentElement.tagName.toLowerCase() === 'root' ? '1' : '0'));
 var div = document.createElement('div');
 div.setAttribute('id', 'moved');
 div.textContent = 'content';
 r.push('O' + (div.ownerDocument === document ? '1' : '0'));
-// Cross-document appendChild (implicitly adopts)
-newDoc.documentElement.appendChild(div);
-r.push('P' + (div.parentNode === newDoc.documentElement ? '1' : '0'));
-r.push('T' + div.textContent);
-r.push('I' + div.getAttribute('id'));
-document.getElementById('result').textContent = r.join(',');
+        // Cross-document appendChild (implicitly adopts)
+        newDoc.documentElement.appendChild(div);
+        r.push('P' + (div.parentNode === newDoc.documentElement ? '1' : '0'));
+        r.push('N' + (div.ownerDocument === newDoc ? '1' : '0'));
+        r.push('T' + div.textContent);
+        r.push('I' + div.getAttribute('id'));
+        document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         // Node moved cross-document preserves attributes and content
-        Assert.Contains("D1,O1,P1,Tcontent,Imoved", result);
+        Assert.Contains("D1,O1,P1,N1,Tcontent,Imoved", result);
     }
 
-    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    [Fact]
     public void Acid3_Test27_Cross_Document_Subtree_Preserves_Structure()
     {
         // Moving a subtree cross-document preserves children, attributes, and text
@@ -495,21 +496,23 @@ child.setAttribute('data-val', '42');
 child.textContent = 'kept';
 parent.appendChild(child);
 // Cross-document appendChild
-newDoc.documentElement.appendChild(parent);
-r.push('A' + parent.getAttribute('class'));
-r.push('C' + parent.childNodes.length);
-r.push('T' + parent.firstChild.tagName.toLowerCase());
-r.push('V' + parent.firstChild.getAttribute('data-val'));
-r.push('X' + parent.firstChild.textContent);
-r.push('P' + (parent.parentNode === newDoc.documentElement ? '1' : '0'));
-document.getElementById('result').textContent = r.join(',');
+        newDoc.documentElement.appendChild(parent);
+        r.push('A' + parent.getAttribute('class'));
+        r.push('C' + parent.childNodes.length);
+        r.push('T' + parent.firstChild.tagName.toLowerCase());
+        r.push('V' + parent.firstChild.getAttribute('data-val'));
+        r.push('X' + parent.firstChild.textContent);
+        r.push('N' + (parent.ownerDocument === newDoc ? '1' : '0'));
+        r.push('M' + (parent.firstChild.ownerDocument === newDoc ? '1' : '0'));
+        r.push('P' + (parent.parentNode === newDoc.documentElement ? '1' : '0'));
+        document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         // Subtree structure, attributes, and text survive cross-document move
-        Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,P1", result);
+        Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,N1,M1,P1", result);
     }
 
     [Fact]
