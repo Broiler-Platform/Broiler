@@ -41,6 +41,7 @@ internal sealed class CssParser
     {
         if (!string.IsNullOrEmpty(stylesheet))
         {
+            _sourceOrder = 0;
             stylesheet = RemoveStylesheetComments(stylesheet);
 
             ParseStyleBlocks(cssData, StripAtRules(stylesheet));
