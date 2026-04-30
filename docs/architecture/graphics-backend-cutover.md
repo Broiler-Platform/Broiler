@@ -31,6 +31,10 @@ Supported values for the internal override:
   through an internal provider seam so the eventual package split only needs to
   move one centralized Skia registration point instead of many hard-wired
   constructor defaults.
+- That centralized registration point now lives in the separate
+  `Broiler.HTML.Image.Compat` assembly, which owns the remaining SkiaSharp
+  implementation files and package/native-asset references while the core
+  `Broiler.HTML.Image` assembly stays package-free.
 - `BBitmap.OpenGraphics` in Broiler raster mode now defers `SKCanvas`/`SKBitmap`
   creation and only materializes the compatibility surface if a draw actually
   falls back to the internal Skia path, and raster-only graphics disposal now

@@ -1,19 +1,18 @@
 using System;
 using System.Drawing.Drawing2D;
 using Broiler.HTML.Adapters.Adapters;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class PenAdapter : RPen
 {
-    private readonly Func<float, DashStyle, SKPaint>? _paintFactory;
-    private readonly Action<SKPaint, float, DashStyle>? _paintUpdater;
-    private SKPaint? _paint;
+    private readonly Func<float, DashStyle, object>? _paintFactory;
+    private readonly Action<object, float, DashStyle>? _paintUpdater;
+    private object? _paint;
     private float _width;
     private DashStyle _dashStyle;
 
-    public PenAdapter(Func<float, DashStyle, SKPaint> paintFactory, Action<SKPaint, float, DashStyle> paintUpdater)
+    public PenAdapter(Func<float, DashStyle, object> paintFactory, Action<object, float, DashStyle> paintUpdater)
     {
         _paintFactory = paintFactory ?? throw new ArgumentNullException(nameof(paintFactory));
         _paintUpdater = paintUpdater ?? throw new ArgumentNullException(nameof(paintUpdater));
@@ -21,7 +20,7 @@ internal sealed class PenAdapter : RPen
         _dashStyle = DashStyle.Solid;
     }
 
-    public SKPaint Paint => _paint ??= _paintFactory?.Invoke(_width, _dashStyle)
+    public object Paint => _paint ??= _paintFactory?.Invoke(_width, _dashStyle)
         ?? throw new InvalidOperationException("Pen paint factory was not configured.");
 
     public BColor? SolidColor { get; init; }

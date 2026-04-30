@@ -41,7 +41,7 @@ internal sealed class SkiaFontTypefaceResolver : IFontTypefaceResolver
     public bool HasMaterializedLoadedTypeface(string family) =>
         _loadedTypefaces.ContainsKey(family);
 
-    public SKTypeface ResolveTypeface(string family, FontStyle style)
+    public object ResolveTypeface(string family, FontStyle style)
     {
         if (_loadedTypefaces.TryGetValue(family, out var loaded))
             return loaded;

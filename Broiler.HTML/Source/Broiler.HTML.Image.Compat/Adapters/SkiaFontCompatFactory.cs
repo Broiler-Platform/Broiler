@@ -6,8 +6,8 @@ internal sealed class SkiaFontCompatFactory : IFontCompatFactory
 {
     public static IFontCompatFactory Instance { get; } = new SkiaFontCompatFactory();
 
-    public SKFont CreateFont(SKTypeface typeface, float size) =>
-        new(typeface, size)
+    public object CreateFont(object typeface, float size) =>
+        new SKFont(SkiaCompatObjects.Typeface(typeface), size)
         {
             // Phase 10.2: Use grayscale anti-aliasing (Antialias) instead of
             // SubpixelAntialias. The Chromium reference screenshot is a bitmap
@@ -22,9 +22,10 @@ internal sealed class SkiaFontCompatFactory : IFontCompatFactory
             Subpixel = true,
         };
 
-    public FontCompatMetrics GetMetrics(SKFont font)
+    public FontCompatMetrics GetMetrics(object font)
     {
-        var skiaMetrics = font.Metrics;
+        var skFont = SkiaCompatObjects.Font(font);
+        var skiaMetrics = skFont.Metrics;
         double height = skiaMetrics.Descent - skiaMetrics.Ascent;
         double underlineOffset = -skiaMetrics.Ascent
             + skiaMetrics.UnderlinePosition.GetValueOrDefault(skiaMetrics.Descent - skiaMetrics.Ascent * 0.87f);

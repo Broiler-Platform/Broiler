@@ -1,12 +1,10 @@
-using SkiaSharp;
-
 namespace Broiler.HTML.Image.Adapters;
 
 internal interface IFontCompatFactory
 {
-    SKFont CreateFont(SKTypeface typeface, float size);
+    object CreateFont(object typeface, float size);
 
-    FontCompatMetrics GetMetrics(SKFont font);
+    FontCompatMetrics GetMetrics(object font);
 }
 
 internal readonly record struct FontCompatMetrics(double Height, double UnderlineOffset);

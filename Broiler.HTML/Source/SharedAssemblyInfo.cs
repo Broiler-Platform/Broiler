@@ -16,5 +16,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyVersion("1.5.2.0")]
 [assembly: InternalsVisibleTo("Broiler.HTML.Core")]
 [assembly: InternalsVisibleTo("Broiler.HTML.CSS")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image.Compat")]
 [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
 [assembly: InternalsVisibleTo("Broiler.Cli.Tests")]

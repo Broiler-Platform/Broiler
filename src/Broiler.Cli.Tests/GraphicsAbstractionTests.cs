@@ -1,4 +1,5 @@
 using Broiler.Cli;
+using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
 using SkiaSharp;
@@ -494,7 +495,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
     {
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
 
@@ -616,7 +617,7 @@ public class GraphicsAbstractionTests
             () => surface.Canvas,
             new RectangleF(0, 0, 32, 32),
             textShaper: textShaper);
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
 
         var measureSize = graphics.MeasureString("measure", font);
         graphics.MeasureString("limit", font, 12, out var charFit, out var charFitWidth);
@@ -696,9 +697,9 @@ public class GraphicsAbstractionTests
         bitmap.SetPixel(1, 1, new BColor(10, 20, 30, 255));
         bitmap.Clear(new BColor(40, 50, 60, 255));
 
-        using var canvas = bitmap.OpenCanvas();
-        using var bitmapCopy = bitmap.ToSkBitmapCopy();
-        using var compatBitmap = bitmap.AsSkBitmap();
+        using var canvas = Assert.IsType<SKCanvas>(bitmap.OpenCanvas());
+        using var bitmapCopy = Assert.IsType<SKBitmap>(bitmap.ToCompatBitmapCopy());
+        using var compatBitmap = Assert.IsType<SKBitmap>(bitmap.AsCompatBitmap());
         using var recorder = new SKPictureRecorder();
         recorder.BeginRecording(new SKRect(0, 0, 4, 4)).DrawRect(new SKRect(0, 0, 4, 4), new SKPaint { Color = SKColors.Red });
         using var picture = recorder.EndRecording();
@@ -734,7 +735,7 @@ public class GraphicsAbstractionTests
         using var graphics = new GraphicsAdapter(
             () => surface.Canvas,
             new RectangleF(0, 0, 32, 32));
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
         using var imageBitmap = new BBitmap(2, 2);
         using var image = new ImageAdapter(imageBitmap);
         using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
@@ -850,7 +851,7 @@ public class GraphicsAbstractionTests
     {
         var textMetricsCompat = new RecordingTextMetricsCompat();
         var textShaper = new SkiaTextShaper(textMetricsCompat);
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
 
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
@@ -877,7 +878,7 @@ public class GraphicsAbstractionTests
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
         var textCanvasCompat = new RecordingTextCanvasCompat();
         var textShaper = new SkiaTextShaper(textCanvasCompat: textCanvasCompat);
-        var font = new FontAdapter(SKTypeface.Default, 12, FontStyle.Regular);
+        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
 
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
@@ -1876,14 +1877,16 @@ public class GraphicsAbstractionTests
             return false;
         }
 
-        public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+        public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point)
         {
             Calls.Add("DrawString");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
+            Assert.IsType<SKCanvas>(canvas);
         }
     }
 
@@ -1915,7 +1918,7 @@ public class GraphicsAbstractionTests
             return _materializedFamilies.Contains(family);
         }
 
-        public SKTypeface ResolveTypeface(string family, FontStyle style)
+        public object ResolveTypeface(string family, FontStyle style)
         {
             Calls.Add("ResolveTypeface");
             _deferredFamilies.Add(family);
@@ -1946,15 +1949,17 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
-        public void DrawString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, Color color, PointF point)
+        public void DrawString(object canvas, FontAdapter font, object renderFont, string text, Color color, PointF point)
         {
             Calls.Add("DrawString");
+            Assert.IsType<SKCanvas>(canvas);
             Assert.Same(font.RenderFont, renderFont);
         }
 
-        public void DrawGradientString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public void DrawGradientString(object canvas, FontAdapter font, object renderFont, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
+            Assert.IsType<SKCanvas>(canvas);
             Assert.Same(font.RenderFont, renderFont);
         }
     }
@@ -1963,15 +1968,16 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
-        public SKFont CreateFont(SKTypeface typeface, float size)
+        public object CreateFont(object typeface, float size)
         {
             Calls.Add($"CreateFont:{size:0.####}");
-            return new SKFont(typeface, size);
+            return new SKFont(Assert.IsAssignableFrom<SKTypeface>(typeface), size);
         }
 
-        public FontCompatMetrics GetMetrics(SKFont font)
+        public FontCompatMetrics GetMetrics(object font)
         {
             Calls.Add("GetMetrics");
+            Assert.IsType<SKFont>(font);
             return new FontCompatMetrics(18d, 7d);
         }
     }
@@ -1982,29 +1988,29 @@ public class GraphicsAbstractionTests
 
         public List<(float StrokeWidth, DashStyle DashStyle)> PenUpdates { get; } = [];
 
-        public SKPaint CreateSolidBrushPaint(Color color)
+        public object CreateSolidBrushPaint(Color color)
         {
             Calls.Add("CreateSolidBrushPaint");
             return new SKPaint();
         }
 
-        public SKPaint CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
+        public object CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
         {
             Calls.Add("CreateLinearGradientBrushPaint");
             return new SKPaint();
         }
 
-        public SKPaint CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
+        public object CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
         {
             Calls.Add("CreatePenPaint");
             return new SKPaint { StrokeWidth = strokeWidth };
         }
 
-        public void UpdatePenPaint(SKPaint paint, float strokeWidth, DashStyle dashStyle)
+        public void UpdatePenPaint(object paint, float strokeWidth, DashStyle dashStyle)
         {
             Calls.Add("UpdatePenPaint");
             PenUpdates.Add((strokeWidth, dashStyle));
-            paint.StrokeWidth = strokeWidth;
+            Assert.IsType<SKPaint>(paint).StrokeWidth = strokeWidth;
         }
     }
 
@@ -2012,34 +2018,34 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
-        public SKPath CreatePath()
+        public object CreatePath()
         {
             Calls.Add("CreatePath");
             return new SKPath();
         }
 
-        public void Reset(SKPath path)
+        public void Reset(object path)
         {
             Calls.Add("Reset");
-            path.Reset();
+            Assert.IsType<SKPath>(path).Reset();
         }
 
-        public void MoveTo(SKPath path, float x, float y)
+        public void MoveTo(object path, float x, float y)
         {
             Calls.Add("MoveTo");
-            path.MoveTo(x, y);
+            Assert.IsType<SKPath>(path).MoveTo(x, y);
         }
 
-        public void LineTo(SKPath path, float x, float y)
+        public void LineTo(object path, float x, float y)
         {
             Calls.Add("LineTo");
-            path.LineTo(x, y);
+            Assert.IsType<SKPath>(path).LineTo(x, y);
         }
 
-        public void ArcTo(SKPath path, float left, float top, float width, float height, float startAngle, float sweepAngle, bool forceMoveTo)
+        public void ArcTo(object path, float left, float top, float width, float height, float startAngle, float sweepAngle, bool forceMoveTo)
         {
             Calls.Add("ArcTo");
-            path.ArcTo(SKRect.Create(left, top, width, height), startAngle, sweepAngle, forceMoveTo);
+            Assert.IsType<SKPath>(path).ArcTo(SKRect.Create(left, top, width, height), startAngle, sweepAngle, forceMoveTo);
         }
     }
 
@@ -2047,43 +2053,53 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
-        public void PushClip(SKCanvas canvas, RectangleF rect)
+        public void PushClip(object canvas, RectangleF rect)
         {
             Calls.Add("PushClip");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void PushClipExclude(SKCanvas canvas, RectangleF rect)
+        public void PushClipExclude(object canvas, RectangleF rect)
         {
             Calls.Add("PushClipExclude");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint)
+        public void DrawLine(object canvas, float x1, float y1, float x2, float y2, object paint)
         {
             Calls.Add("DrawLine");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint)
+        public void DrawRectangle(object canvas, RectangleF rect, object paint)
         {
             Calls.Add("DrawRectangle");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect)
+        public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect)
         {
             Calls.Add("DrawImageWithSource");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect)
+        public void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect)
         {
             Calls.Add("DrawImage");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint)
+        public void DrawPath(object canvas, GraphicsPathAdapter path, object paint)
         {
             Calls.Add("DrawPath");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
         public void ClipRounded(
-            SKCanvas canvas,
+            object canvas,
             RectangleF rect,
             double cornerNw,
             double cornerNwY,
@@ -2095,27 +2111,32 @@ public class GraphicsAbstractionTests
             double cornerSwY)
         {
             Calls.Add("ClipRounded");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public SKPaint CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
+        public object CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation)
         {
             Calls.Add("CreateTexturePaint");
             return new SKPaint();
         }
 
-        public void DrawPolygon(SKCanvas canvas, PointF[] points, SKPaint paint)
+        public void DrawPolygon(object canvas, PointF[] points, object paint)
         {
             Calls.Add("DrawPolygon");
+            Assert.IsType<SKCanvas>(canvas);
+            Assert.IsType<SKPaint>(paint);
         }
 
-        public void SaveOpacityLayer(SKCanvas canvas, float opacity)
+        public void SaveOpacityLayer(object canvas, float opacity)
         {
             Calls.Add("SaveOpacityLayer");
+            Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void SaveBlendLayer(SKCanvas canvas, string blendMode)
+        public void SaveBlendLayer(object canvas, string blendMode)
         {
             Calls.Add("SaveBlendLayer");
+            Assert.IsType<SKCanvas>(canvas);
         }
     }
 
@@ -2139,29 +2160,30 @@ public class GraphicsAbstractionTests
             _bitmap.Erase(new SKColor(color.R, color.G, color.B, color.A));
         }
 
-        public SKBitmap AsBitmap()
+        public object AsBitmap()
         {
             Calls.Add("AsBitmap");
             return _bitmap;
         }
 
-        public SKBitmap ToBitmapCopy()
+        public object ToBitmapCopy()
         {
             Calls.Add("ToBitmapCopy");
             return _bitmap.Copy();
         }
 
-        public SKCanvas OpenCanvas()
+        public object OpenCanvas()
         {
             Calls.Add("OpenCanvas");
             return new SKCanvas(_bitmap);
         }
 
-        public void DrawPictureToFit(SKPicture picture, int width, int height)
+        public void DrawPictureToFit(object picture, int width, int height)
         {
             Calls.Add("DrawPictureToFit");
+            var skPicture = Assert.IsType<SKPicture>(picture);
             using var canvas = new SKCanvas(_bitmap);
-            var cullRect = picture.CullRect;
+            var cullRect = skPicture.CullRect;
             if (cullRect.Width > 0 && cullRect.Height > 0
                 && ((int)Math.Ceiling(cullRect.Width) != width
                     || (int)Math.Ceiling(cullRect.Height) != height))
@@ -2169,7 +2191,7 @@ public class GraphicsAbstractionTests
                 canvas.Scale(width / cullRect.Width, height / cullRect.Height);
             }
 
-            canvas.DrawPicture(picture);
+            canvas.DrawPicture(skPicture);
         }
 
         public void SyncToPrimaryBuffer()
@@ -2184,8 +2206,13 @@ public class GraphicsAbstractionTests
     {
         private readonly Func<IBitmapCompatSurface> _bitmapCompatSurfaceFactory =
             bitmapCompatSurfaceFactory ?? (() => new RecordingBitmapCompatSurface(4, 4));
+        private SkiaImageAdapter? _imageAdapter;
+
+        public RAdapter ImageAdapter => _imageAdapter ??= new SkiaImageAdapter(FontTypefaceResolver, ["SystemUi"], PaintCompatFactory);
 
         public RecordingTextShaper TextShaper { get; } = new();
+
+        RAdapter ISkiaCompatProvider.ImageAdapter => ImageAdapter;
 
         ITextShaper ISkiaCompatProvider.TextShaper => TextShaper;
 
@@ -2224,7 +2251,7 @@ public class GraphicsAbstractionTests
             int height,
             Func<int, int, BColor> readPrimaryPixel,
             Action<int, int, BColor> writePrimaryPixel,
-            SKBitmap? initialBitmap = null,
+            object? initialBitmap = null,
             bool ownsBitmap = true)
         {
             BitmapCompatSurfaceFactoryCallCount++;

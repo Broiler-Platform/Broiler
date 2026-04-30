@@ -14,7 +14,7 @@ public sealed class HtmlContainer : IDisposable
 {
     public HtmlContainer()
     {
-        HtmlContainerInt = new HtmlContainerInt(SkiaImageAdapter.Instance, HandlerFactory.Instance);
+        HtmlContainerInt = new HtmlContainerInt(SkiaCompatProvider.ImageAdapter, HandlerFactory.Instance);
         HtmlContainerInt.SetMargins(0);
         HtmlContainerInt.PageSize = new SizeF(99999, 99999);
     }

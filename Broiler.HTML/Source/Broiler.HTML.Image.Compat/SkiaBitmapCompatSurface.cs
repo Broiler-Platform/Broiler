@@ -49,18 +49,19 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
         _bitmap?.Erase(new SKColor(color.R, color.G, color.B, color.A));
     }
 
-    public SKBitmap AsBitmap() => EnsureBitmap();
+    public object AsBitmap() => EnsureBitmap();
 
-    public SKBitmap ToBitmapCopy() => EnsureBitmap().Copy();
+    public object ToBitmapCopy() => EnsureBitmap().Copy();
 
-    public SKCanvas OpenCanvas() => new(EnsureBitmap());
+    public object OpenCanvas() => new SKCanvas(EnsureBitmap());
 
-    public void DrawPictureToFit(SKPicture picture, int width, int height)
+    public void DrawPictureToFit(object picture, int width, int height)
     {
         ArgumentNullException.ThrowIfNull(picture);
+        var skPicture = SkiaCompatObjects.Picture(picture);
 
         using var canvas = new SKCanvas(EnsureBitmap());
-        var cullRect = picture.CullRect;
+        var cullRect = skPicture.CullRect;
         if (cullRect.Width > 0 && cullRect.Height > 0
             && ((int)Math.Ceiling(cullRect.Width) != width
                 || (int)Math.Ceiling(cullRect.Height) != height))
@@ -70,7 +71,7 @@ internal sealed class SkiaBitmapCompatSurface : IBitmapCompatSurface
             canvas.Scale(scaleX, scaleY);
         }
 
-        canvas.DrawPicture(picture);
+        canvas.DrawPicture(skPicture);
     }
 
     public void SyncToPrimaryBuffer()

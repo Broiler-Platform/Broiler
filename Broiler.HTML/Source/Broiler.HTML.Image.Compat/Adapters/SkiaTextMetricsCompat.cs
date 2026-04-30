@@ -1,3 +1,5 @@
+using SkiaSharp;
+
 namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaTextMetricsCompat : ITextMetricsCompat
@@ -5,7 +7,7 @@ internal sealed class SkiaTextMetricsCompat : ITextMetricsCompat
     public static ITextMetricsCompat Instance { get; } = new SkiaTextMetricsCompat();
 
     public float MeasureTextWidth(FontAdapter font, string text) =>
-        font.Font.MeasureText(text);
+        ((SKFont)font.Font).MeasureText(text);
 
     public void MeasureTextWidth(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
     {
@@ -15,7 +17,7 @@ internal sealed class SkiaTextMetricsCompat : ITextMetricsCompat
         for (int i = 1; i <= text.Length; i++)
         {
             var substring = text.Substring(0, i);
-            var width = font.Font.MeasureText(substring);
+            var width = ((SKFont)font.Font).MeasureText(substring);
             if (width > maxWidth)
                 break;
 

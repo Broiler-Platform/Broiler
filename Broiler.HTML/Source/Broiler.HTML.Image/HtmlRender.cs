@@ -123,7 +123,7 @@ public static class HtmlRender
     /// The font's own family name, or <c>null</c> if loading failed.
     /// </returns>
     public static string LoadFontFromFile(string path, string cssName = null)
-        => SkiaImageAdapter.Instance.LoadFontFromFile(path, cssName);
+        => SkiaCompatProvider.ImageAdapter.LoadFontFromFile(path, cssName);
 
     private static BBitmap RenderToImageCore(string html, int width, int height,
         BColor? backgroundColor,

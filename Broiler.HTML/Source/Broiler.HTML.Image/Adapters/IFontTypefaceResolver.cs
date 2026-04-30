@@ -1,5 +1,4 @@
 using System.Drawing;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
@@ -11,5 +10,5 @@ internal interface IFontTypefaceResolver
 
     bool HasMaterializedLoadedTypeface(string family);
 
-    SKTypeface ResolveTypeface(string family, FontStyle style);
+    object ResolveTypeface(string family, FontStyle style);
 }

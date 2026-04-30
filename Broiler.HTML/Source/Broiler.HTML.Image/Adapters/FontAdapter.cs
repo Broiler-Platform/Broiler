@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
-using SkiaSharp;
 using SixLabors.Fonts;
 using DrawingFontStyle = System.Drawing.FontStyle;
 using SixLaborsFont = SixLabors.Fonts.Font;
@@ -17,32 +16,22 @@ internal sealed class FontAdapter : RFont
     private readonly double _size;
     private readonly string _family;
     private readonly DrawingFontStyle _style;
-    private readonly Func<SKTypeface>? _compatTypefaceFactory;
+    private readonly Func<object>? _compatTypefaceFactory;
     private readonly IFontCompatFactory _fontCompatFactory;
     private double _height = -1;
     private double _underlineOffset = -1;
     private double _whitespaceWidth = -1;
     private SixLaborsFont? _broilerLayoutFont;
     private SixLaborsFont? _broilerRenderFont;
-    private SKTypeface? _typeface;
-    private SKFont? _font;
-    private SKFont? _renderFont;
-
-    public FontAdapter(SKTypeface typeface, double size, DrawingFontStyle style)
-    {
-        var compatTypeface = typeface ?? SKTypeface.Default;
-        _family = compatTypeface.FamilyName;
-        _size = size;
-        _style = style;
-        _compatTypefaceFactory = () => compatTypeface;
-        _fontCompatFactory = SkiaCompatProvider.FontCompatFactory;
-    }
+    private object? _typeface;
+    private object? _font;
+    private object? _renderFont;
 
     public FontAdapter(
         string family,
         double size,
         DrawingFontStyle style,
-        Func<SKTypeface>? compatTypefaceFactory = null,
+        Func<object>? compatTypefaceFactory = null,
         IFontCompatFactory? fontCompatFactory = null)
     {
         _family = family;
@@ -53,12 +42,13 @@ internal sealed class FontAdapter : RFont
     }
 
     /// <summary>Layout font (pt-based) – used for metrics and text measurement.</summary>
-    public SKFont Font => _font ??= _fontCompatFactory.CreateFont(Typeface, (float)_size);
+    public object Font => _font ??= _fontCompatFactory.CreateFont(Typeface, (float)_size);
 
     /// <summary>Render font (CSS px-based) – used for drawing glyphs at correct size.</summary>
-    public SKFont RenderFont => _renderFont ??= _fontCompatFactory.CreateFont(Typeface, (float)(_size * PtToCssPx));
+    public object RenderFont => _renderFont ??= _fontCompatFactory.CreateFont(Typeface, (float)(_size * PtToCssPx));
 
-    public SKTypeface Typeface => _typeface ??= _compatTypefaceFactory?.Invoke() ?? SKTypeface.Default;
+    public object Typeface => _typeface ??= _compatTypefaceFactory?.Invoke()
+        ?? throw new InvalidOperationException("Font compatibility typeface factory was not configured.");
 
     public override double Size => _size;
     public override double Height

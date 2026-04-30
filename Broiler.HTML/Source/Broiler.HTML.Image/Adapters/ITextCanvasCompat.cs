@@ -1,16 +1,15 @@
 using System.Drawing;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
 internal interface ITextCanvasCompat
 {
-    void DrawString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, Color color, PointF point);
+    void DrawString(object canvas, FontAdapter font, object renderFont, string text, Color color, PointF point);
 
     void DrawGradientString(
-        SKCanvas canvas,
+        object canvas,
         FontAdapter font,
-        SKFont renderFont,
+        object renderFont,
         string text,
         RectangleF rect,
         PointF point,

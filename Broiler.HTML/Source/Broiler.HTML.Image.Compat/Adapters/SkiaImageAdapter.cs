@@ -333,7 +333,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             dispose: true);
     }
 
-    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(BBitmap.Wrap((SKBitmap)image, ownsBitmap: true)) : null;
+    protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter(SkiaCompatObjects.CreateBitmap((SKBitmap)image, ownsBitmap: true)) : null;
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {

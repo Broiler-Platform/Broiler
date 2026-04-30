@@ -33,6 +33,9 @@ public class SkiaDecouplingGuardTests
     private static readonly string ImageProjectRelativePath = Path.Combine(
         "Broiler.HTML", "Source", "Broiler.HTML.Image", "Broiler.HTML.Image.csproj");
 
+    private static readonly string ImageCompatProjectRelativePath = Path.Combine(
+        "Broiler.HTML", "Source", "Broiler.HTML.Image.Compat", "Broiler.HTML.Image.Compat.csproj");
+
     private static readonly string[] AllowedSkiaPackageReferences =
     [
         "SkiaSharp",
@@ -144,7 +147,7 @@ public class SkiaDecouplingGuardTests
         {
             new
             {
-                RelativePath = ImageProjectRelativePath,
+                RelativePath = ImageCompatProjectRelativePath,
                 Packages = AllowedSkiaPackageReferences
                     .OrderBy(static value => value, StringComparer.Ordinal)
                     .ToArray(),
@@ -159,7 +162,7 @@ public class SkiaDecouplingGuardTests
     [Fact]
     public void Image_Project_Uses_The_Known_Good_Skia_Compatibility_Package_Versions()
     {
-        var projectPath = Path.Combine(RepoRoot, ImageProjectRelativePath);
+        var projectPath = Path.Combine(RepoRoot, ImageCompatProjectRelativePath);
         var packages = XDocument.Load(projectPath)
             .Descendants()
             .Where(element => element.Name.LocalName == "PackageReference")
@@ -182,7 +185,7 @@ public class SkiaDecouplingGuardTests
             RepoRoot,
             "Broiler.HTML",
             "Source",
-            "Broiler.HTML.Image",
+            "Broiler.HTML.Image.Compat",
             "Adapters",
             "SkiaImageAdapter.cs");
 
@@ -198,7 +201,7 @@ public class SkiaDecouplingGuardTests
             RepoRoot,
             "Broiler.HTML",
             "Source",
-            "Broiler.HTML.Image",
+            "Broiler.HTML.Image.Compat",
             "Adapters",
             "SkiaImageAdapter.cs");
 

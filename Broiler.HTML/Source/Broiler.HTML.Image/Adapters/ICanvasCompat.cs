@@ -1,26 +1,25 @@
 using System.Drawing;
-using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
 
 internal interface ICanvasCompat
 {
-    void PushClip(SKCanvas canvas, RectangleF rect);
+    void PushClip(object canvas, RectangleF rect);
 
-    void PushClipExclude(SKCanvas canvas, RectangleF rect);
+    void PushClipExclude(object canvas, RectangleF rect);
 
-    void DrawLine(SKCanvas canvas, float x1, float y1, float x2, float y2, SKPaint paint);
+    void DrawLine(object canvas, float x1, float y1, float x2, float y2, object paint);
 
-    void DrawRectangle(SKCanvas canvas, RectangleF rect, SKPaint paint);
+    void DrawRectangle(object canvas, RectangleF rect, object paint);
 
-    void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect);
+    void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect, RectangleF srcRect);
 
-    void DrawImage(SKCanvas canvas, BBitmap bitmap, RectangleF destRect);
+    void DrawImage(object canvas, BBitmap bitmap, RectangleF destRect);
 
-    void DrawPath(SKCanvas canvas, GraphicsPathAdapter path, SKPaint paint);
+    void DrawPath(object canvas, GraphicsPathAdapter path, object paint);
 
     void ClipRounded(
-        SKCanvas canvas,
+        object canvas,
         RectangleF rect,
         double cornerNw,
         double cornerNwY,
@@ -31,11 +30,11 @@ internal interface ICanvasCompat
         double cornerSw,
         double cornerSwY);
 
-    SKPaint CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation);
+    object CreateTexturePaint(BBitmap bitmap, PointF translateTransformLocation);
 
-    void DrawPolygon(SKCanvas canvas, PointF[] points, SKPaint paint);
+    void DrawPolygon(object canvas, PointF[] points, object paint);
 
-    void SaveOpacityLayer(SKCanvas canvas, float opacity);
+    void SaveOpacityLayer(object canvas, float opacity);
 
-    void SaveBlendLayer(SKCanvas canvas, string blendMode);
+    void SaveBlendLayer(object canvas, string blendMode);
 }

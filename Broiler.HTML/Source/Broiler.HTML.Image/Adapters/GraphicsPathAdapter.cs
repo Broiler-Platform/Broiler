@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using SkiaSharp;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
 
@@ -10,14 +9,14 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
 {
     private PointF _lastPoint;
     private readonly List<PointF> _flattenedPoints = [];
-    private readonly List<Action<SKPath>> _deferredPathOperations = [];
+    private readonly List<Action<object>> _deferredPathOperations = [];
     private readonly IPathCompat _pathCompat;
-    private SKPath? _path;
+    private object? _path;
 
     internal GraphicsPathAdapter(IPathCompat? pathCompat = null) =>
         _pathCompat = pathCompat ?? SkiaCompatProvider.PathCompat;
 
-    public SKPath Path => EnsurePath();
+    public object Path => EnsurePath();
 
     public IReadOnlyList<PointF> FlattenedPoints => _flattenedPoints;
 
@@ -78,9 +77,9 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
         _lastPoint = new PointF((float)x, (float)y);
     }
 
-    public override void Dispose() => _path?.Dispose();
+    public override void Dispose() => (_path as IDisposable)?.Dispose();
 
-    private SKPath EnsurePath()
+    private object EnsurePath()
     {
         if (_path is not null)
             return _path;

@@ -124,10 +124,10 @@ internal sealed class SkiaTextShaper : ITextShaper
         return true;
     }
 
-    public void DrawString(SKCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+    public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point)
         => _textCanvasCompat.DrawString(canvas, font, font.RenderFont, text, color, point);
 
-    public void DrawGradientString(SKCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+    public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
         => _textCanvasCompat.DrawGradientString(canvas, font, font.RenderFont, text, rect, point, size, colors, positions, angle);
 
     private static void DrawBitmap(BCanvas canvas, BBitmap textBitmap, PointF point)
@@ -192,8 +192,5 @@ internal sealed class SkiaTextShaper : ITextShaper
     // remaining M5 cutover window while the text-fidelity gates in
     // TextFidelityThresholdTests stay pinned to the legacy layout baseline.
     private static bool CanUseBroilerMeasurement(SixLaborsFont font) =>
-        IsDeterministicFixtureFont(font.Family.Name);
-
-    private static bool IsDeterministicFixtureFont(string? familyName) =>
-        string.Equals(familyName, TextCompatConstants.DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
+        TextCompatConstants.IsDeterministicFixtureFont(font.Family.Name);
 }

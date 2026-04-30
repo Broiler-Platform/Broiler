@@ -8,22 +8,24 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
 {
     public static ITextCanvasCompat Instance { get; } = new SkiaTextCanvasCompat();
 
-    public void DrawString(SKCanvas canvas, FontAdapter font, SKFont renderFont, string text, Color color, PointF point)
+    public void DrawString(object canvas, FontAdapter font, object renderFont, string text, Color color, PointF point)
     {
-        var origin = GetDrawOrigin(renderFont, point);
+        var skCanvas = SkiaCompatObjects.Canvas(canvas);
+        var skRenderFont = SkiaCompatObjects.Font(renderFont);
+        var origin = GetDrawOrigin(skRenderFont, point);
         using var paint = new SKPaint
         {
             Color = Utilities.Utils.Convert(color),
             IsAntialias = true,
         };
 
-        canvas.DrawText(text, origin.X, origin.Y, renderFont, paint);
+        skCanvas.DrawText(text, origin.X, origin.Y, skRenderFont, paint);
     }
 
     public void DrawGradientString(
-        SKCanvas canvas,
+        object canvas,
         FontAdapter font,
-        SKFont renderFont,
+        object renderFont,
         string text,
         RectangleF rect,
         PointF point,
@@ -32,8 +34,10 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
         float[] positions,
         float angle)
     {
-        var origin = GetDrawOrigin(renderFont, point);
-        float shaderWidth = Math.Max(rect.Width, renderFont.MeasureText(text));
+        var skCanvas = SkiaCompatObjects.Canvas(canvas);
+        var skRenderFont = SkiaCompatObjects.Font(renderFont);
+        var origin = GetDrawOrigin(skRenderFont, point);
+        float shaderWidth = Math.Max(rect.Width, skRenderFont.MeasureText(text));
         float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
         var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
 
@@ -42,10 +46,10 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
         for (int i = 0; i < colors.Length; i++)
             skColors[i] = Utilities.Utils.Convert(colors[i]);
 
-        canvas.SaveLayer();
+        skCanvas.SaveLayer();
         using (var maskPaint = new SKPaint { Color = SKColors.White, IsAntialias = false })
         {
-            canvas.DrawText(text, origin.X, origin.Y, renderFont, maskPaint);
+            skCanvas.DrawText(text, origin.X, origin.Y, skRenderFont, maskPaint);
         }
 
         using var shader = SKShader.CreateLinearGradient(startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);
@@ -56,17 +60,17 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
             IsAntialias = false,
         };
 
-        if (IsDeterministicFixtureFont(font.Typeface.FamilyName)
+        if (TextCompatConstants.IsDeterministicFixtureFont(SkiaCompatObjects.Typeface(font.Typeface).FamilyName)
             && !text.Contains(' '))
         {
             gradientPaint.BlendMode = SKBlendMode.SrcOver;
-            canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
-            canvas.Restore();
+            skCanvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
+            skCanvas.Restore();
             return;
         }
 
-        canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
-        canvas.Restore();
+        skCanvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
+        skCanvas.Restore();
     }
 
     private static PointF GetDrawOrigin(SKFont renderFont, PointF topLeft)
@@ -87,7 +91,4 @@ internal sealed class SkiaTextCanvasCompat : ITextCanvasCompat
             new SKPoint(cx - sin * halfDiag, cy + cos * halfDiag),
             new SKPoint(cx + sin * halfDiag, cy - cos * halfDiag));
     }
-
-    private static bool IsDeterministicFixtureFont(string? familyName) =>
-        string.Equals(familyName, TextCompatConstants.DeterministicFixtureFontFamily, StringComparison.OrdinalIgnoreCase);
 }

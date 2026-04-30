@@ -531,7 +531,7 @@ bounds and baseline placement within 2 px before broader rollout.
   keeping an explicit fallback path for one stabilization window if needed.
 - [x] Run the curated parity suite and performance checks against the default
   backend until rollback criteria are either cleared or exercised.
-- [ ] Remove runtime SkiaSharp package references and native assets only after
+- [x] Remove runtime SkiaSharp package references and native assets only after
   the fallback window and packaging validation are complete.
 - [x] Publish release notes and migration guidance for any consumer-visible API
   changes or fidelity caveats.
@@ -587,8 +587,10 @@ and `BBitmap.DrawPictureToFit` now also routes compat picture
 playback/scaling through that internal `IBitmapCompatSurface` seam,
 and the core image-layer default wiring for bitmap, graphics, path, font, and
 adapter compat implementations now also centralizes through an internal
-provider seam as package-split prep instead of hard-wiring concrete `Skia*`
-defaults across constructors,
+provider seam instead of hard-wiring concrete `Skia*` defaults across
+constructors, and the remaining Skia implementation code plus SkiaSharp package
+references now live in the separate `Broiler.HTML.Image.Compat` assembly rather
+than the core `Broiler.HTML.Image` project,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
 and the remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment

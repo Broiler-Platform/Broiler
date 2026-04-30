@@ -9,15 +9,15 @@ internal sealed class SkiaPaintCompatFactory : IPaintCompatFactory
 {
     public static IPaintCompatFactory Instance { get; } = new SkiaPaintCompatFactory();
 
-    public SKPaint CreateSolidBrushPaint(Color color) =>
-        new()
+    public object CreateSolidBrushPaint(Color color) =>
+        new SKPaint
         {
             Color = Utilities.Utils.Convert(color),
             Style = SKPaintStyle.Fill,
             IsAntialias = true,
         };
 
-    public SKPaint CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
+    public object CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
     {
         var radians = angle * Math.PI / 180.0;
         var cos = (float)Math.Cos(radians);
@@ -47,7 +47,7 @@ internal sealed class SkiaPaintCompatFactory : IPaintCompatFactory
         };
     }
 
-    public SKPaint CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
+    public object CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
     {
         var paint = new SKPaint
         {
@@ -59,10 +59,11 @@ internal sealed class SkiaPaintCompatFactory : IPaintCompatFactory
         return paint;
     }
 
-    public void UpdatePenPaint(SKPaint paint, float strokeWidth, DashStyle dashStyle)
+    public void UpdatePenPaint(object paint, float strokeWidth, DashStyle dashStyle)
     {
-        paint.StrokeWidth = strokeWidth;
-        paint.PathEffect = CreatePathEffect(dashStyle, strokeWidth);
+        var skPaint = SkiaCompatObjects.Paint(paint);
+        skPaint.StrokeWidth = strokeWidth;
+        skPaint.PathEffect = CreatePathEffect(dashStyle, strokeWidth);
     }
 
     private static SKPathEffect? CreatePathEffect(DashStyle dashStyle, float strokeWidth) => dashStyle switch

@@ -300,7 +300,7 @@ public static class BSvgRasterizer
             float x = context.TransformX(ParseLength(attrs, "x", context.CoordinateWidth));
             float y = context.TransformY(ParseLength(attrs, "y", context.CoordinateHeight));
             float fontSize = context.ScaleStroke(ParseLength(attrs, "font-size", context.CoordinateHeight, 16));
-            var font = SkiaImageAdapter.Instance.GetFont(
+            var font = SkiaCompatProvider.ImageAdapter.GetFont(
                 attrs.TryGetValue("font-family", out var family) && !string.IsNullOrWhiteSpace(family) ? family : "Arial",
                 Math.Max(fontSize, 1),
                 FontStyle.Regular);
