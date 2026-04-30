@@ -35,6 +35,8 @@ Supported values for the internal override:
   details now route through the internal `IFontCompatFactory` seam.
 - `GraphicsPathAdapter` now also defers `SKPath` creation until a fallback path
   draw actually needs the compatibility path object.
+- The remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment
+  application details now route through the internal `IPathCompat` seam.
 - Solid, texture, and linear-gradient brush adapters plus pen adapters now
   defer `SKPaint`/`SKShader` materialization until a draw call actually falls
   back to the internal Skia compatibility path.

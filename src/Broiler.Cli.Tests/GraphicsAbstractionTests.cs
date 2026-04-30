@@ -871,6 +871,29 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void GraphicsPathAdapter_Path_Operations_Delegate_Through_Path_Compat_Seam()
+    {
+        var pathCompat = new RecordingPathCompat();
+        using var path = new GraphicsPathAdapter(pathCompat);
+
+        path.Start(1, 2);
+        path.LineTo(3, 4);
+        path.ArcTo(5, 6, 2, Broiler.HTML.Adapters.Adapters.RGraphicsPath.Corner.TopRight);
+
+        Assert.False(path.HasMaterializedPath);
+        Assert.Empty(pathCompat.Calls);
+
+        _ = path.Path;
+
+        Assert.True(path.HasMaterializedPath);
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo"], pathCompat.Calls);
+
+        path.Start(7, 8);
+
+        Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo", "Reset", "MoveTo"], pathCompat.Calls);
+    }
+
+    [Fact]
     public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -1913,6 +1936,41 @@ public class GraphicsAbstractionTests
             Calls.Add("UpdatePenPaint");
             PenUpdates.Add((strokeWidth, dashStyle));
             paint.StrokeWidth = strokeWidth;
+        }
+    }
+
+    private sealed class RecordingPathCompat : IPathCompat
+    {
+        public List<string> Calls { get; } = [];
+
+        public SKPath CreatePath()
+        {
+            Calls.Add("CreatePath");
+            return new SKPath();
+        }
+
+        public void Reset(SKPath path)
+        {
+            Calls.Add("Reset");
+            path.Reset();
+        }
+
+        public void MoveTo(SKPath path, float x, float y)
+        {
+            Calls.Add("MoveTo");
+            path.MoveTo(x, y);
+        }
+
+        public void LineTo(SKPath path, float x, float y)
+        {
+            Calls.Add("LineTo");
+            path.LineTo(x, y);
+        }
+
+        public void ArcTo(SKPath path, float left, float top, float width, float height, float startAngle, float sweepAngle, bool forceMoveTo)
+        {
+            Calls.Add("ArcTo");
+            path.ArcTo(SKRect.Create(left, top, width, height), startAngle, sweepAngle, forceMoveTo);
         }
     }
 

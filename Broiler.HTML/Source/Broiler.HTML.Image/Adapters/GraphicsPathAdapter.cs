@@ -11,7 +11,11 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
     private PointF _lastPoint;
     private readonly List<PointF> _flattenedPoints = [];
     private readonly List<Action<SKPath>> _deferredPathOperations = [];
+    private readonly IPathCompat _pathCompat;
     private SKPath? _path;
+
+    internal GraphicsPathAdapter(IPathCompat? pathCompat = null) =>
+        _pathCompat = pathCompat ?? SkiaPathCompat.Instance;
 
     public SKPath Path => EnsurePath();
 
@@ -28,20 +32,20 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
         _deferredPathOperations.Clear();
         if (_path is not null)
         {
-            _path.Reset();
-            _path.MoveTo((float)x, (float)y);
+            _pathCompat.Reset(_path);
+            _pathCompat.MoveTo(_path, (float)x, (float)y);
             return;
         }
 
-        _deferredPathOperations.Add(path => path.MoveTo((float)x, (float)y));
+        _deferredPathOperations.Add(path => _pathCompat.MoveTo(path, (float)x, (float)y));
     }
 
     public override void LineTo(double x, double y)
     {
         if (_path is not null)
-            _path.LineTo((float)x, (float)y);
+            _pathCompat.LineTo(_path, (float)x, (float)y);
         else
-            _deferredPathOperations.Add(path => path.LineTo((float)x, (float)y));
+            _deferredPathOperations.Add(path => _pathCompat.LineTo(path, (float)x, (float)y));
 
         _lastPoint = new PointF((float)x, (float)y);
         _flattenedPoints.Add(_lastPoint);
@@ -51,11 +55,12 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
     {
         float left = (float)(Math.Min(x, _lastPoint.X) - (corner == Corner.TopRight || corner == Corner.BottomRight ? size : 0));
         float top = (float)(Math.Min(y, _lastPoint.Y) - (corner == Corner.BottomLeft || corner == Corner.BottomRight ? size : 0));
-        var rect = SKRect.Create(left, top, (float)size * 2, (float)size * 2);
+        float width = (float)size * 2;
+        float height = (float)size * 2;
         if (_path is not null)
-            _path.ArcTo(rect, GetStartAngle(corner), 90, false);
+            _pathCompat.ArcTo(_path, left, top, width, height, GetStartAngle(corner), 90, false);
         else
-            _deferredPathOperations.Add(path => path.ArcTo(rect, GetStartAngle(corner), 90, false));
+            _deferredPathOperations.Add(path => _pathCompat.ArcTo(path, left, top, width, height, GetStartAngle(corner), 90, false));
 
         int segmentCount = Math.Max(4, (int)Math.Ceiling(size));
         float centerX = left + (float)size;
@@ -80,7 +85,7 @@ internal sealed class GraphicsPathAdapter : RGraphicsPath
         if (_path is not null)
             return _path;
 
-        _path = new SKPath();
+        _path = _pathCompat.CreatePath();
         foreach (var operation in _deferredPathOperations)
             operation(_path);
 

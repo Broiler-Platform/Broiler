@@ -585,6 +585,8 @@ opening, copy, and sync details now also route through an internal
 `IBitmapCompatSurface` seam,
 and `GraphicsPathAdapter` now defers `SKPath` creation until fallback path draw
 work needs the compatibility object,
+and the remaining `GraphicsPathAdapter` `SKPath` creation, reset, and segment
+application details now also route through an internal `IPathCompat` seam,
 and CSS hex color parsing now uses a Broiler-owned parser instead of
 `SKColor.TryParse`,
 and the default `broiler` backend now routes text and gradient-text paint
