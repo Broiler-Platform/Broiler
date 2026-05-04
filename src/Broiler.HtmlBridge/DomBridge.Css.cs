@@ -136,6 +136,75 @@ public sealed partial class DomBridge
         "writing-mode",
     };
 
+    private static readonly Dictionary<string, string> UserAgentDefaultDisplayValues = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["html"] = "block",
+        ["address"] = "block",
+        ["blockquote"] = "block",
+        ["body"] = "block",
+        ["dd"] = "block",
+        ["div"] = "block",
+        ["dl"] = "block",
+        ["dt"] = "block",
+        ["fieldset"] = "block",
+        ["form"] = "block",
+        ["frame"] = "block",
+        ["frameset"] = "block",
+        ["h1"] = "block",
+        ["h2"] = "block",
+        ["h3"] = "block",
+        ["h4"] = "block",
+        ["h5"] = "block",
+        ["h6"] = "block",
+        ["noframes"] = "block",
+        ["ol"] = "block",
+        ["p"] = "block",
+        ["ul"] = "block",
+        ["center"] = "block",
+        ["dir"] = "block",
+        ["menu"] = "block",
+        ["pre"] = "block",
+        ["section"] = "block",
+        ["article"] = "block",
+        ["nav"] = "block",
+        ["aside"] = "block",
+        ["header"] = "block",
+        ["footer"] = "block",
+        ["main"] = "block",
+        ["figure"] = "block",
+        ["figcaption"] = "block",
+        ["details"] = "block",
+        ["li"] = "list-item",
+        ["summary"] = "list-item",
+        ["table"] = "table",
+        ["tr"] = "table-row",
+        ["thead"] = "table-header-group",
+        ["tbody"] = "table-row-group",
+        ["tfoot"] = "table-footer-group",
+        ["col"] = "table-column",
+        ["colgroup"] = "table-column-group",
+        ["td"] = "table-cell",
+        ["th"] = "table-cell",
+        ["caption"] = "table-caption",
+        ["button"] = "inline-block",
+        ["textarea"] = "inline-block",
+        ["input"] = "inline-block",
+        ["select"] = "inline-block",
+        ["iframe"] = "inline-block",
+        ["object"] = "inline-block",
+        ["head"] = "none",
+        ["style"] = "none",
+        ["title"] = "none",
+        ["script"] = "none",
+        ["link"] = "none",
+        ["meta"] = "none",
+        ["area"] = "none",
+        ["base"] = "none",
+        ["param"] = "none",
+        ["template"] = "none",
+        ["dialog"] = "none",
+    };
+
     private sealed class CustomPropertyRegistration
     {
         public bool Inherits { get; init; } = true;
@@ -1696,6 +1765,23 @@ public sealed partial class DomBridge
 
     private static bool IsInheritedCssProperty(string property) =>
         CssInheritedProperties.Contains(property);
+
+    private static void ApplyUserAgentDisplayDefaults(
+        Dictionary<string, string> computed,
+        DomElement element)
+    {
+        if (computed.ContainsKey("display"))
+            return;
+
+        if (element.Attributes.ContainsKey("hidden"))
+        {
+            computed["display"] = "none";
+            return;
+        }
+
+        if (UserAgentDefaultDisplayValues.TryGetValue(element.TagName, out var display))
+            computed["display"] = display;
+    }
 
     private static int FindMatchingClosingParen(string value, int openParenIndex)
     {

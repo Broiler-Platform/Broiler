@@ -620,6 +620,12 @@ sub-issues was filed or re-prioritized.
   bottom viewport band, and the focused real-page sanity gate is fully green
   via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~GoogleSearchComplianceTests`.
+- **2026-05-04** — HtmlBridge hit-testing continuation: seeded internal
+  computed-style resolution with key HTML user-agent `display` defaults and
+  stopped normal-flow geometry from counting `display:none` siblings, which
+  fixes the focused document hit-testing regressions where hidden metadata and
+  script nodes were displacing visible targets. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None|FullyQualifiedName~Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

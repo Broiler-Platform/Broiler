@@ -1066,6 +1066,8 @@ public sealed partial class DomBridge
         _computedPropsInProgress[element] = props;
         try
         {
+            ApplyUserAgentDisplayDefaults(props, element);
+
             foreach (var (sel, _, decls) in CssRules)
             {
                 if (MatchesSelector(element, sel))
@@ -1078,6 +1080,7 @@ public sealed partial class DomBridge
             ExpandCssShorthands(props);
             ResolveLengthAttrFunctions(props, element);
             ResolveExplicitInheritedValues(props, element);
+            ApplyInheritedProperties(props, element);
 
             // Expand the inset shorthand → top, right, bottom, left so that
             // downstream code (ComputeElementBox, TryApplyFallback, etc.) can

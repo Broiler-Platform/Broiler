@@ -3372,6 +3372,8 @@ public sealed partial class DomBridge
                     break;
                 if (sibling.IsTextNode)
                     continue;
+                if (!HasAssociatedLayoutBox(sibling))
+                    continue;
 
                 var siblingProps = GetComputedProps(sibling);
                 var siblingPosition = siblingProps.GetValueOrDefault("position");
@@ -3498,6 +3500,8 @@ public sealed partial class DomBridge
                 if (ReferenceEquals(sibling, element))
                     break;
                 if (sibling.IsTextNode)
+                    continue;
+                if (!HasAssociatedLayoutBox(sibling))
                     continue;
 
                 var siblingRect = ComputeRenderedRect(sibling);
