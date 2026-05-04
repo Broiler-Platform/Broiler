@@ -258,12 +258,28 @@ public sealed partial class DomBridge
         return rules;
     }
 
+    private static JSObject BuildCssRuleListObject(IReadOnlyList<JSObject> rules)
+    {
+        var cssRuleList = new JSObject();
+        for (var i = 0; i < rules.Count; i++)
+            cssRuleList[(uint)i] = rules[i];
+
+        cssRuleList.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(rules.Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        return cssRuleList;
+    }
+
     /// <summary>
     /// Builds a CSSRule JSObject from a CSS rule string.
-    /// Sets <c>type</c> (1 = CSSStyleRule, 5 = CSSFontFaceRule),
-    /// <c>cssText</c>, <c>selectorText</c>, and <c>style</c> properties.
+    /// Sets <c>type</c> (1 = CSSStyleRule, 4 = CSSMediaRule, 5 = CSSFontFaceRule),
+    /// <c>cssText</c>, <c>selectorText</c>, <c>media</c>, <c>cssRules</c>, and
+    /// <c>style</c> properties as appropriate.
     /// </summary>
-    private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet)
+    private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
         var ruleObj = new JSObject();
         ruleObj.FastAddProperty(
@@ -273,11 +289,41 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
         ruleObj.FastAddProperty(
             (KeyString)"parentRule",
-            new JSFunction((in Arguments _) => JSNull.Value, "get parentRule"),
+            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
+        if (ruleText.TrimStart().StartsWith("@media", StringComparison.OrdinalIgnoreCase))
+        {
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            int braceOpen = ruleText.IndexOf('{');
+            int braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var mediaText = ruleText.Substring(6, braceOpen - 6).Trim();
+                var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
+                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
+                    .ToList();
+                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+
+                ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var nestedCssText = string.Join(" ",
+                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
+                                .Where(text => !string.IsNullOrEmpty(text)));
+                        return new JSString($"@media {mediaText} {{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+        else if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
         {
             // CSSFontFaceRule — type 5
             ruleObj.FastAddValue((KeyString)"type", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);

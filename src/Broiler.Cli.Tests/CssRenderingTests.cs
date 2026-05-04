@@ -669,6 +669,84 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void CssMediaRule_Exposes_Type_Media_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media screen and (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 4);
+r.push(rule.media.indexOf('screen') >= 0);
+r.push(rule.cssRules.length === 1);
+r.push(rule.cssRules[0].type === 1);
+r.push(rule.cssRules[0].selectorText === '.test');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_Nested_Rules_Expose_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media all and (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var mediaRule = sheet.cssRules[0];
+var nestedRule = mediaRule.cssRules[0];
+r.push(mediaRule.parentRule === null);
+r.push(nestedRule.parentRule === mediaRule);
+r.push(nestedRule.parentStyleSheet === sheet);
+r.push(nestedRule.style.parentRule === nestedRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_CssText_Rebuilds_From_Nested_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var mediaRule = document.styleSheets[0].cssRules[0];
+r.push(mediaRule.cssText.indexOf('@media') >= 0);
+r.push(mediaRule.cssText.indexOf('(min-width: 1px)') >= 0);
+mediaRule.cssRules[0].style.setProperty('margin-left', '2px');
+r.push(mediaRule.cssText.indexOf('margin-left: 2px;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]
