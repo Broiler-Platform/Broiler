@@ -678,6 +678,14 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_IsTrusted_False|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_IsTrusted_False|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed `timeStamp` on
+  bridge-created events in both document and sub-document factories, seeding
+  script-created events with a Unix-millisecond timestamp so
+  `document.createEvent(...)` surfaces a numeric creation time compatibly with
+  standard DOM event behavior. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

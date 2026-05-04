@@ -54,6 +54,26 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CreateEvent_Event_Has_TimeStamp()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.timeStamp);
+r.push(evt.timeStamp >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("number,true", result);
+    }
+
+    [Fact]
     public void CreateEvent_UIEvents_Has_InitUIEvent()
     {
         var html = @"<!DOCTYPE html>

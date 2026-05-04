@@ -594,6 +594,27 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("boolean,false", result);
     }
 
+    [Fact]
+    public void SubDoc_CreateEvent_Event_Has_TimeStamp()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('Event');
+var r = [];
+r.push(typeof evt.timeStamp);
+r.push(evt.timeStamp >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("number,true", result);
+    }
+
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
     [Fact]
