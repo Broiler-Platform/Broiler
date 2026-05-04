@@ -74,6 +74,28 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CreateEvent_Event_Has_Legacy_Alias_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.srcElement);
+r.push(evt.srcElement === null);
+r.push(evt.cancelBubble);
+r.push(evt.returnValue);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("object,true,false,true", result);
+    }
+
+    [Fact]
     public void CreateEvent_UIEvents_Has_InitUIEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -538,6 +560,48 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("false,true", result);
+    }
+
+    [Fact]
+    public void Legacy_Event_Aliases_Track_Dispatch_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var parentHits = 0;
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('test', function() {
+    parentHits++;
+}, false);
+child.addEventListener('test', function(e) {
+    var r = [];
+    r.push(e.srcElement === child);
+    e.cancelBubble = true;
+    e.returnValue = false;
+    r.push(e.cancelBubble);
+    r.push(e.returnValue);
+    window.__legacyResult = r.join(',');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, true);
+var returned = child.dispatchEvent(evt);
+document.getElementById('result').textContent = [
+    window.__legacyResult,
+    parentHits,
+    returned,
+    evt.defaultPrevented,
+    evt.cancelBubble,
+    evt.returnValue
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,true,false|0|false|true|true|false", result);
     }
 
     // ──────────────────────── element.click() ────────────────────────

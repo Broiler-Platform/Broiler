@@ -113,18 +113,31 @@ public sealed partial class DomBridge
         var immediateStopped = false;
         var prevented = false;
         var currentListenerPassive = false;
+        var legacyCancelBubble = false;
 
         // Set up event object properties
         evt[(KeyString)"target"] = target == _documentNode
             ? (_documentJSObject ?? JSNull.Value)
             : ToJSObject(target);
+        evt[(KeyString)"srcElement"] = evt[(KeyString)"target"];
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
         evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) => { stopped = true; return JSUndefined.Value; }, "stopPropagation", 0),
+            new JSFunction((in Arguments _) =>
+            {
+                stopped = true;
+                legacyCancelBubble = true;
+                return JSUndefined.Value;
+            }, "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) => { stopped = true; immediateStopped = true; return JSUndefined.Value; }, "stopImmediatePropagation", 0),
+            new JSFunction((in Arguments _) =>
+            {
+                stopped = true;
+                immediateStopped = true;
+                legacyCancelBubble = true;
+                return JSUndefined.Value;
+            }, "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) =>
@@ -137,6 +150,32 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }, "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddProperty(
+            (KeyString)"cancelBubble",
+            new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new JSFunction((in Arguments setArgs) =>
+            {
+                if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+                {
+                    legacyCancelBubble = true;
+                    stopped = true;
+                }
+                return JSUndefined.Value;
+            }, "set cancelBubble"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty(
+            (KeyString)"returnValue",
+            new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new JSFunction((in Arguments setArgs) =>
+            {
+                if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive)
+                {
+                    prevented = true;
+                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                }
+                return JSUndefined.Value;
+            }, "set returnValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddValue((KeyString)"composedPath",
             new JSFunction((in Arguments _) => BuildComposedPathValue(target, path), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);

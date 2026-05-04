@@ -250,12 +250,14 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var evt = new JSObject();
+                var legacyCancelBubble = false;
                 evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -284,14 +286,46 @@ public sealed partial class DomBridge
                 evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopPropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopImmediatePropagation",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopImmediatePropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"preventDefault",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "preventDefault", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "preventDefault", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddProperty(
+                    (KeyString)"cancelBubble",
+                    new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+                            legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "set cancelBubble"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                evt.FastAddProperty(
+                    (KeyString)"returnValue",
+                    new JSFunction((in Arguments _) => evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && !setArgs[0].BooleanValue)
+                            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "set returnValue"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
                 evt.FastAddValue((KeyString)"initEvent",
                     new JSFunction((in Arguments initArgs) =>
                     {

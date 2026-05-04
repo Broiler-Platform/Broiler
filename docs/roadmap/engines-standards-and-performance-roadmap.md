@@ -686,6 +686,15 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed legacy
+  `srcElement`, `cancelBubble`, and `returnValue` compatibility surfaces on
+  bridge-created events in both document and sub-document factories, and wired
+  dispatch-time alias behavior so legacy event code can observe targets, stop
+  bubbling, and cancel default handling through older DOM event entry points.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~Legacy_Event_Aliases_Track_Dispatch_State|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
