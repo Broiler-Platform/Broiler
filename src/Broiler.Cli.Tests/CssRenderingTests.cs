@@ -826,6 +826,118 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void CssKeyframesRule_Exposes_Type_Name_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { 0% { opacity: 0; } 50%, to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 7);
+r.push(rule.name === 'pulse');
+r.push(rule.cssRules.length === 2);
+r.push(rule.cssRules[0].type === 8);
+r.push(rule.cssRules[0].keyText === '0%');
+r.push(rule.cssRules[1].keyText === '50%, to');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_Keyframe_Rules_Expose_Style_And_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes slide { from { transform: translateX(0px); } to { transform: translateX(10px); } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var keyframesRule = sheet.cssRules[0];
+var keyframeRule = keyframesRule.cssRules[0];
+r.push(keyframeRule.type === 8);
+r.push(keyframeRule.keyText === 'from');
+r.push(keyframeRule.style.getPropertyValue('transform') === 'translateX(0px)');
+r.push(keyframeRule.parentRule === keyframesRule);
+r.push(keyframeRule.parentStyleSheet === sheet);
+r.push(keyframeRule.style.parentRule === keyframeRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_CssText_Rebuilds_From_Nested_Keyframes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var keyframesRule = document.styleSheets[0].cssRules[0];
+r.push(keyframesRule.cssText.indexOf('@keyframes pulse') >= 0);
+r.push(keyframesRule.cssText.indexOf('from') >= 0);
+keyframesRule.cssRules[0].style.setProperty('opacity', '0.25');
+r.push(keyframesRule.cssText.indexOf('opacity: 0.25;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@media screen { .test { color: red; } }
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+@font-face { font-family: ""RoadmapKeyframeTest""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 4);
+r.push(rules[2].type === 7);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]

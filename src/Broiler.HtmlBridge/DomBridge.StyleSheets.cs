@@ -280,11 +280,57 @@ public sealed partial class DomBridge
         return cssRuleList;
     }
 
+    private static JSObject BuildCssKeyframeRuleObject(string ruleText, JSObject parentStyleSheet, JSObject parentRule)
+    {
+        var ruleObj = new JSObject();
+        ruleObj.FastAddProperty(
+            (KeyString)"parentStyleSheet",
+            new JSFunction((in Arguments _) => parentStyleSheet, "get parentStyleSheet"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        ruleObj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => parentRule, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        ruleObj.FastAddValue((KeyString)"type", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        int braceOpen = ruleText.IndexOf('{');
+        if (braceOpen >= 0)
+        {
+            var keyText = ruleText[..braceOpen].Trim();
+            ruleObj.FastAddValue((KeyString)"keyText", new JSString(keyText), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty(
+                (KeyString)"cssText",
+                new JSFunction((in Arguments _) =>
+                {
+                    var styleObj = ruleObj[(KeyString)"style"];
+                    var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
+                    return new JSString($"{keyText} {{ {styleText} }}");
+                }, "get cssText"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            int braceClose = ruleText.LastIndexOf('}');
+            if (braceClose > braceOpen)
+            {
+                var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var styleMap = ParseStyle(declarations);
+                var styleObj = BuildStyleObject(styleMap, ruleObj);
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+        }
+
+        return ruleObj;
+    }
+
     /// <summary>
      /// Builds a CSSRule JSObject from a CSS rule string.
      /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule), <c>cssText</c>, <c>selectorText</c>, <c>href</c>,
-     /// <c>media</c>, <c>cssRules</c>, and <c>style</c> properties as appropriate.
+     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule), <c>cssText</c>,
+     /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>cssRules</c>, and
+     /// <c>style</c> properties as appropriate.
      /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
@@ -396,6 +442,37 @@ public sealed partial class DomBridge
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+        }
+        else if (trimmedRuleText.StartsWith("@keyframes", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSKeyframesRule — type 7
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            int braceOpen = ruleText.IndexOf('{');
+            int braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var name = ruleText.Substring(10, braceOpen - 10).Trim().Trim('"', '\'');
+                var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
+                    .Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj))
+                    .ToList();
+                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var nestedCssText = string.Join(" ",
+                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
+                                .Where(text => !string.IsNullOrEmpty(text)));
+                        return new JSString($"@keyframes {name} {{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }
         else
