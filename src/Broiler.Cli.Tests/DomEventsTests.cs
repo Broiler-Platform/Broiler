@@ -483,6 +483,30 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("wheel,true,true,4,30,40,true,true,1.5,-2.5,1", result);
     }
 
+    [Fact]
+    public void UIEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new UIEvent('build', { bubbles: true, cancelable: false, view: window, detail: 6 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === window);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("build,true,false,true,6,number", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]

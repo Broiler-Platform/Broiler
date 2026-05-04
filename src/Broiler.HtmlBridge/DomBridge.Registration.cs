@@ -646,6 +646,18 @@ public sealed partial class DomBridge
                         options.deltaMode !== undefined ? options.deltaMode : 0);
                     return evt;
                 }
+
+                function UIEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('UIEvents');
+                    evt.initUIEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.detail !== undefined ? options.detail : 0);
+                    return evt;
+                }
             ");
 
         // MutationObserver — DOM Level 4
@@ -1935,6 +1947,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"FocusEvent", context["FocusEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"KeyboardEvent", context["KeyboardEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"WheelEvent", context["WheelEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"UIEvent", context["UIEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.parent — uses the JSContext global scope so that parent.X()
         // resolves user-defined globals (e.g. parent.notify() from sub-documents).

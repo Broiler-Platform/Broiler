@@ -713,6 +713,31 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void SubDoc_UIEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.UIEvent('build', { bubbles: true, cancelable: false, view: win, detail: 6 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === win);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("build,true,false,true,6,number", result);
+    }
+
+    [Fact]
     public void SubDoc_MouseEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>

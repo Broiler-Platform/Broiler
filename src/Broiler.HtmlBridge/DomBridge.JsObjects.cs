@@ -5676,6 +5676,8 @@ public sealed partial class DomBridge
             subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
             subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["UIEvent"] is { } uiEventCtor)
+            subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
