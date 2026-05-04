@@ -25,6 +25,12 @@ public sealed partial class DomBridge
 {
     private static readonly Regex ImportantSuffixPattern = new(@"\s*!\s*important\s*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly HashSet<string> CssStyleDeclarationNonCssNames = new(StringComparer.Ordinal)
+    {
+        "setProperty", "getPropertyValue", "removeProperty",
+        "cssText", "cssFloat", "length", "parentRule",
+        "item", "getPropertyPriority",
+    };
 
     private static string ToCamelCaseStatic(string cssName)
     {
@@ -625,12 +631,7 @@ public sealed partial class DomBridge
         private readonly DomElement _element;
 
         // Names that are JS methods / special properties, not CSS properties.
-        private static readonly HashSet<string> NonCssNames = new(StringComparer.Ordinal)
-        {
-            "setProperty", "getPropertyValue", "removeProperty",
-            "cssText", "cssFloat", "length", "parentRule",
-            "item", "getPropertyPriority",
-        };
+        private static HashSet<string> NonCssNames => CssStyleDeclarationNonCssNames;
 
         public CssStyleDeclaration(DomElement element) => _element = element;
 
@@ -687,6 +688,47 @@ public sealed partial class DomBridge
         }
     }
 
+    private sealed class CssRuleStyleDeclaration : JSObject
+    {
+        private readonly Dictionary<string, string> _style;
+
+        public CssRuleStyleDeclaration(Dictionary<string, string> style) => _style = style;
+
+        protected override bool SetValue(
+            KeyString name, JSValue value, JSValue receiver, bool throwError = true)
+        {
+            var nameStr = name.ToString();
+            if (!CssStyleDeclarationNonCssNames.Contains(nameStr))
+            {
+                var kebab = ToKebabCase(nameStr);
+                var val = value?.ToString() ?? string.Empty;
+                if (string.IsNullOrEmpty(val))
+                    _style.Remove(kebab);
+                else
+                    _style[kebab] = val;
+            }
+
+            return base.SetValue(name, value, receiver, throwError);
+        }
+
+        protected override JSValue GetValue(
+            KeyString key, JSValue receiver, bool throwError = true)
+        {
+            var result = base.GetValue(key, receiver, false);
+            if (result != null && !result.IsUndefined)
+                return result;
+
+            var nameStr = key.ToString();
+            if (!CssStyleDeclarationNonCssNames.Contains(nameStr) &&
+                TryGetStylePropertyRawValue(_style, nameStr, out var val))
+            {
+                return new JSString(StripCssPriority(val));
+            }
+
+            return new JSString(string.Empty);
+        }
+    }
+
     private static string StripCssPriority(string? value)
         => string.IsNullOrEmpty(value) ? string.Empty : ImportantSuffixPattern.Replace(value, string.Empty).Trim();
 
@@ -698,8 +740,11 @@ public sealed partial class DomBridge
             ? $"{StripCssPriority(value)} !important".Trim()
             : StripCssPriority(value);
 
+    private static List<string> GetStylePropertyNames(IReadOnlyDictionary<string, string> style)
+        => style.Keys.ToList();
+
     private static List<string> GetStylePropertyNames(DomElement element)
-        => element.Style.Keys.ToList();
+        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)element.Style);
 
     private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
     {
@@ -747,17 +792,26 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
+    private static bool TryGetStylePropertyRawValue(IReadOnlyDictionary<string, string> style, string property, out string value)
     {
-        if (element.Style.TryGetValue(property, out value!))
+        if (style.TryGetValue(property, out value!))
             return true;
 
         var camel = ToCamelCaseStatic(property);
-        if (camel != property && element.Style.TryGetValue(camel, out value!))
+        if (camel != property && style.TryGetValue(camel, out value!))
             return true;
 
         var kebab = ToKebabCase(property);
-        if (kebab != property && element.Style.TryGetValue(kebab, out value!))
+        if (kebab != property && style.TryGetValue(kebab, out value!))
+            return true;
+
+        value = string.Empty;
+        return false;
+    }
+
+    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
+    {
+        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)element.Style, property, out value!))
             return true;
 
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
@@ -904,6 +958,134 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
+                    return new JSString(GetCssPriority(value));
+                return new JSString(string.Empty);
+            }, "getPropertyPriority", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return style;
+    }
+
+    private static JSObject BuildStyleObject(Dictionary<string, string> styleMap)
+    {
+        var style = new CssRuleStyleDeclaration(styleMap);
+
+        style.FastAddProperty(
+            (KeyString)"cssText",
+            new JSFunction((in Arguments _) =>
+            {
+                var parts = styleMap.Select(kv => $"{kv.Key}: {kv.Value}");
+                var text = string.Join("; ", parts);
+                return new JSString(text.Length > 0 ? text + ";" : text);
+            }, "get cssText"),
+            new JSFunction((in Arguments a) =>
+            {
+                styleMap.Clear();
+                if (a.Length > 0)
+                {
+                    foreach (var kv in ParseStyle(a[0].ToString()))
+                        styleMap[kv.Key] = kv.Value;
+                }
+                return JSUndefined.Value;
+            }, "set cssText"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        style.FastAddValue(
+            (KeyString)"setProperty",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                {
+                    var prop = a[0].ToString();
+                    var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+                    if (string.IsNullOrEmpty(value))
+                        styleMap.Remove(prop);
+                    else
+                        styleMap[prop] = value;
+                }
+                return JSUndefined.Value;
+            }, "setProperty", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        style.FastAddValue(
+            (KeyString)"getPropertyValue",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var prop = a[0].ToString();
+                    if (TryGetStylePropertyRawValue(styleMap, prop, out var val))
+                        return new JSString(StripCssPriority(val));
+
+                    var camel = ToCamelCaseStatic(prop);
+                    var jsVal = a.This?[(KeyString)camel];
+                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
+                        return jsVal;
+                    jsVal = a.This?[(KeyString)prop];
+                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
+                        return jsVal;
+                }
+                return new JSString(string.Empty);
+            }, "getPropertyValue", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        style.FastAddValue(
+            (KeyString)"removeProperty",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var prop = a[0].ToString();
+                    var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? StripCssPriority(val) : string.Empty;
+                    styleMap.Remove(prop);
+                    styleMap.Remove(ToKebabCase(prop));
+                    return new JSString(removed);
+                }
+                return new JSString(string.Empty);
+            }, "removeProperty", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        style.FastAddProperty(
+            (KeyString)"cssFloat",
+            new JSFunction((in Arguments _) =>
+            {
+                if (styleMap.TryGetValue("float", out var val))
+                    return new JSString(val);
+                return new JSString(string.Empty);
+            }, "get cssFloat"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                    styleMap["float"] = a[0].ToString();
+                return JSUndefined.Value;
+            }, "set cssFloat"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        style.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(GetStylePropertyNames(styleMap).Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        style.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
+                {
+                    var propertyNames = GetStylePropertyNames(styleMap);
+                    if (index >= 0 && index < propertyNames.Count)
+                        return new JSString(propertyNames[index]);
+                }
+                return new JSString(string.Empty);
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        style.FastAddValue(
+            (KeyString)"getPropertyPriority",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && TryGetStylePropertyRawValue(styleMap, a[0].ToString(), out var value))
                     return new JSString(GetCssPriority(value));
                 return new JSString(string.Empty);
             }, "getPropertyPriority", 1),

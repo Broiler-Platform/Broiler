@@ -538,6 +538,88 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void CssRule_Style_Cssom_Methods_Enumerate_And_Read_Priority()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red !important; font-size: 14px; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.style.getPropertyValue('color'));
+r.push(rule.style.getPropertyPriority('color'));
+r.push(rule.style.length);
+r.push(rule.style.item(0));
+r.push(rule.style.item(1));
+r.push(rule.style.item(99) === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("red,important,2,color,font-size,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Style_SetProperty_And_RemoveProperty_Modify_Rule_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+rule.style.setProperty('margin-left', '2px', 'important');
+r.push(rule.style.getPropertyValue('margin-left'));
+r.push(rule.style.getPropertyPriority('margin-left'));
+r.push(rule.style.marginLeft);
+r.push(rule.cssText.indexOf('margin-left: 2px !important;') >= 0);
+r.push(rule.style.removeProperty('color'));
+r.push(rule.style.getPropertyValue('color') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2px,important,2px,true,red,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Style_CssText_Getter_And_Setter_Work()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.style.cssText.indexOf('color: red;') >= 0);
+rule.style.cssText = 'background-color: blue; float: left;';
+r.push(rule.style.backgroundColor);
+r.push(rule.style.cssFloat);
+r.push(rule.style.length);
+r.push(rule.cssText.indexOf('background-color: blue;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,blue,left,2,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]

@@ -764,6 +764,13 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_GetPropertyValue_Expands_Inline_Margin_Shorthand|FullyQualifiedName~Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration|FullyQualifiedName~Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: taught
+  `CSSRule.style` objects to expose the same core `CSSStyleDeclaration`
+  surface as inline styles, including `cssText`, `setProperty(...)`,
+  `getPropertyValue(...)`, `removeProperty(...)`, `getPropertyPriority(...)`,
+  `length`, and `item(index)`, while keeping camelCase and kebab-case property
+  access working for stylesheet rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssRule_Style|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

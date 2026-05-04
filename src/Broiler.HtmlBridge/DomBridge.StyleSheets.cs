@@ -266,7 +266,6 @@ public sealed partial class DomBridge
     private static JSObject BuildCssRuleObject(string ruleText)
     {
         var ruleObj = new JSObject();
-        ruleObj.FastAddValue((KeyString)"cssText", new JSString(ruleText), JSPropertyAttributes.EnumerableConfigurableValue);
 
         if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
         {
@@ -279,24 +278,17 @@ public sealed partial class DomBridge
             if (braceOpen >= 0 && braceClose > braceOpen)
             {
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                var styleObj = new JSObject();
-                foreach (var decl in SplitCssDeclarations(declarations))
-                {
-                    var colonIdx = decl.IndexOf(':');
-                    if (colonIdx > 0)
+                var styleMap = ParseStyle(declarations);
+                var styleObj = BuildStyleObject(styleMap);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
                     {
-                        var prop = decl[..colonIdx].Trim();
-                        var val = decl[(colonIdx + 1)..].Trim();
-                        if (!string.IsNullOrEmpty(prop))
-                        {
-                            // Expose as both kebab-case and camelCase
-                            styleObj.FastAddValue((KeyString)prop, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
-                            var camel = ToCamelCaseStatic(prop);
-                            if (camel != prop)
-                                styleObj.FastAddValue((KeyString)camel, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
-                        }
-                    }
-                }
+                        var cssText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
+                        return new JSString($"@font-face {{ {cssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
@@ -311,28 +303,23 @@ public sealed partial class DomBridge
             {
                 var selectorText = ruleText[..braceOpen].Trim();
                 ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var styleObj = ruleObj[(KeyString)"style"];
+                        var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
+                        return new JSString($"{selectorText} {{ {styleText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
 
                 int braceClose = ruleText.LastIndexOf('}');
                 if (braceClose > braceOpen)
                 {
                     var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                    var styleObj = new JSObject();
-                    foreach (var decl in SplitCssDeclarations(declarations))
-                    {
-                        var colonIdx = decl.IndexOf(':');
-                        if (colonIdx > 0)
-                        {
-                            var prop = decl[..colonIdx].Trim();
-                            var val = decl[(colonIdx + 1)..].Trim();
-                            if (!string.IsNullOrEmpty(prop))
-                            {
-                                styleObj.FastAddValue((KeyString)prop, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
-                                var camel = ToCamelCaseStatic(prop);
-                                if (camel != prop)
-                                    styleObj.FastAddValue((KeyString)camel, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
-                            }
-                        }
-                    }
+                    var styleMap = ParseStyle(declarations);
+                    var styleObj = BuildStyleObject(styleMap);
                     ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                 }
             }
