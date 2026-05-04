@@ -861,6 +861,15 @@ sub-issues was filed or re-prioritized.
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@property` entries as `CSSPropertyRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 25`, `name`,
+  `syntax`, `inherits`, `initialValue`, and serialized `cssText`, while
+  preserving mixed top-level rule ordering with charset, import, font-face, and
+  style rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
   `@charset` entries as `CSSCharsetRule`-like objects in
   `document.styleSheets[...].cssRules`, including `type === 2`, `encoding`, and
   `cssText`, while preserving mixed top-level rule ordering with charset,

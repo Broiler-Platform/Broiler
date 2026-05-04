@@ -269,6 +269,79 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CssPropertyRule_Exposes_Name_Syntax_Inherits_InitialValue_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@property --roadmap-color {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: teal;
+}
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 25);
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.name === '--roadmap-color');
+r.push(rule.syntax === '<color>');
+r.push(rule.inherits === false);
+r.push(rule.initialValue === 'teal');
+r.push(rule.cssText.indexOf('@property --roadmap-color') === 0);
+r.push(rule.cssText.indexOf('syntax: ""<color>""') >= 0);
+r.push(rule.cssText.indexOf('inherits: false') >= 0);
+r.push(rule.cssText.indexOf('initial-value: teal') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPropertyRule_Preserves_Mixed_Rule_Order_With_Charset_FontFace_And_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""utf-8"";
+@import url(""base.css"");
+@property --roadmap-gap {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); }
+.test { gap: var(--roadmap-gap); }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 25);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+r.push(rules[2].name === '--roadmap-gap');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void StyleRule_Has_Type_1()
     {
         var html = @"<!DOCTYPE html>

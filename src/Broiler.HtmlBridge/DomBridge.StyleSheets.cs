@@ -6,6 +6,7 @@ using System.Text;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
@@ -329,9 +330,10 @@ public sealed partial class DomBridge
     /// Builds a CSSRule JSObject from a CSS rule string.
     /// Sets <c>type</c> (1 = CSSStyleRule, 2 = CSSCharsetRule, 3 = CSSImportRule,
     /// 4 = CSSMediaRule, 5 = CSSFontFaceRule, 6 = CSSPageRule, 7 = CSSKeyframesRule,
-    /// 9 = CSSNamespaceRule, 11 = CSSSupportsRule, 12 = CSSLayerRule), <c>cssText</c>,
-    /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>conditionText</c>,
-    /// <c>name</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
+    /// 9 = CSSNamespaceRule, 11 = CSSSupportsRule, 12 = CSSLayerRule, 25 = CSSPropertyRule),
+    /// <c>cssText</c>, <c>selectorText</c>, <c>href</c>, <c>media</c>,
+    /// <c>conditionText</c>, <c>name</c>, <c>syntax</c>, <c>inherits</c>,
+    /// <c>initialValue</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
     /// <c>style</c> properties as appropriate.
     /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
@@ -487,6 +489,51 @@ public sealed partial class DomBridge
                             nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
                                 .Where(text => !string.IsNullOrEmpty(text)));
                         return new JSString($"@keyframes {name} {{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+        else if (trimmedRuleText.StartsWith("@property", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSPropertyRule — type 25
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(25), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var braceOpen = trimmedRuleText.IndexOf('{');
+            var braceClose = trimmedRuleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var propertyName = trimmedRuleText.Substring(9, braceOpen - 9).Trim();
+                var descriptorsText = trimmedRuleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var descriptors = ParseStyle(descriptorsText);
+                var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
+                    ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                    : "*";
+                var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
+                    || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
+                var initialValue = descriptors.GetValueOrDefault("initial-value");
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue(
+                    (KeyString)"initialValue",
+                    string.IsNullOrEmpty(initialValue) ? JSNull.Value : new JSString(initialValue),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var serialized = new List<string>
+                        {
+                            $"syntax: \"{EscapeCssPropertyRuleSyntax(syntax)}\"",
+                            $"inherits: {(inherits ? "true" : "false")}"
+                        };
+
+                        if (!string.IsNullOrEmpty(initialValue))
+                            serialized.Add($"initial-value: {initialValue}");
+
+                        return new JSString($"@property {propertyName} {{ {string.Join("; ", serialized)}; }}");
                     }, "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -703,5 +750,18 @@ public sealed partial class DomBridge
 
         return uriPart;
     }
+
+    private static string UnquoteCssPropertyRuleDescriptor(string value)
+    {
+        value = value.Trim();
+        if (value.Length >= 2 && (value[0] == '"' || value[0] == '\'') && value[^1] == value[0])
+            return value[1..^1];
+
+        return value;
+    }
+
+    private static string EscapeCssPropertyRuleSyntax(string syntax) =>
+        syntax.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
 }
