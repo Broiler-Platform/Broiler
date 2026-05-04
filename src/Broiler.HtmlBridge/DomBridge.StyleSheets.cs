@@ -328,10 +328,10 @@ public sealed partial class DomBridge
     /// <summary>
      /// Builds a CSSRule JSObject from a CSS rule string.
      /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 11 = CSSSupportsRule),
-     /// <c>cssText</c>, <c>selectorText</c>, <c>href</c>, <c>media</c>,
-     /// <c>conditionText</c>, <c>cssRules</c>, and <c>style</c> properties as
-     /// appropriate.
+     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 11 = CSSSupportsRule,
+     /// 12 = CSSLayerRule), <c>cssText</c>, <c>selectorText</c>, <c>href</c>,
+     /// <c>media</c>, <c>conditionText</c>, <c>name</c>, <c>cssRules</c>, and
+     /// <c>style</c> properties as appropriate.
      /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
@@ -502,6 +502,60 @@ public sealed partial class DomBridge
                             nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
                                 .Where(text => !string.IsNullOrEmpty(text)));
                         return new JSString($"@supports {conditionText} {{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+        else if (trimmedRuleText.StartsWith("@layer", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSLayerRule — type 12
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(12), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var layerBody = ruleText.Substring(6).Trim();
+            var braceOpen = ruleText.IndexOf('{');
+            var braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var nameText = ruleText.Substring(6, braceOpen - 6).Trim();
+                var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
+                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
+                    .ToList();
+                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+
+                ruleObj.FastAddValue(
+                    (KeyString)"name",
+                    string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var nestedCssText = string.Join(" ",
+                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
+                                .Where(text => !string.IsNullOrEmpty(text)));
+                        var namePrefix = string.IsNullOrEmpty(nameText) ? string.Empty : $"{nameText} ";
+                        return new JSString($"@layer {namePrefix}{{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+            else
+            {
+                var nameText = layerBody.TrimEnd(';').Trim();
+                ruleObj.FastAddValue(
+                    (KeyString)"name",
+                    string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var nameSuffix = string.IsNullOrEmpty(nameText) ? string.Empty : $" {nameText}";
+                        return new JSString($"@layer{nameSuffix};");
                     }, "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);

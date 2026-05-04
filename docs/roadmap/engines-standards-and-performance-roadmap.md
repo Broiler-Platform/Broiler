@@ -818,6 +818,17 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@layer` entries as `CSSLayerRule`-like objects in
+  `document.styleSheets[...].cssRules`, covering both block
+  (`@layer name { ... }`) and statement (`@layer name;`) forms with
+  `type === 12`, `name`, nested `cssRules`, and `cssText`, while preserving
+  nested rule parent-rule/style-sheet backreferences so mutations inside layer
+  blocks rebuild the enclosing rule's serialized `cssText`. Focused coverage
+  now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
