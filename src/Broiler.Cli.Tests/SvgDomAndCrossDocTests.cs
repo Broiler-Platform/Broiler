@@ -573,6 +573,27 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("function,0|build,true,false,payload", result);
     }
 
+    [Fact]
+    public void SubDoc_CreateEvent_Event_Has_IsTrusted_False()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('Event');
+var r = [];
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("boolean,false", result);
+    }
+
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
     [Fact]

@@ -34,6 +34,26 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CreateEvent_Event_Has_IsTrusted_False()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("boolean,false", result);
+    }
+
+    [Fact]
     public void CreateEvent_UIEvents_Has_InitUIEvent()
     {
         var html = @"<!DOCTYPE html>
