@@ -117,6 +117,34 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,0,0,true|30,40,true,true,2,2,true", result);
     }
 
+    [Fact]
+    public void CreateEvent_FocusEvents_Has_InitFocusEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""related"" />
+<div id=""result""></div>
+<script>
+var related = document.getElementById('related');
+var evt = document.createEvent('FocusEvents');
+var before = [evt.detail, evt.relatedTarget === null].join(',');
+evt.initFocusEvent('focusin', true, false, window, 7, related);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.detail);
+after.push(evt.relatedTarget === related);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,true|focusin,true,false,true,7,true", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]

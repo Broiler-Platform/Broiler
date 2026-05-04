@@ -6785,6 +6785,24 @@ public sealed partial class DomBridge
                         return JSUndefined.Value;
                     }, "initUIEvent", 5),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initFocusEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"relatedTarget"] = initArgs[5];
+                        return JSUndefined.Value;
+                    }, "initFocusEvent", 6),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"initMouseEvent",
                     new JSFunction((in Arguments initArgs) =>
                     {
