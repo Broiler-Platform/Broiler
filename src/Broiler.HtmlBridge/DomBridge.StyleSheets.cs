@@ -328,9 +328,10 @@ public sealed partial class DomBridge
     /// <summary>
      /// Builds a CSSRule JSObject from a CSS rule string.
      /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 11 = CSSSupportsRule,
-     /// 12 = CSSLayerRule), <c>cssText</c>, <c>selectorText</c>, <c>href</c>,
-     /// <c>media</c>, <c>conditionText</c>, <c>name</c>, <c>cssRules</c>, and
+     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 9 = CSSNamespaceRule,
+     /// 11 = CSSSupportsRule, 12 = CSSLayerRule), <c>cssText</c>,
+     /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>conditionText</c>,
+     /// <c>name</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
      /// <c>style</c> properties as appropriate.
      /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
@@ -561,6 +562,41 @@ public sealed partial class DomBridge
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }
+        else if (trimmedRuleText.StartsWith("@namespace", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSNamespaceRule — type 9
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var namespaceBody = trimmedRuleText[10..].Trim().TrimEnd(';').Trim();
+            string? prefix = null;
+            var namespaceUri = string.Empty;
+
+            var parts = namespaceBody.Split(new[] { ' ', '\t', '\r', '\n' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2)
+            {
+                prefix = parts[0];
+                namespaceUri = ExtractNamespaceUri(parts[1]);
+            }
+            else if (parts.Length == 1)
+            {
+                namespaceUri = ExtractNamespaceUri(parts[0]);
+            }
+
+            ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(namespaceUri), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue(
+                (KeyString)"prefix",
+                string.IsNullOrEmpty(prefix) ? JSUndefined.Value : new JSString(prefix),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty(
+                (KeyString)"cssText",
+                new JSFunction((in Arguments _) =>
+                {
+                    var prefixPart = string.IsNullOrEmpty(prefix) ? string.Empty : $"{prefix} ";
+                    return new JSString($"@namespace {prefixPart}\"{namespaceUri}\";");
+                }, "get cssText"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
         else
         {
             // CSSStyleRule — type 1
@@ -595,6 +631,34 @@ public sealed partial class DomBridge
         }
 
         return ruleObj;
+    }
+
+    /// <summary>Extracts a namespace URI from a quoted string or <c>url(...)</c> token.</summary>
+    private static string ExtractNamespaceUri(string uriPart)
+    {
+        uriPart = uriPart.Trim();
+
+        if (uriPart.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
+        {
+            var openParen = uriPart.IndexOf('(');
+            var closeParen = uriPart.LastIndexOf(')');
+            if (openParen >= 0 && closeParen > openParen)
+            {
+                return uriPart.Substring(openParen + 1, closeParen - openParen - 1)
+                    .Trim()
+                    .Trim('"', '\'');
+            }
+        }
+
+        if (uriPart.Length > 1 && (uriPart[0] == '"' || uriPart[0] == '\''))
+        {
+            var quote = uriPart[0];
+            var closingQuote = uriPart.LastIndexOf(quote);
+            if (closingQuote > 0)
+                return uriPart.Substring(1, closingQuote - 1);
+        }
+
+        return uriPart;
     }
 
 }

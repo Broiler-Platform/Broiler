@@ -1187,6 +1187,93 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void CssNamespaceRule_Exposes_Type_NamespaceUri_And_Prefix()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@namespace svg ""http://www.w3.org/2000/svg"";
+@namespace ""http://www.w3.org/1999/xhtml"";
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+var prefixedRule = rules[0];
+var defaultRule = rules[1];
+r.push(prefixedRule.type === 9);
+r.push(prefixedRule.prefix === 'svg');
+r.push(prefixedRule.namespaceURI === 'http://www.w3.org/2000/svg');
+r.push(defaultRule.type === 9);
+r.push(defaultRule.prefix === undefined);
+r.push(defaultRule.namespaceURI === 'http://www.w3.org/1999/xhtml');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssNamespaceRule_Supports_Url_Syntax_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@namespace mathml url(http://www.w3.org/1998/Math/MathML);
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 9);
+r.push(rule.prefix === 'mathml');
+r.push(rule.namespaceURI === 'http://www.w3.org/1998/Math/MathML');
+r.push(rule.cssText.indexOf('@namespace mathml') >= 0);
+r.push(rule.cssText.indexOf('http://www.w3.org/1998/Math/MathML') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssNamespaceRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+@supports (display: flex) { .flex { display: flex; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 9);
+r.push(rules[2].type === 12);
+r.push(rules[3].type === 11);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]
