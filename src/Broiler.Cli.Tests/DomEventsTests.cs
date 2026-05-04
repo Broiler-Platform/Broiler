@@ -90,6 +90,33 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,true,4,10,20,30,40,true,false,true,false,2,true", result);
     }
 
+    [Fact]
+    public void CreateEvent_MouseEvents_Has_Alias_Properties_And_Default_Button_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('MouseEvents');
+var before = [evt.x, evt.y, evt.buttons, evt.relatedTarget === null].join(',');
+evt.initMouseEvent('click', true, true, window, 1, 10, 20, 30, 40, false, true, false, true, 2, null);
+var after = [];
+after.push(evt.x);
+after.push(evt.y);
+after.push(evt.x === evt.clientX);
+after.push(evt.y === evt.clientY);
+after.push(evt.buttons);
+after.push(evt.button);
+after.push(evt.relatedTarget === null);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,0,0,true|30,40,true,true,2,2,true", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]

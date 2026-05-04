@@ -259,6 +259,19 @@ public sealed partial class DomBridge
                 evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"ctrlKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
                     new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
@@ -314,9 +327,15 @@ public sealed partial class DomBridge
                         if (initArgs.Length > 6)
                             evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
                         if (initArgs.Length > 7)
+                        {
                             evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
                         if (initArgs.Length > 8)
+                        {
                             evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
                         if (initArgs.Length > 9)
                             evt[(KeyString)"ctrlKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
                         if (initArgs.Length > 10)
@@ -326,7 +345,17 @@ public sealed partial class DomBridge
                         if (initArgs.Length > 12)
                             evt[(KeyString)"metaKey"] = initArgs[12].BooleanValue ? JSBoolean.True : JSBoolean.False;
                         if (initArgs.Length > 13)
-                            evt[(KeyString)"button"] = new JSNumber(initArgs[13].DoubleValue);
+                        {
+                            var button = initArgs[13].DoubleValue;
+                            evt[(KeyString)"button"] = new JSNumber(button);
+                            evt[(KeyString)"buttons"] = new JSNumber(button switch
+                            {
+                                0 => 1,
+                                1 => 4,
+                                2 => 2,
+                                _ => 0
+                            });
+                        }
                         if (initArgs.Length > 14)
                             evt[(KeyString)"relatedTarget"] = initArgs[14];
                         return JSUndefined.Value;
