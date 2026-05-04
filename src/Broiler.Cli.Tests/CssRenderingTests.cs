@@ -203,6 +203,72 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CssFontFaceRule_Exposes_Style_Backreferences_And_Style_Methods()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); font-weight: 700; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 5);
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+r.push(rule.style.getPropertyValue('font-family').indexOf('RoadmapFont') >= 0);
+r.push(rule.style.getPropertyValue('src') === 'url(font.ttf)');
+r.push(rule.style.getPropertyValue('font-weight') === '700');
+rule.style.setProperty('font-style', 'italic');
+r.push(rule.style.getPropertyValue('font-style') === 'italic');
+r.push(rule.cssText.indexOf('font-style: italic') >= 0);
+r.push(rule.style.removeProperty('src') === 'url(font.ttf)');
+r.push(rule.style.getPropertyValue('src') === '');
+r.push(rule.cssText.indexOf('src: url(font.ttf)') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssFontFaceRule_Preserves_Mixed_Rule_Order_With_Charset_And_Page()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""utf-8"";
+@import url(""base.css"");
+@page cover { margin-top: 1in; }
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 6);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void StyleRule_Has_Type_1()
     {
         var html = @"<!DOCTYPE html>
