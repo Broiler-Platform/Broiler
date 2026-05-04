@@ -747,6 +747,14 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_Length_And_Item|FullyQualifiedName~Style_GetPropertyPriority|FullyQualifiedName~Style_SetProperty_Priority"`.
+- **2026-05-04** — HtmlBridge computed-style CSSOM continuation: added
+  `getComputedStyle(...).length`, `item(index)`, and
+  `getPropertyPriority(name)` on computed style objects, while normalizing
+  exposed computed values so `getPropertyValue(...)` and direct property reads
+  do not leak authored `!important` suffixes. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~GetComputedStyle_Length_And_Item|FullyQualifiedName~GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

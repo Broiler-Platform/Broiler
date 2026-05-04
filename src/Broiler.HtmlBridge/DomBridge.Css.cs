@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
@@ -876,6 +877,7 @@ public sealed partial class DomBridge
     private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
         var computed = BuildComputedStyleMap(element, pseudoElement);
+        var propertyNames = computed.Keys.ToList();
         var obj = new JSObject();
 
         // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
@@ -896,9 +898,10 @@ public sealed partial class DomBridge
         foreach (var kv in computed)
         {
             var camel = ToCamelCase(kv.Key);
-            obj.FastAddValue((KeyString)kv.Key, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+            var normalized = StripCssPriority(kv.Value);
+            obj.FastAddValue((KeyString)kv.Key, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
             if (camel != kv.Key)
-                obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+                obj.FastAddValue((KeyString)camel, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // getPropertyValue method (supports both kebab-case and camelCase lookups)
@@ -910,18 +913,43 @@ public sealed partial class DomBridge
                 {
                     var name = a[0].ToString();
                     if (computed.TryGetValue(name, out var val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                     // Try kebab-case conversion for camelCase input
                     var kebab = ToKebabCase(name);
                     if (kebab != name && computed.TryGetValue(kebab, out val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                     // Try camelCase conversion for kebab-case input
                     var camel = ToCamelCase(name);
                     if (camel != name && computed.TryGetValue(camel, out val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                 }
                 return new JSString(string.Empty);
             }, "getPropertyValue", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(propertyNames.Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
+                {
+                    if (index >= 0 && index < propertyNames.Count)
+                        return new JSString(propertyNames[index]);
+                }
+
+                return new JSString(string.Empty);
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getPropertyPriority",
+            new JSFunction((in Arguments _) => new JSString(string.Empty), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;

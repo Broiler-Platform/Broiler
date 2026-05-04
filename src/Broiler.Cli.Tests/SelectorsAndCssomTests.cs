@@ -1140,6 +1140,60 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("important,2px,true", result);
     }
 
+    [Fact]
+    public void GetComputedStyle_Length_And_Item_Enumerate_Computed_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var seenColor = false;
+var seenFontSize = false;
+for (var i = 0; i < cs.length; i++) {
+  var name = cs.item(i);
+  if (name === 'color') seenColor = true;
+  if (name === 'font-size') seenFontSize = true;
+}
+var r = [];
+r.push(cs.length > 0);
+r.push(cs.item(0) !== '');
+r.push(cs.item(9999) === '');
+r.push(seenColor);
+r.push(seenFontSize);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue !important""></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var value = cs.getPropertyValue('color');
+var camel = cs.color || '';
+var r = [];
+r.push(value !== '');
+r.push(value.indexOf('important') === -1);
+r.push(camel.indexOf('important') === -1);
+r.push(cs.getPropertyPriority('color') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
     // ────────────────────── matchMedia ─────────────────────────────────────
 
     [Fact]
