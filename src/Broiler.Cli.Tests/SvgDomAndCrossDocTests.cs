@@ -712,6 +712,108 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("build,true,false,payload,number,true", result);
     }
 
+    [Fact]
+    public void SubDoc_MouseEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 30, clientY: 40, button: 2 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.button);
+r.push(evt.buttons);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("click,true,true,30,40,2,2", result);
+    }
+
+    [Fact]
+    public void SubDoc_FocusEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var related = document.createElement('input');
+var evt = new win.FocusEvent('focusin', { bubbles: true, detail: 7, relatedTarget: related });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.detail);
+r.push(evt.relatedTarget === related);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("focusin,true,7,true", result);
+    }
+
+    [Fact]
+    public void SubDoc_KeyboardEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.KeyboardEvent('keydown', { bubbles: true, key: 'Enter', location: 1, repeat: true, keyCode: 13 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.key);
+r.push(evt.location);
+r.push(evt.repeat);
+r.push(evt.keyCode);
+r.push(evt.which);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("keydown,true,Enter,1,true,13,13", result);
+    }
+
+    [Fact]
+    public void SubDoc_WheelEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: 1.5, deltaY: -2.5, deltaMode: 1, ctrlKey: true });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.ctrlKey);
+r.push(evt.deltaX);
+r.push(evt.deltaY);
+r.push(evt.deltaMode);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("wheel,true,true,true,1.5,-2.5,1", result);
+    }
+
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
     [Fact]

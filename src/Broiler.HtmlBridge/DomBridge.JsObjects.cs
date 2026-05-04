@@ -5668,6 +5668,14 @@ public sealed partial class DomBridge
             subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         if (_jsContext?["CustomEvent"] is { } customEventCtor)
             subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["MouseEvent"] is { } mouseEventCtor)
+            subWindow.FastAddValue((KeyString)"MouseEvent", mouseEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["FocusEvent"] is { } focusEventCtor)
+            subWindow.FastAddValue((KeyString)"FocusEvent", focusEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["KeyboardEvent"] is { } keyboardEventCtor)
+            subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
+            subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
