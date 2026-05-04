@@ -1214,6 +1214,54 @@ public sealed partial class DomBridge
             }, "click", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // element.focus() — creates and dispatches a FocusEvent-like object
+        obj.FastAddValue(
+            (KeyString)"focus",
+            new JSFunction((in Arguments _) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("focus"), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", _windowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                bridge.DispatchEventOnElement(element, evt);
+                return JSUndefined.Value;
+            }, "focus", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // element.blur() — creates and dispatches a FocusEvent-like object
+        obj.FastAddValue(
+            (KeyString)"blur",
+            new JSFunction((in Arguments _) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("blur"), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", _windowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                bridge.DispatchEventOnElement(element, evt);
+                return JSUndefined.Value;
+            }, "blur", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // on* inline event handler properties (onclick, onload, etc.)
         foreach (var eventName in InlineEventNames)
         {

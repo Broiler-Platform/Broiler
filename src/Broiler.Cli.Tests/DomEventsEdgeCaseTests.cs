@@ -229,6 +229,32 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Focus_And_Blur_Do_Not_Bubble()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><input id=""child""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('focus', function(e) { r.push('parent-focus'); }, false);
+parent.addEventListener('blur', function(e) { r.push('parent-blur'); }, false);
+child.addEventListener('focus', function(e) { r.push('child-focus'); }, false);
+child.addEventListener('blur', function(e) { r.push('child-blur'); }, false);
+child.focus();
+child.blur();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">child-focus,child-blur<", result);
+    }
+
+    [Fact]
     public void Event_ComposedPath_Includes_Target_Ancestors_Document_And_Window()
     {
         var html = @"<!DOCTYPE html>

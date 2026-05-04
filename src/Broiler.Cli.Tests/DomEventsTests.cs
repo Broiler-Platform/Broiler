@@ -862,6 +862,60 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,3", result);
     }
 
+    [Fact]
+    public void Element_Focus_Dispatches_Focus_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+target.addEventListener('focus', function(e) {
+    r.push(e.type);
+    r.push(e.bubbles);
+    r.push(e.cancelable);
+    r.push(e.eventPhase);
+    r.push(typeof e.timeStamp);
+}, false);
+target.focus();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("focus,false,false,2,number", result);
+    }
+
+    [Fact]
+    public void Element_Blur_Dispatches_Blur_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+target.addEventListener('blur', function(e) {
+    r.push(e.type);
+    r.push(e.bubbles);
+    r.push(e.cancelable);
+    r.push(e.eventPhase);
+    r.push(typeof e.timeStamp);
+}, false);
+target.blur();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("blur,false,false,2,number", result);
+    }
+
     // ──────────────────────── on* inline handler properties ────────────────────────
 
     [Fact]

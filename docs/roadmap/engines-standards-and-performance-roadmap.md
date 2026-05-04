@@ -730,6 +730,14 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~UIEvent_Constructor|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added `element.focus()`
+  and `element.blur()` bridge methods, dispatching non-bubbling focus/blur
+  events through the existing event propagation path so target listeners and
+  inline handlers observe spec-aligned `focus` / `blur` delivery without a
+  separate dispatch path. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Element_Focus|FullyQualifiedName~Element_Blur|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Focus_And_Blur_Do_Not_Bubble|FullyQualifiedName~DomEventsEdgeCaseTests"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
