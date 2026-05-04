@@ -755,6 +755,15 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~GetComputedStyle_Length_And_Item|FullyQualifiedName~GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized"`.
+- **2026-05-04** — HtmlBridge inline CSSOM continuation: taught
+  `CSSStyleDeclaration.getPropertyValue(...)` and direct property reads to
+  resolve longhands from authored shorthands (for example `margin-left` from
+  `margin`, or `border-left-width` from `border`) without inflating
+  `style.length`, `item(index)`, or `cssText` with synthesized declarations.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_GetPropertyValue_Expands_Inline_Margin_Shorthand|FullyQualifiedName~Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration|FullyQualifiedName~Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

@@ -679,11 +679,7 @@ public sealed partial class DomBridge
             var nameStr = key.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                var kebab = ToKebabCase(nameStr);
-                if (_element.Style.TryGetValue(kebab, out var val))
-                    return new JSString(StripCssPriority(val));
-                // Also try the name as-is (already kebab-case)
-                if (nameStr != kebab && _element.Style.TryGetValue(nameStr, out val))
+                if (TryGetStylePropertyRawValue(_element, nameStr, out var val))
                     return new JSString(StripCssPriority(val));
             }
 
@@ -705,6 +701,52 @@ public sealed partial class DomBridge
     private static List<string> GetStylePropertyNames(DomElement element)
         => element.Style.Keys.ToList();
 
+    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
+    {
+        var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+            !string.IsNullOrEmpty(inlineStyle))
+        {
+            foreach (var kv in ParseStyle(inlineStyle))
+                declared[kv.Key] = kv.Value;
+        }
+
+        foreach (var property in element.JsSetStyleProps)
+        {
+            if (element.Style.TryGetValue(property, out var value))
+                declared[property] = value;
+        }
+
+        return declared;
+    }
+
+    private static bool TryGetExpandedInlineStyleRawValue(DomElement element, string property, out string value)
+    {
+        var declared = BuildDeclaredInlineStyleMap(element);
+        if (declared.Count == 0)
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        ExpandCssShorthands(declared);
+
+        if (declared.TryGetValue(property, out value!))
+            return true;
+
+        var camel = ToCamelCaseStatic(property);
+        if (camel != property && declared.TryGetValue(camel, out value!))
+            return true;
+
+        var kebab = ToKebabCase(property);
+        if (kebab != property && declared.TryGetValue(kebab, out value!))
+            return true;
+
+        value = string.Empty;
+        return false;
+    }
+
     private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
     {
         if (element.Style.TryGetValue(property, out value!))
@@ -718,8 +760,7 @@ public sealed partial class DomBridge
         if (kebab != property && element.Style.TryGetValue(kebab, out value!))
             return true;
 
-        value = string.Empty;
-        return false;
+        return TryGetExpandedInlineStyleRawValue(element, property, out value!);
     }
 
     private static JSObject BuildStyleObject(DomElement element)

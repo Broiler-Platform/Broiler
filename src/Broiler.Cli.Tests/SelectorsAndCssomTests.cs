@@ -1141,6 +1141,77 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Style_GetPropertyValue_Expands_Inline_Margin_Shorthand()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""margin: 1px 2px 3px 4px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.getPropertyValue('margin-top'));
+r.push(el.style.getPropertyValue('margin-right'));
+r.push(el.style.getPropertyValue('margin-bottom'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.marginLeft);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1px,2px,3px,4px,4px", result);
+    }
+
+    [Fact]
+    public void Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.setProperty('margin', '5px 10px');
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.getPropertyValue('margin-top'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.marginLeft);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1,margin,5px,10px,10px", result);
+    }
+
+    [Fact]
+    public void Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.cssText = 'border: 3px solid red;';
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.getPropertyValue('border-left-width'));
+r.push(el.style.borderLeftStyle);
+r.push(el.style.getPropertyValue('border-right-color'));
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1,border,3px,solid,red", result);
+    }
+
+    [Fact]
     public void GetComputedStyle_Length_And_Item_Enumerate_Computed_Properties()
     {
         var html = @"<!DOCTYPE html>
