@@ -613,9 +613,10 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-05-04** — Google Search parity continuation: unskipped the focused
   logo-colour regression by relaxing the blue-pixel threshold to match Google
-  blue (`#4285F4`), turning the real-page sanity gate into a 7/8-green suite
-  with only the known footer absolute-positioning gap still skipped. Focused
-  coverage now passes via
+  blue (`#4285F4`), then re-enabled the footer-region parity check after
+  confirming the simplified `position:absolute; bottom:0` footer now renders in
+  the bottom viewport band. The focused real-page sanity gate is now fully
+  green via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~GoogleSearchComplianceTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`

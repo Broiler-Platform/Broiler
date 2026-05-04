@@ -197,11 +197,11 @@ public class GoogleSearchComplianceTests
     /// <summary>
     /// The footer (bottom ~68px) should render footer links.
     ///
-    /// Currently 0 content pixels — blocked by CSS <c>position:absolute</c>
-    /// with <c>bottom:0</c> rendering.
-    /// Target: >50 content pixels once absolute positioning is improved.
+    /// This guards the focused Google Search parity path now that the
+    /// simplified footer's absolute positioning is rendered into the bottom
+    /// viewport band.
     /// </summary>
-    [Fact(Skip = "Blocked by CSS position:absolute + bottom:0 rendering gap")]
+    [Fact]
     public void GoogleLike_Footer_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
