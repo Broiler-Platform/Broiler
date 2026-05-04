@@ -695,6 +695,14 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~Legacy_Event_Aliases_Track_Dispatch_State|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed the
+  `KeyboardEvent.repeat` surface on bridge-created keyboard events in both
+  document and sub-document factories, wiring `initKeyboardEvent(...)` to seed
+  the repeat flag from the legacy argument list while preserving existing
+  `keyCode`/`charCode` compatibility parsing. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

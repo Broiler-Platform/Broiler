@@ -574,6 +574,31 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
     }
 
     [Fact]
+    public void SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('KeyboardEvents');
+var before = [typeof evt.repeat, evt.repeat].join(',');
+evt.initKeyboardEvent('keydown', true, false, window, 'Enter', 1, true, false, true, false, true, 13, 0);
+var after = [];
+after.push(evt.repeat);
+after.push(evt.keyCode);
+after.push(evt.charCode);
+after.push(evt.which);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("boolean,false|true,13,0,13", result);
+    }
+
+    [Fact]
     public void SubDoc_CreateEvent_Event_Has_IsTrusted_False()
     {
         var html = @"<!DOCTYPE html>
