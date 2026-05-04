@@ -6772,6 +6772,42 @@ public sealed partial class DomBridge
                         return JSUndefined.Value;
                     }, "initUIEvent", 5),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initMouseEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                        if (initArgs.Length > 8)
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"ctrlKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"altKey"] = initArgs[10].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                            evt[(KeyString)"shiftKey"] = initArgs[11].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"metaKey"] = initArgs[12].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 13)
+                            evt[(KeyString)"button"] = new JSNumber(initArgs[13].DoubleValue);
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"relatedTarget"] = initArgs[14];
+                        return JSUndefined.Value;
+                    }, "initMouseEvent", 15),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
                 return evt;
             }, "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);

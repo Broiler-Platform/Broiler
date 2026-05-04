@@ -626,6 +626,12 @@ sub-issues was filed or re-prioritized.
   fixes the focused document hit-testing regressions where hidden metadata and
   script nodes were displacing visible targets. Focused coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None|FullyQualifiedName~Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds"`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: taught bridge-created
+  `MouseEvents` to expose `initMouseEvent()` alongside the existing
+  `initEvent()` / `initUIEvent()` helpers, including the standard mouse
+  coordinates, modifier keys, `button`, `detail`, `view`, and `relatedTarget`
+  fields. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_MouseEvents_Has_InitMouseEvent|FullyQualifiedName~PhaseF_Test30_DispatchEvent_AddRemoveListener"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

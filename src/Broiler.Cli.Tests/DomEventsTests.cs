@@ -56,6 +56,40 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("test,true,false,6", result);
     }
 
+    [Fact]
+    public void CreateEvent_MouseEvents_Has_InitMouseEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('MouseEvents');
+evt.initMouseEvent('click', true, true, window, 4, 10, 20, 30, 40, true, false, true, false, 2, null);
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === window);
+r.push(evt.detail);
+r.push(evt.screenX);
+r.push(evt.screenY);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.ctrlKey);
+r.push(evt.altKey);
+r.push(evt.shiftKey);
+r.push(evt.metaKey);
+r.push(evt.button);
+r.push(evt.relatedTarget === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("click,true,true,true,4,10,20,30,40,true,false,true,false,2,true", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]
