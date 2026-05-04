@@ -269,6 +269,11 @@ public sealed partial class DomBridge
                 evt.FastAddValue((KeyString)"altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"key", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"location", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"keyCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"charCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -326,6 +331,45 @@ public sealed partial class DomBridge
                             evt[(KeyString)"relatedTarget"] = initArgs[5];
                         return JSUndefined.Value;
                     }, "initFocusEvent", 6),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initKeyboardEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"key"] = new JSString(initArgs[4].ToString());
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"location"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"ctrlKey"] = initArgs[6].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 7)
+                            evt[(KeyString)"altKey"] = initArgs[7].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 8)
+                            evt[(KeyString)"shiftKey"] = initArgs[8].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"metaKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                        {
+                            var keyCode = initArgs[11].DoubleValue;
+                            evt[(KeyString)"keyCode"] = new JSNumber(keyCode);
+                            evt[(KeyString)"which"] = new JSNumber(keyCode);
+                        }
+                        if (initArgs.Length > 12)
+                        {
+                            var charCode = initArgs[12].DoubleValue;
+                            evt[(KeyString)"charCode"] = new JSNumber(charCode);
+                            if (charCode != 0)
+                                evt[(KeyString)"which"] = new JSNumber(charCode);
+                        }
+                        return JSUndefined.Value;
+                    }, "initKeyboardEvent", 13),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"initMouseEvent",
                     new JSFunction((in Arguments initArgs) =>

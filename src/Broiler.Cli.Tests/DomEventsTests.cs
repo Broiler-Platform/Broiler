@@ -145,6 +145,39 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,true|focusin,true,false,true,7,true", result);
     }
 
+    [Fact]
+    public void CreateEvent_KeyboardEvents_Has_InitKeyboardEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('KeyboardEvents');
+var before = [evt.key, evt.location, evt.keyCode, evt.charCode, evt.which].join(',');
+evt.initKeyboardEvent('keydown', true, false, window, 'Enter', 1, true, false, true, false, false, 13, 0);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.key);
+after.push(evt.location);
+after.push(evt.ctrlKey);
+after.push(evt.altKey);
+after.push(evt.shiftKey);
+after.push(evt.metaKey);
+after.push(evt.keyCode);
+after.push(evt.charCode);
+after.push(evt.which);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(",0,0,0,0|keydown,true,false,true,Enter,1,true,false,true,false,13,0,13", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]
