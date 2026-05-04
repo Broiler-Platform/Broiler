@@ -23,6 +23,9 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private static readonly Regex ImportantSuffixPattern = new(@"\s*!\s*important\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static string ToCamelCaseStatic(string cssName)
     {
         var sb = new StringBuilder();
@@ -678,14 +681,45 @@ public sealed partial class DomBridge
             {
                 var kebab = ToKebabCase(nameStr);
                 if (_element.Style.TryGetValue(kebab, out var val))
-                    return new JSString(val);
+                    return new JSString(StripCssPriority(val));
                 // Also try the name as-is (already kebab-case)
                 if (nameStr != kebab && _element.Style.TryGetValue(nameStr, out val))
-                    return new JSString(val);
+                    return new JSString(StripCssPriority(val));
             }
 
             return new JSString(string.Empty);
         }
+    }
+
+    private static string StripCssPriority(string? value)
+        => string.IsNullOrEmpty(value) ? string.Empty : ImportantSuffixPattern.Replace(value, string.Empty).Trim();
+
+    private static string GetCssPriority(string? value)
+        => !string.IsNullOrEmpty(value) && ImportantSuffixPattern.IsMatch(value) ? "important" : string.Empty;
+
+    private static string ApplyCssPriority(string value, string priority)
+        => string.Equals(priority?.Trim(), "important", StringComparison.OrdinalIgnoreCase)
+            ? $"{StripCssPriority(value)} !important".Trim()
+            : StripCssPriority(value);
+
+    private static List<string> GetStylePropertyNames(DomElement element)
+        => element.Style.Keys.ToList();
+
+    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
+    {
+        if (element.Style.TryGetValue(property, out value!))
+            return true;
+
+        var camel = ToCamelCaseStatic(property);
+        if (camel != property && element.Style.TryGetValue(camel, out value!))
+            return true;
+
+        var kebab = ToKebabCase(property);
+        if (kebab != property && element.Style.TryGetValue(kebab, out value!))
+            return true;
+
+        value = string.Empty;
+        return false;
     }
 
     private static JSObject BuildStyleObject(DomElement element)
@@ -725,8 +759,17 @@ public sealed partial class DomBridge
                 if (a.Length >= 2)
                 {
                     var prop = a[0].ToString();
-                    element.Style[prop] = a[1].ToString();
-                    element.JsSetStyleProps.Add(prop);
+                    var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        element.Style.Remove(prop);
+                        element.JsSetStyleProps.Remove(prop);
+                    }
+                    else
+                    {
+                        element.Style[prop] = value;
+                        element.JsSetStyleProps.Add(prop);
+                    }
                 }
                 return JSUndefined.Value;
             }, "setProperty", 2),
@@ -742,16 +785,10 @@ public sealed partial class DomBridge
                 if (a.Length > 0)
                 {
                     var prop = a[0].ToString();
-                    if (element.Style.TryGetValue(prop, out var val))
-                        return new JSString(val);
+                    if (TryGetStylePropertyRawValue(element, prop, out var val))
+                        return new JSString(StripCssPriority(val));
                     // Try camelCase version of kebab-case input
                     var camel = ToCamelCaseStatic(prop);
-                    if (camel != prop && element.Style.TryGetValue(camel, out val))
-                        return new JSString(val);
-                    // Try kebab-case version of camelCase input
-                    var kebab = ToKebabCase(prop);
-                    if (kebab != prop && element.Style.TryGetValue(kebab, out val))
-                        return new JSString(val);
                     // Check JSObject properties (set via el.style.propertyName = value)
                     var jsVal = a.This?[(KeyString)camel];
                     if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
@@ -797,6 +834,39 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }, "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // style.length (read-only)
+        style.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(GetStylePropertyNames(element).Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // style.item(index)
+        style.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
+                {
+                    var propertyNames = GetStylePropertyNames(element);
+                    if (index >= 0 && index < propertyNames.Count)
+                        return new JSString(propertyNames[index]);
+                }
+                return new JSString(string.Empty);
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // style.getPropertyPriority(property)
+        style.FastAddValue(
+            (KeyString)"getPropertyPriority",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
+                    return new JSString(GetCssPriority(value));
+                return new JSString(string.Empty);
+            }, "getPropertyPriority", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         return style;
     }

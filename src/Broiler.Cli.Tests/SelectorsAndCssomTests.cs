@@ -1074,6 +1074,72 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,right,none", result);
     }
 
+    [Fact]
+    public void Style_Length_And_Item_Enumerate_Inline_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.item(1));
+r.push(el.style.item(99) === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2,color,font-size,true", result);
+    }
+
+    [Fact]
+    public void Style_GetPropertyPriority_Reads_Important_And_Strips_Value()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue !important; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.getPropertyPriority('color'));
+r.push(el.style.getPropertyValue('color'));
+r.push(el.style.color);
+r.push(el.style.getPropertyPriority('font-size') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("important,blue,blue,true", result);
+    }
+
+    [Fact]
+    public void Style_SetProperty_Priority_Argument_Is_Reflected()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.setProperty('margin-left', '2px', 'important');
+var r = [];
+r.push(el.style.getPropertyPriority('margin-left'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.cssText.indexOf('!important') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("important,2px,true", result);
+    }
+
     // ────────────────────── matchMedia ─────────────────────────────────────
 
     [Fact]

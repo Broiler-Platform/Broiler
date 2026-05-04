@@ -738,6 +738,15 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Element_Focus|FullyQualifiedName~Element_Blur|FullyQualifiedName~DomEvents"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Focus_And_Blur_Do_Not_Bubble|FullyQualifiedName~DomEventsEdgeCaseTests"`.
+- **2026-05-04** — HtmlBridge CSSOM continuation: added
+  `CSSStyleDeclaration.length`, `item(index)`, and `getPropertyPriority(name)`
+  on bridge style objects, and taught `style.setProperty(name, value,
+  priority)` plus `getPropertyValue(...)`/property reads to round-trip
+  `!important` priorities in a CSSOM-aligned way for inline styles exercised by
+  the current bridge tests. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_Length_And_Item|FullyQualifiedName~Style_GetPropertyPriority|FullyQualifiedName~Style_SetProperty_Priority"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
