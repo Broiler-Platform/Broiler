@@ -5664,6 +5664,10 @@ public sealed partial class DomBridge
             (KeyString)"window",
             subWindow,
             JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["Event"] is { } eventCtor)
+            subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["CustomEvent"] is { } customEventCtor)
+            subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {

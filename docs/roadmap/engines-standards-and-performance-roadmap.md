@@ -703,6 +703,15 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added modern
+  `Event` and `CustomEvent` constructors on the bridge window surface, routing
+  them through the existing `document.createEvent(...)` factories so constructor
+  created events inherit the newer compatibility fields like `isTrusted`,
+  `timeStamp`, `srcElement`, and payload `detail` in both main-document and
+  sub-document contexts. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Event_Constructor_Seeds_Init_Dictionary|FullyQualifiedName~CustomEvent_Constructor_Reuses_CreateEvent_Surface|FullyQualifiedName~SubDoc_Event_Constructor_Uses_SubWindow_Surface|FullyQualifiedName~SubDoc_CustomEvent_Constructor_Uses_SubWindow_Surface|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

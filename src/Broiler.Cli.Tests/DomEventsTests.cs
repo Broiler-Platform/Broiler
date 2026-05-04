@@ -325,6 +325,53 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("function,0|build,true,false,payload", result);
     }
 
+    [Fact]
+    public void Event_Constructor_Seeds_Init_Dictionary()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new Event('test', { bubbles: true, cancelable: false });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("test,true,false,boolean,false", result);
+    }
+
+    [Fact]
+    public void CustomEvent_Constructor_Reuses_CreateEvent_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new CustomEvent('build', { bubbles: true, cancelable: false, detail: 'payload' });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+r.push(evt.srcElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("build,true,false,payload,number,true", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]

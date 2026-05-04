@@ -544,26 +544,24 @@ public sealed partial class DomBridge
             }, "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // CustomEvent constructor — DOM Level 4
+        // Event / CustomEvent constructors — DOM Level 4
         context.Eval(@"
+                function Event(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('Event');
+                    evt.initEvent(type, options.bubbles === true, options.cancelable === true);
+                    return evt;
+                }
+
                 function CustomEvent(type, options) {
                     options = options || {};
-                    this.type = type;
-                    this.detail = options.detail !== undefined ? options.detail : null;
-                    this.bubbles = options.bubbles === true;
-                    this.cancelable = options.cancelable === true;
-                    this.defaultPrevented = false;
-                    this.target = null;
-                    this.currentTarget = null;
-                    this.eventPhase = 0;
-                    this.stopPropagation = function() {};
-                    this.preventDefault = function() { this.defaultPrevented = true; };
-                    this.initCustomEvent = function(type, bubbles, cancelable, detail) {
-                        this.type = type;
-                        this.bubbles = bubbles === true;
-                        this.cancelable = cancelable === true;
-                        this.detail = detail !== undefined ? detail : null;
-                    };
+                    var evt = document.createEvent('CustomEvent');
+                    evt.initCustomEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.detail !== undefined ? options.detail : null);
+                    return evt;
                 }
             ");
 
@@ -1848,6 +1846,8 @@ public sealed partial class DomBridge
         RegisterXMLHttpRequest(context);
 
         context["window"] = window;
+        window.FastAddValue((KeyString)"Event", context["Event"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"CustomEvent", context["CustomEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.parent — uses the JSContext global scope so that parent.X()
         // resolves user-defined globals (e.g. parent.notify() from sub-documents).

@@ -663,6 +663,55 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("object,true,false,true", result);
     }
 
+    [Fact]
+    public void SubDoc_Event_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.Event('test', { bubbles: true, cancelable: false });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("test,true,false,boolean,false", result);
+    }
+
+    [Fact]
+    public void SubDoc_CustomEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.CustomEvent('build', { bubbles: true, cancelable: false, detail: 'payload' });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+r.push(evt.srcElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("build,true,false,payload,number,true", result);
+    }
+
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
     [Fact]
