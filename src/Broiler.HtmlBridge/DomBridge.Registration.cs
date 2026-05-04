@@ -355,6 +355,9 @@ public sealed partial class DomBridge
                             evt[(KeyString)"shiftKey"] = initArgs[8].BooleanValue ? JSBoolean.True : JSBoolean.False;
                         if (initArgs.Length > 9)
                             evt[(KeyString)"metaKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        // Index 10 is the legacy altGraphKey slot; keep the
+                        // argument position so older WebKit/Blink-style call
+                        // sites can still pass keyCode/charCode in 11/12.
                         if (initArgs.Length > 11)
                         {
                             var keyCode = initArgs[11].DoubleValue;
