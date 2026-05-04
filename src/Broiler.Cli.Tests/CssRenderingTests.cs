@@ -1274,6 +1274,93 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void CssPageRule_Exposes_Type_SelectorText_And_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@page { margin-top: 1in; margin-bottom: 2in; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 6);
+r.push(rule.selectorText === '');
+r.push(rule.style.getPropertyValue('margin-top') === '1in');
+r.push(rule.style.getPropertyValue('margin-bottom') === '2in');
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPageRule_Supports_Pseudo_Selectors_And_CssText_Rebuild()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@page :first { margin-top: 3cm; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 6);
+r.push(rule.selectorText === ':first');
+r.push(rule.cssText.indexOf('@page :first') >= 0);
+r.push(rule.cssText.indexOf('margin-top: 3cm;') >= 0);
+rule.style.setProperty('margin-left', '4cm');
+r.push(rule.cssText.indexOf('margin-left: 4cm;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPageRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@page :left { margin-top: 2cm; }
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 6);
+r.push(rules[2].type === 9);
+r.push(rules[3].type === 12);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]

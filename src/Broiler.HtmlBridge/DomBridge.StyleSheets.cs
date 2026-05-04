@@ -328,7 +328,7 @@ public sealed partial class DomBridge
     /// <summary>
      /// Builds a CSSRule JSObject from a CSS rule string.
      /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 9 = CSSNamespaceRule,
+     /// 5 = CSSFontFaceRule, 6 = CSSPageRule, 7 = CSSKeyframesRule, 9 = CSSNamespaceRule,
      /// 11 = CSSSupportsRule, 12 = CSSLayerRule), <c>cssText</c>,
      /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>conditionText</c>,
      /// <c>name</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
@@ -596,6 +596,34 @@ public sealed partial class DomBridge
                 }, "get cssText"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+        else if (trimmedRuleText.StartsWith("@page", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSPageRule — type 6
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var braceOpen = ruleText.IndexOf('{');
+            var braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var selectorText = ruleText.Substring(5, braceOpen - 5).Trim();
+                var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var styleMap = ParseStyle(declarations);
+                var styleObj = BuildStyleObject(styleMap, ruleObj);
+
+                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var styleText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
+                        var selectorSuffix = string.IsNullOrEmpty(selectorText) ? string.Empty : $" {selectorText}";
+                        return new JSString($"@page{selectorSuffix} {{ {styleText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
         }
         else
         {
