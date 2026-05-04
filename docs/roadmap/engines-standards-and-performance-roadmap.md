@@ -771,6 +771,15 @@ sub-issues was filed or re-prioritized.
   `length`, and `item(index)`, while keeping camelCase and kebab-case property
   access working for stylesheet rules. Focused coverage now passes via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssRule_Style|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: added
+  backreferences for `CSSRule.parentStyleSheet`, `CSSRule.parentRule`, and
+  `CSSStyleDeclaration.parentRule`, wiring stylesheet rule declarations back to
+  their owning `CSSRule` while keeping inline and computed style objects
+  correctly exposed as `null` parent-rule surfaces. Focused coverage now passes
+  via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

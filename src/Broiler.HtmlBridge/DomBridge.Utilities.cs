@@ -817,7 +817,7 @@ public sealed partial class DomBridge
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
     }
 
-    private static JSObject BuildStyleObject(DomElement element)
+    private static JSObject BuildStyleObject(DomElement element, JSValue? parentRule = null)
     {
         var style = new CssStyleDeclaration(element);
 
@@ -963,10 +963,16 @@ public sealed partial class DomBridge
             }, "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        style.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         return style;
     }
 
-    private static JSObject BuildStyleObject(Dictionary<string, string> styleMap)
+    private static JSObject BuildStyleObject(Dictionary<string, string> styleMap, JSValue? parentRule = null)
     {
         var style = new CssRuleStyleDeclaration(styleMap);
 
@@ -1090,6 +1096,12 @@ public sealed partial class DomBridge
                 return new JSString(string.Empty);
             }, "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        style.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return style;
     }

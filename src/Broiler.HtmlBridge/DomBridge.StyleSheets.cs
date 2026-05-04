@@ -155,7 +155,7 @@ public sealed partial class DomBridge
             EnsureRulesUpToDate();
             for (var i = 0; i < rulesStorage.Count; i++)
             {
-                var ruleObj = BuildCssRuleObject(rulesStorage[i]);
+                var ruleObj = BuildCssRuleObject(rulesStorage[i], sheet);
                 liveCssRules[(uint)i] = ruleObj;
             }
         }
@@ -263,9 +263,19 @@ public sealed partial class DomBridge
     /// Sets <c>type</c> (1 = CSSStyleRule, 5 = CSSFontFaceRule),
     /// <c>cssText</c>, <c>selectorText</c>, and <c>style</c> properties.
     /// </summary>
-    private static JSObject BuildCssRuleObject(string ruleText)
+    private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet)
     {
         var ruleObj = new JSObject();
+        ruleObj.FastAddProperty(
+            (KeyString)"parentStyleSheet",
+            new JSFunction((in Arguments _) => parentStyleSheet, "get parentStyleSheet"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        ruleObj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
         {
@@ -279,7 +289,7 @@ public sealed partial class DomBridge
             {
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleMap = ParseStyle(declarations);
-                var styleObj = BuildStyleObject(styleMap);
+                var styleObj = BuildStyleObject(styleMap, ruleObj);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
                     new JSFunction((in Arguments _) =>
@@ -319,7 +329,7 @@ public sealed partial class DomBridge
                 {
                     var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                     var styleMap = ParseStyle(declarations);
-                    var styleObj = BuildStyleObject(styleMap);
+                    var styleObj = BuildStyleObject(styleMap, ruleObj);
                     ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                 }
             }

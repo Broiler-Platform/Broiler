@@ -1,3 +1,4 @@
+using Broiler.JavaScript.BuiltIns.Null;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -951,6 +952,12 @@ public sealed partial class DomBridge
             (KeyString)"getPropertyPriority",
             new JSFunction((in Arguments _) => new JSString(string.Empty), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return obj;
     }

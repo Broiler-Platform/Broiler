@@ -620,6 +620,55 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,blue,left,2,true", result);
     }
 
+    [Fact]
+    public void CssRule_Parent_Backreferences_Are_Exposed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_And_Computed_Style_ParentRule_Is_Null()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: red; }
+</style>
+</head><body>
+<div id=""target"" style=""margin-left: 2px""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+r.push(target.style.parentRule === null);
+r.push(window.getComputedStyle(target).parentRule === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]
