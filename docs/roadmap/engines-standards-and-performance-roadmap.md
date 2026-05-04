@@ -654,6 +654,14 @@ sub-issues was filed or re-prioritized.
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_KeyboardEvents_Has_InitKeyboardEvent|FullyQualifiedName~DomEvents"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added deprecated
+  `initWheelEvent()` support on bridge-created events in both document and
+  sub-document factories, including default wheel delta fields, mouse-position
+  aliases, and compatibility parsing for the legacy `modifiersList` argument to
+  seed modifier state. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_WheelEvents_Has_InitWheelEvent|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

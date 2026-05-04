@@ -178,6 +178,43 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains(",0,0,0,0|keydown,true,false,true,Enter,1,true,false,true,false,13,0,13", result);
     }
 
+    [Fact]
+    public void CreateEvent_WheelEvents_Has_InitWheelEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('WheelEvents');
+var before = [evt.deltaX, evt.deltaY, evt.deltaZ, evt.deltaMode].join(',');
+evt.initWheelEvent('wheel', true, true, window, 4, 10, 20, 30, 40, 0, null, 'Control Shift', 1.5, -2.5, 0, 1);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.detail);
+after.push(evt.clientX);
+after.push(evt.clientY);
+after.push(evt.x);
+after.push(evt.y);
+after.push(evt.ctrlKey);
+after.push(evt.altKey);
+after.push(evt.shiftKey);
+after.push(evt.metaKey);
+after.push(evt.deltaX);
+after.push(evt.deltaY);
+after.push(evt.deltaZ);
+after.push(evt.deltaMode);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,0,0,0|wheel,true,true,true,4,30,40,30,40,true,false,true,false,1.5,-2.5,0,1", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]

@@ -276,6 +276,10 @@ public sealed partial class DomBridge
                 evt.FastAddValue((KeyString)"which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
                     new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
@@ -425,6 +429,65 @@ public sealed partial class DomBridge
                             evt[(KeyString)"relatedTarget"] = initArgs[14];
                         return JSUndefined.Value;
                     }, "initMouseEvent", 15),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initWheelEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                        {
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
+                        if (initArgs.Length > 8)
+                        {
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"button"] = new JSNumber(initArgs[9].DoubleValue);
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"relatedTarget"] = initArgs[10];
+                        if (initArgs.Length > 11)
+                        {
+                            var modifiers = initArgs[11].ToString()
+                                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            evt[(KeyString)"ctrlKey"] = Array.Exists(modifiers, m => string.Equals(m, "Control", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"altKey"] = Array.Exists(modifiers, m => string.Equals(m, "Alt", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"shiftKey"] = Array.Exists(modifiers, m => string.Equals(m, "Shift", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"metaKey"] = Array.Exists(modifiers, m => string.Equals(m, "Meta", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                        }
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"deltaX"] = new JSNumber(initArgs[12].DoubleValue);
+                        if (initArgs.Length > 13)
+                            evt[(KeyString)"deltaY"] = new JSNumber(initArgs[13].DoubleValue);
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"deltaZ"] = new JSNumber(initArgs[14].DoubleValue);
+                        if (initArgs.Length > 15)
+                            evt[(KeyString)"deltaMode"] = new JSNumber(initArgs[15].DoubleValue);
+                        return JSUndefined.Value;
+                    }, "initWheelEvent", 16),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 return evt;
             }, "createEvent", 1),
