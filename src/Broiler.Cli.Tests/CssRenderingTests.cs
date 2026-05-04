@@ -1361,6 +1361,68 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void CssCharsetRule_Exposes_Type_Encoding_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""UTF-8"";
+body { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 2);
+r.push(rule.encoding === 'UTF-8');
+r.push(rule.cssText === '@charset ""UTF-8"";');
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssCharsetRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""windows-1252"";
+@import url(""base.css"");
+@page :left { margin-top: 2cm; }
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 6);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 6);
+r.push(rules[3].type === 9);
+r.push(rules[4].type === 12);
+r.push(rules[5].type === 1);
+r.push(rules[0].encoding === 'windows-1252');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]

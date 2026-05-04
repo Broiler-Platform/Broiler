@@ -326,14 +326,14 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-     /// Builds a CSSRule JSObject from a CSS rule string.
-     /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule, 6 = CSSPageRule, 7 = CSSKeyframesRule, 9 = CSSNamespaceRule,
-     /// 11 = CSSSupportsRule, 12 = CSSLayerRule), <c>cssText</c>,
-     /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>conditionText</c>,
-     /// <c>name</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
-     /// <c>style</c> properties as appropriate.
-     /// </summary>
+    /// Builds a CSSRule JSObject from a CSS rule string.
+    /// Sets <c>type</c> (1 = CSSStyleRule, 2 = CSSCharsetRule, 3 = CSSImportRule,
+    /// 4 = CSSMediaRule, 5 = CSSFontFaceRule, 6 = CSSPageRule, 7 = CSSKeyframesRule,
+    /// 9 = CSSNamespaceRule, 11 = CSSSupportsRule, 12 = CSSLayerRule), <c>cssText</c>,
+    /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>conditionText</c>,
+    /// <c>name</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
+    /// <c>style</c> properties as appropriate.
+    /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
         var ruleObj = new JSObject();
@@ -350,7 +350,22 @@ public sealed partial class DomBridge
 
         var trimmedRuleText = ruleText.Trim();
 
-        if (trimmedRuleText.StartsWith("@import", StringComparison.OrdinalIgnoreCase))
+        if (trimmedRuleText.StartsWith("@charset", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSCharsetRule — type 2
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var charsetBody = trimmedRuleText[8..].Trim().TrimEnd(';').Trim();
+            var encoding = charsetBody.Trim('"', '\'');
+
+            ruleObj.FastAddValue((KeyString)"encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty(
+                (KeyString)"cssText",
+                new JSFunction((in Arguments _) => new JSString($"@charset \"{encoding}\";"), "get cssText"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+        else if (trimmedRuleText.StartsWith("@import", StringComparison.OrdinalIgnoreCase))
         {
             ruleObj.FastAddValue((KeyString)"type", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
 
