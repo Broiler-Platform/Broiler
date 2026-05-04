@@ -747,6 +747,85 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
+    [Fact]
+    public void CssImportRule_Exposes_Type_Href_Media_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""screen.css"") screen and (min-width: 1px);
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 3);
+r.push(rule.href.indexOf('screen.css') >= 0);
+r.push(rule.media.indexOf('screen') >= 0);
+r.push(rule.cssText.indexOf('@import') >= 0);
+r.push(rule.cssText.indexOf('screen.css') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssImportRule_Can_Use_Quoted_Href_Syntax()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import ""theme.css"";
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 3);
+r.push(rule.href === 'theme.css');
+r.push(rule.media === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssImportRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@media screen { .test { color: red; } }
+@font-face { font-family: ""RoadmapTest""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 4);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 4);
+r.push(rules[2].type === 5);
+r.push(rules[3].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]

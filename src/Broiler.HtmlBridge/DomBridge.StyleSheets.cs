@@ -243,6 +243,13 @@ public sealed partial class DomBridge
         for (int i = 0; i < cssText.Length; i++)
         {
             if (cssText[i] == '{') depth++;
+            else if (cssText[i] == ';' && depth == 0)
+            {
+                var rule = cssText.Substring(start, i - start + 1).Trim();
+                if (rule.Length > 0 && rule.StartsWith("@", StringComparison.Ordinal))
+                    rules.Add(rule);
+                start = i + 1;
+            }
             else if (cssText[i] == '}')
             {
                 depth--;
@@ -274,11 +281,11 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Builds a CSSRule JSObject from a CSS rule string.
-    /// Sets <c>type</c> (1 = CSSStyleRule, 4 = CSSMediaRule, 5 = CSSFontFaceRule),
-    /// <c>cssText</c>, <c>selectorText</c>, <c>media</c>, <c>cssRules</c>, and
-    /// <c>style</c> properties as appropriate.
-    /// </summary>
+     /// Builds a CSSRule JSObject from a CSS rule string.
+     /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
+     /// 5 = CSSFontFaceRule), <c>cssText</c>, <c>selectorText</c>, <c>href</c>,
+     /// <c>media</c>, <c>cssRules</c>, and <c>style</c> properties as appropriate.
+     /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
         var ruleObj = new JSObject();
@@ -293,7 +300,50 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        if (ruleText.TrimStart().StartsWith("@media", StringComparison.OrdinalIgnoreCase))
+        var trimmedRuleText = ruleText.Trim();
+
+        if (trimmedRuleText.StartsWith("@import", StringComparison.OrdinalIgnoreCase))
+        {
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var importBody = trimmedRuleText[7..].Trim().TrimEnd(';').Trim();
+            var href = string.Empty;
+            var mediaText = string.Empty;
+
+            if (importBody.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
+            {
+                var openParen = importBody.IndexOf('(');
+                var closeParen = importBody.IndexOf(')', openParen + 1);
+                if (openParen >= 0 && closeParen > openParen)
+                {
+                    href = importBody.Substring(openParen + 1, closeParen - openParen - 1).Trim().Trim('"', '\'');
+                    mediaText = importBody[(closeParen + 1)..].Trim();
+                }
+            }
+            else if (importBody.StartsWith("\"", StringComparison.Ordinal) || importBody.StartsWith("'", StringComparison.Ordinal))
+            {
+                var quote = importBody[0];
+                var closingQuote = importBody.IndexOf(quote, 1);
+                if (closingQuote > 0)
+                {
+                    href = importBody[1..closingQuote];
+                    mediaText = importBody[(closingQuote + 1)..].Trim();
+                }
+            }
+
+            ruleObj.FastAddValue((KeyString)"href", new JSString(href), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty(
+                (KeyString)"cssText",
+                new JSFunction((in Arguments _) =>
+                {
+                    var mediaSuffix = string.IsNullOrEmpty(mediaText) ? string.Empty : $" {mediaText}";
+                    return new JSString($"@import url(\"{href}\"){mediaSuffix};");
+                }, "get cssText"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+        else if (trimmedRuleText.StartsWith("@media", StringComparison.OrdinalIgnoreCase))
         {
             ruleObj.FastAddValue((KeyString)"type", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -323,7 +373,7 @@ public sealed partial class DomBridge
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }
-        else if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
+        else if (trimmedRuleText.StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
         {
             // CSSFontFaceRule — type 5
             ruleObj.FastAddValue((KeyString)"type", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
