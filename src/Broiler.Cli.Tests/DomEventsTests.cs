@@ -215,6 +215,30 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,0,0,0|wheel,true,true,true,4,30,40,30,40,true,false,true,false,1.5,-2.5,0,1", result);
     }
 
+    [Fact]
+    public void CreateEvent_CustomEvent_Has_InitCustomEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('CustomEvent');
+var before = [typeof evt.initCustomEvent, evt.detail].join(',');
+evt.initCustomEvent('build', true, false, 'payload');
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.detail);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("function,0|build,true,false,payload", result);
+    }
+
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
     [Fact]
