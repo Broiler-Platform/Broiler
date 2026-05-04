@@ -846,9 +846,19 @@ sub-issues was filed or re-prioritized.
   ordering with import, namespace, layer, and style rules and allowing page
   declaration mutations through the bridged `CSSStyleDeclaration` to rebuild the
   enclosing rule's serialized `cssText`. Focused coverage now passes via
-  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+`dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+and
+`dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: added
+  `CSSRuleList.item()`, `insertRule()`, and `deleteRule()` support for nested
+  `cssRules` collections exposed by grouping rules such as `CSSMediaRule`,
+  `CSSKeyframesRule`, `CSSSupportsRule`, and `CSSLayerRule`, while also
+  exposing `item()` on the top-level stylesheet `cssRules` object so nested
+  rule insertion and removal rebuild parent grouping-rule `cssText` in place.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText|FullyQualifiedName~CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
   and
-  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
   `@font-face` entries as `CSSFontFaceRule`-like objects in
   `document.styleSheets[...].cssRules`, including `type === 5`, bridged

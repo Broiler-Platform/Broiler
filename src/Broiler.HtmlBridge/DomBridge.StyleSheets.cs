@@ -150,6 +150,17 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        liveCssRules.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                SyncLiveCssRulesIndices();
+                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
+                var idx = double.IsNaN(dv) ? 0 : (int)dv;
+                return idx >= 0 && idx < rulesStorage.Count ? liveCssRules[(uint)idx] : JSNull.Value;
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // Syncs indexed properties on the live cssRules object with rulesStorage
         void SyncLiveCssRulesIndices()
         {
@@ -266,17 +277,73 @@ public sealed partial class DomBridge
         return rules;
     }
 
-    private static JSObject BuildCssRuleListObject(IReadOnlyList<JSObject> rules)
+    private static JSObject BuildCssRuleListObject(List<JSObject> rules, Func<string, JSObject>? ruleFactory = null)
     {
         var cssRuleList = new JSObject();
-        for (var i = 0; i < rules.Count; i++)
-            cssRuleList[(uint)i] = rules[i];
+        var lastSyncedCount = 0;
+
+        void SyncIndices()
+        {
+            for (var i = 0; i < rules.Count; i++)
+                cssRuleList[(uint)i] = rules[i];
+
+            for (var i = rules.Count; i < lastSyncedCount; i++)
+                cssRuleList.GetElements().RemoveAt((uint)i);
+
+            lastSyncedCount = rules.Count;
+        }
+
+        SyncIndices();
 
         cssRuleList.FastAddProperty(
             (KeyString)"length",
             new JSFunction((in Arguments _) => new JSNumber(rules.Count), "get length"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        cssRuleList.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
+                var index = double.IsNaN(dv) ? 0 : (int)dv;
+                return index >= 0 && index < rules.Count ? rules[index] : JSNull.Value;
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        cssRuleList.FastAddValue(
+            (KeyString)"insertRule",
+            new JSFunction((in Arguments a) =>
+            {
+                if (ruleFactory is null)
+                    return new JSNumber(0);
+
+                var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var dv = a.Length > 1 ? a[1].DoubleValue : rules.Count;
+                var index = double.IsNaN(dv) ? rules.Count : (int)dv;
+                index = Math.Clamp(index, 0, rules.Count);
+
+                rules.Insert(index, ruleFactory(ruleText));
+                SyncIndices();
+                return new JSNumber(index);
+            }, "insertRule", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        cssRuleList.FastAddValue(
+            (KeyString)"deleteRule",
+            new JSFunction((in Arguments a) =>
+            {
+                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
+                var index = double.IsNaN(dv) ? 0 : (int)dv;
+                if (index >= 0 && index < rules.Count)
+                {
+                    rules.RemoveAt(index);
+                    SyncIndices();
+                }
+
+                return JSUndefined.Value;
+            }, "deleteRule", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         return cssRuleList;
     }
@@ -421,7 +488,9 @@ public sealed partial class DomBridge
                 var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
                     .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
                     .ToList();
-                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
                 ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -477,7 +546,9 @@ public sealed partial class DomBridge
                 var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
                     .Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj))
                     .ToList();
-                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj));
 
                 ruleObj.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -553,7 +624,9 @@ public sealed partial class DomBridge
                 var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
                     .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
                     .ToList();
-                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
                 ruleObj.FastAddValue((KeyString)"conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -585,7 +658,9 @@ public sealed partial class DomBridge
                 var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
                     .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
                     .ToList();
-                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
                 ruleObj.FastAddValue(
                     (KeyString)"name",

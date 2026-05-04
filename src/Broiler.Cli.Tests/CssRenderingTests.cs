@@ -887,6 +887,38 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media (min-width: 1px) { .first { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var mediaRule = document.styleSheets[0].cssRules[0];
+var nestedRules = mediaRule.cssRules;
+r.push(typeof nestedRules.item === 'function');
+r.push(nestedRules.item(0).selectorText === '.first');
+r.push(nestedRules.insertRule('.second { color: blue; }', 1) === 1);
+r.push(nestedRules.length === 2);
+r.push(nestedRules[1].selectorText === '.second');
+r.push(mediaRule.cssText.indexOf('.second') >= 0);
+nestedRules.deleteRule(0);
+r.push(nestedRules.length === 1);
+r.push(nestedRules[0].selectorText === '.second');
+r.push(mediaRule.cssText.indexOf('.first') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void CssImportRule_Exposes_Type_Href_Media_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -1044,6 +1076,38 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var keyframesRule = document.styleSheets[0].cssRules[0];
+var nestedRules = keyframesRule.cssRules;
+r.push(typeof nestedRules.item === 'function');
+r.push(nestedRules.item(0).keyText === 'from');
+r.push(nestedRules.insertRule('50% { opacity: 0.5; }', 1) === 1);
+r.push(nestedRules.length === 3);
+r.push(nestedRules[1].keyText === '50%');
+r.push(keyframesRule.cssText.indexOf('50%') >= 0);
+nestedRules.deleteRule(0);
+r.push(nestedRules.length === 2);
+r.push(nestedRules[0].keyText === '50%');
+r.push(keyframesRule.cssText.indexOf('from') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
     }
 
     [Fact]
