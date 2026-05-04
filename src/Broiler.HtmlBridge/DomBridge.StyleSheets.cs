@@ -328,9 +328,10 @@ public sealed partial class DomBridge
     /// <summary>
      /// Builds a CSSRule JSObject from a CSS rule string.
      /// Sets <c>type</c> (1 = CSSStyleRule, 3 = CSSImportRule, 4 = CSSMediaRule,
-     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule), <c>cssText</c>,
-     /// <c>selectorText</c>, <c>href</c>, <c>media</c>, <c>cssRules</c>, and
-     /// <c>style</c> properties as appropriate.
+     /// 5 = CSSFontFaceRule, 7 = CSSKeyframesRule, 11 = CSSSupportsRule),
+     /// <c>cssText</c>, <c>selectorText</c>, <c>href</c>, <c>media</c>,
+     /// <c>conditionText</c>, <c>cssRules</c>, and <c>style</c> properties as
+     /// appropriate.
      /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
@@ -470,6 +471,37 @@ public sealed partial class DomBridge
                             nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
                                 .Where(text => !string.IsNullOrEmpty(text)));
                         return new JSString($"@keyframes {name} {{ {nestedCssText} }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+        else if (trimmedRuleText.StartsWith("@supports", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSSupportsRule — type 11
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            int braceOpen = ruleText.IndexOf('{');
+            int braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var conditionText = ruleText.Substring(9, braceOpen - 9).Trim();
+                var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
+                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
+                    .ToList();
+                var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects);
+
+                ruleObj.FastAddValue((KeyString)"conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var nestedCssText = string.Join(" ",
+                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
+                                .Where(text => !string.IsNullOrEmpty(text)));
+                        return new JSString($"@supports {conditionText} {{ {nestedCssText} }}");
                     }, "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);

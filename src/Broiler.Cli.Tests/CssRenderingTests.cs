@@ -938,6 +938,115 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void CssSupportsRule_Exposes_Type_ConditionText_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: flex) { .flex { display: flex; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 11);
+r.push(rule.conditionText === '(display: flex)');
+r.push(rule.cssRules.length === 1);
+r.push(rule.cssRules[0].type === 1);
+r.push(rule.cssRules[0].selectorText === '.flex');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_Nested_Rules_Expose_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: grid) { .grid { display: grid; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var supportsRule = sheet.cssRules[0];
+var nestedRule = supportsRule.cssRules[0];
+r.push(supportsRule.parentRule === null);
+r.push(nestedRule.parentRule === supportsRule);
+r.push(nestedRule.parentStyleSheet === sheet);
+r.push(nestedRule.style.parentRule === nestedRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_CssText_Rebuilds_From_Nested_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: flex) { .flex { display: flex; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var supportsRule = document.styleSheets[0].cssRules[0];
+r.push(supportsRule.cssText.indexOf('@supports') >= 0);
+r.push(supportsRule.cssText.indexOf('(display: flex)') >= 0);
+supportsRule.cssRules[0].style.setProperty('display', 'inline-flex');
+r.push(supportsRule.cssText.indexOf('display: inline-flex;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@supports (display: flex) { .flex { display: flex; } }
+@media screen { .test { color: red; } }
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 11);
+r.push(rules[2].type === 4);
+r.push(rules[3].type === 7);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]
