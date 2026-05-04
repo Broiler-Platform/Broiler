@@ -323,6 +323,43 @@ internal class CssBox : CssBoxProperties, IDisposable
         return ContainingBlock;
     }
 
+    private bool IsInitialContainingBlock(CssBox cb) =>
+        cb.ParentBox == null && ContainerInt != null;
+
+    private void GetAbsoluteContainingBlockPaddingBox(CssBox cb,
+        out double cbPadLeft,
+        out double cbPadTop,
+        out double cbPadWidth,
+        out double cbPadHeight)
+    {
+        if (IsInlineContainingBlock(cb))
+        {
+            var bbox = GetInlineBoundingBox(cb);
+            if (bbox != RectangleF.Empty)
+            {
+                cbPadLeft = bbox.Left;
+                cbPadTop = bbox.Top;
+                cbPadWidth = bbox.Width;
+                cbPadHeight = bbox.Height;
+                return;
+            }
+        }
+
+        if (IsInitialContainingBlock(cb))
+        {
+            cbPadLeft = 0;
+            cbPadTop = 0;
+            cbPadWidth = ContainerInt!.ViewportSize.Width;
+            cbPadHeight = ContainerInt.ViewportSize.Height;
+            return;
+        }
+
+        cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+        cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+        cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+        cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+    }
+
     /// <summary>
     /// CSS2.1 §10.1: When the containing block for an absolutely positioned
     /// element is formed by an inline-level element, the containing block is
@@ -625,20 +662,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 else if (Position == CssConstants.Absolute)
                 {
                     var cb = FindPositionedContainingBlock();
-                    if (IsInlineContainingBlock(cb))
-                    {
-                        // CSS2.1 §10.1: The containing block is the bounding
-                        // box of the first and last inline boxes of the inline
-                        // ancestor.  The width is the bounding box width.
-                        var bbox = GetInlineBoundingBox(cb);
-                        width = bbox != RectangleF.Empty ? bbox.Width : cb.Size.Width;
-                    }
-                    else
-                    {
-                        width = cb.Size.Width
-                                - cb.ActualPaddingLeft - cb.ActualPaddingRight
-                                - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                    }
+                    GetAbsoluteContainingBlockPaddingBox(cb, out _, out _, out width, out _);
                 }
                 else
                 {
@@ -1135,37 +1159,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     if (Position == CssConstants.Absolute)
                     {
                         var cb = FindPositionedContainingBlock();
-                        // CSS2.1 §10.1: The containing block for an absolutely
-                        // positioned element is the padding-box of the nearest
-                        // positioned ancestor.  When the ancestor is an inline
-                        // element, the containing block is the bounding box of
-                        // the first and last inline boxes generated for it.
-                        double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
-                        if (IsInlineContainingBlock(cb))
-                        {
-                            var bbox = GetInlineBoundingBox(cb);
-                            if (bbox != RectangleF.Empty)
-                            {
-                                cbPadLeft = bbox.Left;
-                                cbPadTop = bbox.Top;
-                                cbPadWidth = bbox.Width;
-                                cbPadHeight = bbox.Height;
-                            }
-                            else
-                            {
-                                cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                                cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                                cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                                cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
-                            }
-                        }
-                        else
-                        {
-                            cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                            cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                            cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                            cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
-                        }
+                        GetAbsoluteContainingBlockPaddingBox(cb, out double cbPadLeft, out double cbPadTop, out double cbPadWidth, out double cbPadHeight);
 
                         float newX = Location.X, newY = Location.Y;
 
@@ -1519,12 +1513,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             else
             {
                 var cb = FindPositionedContainingBlock();
-                cbHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
-                // When the containing block is the initial containing block
-                // (root element) and its height hasn't been finalized yet,
-                // fall back to the viewport height.
-                if (cbHeight <= 0 && ContainerInt != null && (cb.ParentBox == null || cb == ContainingBlock))
-                    cbHeight = ContainerInt.ViewportSize.Height;
+                GetAbsoluteContainingBlockPaddingBox(cb, out _, out _, out _, out cbHeight);
             }
             double cssTop = CssValueParser.ParseLength(Top, cbHeight, GetEmHeight());
             double cssBottom = CssValueParser.ParseLength(Bottom, cbHeight, GetEmHeight());
@@ -1634,12 +1623,56 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
-        // CSS Box Alignment Level 3 §6.1: Post-layout self-alignment for
-        // absolutely positioned elements.  After children are laid out,
-        // shrink the box to fit-content size and align within the IMCB.
-        // This must run after child layout so content dimensions are known.
         if (Position == CssConstants.Absolute)
         {
+            bool hasLeft = Left != null && Left != CssConstants.Auto;
+            bool hasRight = Right != null && Right != CssConstants.Auto;
+            bool hasTop = Top != null && Top != CssConstants.Auto;
+            bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
+
+            if ((!hasLeft && hasRight) || (!hasTop && hasBottom))
+            {
+                var cb = FindPositionedContainingBlock();
+                GetAbsoluteContainingBlockPaddingBox(cb, out double cbPadLeft, out double cbPadTop, out double cbPadWidth, out double cbPadHeight);
+
+                float newX = Location.X;
+                float newY = Location.Y;
+
+                if (!hasLeft && hasRight)
+                {
+                    double boxWidth = ActualRight - Location.X;
+                    if (boxWidth <= 0)
+                        boxWidth = Size.Width;
+
+                    double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                    newX = (float)(cbPadLeft + cbPadWidth - cssRight - ActualMarginRight - boxWidth);
+                }
+
+                if (!hasTop && hasBottom)
+                {
+                    double boxHeight = ActualBottom - Location.Y;
+                    if (boxHeight <= 0)
+                        boxHeight = Size.Height;
+
+                    double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                    newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
+                }
+
+                float deltaX = newX - Location.X;
+                float deltaY = newY - Location.Y;
+                if (deltaX != 0)
+                    OffsetLeft(deltaX);
+                if (deltaY != 0)
+                {
+                    OffsetTop(deltaY);
+                    ActualBottom += deltaY;
+                }
+            }
+
+            // CSS Box Alignment Level 3 §6.1: Post-layout self-alignment for
+            // absolutely positioned elements.  After children are laid out,
+            // shrink the box to fit-content size and align within the IMCB.
+            // This must run after child layout so content dimensions are known.
             string jsPost = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
             bool jsPostNonDefault = jsPost != "auto" && jsPost != "normal" && jsPost != "stretch";
             string asPost = AlignSelf?.Trim().ToLowerInvariant() ?? "auto";
@@ -1648,32 +1681,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (jsPostNonDefault || asPostNonDefault)
             {
                 var cb = FindPositionedContainingBlock();
-                double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
-                if (IsInlineContainingBlock(cb))
-                {
-                    var bbox = GetInlineBoundingBox(cb);
-                    if (bbox != RectangleF.Empty)
-                    {
-                        cbPadLeft = bbox.Left;
-                        cbPadTop = bbox.Top;
-                        cbPadWidth = bbox.Width;
-                        cbPadHeight = bbox.Height;
-                    }
-                    else
-                    {
-                        cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                        cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                        cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                        cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
-                    }
-                }
-                else
-                {
-                    cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                    cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                    cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                    cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
-                }
+                GetAbsoluteContainingBlockPaddingBox(cb, out double cbPadLeft, out double cbPadTop, out double cbPadWidth, out double cbPadHeight);
 
                 bool hasL = Left != null && Left != CssConstants.Auto;
                 bool hasR = Right != null && Right != CssConstants.Auto;
@@ -1761,12 +1769,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                 {
                     float deltaX = newX - Location.X;
                     float deltaY = newY - Location.Y;
-                    Location = new PointF(newX, newY);
-                    ActualBottom += deltaY;
-
-                    foreach (var child in Boxes)
+                    if (deltaX != 0)
+                        OffsetLeft(deltaX);
+                    if (deltaY != 0)
                     {
-                        OffsetBoxRecursive(child, deltaX, deltaY);
+                        OffsetTop(deltaY);
+                        ActualBottom += deltaY;
                     }
                 }
             }
@@ -2919,19 +2927,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
 
         return maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
-    }
-
-    /// <summary>
-    /// Recursively offsets a box and all its descendants by the given
-    /// delta.  Used when post-layout self-alignment moves an abspos box
-    /// to a new position.
-    /// </summary>
-    private static void OffsetBoxRecursive(CssBox box, float dx, float dy)
-    {
-        box.Location = new PointF(box.Location.X + dx, box.Location.Y + dy);
-        box.ActualBottom += dy;
-        foreach (var child in box.Boxes)
-            OffsetBoxRecursive(child, dx, dy);
     }
 
     /// <summary>
