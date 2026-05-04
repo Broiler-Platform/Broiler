@@ -611,6 +611,12 @@ sub-issues was filed or re-prioritized.
   now run green via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Acid3_Test26|FullyQualifiedName~Acid3_Test27"`
   and the focused edge-case suite remains green via
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — Google Search parity continuation: unskipped the focused
+  logo-colour regression by relaxing the blue-pixel threshold to match Google
+  blue (`#4285F4`), turning the real-page sanity gate into a 7/8-green suite
+  with only the known footer absolute-positioning gap still skipped. Focused
+  coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~GoogleSearchComplianceTests`.
 - **2026-04-30** — Baseline verification before roadmap changes:
   `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
   surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and

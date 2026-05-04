@@ -219,7 +219,7 @@ public class GoogleSearchComplianceTests
     /// implemented), but the colour detection thresholds in this test may
     /// need adjustment for Google's specific blue (#4285F4 has G=133).
     /// </summary>
-    [Fact(Skip = "Blue detection threshold too strict for Google blue (#4285F4 has G=133 > 100)")]
+    [Fact]
     public void GoogleLike_Logo_Contains_Coloured_Pixels()
     {
         using var bitmap = RenderGoogleLike();
@@ -230,8 +230,8 @@ public class GoogleSearchComplianceTests
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                // Blue: R<100, G<100, B>150
-                if (px.Red < 100 && px.Green < 100 && px.Blue > 150)
+                // Blue: accommodate Google blue (#4285F4 = 66,133,244)
+                if (px.Red < 100 && px.Green < 140 && px.Blue > 150)
                     hasBlue = true;
                 // Red: R>180, G<100, B<100
                 if (px.Red > 180 && px.Green < 100 && px.Blue < 100)
