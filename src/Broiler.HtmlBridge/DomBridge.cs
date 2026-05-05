@@ -442,18 +442,7 @@ public sealed partial class DomBridge
             foreach (var registration in listeners.ToList())
             {
                 currentListenerPassive = registration.Passive;
-                if (registration.Listener is not JSFunction fn)
-                    continue;
-
-                try
-                {
-                    fn.InvokeFunction(new Arguments(fn, evt));
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.window.dispatchEvent", $"Window event listener error: {ex.Message}", ex);
-                }
-
+                InvokeEventListener(registration.Listener, evt, "DomBridge.window.dispatchEvent");
                 currentListenerPassive = false;
 
                 if (registration.Once)

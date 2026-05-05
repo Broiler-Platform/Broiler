@@ -1477,11 +1477,7 @@ public sealed partial class DomBridge
                     {
                         foreach (var registration in submitListeners.ToList())
                         {
-                            if (registration.Listener is JSFunction fn)
-                            {
-                                try { fn.InvokeFunction(new Arguments(fn, submitEvt)); }
-                                catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.submit", $"Submit listener error: {ex.Message}", ex); }
-                            }
+                            InvokeEventListener(registration.Listener, submitEvt, "DomBridge.submit");
                         }
                     }
 

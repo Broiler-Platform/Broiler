@@ -41,6 +41,28 @@ public sealed partial class DomBridge
         return value != null && !value.IsNullOrUndefined && value.BooleanValue;
     }
 
+    private static void InvokeEventListener(JSValue listener, JSObject evt, string logContext)
+    {
+        try
+        {
+            if (listener is JSFunction fn)
+            {
+                fn.InvokeFunction(new Arguments(fn, evt));
+                return;
+            }
+
+            if (listener is JSObject listenerObject &&
+                listenerObject[(KeyString)"handleEvent"] is JSFunction handleEvent)
+            {
+                handleEvent.InvokeFunction(new Arguments(listenerObject, evt));
+            }
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, logContext, $"Event listener error: {ex.Message}", ex);
+        }
+    }
+
     private JSValue BuildComposedPathValue(DomElement target, IReadOnlyList<DomElement> path)
     {
         JSValue ToEventPathObject(DomElement node)
@@ -244,11 +266,7 @@ public sealed partial class DomBridge
                 // In target phase (capturePhase == null), fire all listeners.
                 if (capturePhase.HasValue && registration.Capture != capturePhase.Value) continue;
                 currentListenerPassive = registration.Passive;
-                if (registration.Listener is JSFunction fn)
-                {
-                    try { fn.InvokeFunction(new Arguments(fn, evt)); }
-                    catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Event listener error: {ex.Message}", ex); }
-                }
+                InvokeEventListener(registration.Listener, evt, "DomBridge.dispatchEvent");
                 currentListenerPassive = false;
 
                 if (registration.Once)

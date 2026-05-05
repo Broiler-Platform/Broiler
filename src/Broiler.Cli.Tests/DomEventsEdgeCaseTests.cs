@@ -181,6 +181,61 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var listener = {
+    count: 0,
+    handleEvent: function(e) {
+        this.count++;
+        document.getElementById('result').textContent = e.type + ',' + this.count;
+    }
+};
+target.addEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">test,1<", result);
+    }
+
+    [Fact]
+    public void RemoveEventListener_ListenerObject_Prevents_Future_Calls()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var count = 0;
+var target = document.getElementById('target');
+var listener = {
+    handleEvent: function() { count++; }
+};
+target.addEventListener('test', listener, false);
+target.removeEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">0<", result);
+    }
+
+    [Fact]
     public void AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
@@ -354,6 +409,32 @@ document.getElementById('result').textContent = count;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains(">1<", result);
+    }
+
+    [Fact]
+    public void Window_AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var listener = {
+    count: 0,
+    handleEvent: function(e) {
+        this.count++;
+        document.getElementById('result').textContent = e.type + ',' + this.count;
+    }
+};
+window.addEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+window.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">test,1<", result);
     }
 
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
