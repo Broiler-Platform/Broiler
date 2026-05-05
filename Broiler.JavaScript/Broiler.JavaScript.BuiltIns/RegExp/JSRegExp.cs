@@ -402,20 +402,17 @@ public partial class JSRegExp : JSObject, IJSRegExp
                     throw JSEngine.NewSyntaxError("The 'u' and 'v' flags cannot be used together");
                 unicodeSets = true;
             }
-            else if (flag == 'y' || flag == 'd')
+            else if (flag == 'y')
             {
-                if (flag == 'y')
-                {
-                    if (sticky)
-                        throw JSEngine.NewSyntaxError("The 'y' flag cannot be specified twice");
-                    sticky = true;
-                }
-                else
-                {
-                    if (hasIndices)
-                        throw JSEngine.NewSyntaxError("The 'd' flag cannot be specified twice");
-                    hasIndices = true;
-                }
+                if (sticky)
+                    throw JSEngine.NewSyntaxError("The 'y' flag cannot be specified twice");
+                sticky = true;
+            }
+            else if (flag == 'd')
+            {
+                if (hasIndices)
+                    throw JSEngine.NewSyntaxError("The 'd' flag cannot be specified twice");
+                hasIndices = true;
             }
             else
             {
