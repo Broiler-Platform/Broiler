@@ -1,6 +1,6 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: Execution kickoff in progress
+> **Status**: **M0 complete** — baseline/instrumentation published; M1 follow-on work next
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
@@ -182,7 +182,7 @@ Phases are sequential at the *exit-criteria* level, but most workstreams run
 in parallel within a phase. Milestone codes (`M0`–`M5`) are used in
 [Section 8](#8-measurable-goals-and-exit-criteria) for the goal table.
 
-### Phase 0 — Baseline and Instrumentation (Milestone **M0**)
+### Phase 0 — Baseline and Instrumentation (Milestone **M0**) — **Completed 2026-05-05**
 
 Establishes the measurement floor that every later milestone is graded
 against. No user-visible behavior changes.
@@ -195,6 +195,12 @@ against. No user-visible behavior changes.
   record**.
 - Document the engine boundaries currently in use by `Broiler.HtmlBridge` and
   identify all leaky abstractions (W2).
+
+**Completion record:** The M0 baseline of record, unified PR dashboard, and
+current HtmlBridge boundary/leak map are now published in
+[`engines-m0-baseline.md`](./engines-m0-baseline.md),
+[`../architecture/htmlbridge-engine-boundaries.md`](../architecture/htmlbridge-engine-boundaries.md),
+and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml).
 
 ### Phase 1 — Boundary Hardening and Spec Mapping (Milestone **M1**)
 
@@ -345,7 +351,7 @@ are filled in at Phase 0 close-out and tracked in the unified dashboard.
 
 | Milestone | JavaScript (Test262) | HTML/CSS (WPT subset) | DOM/Web (WPT subset) | Acid3 capture | Performance gate |
 |---|---|---|---|---|---|
-| **M0** Baseline | publish current pass rate | publish current pass rate | publish current pass rate | 100/100 maintained | publish baselines for all benchmarks |
+| **M0** Baseline ✅ | published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) | published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) | published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) | 100/100 maintained and documented | benchmark baselines published |
 | **M1** Boundary | no regression vs. M0 | no regression vs. M0 | no regression vs. M0 | 100/100 | per-PR regression gate live (≤ 2 % slowdown band) |
 | **M2** Targeted | **+15 pp** over M0 (ES2025 closed) | **+10 pp** over M0 | **+10 pp** over M0 | 100/100 + new visual-fidelity TODOs closed | no benchmark > 5 % slower than M0 |
 | **M3** Web APIs | **+5 pp** over M2 | **+10 pp** over M2 | **+15 pp** over M2 (Fetch, microtasks, structured clone) | 100/100 | no benchmark > 2 % slower than M0 |
@@ -521,7 +527,7 @@ behavioral or performance-sensitive changes:
 
 ### 13.2 Milestone-to-sub-issue checklist
 
-- [ ] **M0** — file and start the W1/W6 baseline issues; publish the baseline of record
+- [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
 - [ ] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
 - [ ] **M2** — file and start W3/W4/W5 targeted compliance issues with spec-cited scopes
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
