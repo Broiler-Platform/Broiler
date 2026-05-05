@@ -286,6 +286,55 @@ child.dispatchEvent(evt);
     }
 
     [Fact]
+    public void InputEvent_Constructor_Sets_Input_Specific_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = new InputEvent('input', {
+    bubbles: true,
+    cancelable: true,
+    data: 'x',
+    inputType: 'insertText',
+    isComposing: true
+});
+target.dispatchEvent(evt);
+document.getElementById('result').textContent =
+    evt.type + '|' + evt.data + '|' + evt.inputType + '|' + evt.isComposing + '|' + evt.bubbles + '|' + evt.cancelable;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">input|x|insertText|true|true|true<", result);
+    }
+
+    [Fact]
+    public void Document_CreateEvent_InputEvent_InitInputEvent_Sets_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('InputEvent');
+evt.initInputEvent('input', true, false, window, 'y', 'deleteContentBackward', false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent =
+    evt.type + '|' + evt.data + '|' + evt.inputType + '|' + evt.isComposing + '|' + evt.bubbles + '|' + evt.cancelable;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">input|y|deleteContentBackward|false|true|false<", result);
+    }
+
+    [Fact]
     public void Window_AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
