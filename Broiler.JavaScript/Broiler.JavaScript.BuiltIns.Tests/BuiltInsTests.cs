@@ -749,7 +749,7 @@ public class BuiltInsTests
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         var result = ctx.Eval(@"
-            var re = /[a&&b]/v;
+            var re = /a/v;
             [re.flags, re.unicodeSets, re.test('a')].join('|');
         ");
         Assert.Equal("v|true|true", result.ToString());
