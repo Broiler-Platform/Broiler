@@ -419,7 +419,6 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        var stopped = false;
         var immediateStopped = false;
         var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
                         defaultPreventedValue.BooleanValue;
@@ -429,7 +428,6 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"stopPropagation",
             new JSFunction((in Arguments _) =>
             {
-                stopped = true;
                 legacyCancelBubble = true;
                 return JSUndefined.Value;
             }, "stopPropagation", 0),
@@ -437,7 +435,6 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
             new JSFunction((in Arguments _) =>
             {
-                stopped = true;
                 immediateStopped = true;
                 legacyCancelBubble = true;
                 return JSUndefined.Value;
@@ -463,7 +460,6 @@ public sealed partial class DomBridge
                 if (setArgs.Length > 0 && setArgs[0].BooleanValue)
                 {
                     legacyCancelBubble = true;
-                    stopped = true;
                 }
                 return JSUndefined.Value;
             }, "set cancelBubble"),
@@ -494,7 +490,7 @@ public sealed partial class DomBridge
         {
             foreach (var registration in listeners.ToList())
             {
-                if (stopped || immediateStopped)
+                if (immediateStopped)
                     break;
 
                 currentListenerPassive = registration.Passive;

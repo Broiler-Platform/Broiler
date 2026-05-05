@@ -466,6 +466,33 @@ document.getElementById('result').textContent = order.join(',');
     }
 
     [Fact]
+    public void Window_StopPropagation_Does_Not_Prevent_Later_Listeners_On_Same_Target()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var order = [];
+window.addEventListener('test', function(e) {
+    order.push('first');
+    e.stopPropagation();
+}, false);
+window.addEventListener('test', function() {
+    order.push('second');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+window.dispatchEvent(evt);
+document.getElementById('result').textContent = order.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">first,second<", result);
+    }
+
+    [Fact]
     public void Window_DispatchEvent_Preserves_Prevented_State_And_ReturnValue()
     {
         var html = @"<!DOCTYPE html>
