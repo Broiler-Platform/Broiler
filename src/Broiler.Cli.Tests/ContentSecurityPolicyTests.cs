@@ -25,6 +25,26 @@ public class ContentSecurityPolicyTests
     }
 
     [Fact]
+    public void ExecuteScriptsWithDom_DefaultSrc_Falls_Back_For_Inline_Scripts()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+            </head>
+            <body>
+                <script>document.body.setAttribute('data-inline', 'ran');</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.DoesNotContain("data-inline=\"ran\"", result);
+    }
+
+    [Fact]
     public void ExecuteScriptsWithDom_Allows_Inline_Script_With_Matching_Nonce()
     {
         const string html = """
@@ -42,6 +62,26 @@ public class ContentSecurityPolicyTests
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("data-inline=\"ran\"", result);
+    }
+
+    [Fact]
+    public void ExecuteScriptsWithDom_ScriptSrcElem_Takes_Precedence_Over_ScriptSrc_For_Inline_Scripts()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; script-src-elem 'self'">
+            </head>
+            <body>
+                <script>document.body.setAttribute('data-inline', 'blocked');</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.DoesNotContain("data-inline=\"blocked\"", result);
     }
 
     [Fact]
