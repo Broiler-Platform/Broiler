@@ -87,6 +87,12 @@ public sealed partial class DomBridge
     /// </summary>
     public Action? TaskCheckpointCallback { get; set; }
 
+    /// <summary>
+    /// Optional Content Security Policy applied while compiling inline script-bearing
+    /// bridge surfaces such as <c>on*</c> attributes.
+    /// </summary>
+    public ContentSecurityPolicy? Csp { get; set; }
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;

@@ -315,6 +315,12 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
         var eventName = attrName[2..].ToLowerInvariant();
+        if (Csp != null && !Csp.AllowsInlineEventHandler())
+        {
+            element.InlineEventHandlers.Remove(eventName);
+            return;
+        }
+
         try
         {
             var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;

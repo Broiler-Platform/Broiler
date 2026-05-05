@@ -90,6 +90,7 @@ public sealed class ScriptEngine : IScriptEngine
             using var context = new JSContext();
             RegisterRuntimeExtensions(context);
             var bridge = new DomBridge();
+            bridge.Csp = Csp;
             bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
             if (!string.IsNullOrEmpty(url))
@@ -175,6 +176,7 @@ public sealed class ScriptEngine : IScriptEngine
         var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
+        bridge.Csp = Csp;
         bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
         if (!string.IsNullOrEmpty(url))

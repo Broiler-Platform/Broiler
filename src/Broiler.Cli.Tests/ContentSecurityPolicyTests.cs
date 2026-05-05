@@ -85,6 +85,48 @@ public class ContentSecurityPolicyTests
     }
 
     [Fact]
+    public void ExecuteScriptsWithDom_Blocks_Inline_Event_Handler_When_ScriptSrcAttr_Disallows_It()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; script-src-attr 'self'">
+            </head>
+            <body>
+                <button id="btn" onclick="document.body.setAttribute('data-attr', 'blocked');">go</button>
+                <script>document.getElementById('btn').click();</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.DoesNotContain("data-attr=\"blocked\"", result);
+    }
+
+    [Fact]
+    public void ExecuteScriptsWithDom_Allows_Inline_Event_Handler_When_ScriptSrc_Falls_Back_To_UnsafeInline()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'">
+            </head>
+            <body>
+                <button id="btn" onclick="document.body.setAttribute('data-attr', 'ran');">go</button>
+                <script>document.getElementById('btn').click();</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("data-attr=\"ran\"", result);
+    }
+
+    [Fact]
     public void ExecuteScriptsWithDom_Blocks_Data_Script_When_Policy_Is_Self_Only()
     {
         const string html = """
