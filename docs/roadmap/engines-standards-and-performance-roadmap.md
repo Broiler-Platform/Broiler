@@ -537,7 +537,10 @@ behavioral or performance-sensitive changes:
 
 - [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
 - [x] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
-- [ ] **M2** — file and start W3/W4/W5 targeted compliance issues with spec-cited scopes
+- [x] **M2** — umbrella tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072) filed to start the targeted compliance push; split the engine-specific W3/W4/W5 follow-ups with spec-cited scopes in the filing order from [Section 13.1](#131-recommended-filing-order)
+  - [ ] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
+  - [ ] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
+  - [ ] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
 - [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
 - [ ] **M5** — file sustaining-governance issue(s) for standards feed intake and support-matrix publication
@@ -553,6 +556,13 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-05** — M2 targeted-compliance kickoff: filed the umbrella tracker as
+  [#1072](https://github.com/MaiRat/Broiler/issues/1072) to cover the
+  milestone-wide standards/performance push spanning JS ES2025 compliance,
+  targeted HTML/Acid/WPT work, bridge DOM/CSSOM/microtask alignment, and the
+  remaining hot-path graphics backend cleanup. The milestone checklist now
+  treats the umbrella issue as started while keeping the W3/W4/W5 per-engine
+  follow-ups explicitly queued in the recommended filing order.
 - **2026-05-05** — M1 boundary/spec-map kickoff: published
   `docs/architecture/htmlbridge-engine-boundaries.md` as the frozen
   `htmlbridge-public-surface/v1` contract, added
