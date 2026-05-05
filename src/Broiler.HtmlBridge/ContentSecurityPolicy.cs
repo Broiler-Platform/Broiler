@@ -139,6 +139,10 @@ public sealed class ContentSecurityPolicy
         if (!string.IsNullOrEmpty(nonce) && MatchesNonce(sources, nonce))
             return true;
 
+        var ignoreStaticAllowlistSources = StrictDynamic && ContainsNonceOrHashSource(sources);
+        if (ignoreStaticAllowlistSources)
+            return false;
+
         var resolved = ResolveUri(scriptUrl, pageUrl);
         if (resolved == null)
             return false;

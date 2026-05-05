@@ -99,6 +99,74 @@ public class ContentSecurityPolicyTests
     }
 
     [Fact]
+    public void ExecuteScriptsWithDom_Blocks_External_Script_When_StrictDynamic_Ignores_Static_Allowlist()
+    {
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "broiler-csp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDirectory);
+
+        try
+        {
+            var scriptPath = Path.Combine(tempDirectory, "ext.js");
+            File.WriteAllText(scriptPath, "document.body.setAttribute('data-external','ran');");
+
+            var pageUrl = new Uri(Path.Combine(tempDirectory, "page.html")).AbsoluteUri;
+            var html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-good' 'strict-dynamic' 'self'">
+                </head>
+                <body>
+                    <script src="ext.js"></script>
+                </body>
+                </html>
+                """;
+
+            var result = CaptureService.ExecuteScriptsWithDom(html, pageUrl);
+
+            Assert.DoesNotContain("data-external=\"ran\"", result);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ExecuteScriptsWithDom_Allows_Nonce_Matching_External_Script_When_StrictDynamic_Is_Present()
+    {
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "broiler-csp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDirectory);
+
+        try
+        {
+            var scriptPath = Path.Combine(tempDirectory, "ext.js");
+            File.WriteAllText(scriptPath, "document.body.setAttribute('data-external','nonce-ok');");
+
+            var pageUrl = new Uri(Path.Combine(tempDirectory, "page.html")).AbsoluteUri;
+            var html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta http-equiv="Content-Security-Policy" content="script-src 'nonce-good' 'strict-dynamic' 'self'">
+                </head>
+                <body>
+                    <script nonce="good" src="ext.js"></script>
+                </body>
+                </html>
+                """;
+
+            var result = CaptureService.ExecuteScriptsWithDom(html, pageUrl);
+
+            Assert.Contains("data-external=\"nonce-ok\"", result);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScriptExtractor_ExtractAll_Skips_Inline_Scripts_Blocked_By_MetaCsp()
     {
         const string html = """
