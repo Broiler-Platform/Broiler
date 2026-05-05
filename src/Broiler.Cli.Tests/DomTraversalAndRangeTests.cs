@@ -665,6 +665,98 @@ document.body.appendChild(out);
     }
 
     [Fact]
+    public void Range_CompareBoundaryPoints_Same_Text_Node_Returns_Signed_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">abcdef</div>
+<script>
+var text = document.getElementById('target').firstChild;
+var a = document.createRange();
+var b = document.createRange();
+a.setStart(text, 1);
+a.setEnd(text, 4);
+b.setStart(text, 2);
+b.setEnd(text, 5);
+var r = [];
+r.push(a.compareBoundaryPoints(a.START_TO_START, b));
+r.push(a.compareBoundaryPoints(a.START_TO_END, b));
+r.push(a.compareBoundaryPoints(a.END_TO_END, b));
+r.push(a.compareBoundaryPoints(a.END_TO_START, b));
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("-1,-1,-1,1", result);
+    }
+
+    [Fact]
+    public void Range_CompareBoundaryPoints_Cross_Containers_Uses_Document_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><span id=""a"">A</span><span id=""b"">B</span></div>
+<script>
+var root = document.getElementById('root');
+var before = document.createRange();
+var after = document.createRange();
+before.setStart(root, 0);
+before.setEnd(root, 1);
+after.setStart(root, 1);
+after.setEnd(root, 2);
+var r = [];
+r.push(before.compareBoundaryPoints(before.START_TO_START, after));
+r.push(after.compareBoundaryPoints(after.START_TO_START, before));
+r.push(before.compareBoundaryPoints(before.END_TO_START, after));
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("-1,1,0", result);
+    }
+
+    [Fact]
+    public void Range_CompareBoundaryPoints_Handles_Ancestor_And_Descendant_Boundaries()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><p id=""host""><span id=""inner"">xy</span></p><p>end</p></div>
+<script>
+var root = document.getElementById('root');
+var innerText = document.getElementById('inner').firstChild;
+var outer = document.createRange();
+var inner = document.createRange();
+outer.setStart(root, 0);
+outer.setEnd(root, 1);
+inner.setStart(innerText, 0);
+inner.setEnd(innerText, 2);
+var r = [];
+r.push(outer.compareBoundaryPoints(outer.START_TO_START, inner));
+r.push(outer.compareBoundaryPoints(outer.END_TO_END, inner));
+r.push(inner.compareBoundaryPoints(inner.START_TO_END, outer));
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("-1,1,-1", result);
+    }
+
+    [Fact]
     public void Range_ToString()
     {
         var html = @"<!DOCTYPE html>
