@@ -732,6 +732,45 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void String_IsWellFormed_Detects_Paired_And_Lone_Surrogates()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                'plain'.isWellFormed(),
+                '\uD83C\uDF89'.isWellFormed(),
+                '\uD800'.isWellFormed(),
+                '\uDC00'.isWellFormed()
+            ].join('|');
+        ");
+        Assert.Equal("true|true|false|false", result.ToString());
+    }
+
+    [Fact]
+    public void String_ToWellFormed_Replaces_Lone_Surrogates_With_Replacement_Character()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                '\uD800A\uDC00'.toWellFormed(),
+                '\uD83C\uDF89'.toWellFormed()
+            ].join('|');
+        ");
+        Assert.Equal("\uFFFDA\uFFFD|🎉", result.ToString());
+    }
+
+    [Fact]
+    public void String_ToWellFormed_Always_Produces_A_WellFormed_String()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"'\uD800'.toWellFormed().isWellFormed();");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
     public void RegExp_V_Flag_Exposes_UnicodeSets_Metadata()
     {
         EnsureBuiltInsLoaded();

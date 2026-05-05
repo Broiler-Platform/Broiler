@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine.Core;
@@ -118,6 +119,74 @@ public partial class JSString
     {
         var @this = a.This.AsString();
         return new JSString(@this.ToUpperInvariant());
+    }
+
+    [JSPrototypeMethod]
+    [JSExport("isWellFormed")]
+    internal static JSValue IsWellFormed(in Arguments a)
+    {
+        var @this = a.This.AsString();
+        return IsWellFormedUtf16(@this) ? JSBoolean.True : JSBoolean.False;
+    }
+
+    [JSPrototypeMethod]
+    [JSExport("toWellFormed")]
+    internal static JSValue ToWellFormed(in Arguments a)
+    {
+        var @this = a.This.AsString();
+        return new JSString(ToWellFormedUtf16(@this));
+    }
+
+    private static bool IsWellFormedUtf16(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var ch = value[i];
+            if (char.IsHighSurrogate(ch))
+            {
+                if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1]))
+                    return false;
+
+                i++;
+            }
+            else if (char.IsLowSurrogate(ch))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string ToWellFormedUtf16(string value)
+    {
+        var result = new StringBuilder(value.Length);
+        for (var i = 0; i < value.Length; i++)
+        {
+            var ch = value[i];
+            if (char.IsHighSurrogate(ch))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                {
+                    result.Append(ch);
+                    result.Append(value[++i]);
+                }
+                else
+                {
+                    result.Append('\uFFFD');
+                }
+            }
+            else if (char.IsLowSurrogate(ch))
+            {
+                result.Append('\uFFFD');
+            }
+            else
+            {
+                result.Append(ch);
+            }
+        }
+
+        return result.ToString();
     }
 
     private static readonly char[] trimCharacters = [
