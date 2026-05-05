@@ -771,6 +771,41 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void Finally_Return_Overrides_Try_And_Catch_Completions()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                (function() { try { return 'try'; } finally { return 'finally'; } })(),
+                (function() { try { throw new Error('boom'); } catch (e) { return 'catch'; } finally { return 'finally'; } })()
+            ].join('|');
+        ");
+        Assert.Equal("finally|finally", result.ToString());
+    }
+
+    [Fact]
+    public void Finally_Return_Skips_Remaining_Finally_Statements()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            (function() {
+                var order = [];
+                try {
+                    order.push('try');
+                    return 'try';
+                } finally {
+                    order.push('finally-before');
+                    return order.join(',');
+                    order.push('finally-after');
+                }
+            })();
+        ");
+        Assert.Equal("try,finally-before", result.ToString());
+    }
+
+    [Fact]
     public void RegExp_V_Flag_Exposes_UnicodeSets_Metadata()
     {
         EnsureBuiltInsLoaded();

@@ -638,7 +638,7 @@ column as work progresses.
 | L2 | Intl.DateTimeFormat | ❌ Not started | — | — |
 | L3 | Generator resumption | ⏳ In progress | — | — |
 | L4 | Number precision | ✅ Done | @copilot | Phase 5 PR |
-| L5 | Finally return | ❌ Not started | — | — |
+| L5 | Finally return | ✅ Done | @copilot | Phase 5 PR |
 | L6 | Destructuring elision | ✅ Done | @copilot | Phase 1 PR |
 | L7 | Date day default | ✅ Done | @copilot | Phase 1 PR |
 | L8 | Promise SyncContext | ✅ Done | @copilot | Phase 5 PR |

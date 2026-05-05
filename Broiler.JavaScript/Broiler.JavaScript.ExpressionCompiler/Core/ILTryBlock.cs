@@ -14,6 +14,9 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
     private readonly ILWriterLabel label = iLWriter.DefineLabel("tryEnd");
 
     private Sequence<(ILWriterLabel hop, ILWriterLabel final, int localIndex)> pendingJumps = [];
+    private Sequence<(int state, ILWriterLabel target, int localIndex)> pendingFinallyJumps = [];
+    private ILWriter.TempVariable? finallyJumpState;
+    private ILWriterLabel? finallyJumpLabel;
 
     internal int SavedLocal;
 
@@ -40,6 +43,9 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
         il.Emit(OpCodes.Leave, label);
 
         il.BeginFinallyBlock();
+        finallyJumpState = il.NewTemp(typeof(int));
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.EmitSaveLocal(finallyJumpState.LocalIndex);
     }
 
     public override void Dispose()
@@ -50,10 +56,29 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
         if (!(isCatch || isFinally))
             throw new InvalidOperationException($"Cannot finish try block without catch/finally");
 
+        if (finallyJumpLabel != null)
+            il.MarkLabel(finallyJumpLabel);
+
         base.Dispose();
 
         // jump all pending
         il.EndExceptionBlock();
+
+        if (finallyJumpState != null)
+        {
+            foreach (var (state, target, index) in pendingFinallyJumps)
+            {
+                var next = il.DefineLabel($"finally jump next {state}");
+                il.EmitLoadLocal(finallyJumpState.LocalIndex);
+                il.Emit(OpCodes.Ldc_I4, state);
+                il.Emit(OpCodes.Bne_Un, next);
+                il.Branch(target, index);
+                il.MarkLabel(next);
+            }
+
+            finallyJumpState.Dispose();
+            finallyJumpState = null;
+        }
 
         foreach (var (hop, jump, index) in pendingJumps)
         {
@@ -72,6 +97,17 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
         if (label.TryBlock == this)
         {
             il.Goto(label, index);
+            return;
+        }
+
+        if (isFinally)
+        {
+            finallyJumpLabel ??= il.DefineLabel($"finally hop for {label.ID}");
+            var state = pendingFinallyJumps.Count + 1;
+            pendingFinallyJumps.Add((state, label, index));
+            il.Emit(OpCodes.Ldc_I4, state);
+            il.EmitSaveLocal(finallyJumpState!.LocalIndex);
+            il.Emit(OpCodes.Br, finallyJumpLabel);
             return;
         }
 
