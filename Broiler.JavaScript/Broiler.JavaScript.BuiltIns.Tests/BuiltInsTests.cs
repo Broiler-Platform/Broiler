@@ -447,7 +447,7 @@ public class BuiltInsTests
         Assert.Equal(3.14, result.DoubleValue, 2);
     }
 
-    // ── M3: ArrayBuffer transfer tests ───────────────────────────────
+    // ── M2: ArrayBuffer transfer tests ───────────────────────────────
 
     [Fact]
     public void ArrayBuffer_Transfer_Copies_Bytes_And_Detaches_Source()
@@ -492,7 +492,7 @@ public class BuiltInsTests
         "));
     }
 
-    // ── M3: JSMap tests ──────────────────────────────────────────────
+    // ── M2: JSMap tests ──────────────────────────────────────────────
 
     [Fact]
     public void Map_SetAndGet()
