@@ -744,11 +744,24 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void RegExp_V_Flag_Works_For_Literals()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = /[a&&b]/v;
+            [re.flags, re.unicodeSets, re.test('a')].join('|');
+        ");
+        Assert.Equal("v|true|true", result.ToString());
+    }
+
+    [Fact]
     public void RegExp_V_Flag_Cannot_Be_Combined_With_U()
     {
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'uv');"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/vu;"));
     }
 
     [Fact]
@@ -757,6 +770,7 @@ public class BuiltInsTests
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'vv');"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/vv;"));
     }
 
     [Fact]

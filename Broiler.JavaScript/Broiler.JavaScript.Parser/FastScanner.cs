@@ -916,6 +916,7 @@ public class FastScanner
             var m = false;
             var s = false;
             var u = false;
+            var v = false;
             var y = false;
 
             try
@@ -961,8 +962,15 @@ public class FastScanner
                             continue;
 
                         case 'u':
-                            if (u) throw Unexpected();
+                            if (u || v) throw Unexpected();
                             u = true;
+                            t.Append(ch);
+                            Consume();
+                            continue;
+
+                        case 'v':
+                            if (v || u) throw Unexpected();
+                            v = true;
                             t.Append(ch);
                             Consume();
                             continue;

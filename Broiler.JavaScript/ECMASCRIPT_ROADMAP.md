@@ -40,7 +40,7 @@ The table below summarizes the per-edition status.
 | ES2020 | 2020 | ✅ Full | Nullish coalescing `??`, optional chaining `?.`, BigInt, dynamic `import()`, `Promise.allSettled`, `globalThis`, logical assignment |
 | ES2021 | 2021 | ⚠️ Mostly | `String.replaceAll`, `Promise.any`, numeric separators, `WeakRef`. **Gap:** `FinalizationRegistry` is partial |
 | ES2022 | 2022 | ⚠️ Mostly | Private fields/methods, static blocks, `.at()`, `Error.cause`, `Object.hasOwn`. **Gap:** top-level await in non-module contexts |
-| ES2023 | 2023 | ⚠️ Mostly | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`). **Gap:** RegExp `v` flag literal parsing remains partial |
+| ES2023 | 2023 | ✅ Full | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`), RegExp `v` flag |
 | ES2024 | 2024 | ⚠️ Partial | `Promise.withResolvers`, `ArrayBuffer.transfer`. **Gaps:** `Atomics.waitAsync`, `String.isWellFormed`/`toWellFormed` full spec compliance |
 | ES2025 | 2025 | ⚠️ Mostly | The ratified ES2025 features tracked in §2 are implemented; remaining compliance work is in the known limitations listed in §3 |
 
