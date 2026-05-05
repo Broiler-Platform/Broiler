@@ -817,6 +817,50 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
     }
 
     [Fact]
+    public void PreventDefault_Before_Dispatch_Preserves_Canceled_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+evt.preventDefault();
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("false,true,false", result);
+    }
+
+    [Fact]
+    public void ReturnValue_False_Before_Dispatch_Preserves_Canceled_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+evt.returnValue = false;
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("false,true,false", result);
+    }
+
+    [Fact]
     public void Legacy_Event_Aliases_Track_Dispatch_State()
     {
         var html = @"<!DOCTYPE html>

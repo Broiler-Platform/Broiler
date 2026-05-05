@@ -111,7 +111,8 @@ public sealed partial class DomBridge
 
         var stopped = false;
         var immediateStopped = false;
-        var prevented = false;
+        var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
+                        defaultPreventedValue.BooleanValue;
         var currentListenerPassive = false;
         var legacyCancelBubble = false;
 
@@ -121,7 +122,6 @@ public sealed partial class DomBridge
             : ToJSObject(target);
         evt[(KeyString)"srcElement"] = evt[(KeyString)"target"];
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
-        evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
             new JSFunction((in Arguments _) =>
             {
