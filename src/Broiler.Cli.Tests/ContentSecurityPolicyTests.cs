@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Broiler.HtmlBridge;
 
 namespace Broiler.Cli.Tests;
@@ -124,6 +126,52 @@ public class ContentSecurityPolicyTests
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("data-attr=\"ran\"", result);
+    }
+
+    [Fact]
+    public void ExecuteScriptsWithDom_Allows_Inline_Event_Handler_With_Matching_Hash_When_UnsafeHashes_Is_Present()
+    {
+        const string handler = "document.body.setAttribute('data-attr', 'hashed');";
+        var hash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(handler)));
+        var html = $$"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; script-src-attr 'unsafe-hashes' 'sha256-{{hash}}'">
+            </head>
+            <body>
+                <button id="btn" onclick="{{handler}}">go</button>
+                <script>document.getElementById('btn').click();</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("data-attr=\"hashed\"", result);
+    }
+
+    [Fact]
+    public void ExecuteScriptsWithDom_Blocks_Hashed_Inline_Event_Handler_Without_UnsafeHashes()
+    {
+        const string handler = "document.body.setAttribute('data-attr', 'hashed');";
+        var hash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(handler)));
+        var html = $$"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; script-src-attr 'sha256-{{hash}}'">
+            </head>
+            <body>
+                <button id="btn" onclick="{{handler}}">go</button>
+                <script>document.getElementById('btn').click();</script>
+            </body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.DoesNotContain("data-attr=\"hashed\"", result);
     }
 
     [Fact]

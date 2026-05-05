@@ -16,9 +16,9 @@ namespace Broiler.HtmlBridge;
 /// <c>'unsafe-eval'</c>, <c>'strict-dynamic'</c>, nonce sources, hash
 /// sources, wildcard <c>*</c>, scheme sources such as <c>https:</c>, and
 /// absolute origin/path sources.
-/// Host wildcards, <c>'unsafe-hashes'</c>, <c>strict-dynamic</c>'s trust
-/// propagation model, and non-script directives are intentionally not yet
-/// implemented and therefore remain explicit gaps.
+/// Host wildcards, <c>strict-dynamic</c>'s trust propagation model, and
+/// non-script directives are intentionally not yet implemented and therefore
+/// remain explicit gaps.
 /// </summary>
 public sealed class ContentSecurityPolicy
 {
@@ -138,7 +138,7 @@ public sealed class ContentSecurityPolicy
     /// Returns whether an inline event handler attribute is allowed under the
     /// effective script attribute directive.
     /// </summary>
-    public bool AllowsInlineEventHandler()
+    public bool AllowsInlineEventHandler(string? handlerText = null)
     {
         var sources = GetEffectiveScriptAttributeSources();
         if (sources.Count == 0)
@@ -147,7 +147,15 @@ public sealed class ContentSecurityPolicy
         if (IsNoneOnly(sources))
             return false;
 
-        return sources.Contains("'unsafe-inline'");
+        if (sources.Contains("'unsafe-inline'"))
+            return true;
+
+        if (!string.IsNullOrEmpty(handlerText) &&
+            sources.Contains("'unsafe-hashes'") &&
+            MatchesHash(sources, handlerText))
+            return true;
+
+        return false;
     }
 
     /// <summary>

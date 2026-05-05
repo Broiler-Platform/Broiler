@@ -315,7 +315,7 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
         var eventName = attrName[2..].ToLowerInvariant();
-        if (Csp != null && !Csp.AllowsInlineEventHandler())
+        if (Csp != null && !Csp.AllowsInlineEventHandler(code))
         {
             element.InlineEventHandlers.Remove(eventName);
             return;
