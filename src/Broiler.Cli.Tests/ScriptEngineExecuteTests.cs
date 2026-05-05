@@ -561,6 +561,35 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts()
+    {
+        var engine = new ScriptEngine();
+        var deferredScripts = new List<string>
+        {
+            """
+            window.order = ['defer-1'];
+            queueMicrotask(function() {
+                window.order.push('micro');
+            });
+            """,
+            """
+            document.getElementById('out').setAttribute('data-order-before-defer-2', window.order.join(','));
+            window.order.push('defer-2');
+            """
+        };
+
+        var html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        var output = engine.Execute(Array.Empty<string>(), deferredScripts, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("data-order-before-defer-2=\"defer-1,micro\"", output);
+    }
+
+    [Fact]
     public void ScriptExtractor_FetchExternalScript_FileUrl()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "broiler-test-" + Guid.NewGuid().ToString("N"));
