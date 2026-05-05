@@ -142,7 +142,8 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) =>
             {
-                if (!currentListenerPassive)
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
                 {
                     prevented = true;
                     evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
@@ -168,7 +169,12 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
             new JSFunction((in Arguments setArgs) =>
             {
-                if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive)
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (setArgs.Length > 0 &&
+                    !setArgs[0].BooleanValue &&
+                    !currentListenerPassive &&
+                    cancelable != null &&
+                    cancelable.BooleanValue)
                 {
                     prevented = true;
                     evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
