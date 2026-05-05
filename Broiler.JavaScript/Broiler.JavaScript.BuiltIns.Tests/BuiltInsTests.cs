@@ -447,6 +447,51 @@ public class BuiltInsTests
         Assert.Equal(3.14, result.DoubleValue, 2);
     }
 
+    // ── M3: ArrayBuffer transfer tests ───────────────────────────────
+
+    [Fact]
+    public void ArrayBuffer_Transfer_Copies_Bytes_And_Detaches_Source()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            var sourceView = new Uint8Array(source);
+            sourceView[0] = 7;
+            sourceView[1] = 11;
+            var moved = source.transfer(6);
+            var movedView = new Uint8Array(moved);
+            [source.detached, moved.detached, moved.byteLength, movedView[0], movedView[1], movedView[4]].join('|');
+        ");
+        Assert.Equal("true|false|6|7|11|0", result.ToString());
+    }
+
+    [Fact]
+    public void ArrayBuffer_TransferToFixedLength_Returns_Transferred_Buffer()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            new Uint8Array(source)[0] = 99;
+            var moved = source.transferToFixedLength(2);
+            [source.detached, moved.detached, moved.byteLength, new Uint8Array(moved)[0]].join('|');
+        ");
+        Assert.Equal("true|false|2|99", result.ToString());
+    }
+
+    [Fact]
+    public void ArrayBuffer_Transferred_Source_Throws_On_ByteLength_Access()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            source.transfer(2);
+            source.byteLength;
+        "));
+    }
+
     // ── M3: JSMap tests ──────────────────────────────────────────────
 
     [Fact]
