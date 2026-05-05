@@ -104,7 +104,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) => new JSString(element.InnerHtml), "get innerHTML"),
             new JSFunction((in Arguments a) =>
             {
-                element.InnerHtml = a.Length > 0 ? a[0].ToString() : string.Empty;
+                bridge.SetElementInnerHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -6366,6 +6366,110 @@ public sealed partial class DomBridge
         foreach (var child in element.Children)
             AddElementsRecursive(child);
     }
+
+    private void RemoveElementsRecursive(DomElement element)
+    {
+        _elements.Remove(element);
+        _jsObjectCache.Remove(element);
+        _styleSheetCache.Remove(element);
+
+        foreach (var child in element.Children)
+            RemoveElementsRecursive(child);
+    }
+
+    private void SetElementInnerHtml(DomElement element, string html)
+    {
+        html ??= string.Empty;
+        element.InnerHtml = html;
+        element.TextContent = null;
+
+        if (element.IsTextNode)
+        {
+            element.TextContent = html;
+            return;
+        }
+
+        foreach (var child in element.Children.ToArray())
+            RemoveElementsRecursive(child);
+
+        element.Children.Clear();
+
+        if (!string.IsNullOrEmpty(html) &&
+            TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
+        {
+            foreach (var child in fragmentContainer.Children.ToArray())
+            {
+                child.Parent = element;
+                AdoptSubtreeIntoDocument(child, element.OwnerDocRoot);
+                element.Children.Add(child);
+                AddElementsRecursive(child);
+            }
+        }
+
+        ExtractStyleBlocks(SerializeToHtml());
+        InvalidateStyleScope(element);
+    }
+
+    private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
+    {
+        container = null!;
+
+        var contextTag = contextElement.TagName.ToLowerInvariant();
+        if (IsVoidHtmlElementTag(contextTag))
+            return false;
+
+        var builder = new HtmlTreeBuilder();
+        var (parsedRoot, _, _) = builder.Build(BuildInnerHtmlParsingDocument(contextTag, html));
+        var head = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase));
+        var body = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase));
+
+        container = contextTag switch
+        {
+            "html" => parsedRoot,
+            "head" => head ?? parsedRoot,
+            "body" => body ?? parsedRoot,
+            "table" or "thead" or "tbody" or "tfoot" or "tr" or "td" or "th" or "colgroup" or "caption" or "select" or "template" =>
+                FindFirstElementByTag(body ?? parsedRoot, contextTag),
+            _ => body?.Children.FirstOrDefault() ?? FindFirstElementByTag(parsedRoot, contextTag)
+        } ?? parsedRoot;
+
+        return true;
+    }
+
+    private static string BuildInnerHtmlParsingDocument(string contextTag, string html) => contextTag switch
+    {
+        "html" => $"<html>{html}</html>",
+        "head" => $"<html><head>{html}</head><body></body></html>",
+        "body" => $"<html><head></head><body>{html}</body></html>",
+        "table" => $"<html><head></head><body><table>{html}</table></body></html>",
+        "thead" or "tbody" or "tfoot" => $"<html><head></head><body><table><{contextTag}>{html}</{contextTag}></table></body></html>",
+        "tr" => $"<html><head></head><body><table><tbody><tr>{html}</tr></tbody></table></body></html>",
+        "td" or "th" => $"<html><head></head><body><table><tbody><tr><{contextTag}>{html}</{contextTag}></tr></tbody></table></body></html>",
+        "colgroup" => $"<html><head></head><body><table><colgroup>{html}</colgroup></table></body></html>",
+        "caption" => $"<html><head></head><body><table><caption>{html}</caption></table></body></html>",
+        "select" => $"<html><head></head><body><select>{html}</select></body></html>",
+        "template" => $"<html><head></head><body><template>{html}</template></body></html>",
+        _ => $"<html><head></head><body><{contextTag}>{html}</{contextTag}></body></html>"
+    };
+
+    private static DomElement? FindFirstElementByTag(DomElement root, string tag)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+                return child;
+
+            var match = FindFirstElementByTag(child, tag);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static bool IsVoidHtmlElementTag(string tag) => tag is
+        "area" or "base" or "br" or "col" or "embed" or "hr" or "img" or
+        "input" or "link" or "meta" or "param" or "source" or "track" or "wbr";
 
     /// <summary>
     /// Builds a sub-document tree from XML/SVG/XHTML content using an XML parser.
