@@ -5940,7 +5940,9 @@ public sealed partial class DomBridge
             return;
 
         var extraction = new ScriptExtractor().ExtractAll(html, GetSubDocumentBaseUrl(containerElement));
-        if (extraction.Scripts.Count == 0 && extraction.DeferredScripts.Count == 0)
+        if (extraction.Scripts.Count == 0 &&
+            extraction.AsyncScripts.Count == 0 &&
+            extraction.DeferredScripts.Count == 0)
             return;
 
         var subDocument = GetOrCreateSubDocument(containerElement);
@@ -5971,6 +5973,19 @@ public sealed partial class DomBridge
             _jsContext["top"] = _windowJSObject ?? subWindow;
 
             foreach (var script in extraction.Scripts)
+            {
+                try
+                {
+                    _jsContext.Eval(script);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                        $"Sub-document script error: {ex.Message}", ex);
+                }
+            }
+
+            foreach (var script in extraction.AsyncScripts)
             {
                 try
                 {

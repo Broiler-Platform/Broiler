@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Broiler.HtmlBridge;
 
@@ -25,7 +26,10 @@ public sealed class RenderingPipeline(
     {
         var (normalisedUrl, html) = await pageLoader.FetchAsync(url);
         var result = scriptExtractor.ExtractAll(html, normalisedUrl);
-        return (normalisedUrl, new PageContent(html, result.Scripts, normalisedUrl, result.DeferredScripts));
+        var executableScripts = result.AsyncScripts.Count == 0
+            ? result.Scripts
+            : result.Scripts.Concat(result.AsyncScripts).ToArray();
+        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, result.DeferredScripts));
     }
 
     /// <summary>

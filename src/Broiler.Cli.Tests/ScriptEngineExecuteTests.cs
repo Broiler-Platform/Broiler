@@ -506,6 +506,30 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void ScriptEngine_Execute_Runs_Async_Scripts_From_ExtractAll_Before_Deferred_Scripts()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div>
+<script>window.__order = ['regular'];</script>
+<script async>window.__order.push('async');</script>
+<script defer>
+var p = document.createElement('p');
+p.textContent = window.__order.join(',');
+document.getElementById('out').appendChild(p);
+</script>
+</body></html>
+""";
+
+        var extraction = new ScriptExtractor().ExtractAll(html, "file:///test.html");
+        var executableScripts = extraction.Scripts.Concat(extraction.AsyncScripts).ToArray();
+        var output = new ScriptEngine().Execute(executableScripts, extraction.DeferredScripts, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("regular,async", output);
+    }
+
+    [Fact]
     public void ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts()
     {
         var engine = new ScriptEngine();
@@ -970,6 +994,26 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("style=\"position: relative; top: -1151.2px", result);
     }
 
+    [Fact]
+    public void DomBridge_Iframe_Srcdoc_Executes_Async_Scripts_Before_Deferred_Scripts()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body><script>window.__innerOrder = ['regular'];</script><script async>window.__innerOrder.push('async');</script><script defer>document.body.setAttribute('data-order', window.__innerOrder.join(','));</script></body></html>"></iframe>
+<div id="result"></div>
+<script>
+var doc = document.getElementById('frame').contentDocument;
+document.getElementById('result').textContent = doc.body.getAttribute('data-order') || 'missing';
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">regular,async<", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
@@ -1126,4 +1170,5 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("animated", stepHtml);
         session.Dispose();
     }
+
 }
