@@ -1,63 +1,85 @@
-# HtmlBridge engine boundaries and current abstraction leaks
+# HtmlBridge engine boundaries (M1 frozen surface)
 
 `Broiler.HtmlBridge` is the seam between the JavaScript engine, the bridge-owned
-DOM model, and the HTML renderer. M0 records the boundary **as it exists today**
-so later milestones can tighten it without losing sight of the current coupling.
+DOM model, and the HTML renderer. M1 freezes the currently supported public
+boundary so follow-on compliance work can tighten behavior without accidentally
+expanding the cross-engine contract.
 
-## Current boundary map
+## Boundary version
 
-### JavaScript → Bridge
+- **Boundary version:** `htmlbridge-public-surface/v1`
+- **Status:** frozen for M1 follow-on work
+- **Change policy:** additive or behavioral changes inside this boundary require
+  spec citations, targeted tests, and an explicit roadmap note; any breaking
+  surface change requires a boundary-version bump.
 
-- `IScriptEngine` is the intended bridge-facing abstraction for script
-  execution, including DOM-aware execution, deferred scripts, CSP, microtasks,
-  and interactive stepping.
-- `DomBridge.Attach(JSContext, html[, url])` registers `document` and
-  `window.location` on a concrete `JSContext`.
-- `DomBridge.RegisterNamedElementGlobals`, timer flushing, and viewport helpers
-  expose the bridge-owned DOM state back into JavaScript execution.
+## Frozen public seam
 
-### Bridge → HTML
+### `IScriptEngine` contract (`htmlbridge-public-surface/v1`)
 
-- `DomBridge` parses HTML into `DomElement` instances and serializes the updated
-  DOM back into HTML strings after script execution.
-- `HtmlContainer` / `HtmlRender` then consume that post-bridge HTML for layout,
-  paint, and raster output.
-- `CaptureService.ExecuteScriptsWithDom` is the main end-to-end composition
-  point used by CLI capture and Acid3 execution.
+`IScriptEngine` is the preferred consumer-facing bridge contract. Its public
+surface is intentionally free of concrete `Broiler.JavaScript.*` and
+`DomElement` types.
 
-### PR dashboard surfaces
+| Surface | Purpose | Primary spec anchor | Notes |
+|---|---|---|---|
+| `Execute(...)` overloads | Execute inline and deferred scripts against a document and return serialized HTML | HTML Living Standard — scripting, script processing model, window load/event-loop integration | `string` HTML hand-off remains a compatibility choice, not a final typed boundary |
+| `ExecuteDetailed(...)` | Broiler diagnostic wrapper around script execution | No direct WHATWG/W3C API | Non-standard diagnostic surface |
+| `ExecuteInteractive(...)` | Interactive timer-batch stepping for capture/dev workflows | HTML timers + animation frame processing | Broiler-specific debugging surface layered on top of browser concepts |
+| `StrictModeEnabled` | Prepend `"use strict"` to executed sources | ECMA-262 strict mode | Broiler execution option, not a web-platform API |
+| `Csp` | Apply bridge CSP decisions | CSP Level 3 (`script-src`, `script-src-elem`, `default-src`) | Bridge-owned policy object |
+| `Profiler` | Collect per-script timings | No direct WHATWG/W3C API | Broiler-specific diagnostics used by perf gating |
+| `MicroTasks` | Drain queued microtasks/promises | HTML event loop / microtask checkpoint | Bridge-owned helper rather than a browser API |
 
-- JavaScript conformance baseline: `src/Broiler.Engines.Baseline` `test262`
-  command.
-- WPT-relevant suites: the existing `Broiler.Cli.Tests` WPT-derived test
-  classes (`WptCssVariablesTests`, `WptCompositingTests`,
-  `WptFontAndSelectorTests`).
-- Acid3 regression: `src/Broiler.Cli.Tests/Acid3RegressionTests.cs`.
+### `DomBridge` stable orchestration surface (`htmlbridge-public-surface/v1`)
 
-## Current abstraction leaks
+These members are frozen for existing in-repo orchestration and capture flows
+without exposing concrete JavaScript-engine types.
 
-1. **Concrete JavaScript engine types cross the public bridge seam.**
-   `DomBridge` is public, but its main attachment path requires concrete
-   `JSContext`, `JSObject`, `JSFunction`, and `JSValue` types rather than a
-   bridge-owned abstraction.
-2. **Bridge internals leak HTML-engine internal types.**
-   `DomBridge.Elements` exposes `DomElement`, and multiple bridge partials work
-   directly against `Broiler.HTML.Core.Core.Entities` types instead of a stable
-   bridge DTO surface.
-3. **CLI capture still orchestrates bridge-specific async details itself.**
-   `CaptureService.ExecuteScriptsWithDom` knows about `MicroTaskQueue`,
-   `DomBridge.AsyncDrainIterationLimit`, script extraction order, and DOM
-   serialization rather than delegating the whole script+DOM lifecycle to a
-   single bridge abstraction.
-4. **The JS ↔ Bridge ↔ HTML hand-off is still string-based.**
-   Script execution returns serialized HTML instead of a typed DOM/render tree
-   contract, so later pipeline stages re-parse data that the bridge already had
-   in memory.
+| Surface | Purpose | Primary spec anchor | Notes |
+|---|---|---|---|
+| `AsyncDrainIterationLimit` | Safety cap for timer/microtask draining | HTML event loop processing model | Broiler guard rail |
+| `TaskCheckpointCallback` | Hook used to run a microtask checkpoint after queued tasks | HTML "perform a microtask checkpoint" | Bridge-owned integration seam |
+| `Title` | Current document title mirror | HTML document title | Read-only outside bridge mutation paths |
+| `SetViewportSize(...)` | Seed viewport-dependent layout / geometry | CSSOM View | Bridge utility surface |
+| `SetLocalBasePath(...)` | Resolve local subresources for tooling | No direct WHATWG/W3C API | Broiler tooling helper |
+| `FlushTimers()` / `FlushTimerStep()` / `HasPendingTimers` | Drive queued timers / RAF batches | HTML timers / animation frame callbacks | Used by CLI/WPT harnesses |
+| `FireWindowLoadEvent()` | Dispatch post-parse load lifecycle | HTML load event processing | End-of-execution bridge hook |
+| `SerializeToHtml()` | Return post-execution DOM as HTML | DOM Parsing/Serialization concepts | Compatibility hand-off to the renderer |
+| `ResolveAnchorPositions(...)` | Apply anchor-position snapshots before serialization/rendering | CSS Anchor Positioning draft | Convenience pipeline hook |
+| `ResolveAnimationSnapshots()` | Resolve animation-driven state before serialization/rendering | Web Animations / CSS Animations concepts | Convenience pipeline hook |
+| `CalculateSpecificity(...)` | Shared selector-specificity helper | Selectors Level 4 | Static helper used by bridge/render paths |
+| `CssRules` | Expose parsed stylesheet rule cache to in-repo consumers | CSSOM | Bridge-owned representation, not browser-native CSSRule objects |
 
-## Why this is the M0 baseline
+## Frozen compatibility-only leak surface
 
-This document intentionally records the current seams without changing them.
-M1 can now measure progress against a fixed boundary map: fewer concrete
-JavaScript types at the bridge API, fewer renderer internals exposed from the
-bridge, and a typed hand-off that avoids HTML re-serialization as the default
-integration path.
+The following public `DomBridge` members still expose engine-internal types.
+They are **not** part of `htmlbridge-public-surface/v1`; they are compatibility
+members that are now frozen so M2+ work cannot silently add new leaks.
+
+| Member | Leak type | Why it remains | Follow-up |
+|---|---|---|---|
+| `Attach(JSContext, string)` | concrete `JSContext` | Current registration path still binds directly to YantraJS globals | Replace with a bridge-owned context abstraction in a later boundary-version bump |
+| `Attach(JSContext, string, string)` | concrete `JSContext` | Same as above, plus URL seeding | Same follow-up as above |
+| `RegisterNamedElementGlobals(JSContext)` | concrete `JSContext` | Legacy HTML named-access wiring still edits the engine global object directly | Fold into the future abstracted attach/runtime surface |
+| `DocumentElement` | `DomElement` | Existing test/WPT helpers still walk the bridge-owned DOM tree directly | Replace with a typed bridge DTO or internal-only test seam |
+| `Elements` | `IReadOnlyList<DomElement>` | Existing capture/execution helpers still enumerate parsed `<script>` elements directly | Replace with bridge-owned script/document snapshots |
+
+## PR dashboard surfaces tied to this boundary
+
+- JavaScript conformance baseline:
+  `src/Broiler.Engines.Baseline` `test262`
+- WPT-relevant suites:
+  `Broiler.Cli.Tests.WptCssVariablesTests`,
+  `Broiler.Cli.Tests.WptFontAndSelectorTests`
+- Acid3 regression:
+  `src/Broiler.Cli.Tests/Acid3RegressionTests.cs`
+- Benchmark regression gate:
+  `Broiler.Engines.Baseline benchmarks --baseline ... --budget-percent 2`
+  (blocking today on `js.startup`, `html.raster`, and `bridge.mutation`)
+
+## Related documents
+
+- [HtmlBridge API/spec map](./htmlbridge-spec-map.md)
+- [Engines M0 baseline](../roadmap/engines-m0-baseline.md)
+- [Cross-engine roadmap](../roadmap/engines-standards-and-performance-roadmap.md)

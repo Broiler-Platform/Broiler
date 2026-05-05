@@ -1,6 +1,6 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: **M0 complete** — baseline/instrumentation published; M1 follow-on work next
+> **Status**: **M0 complete** — M1 boundary/spec mapping and per-PR perf gating are now live
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
@@ -545,6 +545,15 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-05** — M1 boundary/spec-map kickoff: published
+  `docs/architecture/htmlbridge-engine-boundaries.md` as the frozen
+  `htmlbridge-public-surface/v1` contract, added
+  `docs/architecture/htmlbridge-spec-map.md` to map the public
+  `Broiler.HtmlBridge` API to WHATWG/W3C anchors with explicit partial and
+  non-standard flags, and wired the benchmark harness plus PR workflow to fail
+  on mean slowdowns above the M1 ≤ 2% budget versus the committed M0 JSON
+  baseline for the current representative per-engine gate metrics
+  (`js.startup`, `html.raster`, `bridge.mutation`).
 - **2026-04-30** — Execution kickoff: converted this document from a pure draft
   into an execution tracker by adding a ready-to-file sub-issue backlog, a
   milestone filing order, and a milestone checklist aligned to `#1064`.

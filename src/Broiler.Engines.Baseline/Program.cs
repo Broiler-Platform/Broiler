@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -17,6 +18,14 @@ internal static partial class Program
     private const string DefaultTest262Manifest = "tests/m0-baseline/conformance/test262-subset-manifest.json";
     private const string DefaultTest262OutputDir = "tests/m0-baseline/conformance/test262-subset";
     private const string DefaultBenchmarkOutputDir = "tests/m0-baseline/performance";
+    private const string DefaultBenchmarkBaseline = "tests/m0-baseline/performance/engine-benchmark-baseline.json";
+    internal const double DefaultBenchmarkSlowdownBudgetPercent = 2.0;
+    private static readonly HashSet<string> GatedBenchmarkMetrics = new(StringComparer.Ordinal)
+    {
+        "js.startup",
+        "html.raster",
+        "bridge.mutation",
+    };
 
     private const string Test262AssertShim = @"
 var assert = {
@@ -93,7 +102,7 @@ var assert = {
     {
         Console.WriteLine("Usage:");
         Console.WriteLine("  dotnet run --project src/Broiler.Engines.Baseline -- test262 [--manifest <path>] [--output-dir <dir>]");
-        Console.WriteLine("  dotnet run --project src/Broiler.Engines.Baseline -- benchmarks [--output-dir <dir>]");
+        Console.WriteLine("  dotnet run --project src/Broiler.Engines.Baseline -- benchmarks [--output-dir <dir>] [--baseline <path>] [--budget-percent <percent>]");
     }
 
     private static Dictionary<string, string> ParseOptions(IEnumerable<string> args)
@@ -210,6 +219,12 @@ var assert = {
         var outputDir = GetAbsolutePath(repoRoot, options.TryGetValue("output-dir", out var outputOverride)
             ? outputOverride
             : DefaultBenchmarkOutputDir);
+        var baselinePath = GetAbsolutePath(repoRoot, options.TryGetValue("baseline", out var baselineOverride)
+            ? baselineOverride
+            : DefaultBenchmarkBaseline);
+        var slowdownBudgetPercent = options.TryGetValue("budget-percent", out var budgetOverride)
+            ? double.Parse(budgetOverride, CultureInfo.InvariantCulture)
+            : DefaultBenchmarkSlowdownBudgetPercent;
         Directory.CreateDirectory(outputDir);
 
         var results = new List<BenchmarkMetric>
@@ -270,14 +285,28 @@ var assert = {
             GeneratedAtUtc = DateTime.UtcNow,
             Results = results,
         };
+        var baselineReport = LoadBenchmarkReport(baselinePath);
+        var comparison = baselineReport is null
+            ? null
+            : CompareBenchmarkAgainstBaseline(report, baselineReport, slowdownBudgetPercent);
 
         var jsonPath = Path.Combine(outputDir, "engine-benchmark-baseline.json");
         var markdownPath = Path.Combine(outputDir, "engine-benchmark-baseline.md");
         File.WriteAllText(jsonPath, JsonSerializer.Serialize(report, JsonOptions));
-        File.WriteAllText(markdownPath, BuildBenchmarkMarkdown(report));
+        File.WriteAllText(markdownPath, BuildBenchmarkMarkdown(report, comparison));
 
         Console.WriteLine($"Wrote {jsonPath}");
         Console.WriteLine($"Wrote {markdownPath}");
+
+        if (comparison is { HasRegression: true })
+        {
+            foreach (var regression in comparison.Regressions)
+            {
+                Console.Error.WriteLine($"[REGRESSION] {regression}");
+            }
+
+            return 1;
+        }
 
         return 0;
     }
@@ -424,18 +453,96 @@ var assert = {
         return builder.ToString();
     }
 
-    private static string BuildBenchmarkMarkdown(BenchmarkReport report)
+    private static BenchmarkReport? LoadBenchmarkReport(string? baselinePath)
+    {
+        if (string.IsNullOrWhiteSpace(baselinePath) || !File.Exists(baselinePath))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<BenchmarkReport>(
+            File.ReadAllText(baselinePath),
+            JsonOptions);
+    }
+
+    internal static BenchmarkBaselineComparison CompareBenchmarkAgainstBaseline(
+        BenchmarkReport currentReport,
+        BenchmarkReport baselineReport,
+        double slowdownBudgetPercent)
+    {
+        var regressions = new List<string>();
+        var baselineByName = baselineReport.Results.ToDictionary(result => result.Name, StringComparer.Ordinal);
+
+        foreach (var current in currentReport.Results)
+        {
+            if (!GatedBenchmarkMetrics.Contains(current.Name))
+            {
+                continue;
+            }
+
+            if (!baselineByName.TryGetValue(current.Name, out var baseline))
+            {
+                continue;
+            }
+
+            if (!string.Equals(current.Unit, baseline.Unit, StringComparison.Ordinal))
+            {
+                regressions.Add($"{current.Name}: unit changed from {baseline.Unit} to {current.Unit}.");
+                continue;
+            }
+
+            if (baseline.Mean <= 0)
+            {
+                continue;
+            }
+
+            var slowdownPercent = ((current.Mean - baseline.Mean) / baseline.Mean) * 100d;
+            if (slowdownPercent > slowdownBudgetPercent)
+            {
+                regressions.Add(
+                    $"{current.Name}: mean regressed by {slowdownPercent:F2}% " +
+                    $"(baseline {baseline.Mean:F3} {baseline.Unit} → current {current.Mean:F3} {current.Unit}; " +
+                    $"budget {slowdownBudgetPercent:F1}%).");
+            }
+        }
+
+        return new BenchmarkBaselineComparison
+        {
+            SlowdownBudgetPercent = slowdownBudgetPercent,
+            Regressions = regressions,
+        };
+    }
+
+    internal static string BuildBenchmarkMarkdown(BenchmarkReport report, BenchmarkBaselineComparison? comparison = null)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# Engine Benchmark Baseline");
         builder.AppendLine();
         builder.AppendLine($"- Generated: {report.GeneratedAtUtc:O}");
+        if (comparison is not null)
+        {
+            builder.AppendLine(
+                $"- Baseline comparison: {(comparison.HasRegression ? "REGRESSION" : "within budget")} " +
+                $"(slowdown budget ≤ {comparison.SlowdownBudgetPercent:F1}%)");
+        }
+        builder.AppendLine($"- Gated metrics: {string.Join(", ", GatedBenchmarkMetrics.OrderBy(static metric => metric, StringComparer.Ordinal).Select(static metric => $"`{metric}`"))}");
         builder.AppendLine();
         builder.AppendLine("| Metric | Unit | Mean | Median | Min | Max | Notes |");
         builder.AppendLine("|---|---|---:|---:|---:|---:|---|");
         foreach (var result in report.Results)
         {
             builder.AppendLine($"| `{result.Name}` | {result.Unit} | {result.Mean:F3} | {result.Median:F3} | {result.Min:F3} | {result.Max:F3} | {EscapeMarkdown(result.Description)} |");
+        }
+
+        if (comparison is { Regressions.Count: > 0 })
+        {
+            builder.AppendLine();
+            builder.AppendLine("## Regression details");
+            builder.AppendLine();
+            foreach (var regression in comparison.Regressions)
+            {
+                builder.AppendLine($"- {regression}");
+            }
         }
 
         return builder.ToString();
@@ -482,13 +589,20 @@ var assert = {
         public bool HasRegression => Regressions.Count > 0;
     }
 
-    private sealed class BenchmarkReport
+    internal sealed class BenchmarkBaselineComparison
+    {
+        public required double SlowdownBudgetPercent { get; init; }
+        public required List<string> Regressions { get; init; }
+        public bool HasRegression => Regressions.Count > 0;
+    }
+
+    internal sealed class BenchmarkReport
     {
         public required DateTime GeneratedAtUtc { get; init; }
         public required List<BenchmarkMetric> Results { get; init; }
     }
 
-    private sealed class BenchmarkMetric
+    internal sealed class BenchmarkMetric
     {
         public required string Name { get; init; }
         public required string Description { get; init; }
