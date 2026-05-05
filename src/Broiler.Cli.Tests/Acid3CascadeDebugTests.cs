@@ -46,7 +46,7 @@ body { background: white; }
         Assert.True(redPixels < 50, $"Expected no red border pixels from !important override, got {redPixels}");
     }
 
-    [Fact(Skip = "Known limitation: CSS cascade does not sort by specificity within the same step")]
+    [Fact]
     public void Without_Important_Higher_Specificity_Red_Wins()
     {
         // Without !important, the higher specificity red rule should win.

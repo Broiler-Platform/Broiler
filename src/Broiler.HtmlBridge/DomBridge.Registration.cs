@@ -122,7 +122,7 @@ public sealed partial class DomBridge
                 var results = new List<JSValue>();
                 foreach (var el in _elements)
                 {
-                    if (el.TagName == tag)
+                    if (tag == "*" || el.TagName == tag)
                         results.Add(ToJSObject(el));
                 }
                 return new JSArray(results);
@@ -250,24 +250,83 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var evt = new JSObject();
+                var legacyCancelBubble = false;
                 evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"ctrlKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"key", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"location", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"repeat", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"keyCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"charCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopPropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopImmediatePropagation",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopImmediatePropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"preventDefault",
-                    new JSFunction((in Arguments _) => JSUndefined.Value, "preventDefault", 0),
+                    new JSFunction((in Arguments _) =>
+                    {
+                        evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "preventDefault", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddProperty(
+                    (KeyString)"cancelBubble",
+                    new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+                            legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "set cancelBubble"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                evt.FastAddProperty(
+                    (KeyString)"returnValue",
+                    new JSFunction((in Arguments _) => evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && !setArgs[0].BooleanValue)
+                            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "set returnValue"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
                 evt.FastAddValue((KeyString)"initEvent",
                     new JSFunction((in Arguments initArgs) =>
                     {
@@ -296,30 +355,308 @@ public sealed partial class DomBridge
                         return JSUndefined.Value;
                     }, "initUIEvent", 5),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initCustomEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        evt[(KeyString)"detail"] = initArgs.Length > 3
+                            ? initArgs[3]
+                            : JSNull.Value;
+                        return JSUndefined.Value;
+                    }, "initCustomEvent", 4),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initFocusEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"relatedTarget"] = initArgs[5];
+                        return JSUndefined.Value;
+                    }, "initFocusEvent", 6),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initKeyboardEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"key"] = new JSString(initArgs[4].ToString());
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"location"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"ctrlKey"] = initArgs[6].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 7)
+                            evt[(KeyString)"altKey"] = initArgs[7].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 8)
+                            evt[(KeyString)"shiftKey"] = initArgs[8].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"metaKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"repeat"] = initArgs[10].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                        {
+                            var keyCode = initArgs[11].DoubleValue;
+                            evt[(KeyString)"keyCode"] = new JSNumber(keyCode);
+                            evt[(KeyString)"which"] = new JSNumber(keyCode);
+                        }
+                        if (initArgs.Length > 12)
+                        {
+                            var charCode = initArgs[12].DoubleValue;
+                            evt[(KeyString)"charCode"] = new JSNumber(charCode);
+                            if (charCode != 0)
+                                evt[(KeyString)"which"] = new JSNumber(charCode);
+                        }
+                        return JSUndefined.Value;
+                    }, "initKeyboardEvent", 13),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initMouseEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                        {
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
+                        if (initArgs.Length > 8)
+                        {
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"ctrlKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"altKey"] = initArgs[10].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                            evt[(KeyString)"shiftKey"] = initArgs[11].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"metaKey"] = initArgs[12].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 13)
+                        {
+                            var button = initArgs[13].DoubleValue;
+                            evt[(KeyString)"button"] = new JSNumber(button);
+                            evt[(KeyString)"buttons"] = new JSNumber(button switch
+                            {
+                                0 => 1,
+                                1 => 4,
+                                2 => 2,
+                                _ => 0
+                            });
+                        }
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"relatedTarget"] = initArgs[14];
+                        return JSUndefined.Value;
+                    }, "initMouseEvent", 15),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initWheelEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                        {
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
+                        if (initArgs.Length > 8)
+                        {
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"button"] = new JSNumber(initArgs[9].DoubleValue);
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"relatedTarget"] = initArgs[10];
+                        if (initArgs.Length > 11)
+                        {
+                            var modifiers = initArgs[11].ToString()
+                                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            evt[(KeyString)"ctrlKey"] = Array.Exists(modifiers, m => string.Equals(m, "Control", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"altKey"] = Array.Exists(modifiers, m => string.Equals(m, "Alt", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"shiftKey"] = Array.Exists(modifiers, m => string.Equals(m, "Shift", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"metaKey"] = Array.Exists(modifiers, m => string.Equals(m, "Meta", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                        }
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"deltaX"] = new JSNumber(initArgs[12].DoubleValue);
+                        if (initArgs.Length > 13)
+                            evt[(KeyString)"deltaY"] = new JSNumber(initArgs[13].DoubleValue);
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"deltaZ"] = new JSNumber(initArgs[14].DoubleValue);
+                        if (initArgs.Length > 15)
+                            evt[(KeyString)"deltaMode"] = new JSNumber(initArgs[15].DoubleValue);
+                        return JSUndefined.Value;
+                    }, "initWheelEvent", 16),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
                 return evt;
             }, "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // CustomEvent constructor — DOM Level 4
+        // Event / typed event constructors — DOM Level 4
         context.Eval(@"
+                function Event(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('Event');
+                    evt.initEvent(type, options.bubbles === true, options.cancelable === true);
+                    return evt;
+                }
+
                 function CustomEvent(type, options) {
                     options = options || {};
-                    this.type = type;
-                    this.detail = options.detail !== undefined ? options.detail : null;
-                    this.bubbles = options.bubbles === true;
-                    this.cancelable = options.cancelable === true;
-                    this.defaultPrevented = false;
-                    this.target = null;
-                    this.currentTarget = null;
-                    this.eventPhase = 0;
-                    this.stopPropagation = function() {};
-                    this.preventDefault = function() { this.defaultPrevented = true; };
-                    this.initCustomEvent = function(type, bubbles, cancelable, detail) {
-                        this.type = type;
-                        this.bubbles = bubbles === true;
-                        this.cancelable = cancelable === true;
-                        this.detail = detail !== undefined ? detail : null;
-                    };
+                    var evt = document.createEvent('CustomEvent');
+                    evt.initCustomEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.detail !== undefined ? options.detail : null);
+                    return evt;
+                }
+
+                function MouseEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('MouseEvents');
+                    evt.initMouseEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.detail !== undefined ? options.detail : 0,
+                        options.screenX !== undefined ? options.screenX : 0,
+                        options.screenY !== undefined ? options.screenY : 0,
+                        options.clientX !== undefined ? options.clientX : 0,
+                        options.clientY !== undefined ? options.clientY : 0,
+                        options.ctrlKey === true,
+                        options.altKey === true,
+                        options.shiftKey === true,
+                        options.metaKey === true,
+                        options.button !== undefined ? options.button : 0,
+                        options.relatedTarget !== undefined ? options.relatedTarget : null);
+                    return evt;
+                }
+
+                function FocusEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('FocusEvents');
+                    evt.initFocusEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.detail !== undefined ? options.detail : 0,
+                        options.relatedTarget !== undefined ? options.relatedTarget : null);
+                    return evt;
+                }
+
+                function KeyboardEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('KeyboardEvents');
+                    evt.initKeyboardEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.key !== undefined ? options.key : '',
+                        options.location !== undefined ? options.location : 0,
+                        options.ctrlKey === true,
+                        options.altKey === true,
+                        options.shiftKey === true,
+                        options.metaKey === true,
+                        options.repeat === true,
+                        options.keyCode !== undefined ? options.keyCode : 0,
+                        options.charCode !== undefined ? options.charCode : 0);
+                    return evt;
+                }
+
+                function WheelEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('WheelEvents');
+                    var modifiers = [];
+                    if (options.ctrlKey === true) modifiers.push('Control');
+                    if (options.altKey === true) modifiers.push('Alt');
+                    if (options.shiftKey === true) modifiers.push('Shift');
+                    if (options.metaKey === true) modifiers.push('Meta');
+                    evt.initWheelEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.detail !== undefined ? options.detail : 0,
+                        options.screenX !== undefined ? options.screenX : 0,
+                        options.screenY !== undefined ? options.screenY : 0,
+                        options.clientX !== undefined ? options.clientX : 0,
+                        options.clientY !== undefined ? options.clientY : 0,
+                        options.button !== undefined ? options.button : 0,
+                        options.relatedTarget !== undefined ? options.relatedTarget : null,
+                        modifiers.join(' '),
+                        options.deltaX !== undefined ? options.deltaX : 0,
+                        options.deltaY !== undefined ? options.deltaY : 0,
+                        options.deltaZ !== undefined ? options.deltaZ : 0,
+                        options.deltaMode !== undefined ? options.deltaMode : 0);
+                    return evt;
+                }
+
+                function UIEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('UIEvents');
+                    evt.initUIEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.detail !== undefined ? options.detail : 0);
+                    return evt;
                 }
             ");
 
@@ -935,13 +1272,12 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
                 if (!docNode.EventListeners.TryGetValue(type, out var listeners))
                 {
                     listeners = [];
                     docNode.EventListeners[type] = listeners;
                 }
-                listeners.Add((listener, capture));
+                listeners.Add(CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value));
                 return JSUndefined.Value;
             }, "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -953,7 +1289,7 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
+                var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
                 if (docNode.EventListeners.TryGetValue(type, out var listeners))
                 {
                     for (int i = listeners.Count - 1; i >= 0; i--)
@@ -1194,6 +1530,291 @@ public sealed partial class DomBridge
             console,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        static IEnumerable<(string Key, string Value)> EnumerateObjectStringEntries(JSObject obj)
+        {
+            foreach (var (key, value) in obj.Entries)
+            {
+                if (string.IsNullOrEmpty(key) || key[0] == '_' || value is JSFunction || value.IsUndefined || value.IsNull)
+                    continue;
+
+                yield return (key, value.ToString());
+            }
+        }
+
+        static string? TryGetJsPropertyString(JSObject obj, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var value = obj[(KeyString)name];
+                if (value != null && !value.IsUndefined && !value.IsNull)
+                    return value.ToString();
+            }
+
+            return null;
+        }
+
+        static JSObject CreateThenable(Func<JSValue> resolver)
+        {
+            var thenable = new JSObject();
+            thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                    cb.InvokeFunction(new Arguments(cb, resolver()));
+
+                return thenable;
+            }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return thenable;
+        }
+
+        static JSObject CreateHeadersObject(JSValue? initValue = null)
+        {
+            var headersObject = new JSObject();
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var originalNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            void SyncHeader(string name)
+            {
+                if (!values.TryGetValue(name, out var currentValue))
+                    currentValue = string.Empty;
+
+                var originalName = originalNames.TryGetValue(name, out var storedName) ? storedName : name;
+                headersObject[(KeyString)originalName] = new JSString(currentValue);
+                headersObject[(KeyString)name.ToLowerInvariant()] = new JSString(currentValue);
+            }
+
+            void SetHeader(string name, string value)
+            {
+                values[name] = value;
+                originalNames[name] = name;
+                SyncHeader(name);
+            }
+
+            void AppendHeader(string name, string value)
+            {
+                if (values.TryGetValue(name, out var existing) && !string.IsNullOrEmpty(existing))
+                    values[name] = $"{existing}, {value}";
+                else
+                    values[name] = value;
+
+                originalNames[name] = name;
+                SyncHeader(name);
+            }
+
+            if (initValue is JSObject initObject)
+            {
+                foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                    AppendHeader(key, value);
+            }
+
+            headersObject.FastAddValue((KeyString)"get", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSNull.Value;
+
+                var name = a[0].ToString();
+                return values.TryGetValue(name, out var currentValue)
+                    ? new JSString(currentValue)
+                    : JSNull.Value;
+            }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"has", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                return values.ContainsKey(a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+            }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"set", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    SetHeader(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"append", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    AppendHeader(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"delete", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    values.Remove(name);
+                    originalNames.Remove(name);
+                    headersObject[(KeyString)name] = JSUndefined.Value;
+                    headersObject[(KeyString)name.ToLowerInvariant()] = JSUndefined.Value;
+                }
+
+                return JSUndefined.Value;
+            }, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                {
+                    foreach (var header in values)
+                    {
+                        var name = originalNames.TryGetValue(header.Key, out var originalName)
+                            ? originalName
+                            : header.Key;
+                        cb.InvokeFunction(new Arguments(cb, new JSString(header.Value), new JSString(name), headersObject));
+                    }
+                }
+
+                return JSUndefined.Value;
+            }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return headersObject;
+        }
+
+        JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
+        {
+            string url;
+            string method;
+            string? body;
+            JSObject headersObject;
+
+            if (inputValue is JSObject inputObject && !string.IsNullOrEmpty(TryGetJsPropertyString(inputObject, "url", "href")))
+            {
+                url = TryGetJsPropertyString(inputObject, "url", "href") ?? string.Empty;
+                method = (TryGetJsPropertyString(inputObject, "method") ?? "GET").ToUpperInvariant();
+                body = TryGetJsPropertyString(inputObject, "_bodyInit", "body");
+                headersObject = inputObject[(KeyString)"headers"] is JSObject inputHeaders
+                    ? CreateHeadersObject(inputHeaders)
+                    : CreateHeadersObject();
+            }
+            else
+            {
+                url = inputValue.ToString();
+                method = "GET";
+                body = null;
+                headersObject = CreateHeadersObject();
+            }
+
+            if (initValue is JSObject initObject)
+            {
+                method = (TryGetJsPropertyString(initObject, "method") ?? method).ToUpperInvariant();
+                if (TryGetJsPropertyString(initObject, "body") is string initBody)
+                    body = initBody;
+                if (initObject[(KeyString)"headers"] is JSObject initHeaders)
+                    headersObject = CreateHeadersObject(initHeaders);
+            }
+
+            var requestObject = new JSObject();
+            requestObject[(KeyString)"url"] = new JSString(url);
+            requestObject[(KeyString)"method"] = new JSString(method);
+            requestObject[(KeyString)"headers"] = headersObject;
+            requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
+            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => CreateRequestObject(requestObject), "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return body == null ? new JSString(string.Empty) : new JSString(body);
+                });
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return requestObject;
+        }
+
+        JSValue CreateResponse(string body, int statusCode, string statusText, string responseUrl, string type, bool redirected, Dictionary<string, string> headers)
+        {
+            var responseHeaders = new JSObject();
+            foreach (var header in headers)
+                responseHeaders[(KeyString)header.Key] = new JSString(header.Value);
+
+            var headersObject = CreateHeadersObject(responseHeaders);
+            var responseObject = new JSObject();
+            responseObject[(KeyString)"ok"] = statusCode >= 200 && statusCode < 300 ? JSBoolean.True : JSBoolean.False;
+            responseObject[(KeyString)"status"] = new JSNumber(statusCode);
+            responseObject[(KeyString)"statusText"] = new JSString(statusText);
+            responseObject[(KeyString)"url"] = new JSString(responseUrl);
+            responseObject[(KeyString)"redirected"] = redirected ? JSBoolean.True : JSBoolean.False;
+            responseObject[(KeyString)"type"] = new JSString(type);
+            responseObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            responseObject[(KeyString)"headers"] = headersObject;
+            responseObject[(KeyString)"_bodyText"] = new JSString(body);
+            responseObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return new JSString(body);
+                });
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    var escaped = body
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("\n", "\\n")
+                        .Replace("\r", "\\r")
+                        .Replace("\t", "\\t")
+                        .Replace("\b", "\\b")
+                        .Replace("\f", "\\f");
+                    return context.Eval($"JSON.parse(\"{escaped}\")");
+                });
+            }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return new JSObject();
+                });
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
+                CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
+                "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return responseObject;
+        }
+
+        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
+        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
+        var responseCtor = new JSFunction((in Arguments a) =>
+        {
+            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
+            var status = 200;
+            var statusText = string.Empty;
+            var url = string.Empty;
+            var type = "basic";
+            var redirected = false;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (a.Length > 1 && a[1] is JSObject initObject)
+            {
+                if (TryGetJsPropertyString(initObject, "status") is string statusValue && int.TryParse(statusValue, out var parsedStatus))
+                    status = parsedStatus;
+                statusText = TryGetJsPropertyString(initObject, "statusText") ?? string.Empty;
+                url = TryGetJsPropertyString(initObject, "url") ?? string.Empty;
+                type = TryGetJsPropertyString(initObject, "type") ?? "basic";
+                redirected = string.Equals(TryGetJsPropertyString(initObject, "redirected"), "true", StringComparison.OrdinalIgnoreCase);
+
+                if (initObject[(KeyString)"headers"] is JSObject initHeaders)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(initHeaders))
+                        headers[key] = value;
+                }
+            }
+
+            return CreateResponse(body, status, statusText, url, type, redirected, headers);
+        }, "Response", 2);
+        window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["Headers"] = headersCtor;
+        context["Request"] = requestCtor;
+        context["Response"] = responseCtor;
+
         // fetch(url, options) — polyfill backed by HttpClient with headers, method support
         var fetchFn = new JSFunction((in Arguments a) =>
         {
@@ -1201,36 +1822,37 @@ public sealed partial class DomBridge
                 throw new JSException("Failed to execute 'fetch': 1 argument required.");
 
             var fetchUrl = a[0].ToString();
-            var responseObj = new JSObject();
+            if (a[0] is JSObject requestInput)
+            {
+                fetchUrl = TryGetJsPropertyString(requestInput, "url", "href") ?? fetchUrl;
+            }
+
+            JSValue responseObj = new JSObject();
 
             // Parse options (method, headers, body)
             var method = "GET";
             string? requestBody = null;
             var requestHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (a[0] is JSObject requestObject)
+            {
+                method = (TryGetJsPropertyString(requestObject, "method") ?? method).ToUpperInvariant();
+                requestBody = TryGetJsPropertyString(requestObject, "_bodyInit", "body");
+                if (requestObject[(KeyString)"headers"] is JSObject requestHeadersObject)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(requestHeadersObject))
+                        requestHeaders[key] = value;
+                }
+            }
+
             if (a.Length > 1 && a[1] is JSObject opts)
             {
-                var mVal = opts[(KeyString)"method"];
-                if (mVal is JSString mStr)
-                    method = mStr.ToString().ToUpperInvariant();
-                var bVal = opts[(KeyString)"body"];
-                if (bVal is JSString bStr)
-                    requestBody = bStr.ToString();
-                var hVal = opts[(KeyString)"headers"];
-                if (hVal is JSObject hObj)
+                method = (TryGetJsPropertyString(opts, "method") ?? method).ToUpperInvariant();
+                requestBody = TryGetJsPropertyString(opts, "body") ?? requestBody;
+                if (opts[(KeyString)"headers"] is JSObject optionsHeadersObject)
                 {
-                    // Enumerate known request header names.
-                    // Note: YantraJS does not support Object.keys/for-in on all object
-                    // types reliably, so we probe a fixed set of common HTTP headers.
-                    // Custom headers outside this list will not be forwarded.
-                    var commonHeaders = new[] { "Content-Type", "Accept", "Authorization",
-                        "X-Requested-With", "Cache-Control", "Pragma", "If-Modified-Since",
-                        "If-None-Match", "Range" };
-                    foreach (var name in commonHeaders)
-                    {
-                        var v = hObj[(KeyString)name];
-                        if (v is JSString sv)
-                            requestHeaders[name] = sv.ToString();
-                    }
+                    foreach (var (key, value) in EnumerateObjectStringEntries(optionsHeadersObject))
+                        requestHeaders[key] = value;
                 }
             }
 
@@ -1250,15 +1872,6 @@ public sealed partial class DomBridge
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
 
-                responseObj.FastAddValue((KeyString)"ok", response.IsSuccessStatusCode ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"status", new JSNumber(statusCode), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"statusText", new JSString(response.ReasonPhrase ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"redirected", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"type", new JSString("basic"), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"bodyUsed", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.headers — Headers-like object with get(), has(), forEach()
                 var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var h in response.Headers)
                     allHeaders[h.Key] = string.Join(", ", h.Value);
@@ -1267,108 +1880,26 @@ public sealed partial class DomBridge
                     foreach (var h in response.Content.Headers)
                         allHeaders[h.Key] = string.Join(", ", h.Value);
                 }
-
-                var headersObj = new JSObject();
-                headersObj.FastAddValue((KeyString)"get", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length == 0) return JSNull.Value;
-                    var name = hArgs[0].ToString();
-                    return allHeaders.TryGetValue(name, out var val) ? new JSString(val) : JSNull.Value;
-                }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                headersObj.FastAddValue((KeyString)"has", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length == 0) return JSBoolean.False;
-                    return allHeaders.ContainsKey(hArgs[0].ToString()) ? JSBoolean.True : JSBoolean.False;
-                }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                headersObj.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments hArgs) =>
-                {
-                    if (hArgs.Length > 0 && hArgs[0] is JSFunction cb)
-                    {
-                        foreach (var kv in allHeaders)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSString(kv.Value), new JSString(kv.Key))); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.headers.forEach", $"Callback error: {ex.Message}", ex); }
-                        }
-                    }
-                    return JSUndefined.Value;
-                }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"headers", headersObj, JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.text() — returns a thenable with the body text
-                responseObj.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSString(body))); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.text", $"Callback error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.json() — returns a thenable with parsed JSON
-                responseObj.FastAddValue((KeyString)"json", new JSFunction((in Arguments jsonArgs) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try
-                            {
-                                var escaped = body
-                                    .Replace("\\", "\\\\")
-                                    .Replace("\"", "\\\"")
-                                    .Replace("\n", "\\n")
-                                    .Replace("\r", "\\r")
-                                    .Replace("\t", "\\t")
-                                    .Replace("\b", "\\b")
-                                    .Replace("\f", "\\f");
-                                var parsed = context.Eval($"JSON.parse(\"{escaped}\")");
-                                cb.InvokeFunction(new Arguments(cb, parsed));
-                            }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.json", $"JSON parse error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.arrayBuffer() — returns a thenable with empty array buffer stub
-                responseObj.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
-                {
-                    var thenable = new JSObject();
-                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
-                    {
-                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-                        {
-                            try { cb.InvokeFunction(new Arguments(cb, new JSObject())); }
-                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.arrayBuffer", $"Callback error: {ex.Message}", ex); }
-                        }
-                        return thenable;
-                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return thenable;
-                }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-                // response.clone() — returns a shallow copy
-                responseObj.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => responseObj, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj = CreateResponse(
+                    body,
+                    statusCode,
+                    response.ReasonPhrase ?? string.Empty,
+                    fetchUrl,
+                    "basic",
+                    false,
+                    allHeaders);
             }
             catch (Exception ex)
             {
                 RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.fetch", $"Fetch error: {ex.Message}", ex);
-                responseObj.FastAddValue((KeyString)"ok", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"status", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"statusText", new JSString(ex.Message), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
-                var emptyHeaders = new JSObject();
-                emptyHeaders.FastAddValue((KeyString)"get", new JSFunction((in Arguments _) => JSNull.Value, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                emptyHeaders.FastAddValue((KeyString)"has", new JSFunction((in Arguments _) => JSBoolean.False, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                emptyHeaders.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments _) => JSUndefined.Value, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                responseObj.FastAddValue((KeyString)"headers", emptyHeaders, JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj = CreateResponse(
+                    string.Empty,
+                    0,
+                    ex.Message,
+                    fetchUrl,
+                    "error",
+                    false,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             }
 
             // Return a thenable (Promise-like) that resolves immediately
@@ -1410,6 +1941,13 @@ public sealed partial class DomBridge
         RegisterXMLHttpRequest(context);
 
         context["window"] = window;
+        window.FastAddValue((KeyString)"Event", context["Event"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"CustomEvent", context["CustomEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"MouseEvent", context["MouseEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"FocusEvent", context["FocusEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"KeyboardEvent", context["KeyboardEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"WheelEvent", context["WheelEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"UIEvent", context["UIEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.parent — uses the JSContext global scope so that parent.X()
         // resolves user-defined globals (e.g. parent.notify() from sub-documents).
@@ -1600,13 +2138,12 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
                 if (!_windowEventListeners.TryGetValue(type, out var listeners))
                 {
                     listeners = [];
                     _windowEventListeners[type] = listeners;
                 }
-                listeners.Add((listener, capture));
+                listeners.Add(CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value));
                 return JSUndefined.Value;
             }, "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1617,7 +2154,7 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
+                var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
                 if (_windowEventListeners.TryGetValue(type, out var listeners))
                 {
                     for (int i = listeners.Count - 1; i >= 0; i--)

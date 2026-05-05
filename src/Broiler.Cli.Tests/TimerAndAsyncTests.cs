@@ -144,6 +144,54 @@ setTimeout(function() {
         Assert.Contains("survived", result);
     }
 
+    [Fact]
+    public void QueueMicrotask_Runs_After_Current_Script_Completes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""out""></div>
+<script>
+var order = [];
+queueMicrotask(function() {
+    order.push('micro');
+    document.getElementById('out').textContent = order.join(',');
+});
+order.push('sync');
+order.push('after');
+document.getElementById('out').setAttribute('data-before-microtask', order.join(','));
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("data-before-microtask=\"sync,after\"", result);
+        Assert.Contains(">sync,after,micro<", result);
+    }
+
+    [Fact]
+    public void QueueMicrotask_From_Timeout_Runs_Before_Next_Timer_Task()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""out""></div>
+<script>
+var order = [];
+setTimeout(function() {
+    order.push('timeout-1');
+    queueMicrotask(function() { order.push('micro'); });
+}, 0);
+setTimeout(function() {
+    order.push('timeout-2');
+    document.getElementById('out').textContent = order.join(',');
+}, 0);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">timeout-1,micro,timeout-2<", result);
+    }
+
     // ---------------------------------------------------------------
     //  11.2 — setInterval / clearInterval
     // ---------------------------------------------------------------

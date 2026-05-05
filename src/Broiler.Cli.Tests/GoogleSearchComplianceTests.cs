@@ -197,11 +197,11 @@ public class GoogleSearchComplianceTests
     /// <summary>
     /// The footer (bottom ~68px) should render footer links.
     ///
-    /// Currently 0 content pixels — blocked by CSS <c>position:absolute</c>
-    /// with <c>bottom:0</c> rendering.
-    /// Target: >50 content pixels once absolute positioning is improved.
+    /// This guards the focused Google Search parity path now that the
+    /// simplified footer's absolute positioning is rendered into the bottom
+    /// viewport band.
     /// </summary>
-    [Fact(Skip = "Blocked by CSS position:absolute + bottom:0 rendering gap")]
+    [Fact]
     public void GoogleLike_Footer_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -219,7 +219,7 @@ public class GoogleSearchComplianceTests
     /// implemented), but the colour detection thresholds in this test may
     /// need adjustment for Google's specific blue (#4285F4 has G=133).
     /// </summary>
-    [Fact(Skip = "Blue detection threshold too strict for Google blue (#4285F4 has G=133 > 100)")]
+    [Fact]
     public void GoogleLike_Logo_Contains_Coloured_Pixels()
     {
         using var bitmap = RenderGoogleLike();
@@ -230,8 +230,8 @@ public class GoogleSearchComplianceTests
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                // Blue: R<100, G<100, B>150
-                if (px.Red < 100 && px.Green < 100 && px.Blue > 150)
+                // Blue: accommodate Google blue (#4285F4 = 66,133,244)
+                if (px.Red < 100 && px.Green < 140 && px.Blue > 150)
                     hasBlue = true;
                 // Red: R>180, G<100, B<100
                 if (px.Red > 180 && px.Green < 100 && px.Blue < 100)

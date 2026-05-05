@@ -34,6 +34,68 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CreateEvent_Event_Has_IsTrusted_False()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("boolean,false", result);
+    }
+
+    [Fact]
+    public void CreateEvent_Event_Has_TimeStamp()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.timeStamp);
+r.push(evt.timeStamp >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("number,true", result);
+    }
+
+    [Fact]
+    public void CreateEvent_Event_Has_Legacy_Alias_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+var r = [];
+r.push(typeof evt.srcElement);
+r.push(evt.srcElement === null);
+r.push(evt.cancelBubble);
+r.push(evt.returnValue);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("object,true,false,true", result);
+    }
+
+    [Fact]
     public void CreateEvent_UIEvents_Has_InitUIEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -54,6 +116,395 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("test,true,false,6", result);
+    }
+
+    [Fact]
+    public void CreateEvent_MouseEvents_Has_InitMouseEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('MouseEvents');
+evt.initMouseEvent('click', true, true, window, 4, 10, 20, 30, 40, true, false, true, false, 2, null);
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === window);
+r.push(evt.detail);
+r.push(evt.screenX);
+r.push(evt.screenY);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.ctrlKey);
+r.push(evt.altKey);
+r.push(evt.shiftKey);
+r.push(evt.metaKey);
+r.push(evt.button);
+r.push(evt.relatedTarget === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("click,true,true,true,4,10,20,30,40,true,false,true,false,2,true", result);
+    }
+
+    [Fact]
+    public void CreateEvent_MouseEvents_Has_Alias_Properties_And_Default_Button_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('MouseEvents');
+var before = [evt.x, evt.y, evt.buttons, evt.relatedTarget === null].join(',');
+evt.initMouseEvent('click', true, true, window, 1, 10, 20, 30, 40, false, true, false, true, 2, null);
+var after = [];
+after.push(evt.x);
+after.push(evt.y);
+after.push(evt.x === evt.clientX);
+after.push(evt.y === evt.clientY);
+after.push(evt.buttons);
+after.push(evt.button);
+after.push(evt.relatedTarget === null);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,0,0,true|30,40,true,true,2,2,true", result);
+    }
+
+    [Fact]
+    public void CreateEvent_FocusEvents_Has_InitFocusEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""related"" />
+<div id=""result""></div>
+<script>
+var related = document.getElementById('related');
+var evt = document.createEvent('FocusEvents');
+var before = [evt.detail, evt.relatedTarget === null].join(',');
+evt.initFocusEvent('focusin', true, false, window, 7, related);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.detail);
+after.push(evt.relatedTarget === related);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,true|focusin,true,false,true,7,true", result);
+    }
+
+    [Fact]
+    public void CreateEvent_KeyboardEvents_Has_InitKeyboardEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('KeyboardEvents');
+var before = [evt.key, evt.location, evt.keyCode, evt.charCode, evt.which].join(',');
+evt.initKeyboardEvent('keydown', true, false, window, 'Enter', 1, true, false, true, false, false, 13, 0);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.key);
+after.push(evt.location);
+after.push(evt.ctrlKey);
+after.push(evt.altKey);
+after.push(evt.shiftKey);
+after.push(evt.metaKey);
+after.push(evt.keyCode);
+after.push(evt.charCode);
+after.push(evt.which);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(",0,0,0,0|keydown,true,false,true,Enter,1,true,false,true,false,13,0,13", result);
+    }
+
+    [Fact]
+    public void CreateEvent_KeyboardEvents_Has_Repeat_Property()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('KeyboardEvents');
+var before = [typeof evt.repeat, evt.repeat].join(',');
+evt.initKeyboardEvent('keydown', true, false, window, 'Enter', 1, true, false, true, false, true, 13, 0);
+var after = [];
+after.push(evt.repeat);
+after.push(evt.keyCode);
+after.push(evt.charCode);
+after.push(evt.which);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("boolean,false|true,13,0,13", result);
+    }
+
+    [Fact]
+    public void CreateEvent_WheelEvents_Has_InitWheelEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('WheelEvents');
+var before = [evt.deltaX, evt.deltaY, evt.deltaZ, evt.deltaMode].join(',');
+evt.initWheelEvent('wheel', true, true, window, 4, 10, 20, 30, 40, 0, null, 'Control Shift', 1.5, -2.5, 0, 1);
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.view === window);
+after.push(evt.detail);
+after.push(evt.clientX);
+after.push(evt.clientY);
+after.push(evt.x);
+after.push(evt.y);
+after.push(evt.ctrlKey);
+after.push(evt.altKey);
+after.push(evt.shiftKey);
+after.push(evt.metaKey);
+after.push(evt.deltaX);
+after.push(evt.deltaY);
+after.push(evt.deltaZ);
+after.push(evt.deltaMode);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,0,0,0|wheel,true,true,true,4,30,40,30,40,true,false,true,false,1.5,-2.5,0,1", result);
+    }
+
+    [Fact]
+    public void CreateEvent_CustomEvent_Has_InitCustomEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('CustomEvent');
+var before = [typeof evt.initCustomEvent, evt.detail].join(',');
+evt.initCustomEvent('build', true, false, 'payload');
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.detail);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("function,0|build,true,false,payload", result);
+    }
+
+    [Fact]
+    public void Event_Constructor_Seeds_Init_Dictionary()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new Event('test', { bubbles: true, cancelable: false });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("test,true,false,boolean,false", result);
+    }
+
+    [Fact]
+    public void CustomEvent_Constructor_Reuses_CreateEvent_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new CustomEvent('build', { bubbles: true, cancelable: false, detail: 'payload' });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+r.push(evt.srcElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("build,true,false,payload,number,true", result);
+    }
+
+    [Fact]
+    public void MouseEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 4, clientX: 30, clientY: 40, ctrlKey: true, button: 2 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.x);
+r.push(evt.y);
+r.push(evt.ctrlKey);
+r.push(evt.button);
+r.push(evt.buttons);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("click,true,true,4,30,40,30,40,true,2,2", result);
+    }
+
+    [Fact]
+    public void FocusEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""related"" />
+<div id=""result""></div>
+<script>
+var related = document.getElementById('related');
+var evt = new FocusEvent('focusin', { bubbles: true, cancelable: false, detail: 7, relatedTarget: related });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(evt.relatedTarget === related);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("focusin,true,false,7,true", result);
+    }
+
+    [Fact]
+    public void KeyboardEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new KeyboardEvent('keydown', { bubbles: true, cancelable: false, key: 'Enter', location: 1, ctrlKey: true, shiftKey: true, repeat: true, keyCode: 13 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.key);
+r.push(evt.location);
+r.push(evt.ctrlKey);
+r.push(evt.shiftKey);
+r.push(evt.repeat);
+r.push(evt.keyCode);
+r.push(evt.which);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("keydown,true,false,Enter,1,true,true,true,13,13", result);
+    }
+
+    [Fact]
+    public void WheelEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new WheelEvent('wheel', { bubbles: true, cancelable: true, detail: 4, clientX: 30, clientY: 40, ctrlKey: true, shiftKey: true, deltaX: 1.5, deltaY: -2.5, deltaMode: 1 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.ctrlKey);
+r.push(evt.shiftKey);
+r.push(evt.deltaX);
+r.push(evt.deltaY);
+r.push(evt.deltaMode);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("wheel,true,true,4,30,40,true,true,1.5,-2.5,1", result);
+    }
+
+    [Fact]
+    public void UIEvent_Constructor_Seeds_Options()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = new UIEvent('build', { bubbles: true, cancelable: false, view: window, detail: 6 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === window);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("build,true,false,true,6,number", result);
     }
 
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
@@ -317,6 +768,48 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("false,true", result);
     }
 
+    [Fact]
+    public void Legacy_Event_Aliases_Track_Dispatch_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var parentHits = 0;
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('test', function() {
+    parentHits++;
+}, false);
+child.addEventListener('test', function(e) {
+    var r = [];
+    r.push(e.srcElement === child);
+    e.cancelBubble = true;
+    e.returnValue = false;
+    r.push(e.cancelBubble);
+    r.push(e.returnValue);
+    window.__legacyResult = r.join(',');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, true);
+var returned = child.dispatchEvent(evt);
+document.getElementById('result').textContent = [
+    window.__legacyResult,
+    parentHits,
+    returned,
+    evt.defaultPrevented,
+    evt.cancelBubble,
+    evt.returnValue
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,true,false|0|false|true|true|false", result);
+    }
+
     // ──────────────────────── element.click() ────────────────────────
 
     [Fact]
@@ -367,6 +860,60 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("click,true,true,3", result);
+    }
+
+    [Fact]
+    public void Element_Focus_Dispatches_Focus_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+target.addEventListener('focus', function(e) {
+    r.push(e.type);
+    r.push(e.bubbles);
+    r.push(e.cancelable);
+    r.push(e.eventPhase);
+    r.push(typeof e.timeStamp);
+}, false);
+target.focus();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("focus,false,false,2,number", result);
+    }
+
+    [Fact]
+    public void Element_Blur_Dispatches_Blur_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+target.addEventListener('blur', function(e) {
+    r.push(e.type);
+    r.push(e.bubbles);
+    r.push(e.cancelable);
+    r.push(e.eventPhase);
+    r.push(typeof e.timeStamp);
+}, false);
+target.blur();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("blur,false,false,2,number", result);
     }
 
     // ──────────────────────── on* inline handler properties ────────────────────────

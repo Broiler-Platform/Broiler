@@ -203,6 +203,224 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void CssFontFaceRule_Exposes_Style_Backreferences_And_Style_Methods()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); font-weight: 700; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 5);
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+r.push(rule.style.getPropertyValue('font-family').indexOf('RoadmapFont') >= 0);
+r.push(rule.style.getPropertyValue('src') === 'url(font.ttf)');
+r.push(rule.style.getPropertyValue('font-weight') === '700');
+rule.style.setProperty('font-style', 'italic');
+r.push(rule.style.getPropertyValue('font-style') === 'italic');
+r.push(rule.cssText.indexOf('font-style: italic') >= 0);
+r.push(rule.style.removeProperty('src') === 'url(font.ttf)');
+r.push(rule.style.getPropertyValue('src') === '');
+r.push(rule.cssText.indexOf('src: url(font.ttf)') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssFontFaceRule_Preserves_Mixed_Rule_Order_With_Charset_And_Page()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""utf-8"";
+@import url(""base.css"");
+@page cover { margin-top: 1in; }
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 6);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPropertyRule_Exposes_Name_Syntax_Inherits_InitialValue_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@property --roadmap-color {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: teal;
+}
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 25);
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.name === '--roadmap-color');
+r.push(rule.syntax === '<color>');
+r.push(rule.inherits === false);
+r.push(rule.initialValue === 'teal');
+r.push(rule.cssText.indexOf('@property --roadmap-color') === 0);
+r.push(rule.cssText.indexOf('syntax: ""<color>""') >= 0);
+r.push(rule.cssText.indexOf('inherits: false') >= 0);
+r.push(rule.cssText.indexOf('initial-value: teal') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPropertyRule_Preserves_Mixed_Rule_Order_With_Charset_FontFace_And_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""utf-8"";
+@import url(""base.css"");
+@property --roadmap-gap {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); }
+.test { gap: var(--roadmap-gap); }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 25);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+r.push(rules[2].name === '--roadmap-gap');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssCounterStyleRule_Exposes_Name_Descriptors_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@counter-style roadmap-counter {
+  system: numeric;
+  symbols: ""⓪"" ""①"" ""②"";
+  suffix: "": "";
+  fallback: decimal;
+}
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 10);
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.name === 'roadmap-counter');
+r.push(rule.system === 'numeric');
+r.push(rule.symbols.indexOf('①') >= 0);
+r.push(rule.suffix.indexOf(':') >= 0);
+r.push(rule.fallback === 'decimal');
+r.push(rule.cssText.indexOf('@counter-style roadmap-counter') === 0);
+r.push(rule.cssText.indexOf('symbols: ""⓪"" ""①"" ""②""') >= 0);
+r.push(rule.cssText.indexOf('fallback: decimal') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssCounterStyleRule_Preserves_Mixed_Rule_Order_With_Charset_Property_FontFace_And_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""utf-8"";
+@import url(""base.css"");
+@counter-style roadmap-counter {
+  system: numeric;
+  symbols: ""⓪"" ""①"" ""②"";
+}
+@property --roadmap-gap {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+@font-face { font-family: ""RoadmapFont""; src: url(font.ttf); }
+.test { list-style: roadmap-counter; gap: var(--roadmap-gap); }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 6);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 10);
+r.push(rules[3].type === 25);
+r.push(rules[4].type === 5);
+r.push(rules[5].type === 1);
+r.push(rules[2].name === 'roadmap-counter');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void StyleRule_Has_Type_1()
     {
         var html = @"<!DOCTYPE html>
@@ -538,6 +756,955 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void CssRule_Style_Cssom_Methods_Enumerate_And_Read_Priority()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red !important; font-size: 14px; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.style.getPropertyValue('color'));
+r.push(rule.style.getPropertyPriority('color'));
+r.push(rule.style.length);
+r.push(rule.style.item(0));
+r.push(rule.style.item(1));
+r.push(rule.style.item(99) === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("red,important,2,color,font-size,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Style_SetProperty_And_RemoveProperty_Modify_Rule_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+rule.style.setProperty('margin-left', '2px', 'important');
+r.push(rule.style.getPropertyValue('margin-left'));
+r.push(rule.style.getPropertyPriority('margin-left'));
+r.push(rule.style.marginLeft);
+r.push(rule.cssText.indexOf('margin-left: 2px !important;') >= 0);
+r.push(rule.style.removeProperty('color'));
+r.push(rule.style.getPropertyValue('color') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2px,important,2px,true,red,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Style_CssText_Getter_And_Setter_Work()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.style.cssText.indexOf('color: red;') >= 0);
+rule.style.cssText = 'background-color: blue; float: left;';
+r.push(rule.style.backgroundColor);
+r.push(rule.style.cssFloat);
+r.push(rule.style.length);
+r.push(rule.cssText.indexOf('background-color: blue;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,blue,left,2,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Parent_Backreferences_Are_Exposed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_And_Computed_Style_ParentRule_Is_Null()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: red; }
+</style>
+</head><body>
+<div id=""target"" style=""margin-left: 2px""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+r.push(target.style.parentRule === null);
+r.push(window.getComputedStyle(target).parentRule === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_Exposes_Type_Media_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media screen and (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 4);
+r.push(rule.media.indexOf('screen') >= 0);
+r.push(rule.cssRules.length === 1);
+r.push(rule.cssRules[0].type === 1);
+r.push(rule.cssRules[0].selectorText === '.test');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_Nested_Rules_Expose_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media all and (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var mediaRule = sheet.cssRules[0];
+var nestedRule = mediaRule.cssRules[0];
+r.push(mediaRule.parentRule === null);
+r.push(nestedRule.parentRule === mediaRule);
+r.push(nestedRule.parentStyleSheet === sheet);
+r.push(nestedRule.style.parentRule === nestedRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_CssText_Rebuilds_From_Nested_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media (min-width: 1px) { .test { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var mediaRule = document.styleSheets[0].cssRules[0];
+r.push(mediaRule.cssText.indexOf('@media') >= 0);
+r.push(mediaRule.cssText.indexOf('(min-width: 1px)') >= 0);
+mediaRule.cssRules[0].style.setProperty('margin-left', '2px');
+r.push(mediaRule.cssText.indexOf('margin-left: 2px;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@media (min-width: 1px) { .first { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var mediaRule = document.styleSheets[0].cssRules[0];
+var nestedRules = mediaRule.cssRules;
+r.push(typeof nestedRules.item === 'function');
+r.push(nestedRules.item(0).selectorText === '.first');
+r.push(nestedRules.insertRule('.second { color: blue; }', 1) === 1);
+r.push(nestedRules.length === 2);
+r.push(nestedRules[1].selectorText === '.second');
+r.push(mediaRule.cssText.indexOf('.second') >= 0);
+nestedRules.deleteRule(0);
+r.push(nestedRules.length === 1);
+r.push(nestedRules[0].selectorText === '.second');
+r.push(mediaRule.cssText.indexOf('.first') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssImportRule_Exposes_Type_Href_Media_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""screen.css"") screen and (min-width: 1px);
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 3);
+r.push(rule.href.indexOf('screen.css') >= 0);
+r.push(rule.media.indexOf('screen') >= 0);
+r.push(rule.cssText.indexOf('@import') >= 0);
+r.push(rule.cssText.indexOf('screen.css') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssImportRule_Can_Use_Quoted_Href_Syntax()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import ""theme.css"";
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 3);
+r.push(rule.href === 'theme.css');
+r.push(rule.media === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssImportRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@media screen { .test { color: red; } }
+@font-face { font-family: ""RoadmapTest""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 4);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 4);
+r.push(rules[2].type === 5);
+r.push(rules[3].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_Exposes_Type_Name_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { 0% { opacity: 0; } 50%, to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 7);
+r.push(rule.name === 'pulse');
+r.push(rule.cssRules.length === 2);
+r.push(rule.cssRules[0].type === 8);
+r.push(rule.cssRules[0].keyText === '0%');
+r.push(rule.cssRules[1].keyText === '50%, to');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_Keyframe_Rules_Expose_Style_And_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes slide { from { transform: translateX(0px); } to { transform: translateX(10px); } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var keyframesRule = sheet.cssRules[0];
+var keyframeRule = keyframesRule.cssRules[0];
+r.push(keyframeRule.type === 8);
+r.push(keyframeRule.keyText === 'from');
+r.push(keyframeRule.style.getPropertyValue('transform') === 'translateX(0px)');
+r.push(keyframeRule.parentRule === keyframesRule);
+r.push(keyframeRule.parentStyleSheet === sheet);
+r.push(keyframeRule.style.parentRule === keyframeRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_CssText_Rebuilds_From_Nested_Keyframes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var keyframesRule = document.styleSheets[0].cssRules[0];
+r.push(keyframesRule.cssText.indexOf('@keyframes pulse') >= 0);
+r.push(keyframesRule.cssText.indexOf('from') >= 0);
+keyframesRule.cssRules[0].style.setProperty('opacity', '0.25');
+r.push(keyframesRule.cssText.indexOf('opacity: 0.25;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var keyframesRule = document.styleSheets[0].cssRules[0];
+var nestedRules = keyframesRule.cssRules;
+r.push(typeof nestedRules.item === 'function');
+r.push(nestedRules.item(0).keyText === 'from');
+r.push(nestedRules.insertRule('50% { opacity: 0.5; }', 1) === 1);
+r.push(nestedRules.length === 3);
+r.push(nestedRules[1].keyText === '50%');
+r.push(keyframesRule.cssText.indexOf('50%') >= 0);
+nestedRules.deleteRule(0);
+r.push(nestedRules.length === 2);
+r.push(nestedRules[0].keyText === '50%');
+r.push(keyframesRule.cssText.indexOf('from') === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssKeyframesRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@media screen { .test { color: red; } }
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+@font-face { font-family: ""RoadmapKeyframeTest""; src: url(font.ttf); }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 4);
+r.push(rules[2].type === 7);
+r.push(rules[3].type === 5);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_Exposes_Type_ConditionText_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: flex) { .flex { display: flex; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 11);
+r.push(rule.conditionText === '(display: flex)');
+r.push(rule.cssRules.length === 1);
+r.push(rule.cssRules[0].type === 1);
+r.push(rule.cssRules[0].selectorText === '.flex');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_Nested_Rules_Expose_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: grid) { .grid { display: grid; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var supportsRule = sheet.cssRules[0];
+var nestedRule = supportsRule.cssRules[0];
+r.push(supportsRule.parentRule === null);
+r.push(nestedRule.parentRule === supportsRule);
+r.push(nestedRule.parentStyleSheet === sheet);
+r.push(nestedRule.style.parentRule === nestedRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_CssText_Rebuilds_From_Nested_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@supports (display: flex) { .flex { display: flex; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var supportsRule = document.styleSheets[0].cssRules[0];
+r.push(supportsRule.cssText.indexOf('@supports') >= 0);
+r.push(supportsRule.cssText.indexOf('(display: flex)') >= 0);
+supportsRule.cssRules[0].style.setProperty('display', 'inline-flex');
+r.push(supportsRule.cssText.indexOf('display: inline-flex;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssSupportsRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@supports (display: flex) { .flex { display: flex; } }
+@media screen { .test { color: red; } }
+@keyframes pulse { from { opacity: 0; } to { opacity: 1; } }
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 11);
+r.push(rules[2].type === 4);
+r.push(rules[3].type === 7);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssLayerRule_Exposes_Type_Name_And_Nested_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@layer utilities { .mt-1 { margin-top: 1px; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 12);
+r.push(rule.name === 'utilities');
+r.push(rule.cssRules.length === 1);
+r.push(rule.cssRules[0].type === 1);
+r.push(rule.cssRules[0].selectorText === '.mt-1');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssLayerRule_Anonymous_Block_Exposes_Null_Name_And_Backreferences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@layer { .mt-2 { margin-top: 2px; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var layerRule = sheet.cssRules[0];
+var nestedRule = layerRule.cssRules[0];
+r.push(layerRule.name === null);
+r.push(layerRule.parentRule === null);
+r.push(nestedRule.parentRule === layerRule);
+r.push(nestedRule.parentStyleSheet === sheet);
+r.push(nestedRule.style.parentRule === nestedRule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssLayerRule_Statement_Form_Is_Preserved_In_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@layer base;
+.test { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+var rule = rules[0];
+r.push(rules.length === 2);
+r.push(rule.type === 12);
+r.push(rule.name === 'base');
+r.push(rule.cssRules.length === 0);
+r.push(rule.cssText === '@layer base;');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssLayerRule_CssText_Rebuilds_From_Nested_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@layer theme { .button { color: red; } }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var layerRule = document.styleSheets[0].cssRules[0];
+r.push(layerRule.cssText.indexOf('@layer theme') >= 0);
+r.push(layerRule.cssText.indexOf('.button') >= 0);
+layerRule.cssRules[0].style.setProperty('color', 'green');
+r.push(layerRule.cssText.indexOf('color: green;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssLayerRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@layer reset;
+@layer theme { .button { color: red; } }
+@supports (display: flex) { .flex { display: flex; } }
+@media screen { .test { color: blue; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 6);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 12);
+r.push(rules[2].type === 12);
+r.push(rules[3].type === 11);
+r.push(rules[4].type === 4);
+r.push(rules[5].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssNamespaceRule_Exposes_Type_NamespaceUri_And_Prefix()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@namespace svg ""http://www.w3.org/2000/svg"";
+@namespace ""http://www.w3.org/1999/xhtml"";
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+var prefixedRule = rules[0];
+var defaultRule = rules[1];
+r.push(prefixedRule.type === 9);
+r.push(prefixedRule.prefix === 'svg');
+r.push(prefixedRule.namespaceURI === 'http://www.w3.org/2000/svg');
+r.push(defaultRule.type === 9);
+r.push(defaultRule.prefix === undefined);
+r.push(defaultRule.namespaceURI === 'http://www.w3.org/1999/xhtml');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssNamespaceRule_Supports_Url_Syntax_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@namespace mathml url(http://www.w3.org/1998/Math/MathML);
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 9);
+r.push(rule.prefix === 'mathml');
+r.push(rule.namespaceURI === 'http://www.w3.org/1998/Math/MathML');
+r.push(rule.cssText.indexOf('@namespace mathml') >= 0);
+r.push(rule.cssText.indexOf('http://www.w3.org/1998/Math/MathML') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssNamespaceRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+@supports (display: flex) { .flex { display: flex; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 9);
+r.push(rules[2].type === 12);
+r.push(rules[3].type === 11);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPageRule_Exposes_Type_SelectorText_And_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@page { margin-top: 1in; margin-bottom: 2in; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 6);
+r.push(rule.selectorText === '');
+r.push(rule.style.getPropertyValue('margin-top') === '1in');
+r.push(rule.style.getPropertyValue('margin-bottom') === '2in');
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+r.push(rule.style.parentRule === rule);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPageRule_Supports_Pseudo_Selectors_And_CssText_Rebuild()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@page :first { margin-top: 3cm; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rule = document.styleSheets[0].cssRules[0];
+r.push(rule.type === 6);
+r.push(rule.selectorText === ':first');
+r.push(rule.cssText.indexOf('@page :first') >= 0);
+r.push(rule.cssText.indexOf('margin-top: 3cm;') >= 0);
+rule.style.setProperty('margin-left', '4cm');
+r.push(rule.cssText.indexOf('margin-left: 4cm;') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssPageRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@import url(""base.css"");
+@page :left { margin-top: 2cm; }
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 5);
+r.push(rules[0].type === 3);
+r.push(rules[1].type === 6);
+r.push(rules[2].type === 9);
+r.push(rules[3].type === 12);
+r.push(rules[4].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssCharsetRule_Exposes_Type_Encoding_And_CssText()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""UTF-8"";
+body { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.type === 2);
+r.push(rule.encoding === 'UTF-8');
+r.push(rule.cssText === '@charset ""UTF-8"";');
+r.push(rule.parentStyleSheet === sheet);
+r.push(rule.parentRule === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void CssCharsetRule_Preserves_Mixed_Rule_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@charset ""windows-1252"";
+@import url(""base.css"");
+@page :left { margin-top: 2cm; }
+@namespace svg ""http://www.w3.org/2000/svg"";
+@layer theme { .button { color: red; } }
+.plain { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var rules = document.styleSheets[0].cssRules;
+r.push(rules.length === 6);
+r.push(rules[0].type === 2);
+r.push(rules[1].type === 3);
+r.push(rules[2].type === 6);
+r.push(rules[3].type === 9);
+r.push(rules[4].type === 12);
+r.push(rules[5].type === 1);
+r.push(rules[0].encoding === 'windows-1252');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true", result);
+    }
+
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
     [Fact]
@@ -725,6 +1892,67 @@ document.getElementById('result').textContent = initLen + ':' + sheet.cssRules.l
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("2:1", result);
+    }
+
+    [Fact]
+    public void InsertRule_On_StyleSheet_Updates_Live_CssRules_And_Clears_Deleted_Indices()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.first { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(typeof rules.item === 'function');
+r.push(rules.item(0).selectorText === '.first');
+r.push(sheet.insertRule('@media screen { .second { color: blue; } }', 1) === 1);
+r.push(rules.length === 2);
+r.push(rules[1].type === 4);
+r.push(rules.item(1).cssRules[0].selectorText === '.second');
+sheet.deleteRule(0);
+r.push(rules.length === 1);
+r.push(rules[0].type === 4);
+r.push(rules[1] === undefined);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void StyleSheet_InsertRule_Does_Not_Reappear_After_Owner_TextContent_Is_Replaced()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.first { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var styleEl = document.querySelector('style');
+var sheet = document.styleSheets[0];
+sheet.insertRule('.second { color: blue; }', 1);
+r.push(sheet.cssRules.length === 2);
+r.push(sheet.cssRules[1].selectorText === '.second');
+styleEl.textContent = '.third { color: green; }';
+r.push(sheet.cssRules.length === 1);
+r.push(sheet.cssRules[0].selectorText === '.third');
+r.push(sheet.cssRules[1] === undefined);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
     }
 
     [Fact]

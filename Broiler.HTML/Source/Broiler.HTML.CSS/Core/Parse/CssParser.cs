@@ -17,6 +17,7 @@ internal sealed class CssParser
     private readonly IColorResolver _colorResolver;
     private readonly CssValueParser _valueParser;
     private static readonly char[] _cssClassTrimChars = ['\r', '\n', '\t', ' ', '-', '!', '<', '>'];
+    private int _sourceOrder;
 
     public CssParser(IColorResolver colorResolver)
     {
@@ -40,6 +41,7 @@ internal sealed class CssParser
     {
         if (!string.IsNullOrEmpty(stylesheet))
         {
+            _sourceOrder = 0;
             stylesheet = RemoveStylesheetComments(stylesheet);
 
             ParseStyleBlocks(cssData, StripAtRules(stylesheet));
@@ -359,9 +361,127 @@ internal sealed class CssParser
 
             var newblock = ParseCssBlockImp(className, blockSource);
             if (newblock != null)
+            {
+                newblock.Specificity = CalculateSelectorSpecificity(className);
+                newblock.SourceOrder = _sourceOrder++;
                 cssData.AddCssBlock(media, newblock);
+            }
         }
     }
+
+    private static int CalculateSelectorSpecificity(string selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector))
+            return 0;
+
+        int a = 0, b = 0, c = 0;
+
+        for (int i = 0; i < selector.Length; i++)
+        {
+            char ch = selector[i];
+            switch (ch)
+            {
+                case '#':
+                    a++;
+                    i = SkipIdentifier(selector, i + 1) - 1;
+                    break;
+                case '.':
+                    b++;
+                    i = SkipIdentifier(selector, i + 1) - 1;
+                    break;
+                case '[':
+                    b++;
+                    i = SkipBalanced(selector, i + 1, '[', ']');
+                    break;
+                case ':':
+                    if (i + 1 < selector.Length && selector[i + 1] == ':')
+                    {
+                        c++;
+                        i = SkipIdentifier(selector, i + 2) - 1;
+                        break;
+                    }
+
+                    b++;
+                    i = SkipPseudoClass(selector, i + 1) - 1;
+                    break;
+                case '*':
+                case ' ':
+                case '>':
+                case '+':
+                case '~':
+                case ',':
+                    break;
+                default:
+                    if (IsIdentifierStart(ch))
+                    {
+                        c++;
+                        i = SkipIdentifier(selector, i + 1) - 1;
+                    }
+
+                    break;
+            }
+        }
+
+        return (a * 1_000_000) + (b * 1_000) + c;
+    }
+
+    private static int SkipPseudoClass(string selector, int start)
+    {
+        int i = SkipIdentifier(selector, start);
+        if (i < selector.Length && selector[i] == '(')
+            return SkipBalanced(selector, i + 1, '(', ')') + 1;
+
+        return i;
+    }
+
+    private static int SkipBalanced(string text, int start, char open, char close)
+    {
+        int depth = 1;
+        for (int i = start; i < text.Length; i++)
+        {
+            if (text[i] == '"' || text[i] == '\'')
+            {
+                char quote = text[i];
+                i++;
+                while (i < text.Length && text[i] != quote)
+                {
+                    if (text[i] == '\\' && i + 1 < text.Length)
+                        i++;
+                    i++;
+                }
+
+                continue;
+            }
+
+            if (text[i] == open)
+                depth++;
+            else if (text[i] == close)
+            {
+                depth--;
+                if (depth == 0)
+                    return i;
+            }
+        }
+
+        return text.Length - 1;
+    }
+
+    private static int SkipIdentifier(string text, int start)
+    {
+        int i = start;
+        while (i < text.Length)
+        {
+            char ch = text[i];
+            if (!char.IsLetterOrDigit(ch) && ch is not '-' and not '_')
+                break;
+
+            i++;
+        }
+
+        return i;
+    }
+
+    private static bool IsIdentifierStart(char ch) => char.IsLetter(ch) || ch is '_' or '-';
 
     /// <summary>
     /// Decodes CSS escape sequences in a string.  A backslash followed by

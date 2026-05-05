@@ -1074,6 +1074,197 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,right,none", result);
     }
 
+    [Fact]
+    public void Style_Length_And_Item_Enumerate_Inline_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.item(1));
+r.push(el.style.item(99) === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2,color,font-size,true", result);
+    }
+
+    [Fact]
+    public void Style_GetPropertyPriority_Reads_Important_And_Strips_Value()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue !important; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.getPropertyPriority('color'));
+r.push(el.style.getPropertyValue('color'));
+r.push(el.style.color);
+r.push(el.style.getPropertyPriority('font-size') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("important,blue,blue,true", result);
+    }
+
+    [Fact]
+    public void Style_SetProperty_Priority_Argument_Is_Reflected()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.setProperty('margin-left', '2px', 'important');
+var r = [];
+r.push(el.style.getPropertyPriority('margin-left'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.cssText.indexOf('!important') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("important,2px,true", result);
+    }
+
+    [Fact]
+    public void Style_GetPropertyValue_Expands_Inline_Margin_Shorthand()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""margin: 1px 2px 3px 4px""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var r = [];
+r.push(el.style.getPropertyValue('margin-top'));
+r.push(el.style.getPropertyValue('margin-right'));
+r.push(el.style.getPropertyValue('margin-bottom'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.marginLeft);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1px,2px,3px,4px,4px", result);
+    }
+
+    [Fact]
+    public void Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.setProperty('margin', '5px 10px');
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.getPropertyValue('margin-top'));
+r.push(el.style.getPropertyValue('margin-left'));
+r.push(el.style.marginLeft);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1,margin,5px,10px,10px", result);
+    }
+
+    [Fact]
+    public void Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.cssText = 'border: 3px solid red;';
+var r = [];
+r.push(el.style.length);
+r.push(el.style.item(0));
+r.push(el.style.getPropertyValue('border-left-width'));
+r.push(el.style.borderLeftStyle);
+r.push(el.style.getPropertyValue('border-right-color'));
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("1,border,3px,solid,red", result);
+    }
+
+    [Fact]
+    public void GetComputedStyle_Length_And_Item_Enumerate_Computed_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue; font-size: 14px""></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var seenColor = false;
+var seenFontSize = false;
+for (var i = 0; i < cs.length; i++) {
+  var name = cs.item(i);
+  if (name === 'color') seenColor = true;
+  if (name === 'font-size') seenFontSize = true;
+}
+var r = [];
+r.push(cs.length > 0);
+r.push(cs.item(0) !== '');
+r.push(cs.item(9999) === '');
+r.push(seenColor);
+r.push(seenFontSize);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""color: blue !important""></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var value = cs.getPropertyValue('color');
+var camel = cs.color || '';
+var r = [];
+r.push(value !== '');
+r.push(value.indexOf('important') === -1);
+r.push(camel.indexOf('important') === -1);
+r.push(cs.getPropertyPriority('color') === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
     // ────────────────────── matchMedia ─────────────────────────────────────
 
     [Fact]

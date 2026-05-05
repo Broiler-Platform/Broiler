@@ -1,3 +1,4 @@
+using Broiler.JavaScript.BuiltIns.Null;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -5,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
@@ -136,6 +138,75 @@ public sealed partial class DomBridge
         "writing-mode",
     };
 
+    private static readonly Dictionary<string, string> UserAgentDefaultDisplayValues = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["html"] = "block",
+        ["address"] = "block",
+        ["blockquote"] = "block",
+        ["body"] = "block",
+        ["dd"] = "block",
+        ["div"] = "block",
+        ["dl"] = "block",
+        ["dt"] = "block",
+        ["fieldset"] = "block",
+        ["form"] = "block",
+        ["frame"] = "block",
+        ["frameset"] = "block",
+        ["h1"] = "block",
+        ["h2"] = "block",
+        ["h3"] = "block",
+        ["h4"] = "block",
+        ["h5"] = "block",
+        ["h6"] = "block",
+        ["noframes"] = "block",
+        ["ol"] = "block",
+        ["p"] = "block",
+        ["ul"] = "block",
+        ["center"] = "block",
+        ["dir"] = "block",
+        ["menu"] = "block",
+        ["pre"] = "block",
+        ["section"] = "block",
+        ["article"] = "block",
+        ["nav"] = "block",
+        ["aside"] = "block",
+        ["header"] = "block",
+        ["footer"] = "block",
+        ["main"] = "block",
+        ["figure"] = "block",
+        ["figcaption"] = "block",
+        ["details"] = "block",
+        ["li"] = "list-item",
+        ["summary"] = "list-item",
+        ["table"] = "table",
+        ["tr"] = "table-row",
+        ["thead"] = "table-header-group",
+        ["tbody"] = "table-row-group",
+        ["tfoot"] = "table-footer-group",
+        ["col"] = "table-column",
+        ["colgroup"] = "table-column-group",
+        ["td"] = "table-cell",
+        ["th"] = "table-cell",
+        ["caption"] = "table-caption",
+        ["button"] = "inline-block",
+        ["textarea"] = "inline-block",
+        ["input"] = "inline-block",
+        ["select"] = "inline-block",
+        ["iframe"] = "inline-block",
+        ["object"] = "inline-block",
+        ["head"] = "none",
+        ["style"] = "none",
+        ["title"] = "none",
+        ["script"] = "none",
+        ["link"] = "none",
+        ["meta"] = "none",
+        ["area"] = "none",
+        ["base"] = "none",
+        ["param"] = "none",
+        ["template"] = "none",
+        ["dialog"] = "none",
+    };
+
     private sealed class CustomPropertyRegistration
     {
         public bool Inherits { get; init; } = true;
@@ -154,10 +225,6 @@ public sealed partial class DomBridge
     private static readonly Regex MediaQueryPattern = new(
         @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex PseudoSpecificityPattern = new(
-        @"::?[a-zA-Z-]+(?:\([^)]*\))?",
-        RegexOptions.Compiled);
 
     private static readonly Regex LengthAttrFunctionPattern = new(
         @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
@@ -224,75 +291,262 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Calculates CSS Specificity (Level 3) for a simple selector.
-    /// Returns a single integer encoding (a, b, c) where a = ID selectors,
-    /// b = class / attribute / pseudo-class selectors, c = type selectors.
-    /// Inline styles use specificity 1000 (handled externally).
+    /// Calculates CSS specificity for a selector, including Selectors L4
+    /// pseudo-class functions such as <c>:is()</c>, <c>:where()</c>,
+    /// <c>:has()</c>, and <c>:nth-child(... of ...)</c>.
+    /// Returns a sortable integer encoding of (a, b, c) where a = ID selectors,
+    /// b = class / attribute / pseudo-class selectors, and c = type selectors /
+    /// pseudo-elements. Inline styles are handled separately.
     /// </summary>
     public static int CalculateSpecificity(string selector)
     {
-        int a = 0, b = 0, c = 0;
-        var s = selector.Trim();
+        var (a, b, c) = CalculateSpecificityComponents(selector);
+        return EncodeSpecificity(a, b, c);
+    }
 
-        // Remove attribute selectors and count them
-        s = AttributeSelectorPattern.Replace(s, m => { b++; return string.Empty; });
+    private static int EncodeSpecificity(int a, int b, int c) => (a * 1_000_000) + (b * 1_000) + c;
 
-        // Count pseudo-classes and pseudo-elements
-        s = PseudoSpecificityPattern.Replace(s, m =>
+    private static (int A, int B, int C) CalculateSpecificityComponents(string selector)
+    {
+        var max = (A: 0, B: 0, C: 0);
+        foreach (var candidate in SplitCommaSelectors(selector))
         {
-            var token = m.Value;
-            if (token.StartsWith("::", StringComparison.Ordinal))
+            var trimmed = candidate.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            var components = CalculateComplexSelectorSpecificity(trimmed);
+            if (EncodeSpecificity(components.A, components.B, components.C) >
+                EncodeSpecificity(max.A, max.B, max.C))
             {
-                c++; // pseudo-elements contribute to c
+                max = components;
             }
-            else
-            {
-                // :not() — specificity is that of its argument
-                if (token.StartsWith(":not(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
-                {
-                    var inner = token[5..^1].Trim();
-                    var innerSpec = CalculateSpecificity(inner);
-                    a += innerSpec / 100;
-                    b += (innerSpec / 10) % 10;
-                    c += innerSpec % 10;
-                }
-                else
-                {
-                    b++; // pseudo-classes contribute to b
-                }
-            }
+        }
+
+        return max;
+    }
+
+    private static (int A, int B, int C) CalculateComplexSelectorSpecificity(string selector)
+    {
+        int a = 0, b = 0, c = 0;
+        foreach (var (_, compound) in SplitSelectorParts(selector))
+        {
+            var (ca, cb, cc) = CalculateCompoundSpecificity(compound);
+            a += ca;
+            b += cb;
+            c += cc;
+        }
+
+        return (a, b, c);
+    }
+
+    private static (int A, int B, int C) CalculateCompoundSpecificity(string compound)
+    {
+        if (string.IsNullOrWhiteSpace(compound))
+            return (0, 0, 0);
+
+        int a = 0, b = 0, c = 0;
+        var working = compound.Trim();
+
+        working = Regex.Replace(working, @"::[A-Za-z-]+", _ =>
+        {
+            c++;
             return string.Empty;
         });
 
-        foreach (var ch in s)
+        working = AttributeSelectorPattern.Replace(working, _ =>
         {
-            if (ch == '#') a++;
-            else if (ch == '.') b++;
+            b++;
+            return string.Empty;
+        });
+
+        var pseudoClasses = ExtractPseudoClasses(working);
+        foreach (var pseudo in pseudoClasses)
+        {
+            var (pa, pb, pc) = CalculatePseudoSpecificity(pseudo.Name, pseudo.Argument);
+            a += pa;
+            b += pb;
+            c += pc;
         }
 
-        // Count type selectors: letter-only tokens not preceded by # or .
-        var pos = 0;
-        while (pos < s.Length)
+        working = RemovePseudoClasses(working, pseudoClasses);
+
+        for (int i = 0; i < working.Length; i++)
         {
-            if (s[pos] == '#' || s[pos] == '.')
+            var current = working[i];
+            switch (current)
             {
-                pos++;
-                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
-            }
-            else if (char.IsLetter(s[pos]))
-            {
-                var start = pos;
-                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
-                var token = s[start..pos].ToLowerInvariant();
-                if (token != "*") c++;
-            }
-            else
-            {
-                pos++;
+                case '#':
+                    a++;
+                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
+                    break;
+                case '.':
+                    b++;
+                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
+                    break;
+                case '*':
+                case '|':
+                    break;
+                default:
+                    if (IsTypeSelectorStart(working, i))
+                    {
+                        c++;
+                        i = ConsumeTypeSelectorName(working, i) - 1;
+                    }
+                    break;
             }
         }
 
-        return a * 100 + b * 10 + c;
+        return (a, b, c);
+    }
+
+    private static (int A, int B, int C) CalculatePseudoSpecificity(string name, string? argument)
+    {
+        var pseudoName = name.ToLowerInvariant();
+        if (pseudoName is "before" or "after" or "first-line" or "first-letter")
+            return (0, 0, 1);
+
+        return pseudoName switch
+        {
+            "is" or "not" or "has" => CalculateSpecificityComponents(argument ?? string.Empty),
+            "where" => (0, 0, 0),
+            "nth-child" or "nth-last-child" => AddSpecificity((0, 1, 0), GetNthOfSelectorSpecificity(argument)),
+            "nth-of-type" or "nth-last-of-type" => (0, 1, 0),
+            _ => (0, 1, 0)
+        };
+    }
+
+    private static (int A, int B, int C) GetNthOfSelectorSpecificity(string? argument)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+            return (0, 0, 0);
+
+        var selectorList = ExtractNthOfSelectorList(argument);
+        return string.IsNullOrWhiteSpace(selectorList)
+            ? (0, 0, 0)
+            : CalculateSpecificityComponents(selectorList);
+    }
+
+    private static string? ExtractNthOfSelectorList(string argument)
+    {
+        int parenDepth = 0;
+        int bracketDepth = 0;
+        bool inString = false;
+        char stringDelimiter = '\0';
+
+        for (int i = 0; i < argument.Length; i++)
+        {
+            var c = argument[i];
+            if (inString)
+            {
+                if (c == '\\')
+                {
+                    i++;
+                    continue;
+                }
+
+                if (c == stringDelimiter)
+                    inString = false;
+
+                continue;
+            }
+
+            if (c == '"' || c == '\'')
+            {
+                inString = true;
+                stringDelimiter = c;
+                continue;
+            }
+
+            switch (c)
+            {
+                case '(':
+                    parenDepth++;
+                    continue;
+                case ')':
+                    parenDepth = Math.Max(0, parenDepth - 1);
+                    continue;
+                case '[':
+                    bracketDepth++;
+                    continue;
+                case ']':
+                    bracketDepth = Math.Max(0, bracketDepth - 1);
+                    continue;
+            }
+
+            if (parenDepth != 0 || bracketDepth != 0 || !IsStandaloneOfKeyword(argument, i))
+                continue;
+
+            return argument[(i + 2)..].Trim();
+        }
+
+        return null;
+    }
+
+    private static bool IsStandaloneOfKeyword(string text, int index)
+    {
+        if (index + 1 >= text.Length ||
+            char.ToLowerInvariant(text[index]) != 'o' ||
+            char.ToLowerInvariant(text[index + 1]) != 'f')
+            return false;
+
+        var hasLeadingBoundary = index == 0 || char.IsWhiteSpace(text[index - 1]);
+        var trailingIndex = index + 2;
+        var hasTrailingBoundary = trailingIndex >= text.Length || char.IsWhiteSpace(text[trailingIndex]);
+        return hasLeadingBoundary && hasTrailingBoundary;
+    }
+
+    private static (int A, int B, int C) AddSpecificity((int A, int B, int C) left, (int A, int B, int C) right)
+        => (left.A + right.A, left.B + right.B, left.C + right.C);
+
+    private static bool IsTypeSelectorStart(string text, int index)
+    {
+        var current = text[index];
+        if (!char.IsLetter(current) && current != '_')
+            return false;
+
+        if (index > 0)
+        {
+            var previous = text[index - 1];
+            if (char.IsLetterOrDigit(previous) || previous is '-' or '_' or '#' or '.' or ':')
+                return false;
+        }
+
+        return true;
+    }
+
+    private static int ConsumeSimpleSelectorName(string text, int index)
+    {
+        while (index < text.Length)
+        {
+            var c = text[index];
+            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '\\')
+            {
+                index++;
+                continue;
+            }
+
+            break;
+        }
+
+        return index;
+    }
+
+    private static int ConsumeTypeSelectorName(string text, int index)
+    {
+        while (index < text.Length)
+        {
+            var c = text[index];
+            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '|' || c == '\\')
+            {
+                index++;
+                continue;
+            }
+
+            break;
+        }
+
+        return index;
     }
 
     /// <summary>
@@ -450,7 +704,7 @@ public sealed partial class DomBridge
             var selectorGroup = ruleMatch.Groups["selector"].Value.Trim();
             var declarations = ParseStyle(ruleMatch.Groups["declarations"].Value);
 
-            foreach (var sel in selectorGroup.Split(','))
+            foreach (var sel in SplitCommaSelectors(selectorGroup))
             {
                 var selector = sel.Trim();
                 if (string.IsNullOrEmpty(selector)) continue;
@@ -624,6 +878,7 @@ public sealed partial class DomBridge
     private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
         var computed = BuildComputedStyleMap(element, pseudoElement);
+        var propertyNames = computed.Keys.ToList();
         var obj = new JSObject();
 
         // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
@@ -644,9 +899,10 @@ public sealed partial class DomBridge
         foreach (var kv in computed)
         {
             var camel = ToCamelCase(kv.Key);
-            obj.FastAddValue((KeyString)kv.Key, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+            var normalized = StripCssPriority(kv.Value);
+            obj.FastAddValue((KeyString)kv.Key, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
             if (camel != kv.Key)
-                obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+                obj.FastAddValue((KeyString)camel, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // getPropertyValue method (supports both kebab-case and camelCase lookups)
@@ -658,19 +914,50 @@ public sealed partial class DomBridge
                 {
                     var name = a[0].ToString();
                     if (computed.TryGetValue(name, out var val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                     // Try kebab-case conversion for camelCase input
                     var kebab = ToKebabCase(name);
                     if (kebab != name && computed.TryGetValue(kebab, out val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                     // Try camelCase conversion for kebab-case input
                     var camel = ToCamelCase(name);
                     if (camel != name && computed.TryGetValue(camel, out val))
-                        return new JSString(val);
+                        return new JSString(StripCssPriority(val));
                 }
                 return new JSString(string.Empty);
             }, "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(propertyNames.Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
+                {
+                    if (index >= 0 && index < propertyNames.Count)
+                        return new JSString(propertyNames[index]);
+                }
+
+                return new JSString(string.Empty);
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getPropertyPriority",
+            new JSFunction((in Arguments _) => new JSString(string.Empty), "getPropertyPriority", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return obj;
     }
@@ -1513,6 +1800,23 @@ public sealed partial class DomBridge
 
     private static bool IsInheritedCssProperty(string property) =>
         CssInheritedProperties.Contains(property);
+
+    private static void ApplyUserAgentDisplayDefaults(
+        Dictionary<string, string> computed,
+        DomElement element)
+    {
+        if (computed.ContainsKey("display"))
+            return;
+
+        if (element.Attributes.ContainsKey("hidden"))
+        {
+            computed["display"] = "none";
+            return;
+        }
+
+        if (UserAgentDefaultDisplayValues.TryGetValue(element.TagName, out var display))
+            computed["display"] = display;
+    }
 
     private static int FindMatchingClosingParen(string value, int openParenIndex)
     {

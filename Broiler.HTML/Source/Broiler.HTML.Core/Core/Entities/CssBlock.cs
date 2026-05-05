@@ -62,6 +62,18 @@ public sealed class CssBlock
     public List<CssAttributeCondition> AttributeConditions { get; internal set; }
 
     /// <summary>
+    /// Encoded CSS specificity for this block using the usual
+    /// <c>(a,b,c) → a*1_000_000 + b*1_000 + c</c> ordering.
+    /// </summary>
+    public int Specificity { get; internal set; }
+
+    /// <summary>
+    /// Source-order index assigned while parsing the stylesheet so equal-
+    /// specificity rules still cascade in declaration order.
+    /// </summary>
+    public int SourceOrder { get; internal set; }
+
+    /// <summary>
     /// Property names in this block that were declared with <c>!important</c>.
     /// CSS2.1 §6.4.2: Important declarations override normal declarations
     /// regardless of specificity.
@@ -97,6 +109,8 @@ public sealed class CssBlock
     {
         var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null, Hover, PseudoClass);
         clone.IsUserAgent = IsUserAgent;
+        clone.Specificity = Specificity;
+        clone.SourceOrder = SourceOrder;
         if (_importantProperties != null)
             clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
         if (AttributeConditions != null)

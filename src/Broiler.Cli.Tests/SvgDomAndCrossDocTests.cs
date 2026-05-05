@@ -548,6 +548,297 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void SubDoc_CreateEvent_CustomEvent_Has_InitCustomEvent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('CustomEvent');
+var before = [typeof evt.initCustomEvent, evt.detail].join(',');
+evt.initCustomEvent('build', true, false, 'payload');
+var after = [];
+after.push(evt.type);
+after.push(evt.bubbles);
+after.push(evt.cancelable);
+after.push(evt.detail);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("function,0|build,true,false,payload", result);
+    }
+
+    [Fact]
+    public void SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('KeyboardEvents');
+var before = [typeof evt.repeat, evt.repeat].join(',');
+evt.initKeyboardEvent('keydown', true, false, window, 'Enter', 1, true, false, true, false, true, 13, 0);
+var after = [];
+after.push(evt.repeat);
+after.push(evt.keyCode);
+after.push(evt.charCode);
+after.push(evt.which);
+document.getElementById('result').textContent = before + '|' + after.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("boolean,false|true,13,0,13", result);
+    }
+
+    [Fact]
+    public void SubDoc_CreateEvent_Event_Has_IsTrusted_False()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('Event');
+var r = [];
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("boolean,false", result);
+    }
+
+    [Fact]
+    public void SubDoc_CreateEvent_Event_Has_TimeStamp()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('Event');
+var r = [];
+r.push(typeof evt.timeStamp);
+r.push(evt.timeStamp >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("number,true", result);
+    }
+
+    [Fact]
+    public void SubDoc_CreateEvent_Event_Has_Legacy_Alias_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var doc = iframe.contentDocument;
+var evt = doc.createEvent('Event');
+var r = [];
+r.push(typeof evt.srcElement);
+r.push(evt.srcElement === null);
+r.push(evt.cancelBubble);
+r.push(evt.returnValue);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("object,true,false,true", result);
+    }
+
+    [Fact]
+    public void SubDoc_Event_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.Event('test', { bubbles: true, cancelable: false });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(typeof evt.isTrusted);
+r.push(evt.isTrusted);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("test,true,false,boolean,false", result);
+    }
+
+    [Fact]
+    public void SubDoc_CustomEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.CustomEvent('build', { bubbles: true, cancelable: false, detail: 'payload' });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+r.push(evt.srcElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("build,true,false,payload,number,true", result);
+    }
+
+    [Fact]
+    public void SubDoc_UIEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.UIEvent('build', { bubbles: true, cancelable: false, view: win, detail: 6 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.view === win);
+r.push(evt.detail);
+r.push(typeof evt.timeStamp);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("build,true,false,true,6,number", result);
+    }
+
+    [Fact]
+    public void SubDoc_MouseEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 30, clientY: 40, button: 2 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.clientX);
+r.push(evt.clientY);
+r.push(evt.button);
+r.push(evt.buttons);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("click,true,true,30,40,2,2", result);
+    }
+
+    [Fact]
+    public void SubDoc_FocusEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var related = document.createElement('input');
+var evt = new win.FocusEvent('focusin', { bubbles: true, detail: 7, relatedTarget: related });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.detail);
+r.push(evt.relatedTarget === related);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("focusin,true,7,true", result);
+    }
+
+    [Fact]
+    public void SubDoc_KeyboardEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.KeyboardEvent('keydown', { bubbles: true, key: 'Enter', location: 1, repeat: true, keyCode: 13 });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.key);
+r.push(evt.location);
+r.push(evt.repeat);
+r.push(evt.keyCode);
+r.push(evt.which);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("keydown,true,Enter,1,true,13,13", result);
+    }
+
+    [Fact]
+    public void SubDoc_WheelEvent_Constructor_Uses_SubWindow_Surface()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var iframe = document.createElement('iframe');
+var win = iframe.contentWindow;
+var evt = new win.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: 1.5, deltaY: -2.5, deltaMode: 1, ctrlKey: true });
+var r = [];
+r.push(evt.type);
+r.push(evt.bubbles);
+r.push(evt.cancelable);
+r.push(evt.ctrlKey);
+r.push(evt.deltaX);
+r.push(evt.deltaY);
+r.push(evt.deltaMode);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("wheel,true,true,true,1.5,-2.5,1", result);
+    }
+
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
     [Fact]

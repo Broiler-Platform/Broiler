@@ -152,6 +152,161 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("doc-capture,target,doc-bubble", result);
     }
 
+    [Fact]
+    public void AddEventListener_OptionsObject_Capture_And_Remove_Work()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+var handler = function(e) { r.push('capture'); };
+parent.addEventListener('test', handler, { capture: true });
+parent.removeEventListener('test', handler, { capture: true });
+parent.addEventListener('test', function(e) { r.push('bubble'); }, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+child.dispatchEvent(evt);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">bubble<", result);
+        Assert.DoesNotContain(">capture<", result);
+    }
+
+    [Fact]
+    public void AddEventListener_Once_Option_Fires_Only_Once()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var count = 0;
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) { count++; }, { once: true });
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">1<", result);
+    }
+
+    [Fact]
+    public void Passive_Listener_PreventDefault_Does_Not_Cancel_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, true);
+target.addEventListener('test', function(e) { e.preventDefault(); }, { passive: true });
+var r = [];
+r.push('' + target.dispatchEvent(evt));
+r.push('' + evt.defaultPrevented);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,false", result);
+    }
+
+    [Fact]
+    public void Focus_And_Blur_Do_Not_Bubble()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><input id=""child""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('focus', function(e) { r.push('parent-focus'); }, false);
+parent.addEventListener('blur', function(e) { r.push('parent-blur'); }, false);
+child.addEventListener('focus', function(e) { r.push('child-focus'); }, false);
+child.addEventListener('blur', function(e) { r.push('child-blur'); }, false);
+child.focus();
+child.blur();
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">child-focus,child-blur<", result);
+    }
+
+    [Fact]
+    public void Event_ComposedPath_Includes_Target_Ancestors_Document_And_Window()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""child""></div></div>
+<div id=""result""></div>
+<script>
+var parent = document.getElementById('parent');
+var child = document.getElementById('child');
+parent.addEventListener('test', function(e) {
+    var path = e.composedPath();
+    var names = [];
+    for (var i = 0; i < path.length; i++) {
+        var node = path[i];
+        if (node === window) names.push('window');
+        else names.push((node.id || node.nodeName || '').toLowerCase());
+    }
+    document.getElementById('result').textContent = path.length + '|' + names.slice(0, 5).join('>');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+child.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("6|child&gt;parent&gt;body&gt;html&gt;#document", result);
+    }
+
+    [Fact]
+    public void Window_AddEventListener_Once_Option_Fires_Only_Once()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var count = 0;
+window.addEventListener('test', function(e) { count++; }, { once: true });
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+window.dispatchEvent(evt);
+window.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">1<", result);
+    }
+
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
 
     [Fact]
@@ -319,7 +474,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("fired:true", result);
     }
 
-    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    [Fact]
     public void Acid3_Test26_Document_Tree_Lifecycle_Cross_Document_Move()
     {
         // Moving nodes between documents: create in one doc, append in another
@@ -329,27 +484,28 @@ document.getElementById('result').textContent = r.join('|');
 <script>
 var r = [];
 var newDoc = document.implementation.createDocument(null, 'root', null);
-r.push('D' + (newDoc.documentElement.tagName === 'root' ? '1' : '0'));
+        r.push('D' + (newDoc.documentElement.tagName.toLowerCase() === 'root' ? '1' : '0'));
 var div = document.createElement('div');
 div.setAttribute('id', 'moved');
 div.textContent = 'content';
 r.push('O' + (div.ownerDocument === document ? '1' : '0'));
-// Cross-document appendChild (implicitly adopts)
-newDoc.documentElement.appendChild(div);
-r.push('P' + (div.parentNode === newDoc.documentElement ? '1' : '0'));
-r.push('T' + div.textContent);
-r.push('I' + div.getAttribute('id'));
-document.getElementById('result').textContent = r.join(',');
+        // Cross-document appendChild (implicitly adopts)
+        newDoc.documentElement.appendChild(div);
+        r.push('P' + (div.parentNode === newDoc.documentElement ? '1' : '0'));
+        r.push('N' + (div.ownerDocument === newDoc ? '1' : '0'));
+        r.push('T' + div.textContent);
+        r.push('I' + div.getAttribute('id'));
+        document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         // Node moved cross-document preserves attributes and content
-        Assert.Contains("D1,O1,P1,Tcontent,Imoved", result);
+        Assert.Contains("D1,O1,P1,N1,Tcontent,Imoved", result);
     }
 
-    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    [Fact]
     public void Acid3_Test27_Cross_Document_Subtree_Preserves_Structure()
     {
         // Moving a subtree cross-document preserves children, attributes, and text
@@ -366,21 +522,23 @@ child.setAttribute('data-val', '42');
 child.textContent = 'kept';
 parent.appendChild(child);
 // Cross-document appendChild
-newDoc.documentElement.appendChild(parent);
-r.push('A' + parent.getAttribute('class'));
-r.push('C' + parent.childNodes.length);
-r.push('T' + parent.firstChild.tagName.toLowerCase());
-r.push('V' + parent.firstChild.getAttribute('data-val'));
-r.push('X' + parent.firstChild.textContent);
-r.push('P' + (parent.parentNode === newDoc.documentElement ? '1' : '0'));
-document.getElementById('result').textContent = r.join(',');
+        newDoc.documentElement.appendChild(parent);
+        r.push('A' + parent.getAttribute('class'));
+        r.push('C' + parent.childNodes.length);
+        r.push('T' + parent.firstChild.tagName.toLowerCase());
+        r.push('V' + parent.firstChild.getAttribute('data-val'));
+        r.push('X' + parent.firstChild.textContent);
+        r.push('N' + (parent.ownerDocument === newDoc ? '1' : '0'));
+        r.push('M' + (parent.firstChild.ownerDocument === newDoc ? '1' : '0'));
+        r.push('P' + (parent.parentNode === newDoc.documentElement ? '1' : '0'));
+        document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         // Subtree structure, attributes, and text survive cross-document move
-        Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,P1", result);
+        Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,N1,M1,P1", result);
     }
 
     [Fact]

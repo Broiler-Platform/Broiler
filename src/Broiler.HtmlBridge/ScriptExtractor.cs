@@ -78,10 +78,12 @@ public sealed class ScriptExtractor : IScriptExtractor
     public IReadOnlyList<string> Extract(string html)
     {
         var scripts = new List<string>();
+        var csp = ContentSecurityPolicy.FromHtml(html);
 
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
+            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
 
             // Skip module scripts — they are extracted separately
             if (ModuleTypeAttribute.IsMatch(attrs))
@@ -91,6 +93,9 @@ public sealed class ScriptExtractor : IScriptExtractor
             var dataSrcMatch = DataSrcAttrPattern.Match(attrs);
             if (dataSrcMatch.Success)
             {
+                if (csp != null && !csp.AllowsExternalScript(dataSrcMatch.Groups["uri"].Value, pageUrl: null, nonce))
+                    continue;
+
                 var decoded = DecodeDataUri(dataSrcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
                     scripts.Add(decoded);
@@ -103,7 +108,7 @@ public sealed class ScriptExtractor : IScriptExtractor
 
             // Inline script
             var content = match.Groups["content"].Value.Trim();
-            if (!string.IsNullOrEmpty(content))
+            if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
             {
                 scripts.Add(content);
             }
@@ -118,10 +123,12 @@ public sealed class ScriptExtractor : IScriptExtractor
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var asyncScripts = new List<string>();
+        var csp = ContentSecurityPolicy.FromHtml(html);
 
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
+            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
 
             // Skip module scripts — they are extracted separately
             if (ModuleTypeAttribute.IsMatch(attrs))
@@ -135,6 +142,9 @@ public sealed class ScriptExtractor : IScriptExtractor
             var dataSrcMatch = DataSrcAttrPattern.Match(attrs);
             if (dataSrcMatch.Success)
             {
+                if (csp != null && !csp.AllowsExternalScript(dataSrcMatch.Groups["uri"].Value, pageUrl, nonce))
+                    continue;
+
                 var decoded = DecodeDataUri(dataSrcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
                     scriptContent = decoded;
@@ -146,6 +156,9 @@ public sealed class ScriptExtractor : IScriptExtractor
                 if (anySrcMatch.Success)
                 {
                     var srcUri = anySrcMatch.Groups["uri"].Value;
+                    if (csp != null && !csp.AllowsExternalScript(srcUri, pageUrl, nonce))
+                        continue;
+
                     var fetched = FetchExternalScript(srcUri, pageUrl);
                     if (!string.IsNullOrEmpty(fetched))
                         scriptContent = fetched;
@@ -154,7 +167,7 @@ public sealed class ScriptExtractor : IScriptExtractor
                 {
                     // Inline script
                     var content = match.Groups["content"].Value.Trim();
-                    if (!string.IsNullOrEmpty(content))
+                    if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
                         scriptContent = content;
                 }
             }

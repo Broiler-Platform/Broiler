@@ -780,6 +780,7 @@ public sealed partial class DomBridge
                 {
                     newEl.Parent?.Children.Remove(newEl);
                     newEl.Parent = element;
+                    AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                     element.Children.Add(newEl);
                     bridgeForInsert.InvalidateStyleScope(element);
 
@@ -803,6 +804,7 @@ public sealed partial class DomBridge
 
                 newEl.Parent?.Children.Remove(newEl);
                 newEl.Parent = element;
+                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 // Re-find index: removing newEl from its old parent may have shifted
                 // indices if newEl was a sibling of refEl within this same parent.
                 idx = element.Children.IndexOf(refEl);
@@ -956,6 +958,7 @@ public sealed partial class DomBridge
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
+                AdoptSubtreeIntoDocument(childEl, element.OwnerDocRoot);
                 element.Children.Add(childEl);
                 bridgeForAppend.InvalidateStyleScope(element);
 
@@ -1027,6 +1030,7 @@ public sealed partial class DomBridge
 
                 oldEl.Parent = null;
                 newEl.Parent = element;
+                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 element.Children[idx] = newEl;
                 bridgeForAppend.InvalidateStyleScope(element);
                 return a[1]; // returns the old child
@@ -1065,13 +1069,12 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
                 if (!element.EventListeners.TryGetValue(type, out var listeners))
                 {
                     listeners = [];
                     element.EventListeners[type] = listeners;
                 }
-                listeners.Add((listener, capture));
+                listeners.Add(CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value));
                 return JSUndefined.Value;
             }, "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1084,7 +1087,7 @@ public sealed partial class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
-                var capture = a.Length > 2 && a[2].BooleanValue;
+                var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
                 if (element.EventListeners.TryGetValue(type, out var listeners))
                 {
                     for (int i = listeners.Count - 1; i >= 0; i--)
@@ -1211,6 +1214,54 @@ public sealed partial class DomBridge
             }, "click", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // element.focus() — creates and dispatches a FocusEvent-like object
+        obj.FastAddValue(
+            (KeyString)"focus",
+            new JSFunction((in Arguments _) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("focus"), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", _windowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                bridge.DispatchEventOnElement(element, evt);
+                return JSUndefined.Value;
+            }, "focus", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // element.blur() — creates and dispatches a FocusEvent-like object
+        obj.FastAddValue(
+            (KeyString)"blur",
+            new JSFunction((in Arguments _) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("blur"), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", _windowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                bridge.DispatchEventOnElement(element, evt);
+                return JSUndefined.Value;
+            }, "blur", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // on* inline event handler properties (onclick, onload, etc.)
         foreach (var eventName in InlineEventNames)
         {
@@ -1244,6 +1295,9 @@ public sealed partial class DomBridge
             (KeyString)"value",
             new JSFunction((in Arguments a) =>
             {
+                if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
+                    return new JSString(GetSelectValue(element));
+
                 if (element.DomProperties.TryGetValue("_value", out var domVal) && domVal is string sv)
                     return new JSString(sv);
                 if (element.Attributes.TryGetValue("value", out var val))
@@ -1256,6 +1310,8 @@ public sealed partial class DomBridge
                 var v = a.Length > 0 ? a[0].ToString() : string.Empty;
                 if (tag == "input")
                     element.DomProperties["_value"] = v; // IDL value, not reflected
+                else if (tag == "select")
+                    SetSelectValue(element, v);
                 else
                     element.Attributes["value"] = v;
                 return JSUndefined.Value;
@@ -1419,9 +1475,9 @@ public sealed partial class DomBridge
 
                     if (element.EventListeners.TryGetValue("submit", out var submitListeners))
                     {
-                        foreach (var (listener, _) in submitListeners.ToList())
+                        foreach (var registration in submitListeners.ToList())
                         {
-                            if (listener is JSFunction fn)
+                            if (registration.Listener is JSFunction fn)
                             {
                                 try { fn.InvokeFunction(new Arguments(fn, submitEvt)); }
                                 catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.submit", $"Submit listener error: {ex.Message}", ex); }
@@ -1867,6 +1923,63 @@ public sealed partial class DomBridge
                 }, "get cells"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddValue(
+                (KeyString)"insertCell",
+                new JSFunction((in Arguments a) =>
+                {
+                    var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
+                    var td = new DomElement("td", null, null, string.Empty);
+                    bridge._elements.Add(td);
+                    td.Parent = element;
+
+                    var cells = element.Children
+                        .Where(c => !c.IsTextNode && IsTableCellElement(c))
+                        .ToList();
+
+                    if (index < 0 || index >= cells.Count)
+                    {
+                        element.Children.Add(td);
+                    }
+                    else
+                    {
+                        var referenceCell = cells[index];
+                        var childIndex = element.Children.IndexOf(referenceCell);
+                        if (childIndex < 0)
+                            element.Children.Add(td);
+                        else
+                            element.Children.Insert(childIndex, td);
+                    }
+
+                    return ToJSObject(td);
+                }, "insertCell", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"deleteCell",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0)
+                        throw new JSException("Failed to execute 'deleteCell' on 'HTMLTableRowElement': 1 argument required, but only 0 present.");
+
+                    var index = (int)Math.Truncate(a[0].DoubleValue);
+                    var cells = element.Children
+                        .Where(c => !c.IsTextNode && IsTableCellElement(c))
+                        .ToList();
+
+                    if (index < 0)
+                        index = cells.Count + index;
+
+                    if (index < 0 || index >= cells.Count)
+                        throw new JSException("INDEX_SIZE_ERR");
+
+                    var cell = cells[index];
+                    cell.Parent = null;
+                    element.Children.Remove(cell);
+
+                    return JSUndefined.Value;
+                }, "deleteCell", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // HTMLFormElement interface
@@ -2057,21 +2170,16 @@ public sealed partial class DomBridge
             obj.FastAddProperty(
                 (KeyString)"selectedIndex",
                 new JSFunction((in Arguments _) =>
+                    new JSNumber(GetSelectSelectedIndex(element)),
+                    "get selectedIndex"),
+                new JSFunction((in Arguments a) =>
                 {
-                    var idx = 0;
-                    foreach (var c in element.Children)
-                    {
-                        if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (c.Attributes.ContainsKey("selected") ||
-                                (c.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true))
-                                return new JSNumber(idx);
-                            idx++;
-                        }
-                    }
-                    return new JSNumber(0); // default: first option is selected
-                }, "get selectedIndex"),
-                null,
+                    var index = a.Length == 0
+                        ? -1
+                        : (int)Math.Truncate(a[0].DoubleValue);
+                    SetSelectSelectedIndex(element, index);
+                    return JSUndefined.Value;
+                }, "set selectedIndex"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             obj.FastAddProperty(
@@ -2531,15 +2639,8 @@ public sealed partial class DomBridge
                         double.TryParse(valueStr, System.Globalization.NumberStyles.Any,
                             System.Globalization.CultureInfo.InvariantCulture, out var numVal);
 
-                        var baseVal = new JSObject();
-                        baseVal.FastAddValue((KeyString)"value", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
-                        baseVal.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
-                        baseVal.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue); // SVG_LENGTHTYPE_NUMBER
-
-                        var animVal = new JSObject();
-                        animVal.FastAddValue((KeyString)"value", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
-                        animVal.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
-                        animVal.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+                        var baseVal = CreateSvgLengthValue(numVal);
+                        var animVal = CreateSvgLengthValue(numVal);
 
                         animLength.FastAddValue((KeyString)"baseVal", baseVal, JSPropertyAttributes.EnumerableConfigurableValue);
                         animLength.FastAddValue((KeyString)"animVal", animVal, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3319,6 +3420,8 @@ public sealed partial class DomBridge
                     break;
                 if (sibling.IsTextNode)
                     continue;
+                if (!HasAssociatedLayoutBox(sibling))
+                    continue;
 
                 var siblingProps = GetComputedProps(sibling);
                 var siblingPosition = siblingProps.GetValueOrDefault("position");
@@ -3445,6 +3548,8 @@ public sealed partial class DomBridge
                 if (ReferenceEquals(sibling, element))
                     break;
                 if (sibling.IsTextNode)
+                    continue;
+                if (!HasAssociatedLayoutBox(sibling))
                     continue;
 
                 var siblingRect = ComputeRenderedRect(sibling);
@@ -4486,6 +4591,119 @@ public sealed partial class DomBridge
         return count;
     }
 
+    private static JSObject CreateSvgLengthValue(double numericValue)
+    {
+        var svgLength = new JSObject();
+        svgLength.FastAddValue((KeyString)"value", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_UNKNOWN", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_NUMBER", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PERCENTAGE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EMS", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EXS", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PX", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_CM", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_MM", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_IN", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PT", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PC", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+        return svgLength;
+    }
+
+    private static List<DomElement> CollectSelectOptions(DomElement element)
+    {
+        var options = new List<DomElement>();
+        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        {
+            if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
+            {
+                options.Add(child);
+                continue;
+            }
+
+            options.AddRange(CollectSelectOptions(child));
+        }
+
+        return options;
+    }
+
+    private static int GetSelectSelectedIndex(DomElement element)
+    {
+        var options = CollectSelectOptions(element);
+        if (options.Count == 0)
+            return -1;
+
+        if (element.DomProperties.TryGetValue("_selectedIndex", out var explicitIndex) &&
+            explicitIndex is int dirtyIndex)
+        {
+            return dirtyIndex >= 0 && dirtyIndex < options.Count ? dirtyIndex : -1;
+        }
+
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            if (option.Attributes.ContainsKey("selected") ||
+                (option.DomProperties.TryGetValue("_defaultSelected", out var defaultSelected) && defaultSelected is true))
+            {
+                return index;
+            }
+        }
+
+        return 0;
+    }
+
+    private static void SetSelectSelectedIndex(DomElement element, int index)
+    {
+        var options = CollectSelectOptions(element);
+        if (options.Count == 0)
+        {
+            element.DomProperties["_selectedIndex"] = -1;
+            return;
+        }
+
+        if (index < 0 || index >= options.Count)
+            index = -1;
+
+        element.DomProperties["_selectedIndex"] = index;
+    }
+
+    private static string GetSelectValue(DomElement element)
+    {
+        var options = CollectSelectOptions(element);
+        var selectedIndex = GetSelectSelectedIndex(element);
+        if (selectedIndex < 0 || selectedIndex >= options.Count)
+            return string.Empty;
+
+        var option = options[selectedIndex];
+        if (option.DomProperties.TryGetValue("_value", out var domValue) && domValue is string stringValue)
+            return stringValue;
+
+        if (option.Attributes.TryGetValue("value", out var attrValue))
+            return attrValue;
+
+        return option.TextContent;
+    }
+
+    private static void SetSelectValue(DomElement element, string value)
+    {
+        var options = CollectSelectOptions(element);
+        for (var index = 0; index < options.Count; index++)
+        {
+            var option = options[index];
+            var optionValue = option.Attributes.TryGetValue("value", out var attrValue)
+                ? attrValue
+                : option.TextContent;
+            if (string.Equals(optionValue, value, StringComparison.Ordinal))
+            {
+                element.DomProperties["_selectedIndex"] = index;
+                return;
+            }
+        }
+
+        element.DomProperties["_selectedIndex"] = -1;
+    }
+
     private IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)
     {
         foreach (var child in EnumerateRenderedChildren(element))
@@ -5494,6 +5712,20 @@ public sealed partial class DomBridge
             (KeyString)"window",
             subWindow,
             JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["Event"] is { } eventCtor)
+            subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["CustomEvent"] is { } customEventCtor)
+            subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["MouseEvent"] is { } mouseEventCtor)
+            subWindow.FastAddValue((KeyString)"MouseEvent", mouseEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["FocusEvent"] is { } focusEventCtor)
+            subWindow.FastAddValue((KeyString)"FocusEvent", focusEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["KeyboardEvent"] is { } keyboardEventCtor)
+            subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
+            subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["UIEvent"] is { } uiEventCtor)
+            subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
@@ -6556,24 +6788,83 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var evt = new JSObject();
+                var legacyCancelBubble = false;
                 evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"screenY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"clientY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"ctrlKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"key", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"location", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"repeat", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"keyCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"charCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
-                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopPropagation", 0),
+                    new JSFunction((in Arguments __) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopPropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopImmediatePropagation",
-                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                    new JSFunction((in Arguments __) =>
+                    {
+                        legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "stopImmediatePropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"preventDefault",
-                    new JSFunction((in Arguments __) => JSUndefined.Value, "preventDefault", 0),
+                    new JSFunction((in Arguments __) =>
+                    {
+                        evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "preventDefault", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddProperty(
+                    (KeyString)"cancelBubble",
+                    new JSFunction((in Arguments __) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+                            legacyCancelBubble = true;
+                        return JSUndefined.Value;
+                    }, "set cancelBubble"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                evt.FastAddProperty(
+                    (KeyString)"returnValue",
+                    new JSFunction((in Arguments __) => evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+                    new JSFunction((in Arguments setArgs) =>
+                    {
+                        if (setArgs.Length > 0 && !setArgs[0].BooleanValue)
+                            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        return JSUndefined.Value;
+                    }, "set returnValue"),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
                 evt.FastAddValue((KeyString)"initEvent",
                     new JSFunction((in Arguments initArgs) =>
                     {
@@ -6601,6 +6892,191 @@ public sealed partial class DomBridge
                             evt[(KeyString)"detail"] = initArgs[4];
                         return JSUndefined.Value;
                     }, "initUIEvent", 5),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initCustomEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        evt[(KeyString)"detail"] = initArgs.Length > 3
+                            ? initArgs[3]
+                            : JSNull.Value;
+                        return JSUndefined.Value;
+                    }, "initCustomEvent", 4),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initFocusEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"relatedTarget"] = initArgs[5];
+                        return JSUndefined.Value;
+                    }, "initFocusEvent", 6),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initKeyboardEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"key"] = new JSString(initArgs[4].ToString());
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"location"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"ctrlKey"] = initArgs[6].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 7)
+                            evt[(KeyString)"altKey"] = initArgs[7].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 8)
+                            evt[(KeyString)"shiftKey"] = initArgs[8].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"metaKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"repeat"] = initArgs[10].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                        {
+                            var keyCode = initArgs[11].DoubleValue;
+                            evt[(KeyString)"keyCode"] = new JSNumber(keyCode);
+                            evt[(KeyString)"which"] = new JSNumber(keyCode);
+                        }
+                        if (initArgs.Length > 12)
+                        {
+                            var charCode = initArgs[12].DoubleValue;
+                            evt[(KeyString)"charCode"] = new JSNumber(charCode);
+                            if (charCode != 0)
+                                evt[(KeyString)"which"] = new JSNumber(charCode);
+                        }
+                        return JSUndefined.Value;
+                    }, "initKeyboardEvent", 13),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initMouseEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                        {
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
+                        if (initArgs.Length > 8)
+                        {
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"ctrlKey"] = initArgs[9].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"altKey"] = initArgs[10].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 11)
+                            evt[(KeyString)"shiftKey"] = initArgs[11].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"metaKey"] = initArgs[12].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 13)
+                        {
+                            var button = initArgs[13].DoubleValue;
+                            evt[(KeyString)"button"] = new JSNumber(button);
+                            evt[(KeyString)"buttons"] = new JSNumber(button switch
+                            {
+                                0 => 1,
+                                1 => 4,
+                                2 => 2,
+                                _ => 0
+                            });
+                        }
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"relatedTarget"] = initArgs[14];
+                        return JSUndefined.Value;
+                    }, "initMouseEvent", 15),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initWheelEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = new JSNumber(initArgs[4].DoubleValue);
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"screenX"] = new JSNumber(initArgs[5].DoubleValue);
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"screenY"] = new JSNumber(initArgs[6].DoubleValue);
+                        if (initArgs.Length > 7)
+                        {
+                            evt[(KeyString)"clientX"] = new JSNumber(initArgs[7].DoubleValue);
+                            evt[(KeyString)"x"] = new JSNumber(initArgs[7].DoubleValue);
+                        }
+                        if (initArgs.Length > 8)
+                        {
+                            evt[(KeyString)"clientY"] = new JSNumber(initArgs[8].DoubleValue);
+                            evt[(KeyString)"y"] = new JSNumber(initArgs[8].DoubleValue);
+                        }
+                        if (initArgs.Length > 9)
+                            evt[(KeyString)"button"] = new JSNumber(initArgs[9].DoubleValue);
+                        if (initArgs.Length > 10)
+                            evt[(KeyString)"relatedTarget"] = initArgs[10];
+                        if (initArgs.Length > 11)
+                        {
+                            var modifiers = initArgs[11].ToString()
+                                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            evt[(KeyString)"ctrlKey"] = Array.Exists(modifiers, m => string.Equals(m, "Control", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"altKey"] = Array.Exists(modifiers, m => string.Equals(m, "Alt", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"shiftKey"] = Array.Exists(modifiers, m => string.Equals(m, "Shift", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                            evt[(KeyString)"metaKey"] = Array.Exists(modifiers, m => string.Equals(m, "Meta", StringComparison.OrdinalIgnoreCase))
+                                ? JSBoolean.True
+                                : JSBoolean.False;
+                        }
+                        if (initArgs.Length > 12)
+                            evt[(KeyString)"deltaX"] = new JSNumber(initArgs[12].DoubleValue);
+                        if (initArgs.Length > 13)
+                            evt[(KeyString)"deltaY"] = new JSNumber(initArgs[13].DoubleValue);
+                        if (initArgs.Length > 14)
+                            evt[(KeyString)"deltaZ"] = new JSNumber(initArgs[14].DoubleValue);
+                        if (initArgs.Length > 15)
+                            evt[(KeyString)"deltaMode"] = new JSNumber(initArgs[15].DoubleValue);
+                        return JSUndefined.Value;
+                    }, "initWheelEvent", 16),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 return evt;
             }, "createEvent", 1),
@@ -6802,6 +7278,7 @@ public sealed partial class DomBridge
                         if (child.Parent != null)
                             child.Parent.Children.Remove(child);
                         child.Parent = docRoot;
+                        AdoptSubtreeIntoDocument(child, docRoot);
                         docRoot.Children.Add(child);
                         return childObj;
                     }
@@ -7576,7 +8053,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+            if (!child.IsTextNode && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
                 results.Add(ToJSObject(child));
             CollectByTagName(child, tag, results);
         }

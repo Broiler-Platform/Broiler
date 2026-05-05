@@ -1,7 +1,7 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: Draft for team review  
-> **Tracking issue**: Create a detailed roadmap for advancing broiler engines to full standard-compliance and performance  
+> **Status**: Execution kickoff in progress
+> **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
 ---
@@ -20,8 +20,10 @@
 10. [Bottlenecks and Major Challenges](#10-bottlenecks-and-major-challenges)
 11. [Estimated Timelines and Resourcing](#11-estimated-timelines-and-resourcing)
 12. [Governance, Tracking, and Review Cadence](#12-governance-tracking-and-review-cadence)
-13. [Related Roadmaps](#13-related-roadmaps)
-14. [Open Questions](#14-open-questions)
+13. [Execution Backlog and Proposed Sub-Issues](#13-execution-backlog-and-proposed-sub-issues)
+14. [Implementation Notes and Key Decisions](#14-implementation-notes-and-key-decisions)
+15. [Related Roadmaps](#15-related-roadmaps)
+16. [Open Questions](#16-open-questions)
 
 ---
 
@@ -47,7 +49,7 @@ It does **not** restate the deep, per-area roadmaps that already exist in the
 repository. Instead, it links them, fills gaps they do not cover (notably
 HtmlBridge), and provides the cross-cutting milestones, exit criteria, and
 performance targets that bind them together. See
-[Section 13](#13-related-roadmaps) for the existing roadmaps this plan
+[Section 15](#15-related-roadmaps) for the existing roadmaps this plan
 incorporates by reference.
 
 The recommended strategy is **specification-first, seam-driven, and
@@ -481,7 +483,457 @@ have a single accountable owner each** for the duration of the roadmap.
 
 ---
 
-## 13. Related Roadmaps
+## 13. Execution Backlog and Proposed Sub-Issues
+
+The umbrella tracker for execution is [issue #1064](https://github.com/MaiRat/Broiler/issues/1064).
+The items below are the **ready-to-file sub-issue queue** for the major
+deliverables in this roadmap. Existing area-specific roadmap documents remain
+the source of truth for detailed task lists; these issue seeds define the
+cross-engine milestone framing, labels, and dependencies needed to execute the
+plan.
+
+| Proposed sub-issue | Workstreams | Milestone window | Suggested labels | Depends on | Deliverable / exit signal |
+|---|---|---|---|---|---|
+| **Stand up the unified conformance dashboard** | W1 | M0 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance` | #1064 | Publish PR/nightly reporting for Test262, WPT, and Acid3 deltas from one place |
+| **Establish baseline benchmark harness and budgets** | W6 | M0 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | #1064 | Capture the M0 baseline of record for JS, HTML, bridge, and end-to-end capture metrics |
+| **Document and harden JS ↔ Bridge ↔ HTML boundaries** | W2 | M1 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance` | dashboard + benchmark baselines | Produce a versioned bridge-surface/spec map and remove leaking engine-internal types from public seams |
+| **Close the ES2025 compliance gap in `Broiler.JavaScript`** | W3 | M2 | `engine:js`, `area:conformance` | dashboard, boundary map | Land the ratified ES2025 features tracked in `ECMASCRIPT_ROADMAP.md` with Test262 trend reporting |
+| **Execute the targeted HTML/CSS compliance push** | W4 | M2–M3 | `engine:html`, `area:conformance` | dashboard, boundary map | Retire the highest-value Acid/WPT failures and publish a single HTML/CSS pass-rate signal |
+| **Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets** | W5 | M2–M3 | `engine:bridge`, `area:conformance` | boundary map, dashboard | Close the bridge-level gaps for events, CSSOM, microtasks, CSP, Fetch subset, and structured clone |
+| **Finish the graphics backend cutover and remove legacy default paths** | W7 | M1–M4 | `engine:html`, `area:perf` | dashboard, benchmark baselines | Complete the Skia-replacement roadmap through default-build cutover without reintroducing backend-specific public APIs |
+| **Hit roadmap performance budgets and wire per-PR regression gates** | W6 | M1–M4 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | baseline benchmark harness, boundary hardening | Enforce the roadmap budget bands in CI and close the M4 optimization goals |
+| **Adopt steady-state standards tracking and support-matrix governance** | W1–W6 | M5 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance`, `area:perf` | M0–M4 complete | Convert the roadmap from catch-up execution to release-by-release sustaining work |
+
+### 13.1 Recommended filing order
+
+File the sub-issues in the sequence below so baseline work lands before
+behavioral or performance-sensitive changes:
+
+1. Unified conformance dashboard (W1 / M0)
+2. Baseline benchmark harness and budgets (W6 / M0)
+3. Engine-boundary hardening + bridge surface/spec map (W2 / M1)
+4. Graphics backend completion continuation (W7 / M1–M4)
+5. JavaScript ES2025 compliance push (W3 / M2)
+6. HTML/CSS compliance push (W4 / M2–M3)
+7. HtmlBridge DOM/Web API compliance push (W5 / M2–M3)
+8. Performance hardening and CI regression gates (W6 / M1–M4)
+9. Steady-state governance/support matrix follow-up (M5)
+
+### 13.2 Milestone-to-sub-issue checklist
+
+- [ ] **M0** — file and start the W1/W6 baseline issues; publish the baseline of record
+- [ ] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
+- [ ] **M2** — file and start W3/W4/W5 targeted compliance issues with spec-cited scopes
+- [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
+- [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
+- [ ] **M5** — file sustaining-governance issue(s) for standards feed intake and support-matrix publication
+
+---
+
+## 14. Implementation Notes and Key Decisions
+
+These notes are the in-repo companion to issue
+[#1064](https://github.com/MaiRat/Broiler/issues/1064). Keep them short,
+dated, and decision-oriented so contributors can see why the next set of
+sub-issues was filed or re-prioritized.
+
+### 14.1 Implementation notes
+
+- **2026-04-30** — Execution kickoff: converted this document from a pure draft
+  into an execution tracker by adding a ready-to-file sub-issue backlog, a
+  milestone filing order, and a milestone checklist aligned to `#1064`.
+- **2026-04-30** — JavaScript roadmap continuation: repaired the focused
+  `Broiler.JavaScript.BuiltIns.Tests` project after namespace drift and added
+  ES2025 coverage for Iterator helpers, `Promise.try`, `RegExp.escape`, and the
+  remaining Set methods. `dotnet test Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj`
+  now passes with 68/68 tests green.
+- **2026-04-30** — HtmlBridge event-audit continuation: added support for
+  `addEventListener` option objects (`capture`, `once`, `passive`) and
+  `Event.composedPath()` across bridge-dispatched DOM events, then covered the
+  behavior in focused DOM-event regressions. `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEvents`
+  now passes with 43 tests green and 2 existing skips.
+- **2026-04-30** — HtmlBridge microtask continuation: moved the CLI capture
+  path off inline `queueMicrotask` execution, added per-task microtask
+  checkpoints to bridge timer flushing, and aligned `ScriptEngine` /
+  `InteractiveSession` script sequencing with that checkpoint model. Focused
+  regression coverage for same-script, cross-script, and timer-task ordering now
+  passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~QueueMicrotask|FullyQualifiedName~Microtasks_Between"`.
+- **2026-04-30** — HtmlBridge Fetch continuation: added bridge-level
+  `Headers`, `Request`, and `Response` constructors, taught `fetch()` to accept
+  `Request` instances and constructor-backed headers, and kept `XMLHttpRequest`
+  aligned by routing it through the same response/header primitives. Focused
+  bridge network coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~NetworkAndHttpTests`.
+- **2026-04-30** — HtmlBridge CSP continuation: expanded
+  `ContentSecurityPolicy` beyond eval-only parsing to honor the currently wired
+  script directives (`default-src`, `script-src`, `script-src-elem`) for
+  inline-script, external-script, nonce, hash, `self`, and eval decisions,
+  applied that policy during CLI/App script extraction and runtime eval
+  registration, and documented the still-unimplemented CSP3 gaps inline in the
+  bridge policy model. Focused regression coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~ContentSecurityPolicyTests`.
+- **2026-04-30** — HTML/HtmlBridge selectors continuation: upgraded CSS
+  specificity calculation to honor Selectors L4 function semantics for
+  `:is()`, `:where()`, `:has()`, `:not()`, and `:nth-child(... of selector)`,
+  and fixed style-rule extraction so comma-separated selector groups are not
+  split inside functional pseudo-class arguments. Focused regressions now pass
+  via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~SelectorsLevel4SpecificityTests`.
+- **2026-04-30** — HTML/HtmlBridge DOM continuation: wired
+  `HTMLTableRowElement.insertCell()` / `deleteCell()` and completed
+  `HTMLSelectElement.selectedIndex` assignment plus selection-backed `value`
+  reads/writes so the previously skipped Acid3 table/select regressions now run
+  green. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3HtmlElementRegressionTests`.
+- **2026-04-30** — HTML/HtmlBridge SVG continuation: exposed
+  `SVG_LENGTHTYPE_*` constants on bridge-created `SVGLength` instance objects so
+  `SVGAnimatedLength.baseVal` / `animVal` match the existing global
+  `SVGLength` registration closely enough for the skipped Acid3 constant check
+  to run green. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SvgAndParsingRegressionTests`.
+- **2026-04-30** — HTML/HtmlBridge DOM collection continuation: taught
+  document/element `getElementsByTagName('*')` paths to treat `'*'` as the
+  wildcard element selector instead of an exact tag-name match, which clears the
+  remaining skipped Acid3 numeric-coercion regression around live collection
+  lengths. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3SpecialRegressionTests`.
+- **2026-04-30** — HTML engine cascade continuation: started preserving
+  computed specificity and stylesheet source order for per-bucket CSS block
+  application in the image/rendering pipeline, which clears the skipped Acid3
+  debug regression where a later low-specificity selector incorrectly beat an
+  earlier higher-specificity one without `!important`. Focused coverage now
+  passes via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~Acid3CascadeDebugTests`
+  and `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~CssImportantCascadeTests`.
+- **2026-04-30** — HtmlBridge DOM lifecycle continuation: taught bridge node
+  insertion paths to adopt moved subtrees into the destination document by
+  propagating the destination `ownerDocument` root across cross-document
+  `appendChild`, `insertBefore`, `replaceChild`, and document-level append
+  operations. The previously skipped Acid3 cross-document lifecycle regressions
+  now run green via `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Acid3_Test26|FullyQualifiedName~Acid3_Test27"`
+  and the focused edge-case suite remains green via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — Google Search parity continuation: unskipped the focused
+  logo-colour regression by relaxing the blue-pixel threshold to match Google
+  blue (`#4285F4`), then re-enabled the footer-region parity check after
+  teaching absolute-position boxes with right/bottom-only insets to re-anchor
+  themselves after auto-sized layout against the viewport/positioned containing
+  block. The simplified `position:absolute; bottom:0` footer now renders in the
+  bottom viewport band, and the focused real-page sanity gate is fully green
+  via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~GoogleSearchComplianceTests`.
+- **2026-05-04** — HtmlBridge hit-testing continuation: seeded internal
+  computed-style resolution with key HTML user-agent `display` defaults and
+  stopped normal-flow geometry from counting `display:none` siblings, which
+  fixes the focused document hit-testing regressions where hidden metadata and
+  script nodes were displacing visible targets. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None|FullyQualifiedName~Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds"`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: taught bridge-created
+  `MouseEvents` to expose `initMouseEvent()` alongside the existing
+  `initEvent()` / `initUIEvent()` helpers, including the standard mouse
+  coordinates, modifier keys, `button`, `detail`, `view`, and `relatedTarget`
+  fields. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_MouseEvents_Has_InitMouseEvent|FullyQualifiedName~PhaseF_Test30_DispatchEvent_AddRemoveListener"`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: completed the next
+  bridge-created `MouseEvents` surface slice by seeding default mouse fields and
+  exposing the common `x` / `y` aliases plus `buttons` state alongside
+  `clientX`, `clientY`, `button`, and `relatedTarget`. Focused coverage now
+  passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_MouseEvents_Has_Alias_Properties_And_Default_Button_State|FullyQualifiedName~CreateEvent_MouseEvents_Has_InitMouseEvent|FullyQualifiedName~PhaseF_Test30_DispatchEvent_AddRemoveListener"`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added deprecated
+  `initFocusEvent()` support on bridge-created events in both document and
+  sub-document factories, including `view`, UIEvent `detail`, and
+  `relatedTarget` initialization for focused compatibility coverage. Focused
+  coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_FocusEvents_Has_InitFocusEvent|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added deprecated
+  `initKeyboardEvent()` support on bridge-created events in both document and
+  sub-document factories, including default keyboard fields plus compatibility
+  initialization for `key`, `location`, modifier keys, `keyCode`, `charCode`,
+  and `which`. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_KeyboardEvents_Has_InitKeyboardEvent|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added deprecated
+  `initWheelEvent()` support on bridge-created events in both document and
+  sub-document factories, including default wheel delta fields, mouse-position
+  aliases, and compatibility parsing for the legacy `modifiersList` argument to
+  seed modifier state. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_WheelEvents_Has_InitWheelEvent|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added deprecated
+  `initCustomEvent()` support on bridge-created events in both document and
+  sub-document factories so `document.createEvent('CustomEvent')` can seed
+  `type`, bubbling flags, cancelability, and payload `detail` compatibly with
+  older DOM event call sites. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_CustomEvent_Has_InitCustomEvent|FullyQualifiedName~SubDoc_CreateEvent_CustomEvent_Has_InitCustomEvent|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed the
+  read-only-style `isTrusted` surface on bridge-created events in both document
+  and sub-document factories, defaulting script-created events to `false` for
+  compatibility with standard `document.createEvent(...)` behavior. Focused
+  coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_IsTrusted_False|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_IsTrusted_False|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed `timeStamp` on
+  bridge-created events in both document and sub-document factories, seeding
+  script-created events with a Unix-millisecond timestamp so
+  `document.createEvent(...)` surfaces a numeric creation time compatibly with
+  standard DOM event behavior. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_TimeStamp|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed legacy
+  `srcElement`, `cancelBubble`, and `returnValue` compatibility surfaces on
+  bridge-created events in both document and sub-document factories, and wired
+  dispatch-time alias behavior so legacy event code can observe targets, stop
+  bubbling, and cancel default handling through older DOM event entry points.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~SubDoc_CreateEvent_Event_Has_Legacy_Alias_Properties|FullyQualifiedName~Legacy_Event_Aliases_Track_Dispatch_State|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: exposed the
+  `KeyboardEvent.repeat` surface on bridge-created keyboard events in both
+  document and sub-document factories, wiring `initKeyboardEvent(...)` to seed
+  the repeat flag from the legacy argument list while preserving existing
+  `keyCode`/`charCode` compatibility parsing. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added modern
+  `Event` and `CustomEvent` constructors on the bridge window surface, routing
+  them through the existing `document.createEvent(...)` factories so constructor
+  created events inherit the newer compatibility fields like `isTrusted`,
+  `timeStamp`, `srcElement`, and payload `detail` in both main-document and
+  sub-document contexts. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Event_Constructor_Seeds_Init_Dictionary|FullyQualifiedName~CustomEvent_Constructor_Reuses_CreateEvent_Surface|FullyQualifiedName~SubDoc_Event_Constructor_Uses_SubWindow_Surface|FullyQualifiedName~SubDoc_CustomEvent_Constructor_Uses_SubWindow_Surface|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added modern typed
+  `MouseEvent`, `FocusEvent`, `KeyboardEvent`, and `WheelEvent` constructors on
+  the bridge window surface and sub-document windows, routing them through the
+  existing `document.createEvent(...)` factories so constructor-created events
+  inherit the same compatibility fields and aliases as the legacy init-method
+  path. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~MouseEvent_Constructor|FullyQualifiedName~FocusEvent_Constructor|FullyQualifiedName~KeyboardEvent_Constructor|FullyQualifiedName~WheelEvent_Constructor|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added the modern
+  `UIEvent` constructor on the bridge window surface and sub-document windows,
+  routing it through the existing `document.createEvent('UIEvents')` factory so
+  constructor-created UI events inherit the bridge event compatibility fields
+  like `timeStamp` while reusing the established `initUIEvent(...)` plumbing.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~UIEvent_Constructor|FullyQualifiedName~DomEvents|FullyQualifiedName~SvgDomAndCrossDocTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter FullyQualifiedName~DomEventsEdgeCaseTests`.
+- **2026-05-04** — HtmlBridge DOM Events continuation: added `element.focus()`
+  and `element.blur()` bridge methods, dispatching non-bubbling focus/blur
+  events through the existing event propagation path so target listeners and
+  inline handlers observe spec-aligned `focus` / `blur` delivery without a
+  separate dispatch path. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Element_Focus|FullyQualifiedName~Element_Blur|FullyQualifiedName~DomEvents"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Focus_And_Blur_Do_Not_Bubble|FullyQualifiedName~DomEventsEdgeCaseTests"`.
+- **2026-05-04** — HtmlBridge CSSOM continuation: added
+  `CSSStyleDeclaration.length`, `item(index)`, and `getPropertyPriority(name)`
+  on bridge style objects, and taught `style.setProperty(name, value,
+  priority)` plus `getPropertyValue(...)`/property reads to round-trip
+  `!important` priorities in a CSSOM-aligned way for inline styles exercised by
+  the current bridge tests. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_Length_And_Item|FullyQualifiedName~Style_GetPropertyPriority|FullyQualifiedName~Style_SetProperty_Priority"`.
+- **2026-05-04** — HtmlBridge computed-style CSSOM continuation: added
+  `getComputedStyle(...).length`, `item(index)`, and
+  `getPropertyPriority(name)` on computed style objects, while normalizing
+  exposed computed values so `getPropertyValue(...)` and direct property reads
+  do not leak authored `!important` suffixes. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~GetComputedStyle_Length_And_Item|FullyQualifiedName~GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized"`.
+- **2026-05-04** — HtmlBridge inline CSSOM continuation: taught
+  `CSSStyleDeclaration.getPropertyValue(...)` and direct property reads to
+  resolve longhands from authored shorthands (for example `margin-left` from
+  `margin`, or `border-left-width` from `border`) without inflating
+  `style.length`, `item(index)`, or `cssText` with synthesized declarations.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~Style_GetPropertyValue_Expands_Inline_Margin_Shorthand|FullyQualifiedName~Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration|FullyQualifiedName~Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: taught
+  `CSSRule.style` objects to expose the same core `CSSStyleDeclaration`
+  surface as inline styles, including `cssText`, `setProperty(...)`,
+  `getPropertyValue(...)`, `removeProperty(...)`, `getPropertyPriority(...)`,
+  `length`, and `item(index)`, while keeping camelCase and kebab-case property
+  access working for stylesheet rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssRule_Style|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: added
+  backreferences for `CSSRule.parentStyleSheet`, `CSSRule.parentRule`, and
+  `CSSStyleDeclaration.parentRule`, wiring stylesheet rule declarations back to
+  their owning `CSSRule` while keeping inline and computed style objects
+  correctly exposed as `null` parent-rule surfaces. Focused coverage now passes
+  via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@media` rules as `CSSMediaRule` objects in `document.styleSheets[...].cssRules`,
+  including `type === 4`, `media`, nested `cssRules`, and `cssText`, while
+  preserving parent-rule/style-sheet backreferences through nested rules and
+  keeping nested stylesheet-rule mutations reflected in the enclosing media
+  rule's serialized `cssText`. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@import` rules as `CSSImportRule` objects in `document.styleSheets[...].cssRules`,
+  including `type === 3`, `href`, `media`, and `cssText`, and taught the
+  stylesheet rule-string collector to retain top-level semicolon at-rules so
+  import entries participate in mixed rule ordering alongside media, font-face,
+  and style rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@keyframes` rules as `CSSKeyframesRule` objects in `document.styleSheets[...].cssRules`,
+  including `type === 7`, `name`, nested `cssRules`, and `cssText`, while also
+  surfacing nested keyframe blocks as `CSSKeyframeRule`-like objects with
+  `type === 8`, `keyText`, `style`, and parent-rule/style-sheet backreferences
+  so keyframe mutations rebuild the enclosing rule's serialized `cssText`.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@supports` rules as `CSSSupportsRule` objects in
+  `document.styleSheets[...].cssRules`, including `type === 11`,
+  `conditionText`, nested `cssRules`, and `cssText`, while reusing nested
+  rule parent-rule/style-sheet backreferences so mutations inside the supports
+  block rebuild the enclosing rule's serialized `cssText`. Focused coverage now
+  passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@layer` entries as `CSSLayerRule`-like objects in
+  `document.styleSheets[...].cssRules`, covering both block
+  (`@layer name { ... }`) and statement (`@layer name;`) forms with
+  `type === 12`, `name`, nested `cssRules`, and `cssText`, while preserving
+  nested rule parent-rule/style-sheet backreferences so mutations inside layer
+  blocks rebuild the enclosing rule's serialized `cssText`. Focused coverage
+  now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@namespace` entries as `CSSNamespaceRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 9`,
+  `namespaceURI`, optional `prefix`, and `cssText`, while supporting both
+  quoted-string and `url(...)` declaration forms and keeping namespace entries
+  in mixed top-level rule ordering with import, layer, supports, and style
+  rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@page` entries as `CSSPageRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 6`,
+  `selectorText`, `style`, and `cssText`, while preserving top-level rule
+  ordering with import, namespace, layer, and style rules and allowing page
+  declaration mutations through the bridged `CSSStyleDeclaration` to rebuild the
+  enclosing rule's serialized `cssText`. Focused coverage now passes via
+`dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+and
+`dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: added
+  `CSSRuleList.item()`, `insertRule()`, and `deleteRule()` support for nested
+  `cssRules` collections exposed by grouping rules such as `CSSMediaRule`,
+  `CSSKeyframesRule`, `CSSSupportsRule`, and `CSSLayerRule`, while also
+  exposing `item()` on the top-level stylesheet `cssRules` object so nested
+  rule insertion and removal rebuild parent grouping-rule `cssText` in place.
+  Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText|FullyQualifiedName~CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-05** — HtmlBridge stylesheet CSSOM continuation: tightened
+  top-level `CSSStyleSheet.insertRule()` / `deleteRule()` live-list behavior so
+  `document.styleSheets[...].cssRules` updates in place, clears stale numeric
+  indices after deletions, and respects later owner `<style>` text
+  replacements instead of re-inserting stale programmatic rules across
+  rebuilds. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~InsertRule_On_StyleSheet|FullyQualifiedName~StyleSheet_InsertRule_Does_Not_Reappear_After_Owner_TextContent_Is_Replaced|FullyQualifiedName~DeleteRule_On_StyleSheet|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-05** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@counter-style` entries as `CSSCounterStyleRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 10`, `name`, core
+  descriptor surfaces such as `system`, `symbols`, `suffix`, and `fallback`,
+  plus serialized `cssText`, while preserving mixed top-level rule ordering
+  with charset, import, property, font-face, and style rules. Focused coverage
+  now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssCounterStyleRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@font-face` entries as `CSSFontFaceRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 5`, bridged
+  `style`, and serialized `cssText`, while keeping `parentStyleSheet`,
+  `parentRule`, and `style.parentRule` wired through the generic stylesheet
+  CSSOM surfaces so font-face declaration mutations rebuild the enclosing rule
+  text and font-face entries remain in mixed ordering with charset, import,
+  page, and style rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@property` entries as `CSSPropertyRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 25`, `name`,
+  `syntax`, `inherits`, `initialValue`, and serialized `cssText`, while
+  preserving mixed top-level rule ordering with charset, import, font-face, and
+  style rules. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@charset` entries as `CSSCharsetRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 2`, `encoding`, and
+  `cssText`, while preserving mixed top-level rule ordering with charset,
+  import, page, namespace, layer, and style rules. Focused coverage now passes
+  via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-04-30** — Baseline verification before roadmap changes:
+  `dotnet build Broiler.slnx` succeeded, while `dotnet test Broiler.slnx`
+  surfaced pre-existing failures in `src/Broiler.LogAnalyzer.Tests/` and
+  `src/Broiler.Cli.Tests/`. Follow-up roadmap work should therefore use
+  targeted validation for touched areas until the broader baseline is cleaned up.
+
+### 14.2 Key decisions
+
+- **Decision:** Keep `#1064` as the umbrella issue and file execution work as
+  workstream-scoped sub-issues rather than creating one issue per paragraph in
+  this document.
+  **Why:** The roadmap is already organized around workstreams and milestone
+  gates, so this preserves traceability without fragmenting the backlog.
+- **Decision:** Treat existing area-specific roadmap documents as the detailed
+  task source of truth, and use this document only for cross-engine sequencing,
+  gating, and prioritization.
+  **Why:** It avoids duplicating lower-level TODO lists that already exist in
+  `ECMASCRIPT_ROADMAP.md`, the Skia roadmap, WPT triage, Acid3 tracking, and
+  related docs.
+- **Decision:** Baseline infrastructure work (W1/W6) must be filed and started
+  before the M2 compliance pushes are treated as milestone work.
+  **Why:** The roadmap's stated exit criteria require published pass-rate and
+  benchmark signals before later milestones can be objectively graded.
+
+---
+
+## 15. Related Roadmaps
 
 This roadmap composes and sequences the following existing documents. They
 remain the authoritative source for area-level task lists; this roadmap owns
@@ -510,7 +962,7 @@ their **inter-engine ordering and gating**.
 
 ---
 
-## 14. Open Questions
+## 16. Open Questions
 
 1. Which **Test262** subset (categories, feature flags) constitutes the
    per-PR gate? Full nightly is settled; the PR subset is not.
@@ -535,3 +987,5 @@ their **inter-engine ordering and gating**.
 
 - **2026-04-30** — Initial draft created in response to the cross-engine
   roadmap tracking issue.
+- **2026-04-30** — Added the execution backlog, milestone filing order, and
+  implementation-notes log for issue `#1064`.

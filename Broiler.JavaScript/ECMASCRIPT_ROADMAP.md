@@ -42,7 +42,7 @@ The table below summarizes the per-edition status.
 | ES2022 | 2022 | ⚠️ Mostly | Private fields/methods, static blocks, `.at()`, `Error.cause`, `Object.hasOwn`. **Gap:** top-level await in non-module contexts |
 | ES2023 | 2023 | ⚠️ Mostly | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`). **Gap:** Hashbang grammar `#!`, RegExp `v` flag partial |
 | ES2024 | 2024 | ⚠️ Partial | `Promise.withResolvers`. **Gaps:** `ArrayBuffer.transfer`, `Atomics.waitAsync`, `Object.groupBy`/`Map.groupBy`, `String.isWellFormed`/`toWellFormed` full spec compliance |
-| ES2025 | 2025 | ❌ Minimal | Most new features not yet implemented (see §2) |
+| ES2025 | 2025 | ⚠️ Partial | Iterator helpers, Set methods, `Promise.try`, and `RegExp.escape` are implemented; larger gaps remain (see §2) |
 
 ### YantraJS Extensions (Non-Standard)
 
@@ -67,7 +67,7 @@ in this edition and must be implemented for full compliance.
 
 ### 2.1 Iterator Helper Methods
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P0 — High
 **Spec:** [tc39/proposal-iterator-helpers](https://github.com/tc39/proposal-iterator-helpers)
 
@@ -99,7 +99,7 @@ methods.
 
 ### 2.2 Set Methods
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P0 — High
 **Spec:** [tc39/proposal-set-methods](https://github.com/tc39/proposal-set-methods)
 
@@ -147,7 +147,7 @@ import data from "./data.json" with { type: "json" };
 
 ### 2.4 Promise.try
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P1 — Medium
 **Spec:** [tc39/proposal-promise-try](https://github.com/tc39/proposal-promise-try)
 
@@ -169,7 +169,7 @@ Promise.try(() => mayThrow())
 
 ### 2.5 RegExp.escape
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P1 — Medium
 **Spec:** [tc39/proposal-regex-escaping](https://github.com/tc39/proposal-regex-escaping)
 
@@ -677,4 +677,4 @@ column as work progresses.
 
 ---
 
-*Last updated: 2026-03-09*
+*Last updated: 2026-04-30*

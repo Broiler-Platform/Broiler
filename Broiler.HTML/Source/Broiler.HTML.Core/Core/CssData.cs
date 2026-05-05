@@ -1,6 +1,7 @@
 using Broiler.HTML.Core.Core.Entities;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Broiler.HTML.Core.Core;
 
@@ -25,7 +26,9 @@ public sealed class CssData
         if (_mediaBlocks.TryGetValue(media, out Dictionary<string, List<CssBlock>> mid))
             mid.TryGetValue(className, out block);
 
-        return block ?? _emptyArray;
+        return block == null
+            ? _emptyArray
+            : block.OrderBy(static x => x.Specificity).ThenBy(static x => x.SourceOrder);
     }
 
     public void AddCssBlock(string media, CssBlock cssBlock)

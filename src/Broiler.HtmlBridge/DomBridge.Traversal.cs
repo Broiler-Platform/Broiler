@@ -1192,15 +1192,56 @@ public sealed partial class DomBridge
             }, "cloneRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // compareBoundaryPoints(how, sourceRange) — stub: requires full document position comparison
+        int CompareBoundaryPosition(DomElement containerA, int offsetA, DomElement containerB, int offsetB)
+        {
+            if (ReferenceEquals(containerA, containerB) && offsetA == offsetB)
+                return 0;
+
+            if (IsPositionAfter(containerA, offsetA, containerB, offsetB))
+                return 1;
+
+            if (IsPositionAfter(containerB, offsetB, containerA, offsetA))
+                return -1;
+
+            return 0;
+        }
+
+        // compareBoundaryPoints(how, sourceRange)
         range.FastAddValue(
             (KeyString)"compareBoundaryPoints",
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length < 2) throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
-                // 0 = START_TO_START, 1 = START_TO_END, 2 = END_TO_END, 3 = END_TO_START
-                // Full implementation deferred — requires document-order position comparison
-                return new JSNumber(0);
+                if (a[1] is not JSObject sourceRangeObj)
+                    return new JSNumber(0);
+
+                var sourceStartContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
+                var sourceEndContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
+                if (sourceStartContainer == null || sourceEndContainer == null)
+                    return new JSNumber(0);
+
+                var sourceStartOffsetValue = sourceRangeObj[(KeyString)"startOffset"];
+                var sourceEndOffsetValue = sourceRangeObj[(KeyString)"endOffset"];
+                var sourceStartOffset = sourceStartOffsetValue is null || sourceStartOffsetValue.IsNull || sourceStartOffsetValue.IsUndefined
+                    ? 0
+                    : (int)sourceStartOffsetValue.DoubleValue;
+                var sourceEndOffset = sourceEndOffsetValue is null || sourceEndOffsetValue.IsNull || sourceEndOffsetValue.IsUndefined
+                    ? 0
+                    : (int)sourceEndOffsetValue.DoubleValue;
+
+                var howValue = a[0].DoubleValue;
+                var how = double.IsNaN(howValue) ? -1 : (int)howValue;
+
+                var comparison = how switch
+                {
+                    0 => CompareBoundaryPosition(state.StartContainer, state.StartOffset, sourceStartContainer, sourceStartOffset),
+                    1 => CompareBoundaryPosition(state.StartContainer, state.StartOffset, sourceEndContainer, sourceEndOffset),
+                    2 => CompareBoundaryPosition(state.EndContainer, state.EndOffset, sourceEndContainer, sourceEndOffset),
+                    3 => CompareBoundaryPosition(state.EndContainer, state.EndOffset, sourceStartContainer, sourceStartOffset),
+                    _ => throw new JSException("Failed to execute 'compareBoundaryPoints': invalid comparison type.")
+                };
+
+                return new JSNumber(comparison);
             }, "compareBoundaryPoints", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

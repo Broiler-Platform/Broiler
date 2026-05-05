@@ -451,15 +451,20 @@ public class CaptureService
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+        var csp = ContentSecurityPolicy.FromHtml(html);
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
             var isDefer = DeferAttrPattern.IsMatch(attrs);
+            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
             string? scriptContent = null;
 
             var srcMatch = SrcAttrPattern.Match(attrs);
             if (srcMatch.Success)
             {
+                if (csp != null && !csp.AllowsExternalScript(srcMatch.Groups["uri"].Value, url, nonce))
+                    continue;
+
                 // data: URI script
                 var decoded = DecodeDataUri(srcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
@@ -472,6 +477,9 @@ public class CaptureService
                 if (anySrcMatch.Success)
                 {
                     var srcUri = anySrcMatch.Groups["uri"].Value;
+                    if (csp != null && !csp.AllowsExternalScript(srcUri, url, nonce))
+                        continue;
+
                     var fetched = FetchExternalScript(srcUri, url);
                     if (!string.IsNullOrEmpty(fetched))
                         scriptContent = fetched;
@@ -480,7 +488,7 @@ public class CaptureService
                 {
                     // Inline script
                     var content = match.Groups["content"].Value.Trim();
-                    if (!string.IsNullOrEmpty(content))
+                    if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
                         scriptContent = content;
                 }
             }
@@ -496,9 +504,11 @@ public class CaptureService
         if (scripts.Count == 0 && deferredScripts.Count == 0)
             return html;
 
+        var microTasks = new MicroTaskQueue();
         using var context = new JSContext();
-        RegisterRuntimeExtensions(context);
+        RegisterRuntimeExtensions(context, microTasks, csp);
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => microTasks.Drain();
         bridge.Attach(context, html, url);
 
         // Set local base path for sub-resource resolution (e.g. iframe src)
@@ -513,6 +523,29 @@ public class CaptureService
             .Where(t => string.Equals(t.el.TagName, "script", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
+        {
+            for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
+            {
+                var hadWork = false;
+
+                if (microTasks.Count > 0)
+                {
+                    microTasks.Drain();
+                    hadWork = true;
+                }
+
+                if (bridge.HasPendingTimers)
+                {
+                    bridge.FlushTimerStep();
+                    hadWork = true;
+                }
+
+                if (!hadWork)
+                    break;
+            }
+        }
+
         for (int si = 0; si < scripts.Count; si++)
         {
             if (si < scriptElements.Count)
@@ -520,6 +553,7 @@ public class CaptureService
             try
             {
                 context.Eval(scripts[si]);
+                DrainAsyncWork(bridge, microTasks);
             }
             catch (Exception ex)
             {
@@ -535,6 +569,7 @@ public class CaptureService
             try
             {
                 context.Eval(script);
+                DrainAsyncWork(bridge, microTasks);
             }
             catch (Exception ex)
             {
@@ -548,8 +583,8 @@ public class CaptureService
         // the test runner via <body onload="update()">.
         bridge.FireWindowLoadEvent();
 
-        // Flush all pending timers and rAF callbacks before capture
-        bridge.FlushTimers();
+        // Drain queued microtasks and timer work before capture.
+        DrainAsyncWork(bridge, microTasks);
         bridge.ResolveAnimationSnapshots();
 
         return bridge.SerializeToHtml();
@@ -856,22 +891,34 @@ public class CaptureService
     /// the CLI script-execution environment matches the App's
     /// <see cref="ScriptEngine.RegisterRuntimeExtensions"/> setup.
     /// </summary>
-    private static void RegisterRuntimeExtensions(JSContext context)
+    private static void RegisterRuntimeExtensions(JSContext context, MicroTaskQueue microTasks, ContentSecurityPolicy? csp = null)
     {
-        // queueMicrotask(fn) — execute callback (no-op queue; runs inline)
+        // queueMicrotask(fn) — queue callback for the next microtask checkpoint
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
             if (a.Length > 0 && a[0] is JSFunction fn)
             {
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                catch (Exception ex)
+                microTasks.Enqueue(() =>
                 {
-                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.queueMicrotask",
-                        $"Callback error: {ex.Message}", ex);
-                }
+                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.queueMicrotask",
+                            $"Callback error: {ex.Message}", ex);
+                    }
+                });
             }
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
+
+        if (csp != null && !csp.AllowsEval)
+        {
+            context["eval"] = new JSFunction((in Arguments _) =>
+            {
+                throw new InvalidOperationException(
+                    "Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source in the Content Security Policy.");
+            }, "eval", 1);
+        }
 
         // WeakRef polyfill
         RegisterWeakRefPolyfill(context);

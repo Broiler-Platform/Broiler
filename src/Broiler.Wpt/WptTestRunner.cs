@@ -1205,6 +1205,7 @@ internal sealed class WptTestRunner
 
         using var context = new JSContext();
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
             if (a.Length > 0 && a[0] is JSFunction fn)
@@ -1232,8 +1233,7 @@ internal sealed class WptTestRunner
         {
             // Match the broader DomBridge timer drain cap so promise/timer chains
             // used by WPT can settle without risking an infinite loop.
-            const int maxIterations = 1000;
-            for (var iteration = 0; iteration < maxIterations; iteration++)
+            for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
             {
                 bool hadWork = false;
 

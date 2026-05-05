@@ -150,6 +150,92 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("true", result);
     }
 
+    [Fact]
+    public void Fetch_Headers_Constructor_Supports_Common_Mutations()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var headers = new Headers({ Accept: 'text/plain' });
+headers.append('X-Test', 'one');
+headers.append('X-Test', 'two');
+headers.set('Content-Type', 'application/json');
+var beforeDelete = headers.get('x-test');
+headers.delete('X-Test');
+var r = [];
+r.push(headers.get('accept'));
+r.push(headers.get('content-type'));
+r.push(beforeDelete);
+r.push(headers.has('x-test'));
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("text/plain|application/json|one, two|false", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Constructor_Exposes_Url_Method_Headers_And_Body()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'post',
+    headers: { Accept: 'application/json' },
+    body: 'payload'
+});
+var r = [];
+r.push(request.url);
+r.push(request.method);
+r.push(request.headers.get('accept'));
+request.text().then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("http://example.com/data|POST|application/json|payload", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    status: 201,
+    statusText: 'Created',
+    headers: { 'Content-Type': 'text/plain' },
+    url: 'http://example.com/data'
+});
+var r = [];
+r.push(response.ok);
+r.push(response.status);
+r.push(response.statusText);
+r.push(response.headers.get('content-type'));
+r.push(typeof response.clone === 'function');
+response.text().then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|201|Created|text/plain|true|created", result);
+    }
+
     // ────────────────── fetch() method support ──────────────────
 
     [Fact]
@@ -193,6 +279,32 @@ try {
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("CATCH_OK", result);
+    }
+
+    [Fact]
+    public void Fetch_Accepts_Request_Instance_And_Headers_Object()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/request-object', {
+    method: 'POST',
+    headers: new Headers({ accept: 'application/json' }),
+    body: 'payload'
+});
+fetch(request).then(function(response) {
+    var r = [];
+    r.push(response.url === 'http://example.com/request-object');
+    r.push(typeof response.headers.get === 'function');
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true", result);
     }
 
     // ────────────────── XMLHttpRequest enhancements ──────────────────

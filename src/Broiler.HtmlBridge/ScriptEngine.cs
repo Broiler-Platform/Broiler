@@ -51,6 +51,8 @@ public sealed class ScriptEngine : IScriptEngine
                 {
                     context.Eval(source);
                 }
+
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -80,74 +82,83 @@ public sealed class ScriptEngine : IScriptEngine
         if (scripts.Count == 0 && deferredScripts.Count == 0)
             return null;
 
-        using var context = new JSContext();
-        RegisterRuntimeExtensions(context);
-        var bridge = new DomBridge();
+        var previousCsp = Csp;
+        Csp = ContentSecurityPolicy.FromHtml(html) ?? previousCsp;
 
-        if (!string.IsNullOrEmpty(url))
-            bridge.Attach(context, html, url);
-        else
-            bridge.Attach(context, html);
-
-        // Track the corresponding <script> DOM element index so that
-        // document.write() can insert content at the correct position.
-        var scriptElements = new List<int>();
-        for (int idx = 0; idx < bridge.Elements.Count; idx++)
+        try
         {
-            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
-                scriptElements.Add(idx);
-        }
+            using var context = new JSContext();
+            RegisterRuntimeExtensions(context);
+            var bridge = new DomBridge();
+            bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
-        for (var i = 0; i < scripts.Count; i++)
-        {
-            if (i < scriptElements.Count)
-                bridge.CurrentScriptIndex = scriptElements[i];
-            try
+            if (!string.IsNullOrEmpty(url))
+                bridge.Attach(context, html, url);
+            else
+                bridge.Attach(context, html);
+
+            // Track the corresponding <script> DOM element index so that
+            // document.write() can insert content at the correct position.
+            var scriptElements = new List<int>();
+            for (int idx = 0; idx < bridge.Elements.Count; idx++)
             {
-                var source = PrepareSource(scripts[i]);
-                if (Profiler != null)
+                if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                    scriptElements.Add(idx);
+            }
+
+            for (var i = 0; i < scripts.Count; i++)
+            {
+                if (i < scriptElements.Count)
+                    bridge.CurrentScriptIndex = scriptElements[i];
+                try
                 {
-                    Profiler.Measure($"inline-{i}", () => context.Eval(source));
+                    var source = PrepareSource(scripts[i]);
+                    if (Profiler != null)
+                    {
+                        Profiler.Measure($"inline-{i}", () => context.Eval(source));
+                    }
+                    else
+                    {
+                        context.Eval(source);
+                    }
+
+                    DrainAsyncWork(bridge);
                 }
-                else
+                catch (Exception ex)
                 {
+                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
+                }
+            }
+            bridge.CurrentScriptIndex = -1;
+
+            // Execute deferred scripts after all regular scripts
+            // (simulates end-of-parsing for <script defer> tags).
+            foreach (var script in deferredScripts)
+            {
+                try
+                {
+                    var source = PrepareSource(script);
                     context.Eval(source);
+                    DrainAsyncWork(bridge);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Deferred script failed: {ex.Message}", ex);
                 }
             }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
-            }
-        }
-        bridge.CurrentScriptIndex = -1;
 
-        // Execute deferred scripts after all regular scripts
-        // (simulates end-of-parsing for <script defer> tags).
-        foreach (var script in deferredScripts)
+            // Fire body onload event after all scripts have executed
+            // (simulates end-of-parsing / window load in browsers).
+            // This is critical for test harnesses like Acid3 that bootstrap
+            // the test runner via <body onload="update()">.
+            bridge.FireWindowLoadEvent();
+            DrainAsyncWork(bridge);
+            return bridge.SerializeToHtml();
+        }
+        finally
         {
-            try
-            {
-                var source = PrepareSource(script);
-                context.Eval(source);
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Deferred script failed: {ex.Message}", ex);
-            }
+            Csp = previousCsp;
         }
-
-        // Fire body onload event after all scripts have executed
-        // (simulates end-of-parsing / window load in browsers).
-        // This is critical for test harnesses like Acid3 that bootstrap
-        // the test runner via <body onload="update()">.
-        bridge.FireWindowLoadEvent();
-
-        // Flush all pending timers and rAF callbacks so that
-        // setTimeout-chained test harnesses run to completion.
-        bridge.FlushTimers();
-
-        MicroTasks.Drain();
-        return bridge.SerializeToHtml();
     }
 
     /// <inheritdoc />
@@ -156,11 +167,15 @@ public sealed class ScriptEngine : IScriptEngine
         if (scripts.Count == 0 && deferredScripts.Count == 0)
             return null;
 
+        var previousCsp = Csp;
+        Csp = ContentSecurityPolicy.FromHtml(html) ?? previousCsp;
+
         // The JSContext is NOT disposed here – ownership transfers to the
         // InteractiveSession which will dispose it when the caller is done.
         var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
+        bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
         if (!string.IsNullOrEmpty(url))
             bridge.Attach(context, html, url);
@@ -184,6 +199,7 @@ public sealed class ScriptEngine : IScriptEngine
             {
                 var source = PrepareSource(scripts[i]);
                 context.Eval(source);
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -198,6 +214,7 @@ public sealed class ScriptEngine : IScriptEngine
             {
                 var source = PrepareSource(script);
                 context.Eval(source);
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -208,6 +225,7 @@ public sealed class ScriptEngine : IScriptEngine
         bridge.FireWindowLoadEvent();
         MicroTasks.Drain();
 
+        Csp = previousCsp;
         return new InteractiveSession(context, bridge, MicroTasks);
     }
 
@@ -234,6 +252,8 @@ public sealed class ScriptEngine : IScriptEngine
                 {
                     context.Eval(source);
                 }
+
+                MicroTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -253,6 +273,33 @@ public sealed class ScriptEngine : IScriptEngine
             Success = errors.Count == 0,
             Errors = errors
         };
+    }
+
+    /// <summary>
+    /// Drain queued microtasks and timer tasks until the bridge-backed execution
+    /// environment settles, matching the checkpointing used by the WPT harness.
+    /// </summary>
+    private void DrainAsyncWork(DomBridge bridge)
+    {
+        for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
+        {
+            var hadWork = false;
+
+            if (MicroTasks.Count > 0)
+            {
+                MicroTasks.Drain();
+                hadWork = true;
+            }
+
+            if (bridge.HasPendingTimers)
+            {
+                bridge.FlushTimerStep();
+                hadWork = true;
+            }
+
+            if (!hadWork)
+                break;
+        }
     }
 
     /// <summary>
