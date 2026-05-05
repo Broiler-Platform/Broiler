@@ -1,0 +1,30 @@
+{
+  "repository": "tc39/test262",
+  "revision": "d0c1b4555b03dd404873fd6422a4b5da00136500",
+  "tests": [
+    {
+      "id": "Promise.resolve is a function",
+      "path": "test/built-ins/Promise/resolve/S25.4.4.5_A1.1_T1.js"
+    },
+    {
+      "id": "JSON.stringify uses toJSON return values",
+      "path": "test/built-ins/JSON/stringify/value-tojson-result.js"
+    },
+    {
+      "id": "Map constructor without iterable does not call set",
+      "path": "test/built-ins/Map/map-no-iterable-does-not-call-set.js"
+    },
+    {
+      "id": "Set constructor with empty iterable does not call add",
+      "path": "test/built-ins/Set/set-iterable-empty-does-not-call-add.js"
+    },
+    {
+      "id": "Array.isArray recognises proxied arrays",
+      "path": "test/built-ins/Array/isArray/proxy.js"
+    },
+    {
+      "id": "String.prototype.trim works for booleans",
+      "path": "test/built-ins/String/prototype/trim/15.5.4.20-1-3.js"
+    }
+  ]
+}

@@ -91,6 +91,9 @@ See [Issue #1](https://github.com/MaiRat/Broiler/issues/1) for the full developm
 A comprehensive plan covering milestones from Enhanced MVP through to a
 production-grade, standards-compliant HTML and JavaScript engine.
 See the [HTML & JS Engine Roadmap](docs/roadmap/html-js-engine.md) for details.
+For the cross-engine standards/performance baseline and PR dashboard, see the
+[Engines M0 baseline](docs/roadmap/engines-m0-baseline.md) and the
+[HtmlBridge engine boundary map](docs/architecture/htmlbridge-engine-boundaries.md).
 
 ### Development Console & Development Site
 
@@ -218,7 +221,8 @@ dotnet test src/Broiler.Cli.Tests/ --filter "FullyQualifiedName~Acid1"
 
 See [docs/acid1-testing.md](docs/acid1-testing.md) for detailed Acid1 test
 documentation and [docs/testing-guide.md](docs/testing-guide.md) for the
-complete testing guide.
+complete testing guide. The M0 engines dashboard baselines are published in
+[docs/roadmap/engines-m0-baseline.md](docs/roadmap/engines-m0-baseline.md).
 
 ## DOM Interaction
 

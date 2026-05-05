@@ -1,0 +1,53 @@
+{
+  "Repository": "tc39/test262",
+  "Revision": "d0c1b4555b03dd404873fd6422a4b5da00136500",
+  "GeneratedAtUtc": "2026-05-05T09:26:21.5207738Z",
+  "Total": 6,
+  "Passed": 4,
+  "Failed": 2,
+  "Results": [
+    {
+      "Id": "Promise.resolve is a function",
+      "Path": "test/built-ins/Promise/resolve/S25.4.4.5_A1.1_T1.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/Promise/resolve/S25.4.4.5_A1.1_T1.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "JSON.stringify uses toJSON return values",
+      "Path": "test/built-ins/JSON/stringify/value-tojson-result.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/JSON/stringify/value-tojson-result.js",
+      "Passed": false,
+      "Message": "Expected [false] but got {}"
+    },
+    {
+      "Id": "Map constructor without iterable does not call set",
+      "Path": "test/built-ins/Map/map-no-iterable-does-not-call-set.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/Map/map-no-iterable-does-not-call-set.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Set constructor with empty iterable does not call add",
+      "Path": "test/built-ins/Set/set-iterable-empty-does-not-call-add.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/Set/set-iterable-empty-does-not-call-add.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Array.isArray recognises proxied arrays",
+      "Path": "test/built-ins/Array/isArray/proxy.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/Array/isArray/proxy.js",
+      "Passed": false,
+      "Message": "Array.isArray(new Proxy([], {})) must return true"
+    },
+    {
+      "Id": "String.prototype.trim works for booleans",
+      "Path": "test/built-ins/String/prototype/trim/15.5.4.20-1-3.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/d0c1b4555b03dd404873fd6422a4b5da00136500/test/built-ins/String/prototype/trim/15.5.4.20-1-3.js",
+      "Passed": true,
+      "Message": null
+    }
+  ],
+  "PassRate": 0.6666666666666666
+}
