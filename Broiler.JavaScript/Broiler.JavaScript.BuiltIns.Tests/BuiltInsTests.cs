@@ -511,6 +511,33 @@ public class BuiltInsTests
         Assert.Throws<JSException>(() => ctx.Eval("0;\n#!/usr/bin/env node\n1;"));
     }
 
+    [Fact]
+    public void Eval_Var_Can_Coexist_With_Global_Let()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("let value = 1; [eval('var value = 2; value;'), value].join('|');");
+        Assert.Equal("2|1", result.ToString());
+    }
+
+    [Fact]
+    public void Eval_Var_Can_Coexist_With_Global_Const()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("const value = 1; [eval('var value = 2; value;'), value].join('|');");
+        Assert.Equal("2|1", result.ToString());
+    }
+
+    [Fact]
+    public void Eval_Var_Can_Be_Redeclared_Across_Direct_Evals()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("let value = 1; [eval('var value = 2; value;'), eval('var value = 3; value;'), value].join('|');");
+        Assert.Equal("2|3|1", result.ToString());
+    }
+
     // ── M2: JSMap tests ──────────────────────────────────────────────
 
     [Fact]
