@@ -18,6 +18,8 @@ internal static class RegExpValidator
         try
         {
             var options = RegexOptions.None;
+            bool unicode = false;
+            bool unicodeSets = false;
             if (flags != null)
             {
                 foreach (var ch in flags)
@@ -27,6 +29,22 @@ internal static class RegExpValidator
                         case 'i': options |= RegexOptions.IgnoreCase; break;
                         case 'm': options |= RegexOptions.Multiline; break;
                         case 's': options |= RegexOptions.Singleline; break;
+                        case 'u':
+                            if (unicode || unicodeSets)
+                                return false;
+                            unicode = true;
+                            break;
+                        case 'v':
+                            if (unicodeSets || unicode)
+                                return false;
+                            unicodeSets = true;
+                            break;
+                        case 'g':
+                        case 'y':
+                        case 'd':
+                            break;
+                        default:
+                            return false;
                     }
                 }
             }

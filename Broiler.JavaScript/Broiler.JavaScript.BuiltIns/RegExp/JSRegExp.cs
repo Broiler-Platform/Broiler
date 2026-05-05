@@ -54,6 +54,10 @@ public partial class JSRegExp : JSObject, IJSRegExp
     public readonly bool multiline;
     [JSExport]
     public readonly bool ignoreCase;
+    [JSExport]
+    public readonly bool unicode;
+    [JSExport]
+    public readonly bool unicodeSets;
 
     internal Regex value;
 
@@ -74,7 +78,7 @@ public partial class JSRegExp : JSObject, IJSRegExp
         this.flags = flags;
         this.pattern = pattern;
 
-        (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
+        (value, globalSearch, ignoreCase, multiline, unicode, unicodeSets) = CreateRegex(pattern, flags);
     }
 
     public JSRegExp(string pattern, string flags) : this()
@@ -82,7 +86,7 @@ public partial class JSRegExp : JSObject, IJSRegExp
         this.flags = flags;
         this.pattern = pattern;
 
-        (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
+        (value, globalSearch, ignoreCase, multiline, unicode, unicodeSets) = CreateRegex(pattern, flags);
     }
 
     /// <summary>
@@ -309,17 +313,19 @@ public partial class JSRegExp : JSObject, IJSRegExp
     /// v (unicodeSets)
     /// d (hasIndices)</param>
     /// <returns> RegexOptions flags that correspond to the given flags. </returns>
-    private static (RegexOptions, bool, bool, bool, bool) ParseFlags(string flags)
+    private static (RegexOptions Options, bool GlobalSearch, bool IgnoreCase, bool Multiline, bool DotAll, bool Unicode, bool UnicodeSets) ParseFlags(string flags)
     {
         bool globalSearch = false;
         bool ignoreCase = false;
         bool multiline = false;
         bool dotAll = false;
+        bool unicode = false;
+        bool unicodeSets = false;
 
         var options = RegexOptions.ECMAScript;
 
         if (flags == null)
-            return (options, globalSearch, ignoreCase, multiline, dotAll);
+            return (options, globalSearch, ignoreCase, multiline, dotAll, unicode, unicodeSets);
 
         for (int i = 0; i < flags.Length; i++)
         {
@@ -354,7 +360,23 @@ public partial class JSRegExp : JSObject, IJSRegExp
                 options &= ~RegexOptions.ECMAScript;
                 options |= RegexOptions.Singleline;
             }
-            else if (flag == 'u' || flag == 'v' || flag == 'y' || flag == 'd')
+            else if (flag == 'u')
+            {
+                if (unicode)
+                    throw JSEngine.NewSyntaxError("The 'u' flag cannot be specified twice");
+                if (unicodeSets)
+                    throw JSEngine.NewSyntaxError("The 'u' and 'v' flags cannot be used together");
+                unicode = true;
+            }
+            else if (flag == 'v')
+            {
+                if (unicodeSets)
+                    throw JSEngine.NewSyntaxError("The 'v' flag cannot be specified twice");
+                if (unicode)
+                    throw JSEngine.NewSyntaxError("The 'u' and 'v' flags cannot be used together");
+                unicodeSets = true;
+            }
+            else if (flag == 'y' || flag == 'd')
             {
                 // Accepted but not enforced in this implementation.
             }
@@ -364,7 +386,7 @@ public partial class JSRegExp : JSObject, IJSRegExp
             }
         }
 
-        return (options, globalSearch, ignoreCase, multiline, dotAll);
+        return (options, globalSearch, ignoreCase, multiline, dotAll, unicode, unicodeSets);
     }
 
     /// <summary>
@@ -372,11 +394,11 @@ public partial class JSRegExp : JSObject, IJSRegExp
     /// Supports ES2025 inline pattern modifiers (§2.6) and duplicate
     /// named capturing groups (§2.7).
     /// </summary>
-    public static (Regex, bool, bool, bool) CreateRegex(string pattern, string flags)
+    public static (Regex, bool, bool, bool, bool, bool) CreateRegex(string pattern, string flags)
     {
         try
         {
-            var (options, globalSearch, ignoreCase, multiline, dotAll) = ParseFlags(flags);
+            var (options, globalSearch, ignoreCase, multiline, dotAll, unicode, unicodeSets) = ParseFlags(flags);
 
             // BROILER-PATCH: Transform ES3 empty character classes and forward backreferences
             // for .NET compatibility (tests 89, 90)
@@ -450,11 +472,19 @@ public partial class JSRegExp : JSObject, IJSRegExp
                 }
             }
 
-            return (new Regex(pattern, options), globalSearch, ignoreCase, multiline);
+            return (new Regex(pattern, options), globalSearch, ignoreCase, multiline, unicode, unicodeSets);
+        }
+        catch (JSException)
+        {
+            throw;
+        }
+        catch (ArgumentException ex)
+        {
+            throw JSEngine.NewSyntaxError(ex.Message);
         }
         catch
         {
-            return (null, false, false, false);
+            throw JSEngine.NewSyntaxError("Invalid regular expression");
         }
     }
 

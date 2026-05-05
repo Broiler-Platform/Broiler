@@ -641,6 +641,34 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void RegExp_V_Flag_Exposes_UnicodeSets_Metadata()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = new RegExp('a', 'v');
+            [re.flags, re.unicodeSets, re.unicode].join('|');
+        ");
+        Assert.Equal("v|true|false", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Cannot_Be_Combined_With_U()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'uv');"));
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Cannot_Be_Specified_Twice()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'vv');"));
+    }
+
+    [Fact]
     public void Iterator_From_Map_Filter_Take_ToArray()
     {
         EnsureBuiltInsLoaded();
