@@ -714,6 +714,36 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void RegExp_Flags_Are_Normalized_And_Metadata_Is_Exposed()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = new RegExp('a', 'yidg');
+            [re.flags, re.hasIndices, re.sticky, re.global, re.ignoreCase].join('|');
+        ");
+        Assert.Equal("dgiy|true|true|true|true", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_D_And_Y_Flags_Cannot_Be_Specified_Twice()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'dd');"));
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'yy');"));
+    }
+
+    [Fact]
+    public void RegExp_Literal_Duplicate_D_And_Y_Flags_Are_Rejected()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("/a/dd"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/yy"));
+    }
+
+    [Fact]
     public void Iterator_From_Map_Filter_Take_ToArray()
     {
         EnsureBuiltInsLoaded();

@@ -18,6 +18,12 @@ internal static class RegExpValidator
         try
         {
             var options = RegexOptions.None;
+            bool global = false;
+            bool ignoreCase = false;
+            bool multiline = false;
+            bool dotAll = false;
+            bool hasIndices = false;
+            bool sticky = false;
             bool unicode = false;
             bool unicodeSets = false;
             if (flags != null)
@@ -26,9 +32,29 @@ internal static class RegExpValidator
                 {
                     switch (ch)
                     {
-                        case 'i': options |= RegexOptions.IgnoreCase; break;
-                        case 'm': options |= RegexOptions.Multiline; break;
-                        case 's': options |= RegexOptions.Singleline; break;
+                        case 'g':
+                            if (global)
+                                return false;
+                            global = true;
+                            break;
+                        case 'i':
+                            if (ignoreCase)
+                                return false;
+                            options |= RegexOptions.IgnoreCase;
+                            ignoreCase = true;
+                            break;
+                        case 'm':
+                            if (multiline)
+                                return false;
+                            options |= RegexOptions.Multiline;
+                            multiline = true;
+                            break;
+                        case 's':
+                            if (dotAll)
+                                return false;
+                            options |= RegexOptions.Singleline;
+                            dotAll = true;
+                            break;
                         case 'u':
                             if (unicode || unicodeSets)
                                 return false;
@@ -39,9 +65,15 @@ internal static class RegExpValidator
                                 return false;
                             unicodeSets = true;
                             break;
-                        case 'g':
                         case 'y':
+                            if (sticky)
+                                return false;
+                            sticky = true;
+                            break;
                         case 'd':
+                            if (hasIndices)
+                                return false;
+                            hasIndices = true;
                             break;
                         default:
                             return false;
