@@ -245,6 +245,8 @@ public class FastScanner
                 return ReadNumber(state, first);
 
             case '#':
+                if (Next() == '!' && IsHashbangStart())
+                    return SkipSingleLineComment(state);
                 return ReadSymbol(state, TokenTypes.Hash);
 
             case '/':
@@ -586,6 +588,12 @@ public class FastScanner
             result = (char)code;
             return true;
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsHashbangStart()
+    {
+        return position == 0;
     }
 
     private string ScanUnicodeCodePointEscape()

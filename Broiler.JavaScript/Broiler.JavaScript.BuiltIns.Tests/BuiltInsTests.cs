@@ -492,6 +492,25 @@ public class BuiltInsTests
         "));
     }
 
+    // ── M2: Hashbang grammar tests ────────────────────────────────────
+
+    [Fact]
+    public void Hashbang_At_Start_Of_Source_Is_Ignored()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("#!/usr/bin/env node\n1 + 2;");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Hashbang_Not_At_Start_Of_Source_Is_Rejected()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("0;\n#!/usr/bin/env node\n1;"));
+    }
+
     // ── M2: JSMap tests ──────────────────────────────────────────────
 
     [Fact]
