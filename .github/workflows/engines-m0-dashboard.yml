@@ -77,7 +77,11 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Run engine baseline benchmarks
-        run: dotnet run --project src/Broiler.Engines.Baseline --configuration Release -- benchmarks --output-dir tests/m0-baseline/ci/benchmarks
+        run: >-
+          dotnet run --project src/Broiler.Engines.Baseline --configuration Release -- benchmarks
+          --output-dir tests/m0-baseline/ci/benchmarks
+          --baseline tests/m0-baseline/performance/engine-benchmark-baseline.json
+          --budget-percent 2
       - name: Publish benchmark summary
         if: always()
         run: cat tests/m0-baseline/ci/benchmarks/engine-benchmark-baseline.md >> "$GITHUB_STEP_SUMMARY"

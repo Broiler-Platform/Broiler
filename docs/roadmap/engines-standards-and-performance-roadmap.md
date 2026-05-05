@@ -1,6 +1,6 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: **M0 complete** — baseline/instrumentation published; M1 follow-on work next
+> **Status**: **M1 complete** — boundary/spec mapping and per-PR perf gating are published; M2 targeted compliance work next
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
@@ -202,7 +202,7 @@ current HtmlBridge boundary/leak map are now published in
 [`../architecture/htmlbridge-engine-boundaries.md`](../architecture/htmlbridge-engine-boundaries.md),
 and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml).
 
-### Phase 1 — Boundary Hardening and Spec Mapping (Milestone **M1**)
+### Phase 1 — Boundary Hardening and Spec Mapping (Milestone **M1**) — **Completed 2026-05-05**
 
 Prepares the engines for compliance-driven change without altering behavior.
 
@@ -213,6 +213,14 @@ Prepares the engines for compliance-driven change without altering behavior.
 - Migrate any remaining public Skia-typed surfaces per
   [`skia-replacement-roadmap.md`](./skia-replacement-roadmap.md) (W7).
 - Land a per-PR perf-regression gate on the budgets defined in Phase 0 (W6).
+
+**Completion record:** The frozen HtmlBridge public seam, the
+`Broiler.HtmlBridge` API/spec map, the remaining public Skia-surface cleanup,
+and the representative per-PR benchmark gate are now published in
+[`../architecture/htmlbridge-engine-boundaries.md`](../architecture/htmlbridge-engine-boundaries.md),
+[`../architecture/htmlbridge-spec-map.md`](../architecture/htmlbridge-spec-map.md),
+[`skia-replacement-roadmap.md`](./skia-replacement-roadmap.md),
+and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml).
 
 ### Phase 2 — Targeted Compliance Push (Milestone **M2**)
 
@@ -528,7 +536,7 @@ behavioral or performance-sensitive changes:
 ### 13.2 Milestone-to-sub-issue checklist
 
 - [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
-- [ ] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
+- [x] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
 - [ ] **M2** — file and start W3/W4/W5 targeted compliance issues with spec-cited scopes
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
 - [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
@@ -545,6 +553,15 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-05** — M1 boundary/spec-map kickoff: published
+  `docs/architecture/htmlbridge-engine-boundaries.md` as the frozen
+  `htmlbridge-public-surface/v1` contract, added
+  `docs/architecture/htmlbridge-spec-map.md` to map the public
+  `Broiler.HtmlBridge` API to WHATWG/W3C anchors with explicit partial and
+  non-standard flags, and wired the benchmark harness plus PR workflow to fail
+  on mean slowdowns above the M1 ≤ 2% budget versus the committed M0 JSON
+  baseline for the current representative per-engine gate metrics
+  (`js.startup`, `html.raster`, `bridge.mutation`).
 - **2026-04-30** — Execution kickoff: converted this document from a pure draft
   into an execution tracker by adding a ready-to-file sub-issue backlog, a
   milestone filing order, and a milestone checklist aligned to `#1064`.
