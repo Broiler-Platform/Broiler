@@ -1253,7 +1253,7 @@ document.getElementById('result').textContent = order.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        // At target phase (phase 2), all listeners fire in registration order
+        // At target phase (phase 2), capture listeners fire before bubble listeners
         Assert.Contains("capture-2,bubble-2", result);
     }
 

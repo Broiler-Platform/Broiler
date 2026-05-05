@@ -219,14 +219,15 @@ public sealed partial class DomBridge
             FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
-        // Phase 2: Target — fire ALL listeners (both capture and bubble) in registration order
+        // Phase 2: Target — fire capture listeners first, then non-capture listeners.
         if (!stopped)
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(2);
             evt[(KeyString)"currentTarget"] = target == _documentNode
                 ? (_documentJSObject ?? JSNull.Value)
                 : ToJSObject(target);
-            FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped, ref currentListenerPassive);
+            FireListeners(target, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped, ref currentListenerPassive);
+            FireListeners(target, eventType, evt, capturePhase: false, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
         // Phase 3: Bubble (parent of target → root) — only if event.bubbles is true
@@ -252,7 +253,7 @@ public sealed partial class DomBridge
     /// Fires registered listeners for the given event type on a single element.
     /// When <paramref name="capturePhase"/> is <c>true</c>, only capture listeners fire.
     /// When <c>false</c>, only bubble listeners fire.
-    /// When <c>null</c> (target phase), all listeners fire in registration order plus the inline handler.
+    /// When <c>null</c> (unused), all listeners fire in registration order plus the inline handler.
     /// </summary>
     private static void FireListeners(DomElement el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)

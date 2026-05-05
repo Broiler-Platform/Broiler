@@ -904,4 +904,32 @@ document.getElementById('result').textContent = r.join(',');
         // Capture listeners fire in registration order
         Assert.Contains("cap-1,cap-2,cap-3,target", result);
     }
+
+    [Fact]
+    public void Target_Phase_Capture_Listeners_Fire_Before_Bubble_Listeners_Even_When_Registered_Later()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var order = [];
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) {
+    order.push('bubble-' + e.eventPhase);
+}, false);
+target.addEventListener('test', function(e) {
+    order.push('capture-' + e.eventPhase);
+}, true);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = order.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("capture-2,bubble-2", result);
+    }
 }
