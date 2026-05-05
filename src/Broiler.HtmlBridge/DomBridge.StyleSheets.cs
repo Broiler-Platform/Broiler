@@ -91,9 +91,6 @@ public sealed partial class DomBridge
 
         // Internal rules storage for this stylesheet
         var rulesStorage = new List<string>();
-        // Flag to skip text-based rebuild (set by deleteRule)
-        var skipRebuild = false;
-
         // Parse initial rules from the style element's text content
         var initialText = CollectStyleElementText(styleElement);
         if (!string.IsNullOrWhiteSpace(initialText))
@@ -103,42 +100,29 @@ public sealed partial class DomBridge
         }
 
         // Track last known text content to detect changes
-        var lastTextHash = string.Empty;
+        var lastTextHash = initialText ?? string.Empty;
 
-        // Ensure rulesStorage is up-to-date with text content and inserted rules
+        // Ensure rulesStorage is up-to-date with text content
         void EnsureRulesUpToDate()
         {
-            if (skipRebuild) return;
-
             var currentText = CollectStyleElementText(styleElement);
             var currentHash = currentText ?? string.Empty;
+            if (currentHash == lastTextHash)
+                return;
 
-            if (currentHash != lastTextHash)
+            rulesStorage.Clear();
+            if (!string.IsNullOrWhiteSpace(currentText))
             {
-                rulesStorage.Clear();
-                if (!string.IsNullOrWhiteSpace(currentText))
-                {
-                    foreach (var rule in ParseCssRuleStrings(currentText))
-                        rulesStorage.Add(rule);
-                }
-                lastTextHash = currentHash;
-
-                // Re-insert any programmatically added rules
-                if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
-                {
-                    foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
-                    {
-                        if (idx <= rulesStorage.Count)
-                            rulesStorage.Insert(idx, rule);
-                        else
-                            rulesStorage.Add(rule);
-                    }
-                }
+                foreach (var rule in ParseCssRuleStrings(currentText))
+                    rulesStorage.Add(rule);
             }
+
+            lastTextHash = currentHash;
         }
 
         // Live cssRules object — single instance that always reflects current state
         var liveCssRules = new JSObject();
+        var lastSyncedRuleCount = 0;
         // length is a live getter that always reflects the current rule count
         liveCssRules.FastAddProperty(
             (KeyString)"length",
@@ -170,6 +154,11 @@ public sealed partial class DomBridge
                 var ruleObj = BuildCssRuleObject(rulesStorage[i], sheet);
                 liveCssRules[(uint)i] = ruleObj;
             }
+
+            for (var i = rulesStorage.Count; i < lastSyncedRuleCount; i++)
+                liveCssRules.GetElements().RemoveAt((uint)i);
+
+            lastSyncedRuleCount = rulesStorage.Count;
         }
 
         // cssRules — returns the live collection, syncing indices on access
@@ -189,18 +178,13 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
-                var index = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                var dv = a.Length > 1 ? a[1].DoubleValue : rulesStorage.Count;
+                var index = double.IsNaN(dv) ? rulesStorage.Count : (int)dv;
 
-                if (!styleElement.DomProperties.TryGetValue("_insertedRules", out var existing) || existing is not List<(int, string)>)
-                {
-                    existing = new List<(int Index, string Rule)>();
-                    styleElement.DomProperties["_insertedRules"] = existing;
-                }
-                ((List<(int Index, string Rule)>)existing).Add((index, ruleText));
-
-                // Invalidate cache so next cssRules access rebuilds
-                skipRebuild = false;
-                lastTextHash = string.Empty;
+                EnsureRulesUpToDate();
+                index = Math.Clamp(index, 0, rulesStorage.Count);
+                rulesStorage.Insert(index, ruleText);
+                SyncLiveCssRulesIndices();
 
                 return new JSNumber(index);
             }, "insertRule", 2),
@@ -211,14 +195,14 @@ public sealed partial class DomBridge
             (KeyString)"deleteRule",
             new JSFunction((in Arguments a) =>
             {
+                EnsureRulesUpToDate();
                 if (a.Length > 0)
                 {
                     var dv = a[0].DoubleValue;
                     var idx = double.IsNaN(dv) ? 0 : (int)dv;
                     if (idx >= 0 && idx < rulesStorage.Count)
                         rulesStorage.RemoveAt(idx);
-                    // Skip text-based rebuild since we modified programmatically
-                    skipRebuild = true;
+                    SyncLiveCssRulesIndices();
                 }
                 return JSUndefined.Value;
             }, "deleteRule", 1),

@@ -859,6 +859,15 @@ and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText|FullyQualifiedName~CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-05** — HtmlBridge stylesheet CSSOM continuation: tightened
+  top-level `CSSStyleSheet.insertRule()` / `deleteRule()` live-list behavior so
+  `document.styleSheets[...].cssRules` updates in place, clears stale numeric
+  indices after deletions, and respects later owner `<style>` text
+  replacements instead of re-inserting stale programmatic rules across
+  rebuilds. Focused coverage now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~InsertRule_On_StyleSheet|FullyQualifiedName~StyleSheet_InsertRule_Does_Not_Reappear_After_Owner_TextContent_Is_Replaced|FullyQualifiedName~DeleteRule_On_StyleSheet|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-05-05** — HtmlBridge stylesheet CSSOM continuation: exposed
   `@counter-style` entries as `CSSCounterStyleRule`-like objects in
   `document.styleSheets[...].cssRules`, including `type === 10`, `name`, core

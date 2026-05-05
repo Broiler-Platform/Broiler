@@ -1895,6 +1895,67 @@ document.getElementById('result').textContent = initLen + ':' + sheet.cssRules.l
     }
 
     [Fact]
+    public void InsertRule_On_StyleSheet_Updates_Live_CssRules_And_Clears_Deleted_Indices()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.first { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(typeof rules.item === 'function');
+r.push(rules.item(0).selectorText === '.first');
+r.push(sheet.insertRule('@media screen { .second { color: blue; } }', 1) === 1);
+r.push(rules.length === 2);
+r.push(rules[1].type === 4);
+r.push(rules.item(1).cssRules[0].selectorText === '.second');
+sheet.deleteRule(0);
+r.push(rules.length === 1);
+r.push(rules[0].type === 4);
+r.push(rules[1] === undefined);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void StyleSheet_InsertRule_Does_Not_Reappear_After_Owner_TextContent_Is_Replaced()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.first { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var styleEl = document.querySelector('style');
+var sheet = document.styleSheets[0];
+sheet.insertRule('.second { color: blue; }', 1);
+r.push(sheet.cssRules.length === 2);
+r.push(sheet.cssRules[1].selectorText === '.second');
+styleEl.textContent = '.third { color: green; }';
+r.push(sheet.cssRules.length === 1);
+r.push(sheet.cssRules[0].selectorText === '.third');
+r.push(sheet.cssRules[1] === undefined);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void Cursor_Property_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
