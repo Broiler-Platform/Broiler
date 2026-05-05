@@ -412,20 +412,36 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        var prevented = false;
+        var stopped = false;
+        var immediateStopped = false;
+        var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
+                        defaultPreventedValue.BooleanValue;
         var currentListenerPassive = false;
+        var legacyCancelBubble = false;
+        evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
+            new JSFunction((in Arguments _) =>
+            {
+                stopped = true;
+                legacyCancelBubble = true;
+                return JSUndefined.Value;
+            }, "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) => JSUndefined.Value, "stopImmediatePropagation", 0),
+            new JSFunction((in Arguments _) =>
+            {
+                stopped = true;
+                immediateStopped = true;
+                legacyCancelBubble = true;
+                return JSUndefined.Value;
+            }, "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) =>
             {
-                if (!currentListenerPassive)
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
                 {
                     prevented = true;
                     evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
@@ -433,6 +449,37 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }, "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddProperty(
+            (KeyString)"cancelBubble",
+            new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new JSFunction((in Arguments setArgs) =>
+            {
+                if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+                {
+                    legacyCancelBubble = true;
+                    stopped = true;
+                }
+                return JSUndefined.Value;
+            }, "set cancelBubble"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty(
+            (KeyString)"returnValue",
+            new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new JSFunction((in Arguments setArgs) =>
+            {
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (setArgs.Length > 0 &&
+                    !setArgs[0].BooleanValue &&
+                    !currentListenerPassive &&
+                    cancelable != null &&
+                    cancelable.BooleanValue)
+                {
+                    prevented = true;
+                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                }
+                return JSUndefined.Value;
+            }, "set returnValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddValue((KeyString)"composedPath",
             new JSFunction((in Arguments _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -441,6 +488,9 @@ public sealed partial class DomBridge
         {
             foreach (var registration in listeners.ToList())
             {
+                if (stopped || immediateStopped)
+                    break;
+
                 currentListenerPassive = registration.Passive;
                 InvokeEventListener(registration.Listener, evt, "DomBridge.window.dispatchEvent");
                 currentListenerPassive = false;
