@@ -314,6 +314,8 @@ referenced roadmaps where they already exist.
 
 ### 7.3 `Broiler.HtmlBridge`
 
+- See [`htmlbridge-split-evaluation.md`](./htmlbridge-split-evaluation.md) for
+  the current responsibility audit and the recommended seam-first split plan.
 - **Compliance**
   - Produce a **bridge surface ↔ spec** mapping document covering every
     `DomBridge.*.cs` partial (W2, M1).
