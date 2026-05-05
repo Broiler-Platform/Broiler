@@ -859,6 +859,16 @@ and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText|FullyQualifiedName~CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
   and
   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
+- **2026-05-05** — HtmlBridge stylesheet CSSOM continuation: exposed
+  `@counter-style` entries as `CSSCounterStyleRule`-like objects in
+  `document.styleSheets[...].cssRules`, including `type === 10`, `name`, core
+  descriptor surfaces such as `system`, `symbols`, `suffix`, and `fallback`,
+  plus serialized `cssText`, while preserving mixed top-level rule ordering
+  with charset, import, property, font-face, and style rules. Focused coverage
+  now passes via
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~CssCounterStyleRule|FullyQualifiedName~CssPropertyRule|FullyQualifiedName~CssFontFaceRule|FullyQualifiedName~CssCharsetRule|FullyQualifiedName~CssPageRule|FullyQualifiedName~CssNamespaceRule|FullyQualifiedName~CssLayerRule|FullyQualifiedName~CssSupportsRule|FullyQualifiedName~CssKeyframesRule|FullyQualifiedName~CssImportRule|FullyQualifiedName~CssMediaRule|FullyQualifiedName~CssRule_Style|FullyQualifiedName~ParentRule|FullyQualifiedName~CssRenderingTests"`
+  and
+  `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --filter "FullyQualifiedName~WptCssVariablesTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~CssRenderingTests|FullyQualifiedName~RenderingPipelineTests"`.
 - **2026-05-04** — HtmlBridge stylesheet CSSOM continuation: exposed
   `@font-face` entries as `CSSFontFaceRule`-like objects in
   `document.styleSheets[...].cssRules`, including `type === 5`, bridged

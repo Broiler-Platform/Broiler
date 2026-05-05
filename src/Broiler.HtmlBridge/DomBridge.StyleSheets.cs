@@ -397,11 +397,14 @@ public sealed partial class DomBridge
     /// Builds a CSSRule JSObject from a CSS rule string.
     /// Sets <c>type</c> (1 = CSSStyleRule, 2 = CSSCharsetRule, 3 = CSSImportRule,
     /// 4 = CSSMediaRule, 5 = CSSFontFaceRule, 6 = CSSPageRule, 7 = CSSKeyframesRule,
-    /// 9 = CSSNamespaceRule, 11 = CSSSupportsRule, 12 = CSSLayerRule, 25 = CSSPropertyRule),
+    /// 9 = CSSNamespaceRule, 10 = CSSCounterStyleRule, 11 = CSSSupportsRule,
+    /// 12 = CSSLayerRule, 25 = CSSPropertyRule),
     /// <c>cssText</c>, <c>selectorText</c>, <c>href</c>, <c>media</c>,
-    /// <c>conditionText</c>, <c>name</c>, <c>syntax</c>, <c>inherits</c>,
-    /// <c>initialValue</c>, <c>namespaceURI</c>, <c>prefix</c>, <c>cssRules</c>, and
-    /// <c>style</c> properties as appropriate.
+    /// <c>conditionText</c>, <c>name</c>, <c>system</c>, <c>symbols</c>,
+    /// <c>additiveSymbols</c>, <c>negative</c>, <c>prefix</c>, <c>suffix</c>,
+    /// <c>range</c>, <c>pad</c>, <c>fallback</c>, <c>speakAs</c>, <c>syntax</c>,
+    /// <c>inherits</c>, <c>initialValue</c>, <c>namespaceURI</c>, <c>cssRules</c>,
+    /// and <c>style</c> properties as appropriate.
     /// </summary>
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
@@ -605,6 +608,65 @@ public sealed partial class DomBridge
                             serialized.Add($"initial-value: {initialValue}");
 
                         return new JSString($"@property {propertyName} {{ {string.Join("; ", serialized)}; }}");
+                    }, "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+        else if (trimmedRuleText.StartsWith("@counter-style", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSCounterStyleRule — type 10
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            var braceOpen = trimmedRuleText.IndexOf('{');
+            var braceClose = trimmedRuleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var ruleName = trimmedRuleText.Substring(14, braceOpen - 14).Trim();
+                var descriptorsText = trimmedRuleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var descriptors = ParseStyle(descriptorsText);
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                var descriptorMap = new (string CssName, string JsName)[]
+                {
+                    ("system", "system"),
+                    ("symbols", "symbols"),
+                    ("additive-symbols", "additiveSymbols"),
+                    ("negative", "negative"),
+                    ("prefix", "prefix"),
+                    ("suffix", "suffix"),
+                    ("range", "range"),
+                    ("pad", "pad"),
+                    ("fallback", "fallback"),
+                    ("speak-as", "speakAs")
+                };
+
+                foreach (var (cssName, jsName) in descriptorMap)
+                {
+                    ruleObj.FastAddValue(
+                        (KeyString)jsName,
+                        descriptors.TryGetValue(cssName, out var value) ? new JSString(value) : JSUndefined.Value,
+                        JSPropertyAttributes.EnumerableConfigurableValue);
+                }
+
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var serialized = new List<string>();
+                        foreach (var (cssName, jsName) in descriptorMap)
+                        {
+                            var value = ruleObj[(KeyString)jsName];
+                            if (value is null || value == JSUndefined.Value)
+                                continue;
+
+                            var text = value.ToString();
+                            if (!string.IsNullOrEmpty(text))
+                                serialized.Add($"{cssName}: {text}");
+                        }
+
+                        return new JSString($"@counter-style {ruleName} {{ {string.Join("; ", serialized)}; }}");
                     }, "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
