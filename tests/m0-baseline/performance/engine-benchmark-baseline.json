@@ -1,0 +1,85 @@
+{
+  "GeneratedAtUtc": "2026-05-05T09:21:02.7253631Z",
+  "Results": [
+    {
+      "Name": "js.startup",
+      "Description": "Create a fresh JSContext and evaluate a trivial expression",
+      "Unit": "ms",
+      "SampleCount": 20,
+      "Mean": 2.9141000000000004,
+      "Median": 2.51305,
+      "Min": 0.8225,
+      "Max": 7.6417
+    },
+    {
+      "Name": "js.micro",
+      "Description": "Evaluate a hot arithmetic loop in one context",
+      "Unit": "ms",
+      "SampleCount": 20,
+      "Mean": 3.559515,
+      "Median": 3.78845,
+      "Min": 1.8226,
+      "Max": 7.0845
+    },
+    {
+      "Name": "html.parse",
+      "Description": "HtmlContainer.SetHtml on the baseline sample document",
+      "Unit": "ms",
+      "SampleCount": 15,
+      "Mean": 3.8611133333333334,
+      "Median": 1.7055,
+      "Min": 1.3655,
+      "Max": 13.4993
+    },
+    {
+      "Name": "html.layout",
+      "Description": "HtmlContainer.SetHtml \u002B PerformLayout on the baseline sample document",
+      "Unit": "ms",
+      "SampleCount": 15,
+      "Mean": 5.0484,
+      "Median": 3.5078,
+      "Min": 3.1717,
+      "Max": 14.5079
+    },
+    {
+      "Name": "html.paint",
+      "Description": "HtmlContainer.PerformPaint after layout on the baseline sample document",
+      "Unit": "ms",
+      "SampleCount": 15,
+      "Mean": 325.04824666666667,
+      "Median": 264.3272,
+      "Min": 257.5192,
+      "Max": 838.3561
+    },
+    {
+      "Name": "html.raster",
+      "Description": "Render and PNG-encode the baseline sample document",
+      "Unit": "ms",
+      "SampleCount": 10,
+      "Mean": 286.41360999999995,
+      "Median": 285.76685,
+      "Min": 284.1153,
+      "Max": 294.5337
+    },
+    {
+      "Name": "bridge.dom-call",
+      "Description": "Repeated document.getElementById().getAttribute() calls",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 2238.079166666667,
+      "Median": 1763.25,
+      "Min": 1717.1,
+      "Max": 5241.7
+    },
+    {
+      "Name": "bridge.mutation",
+      "Description": "Repeated textContent mutations through the DOM bridge",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 818681.5833333334,
+      "Median": 795240,
+      "Min": 693577.8,
+      "Max": 1084894.6
+    }
+  ]
+}
