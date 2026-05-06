@@ -6038,38 +6038,10 @@ public sealed partial class DomBridge
             extraction.DeferredScripts.Count == 0)
             return;
 
-        var subDocument = GetOrCreateSubDocument(containerElement);
         var subWindow = GetOrCreateSubWindow(containerElement);
-        var location = subWindow[(KeyString)"location"];
 
-        JSValue? previousWindow = null;
-        JSValue? previousDocument = null;
-        JSValue? previousLocation = null;
-        JSValue? previousParent = null;
-        JSValue? previousPostMessage = null;
-        JSValue? previousSelf = null;
-        JSValue? previousTop = null;
-        var previousCurrentWindow = _currentWindowOverride;
-
-        try
+        RunWithWindowContext(subWindow, () =>
         {
-            previousWindow = _jsContext.Eval("typeof window === 'undefined' ? undefined : window");
-            previousDocument = _jsContext.Eval("typeof document === 'undefined' ? undefined : document");
-            previousLocation = _jsContext.Eval("typeof location === 'undefined' ? undefined : location");
-            previousParent = _jsContext.Eval("typeof parent === 'undefined' ? undefined : parent");
-            previousPostMessage = _jsContext.Eval("typeof postMessage === 'undefined' ? undefined : postMessage");
-            previousSelf = _jsContext.Eval("typeof self === 'undefined' ? undefined : self");
-            previousTop = _jsContext.Eval("typeof top === 'undefined' ? undefined : top");
-
-            _jsContext["window"] = subWindow;
-            _jsContext["document"] = subDocument;
-            _jsContext["location"] = location;
-            _jsContext["parent"] = GetParentWindowForSubDocument(containerElement) ?? JSUndefined.Value;
-            _jsContext["postMessage"] = subWindow[(KeyString)"postMessage"] ?? JSUndefined.Value;
-            _jsContext["self"] = subWindow;
-            _jsContext["top"] = _windowJSObject ?? subWindow;
-            _currentWindowOverride = subWindow;
-
             foreach (var script in extraction.Scripts)
             {
                 try
@@ -6108,18 +6080,7 @@ public sealed partial class DomBridge
                         $"Sub-document deferred script error: {ex.Message}", ex);
                 }
             }
-        }
-        finally
-        {
-            _jsContext["window"] = previousWindow ?? JSUndefined.Value;
-            _jsContext["document"] = previousDocument ?? JSUndefined.Value;
-            _jsContext["location"] = previousLocation ?? JSUndefined.Value;
-            _jsContext["parent"] = previousParent ?? JSUndefined.Value;
-            _jsContext["postMessage"] = previousPostMessage ?? JSUndefined.Value;
-            _jsContext["self"] = previousSelf ?? JSUndefined.Value;
-            _jsContext["top"] = previousTop ?? JSUndefined.Value;
-            _currentWindowOverride = previousCurrentWindow;
-        }
+        });
     }
 
     /// <summary>
