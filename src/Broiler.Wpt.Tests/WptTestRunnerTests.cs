@@ -7639,7 +7639,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             })()
             """);
 
-        Assert.Equal("outer|inner>outer>BODY>HTML", result.ToString());
+        Assert.Equal("inner|inner>outer>BODY>HTML", result.ToString());
     }
 
     [Fact]
