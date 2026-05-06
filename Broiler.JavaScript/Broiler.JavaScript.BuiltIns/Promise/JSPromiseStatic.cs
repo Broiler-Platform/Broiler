@@ -39,32 +39,44 @@ public partial class JSPromise
     [JSExport("try")]
     public static JSValue Try(in Arguments a)
     {
+        var receiver = a.This;
+        if (!receiver.IsObject)
+            throw JSEngine.NewTypeError("Promise.try receiver must be an object");
+
+        if (receiver is not JSFunction constructor || constructor.prototype == null)
+            throw JSEngine.NewTypeError("Promise.try receiver must be a constructor");
+
         var callbackfn = a.Get1();
         if (!callbackfn.IsFunction)
             throw JSEngine.NewTypeError("Promise.try requires a callable argument");
 
-        try
-        {
-            // Collect extra arguments beyond the callback
-            var extraArgs = new JSValue[a.Length > 1 ? a.Length - 1 : 0];
-            for (int i = 1; i < a.Length; i++)
-                extraArgs[i - 1] = a.GetAt(i);
+        var extraArgs = new JSValue[a.Length > 1 ? a.Length - 1 : 0];
+        for (int i = 1; i < a.Length; i++)
+            extraArgs[i - 1] = a.GetAt(i);
 
-            var callArgs = new Arguments(JSUndefined.Value, extraArgs);
-            var result = callbackfn.InvokeFunction(callArgs);
-            if (result is JSPromise)
-                return result;
+        var executor = JSValue.CreateFunction((in Arguments executorArgs) =>
+        {
+            var resolve = executorArgs.Get1();
+            var reject = executorArgs.GetAt(1);
 
-            return new JSPromise(result, PromiseState.Resolved);
-        }
-        catch (JSException ex)
-        {
-            return new JSPromise(ex.Error ?? JSException.JSErrorFrom(ex), PromiseState.Rejected);
-        }
-        catch (Exception ex)
-        {
-            return new JSPromise(JSException.JSErrorFrom(ex), PromiseState.Rejected);
-        }
+            try
+            {
+                var result = callbackfn.InvokeFunction(new Arguments(JSUndefined.Value, extraArgs));
+                resolve.InvokeFunction(new Arguments(JSUndefined.Value, result));
+            }
+            catch (JSException ex)
+            {
+                reject.InvokeFunction(new Arguments(JSUndefined.Value, ex.Error ?? JSException.JSErrorFrom(ex)));
+            }
+            catch (Exception ex)
+            {
+                reject.InvokeFunction(new Arguments(JSUndefined.Value, JSException.JSErrorFrom(ex)));
+            }
+
+            return JSUndefined.Value;
+        }, "executor", length: 2, createPrototype: false);
+
+        return constructor.CreateInstance(new Arguments(JSUndefined.Value, executor));
     }
 
     [JSExport("resolve")]

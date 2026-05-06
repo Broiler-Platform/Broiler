@@ -1,0 +1,30 @@
+{
+  "name": "Test262 ES2025 focused subset",
+  "repository": "tc39/test262",
+  "revision": "e6c98682c47b869f2e5042e67a7035ffd9775a74",
+  "tests": [
+    { "id": "Promise.try receiver must be object", "path": "test/built-ins/Promise/try/ctx-non-object.js" },
+    { "id": "Promise.try receiver must be constructor", "path": "test/built-ins/Promise/try/ctx-non-ctor.js" },
+    { "id": "Promise.try constructor errors bubble", "path": "test/built-ins/Promise/try/ctx-ctor-throws.js" },
+    { "id": "Promise.try returns Promise", "path": "test/built-ins/Promise/try/promise.js" },
+    { "id": "Iterator.map rejects non-callable mapper", "path": "test/built-ins/Iterator/prototype/map/non-callable-mapper.js" },
+    { "id": "Iterator.map passes counter", "path": "test/built-ins/Iterator/prototype/map/mapper-args.js" },
+    { "id": "Iterator.map mapper this", "path": "test/built-ins/Iterator/prototype/map/mapper-this.js" },
+    { "id": "Iterator.filter passes counter", "path": "test/built-ins/Iterator/prototype/filter/predicate-args.js" },
+    { "id": "Iterator.filter predicate this", "path": "test/built-ins/Iterator/prototype/filter/predicate-this.js" },
+    { "id": "Iterator.flatMap passes counter", "path": "test/built-ins/Iterator/prototype/flatMap/mapper-args.js" },
+    { "id": "Iterator.flatMap mapper this", "path": "test/built-ins/Iterator/prototype/flatMap/mapper-this.js" },
+    { "id": "Iterator.forEach passes counter", "path": "test/built-ins/Iterator/prototype/forEach/fn-args.js" },
+    { "id": "Iterator.forEach callback this", "path": "test/built-ins/Iterator/prototype/forEach/fn-this.js" },
+    { "id": "Iterator.reduce passes counter", "path": "test/built-ins/Iterator/prototype/reduce/reducer-args-no-initial-value.js" },
+    { "id": "Iterator.reduce reducer this", "path": "test/built-ins/Iterator/prototype/reduce/reducer-this.js" },
+    { "id": "Set.isSubsetOf accepts set-like", "path": "test/built-ins/Set/prototype/isSubsetOf/allows-set-like-object.js" },
+    { "id": "Set.isSupersetOf accepts set-like", "path": "test/built-ins/Set/prototype/isSupersetOf/allows-set-like-object.js" },
+    { "id": "Set.isDisjointFrom accepts set-like", "path": "test/built-ins/Set/prototype/isDisjointFrom/allows-set-like-object.js" },
+    { "id": "RegExp.unicodeSets exposes metadata", "path": "test/built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js" },
+    { "id": "RegExp.unicodeSets rejects invalid this", "path": "test/built-ins/RegExp/prototype/unicodeSets/this-val-invalid-obj.js" },
+    { "id": "RegExp.escape escapes syntax chars", "path": "test/built-ins/RegExp/escape/escaped-syntax-characters-simple.js" },
+    { "id": "RegExp.escape escapes whitespace", "path": "test/built-ins/RegExp/escape/escaped-whitespace.js" },
+    { "id": "RegExp.escape coerces non-strings", "path": "test/built-ins/RegExp/escape/non-string-inputs.js" }
+  ]
+}

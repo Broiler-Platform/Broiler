@@ -19,8 +19,8 @@ public partial class JSRegExp : JSObject, IJSRegExp
     internal static JSValue Escape(in Arguments a)
     {
         var input = a.Get1();
-        if (input.IsNullOrUndefined)
-            throw JSEngine.NewTypeError("RegExp.escape called on null or undefined");
+        if (!input.IsString)
+            throw JSEngine.NewTypeError("RegExp.escape requires a string argument");
 
         var str = input.ToString();
         var sb = new StringBuilder(str.Length + 4);
@@ -28,6 +28,9 @@ public partial class JSRegExp : JSObject, IJSRegExp
         for (int i = 0; i < str.Length; i++)
         {
             var c = str[i];
+            if (TryAppendWhitespaceEscape(sb, c))
+                continue;
+
             if (c == '^' || c == '$' || c == '\\' || c == '.' || c == '*' ||
                 c == '+' || c == '?' || c == '(' || c == ')' || c == '[' ||
                 c == ']' || c == '{' || c == '}' || c == '|' || c == '/')
@@ -39,6 +42,49 @@ public partial class JSRegExp : JSObject, IJSRegExp
         }
 
         return JSValue.CreateString(sb.ToString());
+    }
+
+    private static bool TryAppendWhitespaceEscape(StringBuilder sb, char c)
+    {
+        switch (c)
+        {
+            case '\t':
+                sb.Append(@"\t");
+                return true;
+            case '\n':
+                sb.Append(@"\n");
+                return true;
+            case '\v':
+                sb.Append(@"\v");
+                return true;
+            case '\f':
+                sb.Append(@"\f");
+                return true;
+            case '\r':
+                sb.Append(@"\r");
+                return true;
+            case ' ':
+                sb.Append(@"\x20");
+                return true;
+        }
+
+        if (char.IsWhiteSpace(c) || c == '\uFEFF' || c == '\u2028' || c == '\u2029')
+        {
+            if (c <= 0xFF)
+            {
+                sb.Append(@"\x");
+                sb.Append(((int)c).ToString("x2"));
+            }
+            else
+            {
+                sb.Append(@"\u");
+                sb.Append(((int)c).ToString("x4"));
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     [JSExport("source")]

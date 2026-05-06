@@ -1,0 +1,173 @@
+{
+  "Name": "Test262 ES2025 focused subset",
+  "Repository": "tc39/test262",
+  "Revision": "e6c98682c47b869f2e5042e67a7035ffd9775a74",
+  "GeneratedAtUtc": "2026-05-06T16:41:58.7807874Z",
+  "Total": 23,
+  "Passed": 23,
+  "Failed": 0,
+  "Results": [
+    {
+      "Id": "Promise.try receiver must be object",
+      "Path": "test/built-ins/Promise/try/ctx-non-object.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Promise/try/ctx-non-object.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Promise.try receiver must be constructor",
+      "Path": "test/built-ins/Promise/try/ctx-non-ctor.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Promise/try/ctx-non-ctor.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Promise.try constructor errors bubble",
+      "Path": "test/built-ins/Promise/try/ctx-ctor-throws.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Promise/try/ctx-ctor-throws.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Promise.try returns Promise",
+      "Path": "test/built-ins/Promise/try/promise.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Promise/try/promise.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.map rejects non-callable mapper",
+      "Path": "test/built-ins/Iterator/prototype/map/non-callable-mapper.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/map/non-callable-mapper.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.map passes counter",
+      "Path": "test/built-ins/Iterator/prototype/map/mapper-args.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/map/mapper-args.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.map mapper this",
+      "Path": "test/built-ins/Iterator/prototype/map/mapper-this.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/map/mapper-this.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.filter passes counter",
+      "Path": "test/built-ins/Iterator/prototype/filter/predicate-args.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/filter/predicate-args.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.filter predicate this",
+      "Path": "test/built-ins/Iterator/prototype/filter/predicate-this.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/filter/predicate-this.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.flatMap passes counter",
+      "Path": "test/built-ins/Iterator/prototype/flatMap/mapper-args.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/flatMap/mapper-args.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.flatMap mapper this",
+      "Path": "test/built-ins/Iterator/prototype/flatMap/mapper-this.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/flatMap/mapper-this.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.forEach passes counter",
+      "Path": "test/built-ins/Iterator/prototype/forEach/fn-args.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/forEach/fn-args.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.forEach callback this",
+      "Path": "test/built-ins/Iterator/prototype/forEach/fn-this.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/forEach/fn-this.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.reduce passes counter",
+      "Path": "test/built-ins/Iterator/prototype/reduce/reducer-args-no-initial-value.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/reduce/reducer-args-no-initial-value.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Iterator.reduce reducer this",
+      "Path": "test/built-ins/Iterator/prototype/reduce/reducer-this.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Iterator/prototype/reduce/reducer-this.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Set.isSubsetOf accepts set-like",
+      "Path": "test/built-ins/Set/prototype/isSubsetOf/allows-set-like-object.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Set/prototype/isSubsetOf/allows-set-like-object.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Set.isSupersetOf accepts set-like",
+      "Path": "test/built-ins/Set/prototype/isSupersetOf/allows-set-like-object.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Set/prototype/isSupersetOf/allows-set-like-object.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "Set.isDisjointFrom accepts set-like",
+      "Path": "test/built-ins/Set/prototype/isDisjointFrom/allows-set-like-object.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/Set/prototype/isDisjointFrom/allows-set-like-object.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "RegExp.unicodeSets exposes metadata",
+      "Path": "test/built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "RegExp.unicodeSets rejects invalid this",
+      "Path": "test/built-ins/RegExp/prototype/unicodeSets/this-val-invalid-obj.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/RegExp/prototype/unicodeSets/this-val-invalid-obj.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "RegExp.escape escapes syntax chars",
+      "Path": "test/built-ins/RegExp/escape/escaped-syntax-characters-simple.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/RegExp/escape/escaped-syntax-characters-simple.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "RegExp.escape escapes whitespace",
+      "Path": "test/built-ins/RegExp/escape/escaped-whitespace.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/RegExp/escape/escaped-whitespace.js",
+      "Passed": true,
+      "Message": null
+    },
+    {
+      "Id": "RegExp.escape coerces non-strings",
+      "Path": "test/built-ins/RegExp/escape/non-string-inputs.js",
+      "Url": "https://raw.githubusercontent.com/tc39/test262/e6c98682c47b869f2e5042e67a7035ffd9775a74/test/built-ins/RegExp/escape/non-string-inputs.js",
+      "Passed": true,
+      "Message": null
+    }
+  ],
+  "PassRate": 1
+}

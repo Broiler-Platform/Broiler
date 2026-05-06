@@ -170,6 +170,7 @@ public partial class JSIteratorObject : JSObject
 
         var en = EnumeratorFrom(a.This);
         JSValue accumulator;
+        uint count = 0;
 
         if (a.Length >= 2)
         {
@@ -181,10 +182,11 @@ public partial class JSIteratorObject : JSObject
                 throw JSEngine.NewTypeError("Reduce of empty iterator with no initial value");
 
             accumulator = first;
+            count = 1;
         }
 
         while (en.MoveNext(out var value))
-            accumulator = fn.InvokeFunction(new Arguments(JSUndefined.Value, accumulator, value));
+            accumulator = fn.InvokeFunction(new Arguments(JSUndefined.Value, accumulator, value, JSValue.CreateNumber(count++)));
 
         return accumulator;
     }
@@ -207,8 +209,9 @@ public partial class JSIteratorObject : JSObject
             throw JSEngine.NewTypeError("Iterator.prototype.forEach requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
+        uint count = 0;
         while (en.MoveNext(out var value))
-            fn.InvokeFunction(new Arguments(JSUndefined.Value, value));
+            fn.InvokeFunction(new Arguments(JSUndefined.Value, value, JSValue.CreateNumber(count++)));
 
         return JSUndefined.Value;
     }
@@ -220,9 +223,10 @@ public partial class JSIteratorObject : JSObject
             throw JSEngine.NewTypeError("Iterator.prototype.some requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
+        uint count = 0;
         while (en.MoveNext(out var value))
         {
-            if (fn.InvokeFunction(new Arguments(JSUndefined.Value, value)).BooleanValue)
+            if (fn.InvokeFunction(new Arguments(JSUndefined.Value, value, JSValue.CreateNumber(count++))).BooleanValue)
                 return JSBoolean.True;
         }
 
@@ -236,10 +240,11 @@ public partial class JSIteratorObject : JSObject
             throw JSEngine.NewTypeError("Iterator.prototype.every requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
+        uint count = 0;
 
         while (en.MoveNext(out var value))
         {
-            if (!fn.InvokeFunction(new Arguments(JSUndefined.Value, value)).BooleanValue)
+            if (!fn.InvokeFunction(new Arguments(JSUndefined.Value, value, JSValue.CreateNumber(count++))).BooleanValue)
                 return JSBoolean.False;
         }
 
@@ -253,9 +258,10 @@ public partial class JSIteratorObject : JSObject
             throw JSEngine.NewTypeError("Iterator.prototype.find requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
+        uint count = 0;
         while (en.MoveNext(out var value))
         {
-            if (fn.InvokeFunction(new Arguments(JSUndefined.Value, value)).BooleanValue)
+            if (fn.InvokeFunction(new Arguments(JSUndefined.Value, value, JSValue.CreateNumber(count++))).BooleanValue)
                 return value;
         }
 
@@ -275,11 +281,13 @@ public partial class JSIteratorObject : JSObject
     // ===============================================================
     internal sealed class MapEnumerator(IElementEnumerator source, JSValue fn) : IElementEnumerator
     {
+        private uint _count;
+
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
             if (source.MoveNext(out hasValue, out var item, out index))
             {
-                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item));
+                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++)));
                 return true;
             }
 
@@ -291,7 +299,7 @@ public partial class JSIteratorObject : JSObject
         {
             if (source.MoveNext(out var item))
             {
-                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item));
+                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++)));
                 return true;
             }
 
@@ -303,7 +311,7 @@ public partial class JSIteratorObject : JSObject
         {
             if (source.MoveNext(out var item))
             {
-                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item));
+                value = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++)));
                 return true;
             }
 
@@ -314,7 +322,7 @@ public partial class JSIteratorObject : JSObject
         public JSValue NextOrDefault(JSValue @default)
         {
             if (source.MoveNext(out var item))
-                return fn.InvokeFunction(new Arguments(JSUndefined.Value, item));
+                return fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++)));
 
             return @default;
         }
@@ -323,12 +331,13 @@ public partial class JSIteratorObject : JSObject
     internal sealed class FilterEnumerator(IElementEnumerator source, JSValue fn) : IElementEnumerator
     {
         private uint index = 0;
+        private uint predicateCount = 0;
 
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
             while (source.MoveNext(out var item))
             {
-                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).BooleanValue)
+                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(predicateCount++))).BooleanValue)
                 {
                     value = item;
                     hasValue = true;
@@ -348,7 +357,7 @@ public partial class JSIteratorObject : JSObject
         {
             while (source.MoveNext(out var item))
             {
-                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).BooleanValue)
+                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(predicateCount++))).BooleanValue)
                 {
                     value = item;
                     return true;
@@ -363,7 +372,7 @@ public partial class JSIteratorObject : JSObject
         {
             while (source.MoveNext(out var item))
             {
-                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).BooleanValue)
+                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(predicateCount++))).BooleanValue)
                 {
                     value = item;
                     return true;
@@ -378,7 +387,7 @@ public partial class JSIteratorObject : JSObject
         {
             while (source.MoveNext(out var item))
             {
-                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).BooleanValue)
+                if (fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(predicateCount++))).BooleanValue)
                     return item;
             }
 
@@ -469,6 +478,7 @@ public partial class JSIteratorObject : JSObject
     internal sealed class FlatMapEnumerator(IElementEnumerator source, JSValue fn) : IElementEnumerator
     {
         private IElementEnumerator _inner;
+        private uint _count;
 
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
@@ -480,7 +490,7 @@ public partial class JSIteratorObject : JSObject
                 if (!source.MoveNext(out var item))
                 { value = JSUndefined.Value; hasValue = false; index = 0; return false; }
 
-                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).GetElementEnumerator();
+                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++))).GetElementEnumerator();
             }
         }
 
@@ -492,7 +502,7 @@ public partial class JSIteratorObject : JSObject
                 if (!source.MoveNext(out var item))
                 { value = JSUndefined.Value; return false; }
 
-                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).GetElementEnumerator();
+                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++))).GetElementEnumerator();
             }
         }
 
@@ -503,7 +513,7 @@ public partial class JSIteratorObject : JSObject
                 if (_inner != null && _inner.MoveNext(out value)) return true;
                 if (!source.MoveNext(out var item))
                 { value = @default; return false; }
-                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item))
+                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++)))
                     .GetElementEnumerator();
             }
         }
@@ -515,7 +525,7 @@ public partial class JSIteratorObject : JSObject
                 if (_inner != null && _inner.MoveNext(out var v)) return v;
                 if (!source.MoveNext(out var item)) return @default;
 
-                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item)).GetElementEnumerator();
+                _inner = fn.InvokeFunction(new Arguments(JSUndefined.Value, item, JSValue.CreateNumber(_count++))).GetElementEnumerator();
             }
         }
     }

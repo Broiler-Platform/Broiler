@@ -699,6 +699,33 @@ public class BuiltInsTests
         Assert.Equal("true|true|true", result.ToString());
     }
 
+    [Fact]
+    public void Set_Methods_Accept_SetLike_Objects()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var other = {
+                size: 2,
+                has(value) { return value === 2 || value === 4; },
+                keys: function* () { yield 2; yield 4; }
+            };
+            var baseSet = new Set([1, 2, 3]);
+            var union = baseSet.union(other);
+            var intersection = baseSet.intersection(other);
+            var difference = baseSet.difference(other);
+            var symmetric = baseSet.symmetricDifference(other);
+            [
+                union.size, union.has(1), union.has(4),
+                intersection.size, intersection.has(2),
+                difference.size, difference.has(1), difference.has(3),
+                symmetric.size, symmetric.has(1), symmetric.has(3), symmetric.has(4),
+                baseSet.isSubsetOf(other), baseSet.isSupersetOf(other), baseSet.isDisjointFrom(other)
+            ].join('|');
+        ");
+        Assert.Equal("4|true|true|1|true|2|true|true|3|true|true|true|false|false|false", result.ToString());
+    }
+
     // ── M3: ES2025 built-in coverage ──────────────────────────────────
 
     [Fact]
@@ -723,12 +750,41 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void Promise_Try_Uses_The_Receiver_Constructor()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var captured = null;
+            var calls = 0;
+            function CustomPromise(executor) {
+                captured = executor;
+                calls++;
+            }
+
+            var instance = Promise.try.call(CustomPromise, () => 42);
+            [instance.constructor === CustomPromise, calls, typeof captured].join('|');
+        ");
+        Assert.Equal("true|1|function", result.ToString());
+    }
+
+    [Fact]
     public void RegExp_Escape_Escapes_Syntax_Characters()
     {
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         var result = ctx.Eval(@"RegExp.escape('hello.world?+[test]{x}(y)|/\\^$');");
         Assert.Equal(@"hello\.world\?\+\[test\]\{x\}\(y\)\|\/\\\^\$", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_Escape_Escapes_Whitespace_And_Rejects_NonStrings()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"RegExp.escape('\uFEFF \u00A0\u202F');");
+        Assert.Equal(@"\ufeff\x20\xa0\u202f", result.ToString());
+        Assert.Throws<JSException>(() => ctx.Eval("RegExp.escape(123);"));
     }
 
     [Fact]
@@ -905,6 +961,32 @@ public class BuiltInsTests
             values().drop(1).find(v => v === 2);
         ");
         Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Iterator_Helper_Callbacks_Receive_Counters()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            function* letters() {
+                yield 'a';
+                yield 'b';
+                yield 'c';
+            }
+
+            var map = letters().map((value, count) => value + count).toArray().join(',');
+            var filterCounts = [];
+            [...letters().filter((value, count) => { filterCounts.push(count); return true; })];
+            var flatMapCounts = [];
+            [...letters().flatMap((value, count) => { flatMapCounts.push(count); return [value]; })];
+            var forEachCounts = [];
+            letters().forEach((value, count) => forEachCounts.push(count));
+            var reduceCounts = [];
+            letters().reduce((memo, value, count) => { reduceCounts.push(count); return value; });
+            [map, filterCounts.join(','), flatMapCounts.join(','), forEachCounts.join(','), reduceCounts.join(',')].join('|');
+        ");
+        Assert.Equal("a0,b1,c2|0,1,2|0,1,2|0,1,2|1,2", result.ToString());
     }
 
     // ── M3: JSWeakSet tests ──────────────────────────────────────────
