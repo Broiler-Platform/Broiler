@@ -94,11 +94,11 @@ internal static class PaintWalker
             if (needsOpacity)
                 items.Add(new OpacityItem { Bounds = viewport, Opacity = rootOpacity });
 
-            var gradientPositionRect = GetBackgroundClipRect(
+            var gradientClipRect = GetBackgroundClipRect(
                 gradientSource.Bounds,
                 gradientSource,
                 gradientSource.Style.BackgroundClip);
-            EmitGradientLayers(gradientSource, viewport, viewport, items, gradientPositionRect);
+            EmitGradientLayers(gradientSource, gradientClipRect, viewport, items);
 
             if (needsOpacity)
                 items.Add(new RestoreOpacityItem { Bounds = viewport });
@@ -2094,17 +2094,11 @@ internal static class PaintWalker
     /// layer in the fragment's <c>background-image</c>.  Layers are painted
     /// bottom-most first (last in the comma list) to top-most (first in the list).
     /// </summary>
-    private static void EmitGradientLayers(
-        Fragment fragment,
-        RectangleF fillRect,
-        RectangleF viewport,
-        List<DisplayItem> items,
-        RectangleF? positioningRectOverride = null)
+    private static void EmitGradientLayers(Fragment fragment, RectangleF fillRect, RectangleF viewport, List<DisplayItem> items)
     {
         var style = fragment.Style;
         var gradientFunctions = SplitGradientLayers(style.BackgroundImage);
         if (gradientFunctions.Count == 0) return;
-        var positioningRect = positioningRectOverride ?? fillRect;
 
         // Per-layer comma-separated properties.
         var sizes = SplitOnTopLevelCommas(style.BackgroundSize ?? "auto");
@@ -2131,18 +2125,18 @@ internal static class PaintWalker
                 continue;
 
             // Parse background-size for this layer.
-            float tileW = positioningRect.Width;
-            float tileH = positioningRect.Height;
-            ParseBackgroundSize(sizeStr, positioningRect.Width, positioningRect.Height, out tileW, out tileH);
+            float tileW = fillRect.Width;
+            float tileH = fillRect.Height;
+            ParseBackgroundSize(sizeStr, fillRect.Width, fillRect.Height, out tileW, out tileH);
 
             // Determine tile origin based on attachment and position.
             // For 'fixed' attachment: position relative to viewport.
             // For 'scroll' attachment: position relative to the background
-            // positioning area represented by positioningRect.
+            // positioning area represented by fillRect.
             bool isFixed = attachStr.Equals("fixed", StringComparison.OrdinalIgnoreCase);
             var tileOrigin = isFixed
                 ? new PointF(viewport.X, viewport.Y)
-                : new PointF(positioningRect.X, positioningRect.Y);
+                : new PointF(fillRect.X, fillRect.Y);
 
             // Apply background-position offset.
             var posParts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2166,10 +2160,8 @@ internal static class PaintWalker
                         else if (yVal == null) yVal = p;
                     }
                 }
-                var positionWidth = isFixed ? viewport.Width : positioningRect.Width;
-                var positionHeight = isFixed ? viewport.Height : positioningRect.Height;
-                tileOrigin.X += ParsePositionValue(xVal, positionWidth, tileW);
-                tileOrigin.Y += ParsePositionValue(yVal, positionHeight, tileH);
+                tileOrigin.X += ParsePositionValue(xVal, fillRect.Width, tileW);
+                tileOrigin.Y += ParsePositionValue(yVal, fillRect.Height, tileH);
             }
 
             items.Add(new DrawTiledGradientItem
