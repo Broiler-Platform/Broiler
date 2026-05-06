@@ -88,13 +88,14 @@ measurement-gated**:
 
 ### 3.1 `Broiler.JavaScript`
 
-- Language baseline: broad ES2024 coverage with partial ES2025; tracked in
+- Language baseline: broad ES2024 coverage with ES2025 support tracked in
   detail in [`Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`](../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md).
 - Architecture is split across parser, AST, compiler (Linq/expression
   compilers), runtime, builtins, modules, and storage projects, each with
   dedicated test projects.
 - Conformance signal today: focused unit/integration tests under
-  `Broiler.JavaScript.*.Tests`; no continuous Test262 score is published.
+  `Broiler.JavaScript.*.Tests` plus the PR-gated ES2025 Test262 subset in
+  `tests/m2-conformance/test262-es2025/`.
 - Performance signal today: limited — there is no cross-engine benchmark
   harness comparable to the JS micro/macro suites used by mainstream engines.
 
@@ -538,7 +539,7 @@ behavioral or performance-sensitive changes:
 - [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
 - [x] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
 - [ ] **M2** — targeted compliance push remains in progress under umbrella tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072); only mark this milestone complete after the W3/W4/W5 tracks below are finished and the Phase 2 exit criteria are met
-  - [ ] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
+  - [x] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
   - [ ] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
   - [ ] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
@@ -556,14 +557,13 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
-- **2026-05-06** — M2 status audit: re-checked the W3/W4/W5 subtasks and left
-  Milestone 2 marked in progress rather than complete. `ECMASCRIPT_ROADMAP.md`
-  still reports ES2025 as "Mostly" complete with open limitations (`Intl` and
-  generator resumption), `wpt-failure-triage.md` still has active unchecked
-  Phase 6 HTML/CSS work, `acid3-compliance.md` is still active, the
-  `Broiler.HtmlBridge` roadmap still spans M2-M3 for several bridge gaps, and
-  umbrella tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072)
-  remains open.
+- **2026-05-06** — W3 close-out: tightened the `Broiler.JavaScript` ES2025
+  surface by fixing iterator-helper callback counters, `Promise.try` receiver
+  validation, Set-method set-like handling, and the remaining `RegExp.escape`
+  coercion/whitespace gaps; extended the in-repo Test262 harness to load
+  harness includes and enforce minimum pass rates; and published the focused
+  ES2025 subset baseline under `tests/m2-conformance/test262-es2025/` with a
+  PR gate in [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml).
 - **2026-05-05** — M2 targeted-compliance kickoff: filed the umbrella tracker as
   [#1072](https://github.com/MaiRat/Broiler/issues/1072) to cover the
   milestone-wide standards/performance push spanning JS ES2025 compliance,

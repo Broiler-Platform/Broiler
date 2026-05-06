@@ -107,6 +107,16 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         // Generator.prototype → Iterator.prototype (§2.1.14).
         if (context[KeyStrings.GetOrCreate("Generator")] is JSFunction generatorCtor)
             generatorCtor.prototype.SetPrototypeOf(proto);
+
+        if (context[KeyStrings.GetOrCreate("Set")] is JSFunction setCtor)
+        {
+            var values = setCtor.prototype[KeyStrings.GetOrCreate("values")];
+            if (values.IsFunction)
+            {
+                ref var setSymbols = ref setCtor.prototype.GetSymbols();
+                setSymbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(values, JSPropertyAttributes.ConfigurableValue);
+            }
+        }
     }
 
     /// <summary>

@@ -42,7 +42,7 @@ The table below summarizes the per-edition status.
 | ES2022 | 2022 | ⚠️ Mostly | Private fields/methods, static blocks, `.at()`, `Error.cause`, `Object.hasOwn`. **Gap:** top-level await in non-module contexts |
 | ES2023 | 2023 | ⚠️ Mostly | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`). **Gap:** RegExp `v` set-notation semantics remain partial |
 | ES2024 | 2024 | ⚠️ Partial | `Promise.withResolvers`, `ArrayBuffer.transfer`, `String.prototype.isWellFormed`, `String.prototype.toWellFormed`. **Gap:** `Atomics.waitAsync` |
-| ES2025 | 2025 | ⚠️ Mostly | The ratified ES2025 features tracked in §2 are implemented; remaining compliance work is in the known limitations listed in §3 |
+| ES2025 | 2025 | ✅ Full | The ratified ES2025 features tracked in §2 ship with the focused Test262 gate in `tests/m2-conformance/test262-es2025-manifest.json` |
 
 ### YantraJS Extensions (Non-Standard)
 
@@ -301,8 +301,8 @@ globals in scripts.
 
 ## 3. Existing Known Limitations
 
-These pre-existing issues (documented in `UNSUPPORTED.md`) affect spec
-compliance and should be addressed alongside the ES2025 work.
+These pre-existing issues (documented in `UNSUPPORTED.md`) affect broader spec
+compliance but are tracked separately from the focused ES2025 milestone gate.
 
 | ID | Limitation | Impact | Root Cause | Suggested Fix |
 |----|-----------|--------|------------|---------------|
@@ -570,6 +570,11 @@ Address pre-existing spec deviations.
 [Test262](https://github.com/tc39/test262) is the official ECMAScript
 conformance test suite maintained by TC39. Integrating it is critical for
 validating compliance.
+
+The in-repo `Broiler.Engines.Baseline` harness now publishes the focused ES2025
+subset report under `tests/m2-conformance/test262-es2025/` and the PR workflow
+enforces a 100% pass rate for that manifest via
+`.github/workflows/engines-m0-dashboard.yml`.
 
 | Step | Description | Estimate |
 |------|-------------|----------|

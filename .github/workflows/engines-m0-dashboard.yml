@@ -30,6 +30,29 @@ jobs:
           name: test262-subset
           path: tests/m0-baseline/ci/test262/
 
+  test262-es2025:
+    name: Test262 ES2025 subset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run Test262 ES2025 subset gate
+        run: >-
+          dotnet run --project src/Broiler.Engines.Baseline --configuration Release -- test262
+          --manifest tests/m2-conformance/test262-es2025-manifest.json
+          --output-dir tests/m2-conformance/ci/test262-es2025
+          --minimum-pass-rate 100
+      - name: Publish Test262 ES2025 summary
+        if: always()
+        run: cat tests/m2-conformance/ci/test262-es2025/test262-subset-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test262-es2025
+          path: tests/m2-conformance/ci/test262-es2025/
+
   wpt-suites:
     name: WPT relevant suites
     runs-on: ubuntu-latest
@@ -96,6 +119,7 @@ jobs:
     if: always()
     needs:
       - test262-subset
+      - test262-es2025
       - wpt-suites
       - acid3
       - benchmarks
@@ -111,12 +135,17 @@ jobs:
           echo "| Signal | Result |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           echo "| Test262 subset | ${{ needs.test262-subset.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Test262 ES2025 subset | ${{ needs.test262-es2025.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| WPT relevant suites | ${{ needs.wpt-suites.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Acid3 regression | ${{ needs.acid3.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Benchmarks | ${{ needs.benchmarks.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ -f artifacts/test262-subset/test262-subset-summary.md ]; then
             cat artifacts/test262-subset/test262-subset-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f artifacts/test262-es2025/test262-subset-summary.md ]; then
+            cat artifacts/test262-es2025/test262-subset-summary.md >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -f artifacts/engine-baseline-benchmarks/engine-benchmark-baseline.md ]; then

@@ -20,55 +20,14 @@ internal static partial class Program
     private const string DefaultBenchmarkOutputDir = "tests/m0-baseline/performance";
     private const string DefaultBenchmarkBaseline = "tests/m0-baseline/performance/engine-benchmark-baseline.json";
     internal const double DefaultBenchmarkSlowdownBudgetPercent = 2.0;
+    private static readonly string[] DefaultTest262HarnessFiles = ["harness/sta.js", "harness/assert.js"];
+    private static readonly Dictionary<string, string> Test262SourceCache = new(StringComparer.Ordinal);
     private static readonly HashSet<string> GatedBenchmarkMetrics = new(StringComparer.Ordinal)
     {
         "js.startup",
         "html.raster",
         "bridge.mutation",
     };
-
-    private const string Test262AssertShim = @"
-var assert = {
-  sameValue: function(actual, expected, message) {
-    if (actual === expected) {
-      return;
-    }
-    if (actual !== actual && expected !== expected) {
-      return;
-    }
-    throw new Error(message || ('Expected ' + String(expected) + ' but got ' + String(actual)));
-  },
-  notSameValue: function(actual, unexpected, message) {
-    if (actual === unexpected || (actual !== actual && unexpected !== unexpected)) {
-      throw new Error(message || ('Did not expect ' + String(unexpected)));
-    }
-  },
-  compareArray: function(actual, expected, message) {
-    if (!actual || actual.length !== expected.length) {
-      throw new Error(message || 'Array length mismatch');
-    }
-    for (var i = 0; i < expected.length; i++) {
-      if (actual[i] !== expected[i]) {
-        throw new Error(message || ('Array mismatch at index ' + i));
-      }
-    }
-  },
-  throws: function(expectedErrorConstructor, func, message) {
-    var threw = false;
-    try {
-      func();
-    } catch (error) {
-      threw = true;
-      if (expectedErrorConstructor && !(error instanceof expectedErrorConstructor)) {
-        throw new Error(message || ('Expected ' + expectedErrorConstructor.name + ' but got ' + error));
-      }
-    }
-    if (!threw) {
-      throw new Error(message || 'Expected function to throw');
-    }
-  }
-};
-";
 
     private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
@@ -142,6 +101,9 @@ var assert = {
         var baselinePath = options.TryGetValue("baseline", out var baselineOverride)
             ? GetAbsolutePath(repoRoot, baselineOverride)
             : null;
+        var minimumPassRate = options.TryGetValue("minimum-pass-rate", out var minimumPassRateOverride)
+            ? ParseMinimumPassRate(minimumPassRateOverride)
+            : (double?)null;
 
         Directory.CreateDirectory(outputDir);
 
@@ -151,8 +113,9 @@ var assert = {
         var results = new List<Test262CaseResult>();
         foreach (var testCase in manifest.Tests)
         {
-            var url = $"https://raw.githubusercontent.com/{manifest.Repository}/{manifest.Revision}/{testCase.Path}";
-            var source = await HttpClient.GetStringAsync(url);
+            var url = BuildRawGitHubUrl(manifest.Repository, manifest.Revision, testCase.Path);
+            var source = await FetchCachedTextAsync(url);
+            var metadata = ParseTest262Metadata(source);
             var executableSource = StripTest262FrontMatter(source);
 
             var result = new Test262CaseResult
@@ -166,8 +129,44 @@ var assert = {
             try
             {
                 using var context = new JSContext();
-                context.Eval(Test262AssertShim);
+                var asyncCompletion = metadata.Flags.Contains("async", StringComparer.Ordinal)
+                    ? new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously)
+                    : null;
+
+                if (asyncCompletion is not null)
+                {
+                    context["$DONE"] = JSValue.CreateFunction((in Arguments doneArgs) =>
+                    {
+                        var error = doneArgs.Length > 0 ? doneArgs.Get1() : JSUndefined.Value;
+                        if (error.IsNullOrUndefined)
+                        {
+                            asyncCompletion.TrySetResult(null);
+                        }
+                        else
+                        {
+                            asyncCompletion.TrySetException(JSException.FromValue(error));
+                        }
+
+                        return JSUndefined.Value;
+                    }, "$DONE", createPrototype: false);
+                }
+
+                foreach (var harnessFile in DefaultTest262HarnessFiles)
+                {
+                    context.Eval(await FetchCachedTextAsync(BuildRawGitHubUrl(manifest.Repository, manifest.Revision, harnessFile)));
+                }
+
+                foreach (var include in metadata.Includes)
+                {
+                    context.Eval(await FetchCachedTextAsync(BuildRawGitHubUrl(manifest.Repository, manifest.Revision, $"harness/{include}")));
+                }
+
                 context.Eval(executableSource);
+
+                if (asyncCompletion is not null)
+                {
+                    await asyncCompletion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                }
             }
             catch (Exception ex)
             {
@@ -181,6 +180,7 @@ var assert = {
 
         var report = new Test262Report
         {
+            Name = manifest.Name,
             Repository = manifest.Repository,
             Revision = manifest.Revision,
             GeneratedAtUtc = DateTime.UtcNow,
@@ -205,6 +205,12 @@ var assert = {
             {
                 Console.Error.WriteLine($"[REGRESSION] {regression}");
             }
+            return 1;
+        }
+
+        if (minimumPassRate is { } minPassRate && report.PassRate < minPassRate)
+        {
+            Console.Error.WriteLine($"[PASS-RATE] {report.PassRate:P1} is below the required minimum of {minPassRate:P1}.");
             return 1;
         }
 
@@ -363,6 +369,57 @@ var assert = {
     private static string StripTest262FrontMatter(string source)
         => Regex.Replace(source, @"^\s*/\*---[\s\S]*?---\*/\s*", string.Empty, RegexOptions.Multiline);
 
+    private static Test262Metadata ParseTest262Metadata(string source)
+    {
+        var match = Regex.Match(source, @"^\s*/\*---(?<metadata>[\s\S]*?)---\*/", RegexOptions.Multiline);
+        if (!match.Success)
+        {
+            return Test262Metadata.Empty;
+        }
+
+        var metadata = match.Groups["metadata"].Value;
+        return new Test262Metadata(
+            ParseMetadataList(metadata, "flags"),
+            ParseMetadataList(metadata, "includes"));
+    }
+
+    private static List<string> ParseMetadataList(string metadata, string key)
+    {
+        var match = Regex.Match(metadata, $@"(?m)^\s*{Regex.Escape(key)}\s*:\s*\[(?<values>[^\]]*)\]\s*$");
+        if (!match.Success)
+        {
+            return [];
+        }
+
+        return match.Groups["values"].Value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(static value => value.Trim().Trim('\'', '"'))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+    }
+
+    private static double ParseMinimumPassRate(string value)
+    {
+        var normalized = value.Trim().TrimEnd('%');
+        var parsed = double.Parse(normalized, CultureInfo.InvariantCulture);
+        return parsed > 1d ? parsed / 100d : parsed;
+    }
+
+    private static string BuildRawGitHubUrl(string repository, string revision, string relativePath)
+        => $"https://raw.githubusercontent.com/{repository}/{revision}/{relativePath}";
+
+    private static async Task<string> FetchCachedTextAsync(string url)
+    {
+        if (Test262SourceCache.TryGetValue(url, out var cached))
+        {
+            return cached;
+        }
+
+        var source = await HttpClient.GetStringAsync(url);
+        Test262SourceCache[url] = source;
+        return source;
+    }
+
     private static string FindRepoRoot()
     {
         var current = AppContext.BaseDirectory;
@@ -429,7 +486,7 @@ var assert = {
     private static string BuildTest262Markdown(Test262Report report, Test262BaselineComparison? comparison)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("# Test262 Subset Baseline");
+        builder.AppendLine($"# {report.Name ?? "Test262 Subset Baseline"}");
         builder.AppendLine();
         builder.AppendLine($"- Generated: {report.GeneratedAtUtc:O}");
         builder.AppendLine($"- Repository: `{report.Repository}` @ `{report.Revision}`");
@@ -557,8 +614,12 @@ var assert = {
         PropertyNameCaseInsensitive = true,
     };
 
-    private sealed record Test262Manifest(string Repository, string Revision, List<Test262ManifestCase> Tests);
+    private sealed record Test262Manifest(string Repository, string Revision, List<Test262ManifestCase> Tests, string? Name = null);
     private sealed record Test262ManifestCase(string Id, string Path);
+    private sealed record Test262Metadata(List<string> Flags, List<string> Includes)
+    {
+        public static Test262Metadata Empty { get; } = new([], []);
+    }
 
     private sealed class Test262CaseResult
     {
@@ -571,6 +632,7 @@ var assert = {
 
     private sealed class Test262Report
     {
+        public string? Name { get; init; }
         public required string Repository { get; init; }
         public required string Revision { get; init; }
         public required DateTime GeneratedAtUtc { get; init; }

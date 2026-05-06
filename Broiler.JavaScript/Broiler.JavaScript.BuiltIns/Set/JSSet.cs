@@ -1,6 +1,7 @@
-﻿using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
+using System;
 using System.Collections.Generic;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine.Extensions;
@@ -12,6 +13,8 @@ namespace Broiler.JavaScript.BuiltIns.Set;
 [JSClassGenerator("Set")]
 public partial class JSSet : JSObject
 {
+    private readonly record struct SetLikeRecord(int Size, Func<JSValue, bool> Has, Func<IElementEnumerator> GetKeys);
+
     private LinkedList<JSValue> store = new();
     private StringMap<LinkedListNode<JSValue>> index;
 
@@ -33,7 +36,7 @@ public partial class JSSet : JSObject
     {
         HashedString uk = key.ToUniqueID();
 
-        if (!index.TryGetValue(in uk, out var i))
+        if (!index.TryGetValue(in uk, out _))
         {
             var node = store.AddLast(key);
             index.Put(in uk) = node;
@@ -58,10 +61,106 @@ public partial class JSSet : JSObject
         if (index.TryGetValue(in uk, out var i))
         {
             store.Remove(i);
+            RebuildIndex();
             return JSBoolean.True;
         }
 
         return JSBoolean.False;
+    }
+
+    private bool Contains(JSValue key)
+    {
+        HashedString uk = key.ToUniqueID();
+        return index.TryGetValue(in uk, out _);
+    }
+
+    private bool Remove(JSValue key)
+    {
+        HashedString uk = key.ToUniqueID();
+        if (!index.TryGetValue(in uk, out var node))
+            return false;
+
+        store.Remove(node);
+        RebuildIndex();
+        return true;
+    }
+
+    private void RebuildIndex()
+    {
+        index = new();
+        for (var node = store.First; node != null; node = node.Next)
+        {
+            HashedString uk = node.Value.ToUniqueID();
+            index.Put(in uk) = node;
+        }
+    }
+
+    private static SetLikeRecord GetSetLikeRecord(JSValue other, string methodName)
+    {
+        if (!other.IsObject)
+            throw JSEngine.NewTypeError($"Set.prototype.{methodName} requires a Set or set-like object argument");
+
+        if (other is JSSet otherSet)
+        {
+            return new SetLikeRecord(
+                otherSet.Size,
+                otherSet.Contains,
+                () => new StoreEnumerator(otherSet.store));
+        }
+
+        var sizeValue = other["size"];
+        var hasMethod = other["has"];
+        var keysMethod = other["keys"];
+
+        if (!hasMethod.IsFunction || !keysMethod.IsFunction)
+            throw JSEngine.NewTypeError($"Set.prototype.{methodName} requires a Set or set-like object argument");
+
+        return new SetLikeRecord(
+            (int)sizeValue.DoubleValue,
+            value => hasMethod.Call(other, value).BooleanValue,
+            () => keysMethod.Call(other).GetElementEnumerator());
+    }
+
+    private sealed class StoreEnumerator(LinkedList<JSValue> source) : IElementEnumerator
+    {
+        private LinkedListNode<JSValue> current;
+        private uint index;
+
+        private bool MoveNextNode(out JSValue value, out uint currentIndex)
+        {
+            current = current == null ? source.First : current.Next;
+            if (current == null)
+            {
+                value = JSUndefined.Value;
+                currentIndex = 0;
+                return false;
+            }
+
+            value = current.Value;
+            currentIndex = index++;
+            return true;
+        }
+
+        public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
+        {
+            hasValue = MoveNextNode(out value, out index);
+            return hasValue;
+        }
+
+        public bool MoveNext(out JSValue value)
+            => MoveNextNode(out value, out _);
+
+        public bool MoveNextOrDefault(out JSValue value, JSValue @default)
+        {
+            if (MoveNextNode(out value, out _))
+                return true;
+
+            value = @default;
+            return false;
+        }
+
+        public JSValue NextOrDefault(JSValue @default)
+            => MoveNextNode(out var value, out _) ? value : @default;
     }
 
     [JSExport("entries")]
@@ -127,9 +226,7 @@ public partial class JSSet : JSObject
     [JSExport("union")]
     public JSValue Union(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.union requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "union");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
@@ -138,10 +235,10 @@ public partial class JSSet : JSObject
                 result.Add(item);
         }
 
-        if (otherSet.store != null)
+        var keys = other.GetKeys();
+        while (keys.MoveNext(out var item))
         {
-            foreach (var item in otherSet.store)
-                result.Add(item);
+            result.Add(item);
         }
 
         return result;
@@ -150,17 +247,14 @@ public partial class JSSet : JSObject
     [JSExport("intersection")]
     public JSValue Intersection(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.intersection requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "intersection");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
         {
             foreach (var item in store)
             {
-                HashedString uk = item.ToUniqueID();
-                if (otherSet.index.TryGetValue(in uk, out _))
+                if (other.Has(item))
                     result.Add(item);
             }
         }
@@ -171,9 +265,7 @@ public partial class JSSet : JSObject
     [JSExport("difference")]
     public JSValue Difference(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.difference requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "difference");
 
         var result = new JSSet(Arguments.Empty);
         if (store == null)
@@ -181,8 +273,7 @@ public partial class JSSet : JSObject
 
         foreach (var item in store)
         {
-            HashedString uk = item.ToUniqueID();
-            if (!otherSet.index.TryGetValue(in uk, out _))
+            if (!other.Has(item))
                 result.Add(item);
         }
 
@@ -192,28 +283,19 @@ public partial class JSSet : JSObject
     [JSExport("symmetricDifference")]
     public JSValue SymmetricDifference(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.symmetricDifference requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "symmetricDifference");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
         {
             foreach (var item in store)
-            {
-                HashedString uk = item.ToUniqueID();
-                if (!otherSet.index.TryGetValue(in uk, out _))
-                    result.Add(item);
-            }
+                result.Add(item);
         }
 
-        if (otherSet.store == null)
-            return result;
-
-        foreach (var item in otherSet.store)
+        var keys = other.GetKeys();
+        while (keys.MoveNext(out var item))
         {
-            HashedString uk = item.ToUniqueID();
-            if (!index.TryGetValue(in uk, out _))
+            if (!result.Remove(item))
                 result.Add(item);
         }
 
@@ -223,17 +305,14 @@ public partial class JSSet : JSObject
     [JSExport("isSubsetOf")]
     public JSValue IsSubsetOf(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.isSubsetOf requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "isSubsetOf");
 
         if (store == null)
             return JSBoolean.True;
 
         foreach (var item in store)
         {
-            HashedString uk = item.ToUniqueID();
-            if (!otherSet.index.TryGetValue(in uk, out _))
+            if (!other.Has(item))
                 return JSBoolean.False;
         }
 
@@ -243,17 +322,15 @@ public partial class JSSet : JSObject
     [JSExport("isSupersetOf")]
     public JSValue IsSupersetOf(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.isSupersetOf requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "isSupersetOf");
 
-        if (otherSet.store == null)
-            return JSBoolean.True;
+        if (other.Size > Size)
+            return JSBoolean.False;
 
-        foreach (var item in otherSet.store)
+        var keys = other.GetKeys();
+        while (keys.MoveNext(out var item))
         {
-            HashedString uk = item.ToUniqueID();
-            if (!index.TryGetValue(in uk, out _))
+            if (!Contains(item))
                 return JSBoolean.False;
         }
 
@@ -263,18 +340,15 @@ public partial class JSSet : JSObject
     [JSExport("isDisjointFrom")]
     public JSValue IsDisjointFrom(in Arguments a)
     {
-        var other = a.Get1();
-        if (other is not JSSet otherSet)
-            throw JSEngine.NewTypeError("Set.prototype.isDisjointFrom requires a Set argument");
+        var other = GetSetLikeRecord(a.Get1(), "isDisjointFrom");
 
-        if (store != null)
+        if (store == null)
+            return JSBoolean.True;
+
+        foreach (var item in store)
         {
-            foreach (var item in store)
-            {
-                HashedString uk = item.ToUniqueID();
-                if (otherSet.index.TryGetValue(in uk, out _))
-                    return JSBoolean.False;
-            }
+            if (other.Has(item))
+                return JSBoolean.False;
         }
 
         return JSBoolean.True;
