@@ -188,6 +188,85 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                iframe.style.position = 'absolute';
+                iframe.style.left = '100px';
+                iframe.style.top = '300px';
+                iframe.style.width = '400px';
+                iframe.style.height = '300px';
+                iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>';
+                var target = iframe.contentDocument.getElementById('target');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("140|460|0|0", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Scrollable_Fixed_Targets()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                iframe.style.position = 'absolute';
+                iframe.style.left = '100px';
+                iframe.style.top = '300px';
+                iframe.style.width = '400px';
+                iframe.style.height = '300px';
+                iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>';
+                var target = iframe.contentDocument.getElementById('target');
+                var container = iframe.contentDocument.getElementById('container');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("130|440|0|0|300|300", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls

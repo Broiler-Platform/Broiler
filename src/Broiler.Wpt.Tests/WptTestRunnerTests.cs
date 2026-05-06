@@ -44,6 +44,21 @@ public class WptTestRunnerTests : IDisposable
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
+    private string RunTempScriptExecution(string testHtml, string namePrefix)
+    {
+        var testFile = Path.Combine(_tempDir, $"{namePrefix}.html");
+        File.WriteAllText(testFile, testHtml);
+
+        var method = typeof(WptTestRunner).GetMethod(
+            "ExecuteScriptsWithDom",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        return Assert.IsType<string>(method!.Invoke(
+            null,
+            [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false]));
+    }
+
     private void WriteTempSupportFile(string relativePath, string content)
     {
         var fullPath = Path.Combine(_tempDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -8258,6 +8273,12 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     window.addEventListener('load', function () {
       var target = frames[0].document.getElementById('target');
       target.scrollIntoView({ block: 'start', inline: 'start' });
+      document.body.setAttribute('data-scroll-check', [
+        document.documentElement.scrollLeft,
+        document.documentElement.scrollTop,
+        frames[0].scrollX,
+        frames[0].scrollY
+      ].join('|'));
       if (document.documentElement.scrollLeft === 140 &&
           document.documentElement.scrollTop === 460 &&
           frames[0].scrollX === 0 &&
@@ -8268,22 +8289,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
   </script>
 </body>
 </html>";
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: green; }
-  </style>
-</head>
-<body>
-  <div id=""pass""></div>
-</body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scripted-srcdoc");
-        Assert.True(result.Passed,
-            $"script-assigned iframe.srcdoc should populate frames[0].document for fixed-target scrollIntoView harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "scroll-into-view-fixed-scripted-srcdoc");
+        Assert.Contains("data-scroll-check=\"140|460|0|0\"", result);
+        Assert.Contains("id=\"pass\" style=\"background: green;", result);
     }
 
     [Fact]
