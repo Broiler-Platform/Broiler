@@ -1,6 +1,6 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: **M1 complete** — boundary/spec mapping and per-PR perf gating are published; M2 targeted compliance work next
+> **Status**: **M2 in progress** — W3 and W4 are published/verified; W5 remains before the milestone can close
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
@@ -108,7 +108,9 @@ measurement-gated**:
   capture/script harness (see
   [`acid3-compliance.md`](./acid3-compliance.md)); ongoing visual-fidelity
   triage tracked there and in [`acid-test-triage.md`](./acid-test-triage.md);
-  WPT triage tracked in [`wpt-failure-triage.md`](./wpt-failure-triage.md).
+  WPT triage tracked in [`wpt-failure-triage.md`](./wpt-failure-triage.md);
+  the focused M2 HTML/CSS conformance signal is published in
+  [`../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md`](../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md).
 - The graphics backend is mid-migration from SkiaSharp to a Broiler-owned
   raster path; see [`skia-replacement-roadmap.md`](./skia-replacement-roadmap.md).
 - Performance signal today: pixel-diff and capture timings exist for
@@ -513,7 +515,7 @@ plan.
 | **Establish baseline benchmark harness and budgets** | W6 | M0 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | #1064 | Capture the M0 baseline of record for JS, HTML, bridge, and end-to-end capture metrics |
 | **Document and harden JS ↔ Bridge ↔ HTML boundaries** | W2 | M1 | `engine:js`, `engine:html`, `engine:bridge`, `area:conformance` | dashboard + benchmark baselines | Produce a versioned bridge-surface/spec map and remove leaking engine-internal types from public seams |
 | **Close the ES2025 compliance gap in `Broiler.JavaScript`** | W3 | M2 | `engine:js`, `area:conformance` | dashboard, boundary map | Land the ratified ES2025 features tracked in `ECMASCRIPT_ROADMAP.md` with Test262 trend reporting |
-| **Execute the targeted HTML/CSS compliance push** | W4 | M2–M3 | `engine:html`, `area:conformance` | dashboard, boundary map | Retire the highest-value Acid/WPT failures and publish a single HTML/CSS pass-rate signal |
+| **Execute the targeted HTML/CSS compliance push** | W4 | M2–M3 | `engine:html`, `area:conformance` | dashboard, boundary map | Retire the highest-value Acid/WPT failures and publish a single HTML/CSS pass-rate signal in [`tests/m2-conformance/html-css-targeted/`](../../tests/m2-conformance/html-css-targeted/) |
 | **Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets** | W5 | M2–M3 | `engine:bridge`, `area:conformance` | boundary map, dashboard | Close the bridge-level gaps for events, CSSOM, microtasks, CSP, Fetch subset, and structured clone |
 | **Finish the graphics backend cutover and remove legacy default paths** | W7 | M1–M4 | `engine:html`, `area:perf` | dashboard, benchmark baselines | Complete the Skia-replacement roadmap through default-build cutover without reintroducing backend-specific public APIs |
 | **Hit roadmap performance budgets and wire per-PR regression gates** | W6 | M1–M4 | `engine:js`, `engine:html`, `engine:bridge`, `area:perf` | baseline benchmark harness, boundary hardening | Enforce the roadmap budget bands in CI and close the M4 optimization goals |
@@ -538,9 +540,9 @@ behavioral or performance-sensitive changes:
 
 - [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
 - [x] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
-- [ ] **M2** — targeted compliance push remains in progress under umbrella tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072); only mark this milestone complete after the W3/W4/W5 tracks below are finished and the Phase 2 exit criteria are met
+- [ ] **M2** — targeted compliance push remains in progress; the umbrella kickoff tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072) is closed, but only mark this milestone complete after the remaining W5 track below is finished and the Phase 2 exit criteria are met
   - [x] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
-  - [ ] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
+  - [x] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
   - [ ] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
 - [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
@@ -557,6 +559,14 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-06** — W4 close-out: published the focused HTML/CSS Milestone 2
+  signal in
+  [`tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md`](../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md),
+  wired [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
+  to run and summarize that combined suite on every PR, and re-verified the
+  full W4 slice locally at **70 / 70 passed** across the WPT-derived CSS
+  suites, the focused Acid3/selector regressions, and the Google Search parity
+  gate.
 - **2026-05-06** — W3 close-out: tightened the `Broiler.JavaScript` ES2025
   surface by fixing iterator-helper callback counters, `Promise.try` receiver
   validation, Set-method set-like handling, and the remaining `RegExp.escape`

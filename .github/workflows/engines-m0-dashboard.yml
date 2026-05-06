@@ -72,6 +72,79 @@ jobs:
           name: wpt-relevant-suites
           path: src/Broiler.Cli.Tests/TestResults/
 
+  html-css-targeted:
+    name: HTML/CSS targeted conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run HTML/CSS targeted suite
+        run: >-
+          dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --configuration Release --nologo
+          --filter "FullyQualifiedName~Broiler.Cli.Tests.WptCssVariablesTests|FullyQualifiedName~Broiler.Cli.Tests.WptFontAndSelectorTests|FullyQualifiedName~GoogleSearchComplianceTests|FullyQualifiedName~Acid3HtmlElementRegressionTests|FullyQualifiedName~Acid3SpecialRegressionTests|FullyQualifiedName~Acid3CssSelectorRegressionTests|FullyQualifiedName~SelectorsLevel4SpecificityTests"
+          --logger "trx;LogFileName=html-css-targeted.trx"
+      - name: Build HTML/CSS summary
+        if: always()
+        run: |
+          mkdir -p tests/m2-conformance/ci/html-css-targeted
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          trx_files = list(Path("src/Broiler.Cli.Tests/TestResults").rglob("html-css-targeted.trx"))
+          if not trx_files:
+              raise SystemExit("Could not find html-css-targeted.trx")
+
+          root = ET.parse(trx_files[0]).getroot()
+          ns = {"trx": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          counters = root.find(".//trx:Counters", ns)
+          if counters is None:
+              raise SystemExit("Could not find TRX counters")
+
+          total = int(counters.attrib.get("total", "0"))
+          executed = int(counters.attrib.get("executed", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          failed = int(counters.attrib.get("failed", "0"))
+          not_executed = int(counters.attrib.get("notExecuted", "0"))
+          pass_rate = (passed / executed * 100.0) if executed else 0.0
+
+          summary = f"""# HTML/CSS targeted conformance
+
+          | Metric | Value |
+          |---|---:|
+          | Total tests | {total} |
+          | Executed | {executed} |
+          | Passed | {passed} |
+          | Failed | {failed} |
+          | Skipped / not executed | {not_executed} |
+          | Pass rate | {pass_rate:.1f}% |
+
+          This summary is generated from the focused Milestone 2 / W4 suite:
+
+          - `Broiler.Cli.Tests.WptCssVariablesTests`
+          - `Broiler.Cli.Tests.WptFontAndSelectorTests`
+          - `Broiler.Cli.Tests.GoogleSearchComplianceTests`
+          - `Broiler.Cli.Tests.Acid3HtmlElementRegressionTests`
+          - `Broiler.Cli.Tests.Acid3SpecialRegressionTests`
+          - `Broiler.Cli.Tests.Acid3CssSelectorRegressionTests`
+          - `Broiler.Cli.Tests.SelectorsLevel4SpecificityTests`
+          """
+
+          Path("tests/m2-conformance/ci/html-css-targeted/html-css-targeted-summary.md").write_text(summary)
+          PY
+      - name: Publish HTML/CSS summary
+        if: always()
+        run: cat tests/m2-conformance/ci/html-css-targeted/html-css-targeted-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: html-css-targeted
+          path: |
+            tests/m2-conformance/ci/html-css-targeted/
+            src/Broiler.Cli.Tests/TestResults/
+
   acid3:
     name: Acid3 regression
     runs-on: ubuntu-latest
@@ -121,6 +194,7 @@ jobs:
       - test262-subset
       - test262-es2025
       - wpt-suites
+      - html-css-targeted
       - acid3
       - benchmarks
     runs-on: ubuntu-latest
@@ -137,6 +211,7 @@ jobs:
           echo "| Test262 subset | ${{ needs.test262-subset.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Test262 ES2025 subset | ${{ needs.test262-es2025.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| WPT relevant suites | ${{ needs.wpt-suites.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| HTML/CSS targeted conformance | ${{ needs.html-css-targeted.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Acid3 regression | ${{ needs.acid3.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Benchmarks | ${{ needs.benchmarks.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -146,6 +221,10 @@ jobs:
           fi
           if [ -f artifacts/test262-es2025/test262-subset-summary.md ]; then
             cat artifacts/test262-es2025/test262-subset-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f artifacts/html-css-targeted/html-css-targeted-summary.md ]; then
+            cat artifacts/html-css-targeted/html-css-targeted-summary.md >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -f artifacts/engine-baseline-benchmarks/engine-benchmark-baseline.md ]; then
