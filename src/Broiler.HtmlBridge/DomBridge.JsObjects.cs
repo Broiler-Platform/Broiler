@@ -6408,6 +6408,9 @@ public sealed partial class DomBridge
         var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
         docRoot.Parent = containerElement;
 
+        if (!Regex.IsMatch(html, @"<\s*html(?=[\s>/])", RegexOptions.IgnoreCase))
+            html = BuildInnerHtmlParsingDocument("body", html);
+
         var builder = new HtmlTreeBuilder();
         var (parsedRoot, allElements, _) = builder.Build(html);
 
