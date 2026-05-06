@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
@@ -1810,7 +1811,7 @@ public sealed partial class DomBridge
                 return CreateThenable(() =>
                 {
                     responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSObject();
+                    return new JSArrayBuffer(Encoding.UTF8.GetBytes(body));
                 });
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
@@ -2637,6 +2638,7 @@ public sealed partial class DomBridge
                     this.readyState = 0;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
                     this.responseType = '';
                     this.responseURL = '';
@@ -2676,6 +2678,7 @@ public sealed partial class DomBridge
                     this.readyState = 1;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
                     this.responseURL = '';
                     this._responseHeaders = {};
@@ -2710,6 +2713,7 @@ public sealed partial class DomBridge
                     this.readyState = 0;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
                     if (typeof this.onabort === 'function') {
                         this.onabort();
@@ -2748,9 +2752,21 @@ public sealed partial class DomBridge
                             if (typeof self.onreadystatechange === 'function') {
                                 self.onreadystatechange();
                             }
-                            response.text().then(function(text) {
+                            var bodyReader =
+                                self.responseType === 'arraybuffer' &&
+                                response &&
+                                typeof response.arrayBuffer === 'function'
+                                    ? response.arrayBuffer()
+                                    : response.text();
+                            bodyReader.then(function(bodyValue) {
                                 if (self._aborted) return;
-                                self.responseText = text;
+                                if (self.responseType === 'arraybuffer') {
+                                    self.response = bodyValue;
+                                    self.responseText = '';
+                                } else {
+                                    self.response = bodyValue;
+                                    self.responseText = '' + bodyValue;
+                                }
                                 self.readyState = 3;
                                 if (typeof self.onprogress === 'function') {
                                     self.onprogress();

@@ -151,6 +151,32 @@ fetch('http://example.com').then(function(response) {
     }
 
     [Fact]
+    public void Fetch_Response_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('ABC');
+response.arrayBuffer().then(function(buffer) {
+    var view = new Uint8Array(buffer);
+    document.getElementById('result').textContent = [
+        response.bodyUsed === true,
+        buffer instanceof ArrayBuffer,
+        buffer.byteLength,
+        view[0],
+        view[1],
+        view[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|3|65|66|67", result);
+    }
+
+    [Fact]
     public void Fetch_Headers_Constructor_Supports_Common_Mutations()
     {
         var html = @"<!DOCTYPE html>
@@ -905,5 +931,46 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true", result);
+    }
+
+    [Fact]
+    public void XHR_ArrayBuffer_ResponseType_Uses_Fetch_ArrayBuffer_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('AB', {
+                status: 200,
+                headers: { 'Content-Type': 'application/octet-stream' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'arraybuffer';
+xhr.onload = function() {
+    var view = new Uint8Array(xhr.response);
+    document.getElementById('result').textContent = [
+        xhr.response instanceof ArrayBuffer,
+        xhr.responseText === '',
+        view[0],
+        view[1]
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|65|66", result);
     }
 }
