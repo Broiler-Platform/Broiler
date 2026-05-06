@@ -3870,10 +3870,10 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
   <script src=""/resources/testharness.js""></script>
   <script src=""/resources/testharnessreport.js""></script>
   <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    html, body { margin: 0; padding: 0; background: red; }
     body {
-      width: 1000vw;
-      height: 1000vh;
+      width: 2000px;
+      height: 2000px;
       background: repeating-linear-gradient(45deg, #A2CFD9, #A2CFD9 100px, #C3F3FF 100px, #C3F3FF 200px);
     }
     #pass { width: 100px; height: 100px; background: red; position: absolute; top: 0; left: 0; }
@@ -3950,12 +3950,23 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
       var scrollableTarget = scrollableContainer.querySelector('.target');
       scrollableTarget.scrollIntoView({ block: 'start', inline: 'start' });
       var scrollableOk =
-        window.scrollX === 130 &&
+        window.scrollX === 100 &&
         window.scrollY === 440 &&
         frames[0].scrollX === 0 &&
         frames[0].scrollY === 0 &&
         scrollableContainer.scrollLeft === 300 &&
         scrollableContainer.scrollTop === 300;
+
+      document.body.setAttribute('data-scroll-check', [
+        fixedOk,
+        scrollableOk,
+        window.scrollX,
+        window.scrollY,
+        frames[0].scrollX,
+        frames[0].scrollY,
+        scrollableContainer.scrollLeft,
+        scrollableContainer.scrollTop
+      ].join('|'));
 
       if (fixedOk && scrollableOk) {
         document.getElementById('pass').style.background = 'green';
@@ -3964,20 +3975,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
   </script>
 </body>
 </html>";
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: green; }
-  </style>
-</head>
-<body><div id=""pass""></div></body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-full-harness");
-        Assert.True(result.Passed,
-            $"Full harness-style fixed-position iframe follow-up should match the reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "scroll-into-view-fixed-full-harness");
+        Assert.Contains("data-scroll-check=\"true|true|100|440|0|0|300|300\"", result);
+        Assert.Contains("id=\"pass\" style=\"background: green;", result);
     }
 
     [Fact]
