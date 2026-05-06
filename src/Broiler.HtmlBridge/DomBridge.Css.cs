@@ -23,6 +23,7 @@ public sealed partial class DomBridge
     private const int MaxCustomPropertyResolutionPasses = 4;
     private int _styleInvalidationBatchDepth;
     private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+    private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsCache = [];
     private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = [];
     private readonly HashSet<(DomElement Element, bool Vertical)> _contentExtentInProgress = [];
 
@@ -801,6 +802,7 @@ public sealed partial class DomBridge
 
     internal void InvalidateStyleScope(DomElement anchor)
     {
+        _computedPropsCache.Clear();
         var docRoot = GetDocumentRootFor(anchor);
         if (_styleInvalidationBatchDepth > 0)
         {
@@ -3331,6 +3333,11 @@ public sealed partial class DomBridge
                 if (w > 0 || h > 0)
                     return (w, h);
             }
+
+            var attributeWidth = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("width"));
+            var attributeHeight = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("height"));
+            if (attributeWidth > 0 || attributeHeight > 0)
+                return (attributeWidth, attributeHeight);
         }
         return (0, 0); // Default: headless 0×0 viewport
     }
@@ -3348,6 +3355,15 @@ public sealed partial class DomBridge
         var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
         var px = ParseCssLengthToPixels(valueStr);
         return !double.IsNaN(px) ? (int)px : 0;
+    }
+
+    private static int ParseViewportDimensionAttribute(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return 0;
+
+        var px = ParseCssLengthToPixels(value.Trim());
+        return !double.IsNaN(px) && px > 0 ? (int)px : 0;
     }
 
     /// <summary>

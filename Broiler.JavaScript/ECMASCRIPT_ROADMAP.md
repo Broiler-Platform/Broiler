@@ -40,9 +40,9 @@ The table below summarizes the per-edition status.
 | ES2020 | 2020 | ✅ Full | Nullish coalescing `??`, optional chaining `?.`, BigInt, dynamic `import()`, `Promise.allSettled`, `globalThis`, logical assignment |
 | ES2021 | 2021 | ⚠️ Mostly | `String.replaceAll`, `Promise.any`, numeric separators, `WeakRef`. **Gap:** `FinalizationRegistry` is partial |
 | ES2022 | 2022 | ⚠️ Mostly | Private fields/methods, static blocks, `.at()`, `Error.cause`, `Object.hasOwn`. **Gap:** top-level await in non-module contexts |
-| ES2023 | 2023 | ⚠️ Mostly | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`). **Gap:** Hashbang grammar `#!`, RegExp `v` flag partial |
-| ES2024 | 2024 | ⚠️ Partial | `Promise.withResolvers`. **Gaps:** `ArrayBuffer.transfer`, `Atomics.waitAsync`, `Object.groupBy`/`Map.groupBy`, `String.isWellFormed`/`toWellFormed` full spec compliance |
-| ES2025 | 2025 | ⚠️ Partial | Iterator helpers, Set methods, `Promise.try`, and `RegExp.escape` are implemented; larger gaps remain (see §2) |
+| ES2023 | 2023 | ⚠️ Mostly | `using`/`await using`, `findLast`/`findLastIndex`, immutable array methods (`toReversed`, `toSorted`, `toSpliced`, `with`). **Gap:** RegExp `v` set-notation semantics remain partial |
+| ES2024 | 2024 | ⚠️ Partial | `Promise.withResolvers`, `ArrayBuffer.transfer`, `String.prototype.isWellFormed`, `String.prototype.toWellFormed`. **Gap:** `Atomics.waitAsync` |
+| ES2025 | 2025 | ⚠️ Mostly | The ratified ES2025 features tracked in §2 are implemented; remaining compliance work is in the known limitations listed in §3 |
 
 ### YantraJS Extensions (Non-Standard)
 
@@ -262,7 +262,7 @@ implementation for IEEE 754 half-precision may be needed, or use `System.Half`
 
 ### 2.9 ArrayBuffer.transfer and Related Methods
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P1 — Medium
 **Spec:** [tc39/proposal-arraybuffer-transfer](https://github.com/tc39/proposal-arraybuffer-transfer)
 
@@ -282,7 +282,7 @@ Adds zero-copy buffer transfer and resize capabilities.
 
 ### 2.10 Redeclarable Global eval-Declared vars
 
-**Status:** ❓ Needs investigation
+**Status:** ✅ Audited — existing behavior matches the proposal
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-redeclarable-global-eval-vars](https://github.com/nicolo-ribaudo/proposal-redeclarable-global-eval-vars)
 
@@ -622,7 +622,7 @@ column as work progresses.
 | 2.7 | Duplicate named groups | ✅ Done | @copilot | Phase 3 PR |
 | 2.8 | Float16Array | ✅ Done | @copilot | Phase 3 PR |
 | 2.9 | ArrayBuffer.transfer | ✅ Done | @copilot | Phase 2 PR |
-| 2.10 | Redeclarable eval vars | ⏳ Audited — eval scope update needs compiler work | — | — |
+| 2.10 | Redeclarable eval vars | ✅ Done | @copilot | Phase 1 PR |
 | 4.1 | Temporal API | ❌ Not started | — | — |
 | 4.2 | Math.sumPrecise | ✅ Done | @copilot | Phase 4 PR |
 | 4.3 | Uint8Array Base64/Hex | ✅ Done | @copilot | Phase 4 PR |
@@ -638,7 +638,7 @@ column as work progresses.
 | L2 | Intl.DateTimeFormat | ❌ Not started | — | — |
 | L3 | Generator resumption | ⏳ In progress | — | — |
 | L4 | Number precision | ✅ Done | @copilot | Phase 5 PR |
-| L5 | Finally return | ❌ Not started | — | — |
+| L5 | Finally return | ✅ Done | @copilot | Phase 5 PR |
 | L6 | Destructuring elision | ✅ Done | @copilot | Phase 1 PR |
 | L7 | Date day default | ✅ Done | @copilot | Phase 1 PR |
 | L8 | Promise SyncContext | ✅ Done | @copilot | Phase 5 PR |

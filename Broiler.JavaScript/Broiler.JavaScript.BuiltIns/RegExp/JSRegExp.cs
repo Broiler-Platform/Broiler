@@ -54,6 +54,14 @@ public partial class JSRegExp : JSObject, IJSRegExp
     public readonly bool multiline;
     [JSExport]
     public readonly bool ignoreCase;
+    [JSExport]
+    public readonly bool hasIndices;
+    [JSExport]
+    public readonly bool sticky;
+    [JSExport]
+    public readonly bool unicode;
+    [JSExport]
+    public readonly bool unicodeSets;
 
     internal Regex value;
 
@@ -71,18 +79,16 @@ public partial class JSRegExp : JSObject, IJSRegExp
         if (a.Length > 1)
             flags = a.GetAt(1).ToString();
 
-        this.flags = flags;
         this.pattern = pattern;
 
-        (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
+        (value, globalSearch, ignoreCase, multiline, hasIndices, sticky, unicode, unicodeSets, this.flags) = CreateRegex(pattern, flags);
     }
 
     public JSRegExp(string pattern, string flags) : this()
     {
-        this.flags = flags;
         this.pattern = pattern;
 
-        (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
+        (value, globalSearch, ignoreCase, multiline, hasIndices, sticky, unicode, unicodeSets, this.flags) = CreateRegex(pattern, flags);
     }
 
     /// <summary>
@@ -309,17 +315,43 @@ public partial class JSRegExp : JSObject, IJSRegExp
     /// v (unicodeSets)
     /// d (hasIndices)</param>
     /// <returns> RegexOptions flags that correspond to the given flags. </returns>
-    private static (RegexOptions, bool, bool, bool, bool) ParseFlags(string flags)
+    private static string BuildFlagsString(bool hasIndices, bool globalSearch, bool ignoreCase, bool multiline, bool dotAll, bool unicode, bool unicodeSets, bool sticky)
+    {
+        var builder = new StringBuilder(8);
+        if (hasIndices)
+            builder.Append('d');
+        if (globalSearch)
+            builder.Append('g');
+        if (ignoreCase)
+            builder.Append('i');
+        if (multiline)
+            builder.Append('m');
+        if (dotAll)
+            builder.Append('s');
+        if (unicode)
+            builder.Append('u');
+        if (unicodeSets)
+            builder.Append('v');
+        if (sticky)
+            builder.Append('y');
+        return builder.ToString();
+    }
+
+    private static (RegexOptions Options, bool GlobalSearch, bool IgnoreCase, bool Multiline, bool DotAll, bool HasIndices, bool Sticky, bool Unicode, bool UnicodeSets, string NormalizedFlags) ParseFlags(string flags)
     {
         bool globalSearch = false;
         bool ignoreCase = false;
         bool multiline = false;
         bool dotAll = false;
+        bool hasIndices = false;
+        bool sticky = false;
+        bool unicode = false;
+        bool unicodeSets = false;
 
         var options = RegexOptions.ECMAScript;
 
         if (flags == null)
-            return (options, globalSearch, ignoreCase, multiline, dotAll);
+            return (options, globalSearch, ignoreCase, multiline, dotAll, hasIndices, sticky, unicode, unicodeSets, string.Empty);
 
         for (int i = 0; i < flags.Length; i++)
         {
@@ -354,9 +386,33 @@ public partial class JSRegExp : JSObject, IJSRegExp
                 options &= ~RegexOptions.ECMAScript;
                 options |= RegexOptions.Singleline;
             }
-            else if (flag == 'u' || flag == 'v' || flag == 'y' || flag == 'd')
+            else if (flag == 'u')
             {
-                // Accepted but not enforced in this implementation.
+                if (unicode)
+                    throw JSEngine.NewSyntaxError("The 'u' flag cannot be specified twice");
+                if (unicodeSets)
+                    throw JSEngine.NewSyntaxError("The 'u' and 'v' flags cannot be used together");
+                unicode = true;
+            }
+            else if (flag == 'v')
+            {
+                if (unicodeSets)
+                    throw JSEngine.NewSyntaxError("The 'v' flag cannot be specified twice");
+                if (unicode)
+                    throw JSEngine.NewSyntaxError("The 'u' and 'v' flags cannot be used together");
+                unicodeSets = true;
+            }
+            else if (flag == 'y')
+            {
+                if (sticky)
+                    throw JSEngine.NewSyntaxError("The 'y' flag cannot be specified twice");
+                sticky = true;
+            }
+            else if (flag == 'd')
+            {
+                if (hasIndices)
+                    throw JSEngine.NewSyntaxError("The 'd' flag cannot be specified twice");
+                hasIndices = true;
             }
             else
             {
@@ -364,7 +420,8 @@ public partial class JSRegExp : JSObject, IJSRegExp
             }
         }
 
-        return (options, globalSearch, ignoreCase, multiline, dotAll);
+        return (options, globalSearch, ignoreCase, multiline, dotAll, hasIndices, sticky, unicode, unicodeSets,
+            BuildFlagsString(hasIndices, globalSearch, ignoreCase, multiline, dotAll, unicode, unicodeSets, sticky));
     }
 
     /// <summary>
@@ -372,11 +429,11 @@ public partial class JSRegExp : JSObject, IJSRegExp
     /// Supports ES2025 inline pattern modifiers (§2.6) and duplicate
     /// named capturing groups (§2.7).
     /// </summary>
-    public static (Regex, bool, bool, bool) CreateRegex(string pattern, string flags)
+    public static (Regex, bool, bool, bool, bool, bool, bool, bool, string) CreateRegex(string pattern, string flags)
     {
         try
         {
-            var (options, globalSearch, ignoreCase, multiline, dotAll) = ParseFlags(flags);
+            var (options, globalSearch, ignoreCase, multiline, dotAll, hasIndices, sticky, unicode, unicodeSets, normalizedFlags) = ParseFlags(flags);
 
             // BROILER-PATCH: Transform ES3 empty character classes and forward backreferences
             // for .NET compatibility (tests 89, 90)
@@ -450,11 +507,19 @@ public partial class JSRegExp : JSObject, IJSRegExp
                 }
             }
 
-            return (new Regex(pattern, options), globalSearch, ignoreCase, multiline);
+            return (new Regex(pattern, options), globalSearch, ignoreCase, multiline, hasIndices, sticky, unicode, unicodeSets, normalizedFlags);
+        }
+        catch (JSException)
+        {
+            throw;
+        }
+        catch (ArgumentException ex)
+        {
+            throw JSEngine.NewSyntaxError(ex.Message);
         }
         catch
         {
-            return (null, false, false, false);
+            throw JSEngine.NewSyntaxError("Invalid regular expression");
         }
     }
 

@@ -131,6 +131,142 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Fragments_Populate_FramesDocument()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                frame.srcdoc = '<!DOCTYPE html><style>.box{color:red}</style><div id="target" class="box">ok</div>';
+                return [
+                    !!frames[0].document.getElementById('target'),
+                    !!frames[0].document.querySelector('.box'),
+                    frames[0].document.getElementById('target').textContent.trim()
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true|ok", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Rebuilds_Existing_Subdocument()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='old'>old</div></body></html>"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                var before = frame.contentDocument.getElementById('old').textContent;
+                frame.srcdoc = '<!DOCTYPE html><div id="new">new</div>';
+                return [
+                    before,
+                    frame.contentDocument.getElementById('old') === null,
+                    frame.contentDocument.getElementById('new').textContent
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("old|true|new", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                iframe.style.position = 'absolute';
+                iframe.style.left = '100px';
+                iframe.style.top = '300px';
+                iframe.style.width = '400px';
+                iframe.style.height = '300px';
+                iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>';
+                var target = iframe.contentDocument.getElementById('target');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("140|460|0|0", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Scrollable_Fixed_Targets()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                iframe.style.position = 'absolute';
+                iframe.style.left = '100px';
+                iframe.style.top = '300px';
+                iframe.style.width = '400px';
+                iframe.style.height = '300px';
+                iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>';
+                var target = iframe.contentDocument.getElementById('target');
+                var container = iframe.contentDocument.getElementById('container');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("130|440|0|0|300|300", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls
@@ -506,6 +642,30 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void ScriptEngine_Execute_Runs_Async_Scripts_From_ExtractAll_Before_Deferred_Scripts()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div>
+<script>window.__order = ['regular'];</script>
+<script async>window.__order.push('async');</script>
+<script defer>
+var p = document.createElement('p');
+p.textContent = window.__order.join(',');
+document.getElementById('out').appendChild(p);
+</script>
+</body></html>
+""";
+
+        var extraction = new ScriptExtractor().ExtractAll(html, "file:///test.html");
+        var executableScripts = extraction.Scripts.Concat(extraction.AsyncScripts).ToArray();
+        var output = new ScriptEngine().Execute(executableScripts, extraction.DeferredScripts, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("regular,async", output);
+    }
+
+    [Fact]
     public void ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts()
     {
         var engine = new ScriptEngine();
@@ -534,6 +694,35 @@ document.write('<p id=""injected"">written</p>');
 
         Assert.NotNull(output);
         Assert.Contains("data-order-before-script-2=\"script-1,micro\"", output);
+    }
+
+    [Fact]
+    public void ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts()
+    {
+        var engine = new ScriptEngine();
+        var deferredScripts = new List<string>
+        {
+            """
+            window.order = ['defer-1'];
+            queueMicrotask(function() {
+                window.order.push('micro');
+            });
+            """,
+            """
+            document.getElementById('out').setAttribute('data-order-before-defer-2', window.order.join(','));
+            window.order.push('defer-2');
+            """
+        };
+
+        var html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        var output = engine.Execute(Array.Empty<string>(), deferredScripts, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("data-order-before-defer-2=\"defer-1,micro\"", output);
     }
 
     [Fact]
@@ -970,6 +1159,26 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("style=\"position: relative; top: -1151.2px", result);
     }
 
+    [Fact]
+    public void DomBridge_Iframe_Srcdoc_Executes_Async_Scripts_Before_Deferred_Scripts()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body><script>window.__innerOrder = ['regular'];</script><script async>window.__innerOrder.push('async');</script><script defer>document.body.setAttribute('data-order', window.__innerOrder.join(','));</script></body></html>"></iframe>
+<div id="result"></div>
+<script>
+var doc = document.getElementById('frame').contentDocument;
+document.getElementById('result').textContent = doc.body.getAttribute('data-order') || 'missing';
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">regular,async<", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
@@ -1126,4 +1335,5 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("animated", stepHtml);
         session.Dispose();
     }
+
 }

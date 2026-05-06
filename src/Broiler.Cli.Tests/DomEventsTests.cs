@@ -769,6 +769,98 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
     }
 
     [Fact]
+    public void PreventDefault_On_NonCancelable_Event_Does_Not_Set_DefaultPrevented()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) {
+    e.preventDefault();
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,false,true", result);
+    }
+
+    [Fact]
+    public void ReturnValue_False_On_NonCancelable_Event_Does_Not_Cancel_Dispatched_Event()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) {
+    e.returnValue = false;
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true,false,true", result);
+    }
+
+    [Fact]
+    public void PreventDefault_Before_Dispatch_Preserves_Canceled_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+evt.preventDefault();
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("false,true,false", result);
+    }
+
+    [Fact]
+    public void ReturnValue_False_Before_Dispatch_Preserves_Canceled_State()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+evt.returnValue = false;
+var returned = target.dispatchEvent(evt);
+document.getElementById('result').textContent = returned + ',' + evt.defaultPrevented + ',' + evt.returnValue;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("false,true,false", result);
+    }
+
+    [Fact]
     public void Legacy_Event_Aliases_Track_Dispatch_State()
     {
         var html = @"<!DOCTYPE html>
@@ -1161,7 +1253,7 @@ document.getElementById('result').textContent = order.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        // At target phase (phase 2), all listeners fire in registration order
+        // At target phase (phase 2), capture listeners fire before bubble listeners
         Assert.Contains("capture-2,bubble-2", result);
     }
 

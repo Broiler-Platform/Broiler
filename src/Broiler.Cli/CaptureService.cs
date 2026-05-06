@@ -508,6 +508,7 @@ public class CaptureService
         using var context = new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
         var bridge = new DomBridge();
+        bridge.Csp = csp;
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         bridge.Attach(context, html, url);
 

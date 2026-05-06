@@ -36,6 +36,8 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(DrawSvgEllipseItem), "DrawSvgEllipse")]
 [JsonDerivedType(typeof(DrawSvgTextItem), "DrawSvgText")]
 [JsonDerivedType(typeof(DrawSvgLineItem), "DrawSvgLine")]
+[JsonDerivedType(typeof(DrawSvgPolygonItem), "DrawSvgPolygon")]
+[JsonDerivedType(typeof(DrawSvgPolylineItem), "DrawSvgPolyline")]
 [JsonDerivedType(typeof(BlendModeItem), "BlendMode")]
 [JsonDerivedType(typeof(RestoreBlendModeItem), "RestoreBlendMode")]
 [JsonDerivedType(typeof(DrawTiledGradientItem), "DrawTiledGradient")]
@@ -262,6 +264,24 @@ public sealed class DrawSvgLineItem : DisplayItem
     public float Y1 { get; init; }
     public float X2 { get; init; }
     public float Y2 { get; init; }
+    public Color Stroke { get; init; }
+    public float StrokeWidth { get; init; }
+}
+
+/// <summary>Draws an SVG polygon.</summary>
+public sealed class DrawSvgPolygonItem : DisplayItem
+{
+    public IReadOnlyList<PointF> Points { get; init; } = [];
+    public Color Fill { get; init; }
+    public Color Stroke { get; init; }
+    public float StrokeWidth { get; init; }
+}
+
+/// <summary>Draws an SVG polyline.</summary>
+public sealed class DrawSvgPolylineItem : DisplayItem
+{
+    public IReadOnlyList<PointF> Points { get; init; } = [];
+    public Color Fill { get; init; }
     public Color Stroke { get; init; }
     public float StrokeWidth { get; init; }
 }

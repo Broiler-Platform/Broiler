@@ -477,6 +477,23 @@ internal sealed class WptTestRunner
 })();
 ";
 
+    private static readonly string[] TestharnessGlobalNames =
+    [
+        "test",
+        "async_test",
+        "promise_test",
+        "assert_equals",
+        "assert_true",
+        "assert_false",
+        "assert_unreached",
+        "assert_approx_equals",
+        "assert_less_than",
+        "assert_greater_than",
+        "setup",
+        "done",
+        "checkLayout"
+    ];
+
     private readonly int _width;
     private readonly int _height;
 
@@ -1264,6 +1281,7 @@ internal sealed class WptTestRunner
                 try
                 {
                     context.Eval(script);
+                    PromoteWindowGlobalsToContext(context);
                     DrainAsyncWork();
                 }
                 catch (Exception ex)
@@ -1278,6 +1296,7 @@ internal sealed class WptTestRunner
                 try
                 {
                     context.Eval(script);
+                    PromoteWindowGlobalsToContext(context);
                     DrainAsyncWork();
                 }
                 catch (Exception ex)
@@ -1308,6 +1327,23 @@ internal sealed class WptTestRunner
         bridge.ResolveAnchorPositions();
 
         return bridge.SerializeToHtml();
+    }
+
+    private static void PromoteWindowGlobalsToContext(JSContext context)
+    {
+        foreach (var name in TestharnessGlobalNames)
+        {
+            try
+            {
+                var value = context.Eval($"typeof window['{name}'] !== 'undefined' ? window['{name}'] : undefined");
+                if (value != null && value != JSUndefined.Value)
+                    context[name] = value;
+            }
+            catch
+            {
+                // Best-effort only — some globals may not exist for a given page.
+            }
+        }
     }
 
     private static string? ResolveExternalScriptPath(string src, string? testDir, string? wptRoot)

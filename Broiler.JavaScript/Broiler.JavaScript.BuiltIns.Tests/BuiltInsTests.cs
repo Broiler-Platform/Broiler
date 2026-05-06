@@ -447,7 +447,98 @@ public class BuiltInsTests
         Assert.Equal(3.14, result.DoubleValue, 2);
     }
 
-    // ── M3: JSMap tests ──────────────────────────────────────────────
+    // ── M2: ArrayBuffer transfer tests ───────────────────────────────
+
+    [Fact]
+    public void ArrayBuffer_Transfer_Copies_Bytes_And_Detaches_Source()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            var sourceView = new Uint8Array(source);
+            sourceView[0] = 7;
+            sourceView[1] = 11;
+            var moved = source.transfer(6);
+            var movedView = new Uint8Array(moved);
+            [source.detached, moved.detached, moved.byteLength, movedView[0], movedView[1], movedView[4]].join('|');
+        ");
+        Assert.Equal("true|false|6|7|11|0", result.ToString());
+    }
+
+    [Fact]
+    public void ArrayBuffer_TransferToFixedLength_Returns_Transferred_Buffer()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            new Uint8Array(source)[0] = 99;
+            var moved = source.transferToFixedLength(2);
+            [source.detached, moved.detached, moved.byteLength, new Uint8Array(moved)[0]].join('|');
+        ");
+        Assert.Equal("true|false|2|99", result.ToString());
+    }
+
+    [Fact]
+    public void ArrayBuffer_Transferred_Source_Throws_On_ByteLength_Access()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            source.transfer(2);
+            source.byteLength;
+        "));
+    }
+
+    // ── M2: Hashbang grammar tests ────────────────────────────────────
+
+    [Fact]
+    public void Hashbang_At_Start_Of_Source_Is_Ignored()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("#!/usr/bin/env node\n1 + 2;");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Hashbang_Not_At_Start_Of_Source_Is_Rejected()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("0;\n#!/usr/bin/env node\n1;"));
+    }
+
+    [Fact]
+    public void Eval_Var_Can_Coexist_With_Global_Let()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("let value = 1; [eval('var value = 2; value;'), value].join('|');");
+        Assert.Equal("2|1", result.ToString());
+    }
+
+    [Fact]
+    public void Eval_Var_Can_Coexist_With_Global_Const()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("const value = 1; [eval('var value = 2; value;'), value].join('|');");
+        Assert.Equal("2|1", result.ToString());
+    }
+
+    [Fact]
+    public void Eval_Var_Can_Be_Redeclared_Across_Direct_Evals()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("let value = 1; [eval('var value = 2; value;'), eval('var value = 3; value;'), value].join('|');");
+        Assert.Equal("2|3|1", result.ToString());
+    }
+
+    // ── M2: JSMap tests ──────────────────────────────────────────────
 
     [Fact]
     public void Map_SetAndGet()
@@ -638,6 +729,152 @@ public class BuiltInsTests
         using var ctx = new JSContext();
         var result = ctx.Eval(@"RegExp.escape('hello.world?+[test]{x}(y)|/\\^$');");
         Assert.Equal(@"hello\.world\?\+\[test\]\{x\}\(y\)\|\/\\\^\$", result.ToString());
+    }
+
+    [Fact]
+    public void String_IsWellFormed_Detects_Paired_And_Lone_Surrogates()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                'plain'.isWellFormed(),
+                '\uD83C\uDF89'.isWellFormed(),
+                '\uD800'.isWellFormed(),
+                '\uDC00'.isWellFormed()
+            ].join('|');
+        ");
+        Assert.Equal("true|true|false|false", result.ToString());
+    }
+
+    [Fact]
+    public void String_ToWellFormed_Replaces_Lone_Surrogates_With_Replacement_Character()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                '\uD800A\uDC00'.toWellFormed(),
+                '\uD83C\uDF89'.toWellFormed()
+            ].join('|');
+        ");
+        Assert.Equal("\uFFFDA\uFFFD|🎉", result.ToString());
+    }
+
+    [Fact]
+    public void String_ToWellFormed_Always_Produces_A_WellFormed_String()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"'\uD800'.toWellFormed().isWellFormed();");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Finally_Return_Overrides_Try_And_Catch_Completions()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            [
+                (function() { try { return 'try'; } finally { return 'finally'; } })(),
+                (function() { try { throw new Error('boom'); } catch (e) { return 'catch'; } finally { return 'finally'; } })()
+            ].join('|');
+        ");
+        Assert.Equal("finally|finally", result.ToString());
+    }
+
+    [Fact]
+    public void Finally_Return_Skips_Remaining_Finally_Statements()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            (function() {
+                var order = [];
+                try {
+                    order.push('try');
+                    return 'try';
+                } finally {
+                    order.push('finally-before');
+                    return order.join(',');
+                    order.push('finally-after');
+                }
+            })();
+        ");
+        Assert.Equal("try,finally-before", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Exposes_UnicodeSets_Metadata()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = new RegExp('a', 'v');
+            [re.flags, re.unicodeSets, re.unicode].join('|');
+        ");
+        Assert.Equal("v|true|false", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Works_For_Literals()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = /a/v;
+            [re.flags, re.unicodeSets, re.test('a')].join('|');
+        ");
+        Assert.Equal("v|true|true", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Cannot_Be_Combined_With_U()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'uv');"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/vu;"));
+    }
+
+    [Fact]
+    public void RegExp_V_Flag_Cannot_Be_Specified_Twice()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'vv');"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/vv;"));
+    }
+
+    [Fact]
+    public void RegExp_Flags_Are_Normalized_And_Metadata_Is_Exposed()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var re = new RegExp('a', 'yidg');
+            [re.flags, re.hasIndices, re.sticky, re.global, re.ignoreCase].join('|');
+        ");
+        Assert.Equal("dgiy|true|true|true|true", result.ToString());
+    }
+
+    [Fact]
+    public void RegExp_D_And_Y_Flags_Cannot_Be_Specified_Twice()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'dd');"));
+        Assert.Throws<JSException>(() => ctx.Eval("new RegExp('a', 'yy');"));
+    }
+
+    [Fact]
+    public void RegExp_Literal_Duplicate_D_And_Y_Flags_Are_Rejected()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval("/a/dd"));
+        Assert.Throws<JSException>(() => ctx.Eval("/a/yy"));
     }
 
     [Fact]

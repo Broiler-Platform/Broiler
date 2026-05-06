@@ -181,6 +181,61 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var listener = {
+    count: 0,
+    handleEvent: function(e) {
+        this.count++;
+        document.getElementById('result').textContent = e.type + ',' + this.count;
+    }
+};
+target.addEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">test,1<", result);
+    }
+
+    [Fact]
+    public void RemoveEventListener_ListenerObject_Prevents_Future_Calls()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var count = 0;
+var target = document.getElementById('target');
+var listener = {
+    handleEvent: function() { count++; }
+};
+target.addEventListener('test', listener, false);
+target.removeEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = count;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">0<", result);
+    }
+
+    [Fact]
     public void AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
@@ -286,6 +341,55 @@ child.dispatchEvent(evt);
     }
 
     [Fact]
+    public void InputEvent_Constructor_Sets_Input_Specific_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = new InputEvent('input', {
+    bubbles: true,
+    cancelable: true,
+    data: 'x',
+    inputType: 'insertText',
+    isComposing: true
+});
+target.dispatchEvent(evt);
+document.getElementById('result').textContent =
+    evt.type + '|' + evt.data + '|' + evt.inputType + '|' + evt.isComposing + '|' + evt.bubbles + '|' + evt.cancelable;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">input|x|insertText|true|true|true<", result);
+    }
+
+    [Fact]
+    public void Document_CreateEvent_InputEvent_InitInputEvent_Sets_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""target"">
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('InputEvent');
+evt.initInputEvent('input', true, false, window, 'y', 'deleteContentBackward', false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent =
+    evt.type + '|' + evt.data + '|' + evt.inputType + '|' + evt.isComposing + '|' + evt.bubbles + '|' + evt.cancelable;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">input|y|deleteContentBackward|false|true|false<", result);
+    }
+
+    [Fact]
     public void Window_AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
@@ -305,6 +409,111 @@ document.getElementById('result').textContent = count;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains(">1<", result);
+    }
+
+    [Fact]
+    public void Window_AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var listener = {
+    count: 0,
+    handleEvent: function(e) {
+        this.count++;
+        document.getElementById('result').textContent = e.type + ',' + this.count;
+    }
+};
+window.addEventListener('test', listener, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, false);
+window.dispatchEvent(evt);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">test,1<", result);
+    }
+
+    [Fact]
+    public void Window_StopImmediatePropagation_Prevents_Later_Listeners()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var order = [];
+window.addEventListener('test', function(e) {
+    order.push('first');
+    e.stopImmediatePropagation();
+}, false);
+window.addEventListener('test', function() {
+    order.push('second');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+window.dispatchEvent(evt);
+document.getElementById('result').textContent = order.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">first<", result);
+        Assert.DoesNotContain("first,second", result);
+    }
+
+    [Fact]
+    public void Window_StopPropagation_Does_Not_Prevent_Later_Listeners_On_Same_Target()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var order = [];
+window.addEventListener('test', function(e) {
+    order.push('first');
+    e.stopPropagation();
+}, false);
+window.addEventListener('test', function() {
+    order.push('second');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+window.dispatchEvent(evt);
+document.getElementById('result').textContent = order.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">first,second<", result);
+    }
+
+    [Fact]
+    public void Window_DispatchEvent_Preserves_Prevented_State_And_ReturnValue()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var evt = document.createEvent('Event');
+evt.initEvent('test', false, true);
+evt.preventDefault();
+var returned = window.dispatchEvent(evt);
+document.getElementById('result').textContent = [
+    returned,
+    evt.defaultPrevented,
+    evt.returnValue
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">false,true,false<", result);
     }
 
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
@@ -694,5 +903,33 @@ document.getElementById('result').textContent = r.join(',');
 
         // Capture listeners fire in registration order
         Assert.Contains("cap-1,cap-2,cap-3,target", result);
+    }
+
+    [Fact]
+    public void Target_Phase_Capture_Listeners_Fire_Before_Bubble_Listeners_Even_When_Registered_Later()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var order = [];
+var target = document.getElementById('target');
+target.addEventListener('test', function(e) {
+    order.push('bubble-' + e.eventPhase);
+}, false);
+target.addEventListener('test', function(e) {
+    order.push('capture-' + e.eventPhase);
+}, true);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = order.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("capture-2,bubble-2", result);
     }
 }

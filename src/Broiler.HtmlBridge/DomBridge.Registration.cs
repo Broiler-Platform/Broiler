@@ -303,7 +303,9 @@ public sealed partial class DomBridge
                 evt.FastAddValue((KeyString)"preventDefault",
                     new JSFunction((in Arguments _) =>
                     {
-                        evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                        var cancelable = evt[(KeyString)"cancelable"];
+                        if (cancelable != null && cancelable.BooleanValue)
+                            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
                         return JSUndefined.Value;
                     }, "preventDefault", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
@@ -322,7 +324,11 @@ public sealed partial class DomBridge
                     new JSFunction((in Arguments _) => evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True, "get returnValue"),
                     new JSFunction((in Arguments setArgs) =>
                     {
-                        if (setArgs.Length > 0 && !setArgs[0].BooleanValue)
+                        var cancelable = evt[(KeyString)"cancelable"];
+                        if (setArgs.Length > 0 &&
+                            !setArgs[0].BooleanValue &&
+                            cancelable != null &&
+                            cancelable.BooleanValue)
                             evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
                         return JSUndefined.Value;
                     }, "set returnValue"),
@@ -354,6 +360,26 @@ public sealed partial class DomBridge
                             evt[(KeyString)"detail"] = initArgs[4];
                         return JSUndefined.Value;
                     }, "initUIEvent", 5),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initInputEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"data"] = initArgs[4];
+                        if (initArgs.Length > 5)
+                            evt[(KeyString)"inputType"] = new JSString(initArgs[5].ToString());
+                        if (initArgs.Length > 6)
+                            evt[(KeyString)"isComposing"] = initArgs[6].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        return JSUndefined.Value;
+                    }, "initInputEvent", 7),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"initCustomEvent",
                     new JSFunction((in Arguments initArgs) =>
@@ -656,6 +682,20 @@ public sealed partial class DomBridge
                         options.cancelable === true,
                         options.view !== undefined ? options.view : null,
                         options.detail !== undefined ? options.detail : 0);
+                    return evt;
+                }
+
+                function InputEvent(type, options) {
+                    options = options || {};
+                    var evt = document.createEvent('InputEvent');
+                    evt.initInputEvent(
+                        type,
+                        options.bubbles === true,
+                        options.cancelable === true,
+                        options.view !== undefined ? options.view : null,
+                        options.data !== undefined ? options.data : null,
+                        options.inputType !== undefined ? options.inputType : '',
+                        options.isComposing === true);
                     return evt;
                 }
             ");
@@ -1948,6 +1988,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"KeyboardEvent", context["KeyboardEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"WheelEvent", context["WheelEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"UIEvent", context["UIEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"InputEvent", context["InputEvent"], JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.parent — uses the JSContext global scope so that parent.X()
         // resolves user-defined globals (e.g. parent.notify() from sub-documents).

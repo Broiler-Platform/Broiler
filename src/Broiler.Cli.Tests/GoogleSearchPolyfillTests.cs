@@ -294,7 +294,7 @@ public class GoogleSearchPolyfillTests
     public void Document_HitTesting_Tracks_AutoSized_Ancestors_With_Negative_Margins()
     {
         var result = ExecJs(@"
-            document.body.innerHTML = '<div id=""outer"" style=""background:yellow""><div id=""inner"" style=""width:100px;height:100px;margin-bottom:-100px;background:lime;""></div>Hello</div>';
+            document.body.innerHTML = '<div id=""outer"" style=""background:yellow""><div id=""inner"" style=""width:100px;height:100px;margin-bottom:-100px;background:lime;""></div>Hello</div><pre id=""result""></pre>';
             var outer = document.getElementById('outer');
             var rect = outer.getBoundingClientRect();
             var hits = document.elementsFromPoint(rect.left + 1, rect.top + 1);
@@ -304,14 +304,30 @@ public class GoogleSearchPolyfillTests
             ].join('|');
         ");
 
-        Assert.Contains("outer|inner>outer>BODY>HTML", result);
+        Assert.Contains("inner|inner&gt;outer&gt;BODY&gt;HTML", result);
+    }
+
+    [Fact]
+    public void Body_InnerHtml_Reparses_Nodes_Into_The_Live_Dom()
+    {
+        var result = ExecJs(@"
+            document.body.innerHTML = '<section id=""outer""><span id=""inner"">ok</span></section><pre id=""result""></pre>';
+            var inner = document.getElementById('inner');
+            document.getElementById('result').textContent = [
+                inner !== null,
+                inner && inner.parentNode && inner.parentNode.id,
+                document.body.children.length
+            ].join('|');
+        ");
+
+        Assert.Contains("true|outer|2", result);
     }
 
     [Fact]
     public void AutoSized_ScrollMetrics_Ignore_MarginOnly_NonOverflow_Cases()
     {
         var result = ExecJs(@"
-            document.body.innerHTML = '<style>#target div{height:20px;min-width:20px;background:green;margin:20px 10px;}</style><div id=""target""><div><div></div></div><div></div><div></div><div></div></div>';
+            document.body.innerHTML = '<style>#target div{height:20px;min-width:20px;background:green;margin:20px 10px;}</style><div id=""target""><div><div></div></div><div></div><div></div><div></div></div><pre id=""result""></pre>';
             var target = document.getElementById('target');
             var cases = [
                 ['visible', 'block', '0', '0'],

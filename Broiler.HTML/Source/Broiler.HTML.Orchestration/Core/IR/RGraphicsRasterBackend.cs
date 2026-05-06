@@ -59,6 +59,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case DrawSvgLineItem svgLine:
                     RenderSvgLine(g, svgLine);
                     break;
+                case DrawSvgPolygonItem svgPolygon:
+                    RenderSvgPolygon(g, svgPolygon);
+                    break;
+                case DrawSvgPolylineItem svgPolyline:
+                    RenderSvgPolyline(g, svgPolyline);
+                    break;
                 case ClipItem clip:
                     if (clip.CornerNw > 0 || clip.CornerNe > 0 || clip.CornerSe > 0 || clip.CornerSw > 0)
                         g.PushClipRounded(
@@ -829,6 +835,51 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 item.Bounds.X + item.X1, item.Bounds.Y + item.Y1,
                 item.Bounds.X + item.X2, item.Bounds.Y + item.Y2);
         }
+    }
+
+    private static void RenderSvgPolygon(RGraphics g, DrawSvgPolygonItem item)
+    {
+        if (item.Points.Count < 2)
+            return;
+
+        var points = ToAbsolutePoints(item.Bounds, item.Points);
+        if (!item.Fill.IsEmpty && item.Fill.A > 0)
+            g.DrawPolygon(g.GetSolidBrush(item.Fill), points);
+
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+            for (var i = 1; i < points.Length; i++)
+                g.DrawLine(pen, points[i - 1].X, points[i - 1].Y, points[i].X, points[i].Y);
+            g.DrawLine(pen, points[^1].X, points[^1].Y, points[0].X, points[0].Y);
+        }
+    }
+
+    private static void RenderSvgPolyline(RGraphics g, DrawSvgPolylineItem item)
+    {
+        if (item.Points.Count < 2)
+            return;
+
+        var points = ToAbsolutePoints(item.Bounds, item.Points);
+        if (!item.Fill.IsEmpty && item.Fill.A > 0)
+            g.DrawPolygon(g.GetSolidBrush(item.Fill), points);
+
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+            for (var i = 1; i < points.Length; i++)
+                g.DrawLine(pen, points[i - 1].X, points[i - 1].Y, points[i].X, points[i].Y);
+        }
+    }
+
+    private static PointF[] ToAbsolutePoints(RectangleF bounds, IReadOnlyList<PointF> points)
+    {
+        var absolute = new PointF[points.Count];
+        for (var i = 0; i < points.Count; i++)
+            absolute[i] = new PointF(bounds.X + points[i].X, bounds.Y + points[i].Y);
+        return absolute;
     }
 
     private static RPen CreateBorderPen(RGraphics g, string style, Color color, double width)

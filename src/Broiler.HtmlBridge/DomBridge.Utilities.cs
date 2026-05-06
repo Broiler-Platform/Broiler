@@ -629,11 +629,16 @@ public sealed partial class DomBridge
     private sealed class CssStyleDeclaration : JSObject
     {
         private readonly DomElement _element;
+        private readonly Action? _onMutation;
 
         // Names that are JS methods / special properties, not CSS properties.
         private static HashSet<string> NonCssNames => CssStyleDeclarationNonCssNames;
 
-        public CssStyleDeclaration(DomElement element) => _element = element;
+        public CssStyleDeclaration(DomElement element, Action? onMutation = null)
+        {
+            _element = element;
+            _onMutation = onMutation;
+        }
 
         protected override bool SetValue(
             KeyString name, JSValue value, JSValue receiver, bool throwError = true)
@@ -663,6 +668,8 @@ public sealed partial class DomBridge
                     _element.DomProperties.Remove("_resolvedWidth");
                     _element.DomProperties.Remove("_resolvedHeight");
                 }
+
+                _onMutation?.Invoke();
             }
 
             return base.SetValue(name, value, receiver, throwError);
@@ -817,9 +824,9 @@ public sealed partial class DomBridge
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
     }
 
-    private static JSObject BuildStyleObject(DomElement element, JSValue? parentRule = null)
+    private static JSObject BuildStyleObject(DomElement element, Action? onMutation = null, JSValue? parentRule = null)
     {
-        var style = new CssStyleDeclaration(element);
+        var style = new CssStyleDeclaration(element, onMutation);
 
         // style.cssText (getter / setter)
         style.FastAddProperty(
@@ -842,6 +849,7 @@ public sealed partial class DomBridge
                         element.JsSetStyleProps.Add(kv.Key);
                     }
                 }
+                onMutation?.Invoke();
                 return JSUndefined.Value;
             }, "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -865,6 +873,8 @@ public sealed partial class DomBridge
                         element.Style[prop] = value;
                         element.JsSetStyleProps.Add(prop);
                     }
+
+                    onMutation?.Invoke();
                 }
                 return JSUndefined.Value;
             }, "setProperty", 2),
@@ -907,6 +917,7 @@ public sealed partial class DomBridge
                     var removed = element.Style.TryGetValue(prop, out var val) ? val : string.Empty;
                     element.Style.Remove(prop);
                     element.JsSetStyleProps.Remove(prop);
+                    onMutation?.Invoke();
                     return new JSString(removed);
                 }
                 return new JSString(string.Empty);
@@ -926,6 +937,7 @@ public sealed partial class DomBridge
             {
                 if (a.Length > 0)
                     element.Style["float"] = a[0].ToString();
+                onMutation?.Invoke();
                 return JSUndefined.Value;
             }, "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);

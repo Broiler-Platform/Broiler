@@ -272,13 +272,21 @@ public sealed partial class DomBridge
                     element.Style[property] = scaled;
             }
 
-            ApplyZoomSerializationSvgAttributes(element, usedZoom);
         }
+
+        if (ShouldApplySvgSerializationAttributes(element))
+            ApplyZoomSerializationSvgAttributes(element, usedZoom);
 
         element.Style.Remove("zoom");
 
         foreach (var child in element.Children)
             ApplyZoomSerializationStyles(child, usedZoom);
+    }
+
+    private static bool ShouldApplySvgSerializationAttributes(DomElement element)
+    {
+        var tag = element.TagName.ToLowerInvariant();
+        return tag is "svg" or "defs" or "path" or "rect" or "line" or "text" or "textpath" or "polygon" or "polyline";
     }
 
     private bool TryGetZoomSerializableValue(
@@ -359,6 +367,18 @@ public sealed partial class DomBridge
     private void ApplyZoomSerializationSvgAttributes(DomElement element, double usedZoom)
     {
         var tag = element.TagName.ToLowerInvariant();
+        var props = GetComputedProps(element);
+
+        ApplySvgPresentationAttribute(element, props, "fill");
+        ApplySvgPresentationAttribute(element, props, "stroke");
+        ApplySvgPresentationAttribute(element, props, "stroke-width", preferInlineStyle: true);
+
+        if (tag is "text" or "textpath")
+        {
+            ApplySvgPresentationAttribute(element, props, "font-size", preferInlineStyle: true);
+            ApplySvgPresentationAttribute(element, props, "font-family");
+        }
+
         switch (tag)
         {
             case "svg":
@@ -389,6 +409,29 @@ public sealed partial class DomBridge
                 ScaleSvgPathDataAttribute(element, "d", usedZoom);
                 break;
         }
+    }
+
+    private void ApplySvgPresentationAttribute(
+        DomElement element,
+        Dictionary<string, string> props,
+        string propertyName,
+        bool preferInlineStyle = false)
+    {
+        if (element.Attributes.ContainsKey(propertyName))
+            return;
+
+        string? value = null;
+        if (preferInlineStyle && element.Style.TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
+            value = inlineValue;
+        else if (props.TryGetValue(propertyName, out var propValue) && !string.IsNullOrWhiteSpace(propValue))
+            value = propValue;
+        else if (preferInlineStyle && props.TryGetValue(propertyName, out var fallbackProp) && !string.IsNullOrWhiteSpace(fallbackProp))
+            value = fallbackProp;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        element.Attributes[propertyName] = value.Trim();
     }
 
     private void ScaleSvgLengthAttribute(DomElement element, string attributeName, double usedZoom)
@@ -461,6 +504,13 @@ public sealed partial class DomBridge
                 return false;
             }
 
+            if (TryResolveSvgFontRelativeUnitPixels(element, unit, out var unitPixels))
+            {
+                scaled = (number * unitPixels * usedZoom)
+                    .ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+
             var factor = ResolveSvgLengthZoomFactor(element, unit, usedZoom);
             if (Math.Abs(factor - 1.0) < ZoomSerializationEpsilon)
                 return false;
@@ -471,6 +521,71 @@ public sealed partial class DomBridge
 
         return false;
     }
+
+    private bool TryResolveSvgFontRelativeUnitPixels(DomElement element, string unit, out double pixels)
+    {
+        pixels = 0;
+        if (SvgRootFontRelativeUnits.Contains(unit))
+        {
+            pixels = ResolveOriginalRootSpecifiedFontSizePx() * GetSvgFontRelativeUnitRatio(unit);
+            return pixels > 0;
+        }
+
+        if (!SvgFontRelativeUnits.Contains(unit))
+            return false;
+
+        pixels = ResolveOriginalNearestSpecifiedFontSizePx(element) * GetSvgFontRelativeUnitRatio(unit);
+        return pixels > 0;
+    }
+
+    private double ResolveOriginalNearestSpecifiedFontSizePx(DomElement element)
+    {
+        for (DomElement? current = element; current != null; current = current.Parent)
+        {
+            if (TryGetSpecifiedFontSizePx(current, out var fontSize))
+                return fontSize;
+        }
+
+        return ResolveOriginalRootSpecifiedFontSizePx();
+    }
+
+    private double ResolveOriginalRootSpecifiedFontSizePx() =>
+        TryGetSpecifiedFontSizePx(DocumentElement, out var fontSize) ? fontSize : 16;
+
+    private bool TryGetSpecifiedFontSizePx(DomElement element, out double fontSize)
+    {
+        fontSize = 0;
+        var specified = BuildSpecifiedStyleMap(element);
+        if (TryParsePx(specified.GetValueOrDefault("font-size")) is double px)
+        {
+            fontSize = px;
+            return true;
+        }
+
+        if (!specified.TryGetValue("font", out var fontShorthand) || string.IsNullOrWhiteSpace(fontShorthand))
+            return false;
+
+        var sizeMatch = Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
+        if (!sizeMatch.Success ||
+            !double.TryParse(sizeMatch.Groups[1].Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out fontSize))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static double GetSvgFontRelativeUnitRatio(string unit) => unit.ToLowerInvariant() switch
+    {
+        // Broiler's SVG length resolution currently uses the same deterministic
+        // Ahem-like 0.8em approximation that the existing font-relative zoom
+        // coverage already assumes for ex/cap units.
+        "ex" or "rex" or "cap" or "rcap" => 0.8,
+        _ => 1.0
+    };
 
     private double ResolveSvgLengthZoomFactor(DomElement element, string unit, double usedZoom)
     {

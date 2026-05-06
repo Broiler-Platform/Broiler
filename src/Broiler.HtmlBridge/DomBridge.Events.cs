@@ -41,6 +41,28 @@ public sealed partial class DomBridge
         return value != null && !value.IsNullOrUndefined && value.BooleanValue;
     }
 
+    private static void InvokeEventListener(JSValue listener, JSObject evt, string logContext)
+    {
+        try
+        {
+            if (listener is JSFunction fn)
+            {
+                fn.InvokeFunction(new Arguments(fn, evt));
+                return;
+            }
+
+            if (listener is JSObject listenerObject &&
+                listenerObject[(KeyString)"handleEvent"] is JSFunction handleEvent)
+            {
+                handleEvent.InvokeFunction(new Arguments(listenerObject, evt));
+            }
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, logContext, $"Event listener error: {ex.Message}", ex);
+        }
+    }
+
     private JSValue BuildComposedPathValue(DomElement target, IReadOnlyList<DomElement> path)
     {
         JSValue ToEventPathObject(DomElement node)
@@ -111,7 +133,8 @@ public sealed partial class DomBridge
 
         var stopped = false;
         var immediateStopped = false;
-        var prevented = false;
+        var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
+                        defaultPreventedValue.BooleanValue;
         var currentListenerPassive = false;
         var legacyCancelBubble = false;
 
@@ -121,7 +144,6 @@ public sealed partial class DomBridge
             : ToJSObject(target);
         evt[(KeyString)"srcElement"] = evt[(KeyString)"target"];
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
-        evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
             new JSFunction((in Arguments _) =>
             {
@@ -142,7 +164,8 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) =>
             {
-                if (!currentListenerPassive)
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
                 {
                     prevented = true;
                     evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
@@ -168,7 +191,12 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
             new JSFunction((in Arguments setArgs) =>
             {
-                if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive)
+                var cancelable = evt[(KeyString)"cancelable"];
+                if (setArgs.Length > 0 &&
+                    !setArgs[0].BooleanValue &&
+                    !currentListenerPassive &&
+                    cancelable != null &&
+                    cancelable.BooleanValue)
                 {
                     prevented = true;
                     evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
@@ -191,14 +219,15 @@ public sealed partial class DomBridge
             FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
-        // Phase 2: Target — fire ALL listeners (both capture and bubble) in registration order
+        // Phase 2: Target — fire capture listeners first, then non-capture listeners.
         if (!stopped)
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(2);
             evt[(KeyString)"currentTarget"] = target == _documentNode
                 ? (_documentJSObject ?? JSNull.Value)
                 : ToJSObject(target);
-            FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped, ref currentListenerPassive);
+            FireListeners(target, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped, ref currentListenerPassive);
+            FireListeners(target, eventType, evt, capturePhase: false, ref stopped, ref immediateStopped, ref currentListenerPassive);
         }
 
         // Phase 3: Bubble (parent of target → root) — only if event.bubbles is true
@@ -224,7 +253,7 @@ public sealed partial class DomBridge
     /// Fires registered listeners for the given event type on a single element.
     /// When <paramref name="capturePhase"/> is <c>true</c>, only capture listeners fire.
     /// When <c>false</c>, only bubble listeners fire.
-    /// When <c>null</c> (target phase), all listeners fire in registration order plus the inline handler.
+    /// When <c>null</c> (unused), all listeners fire in registration order plus the inline handler.
     /// </summary>
     private static void FireListeners(DomElement el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
@@ -238,11 +267,7 @@ public sealed partial class DomBridge
                 // In target phase (capturePhase == null), fire all listeners.
                 if (capturePhase.HasValue && registration.Capture != capturePhase.Value) continue;
                 currentListenerPassive = registration.Passive;
-                if (registration.Listener is JSFunction fn)
-                {
-                    try { fn.InvokeFunction(new Arguments(fn, evt)); }
-                    catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Event listener error: {ex.Message}", ex); }
-                }
+                InvokeEventListener(registration.Listener, evt, "DomBridge.dispatchEvent");
                 currentListenerPassive = false;
 
                 if (registration.Once)
@@ -291,6 +316,12 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
         var eventName = attrName[2..].ToLowerInvariant();
+        if (Csp != null && !Csp.AllowsInlineEventHandler(code))
+        {
+            element.InlineEventHandlers.Remove(eventName);
+            return;
+        }
+
         try
         {
             var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;

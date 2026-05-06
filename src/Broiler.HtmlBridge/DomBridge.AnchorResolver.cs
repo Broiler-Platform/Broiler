@@ -1059,6 +1059,9 @@ public sealed partial class DomBridge
     /// </summary>
     private Dictionary<string, string> GetComputedProps(DomElement element)
     {
+        if (_computedPropsCache.TryGetValue(element, out var cached))
+            return cached;
+
         if (_computedPropsInProgress.TryGetValue(element, out var inProgress))
             return inProgress;
 
@@ -1106,6 +1109,7 @@ public sealed partial class DomBridge
             ApplyApproximateFormControlComputedSizes(props, element);
             ApplyLogicalSizeAliases(props);
 
+            _computedPropsCache[element] = props;
             return props;
         }
         finally

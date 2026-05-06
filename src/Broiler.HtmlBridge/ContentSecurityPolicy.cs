@@ -9,15 +9,16 @@ namespace Broiler.HtmlBridge;
 /// <summary>
 /// Lightweight Content Security Policy (CSP) model for the bridge script
 /// pipeline. The currently honored directives are <c>default-src</c>,
-/// <c>script-src</c>, and <c>script-src-elem</c> for inline-script,
-/// external-script, and <c>eval()</c> gating. The currently honored source
-/// expressions are <c>'none'</c>, <c>'self'</c>, <c>'unsafe-inline'</c>,
+/// <c>script-src</c>, <c>script-src-elem</c>, and <c>script-src-attr</c>
+/// for inline-script, external-script, inline event-handler, and
+/// <c>eval()</c> gating. The currently honored source expressions are
+/// <c>'none'</c>, <c>'self'</c>, <c>'unsafe-inline'</c>,
 /// <c>'unsafe-eval'</c>, <c>'strict-dynamic'</c>, nonce sources, hash
 /// sources, wildcard <c>*</c>, scheme sources such as <c>https:</c>, and
 /// absolute origin/path sources.
-/// Host wildcards, <c>'unsafe-hashes'</c>, <c>strict-dynamic</c>'s trust
-/// propagation model, and non-script directives are intentionally not yet
-/// implemented and therefore remain explicit gaps.
+/// Host wildcards, <c>strict-dynamic</c>'s trust propagation model, and
+/// non-script directives are intentionally not yet implemented and therefore
+/// remain explicit gaps.
 /// </summary>
 public sealed class ContentSecurityPolicy
 {
@@ -28,6 +29,7 @@ public sealed class ContentSecurityPolicy
     private readonly HashSet<string> _defaultSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcElemTokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _scriptSrcAttrTokens = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Whether <c>eval()</c> and similar dynamic code execution is allowed.
@@ -56,6 +58,11 @@ public sealed class ContentSecurityPolicy
     public IReadOnlyCollection<string> ScriptSrcElemTokens => _scriptSrcElemTokens;
 
     /// <summary>
+    /// The raw <c>script-src-attr</c> tokens parsed from the policy.
+    /// </summary>
+    public IReadOnlyCollection<string> ScriptSrcAttrTokens => _scriptSrcAttrTokens;
+
+    /// <summary>
     /// Parse a CSP header value and apply the honored script directives.
     /// Unknown directives are ignored.
     /// </summary>
@@ -64,6 +71,7 @@ public sealed class ContentSecurityPolicy
         _defaultSrcTokens.Clear();
         _scriptSrcTokens.Clear();
         _scriptSrcElemTokens.Clear();
+        _scriptSrcAttrTokens.Clear();
         AllowsEval = true;
         StrictDynamic = false;
 
@@ -84,6 +92,8 @@ public sealed class ContentSecurityPolicy
                 target = _scriptSrcTokens;
             else if (string.Equals(tokens[0], "script-src-elem", StringComparison.OrdinalIgnoreCase))
                 target = _scriptSrcElemTokens;
+            else if (string.Equals(tokens[0], "script-src-attr", StringComparison.OrdinalIgnoreCase))
+                target = _scriptSrcAttrTokens;
 
             if (target == null)
                 continue;
@@ -97,7 +107,8 @@ public sealed class ContentSecurityPolicy
         StrictDynamic =
             _defaultSrcTokens.Contains("'strict-dynamic'") ||
             _scriptSrcTokens.Contains("'strict-dynamic'") ||
-            _scriptSrcElemTokens.Contains("'strict-dynamic'");
+            _scriptSrcElemTokens.Contains("'strict-dynamic'") ||
+            _scriptSrcAttrTokens.Contains("'strict-dynamic'");
     }
 
     /// <summary>
@@ -124,6 +135,30 @@ public sealed class ContentSecurityPolicy
     }
 
     /// <summary>
+    /// Returns whether an inline event handler attribute is allowed under the
+    /// effective script attribute directive.
+    /// </summary>
+    public bool AllowsInlineEventHandler(string? handlerText = null)
+    {
+        var sources = GetEffectiveScriptAttributeSources();
+        if (sources.Count == 0)
+            return true;
+
+        if (IsNoneOnly(sources))
+            return false;
+
+        if (sources.Contains("'unsafe-inline'"))
+            return true;
+
+        if (!string.IsNullOrEmpty(handlerText) &&
+            sources.Contains("'unsafe-hashes'") &&
+            MatchesHash(sources, handlerText))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
     /// Returns whether an external script URL is allowed under the effective
     /// script element directive.
     /// </summary>
@@ -138,6 +173,10 @@ public sealed class ContentSecurityPolicy
 
         if (!string.IsNullOrEmpty(nonce) && MatchesNonce(sources, nonce))
             return true;
+
+        var ignoreStaticAllowlistSources = StrictDynamic && ContainsNonceOrHashSource(sources);
+        if (ignoreStaticAllowlistSources)
+            return false;
 
         var resolved = ResolveUri(scriptUrl, pageUrl);
         if (resolved == null)
@@ -228,6 +267,15 @@ public sealed class ContentSecurityPolicy
     {
         if (_scriptSrcElemTokens.Count > 0)
             return _scriptSrcElemTokens;
+        if (_scriptSrcTokens.Count > 0)
+            return _scriptSrcTokens;
+        return _defaultSrcTokens;
+    }
+
+    private HashSet<string> GetEffectiveScriptAttributeSources()
+    {
+        if (_scriptSrcAttrTokens.Count > 0)
+            return _scriptSrcAttrTokens;
         if (_scriptSrcTokens.Count > 0)
             return _scriptSrcTokens;
         return _defaultSrcTokens;

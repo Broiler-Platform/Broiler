@@ -104,7 +104,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) => new JSString(element.InnerHtml), "get innerHTML"),
             new JSFunction((in Arguments a) =>
             {
-                element.InnerHtml = a.Length > 0 ? a[0].ToString() : string.Empty;
+                bridge.SetElementInnerHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -161,7 +161,7 @@ public sealed partial class DomBridge
         // style object — CSS property access and manipulation.
         // In browsers, `element.style` is a read-only property: assigning a
         // string sets `style.cssText` instead of replacing the object.
-        var styleObj = BuildStyleObject(element);
+        var styleObj = BuildStyleObject(element, () => bridge.InvalidateStyleScope(element));
         obj.FastAddProperty(
             (KeyString)"style",
             new JSFunction((in Arguments a) => styleObj, "get style"),
@@ -177,6 +177,8 @@ public sealed partial class DomBridge
                         element.Style[kv.Key] = kv.Value;
                         element.JsSetStyleProps.Add(kv.Key);
                     }
+
+                    bridge.InvalidateStyleScope(element);
                 }
                 return JSUndefined.Value;
             }, "set style"),
@@ -217,6 +219,7 @@ public sealed partial class DomBridge
                         element.Style.Clear();
                         foreach (var kv in ParseStyle(attrVal))
                             element.Style[kv.Key] = kv.Value;
+                        bridgeForSet.InvalidateStyleScope(element);
                     }
                     // Compile on* event handler attributes into functions
                     else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
@@ -1477,11 +1480,7 @@ public sealed partial class DomBridge
                     {
                         foreach (var registration in submitListeners.ToList())
                         {
-                            if (registration.Listener is JSFunction fn)
-                            {
-                                try { fn.InvokeFunction(new Arguments(fn, submitEvt)); }
-                                catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.submit", $"Submit listener error: {ex.Message}", ex); }
-                            }
+                            InvokeEventListener(registration.Listener, submitEvt, "DomBridge.submit");
                         }
                     }
 
@@ -3049,12 +3048,24 @@ public sealed partial class DomBridge
             if (svgLength > 0)
                 return svgLength;
 
+            var replacedElementLength = ResolveReplacedElementAttributeExtent(element, vertical);
+            if (replacedElementLength > 0)
+                return replacedElementLength;
+
             return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
         }
         finally
         {
             _contentExtentInProgress.Remove((element, vertical));
         }
+    }
+
+    private static double ResolveReplacedElementAttributeExtent(DomElement element, bool vertical)
+    {
+        if (!string.Equals(element.TagName, "img", StringComparison.OrdinalIgnoreCase))
+            return 0;
+
+        return ParsePositiveDouble(element.Attributes.GetValueOrDefault(vertical ? "height" : "width"));
     }
 
     private double ResolveBorderBoxExtent(DomElement element, bool vertical)
@@ -3328,13 +3339,19 @@ public sealed partial class DomBridge
         var props = GetComputedProps(element);
         var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
         var ownZoom = GetUsedZoomForElement(element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
         var maxWidth = ownWidth;
+        var elementRect = ComputeRenderedRect(element);
+        var borderLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
+        var originLeft = elementRect.Left + borderLeft;
+
         foreach (var child in EnumerateRenderedDescendants(element))
         {
             var childRect = ComputeRenderedRect(child);
             var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
-            var childOffset = ComputeOffsetWithinAncestor(child, element, vertical: false);
+            var childOffset = ReferenceEquals(GetAssignedSlot(child), element)
+                ? ComputeOffsetWithinAncestor(child, element, vertical: false)
+                : childRect.Left - originLeft;
             maxWidth = Math.Max(maxWidth, childOffset + widthInContainerSpace + trailingPadding);
         }
 
@@ -3349,13 +3366,19 @@ public sealed partial class DomBridge
         var props = GetComputedProps(element);
         var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
         var ownZoom = GetUsedZoomForElement(element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
         var maxHeight = ownHeight;
+        var elementRect = ComputeRenderedRect(element);
+        var borderTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
+        var originTop = elementRect.Top + borderTop;
+
         foreach (var child in EnumerateRenderedDescendants(element))
         {
             var childRect = ComputeRenderedRect(child);
             var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
-            var childOffset = ComputeOffsetWithinAncestor(child, element, vertical: true);
+            var childOffset = ReferenceEquals(GetAssignedSlot(child), element)
+                ? ComputeOffsetWithinAncestor(child, element, vertical: true)
+                : childRect.Top - originTop;
             maxHeight = Math.Max(maxHeight, childOffset + heightInContainerSpace + trailingPadding);
         }
 
@@ -3885,6 +3908,14 @@ public sealed partial class DomBridge
                 baselineY = pathStart.Y;
         }
 
+        var viewport = FindNearestSvgViewportAncestor(element);
+        if (viewport != null)
+        {
+            var viewportRect = ComputeRenderedRect(viewport);
+            baselineX += viewportRect.Left;
+            baselineY += viewportRect.Top;
+        }
+
         rect = (baselineX, baselineY - fontSize, width, fontSize);
         return true;
     }
@@ -3919,6 +3950,18 @@ public sealed partial class DomBridge
                 var resolved = ParseCssLengthToPixelsWithViewport(rawValue, current, percentageBasis: percentageBasis);
                 if (resolved > 0 || string.Equals(rawValue?.Trim(), "0", StringComparison.Ordinal))
                     return resolved;
+
+                var scalar = rawValue?
+                    .Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (double.TryParse(
+                    scalar,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var numericValue))
+                {
+                    return numericValue;
+                }
             }
 
             if (IsSvgTextPathElement(current) &&
@@ -3983,6 +4026,17 @@ public sealed partial class DomBridge
         var tag = element.TagName;
         return string.Equals(tag, "textpath", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "svg:textpath", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DomElement? FindNearestSvgViewportAncestor(DomElement element)
+    {
+        for (var current = element.Parent; current != null; current = current.Parent)
+        {
+            if (IsSvgViewportElement(current))
+                return current;
+        }
+
+        return null;
     }
 
     private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
@@ -4055,7 +4109,7 @@ public sealed partial class DomBridge
         const string defaultInline = "nearest";
 
         if (args.Length == 0)
-            return (defaultBlock, defaultInline, null);
+            return (defaultBlock, "start-if-needed", null);
 
         var first = args[0];
         if (first is JSObject options)
@@ -4124,7 +4178,7 @@ public sealed partial class DomBridge
             return fallback;
 
         var normalized = value.Trim().ToLowerInvariant();
-        return normalized is "start" or "center" or "end" or "nearest"
+        return normalized is "start" or "center" or "end" or "nearest" or "start-if-needed" or "end-if-needed"
             ? normalized
             : fallback;
     }
@@ -4163,6 +4217,8 @@ public sealed partial class DomBridge
         {
             "start" => "end",
             "end" => "start",
+            "start-if-needed" => "end-if-needed",
+            "end-if-needed" => "start-if-needed",
             _ => normalized
         };
     }
@@ -4972,6 +5028,11 @@ public sealed partial class DomBridge
         if (targetStart >= visibleStart && targetEnd <= visibleEnd)
             return currentScroll;
 
+        if (normalizedAlignment == "start-if-needed")
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, startTarget, coordinateSpaceIsPhysical);
+        if (normalizedAlignment == "end-if-needed")
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, endTarget, coordinateSpaceIsPhysical);
+
         if (targetSize + marginStart + marginEnd > alignmentViewportSize)
         {
             var chosenTarget = Math.Abs(startTarget - physicalCurrentScroll) <= Math.Abs(endTarget - physicalCurrentScroll)
@@ -5439,7 +5500,23 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
         var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element);
-        return fontSize > 0 ? fontSize : 16;
+        if (fontSize > 0)
+            return fontSize;
+
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (!current.Attributes.TryGetValue("font-size", out var attributeValue) ||
+                string.IsNullOrWhiteSpace(attributeValue))
+            {
+                continue;
+            }
+
+            var attributeFontSize = ParseCssLengthToPixelsWithViewport(attributeValue, current);
+            if (attributeFontSize > 0)
+                return attributeFontSize;
+        }
+
+        return 16;
     }
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
@@ -5452,6 +5529,14 @@ public sealed partial class DomBridge
 
     private void InvalidateCachedSubDocument(DomElement containerElement)
     {
+        var existingDocRoot = containerElement.Children.FirstOrDefault(child =>
+            string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        if (existingDocRoot != null)
+        {
+            RemoveElementsRecursive(existingDocRoot);
+            containerElement.Children.Remove(existingDocRoot);
+        }
+
         _subDocumentCache.Remove(containerElement);
         _subWindowCache.Remove(containerElement);
         _subDocumentLocationCache.Remove(containerElement);
@@ -5940,7 +6025,9 @@ public sealed partial class DomBridge
             return;
 
         var extraction = new ScriptExtractor().ExtractAll(html, GetSubDocumentBaseUrl(containerElement));
-        if (extraction.Scripts.Count == 0 && extraction.DeferredScripts.Count == 0)
+        if (extraction.Scripts.Count == 0 &&
+            extraction.AsyncScripts.Count == 0 &&
+            extraction.DeferredScripts.Count == 0)
             return;
 
         var subDocument = GetOrCreateSubDocument(containerElement);
@@ -5971,6 +6058,19 @@ public sealed partial class DomBridge
             _jsContext["top"] = _windowJSObject ?? subWindow;
 
             foreach (var script in extraction.Scripts)
+            {
+                try
+                {
+                    _jsContext.Eval(script);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                        $"Sub-document script error: {ex.Message}", ex);
+                }
+            }
+
+            foreach (var script in extraction.AsyncScripts)
             {
                 try
                 {
@@ -6319,6 +6419,9 @@ public sealed partial class DomBridge
         var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
         docRoot.Parent = containerElement;
 
+        if (!Regex.IsMatch(html, @"<\s*html(?=[\s>/])", RegexOptions.IgnoreCase))
+            html = BuildInnerHtmlParsingDocument("body", html);
+
         var builder = new HtmlTreeBuilder();
         var (parsedRoot, allElements, _) = builder.Build(html);
 
@@ -6355,6 +6458,110 @@ public sealed partial class DomBridge
         foreach (var child in element.Children)
             AddElementsRecursive(child);
     }
+
+    private void RemoveElementsRecursive(DomElement element)
+    {
+        _elements.Remove(element);
+        _jsObjectCache.Remove(element);
+        _styleSheetCache.Remove(element);
+
+        foreach (var child in element.Children)
+            RemoveElementsRecursive(child);
+    }
+
+    private void SetElementInnerHtml(DomElement element, string html)
+    {
+        html ??= string.Empty;
+        element.InnerHtml = html;
+        element.TextContent = null;
+
+        if (element.IsTextNode)
+        {
+            element.TextContent = html;
+            return;
+        }
+
+        foreach (var child in element.Children.ToArray())
+            RemoveElementsRecursive(child);
+
+        element.Children.Clear();
+
+        if (!string.IsNullOrEmpty(html) &&
+            TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
+        {
+            foreach (var child in fragmentContainer.Children.ToArray())
+            {
+                child.Parent = element;
+                AdoptSubtreeIntoDocument(child, element.OwnerDocRoot);
+                element.Children.Add(child);
+                AddElementsRecursive(child);
+            }
+        }
+
+        ExtractStyleBlocks(SerializeToHtml());
+        InvalidateStyleScope(element);
+    }
+
+    private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
+    {
+        container = null!;
+
+        var contextTag = contextElement.TagName.ToLowerInvariant();
+        if (IsVoidHtmlElementTag(contextTag))
+            return false;
+
+        var builder = new HtmlTreeBuilder();
+        var (parsedRoot, _, _) = builder.Build(BuildInnerHtmlParsingDocument(contextTag, html));
+        var head = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase));
+        var body = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase));
+
+        container = contextTag switch
+        {
+            "html" => parsedRoot,
+            "head" => head ?? parsedRoot,
+            "body" => body ?? parsedRoot,
+            "table" or "thead" or "tbody" or "tfoot" or "tr" or "td" or "th" or "colgroup" or "caption" or "select" or "template" =>
+                FindFirstElementByTag(body ?? parsedRoot, contextTag),
+            _ => body?.Children.FirstOrDefault() ?? FindFirstElementByTag(parsedRoot, contextTag)
+        } ?? parsedRoot;
+
+        return true;
+    }
+
+    private static string BuildInnerHtmlParsingDocument(string contextTag, string html) => contextTag switch
+    {
+        "html" => $"<html>{html}</html>",
+        "head" => $"<html><head>{html}</head><body></body></html>",
+        "body" => $"<html><head></head><body>{html}</body></html>",
+        "table" => $"<html><head></head><body><table>{html}</table></body></html>",
+        "thead" or "tbody" or "tfoot" => $"<html><head></head><body><table><{contextTag}>{html}</{contextTag}></table></body></html>",
+        "tr" => $"<html><head></head><body><table><tbody><tr>{html}</tr></tbody></table></body></html>",
+        "td" or "th" => $"<html><head></head><body><table><tbody><tr><{contextTag}>{html}</{contextTag}></tr></tbody></table></body></html>",
+        "colgroup" => $"<html><head></head><body><table><colgroup>{html}</colgroup></table></body></html>",
+        "caption" => $"<html><head></head><body><table><caption>{html}</caption></table></body></html>",
+        "select" => $"<html><head></head><body><select>{html}</select></body></html>",
+        "template" => $"<html><head></head><body><template>{html}</template></body></html>",
+        _ => $"<html><head></head><body><{contextTag}>{html}</{contextTag}></body></html>"
+    };
+
+    private static DomElement? FindFirstElementByTag(DomElement root, string tag)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+                return child;
+
+            var match = FindFirstElementByTag(child, tag);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static bool IsVoidHtmlElementTag(string tag) => tag is
+        "area" or "base" or "br" or "col" or "embed" or "hr" or "img" or
+        "input" or "link" or "meta" or "param" or "source" or "track" or "wbr";
 
     /// <summary>
     /// Builds a sub-document tree from XML/SVG/XHTML content using an XML parser.
@@ -7552,13 +7759,14 @@ public sealed partial class DomBridge
             hits.Add(element);
     }
 
+
     private bool IsElementHitTestCandidate(DomElement element, double x, double y)
     {
-        if (!IsElementRenderedForHitTesting(element))
-            return false;
-
         if (IsAreaElement(element))
             return IsImageMapAreaHit(element, x, y);
+
+        if (!IsElementRenderedForHitTesting(element))
+            return false;
 
         if (IsTableStructuralHitTestOnlyElement(element))
             return false;
@@ -7604,16 +7812,14 @@ public sealed partial class DomBridge
             return svgTextRect;
         }
 
-        var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
-        var documentElement = GetOwningDocumentElement(element);
-        if (!IsViewportBodyElement(element, documentElement))
-            return rect;
+        if (IsSvgTextContentElement(element) &&
+            TryGetSvgChildrenUnionRect(element, out var svgTextChildrenRect))
+        {
+            return svgTextChildrenRect;
+        }
 
-        return (
-            rect.Left,
-            rect.Top,
-            Math.Max(rect.Width, GetScrollWidthForDomElement(element, isRoot: false)),
-            Math.Max(rect.Height, GetScrollHeightForDomElement(element, isRoot: false)));
+        var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
+        return rect;
     }
 
     private static bool IsTableCellElement(DomElement element)
