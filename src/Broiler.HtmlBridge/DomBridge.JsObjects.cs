@@ -4063,7 +4063,7 @@ public sealed partial class DomBridge
         const string defaultInline = "nearest";
 
         if (args.Length == 0)
-            return (defaultBlock, defaultInline, null);
+            return (defaultBlock, "start-if-needed", null);
 
         var first = args[0];
         if (first is JSObject options)
@@ -4132,7 +4132,7 @@ public sealed partial class DomBridge
             return fallback;
 
         var normalized = value.Trim().ToLowerInvariant();
-        return normalized is "start" or "center" or "end" or "nearest"
+        return normalized is "start" or "center" or "end" or "nearest" or "start-if-needed" or "end-if-needed"
             ? normalized
             : fallback;
     }
@@ -4171,6 +4171,8 @@ public sealed partial class DomBridge
         {
             "start" => "end",
             "end" => "start",
+            "start-if-needed" => "end-if-needed",
+            "end-if-needed" => "start-if-needed",
             _ => normalized
         };
     }
@@ -4979,6 +4981,11 @@ public sealed partial class DomBridge
 
         if (targetStart >= visibleStart && targetEnd <= visibleEnd)
             return currentScroll;
+
+        if (normalizedAlignment == "start-if-needed")
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, startTarget, coordinateSpaceIsPhysical);
+        if (normalizedAlignment == "end-if-needed")
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, endTarget, coordinateSpaceIsPhysical);
 
         if (targetSize + marginStart + marginEnd > alignmentViewportSize)
         {
