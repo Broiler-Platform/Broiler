@@ -34,8 +34,8 @@ public partial class JSJSON : JSObject
             return JSJsonParser.Parse(text.ToString(), null) ?? JSNull.Value;
 
         var t = a.This;
-        var context = JSEngine.Current as JSContext;
-        if (context == null || !context.HasExperimentalFeature(JavaScriptFeatureFlags.JsonParseSourceTextAccess))
+        if (JSEngine.Current is not JSContext context ||
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.JsonParseSourceTextAccess))
         {
             return JSJsonParser.Parse(text.ToString(),
                 p => function.f(new Arguments(t, new JSString(p.key), p.value))) ?? JSNull.Value;
