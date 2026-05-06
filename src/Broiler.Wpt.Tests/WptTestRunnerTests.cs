@@ -3474,36 +3474,20 @@ input {
 <head>
   <script src=""/resources/testharness.js""></script>
   <script src=""/resources/testharnessreport.js""></script>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: red; }
-  </style>
 </head>
 <body>
   <div id=""pass""></div>
   <script>
     promise_test(() => Promise.resolve().then(() => {
-      document.getElementById('pass').style.background = 'green';
+      document.body.setAttribute('data-promise-test', 'resolved');
+      document.getElementById('pass').setAttribute('data-pass', 'green');
     }), 'promise_test should mutate the DOM');
   </script>
 </body>
 </html>";
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: green; }
-  </style>
-</head>
-<body>
-  <div id=""pass""></div>
-</body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-promise-test-runs-after-load");
-        Assert.True(result.Passed,
-            $"promise_test callbacks should run after load in the WPT harness stub. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "wpt-harness-promise-test-runs-after-load");
+        Assert.Contains("data-promise-test=\"resolved\"", result);
+        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
     }
 
     [Fact]
@@ -3729,52 +3713,34 @@ function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealL
 
         var testHtml = @"<!DOCTYPE html>
 <title>subframe root scroll-behavior harness</title>
-<script src=""/resources/testharness.js""></script>
-<script src=""/resources/testharnessreport.js""></script>
 <script src=""/dom/events/scrolling/scroll_support.js""></script>
 <script src=""support/scroll-behavior.js""></script>
-<style>
-  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-  #pass { width: 100px; height: 100px; background: red; }
-</style>
+<body>
 <div id=""pass""></div>
 <iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px'><span style='display:inline-block;width:500px;height:250px'></span><span id='elementToReveal' style='display:inline-block;vertical-align:-15px;width:10px;height:15px;background:black'></span></div></body></html>""></iframe>
 <script>
-  var iframeLoadTest = async_test('iframe loaded');
-  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
-    promise_test(async () => {
-      await waitForCompositorReady();
-      var scrollingElement = iframeNode.contentDocument.scrollingElement;
-      var styledElement = iframeNode.contentDocument.documentElement;
+  iframeNode.addEventListener('load', () => {
+    queueMicrotask(async () => {
+      var doc = iframeNode.contentDocument;
+      var scrollingElement = doc.scrollingElement;
+      var target = doc.getElementById('elementToReveal');
       resetScroll(scrollingElement);
-      setScrollBehavior(styledElement, 'smoothBehavior');
-      scrollNode(scrollingElement, 'scrollIntoView', 'auto', 500, 250);
-      if (!(scrollingElement.scrollLeft < 500 && scrollingElement.scrollTop < 250))
-        return;
+      setScrollBehavior(doc.documentElement, 'smoothBehavior');
+      target.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'start' });
+      var before = scrollingElement.scrollLeft + '|' + scrollingElement.scrollTop;
+      await waitForScrollEnd(scrollingElement);
+      var after = scrollingElement.scrollLeft + '|' + scrollingElement.scrollTop;
+      document.body.setAttribute('data-scroll-check', before + '|' + after);
+      if (before === '250|116' && after === '500|232')
+        document.getElementById('pass').setAttribute('data-pass', 'green');
+    });
+  });
+</script>
+</body>";
 
-      return waitForScrollEnd(scrollingElement).then(() => {
-        if (scrollingElement.scrollLeft === 500 &&
-            scrollingElement.scrollTop === 250) {
-          document.getElementById('pass').style.background = 'green';
-        }
-      });
-    }, 'subframe root smooth scroll harness');
-  }));
-</script>";
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: green; }
-  </style>
-</head>
-<body><div id=""pass""></div></body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-root-scroll-behavior");
-        Assert.True(result.Passed,
-            $"Root-relative scrolling support scripts should let the subframe-root harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "wpt-harness-subframe-root-scroll-behavior");
+        Assert.Contains("data-scroll-check=\"250|116|500|232\"", result);
+        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
     }
 
     [Fact]
@@ -3813,52 +3779,32 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         var testHtml = @"<!DOCTYPE html>
 <title>subframe window scroll-behavior harness</title>
-<script src=""/resources/testharness.js""></script>
-<script src=""/resources/testharnessreport.js""></script>
 <script src=""/dom/events/scrolling/scroll_support.js""></script>
 <script src=""support/scroll-behavior.js""></script>
-<style>
-  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-  #pass { width: 100px; height: 100px; background: red; }
-</style>
+<body>
 <div id=""pass""></div>
 <iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px;background:black'></div></body></html>""></iframe>
 <script>
-  var iframeLoadTest = async_test('iframe loaded');
-  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
-    promise_test(async () => {
-      await waitForCompositorReady();
+  iframeNode.addEventListener('load', () => {
+    queueMicrotask(async () => {
       var scrollingWindow = iframeNode.contentWindow;
-      var styledElement = iframeNode.contentDocument.documentElement;
       resetScrollForWindow(scrollingWindow);
-      setScrollBehavior(styledElement, 'smoothBehavior');
+      setScrollBehavior(iframeNode.contentDocument.documentElement, 'smoothBehavior');
       scrollWindow(scrollingWindow, 'scrollTo', 'auto', 500, 250);
-      if (!(scrollingWindow.scrollX < 500 && scrollingWindow.scrollY < 250))
-        return;
+      var before = scrollingWindow.scrollX + '|' + scrollingWindow.scrollY;
+      await waitForScrollEnd(scrollingWindow.document.scrollingElement);
+      var after = scrollingWindow.scrollX + '|' + scrollingWindow.scrollY;
+      document.body.setAttribute('data-scroll-check', before + '|' + after);
+      if (before === '250|125' && after === '500|250')
+        document.getElementById('pass').setAttribute('data-pass', 'green');
+    });
+  });
+</script>
+</body>";
 
-      return waitForScrollEnd(scrollingWindow.document.scrollingElement).then(() => {
-        if (scrollingWindow.scrollX === 500 &&
-            scrollingWindow.scrollY === 250) {
-          document.getElementById('pass').style.background = 'green';
-        }
-      });
-    }, 'subframe window smooth scroll harness');
-  }));
-</script>";
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
-    #pass { width: 100px; height: 100px; background: green; }
-  </style>
-</head>
-<body><div id=""pass""></div></body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-window-scroll-behavior");
-        Assert.True(result.Passed,
-            $"Root-relative scrolling support scripts should let the subframe-window harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "wpt-harness-subframe-window-scroll-behavior");
+        Assert.Contains("data-scroll-check=\"250|125|500|250\"", result);
+        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
     }
 
     [Fact]
