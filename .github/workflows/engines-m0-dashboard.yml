@@ -91,6 +91,7 @@ jobs:
           mkdir -p tests/m2-conformance/ci/html-css-targeted
           python3 - <<'PY'
           from pathlib import Path
+          import textwrap
           import xml.etree.ElementTree as ET
 
           trx_files = list(Path("src/Broiler.Cli.Tests/TestResults").rglob("html-css-targeted.trx"))
@@ -110,7 +111,8 @@ jobs:
           not_executed = int(counters.attrib.get("notExecuted", "0"))
           pass_rate = (passed / executed * 100.0) if executed else 0.0
 
-          summary = f"""# HTML/CSS targeted conformance
+          summary = textwrap.dedent(f"""
+          ## HTML/CSS targeted conformance
 
           | Metric | Value |
           |---|---:|
@@ -130,7 +132,7 @@ jobs:
           - `Broiler.Cli.Tests.Acid3SpecialRegressionTests`
           - `Broiler.Cli.Tests.Acid3CssSelectorRegressionTests`
           - `Broiler.Cli.Tests.SelectorsLevel4SpecificityTests`
-          """
+          """).strip() + "\n"
 
           Path("tests/m2-conformance/ci/html-css-targeted/html-css-targeted-summary.md").write_text(summary)
           PY
