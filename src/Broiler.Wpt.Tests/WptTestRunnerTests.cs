@@ -8400,6 +8400,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             })()
             """);
 
+        // With only { behavior: 'auto' }, scrollIntoView() keeps the default
+        // inline-nearest behavior, so the subframe root only scrolls far enough
+        // to reveal the target horizontally while still animating the block axis.
         Assert.Equal("55|125|true|true", beforeFlush.ToString());
 
         bridge.FlushTimerStep();
@@ -8737,6 +8740,10 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </body>
 </html>";
 
+        // The bridge-side visual viewport and fixed-scroller state is already
+        // covered directly in CLI serialization tests; keep this WPT guard
+        // focused on the harness-side execution state instead of native control
+        // pixel output.
         var result = RunTempScriptExecution(testHtml, "visual-scroll-into-view-002");
         Assert.Contains("data-debug=\"1000|1000|1384|2|210.4000000000001|0\"", result);
         Assert.Contains("id=\"fixed\"", result);
