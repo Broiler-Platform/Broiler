@@ -2764,6 +2764,8 @@ public sealed partial class DomBridge
                                     self.response = bodyValue;
                                     self.responseText = '';
                                 } else {
+                                    // For the default/text response types, XHR exposes the
+                                    // same textual payload via both response and responseText.
                                     self.response = bodyValue;
                                     self.responseText = '' + bodyValue;
                                 }
