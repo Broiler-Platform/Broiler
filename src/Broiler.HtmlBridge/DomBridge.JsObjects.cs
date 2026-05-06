@@ -7748,11 +7748,11 @@ public sealed partial class DomBridge
 
     private bool IsElementHitTestCandidate(DomElement element, double x, double y)
     {
-        if (!IsElementRenderedForHitTesting(element))
-            return false;
-
         if (IsAreaElement(element))
             return IsImageMapAreaHit(element, x, y);
+
+        if (!IsElementRenderedForHitTesting(element))
+            return false;
 
         if (IsTableStructuralHitTestOnlyElement(element))
             return false;
