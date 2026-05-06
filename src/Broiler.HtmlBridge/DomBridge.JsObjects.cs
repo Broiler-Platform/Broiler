@@ -3893,6 +3893,14 @@ public sealed partial class DomBridge
                 baselineY = pathStart.Y;
         }
 
+        var viewport = FindNearestSvgViewportAncestor(element);
+        if (viewport != null)
+        {
+            var viewportRect = ComputeRenderedRect(viewport);
+            baselineX += viewportRect.Left;
+            baselineY += viewportRect.Top;
+        }
+
         rect = (baselineX, baselineY - fontSize, width, fontSize);
         return true;
     }
@@ -3927,6 +3935,18 @@ public sealed partial class DomBridge
                 var resolved = ParseCssLengthToPixelsWithViewport(rawValue, current, percentageBasis: percentageBasis);
                 if (resolved > 0 || string.Equals(rawValue?.Trim(), "0", StringComparison.Ordinal))
                     return resolved;
+
+                var scalar = rawValue?
+                    .Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (double.TryParse(
+                    scalar,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var numericValue))
+                {
+                    return numericValue;
+                }
             }
 
             if (IsSvgTextPathElement(current) &&
@@ -3991,6 +4011,17 @@ public sealed partial class DomBridge
         var tag = element.TagName;
         return string.Equals(tag, "textpath", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "svg:textpath", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DomElement? FindNearestSvgViewportAncestor(DomElement element)
+    {
+        for (var current = element.Parent; current != null; current = current.Parent)
+        {
+            if (IsSvgViewportElement(current))
+                return current;
+        }
+
+        return null;
     }
 
     private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
@@ -5454,7 +5485,23 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
         var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element);
-        return fontSize > 0 ? fontSize : 16;
+        if (fontSize > 0)
+            return fontSize;
+
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (!current.Attributes.TryGetValue("font-size", out var attributeValue) ||
+                string.IsNullOrWhiteSpace(attributeValue))
+            {
+                continue;
+            }
+
+            var attributeFontSize = ParseCssLengthToPixelsWithViewport(attributeValue, current);
+            if (attributeFontSize > 0)
+                return attributeFontSize;
+        }
+
+        return 16;
     }
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
@@ -7736,6 +7783,12 @@ public sealed partial class DomBridge
             TryGetSvgTextHitTestRect(element, out var svgTextRect))
         {
             return svgTextRect;
+        }
+
+        if (IsSvgTextContentElement(element) &&
+            TryGetSvgChildrenUnionRect(element, out var svgTextChildrenRect))
+        {
+            return svgTextChildrenRect;
         }
 
         var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
