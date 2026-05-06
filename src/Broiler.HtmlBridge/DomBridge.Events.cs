@@ -38,6 +38,8 @@ public sealed partial class DomBridge
     private static bool HasMatchingEventListener(
         List<EventListenerRegistration> listeners,
         EventListenerRegistration candidate)
+        // Callers pass the registrations already scoped to a single event type,
+        // so the DOM duplicate-registration check only needs listener/capture.
         => listeners.Any(existing =>
             existing.Listener == candidate.Listener &&
             existing.Capture == candidate.Capture);
