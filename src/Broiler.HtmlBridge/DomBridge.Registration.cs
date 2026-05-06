@@ -1850,12 +1850,15 @@ public sealed partial class DomBridge
 
             return CreateResponse(body, status, statusText, url, type, redirected, headers);
         }, "Response", 2);
+        var messageChannelCtor = new JSFunction((in Arguments _) => CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["Headers"] = headersCtor;
         context["Request"] = requestCtor;
         context["Response"] = responseCtor;
+        context["MessageChannel"] = messageChannelCtor;
 
         // fetch(url, options) — polyfill backed by HttpClient with headers, method support
         var fetchFn = new JSFunction((in Arguments a) =>
@@ -2103,6 +2106,7 @@ public sealed partial class DomBridge
             navigatorObj,
             JSPropertyAttributes.EnumerableConfigurableValue);
         context["navigator"] = navigatorObj;
+        context["postMessage"] = window[(KeyString)"postMessage"];
 
         // TODO-G4: window.innerWidth / innerHeight
         var vpWidth = _viewportWidth;
@@ -2223,6 +2227,7 @@ public sealed partial class DomBridge
                 return DispatchWindowEvent(evt);
             }, "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        RegisterWindowMessaging(window);
         window.FastAddProperty(
             (KeyString)"frames",
             new JSFunction((in Arguments _) => BuildWindowFramesArray(), "get frames"),

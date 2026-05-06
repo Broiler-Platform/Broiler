@@ -5709,6 +5709,10 @@ public sealed partial class DomBridge
         var subDocument = GetOrCreateSubDocument(containerElement);
         var subWindow = new JSObject();
         _subWindowCache[containerElement] = subWindow;
+        _subWindowContainers[subWindow] = containerElement;
+        _eventTargetOwnerWindows[subWindow] = subWindow;
+        InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
+        RegisterWindowMessaging(subWindow);
 
         subWindow.FastAddProperty(
             (KeyString)"document",
@@ -5813,6 +5817,8 @@ public sealed partial class DomBridge
             subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         if (_jsContext?["UIEvent"] is { } uiEventCtor)
             subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["MessageChannel"] is { } messageChannelCtor)
+            subWindow.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
@@ -6040,8 +6046,10 @@ public sealed partial class DomBridge
         JSValue? previousDocument = null;
         JSValue? previousLocation = null;
         JSValue? previousParent = null;
+        JSValue? previousPostMessage = null;
         JSValue? previousSelf = null;
         JSValue? previousTop = null;
+        var previousCurrentWindow = _currentWindowOverride;
 
         try
         {
@@ -6049,6 +6057,7 @@ public sealed partial class DomBridge
             previousDocument = _jsContext.Eval("typeof document === 'undefined' ? undefined : document");
             previousLocation = _jsContext.Eval("typeof location === 'undefined' ? undefined : location");
             previousParent = _jsContext.Eval("typeof parent === 'undefined' ? undefined : parent");
+            previousPostMessage = _jsContext.Eval("typeof postMessage === 'undefined' ? undefined : postMessage");
             previousSelf = _jsContext.Eval("typeof self === 'undefined' ? undefined : self");
             previousTop = _jsContext.Eval("typeof top === 'undefined' ? undefined : top");
 
@@ -6056,8 +6065,10 @@ public sealed partial class DomBridge
             _jsContext["document"] = subDocument;
             _jsContext["location"] = location;
             _jsContext["parent"] = GetParentWindowForSubDocument(containerElement) ?? JSUndefined.Value;
+            _jsContext["postMessage"] = subWindow[(KeyString)"postMessage"] ?? JSUndefined.Value;
             _jsContext["self"] = subWindow;
             _jsContext["top"] = _windowJSObject ?? subWindow;
+            _currentWindowOverride = subWindow;
 
             foreach (var script in extraction.Scripts)
             {
@@ -6104,8 +6115,10 @@ public sealed partial class DomBridge
             _jsContext["document"] = previousDocument ?? JSUndefined.Value;
             _jsContext["location"] = previousLocation ?? JSUndefined.Value;
             _jsContext["parent"] = previousParent ?? JSUndefined.Value;
+            _jsContext["postMessage"] = previousPostMessage ?? JSUndefined.Value;
             _jsContext["self"] = previousSelf ?? JSUndefined.Value;
             _jsContext["top"] = previousTop ?? JSUndefined.Value;
+            _currentWindowOverride = previousCurrentWindow;
         }
     }
 

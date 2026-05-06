@@ -58,6 +58,17 @@ public sealed partial class DomBridge
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<JSObject, Dictionary<string, List<EventListenerRegistration>>> _eventTargetListeners =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, DomElement> _subWindowContainers =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, JSObject> _messagePortPeers =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly HashSet<JSObject> _closedMessagePorts =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
     private double _visualViewportPageTopOffset;
