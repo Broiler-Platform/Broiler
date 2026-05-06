@@ -284,6 +284,43 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void AddEventListener_Duplicate_Registration_Is_Ignored_For_Element_Document_And_Window()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+var elementCount = 0;
+var documentCount = 0;
+var windowCount = 0;
+function onElement() { elementCount++; }
+function onDocument() { documentCount++; }
+function onWindow() { windowCount++; }
+target.addEventListener('test', onElement, false);
+target.addEventListener('test', onElement, false);
+document.addEventListener('test', onDocument, false);
+document.addEventListener('test', onDocument, false);
+window.addEventListener('test', onWindow, false);
+window.addEventListener('test', onWindow, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+target.dispatchEvent(evt);
+var winEvt = document.createEvent('Event');
+winEvt.initEvent('test', false, false);
+window.dispatchEvent(winEvt);
+document.getElementById('result').textContent = [elementCount, documentCount, windowCount].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">1,1,1<", result);
+    }
+
+    [Fact]
     public void Focus_And_Blur_Do_Not_Bubble()
     {
         var html = @"<!DOCTYPE html>
@@ -514,6 +551,37 @@ document.getElementById('result').textContent = [
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains(">false,true,false<", result);
+    }
+
+    [Fact]
+    public void DispatchEvent_Resets_CurrentTarget_And_EventPhase_After_Dispatch()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+target.addEventListener('test', function() {}, false);
+target.dispatchEvent(evt);
+var winEvt = document.createEvent('Event');
+winEvt.initEvent('test', false, false);
+window.addEventListener('test', function() {}, false);
+window.dispatchEvent(winEvt);
+document.getElementById('result').textContent = [
+    evt.currentTarget === null,
+    evt.eventPhase,
+    winEvt.currentTarget === null,
+    winEvt.eventPhase
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">true,0,true,0<", result);
     }
 
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
