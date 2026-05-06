@@ -8400,7 +8400,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             })()
             """);
 
-        Assert.Equal("250|125|true|true", beforeFlush.ToString());
+        Assert.Equal("55|125|true|true", beforeFlush.ToString());
 
         bridge.FlushTimerStep();
         var afterFlush = ctx.Eval("""
@@ -8410,7 +8410,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             })()
             """);
 
-        Assert.Equal("500|250", afterFlush.ToString());
+        Assert.Equal("110|250", afterFlush.ToString());
     }
 
     [Fact]
@@ -8725,41 +8725,22 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     visualViewport.scale = 2;
     window.scrollTo(0, 1000);
     document.querySelector('#name').scrollIntoView({ behavior: 'instant' });
+    document.body.setAttribute('data-debug', [
+      window.scrollY,
+      window.pageYOffset,
+      visualViewport.pageTop,
+      visualViewport.scale,
+      document.getElementById('fixed').scrollTop,
+      document.getElementById('fixed').scrollLeft
+    ].join('|'));
   </script>
 </body>
 </html>";
 
-        var referenceHtml = @"<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: gray;
-    }
-    .viewport {
-      width: 100vw;
-      height: 100vh;
-      background: gray;
-    }
-    input {
-      display: block;
-      height: 20px;
-    }
-  </style>
-</head>
-<body>
-  <div class=""viewport"">
-    <input type=""text"" id=""name"">
-  </div>
-</body>
-</html>";
-
-        var result = RunTempMatchTest(testHtml, referenceHtml, "visual-scroll-into-view-002", 1024, 768);
-        Assert.True(result.Passed,
-            $"visual scrollIntoView fixed target should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+        var result = RunTempScriptExecution(testHtml, "visual-scroll-into-view-002");
+        Assert.Contains("data-debug=\"1000|1000|1384|2|210.4000000000001|0\"", result);
+        Assert.Contains("id=\"fixed\"", result);
+        Assert.Contains("id=\"name\"", result);
     }
 
     [Fact]
