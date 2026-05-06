@@ -25,6 +25,10 @@ public sealed partial class DomBridge
     private const int MaxScrollContinuationDepth = 16;
 
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
+    private int _transientLayoutCacheDepth;
+    private Dictionary<DomElement, (double Left, double Top, double Width, double Height)>? _transientRenderedRectCache;
+    private Dictionary<DomElement, (double Left, double Top, double Width, double Height)>? _transientUnzoomedLayoutRectCache;
+    private Dictionary<(DomElement Element, bool Vertical), double>? _transientContentExtentCache;
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
     private int _topLayerCounter;
 
@@ -3027,6 +3031,12 @@ public sealed partial class DomBridge
 
     private double ResolveContentBoxExtent(DomElement element, bool vertical)
     {
+        if (_transientContentExtentCache != null &&
+            _transientContentExtentCache.TryGetValue((element, vertical), out var cachedExtent))
+        {
+            return cachedExtent;
+        }
+
         if (!_contentExtentInProgress.Add((element, vertical)))
             return 0;
 
@@ -3039,13 +3049,21 @@ public sealed partial class DomBridge
                 element,
                 percentageBasis: percentageBasis);
             if (specified > 0)
+            {
+                _transientContentExtentCache?[(element, vertical)] = specified;
                 return specified;
+            }
 
             var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
             if (svgLength > 0)
+            {
+                _transientContentExtentCache?[(element, vertical)] = svgLength;
                 return svgLength;
+            }
 
-            return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+            var extent = EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+            _transientContentExtentCache?[(element, vertical)] = extent;
+            return extent;
         }
         finally
         {
@@ -3498,14 +3516,28 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeRenderedRect(DomElement element)
     {
+        if (_transientRenderedRectCache != null &&
+            _transientRenderedRectCache.TryGetValue(element, out var cachedRect))
+        {
+            return cachedRect;
+        }
+
         var layoutRect = ComputeUnzoomedLayoutRect(element);
         var zoom = GetUsedZoomForElement(element);
         var transformScale = GetTransformScale(element);
-        return (layoutRect.Left, layoutRect.Top, layoutRect.Width * zoom * transformScale, layoutRect.Height * zoom * transformScale);
+        var renderedRect = (layoutRect.Left, layoutRect.Top, layoutRect.Width * zoom * transformScale, layoutRect.Height * zoom * transformScale);
+        _transientRenderedRectCache?[element] = renderedRect;
+        return renderedRect;
     }
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
+        if (_transientUnzoomedLayoutRectCache != null &&
+            _transientUnzoomedLayoutRectCache.TryGetValue(element, out var cachedRect))
+        {
+            return cachedRect;
+        }
+
         var props = GetComputedProps(element);
         var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
         var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
@@ -3528,7 +3560,11 @@ public sealed partial class DomBridge
         }
 
         if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
-            return (0, 0, width, height);
+        {
+            var rootRect = (0d, 0d, width, height);
+            _transientUnzoomedLayoutRectCache?[element] = rootRect;
+            return rootRect;
+        }
 
         if (string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
         {
@@ -3536,7 +3572,9 @@ public sealed partial class DomBridge
             var specifiedMarginLeft = props.GetValueOrDefault("margin-left");
             var bodyMarginTop = HasExplicitBodyMargin(specifiedMarginTop) ? marginTop : DefaultBodyMarginPixels;
             var bodyMarginLeft = HasExplicitBodyMargin(specifiedMarginLeft) ? marginLeft : DefaultBodyMarginPixels;
-            return (bodyMarginLeft, bodyMarginTop, width, height);
+            var bodyRect = (bodyMarginLeft, bodyMarginTop, width, height);
+            _transientUnzoomedLayoutRectCache?[element] = bodyRect;
+            return bodyRect;
         }
 
         var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
@@ -3588,7 +3626,9 @@ public sealed partial class DomBridge
         resolvedTop += translateY;
         resolvedLeft += translateX;
 
-        return (resolvedLeft, resolvedTop, width, height);
+        var rect = (resolvedLeft, resolvedTop, width, height);
+        _transientUnzoomedLayoutRectCache?[element] = rect;
+        return rect;
     }
 
     private double GetNormalFlowHeightContribution(
@@ -7698,26 +7738,59 @@ public sealed partial class DomBridge
 
     private IReadOnlyList<DomElement> HitTestDocumentPoint(DomElement docRoot, double x, double y)
     {
-        if (!double.IsFinite(x) || !double.IsFinite(y))
-            return Array.Empty<DomElement>();
+        BeginTransientLayoutCache();
+        try
+        {
+            if (!double.IsFinite(x) || !double.IsFinite(y))
+                return Array.Empty<DomElement>();
 
-        var documentElement = IsDocumentElement(docRoot)
-            ? docRoot
-            : docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
-        if (documentElement == null)
-            return Array.Empty<DomElement>();
+            var documentElement = IsDocumentElement(docRoot)
+                ? docRoot
+                : docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+            if (documentElement == null)
+                return Array.Empty<DomElement>();
 
-        if (!DocumentHasViewport(documentElement))
-            return Array.Empty<DomElement>();
+            if (!DocumentHasViewport(documentElement))
+                return Array.Empty<DomElement>();
 
-        var viewportWidth = GetViewportReferenceLength(documentElement, vertical: false);
-        var viewportHeight = GetViewportReferenceLength(documentElement, vertical: true);
-        if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
-            return Array.Empty<DomElement>();
+            var viewportWidth = GetViewportReferenceLength(documentElement, vertical: false);
+            var viewportHeight = GetViewportReferenceLength(documentElement, vertical: true);
+            if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
+                return Array.Empty<DomElement>();
 
-        var hits = new List<DomElement>();
-        CollectHitTestMatches(documentElement, x, y, hits);
-        return hits;
+            var hits = new List<DomElement>();
+            CollectHitTestMatches(documentElement, x, y, hits);
+            return hits;
+        }
+        finally
+        {
+            EndTransientLayoutCache();
+        }
+    }
+
+    private void BeginTransientLayoutCache()
+    {
+        _transientLayoutCacheDepth++;
+        if (_transientLayoutCacheDepth != 1)
+            return;
+
+        _transientRenderedRectCache = [];
+        _transientUnzoomedLayoutRectCache = [];
+        _transientContentExtentCache = [];
+    }
+
+    private void EndTransientLayoutCache()
+    {
+        if (_transientLayoutCacheDepth <= 0)
+            return;
+
+        _transientLayoutCacheDepth--;
+        if (_transientLayoutCacheDepth != 0)
+            return;
+
+        _transientRenderedRectCache = null;
+        _transientUnzoomedLayoutRectCache = null;
+        _transientContentExtentCache = null;
     }
 
     private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)
