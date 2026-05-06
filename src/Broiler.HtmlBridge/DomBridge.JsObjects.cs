@@ -3045,12 +3045,24 @@ public sealed partial class DomBridge
             if (svgLength > 0)
                 return svgLength;
 
+            var replacedElementLength = ResolveReplacedElementAttributeExtent(element, vertical);
+            if (replacedElementLength > 0)
+                return replacedElementLength;
+
             return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
         }
         finally
         {
             _contentExtentInProgress.Remove((element, vertical));
         }
+    }
+
+    private static double ResolveReplacedElementAttributeExtent(DomElement element, bool vertical)
+    {
+        if (!string.Equals(element.TagName, "img", StringComparison.OrdinalIgnoreCase))
+            return 0;
+
+        return ParsePositiveDouble(element.Attributes.GetValueOrDefault(vertical ? "height" : "width"));
     }
 
     private double ResolveBorderBoxExtent(DomElement element, bool vertical)
