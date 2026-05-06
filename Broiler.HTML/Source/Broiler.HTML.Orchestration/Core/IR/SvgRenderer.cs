@@ -193,7 +193,7 @@ internal static class SvgRenderer
         foreach (Match m in Regex.Matches(svgXml, @"<text\s+([^>]*)>(.*?)</text>" ,
             RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
-            if (m.Groups[2].Value.Contains('<'))
+            if (Regex.IsMatch(m.Groups[2].Value, @"<\s*textpath\b", RegexOptions.IgnoreCase))
                 continue;
 
             var attrs = ParseAttributes(m.Groups[1].Value);
