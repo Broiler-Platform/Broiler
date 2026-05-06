@@ -3321,17 +3321,16 @@ public sealed partial class DomBridge
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
             return selectScrollWidth;
 
-        var props = GetComputedProps(element);
         var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
-        var ownZoom = GetUsedZoomForElement(element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
         var maxWidth = ownWidth;
+        var elementRect = ComputeRenderedRect(element);
+        var borderLeft = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("border-left-width"), element);
+        var originLeft = elementRect.Left + borderLeft;
+
         foreach (var child in EnumerateRenderedDescendants(element))
         {
             var childRect = ComputeRenderedRect(child);
-            var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
-            var childOffset = ComputeOffsetWithinAncestor(child, element, vertical: false);
-            maxWidth = Math.Max(maxWidth, childOffset + widthInContainerSpace + trailingPadding);
+            maxWidth = Math.Max(maxWidth, childRect.Left + childRect.Width - originLeft);
         }
 
         return maxWidth;
@@ -3342,17 +3341,16 @@ public sealed partial class DomBridge
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
             return selectScrollHeight;
 
-        var props = GetComputedProps(element);
         var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
-        var ownZoom = GetUsedZoomForElement(element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
         var maxHeight = ownHeight;
+        var elementRect = ComputeRenderedRect(element);
+        var borderTop = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("border-top-width"), element);
+        var originTop = elementRect.Top + borderTop;
+
         foreach (var child in EnumerateRenderedDescendants(element))
         {
             var childRect = ComputeRenderedRect(child);
-            var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
-            var childOffset = ComputeOffsetWithinAncestor(child, element, vertical: true);
-            maxHeight = Math.Max(maxHeight, childOffset + heightInContainerSpace + trailingPadding);
+            maxHeight = Math.Max(maxHeight, childRect.Top + childRect.Height - originTop);
         }
 
         return maxHeight;

@@ -23,6 +23,7 @@ public sealed partial class DomBridge
     private const int MaxCustomPropertyResolutionPasses = 4;
     private int _styleInvalidationBatchDepth;
     private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+    private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsCache = [];
     private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = [];
     private readonly HashSet<(DomElement Element, bool Vertical)> _contentExtentInProgress = [];
 
@@ -801,6 +802,7 @@ public sealed partial class DomBridge
 
     internal void InvalidateStyleScope(DomElement anchor)
     {
+        _computedPropsCache.Clear();
         var docRoot = GetDocumentRootFor(anchor);
         if (_styleInvalidationBatchDepth > 0)
         {

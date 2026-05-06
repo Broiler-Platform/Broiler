@@ -574,6 +574,7 @@ public sealed partial class DomBridge
     {
         _elements.Clear();
         _jsObjectCache.Clear();
+        _computedPropsCache.Clear();
         _documentNode.Children.Clear();
         _serializationTransformsApplied = false;
 
