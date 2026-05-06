@@ -35,6 +35,7 @@ internal static class SvgRenderer
         // Default preserveAspectRatio is "xMidYMid meet" — scale uniformly
         // to fit, then centre in the viewport.
         float sx = 1f, sy = 1f, tx = 0f, ty = 0f;
+        var pathStartsById = new Dictionary<string, PointF>(StringComparer.OrdinalIgnoreCase);
         var svgMatch = Regex.Match(svgXml, @"<svg\s+([^>]*?)\/?>", RegexOptions.IgnoreCase);
         if (svgMatch.Success)
         {
@@ -59,6 +60,17 @@ internal static class SvgRenderer
                     ty = -vbY * scale + (bounds.Height - vbH * scale) / 2f;
                 }
             }
+        }
+
+        foreach (Match m in Regex.Matches(svgXml, @"<path\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        {
+            var attrs = ParseAttributes(m.Groups[1].Value);
+            if (!attrs.TryGetValue("id", out var id) || !attrs.TryGetValue("d", out var pathData))
+                continue;
+
+            var start = TryGetPathStart(pathData);
+            if (start.HasValue)
+                pathStartsById[id] = start.Value;
         }
 
         // <rect ... /> or <rect ...></rect>
@@ -129,10 +141,61 @@ internal static class SvgRenderer
             });
         }
 
+        foreach (Match m in Regex.Matches(svgXml, @"<polygon\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        {
+            var attrs = ParseAttributes(m.Groups[1].Value);
+            items.Add(new DrawSvgPolygonItem
+            {
+                Bounds = bounds,
+                Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
+                Fill = GetColor(attrs, "fill", Color.Black),
+                Stroke = GetColor(attrs, "stroke", Color.Empty),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+            });
+        }
+
+        foreach (Match m in Regex.Matches(svgXml, @"<polyline\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        {
+            var attrs = ParseAttributes(m.Groups[1].Value);
+            items.Add(new DrawSvgPolylineItem
+            {
+                Bounds = bounds,
+                Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
+                Fill = GetColor(attrs, "fill", Color.Empty),
+                Stroke = GetColor(attrs, "stroke", Color.Empty),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+            });
+        }
+
         // <text ...>content</text>
+        foreach (Match m in Regex.Matches(svgXml, @"<text\s+([^>]*)>\s*<textpath\s+([^>]*)>(.*?)</textpath>\s*</text>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        {
+            var attrs = ParseAttributes(m.Groups[1].Value);
+            var textPathAttrs = ParseAttributes(m.Groups[2].Value);
+            if (!textPathAttrs.TryGetValue("href", out var href) || !href.StartsWith("#", StringComparison.Ordinal))
+                continue;
+            if (!pathStartsById.TryGetValue(href[1..], out var start))
+                continue;
+
+            items.Add(new DrawSvgTextItem
+            {
+                Bounds = bounds,
+                X = start.X * sx + tx,
+                Y = start.Y * sy + ty,
+                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
+                FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
+                Fill = GetColor(attrs, "fill", Color.Black),
+                Text = Regex.Replace(m.Groups[3].Value, "<.*?>", string.Empty).Trim(),
+            });
+        }
+
         foreach (Match m in Regex.Matches(svgXml, @"<text\s+([^>]*)>(.*?)</text>" ,
             RegexOptions.IgnoreCase | RegexOptions.Singleline))
         {
+            if (m.Groups[2].Value.Contains('<'))
+                continue;
+
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgTextItem
             {
@@ -145,6 +208,37 @@ internal static class SvgRenderer
                 Text = m.Groups[2].Value.Trim(),
             });
         }
+    }
+
+    private static PointF? TryGetPathStart(string pathData)
+    {
+        var match = Regex.Match(pathData, @"M\s*(?<x>-?\d*\.?\d+)\s*,?\s*(?<y>-?\d*\.?\d+)", RegexOptions.IgnoreCase);
+        if (!match.Success ||
+            !float.TryParse(match.Groups["x"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+            !float.TryParse(match.Groups["y"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            return null;
+        }
+
+        return new PointF(x, y);
+    }
+
+    private static List<PointF> ParsePoints(string value, float sx, float sy, float tx, float ty)
+    {
+        var points = new List<PointF>();
+        var numbers = Regex.Matches(value, @"-?\d*\.?\d+(?:[eE][+-]?\d+)?");
+        for (var i = 0; i + 1 < numbers.Count; i += 2)
+        {
+            if (!float.TryParse(numbers[i].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+                !float.TryParse(numbers[i + 1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+            {
+                continue;
+            }
+
+            points.Add(new PointF(x * sx + tx, y * sy + ty));
+        }
+
+        return points;
     }
 
     private static Dictionary<string, string> ParseAttributes(string attrStr)
