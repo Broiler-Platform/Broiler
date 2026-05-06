@@ -165,7 +165,14 @@ internal static partial class Program
 
                 if (asyncCompletion is not null)
                 {
-                    await asyncCompletion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                    try
+                    {
+                        await asyncCompletion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        throw new TimeoutException($"Timed out waiting for async Test262 case '{testCase.Id}' to call $DONE.", ex);
+                    }
                 }
             }
             catch (Exception ex)

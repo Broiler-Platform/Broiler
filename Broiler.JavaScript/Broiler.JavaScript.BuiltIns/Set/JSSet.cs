@@ -61,7 +61,7 @@ public partial class JSSet : JSObject
         if (index.TryGetValue(in uk, out var i))
         {
             store.Remove(i);
-            RebuildIndex();
+            index.TryRemove(uk.Value, out _);
             return JSBoolean.True;
         }
 
@@ -81,18 +81,8 @@ public partial class JSSet : JSObject
             return false;
 
         store.Remove(node);
-        RebuildIndex();
+        index.TryRemove(uk.Value, out _);
         return true;
-    }
-
-    private void RebuildIndex()
-    {
-        index = new();
-        for (var node = store.First; node != null; node = node.Next)
-        {
-            HashedString uk = node.Value.ToUniqueID();
-            index.Put(in uk) = node;
-        }
     }
 
     private static SetLikeRecord GetSetLikeRecord(JSValue other, string methodName)
