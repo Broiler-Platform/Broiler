@@ -232,6 +232,59 @@ request.text().then(function(text) {
     }
 
     [Fact]
+    public void Fetch_Request_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'ABC' });
+request.arrayBuffer().then(function(buffer) {
+    var view = new Uint8Array(buffer);
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        buffer instanceof ArrayBuffer,
+        buffer.byteLength,
+        view[0],
+        view[1],
+        view[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|3|65|66|67", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Json_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: '{""name"":""broiler"",""count"":2}'
+});
+request.json().then(function(value) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        value.name,
+        value.count
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|broiler|2", result);
+    }
+
+    [Fact]
     public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
     {
         var html = @"<!DOCTYPE html>

@@ -1761,6 +1761,31 @@ public sealed partial class DomBridge
                     return body == null ? new JSString(string.Empty) : new JSString(body);
                 });
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    var jsonText = body ?? string.Empty;
+                    var escaped = jsonText
+                        .Replace("\\", "\\\\")
+                        .Replace("\"", "\\\"")
+                        .Replace("\n", "\\n")
+                        .Replace("\r", "\\r")
+                        .Replace("\t", "\\t")
+                        .Replace("\b", "\\b")
+                        .Replace("\f", "\\f");
+                    return context.Eval($"JSON.parse(\"{escaped}\")");
+                });
+            }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty));
+                });
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
         }
