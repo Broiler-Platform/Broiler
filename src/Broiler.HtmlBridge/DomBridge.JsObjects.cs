@@ -1077,7 +1077,9 @@ public sealed partial class DomBridge
                     listeners = [];
                     element.EventListeners[type] = listeners;
                 }
-                listeners.Add(CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value));
+                var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
+                if (!HasMatchingEventListener(listeners, registration))
+                    listeners.Add(registration);
                 return JSUndefined.Value;
             }, "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);

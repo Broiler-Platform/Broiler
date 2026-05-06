@@ -35,6 +35,13 @@ public sealed partial class DomBridge
     private static bool GetCaptureForRemoval(JSValue options)
         => options is JSObject optionsObject ? GetBooleanOption(optionsObject, "capture") : options.BooleanValue;
 
+    private static bool HasMatchingEventListener(
+        List<EventListenerRegistration> listeners,
+        EventListenerRegistration candidate)
+        => listeners.Any(existing =>
+            existing.Listener == candidate.Listener &&
+            existing.Capture == candidate.Capture);
+
     private static bool GetBooleanOption(JSObject options, string name)
     {
         var value = options[(KeyString)name];
@@ -246,6 +253,8 @@ public sealed partial class DomBridge
             }
         }
 
+        evt[(KeyString)"currentTarget"] = JSNull.Value;
+        evt[(KeyString)"eventPhase"] = new JSNumber(0);
         return prevented ? JSBoolean.False : JSBoolean.True;
     }
 

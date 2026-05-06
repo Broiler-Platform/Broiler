@@ -416,6 +416,7 @@ public sealed partial class DomBridge
 
         var eventType = evt[(KeyString)"type"]?.ToString() ?? "unknown";
         evt.FastAddValue((KeyString)"target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt[(KeyString)"srcElement"] = _windowJSObject;
         evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -502,6 +503,8 @@ public sealed partial class DomBridge
             }
         }
 
+        evt[(KeyString)"currentTarget"] = JSNull.Value;
+        evt[(KeyString)"eventPhase"] = new JSNumber(0);
         return prevented ? JSBoolean.False : JSBoolean.True;
     }
 
