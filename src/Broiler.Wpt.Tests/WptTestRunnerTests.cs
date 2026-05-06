@@ -3480,14 +3480,14 @@ input {
   <script>
     promise_test(() => Promise.resolve().then(() => {
       document.body.setAttribute('data-promise-test', 'resolved');
-      document.getElementById('pass').setAttribute('data-pass', 'green');
+      document.getElementById('pass').setAttribute('data-promise-result', 'green');
     }), 'promise_test should mutate the DOM');
   </script>
 </body>
 </html>";
         var result = RunTempScriptExecution(testHtml, "wpt-harness-promise-test-runs-after-load");
         Assert.Contains("data-promise-test=\"resolved\"", result);
-        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
+        Assert.Contains("id=\"pass\" data-promise-result=\"green\"", result);
     }
 
     [Fact]
@@ -3731,8 +3731,11 @@ function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealL
       await waitForScrollEnd(scrollingElement);
       var after = scrollingElement.scrollLeft + '|' + scrollingElement.scrollTop;
       document.body.setAttribute('data-scroll-check', before + '|' + after);
+      // The target sits after a 500×250 inline spacer and uses vertical-align:-15px,
+      // so Broiler's start-alignment lands at 250|116 before the smooth-scroll flush
+      // and 500|232 after the queued completion step runs.
       if (before === '250|116' && after === '500|232')
-        document.getElementById('pass').setAttribute('data-pass', 'green');
+        document.getElementById('pass').setAttribute('data-scroll-result', 'green');
     });
   });
 </script>
@@ -3740,7 +3743,7 @@ function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealL
 
         var result = RunTempScriptExecution(testHtml, "wpt-harness-subframe-root-scroll-behavior");
         Assert.Contains("data-scroll-check=\"250|116|500|232\"", result);
-        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
+        Assert.Contains("id=\"pass\" data-scroll-result=\"green\"", result);
     }
 
     [Fact]
@@ -3796,7 +3799,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
       var after = scrollingWindow.scrollX + '|' + scrollingWindow.scrollY;
       document.body.setAttribute('data-scroll-check', before + '|' + after);
       if (before === '250|125' && after === '500|250')
-        document.getElementById('pass').setAttribute('data-pass', 'green');
+        document.getElementById('pass').setAttribute('data-scroll-result', 'green');
     });
   });
 </script>
@@ -3804,7 +3807,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         var result = RunTempScriptExecution(testHtml, "wpt-harness-subframe-window-scroll-behavior");
         Assert.Contains("data-scroll-check=\"250|125|500|250\"", result);
-        Assert.Contains("id=\"pass\" data-pass=\"green\"", result);
+        Assert.Contains("id=\"pass\" data-scroll-result=\"green\"", result);
     }
 
     [Fact]
