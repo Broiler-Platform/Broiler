@@ -147,6 +147,81 @@ jobs:
             tests/m2-conformance/ci/html-css-targeted/
             src/Broiler.Cli.Tests/TestResults/
 
+  bridge-targeted:
+    name: Bridge DOM/Web targeted conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run Bridge DOM/Web targeted suite
+        run: >-
+          dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj --configuration Release --nologo
+          --filter "FullyQualifiedName~DomEventsTests|FullyQualifiedName~DomEventsEdgeCaseTests|FullyQualifiedName~SelectorsAndCssomTests|FullyQualifiedName~TimerAndAsyncTests|FullyQualifiedName~ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts|FullyQualifiedName~ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts|FullyQualifiedName~InteractiveSession_Step_Runs_Microtasks_Between_Timer_Tasks"
+          --logger "trx;LogFileName=bridge-targeted.trx"
+      - name: Build Bridge summary
+        if: always()
+        run: |
+          mkdir -p tests/m2-conformance/ci/bridge-targeted
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          import xml.etree.ElementTree as ET
+
+          trx_files = list(Path("src/Broiler.Cli.Tests/TestResults").rglob("bridge-targeted.trx"))
+          if not trx_files:
+              raise SystemExit("Could not find bridge-targeted.trx")
+
+          root = ET.parse(trx_files[0]).getroot()
+          ns = {"trx": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          counters = root.find(".//trx:Counters", ns)
+          if counters is None:
+              raise SystemExit("Could not find TRX counters")
+
+          total = int(counters.attrib.get("total", "0"))
+          executed = int(counters.attrib.get("executed", "0"))
+          passed = int(counters.attrib.get("passed", "0"))
+          failed = int(counters.attrib.get("failed", "0"))
+          not_executed = int(counters.attrib.get("notExecuted", "0"))
+          pass_rate = (passed / executed * 100.0) if executed else 0.0
+
+          summary = textwrap.dedent(f"""
+          ## Bridge DOM/Web targeted conformance
+
+          | Metric | Value |
+          |---|---:|
+          | Total tests | {total} |
+          | Executed | {executed} |
+          | Passed | {passed} |
+          | Failed | {failed} |
+          | Skipped / not executed | {not_executed} |
+          | Pass rate | {pass_rate:.1f}% |
+
+          This summary is generated from the focused Milestone 2 / W5 Bridge suite:
+
+          - `Broiler.Cli.Tests.DomEventsTests`
+          - `Broiler.Cli.Tests.DomEventsEdgeCaseTests`
+          - `Broiler.Cli.Tests.SelectorsAndCssomTests`
+          - `Broiler.Cli.Tests.TimerAndAsyncTests`
+          - `ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts`
+          - `ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts`
+          - `InteractiveSession_Step_Runs_Microtasks_Between_Timer_Tasks`
+          """).strip() + "\n"
+
+          Path("tests/m2-conformance/ci/bridge-targeted/bridge-targeted-summary.md").write_text(summary)
+          PY
+      - name: Publish Bridge summary
+        if: always()
+        run: cat tests/m2-conformance/ci/bridge-targeted/bridge-targeted-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bridge-targeted
+          path: |
+            tests/m2-conformance/ci/bridge-targeted/
+            src/Broiler.Cli.Tests/TestResults/
+
   acid3:
     name: Acid3 regression
     runs-on: ubuntu-latest
@@ -197,6 +272,7 @@ jobs:
       - test262-es2025
       - wpt-suites
       - html-css-targeted
+      - bridge-targeted
       - acid3
       - benchmarks
     runs-on: ubuntu-latest
@@ -214,6 +290,7 @@ jobs:
           echo "| Test262 ES2025 subset | ${{ needs.test262-es2025.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| WPT relevant suites | ${{ needs.wpt-suites.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| HTML/CSS targeted conformance | ${{ needs.html-css-targeted.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Bridge DOM/Web targeted conformance | ${{ needs.bridge-targeted.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Acid3 regression | ${{ needs.acid3.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Benchmarks | ${{ needs.benchmarks.result }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -227,6 +304,10 @@ jobs:
           fi
           if [ -f artifacts/html-css-targeted/html-css-targeted-summary.md ]; then
             cat artifacts/html-css-targeted/html-css-targeted-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f artifacts/bridge-targeted/bridge-targeted-summary.md ]; then
+            cat artifacts/bridge-targeted/bridge-targeted-summary.md >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -f artifacts/engine-baseline-benchmarks/engine-benchmark-baseline.md ]; then

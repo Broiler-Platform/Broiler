@@ -1,6 +1,6 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: **M2 in progress** — W3 and W4 are published/verified; W5 remains before the milestone can close
+> **Status**: **M2 implementation complete** — W3, W4, and W5 are published/verified; the unified dashboard now carries the focused Phase 2 JS, HTML/CSS, and Bridge signals of record
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
 
@@ -125,8 +125,11 @@ measurement-gated**:
   `IScriptEngine`, `ScriptExecutionResult`, `MicroTaskQueue`,
   `ScriptProfilingHook`) and the rendering-stage orchestration
   (`RenderingStages`, `HtmlPostProcessor`, `ImagePipeline`).
-- Standards signal today: behavior is validated indirectly through Acid3 and
-  WPT runs; there is no dedicated bridge-level compliance harness.
+- Standards signal today: the focused M2 Bridge DOM/Web compliance signal is
+  published in
+  [`../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md`](../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md),
+  covering the roadmap-targeted DOM events, CSSOM, and microtask ordering
+  slices alongside the broader Acid3/WPT coverage.
 - Performance signal today: the `ScriptProfilingHook` provides per-script
   timing, but there is no aggregate bridge-overhead benchmark.
 
@@ -238,6 +241,14 @@ The first phase that meaningfully moves pass rates.
 - Bring DOM Events, CSSOM `getComputedStyle`, and microtask scheduling in the
   bridge to spec for the cases exercised by WPT today (W5).
 - Eliminate fallback-only Skia paths still on the hot raster path (W7).
+
+**Completion record:** The W3 ES2025 subset, the W4 HTML/CSS targeted suite,
+and the W5 Bridge DOM/Web targeted suite are now all published and wired into
+the unified PR dashboard via
+[`tests/m2-conformance/test262-es2025/`](../../tests/m2-conformance/test262-es2025/),
+[`../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md`](../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md),
+[`../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md`](../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md),
+and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml).
 
 ### Phase 3 — Web API Surface Expansion (Milestone **M3**)
 
@@ -540,10 +551,10 @@ behavioral or performance-sensitive changes:
 
 - [x] **M0** — baseline/dashboard deliverables published in [`engines-m0-baseline.md`](./engines-m0-baseline.md) and [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
 - [x] **M1** — file and start the W2/W7 continuation issues; document the frozen public seams
-- [ ] **M2** — targeted compliance push remains in progress; the umbrella kickoff tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072) is closed, but only mark this milestone complete after the remaining W5 track below is finished and the Phase 2 exit criteria are met
+- [x] **M2** — targeted compliance push published across the focused JS, HTML/CSS, and Bridge signals, with the umbrella kickoff tracker [#1072](https://github.com/MaiRat/Broiler/issues/1072) now backed by the Phase 2 dashboard slices of record
   - [x] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
   - [x] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
-  - [ ] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
+  - [x] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
 - [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
 - [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
 - [ ] **M5** — file sustaining-governance issue(s) for standards feed intake and support-matrix publication
@@ -559,6 +570,14 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-06** — W5 close-out: published the focused Bridge Milestone 2
+  signal in
+  [`tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md`](../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md),
+  wired [`.github/workflows/engines-m0-dashboard.yml`](../../.github/workflows/engines-m0-dashboard.yml)
+  to run and summarize that DOM/event/CSSOM/microtask suite on every PR, and
+  re-verified the full W5 slice locally at **167 / 167 passed** across the
+  focused event, edge-case dispatch, CSSOM, async, and microtask-ordering
+  coverage.
 - **2026-05-06** — W4 close-out: published the focused HTML/CSS Milestone 2
   signal in
   [`tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md`](../../tests/m2-conformance/html-css-targeted/html-css-targeted-summary.md),
