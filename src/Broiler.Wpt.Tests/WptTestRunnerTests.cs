@@ -3949,6 +3949,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
       var scrollableContainer = frames[0].document.querySelector('.fixedContainer.scrollable');
       var scrollableTarget = scrollableContainer.querySelector('.target');
       scrollableTarget.scrollIntoView({ block: 'start', inline: 'start' });
+      // This harness uses a right-aligned fixed scroller inside the iframe,
+      // so the outer document only needs to scroll horizontally to x=100.
       var scrollableOk =
         window.scrollX === 100 &&
         window.scrollY === 440 &&
