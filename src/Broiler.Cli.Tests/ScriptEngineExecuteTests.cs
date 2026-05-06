@@ -150,7 +150,7 @@ function run() {
                 return [
                     !!frames[0].document.getElementById('target'),
                     !!frames[0].document.querySelector('.box'),
-                    frames[0].document.body.textContent.trim()
+                    frames[0].document.getElementById('target').textContent.trim()
                 ].join('|');
             })()
             """);
