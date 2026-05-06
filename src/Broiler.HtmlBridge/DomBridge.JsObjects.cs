@@ -5526,6 +5526,14 @@ public sealed partial class DomBridge
 
     private void InvalidateCachedSubDocument(DomElement containerElement)
     {
+        var existingDocRoot = containerElement.Children.FirstOrDefault(child =>
+            string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        if (existingDocRoot != null)
+        {
+            RemoveElementsRecursive(existingDocRoot);
+            containerElement.Children.Remove(existingDocRoot);
+        }
+
         _subDocumentCache.Remove(containerElement);
         _subWindowCache.Remove(containerElement);
         _subDocumentLocationCache.Remove(containerElement);

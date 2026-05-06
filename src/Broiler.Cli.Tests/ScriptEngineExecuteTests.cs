@@ -131,6 +131,63 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Fragments_Populate_FramesDocument()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                frame.srcdoc = '<!DOCTYPE html><style>.box{color:red}</style><div id="target" class="box">ok</div>';
+                return [
+                    !!frames[0].document.getElementById('target'),
+                    !!frames[0].document.querySelector('.box'),
+                    frames[0].document.body.textContent.trim()
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true|ok", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Rebuilds_Existing_Subdocument()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='old'>old</div></body></html>"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                var before = frame.contentDocument.getElementById('old').textContent;
+                frame.srcdoc = '<!DOCTYPE html><div id="new">new</div>';
+                return [
+                    before,
+                    frame.contentDocument.getElementById('old') === null,
+                    frame.contentDocument.getElementById('new').textContent
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("old|true|new", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls
