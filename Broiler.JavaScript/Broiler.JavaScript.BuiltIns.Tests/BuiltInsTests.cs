@@ -8,6 +8,9 @@ namespace Broiler.JavaScript.BuiltIns.Tests;
 
 public class BuiltInsTests
 {
+    private static JSContext CreateContext(JavaScriptFeatureFlags experimentalFeatures = JavaScriptFeatureFlags.AllExperimentalEs2026)
+        => new(experimentalFeatures: experimentalFeatures);
+
     [Fact]
     public void WeakRef_Construct_And_Deref()
     {
@@ -406,6 +409,41 @@ public class BuiltInsTests
         using var ctx = new JSContext();
         var result = ctx.Eval("JSON.stringify({ a: 1 }, null, 2)");
         Assert.Contains("\"a\"", result.ToString());
+    }
+
+    [Fact]
+    public void JSON_Parse_SourceTextAccess_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.JsonParseSourceTextAccess);
+        var result = ctx.Eval("""
+            var seen = [];
+            JSON.parse('{"a":1}', function(key, value, context) {
+                seen.push(context === undefined ? 'missing' : 'present');
+                return value;
+            });
+            seen.join(',');
+            """);
+        Assert.Equal("missing", result.ToString());
+    }
+
+    [Fact]
+    public void JSON_Parse_SourceTextAccess_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.JsonParseSourceTextAccess);
+        var result = ctx.Eval("""
+            var seen = [];
+            JSON.parse('{"a":1}', function(key, value, context) {
+                if (key === 'a') {
+                    seen.push(context === undefined ? 'missing' : 'present');
+                    seen.push(context.source);
+                }
+                return value;
+            });
+            seen.join('|');
+            """);
+        Assert.Equal("present|1", result.ToString());
     }
 
     // ── M3: DataView tests ───────────────────────────────────────────
@@ -1037,6 +1075,40 @@ public class BuiltInsTests
             clone.size;
         ");
         Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void ExperimentalEs2026Features_CanBeDisabled_PerContext()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.None);
+        var result = ctx.Eval("""
+            [
+              typeof structuredClone,
+              typeof Math.sumPrecise,
+              typeof Uint8Array.fromBase64,
+              typeof Uint8Array.prototype.toBase64,
+              typeof Map.prototype.getOrInsert,
+              typeof WeakMap.prototype.getOrInsert
+            ].join('|');
+            """);
+        Assert.Equal("undefined|undefined|undefined|undefined|undefined|undefined", result.ToString());
+    }
+
+    [Fact]
+    public void ExperimentalEs2026Features_CanBeEnabled_Selectively()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone | JavaScriptFeatureFlags.MapUpsert);
+        var result = ctx.Eval("""
+            [
+              typeof structuredClone,
+              typeof Math.sumPrecise,
+              typeof Map.prototype.getOrInsert,
+              typeof Uint8Array.fromBase64
+            ].join('|');
+            """);
+        Assert.Equal("function|undefined|function|undefined", result.ToString());
     }
 
     /// <summary>
