@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
@@ -1713,6 +1714,8 @@ public sealed partial class DomBridge
             return headersObject;
         }
 
+        JSValue ParseJsonText(string jsonText) => context.Eval($"JSON.parse({JsonSerializer.Serialize(jsonText)})");
+
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
             string url;
@@ -1766,16 +1769,7 @@ public sealed partial class DomBridge
                 return CreateThenable(() =>
                 {
                     requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    var jsonText = body ?? string.Empty;
-                    var escaped = jsonText
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("\n", "\\n")
-                        .Replace("\r", "\\r")
-                        .Replace("\t", "\\t")
-                        .Replace("\b", "\\b")
-                        .Replace("\f", "\\f");
-                    return context.Eval($"JSON.parse(\"{escaped}\")");
+                    return ParseJsonText(body ?? string.Empty);
                 });
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
@@ -1820,15 +1814,7 @@ public sealed partial class DomBridge
                 return CreateThenable(() =>
                 {
                     responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    var escaped = body
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("\n", "\\n")
-                        .Replace("\r", "\\r")
-                        .Replace("\t", "\\t")
-                        .Replace("\b", "\\b")
-                        .Replace("\f", "\\f");
-                    return context.Eval($"JSON.parse(\"{escaped}\")");
+                    return ParseJsonText(body);
                 });
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
