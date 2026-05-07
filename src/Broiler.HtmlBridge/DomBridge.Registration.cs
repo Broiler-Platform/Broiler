@@ -1720,8 +1720,35 @@ public sealed partial class DomBridge
         static string DecodeFormComponent(string value)
             => Uri.UnescapeDataString(value.Replace("+", " "));
 
+        static bool IsFormComponentUnescapedByte(byte value)
+            => (value >= (byte)'a' && value <= (byte)'z')
+               || (value >= (byte)'A' && value <= (byte)'Z')
+               || (value >= (byte)'0' && value <= (byte)'9')
+               || value is (byte)'*' or (byte)'-' or (byte)'.' or (byte)'_';
+
         static string EncodeFormComponent(string value)
-            => Uri.EscapeDataString(value).Replace("%20", "+");
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            var builder = new StringBuilder(bytes.Length);
+            foreach (var current in bytes)
+            {
+                if (current == (byte)' ')
+                {
+                    builder.Append('+');
+                }
+                else if (IsFormComponentUnescapedByte(current))
+                {
+                    builder.Append((char)current);
+                }
+                else
+                {
+                    builder.Append('%');
+                    builder.Append(current.ToString("X2"));
+                }
+            }
+
+            return builder.ToString();
+        }
 
         static JSObject CreateFormDataObject(JSValue? initValue = null)
         {
