@@ -1462,6 +1462,87 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void XHR_OverrideMimeType_Populates_ResponseXml_For_Default_Text_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.overrideMimeType('text/html');
+xhr.onload = function() {
+    var payload = xhr.responseXML && xhr.responseXML.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseText,
+        xhr.responseText.indexOf('payload') >= 0,
+        xhr.responseXML !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
+    }
+
+    [Fact]
+    public void XHR_OverrideMimeType_Leaves_ResponseXml_Null_For_Plain_Text_Override()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('plain text payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.overrideMimeType('text/plain');
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseText,
+        xhr.responseText,
+        xhr.responseXML === null
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|plain text payload|true", result);
+    }
+
+    [Fact]
     public void XHR_ArrayBuffer_ResponseType_Uses_Fetch_ArrayBuffer_Result()
     {
         var html = @"<!DOCTYPE html>

@@ -3085,12 +3085,30 @@ public sealed partial class DomBridge
                             }
                             bodyPromise.then(function(bodyValue) {
                                 if (self._aborted) return;
+                                var effectiveMimeType = self._mimeOverride;
+                                if (!effectiveMimeType) {
+                                    effectiveMimeType = self.getResponseHeader('Content-Type') || '';
+                                }
+                                var lowerMimeType = (effectiveMimeType || '').toLowerCase();
+                                var shouldPopulateResponseXml =
+                                    lowerMimeType.indexOf('text/html') >= 0 ||
+                                    lowerMimeType.indexOf('application/xhtml+xml') >= 0 ||
+                                    lowerMimeType.indexOf('application/xml') >= 0 ||
+                                    lowerMimeType.indexOf('text/xml') >= 0 ||
+                                    /\+xml(?:\s*;|$)/.test(lowerMimeType);
+
                                 if (self.responseType === '' || self.responseType === 'text') {
                                     // Per XHR semantics, the default/text response types expose
                                     // the same textual payload via both response and responseText.
                                     self.response = bodyValue;
                                     self.responseText = '' + bodyValue;
-                                    self.responseXML = null;
+                                    if (shouldPopulateResponseXml) {
+                                        var parsedDocument = document.implementation.createHTMLDocument('');
+                                        parsedDocument.body.innerHTML = '' + bodyValue;
+                                        self.responseXML = parsedDocument;
+                                    } else {
+                                        self.responseXML = null;
+                                    }
                                 } else if (self.responseType === 'document') {
                                     var responseDocument = document.implementation.createHTMLDocument('');
                                     responseDocument.body.innerHTML = '' + bodyValue;
