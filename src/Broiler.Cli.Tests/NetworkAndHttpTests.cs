@@ -317,6 +317,63 @@ request.blob().then(function(blob) {
     }
 
     [Fact]
+    public void Fetch_Request_Clone_Preserves_Body_Without_Consuming_Original()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+var clone = request.clone();
+clone.text().then(function(cloneText) {
+    request.text().then(function(originalText) {
+        document.getElementById('result').textContent = [
+            cloneText,
+            originalText,
+            request.bodyUsed === true,
+            clone.bodyUsed === true
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("payload|payload|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Clone_Throws_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+request.text().then(function() {
+    try {
+        request.clone();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
     public void Fetch_Request_FormData_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -400,6 +457,61 @@ response.text().then(function(text) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|201|Created|text/plain|true|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Clone_Preserves_Body_Without_Consuming_Original()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+var clone = response.clone();
+clone.text().then(function(cloneText) {
+    response.text().then(function(originalText) {
+        document.getElementById('result').textContent = [
+            cloneText,
+            originalText,
+            response.bodyUsed === true,
+            clone.bodyUsed === true
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("created|created|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Clone_Throws_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.text().then(function() {
+    try {
+        response.clone();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
     }
 
     [Fact]

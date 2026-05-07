@@ -1941,7 +1941,13 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"headers"] = headersObject;
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
-            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => CreateRequestObject(requestObject), "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
+            {
+                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                    throw new JSException("Failed to execute 'clone' on 'Request': body is already used.");
+
+                return CreateRequestObject(requestObject);
+            }, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
             {
                 return CreateThenable(() =>
@@ -2044,8 +2050,12 @@ public sealed partial class DomBridge
                 });
             }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
-                CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
-                "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            {
+                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                    throw new JSException("Failed to execute 'clone' on 'Response': body is already used.");
+
+                return CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase));
+            }, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return responseObject;
         }
