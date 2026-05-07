@@ -1958,55 +1958,45 @@ public sealed partial class DomBridge
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return body == null ? new JSString(string.Empty) : new JSString(body);
-                });
+                    body == null ? new JSString(string.Empty) : new JSString(body));
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return ParseJsonText(body ?? string.Empty);
-                });
+                    ParseJsonText(body ?? string.Empty));
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty));
-                });
+                    new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty)));
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return CreateBlobBody(body ?? string.Empty, headersObject);
-                });
+                    CreateBlobBody(body ?? string.Empty, headersObject));
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return CreateFormDataObject(new JSString(body ?? string.Empty));
-                });
+                    CreateFormDataObject(new JSString(body ?? string.Empty)));
             }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
@@ -2034,55 +2024,45 @@ public sealed partial class DomBridge
                 if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSString(body);
-                });
+                    new JSString(body));
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
             {
                 if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return ParseJsonText(body);
-                });
+                    ParseJsonText(body));
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
                 if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSArrayBuffer(Encoding.UTF8.GetBytes(body));
-                });
+                    new JSArrayBuffer(Encoding.UTF8.GetBytes(body)));
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
             {
                 if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return CreateBlobBody(body, headersObject);
-                });
+                    CreateBlobBody(body, headersObject));
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
             {
                 if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return CreateFormDataObject(new JSString(body));
-                });
+                    CreateFormDataObject(new JSString(body)));
             }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
             {

@@ -456,6 +456,38 @@ request.text().then(function() {
     }
 
     [Fact]
+    public void Fetch_Request_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+var firstRead = request.text();
+var r = [];
+r.push(request.bodyUsed === true);
+try {
+    request.json();
+    r.push('NO_THROW');
+} catch (e) {
+    r.push(e.message);
+}
+firstRead.then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|Failed to execute body reader on 'Request': body is already used.|payload", result);
+    }
+
+    [Fact]
     public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -621,6 +653,37 @@ response.text().then(function() {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('{""name"":""broiler""}', {
+    headers: { 'Content-Type': 'application/json' }
+});
+var firstRead = response.text();
+var r = [];
+r.push(response.bodyUsed === true);
+try {
+    response.json();
+    r.push('NO_THROW');
+} catch (e) {
+    r.push(e.message);
+}
+firstRead.then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|Failed to execute body reader on 'Response': body is already used.|", result);
     }
 
     // ────────────────── fetch() method support ──────────────────
