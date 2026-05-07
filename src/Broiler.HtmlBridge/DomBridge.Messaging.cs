@@ -390,7 +390,7 @@ public sealed partial class DomBridge
         var transferArray = (JSArray)transferValue;
 
         var transferredPorts = new List<JSValue>();
-        var seenPorts = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
+        var portsInTransferList = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
             if (item is not JSObject port || !_messagePortPeers.ContainsKey(port))
@@ -399,7 +399,7 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            if (!seenPorts.Add(port))
+            if (!portsInTransferList.Add(port))
             {
                 ThrowDOMException(_jsContext!, "The transfer list contains duplicate ports.", "DataCloneError");
             }
