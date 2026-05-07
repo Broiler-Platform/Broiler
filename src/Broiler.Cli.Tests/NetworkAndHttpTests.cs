@@ -1210,6 +1210,43 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
+    [Fact]
+    public void XHR_ReadyStateChange_Fires_For_Loading_State_Before_Done()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var readyStates = [];
+xhr.onreadystatechange = function() {
+    readyStates.push(xhr.readyState);
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+document.getElementById('result').textContent = readyStates.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("1,2,3,4", result);
+    }
+
     // ────────────────── Content-Type handling ──────────────────
 
     [Fact]

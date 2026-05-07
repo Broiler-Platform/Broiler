@@ -3190,6 +3190,9 @@ public sealed partial class DomBridge
                                     self.responseXML = null;
                                 }
                                 self.readyState = 3;
+                                if (typeof self.onreadystatechange === 'function') {
+                                    self.onreadystatechange();
+                                }
                                 if (typeof self.onprogress === 'function') {
                                     self.onprogress();
                                 }
