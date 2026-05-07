@@ -2426,10 +2426,35 @@ public sealed partial class DomBridge
             (KeyString)"vendor",
             new JSString(""),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        // sendBeacon(url, data) — no-op, returns true
+        // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
         navigatorObj.FastAddValue(
             (KeyString)"sendBeacon",
-            new JSFunction((in Arguments _) => JSBoolean.True, "sendBeacon", 2),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0].IsNullOrUndefined)
+                    return JSBoolean.False;
+
+                try
+                {
+                    if (window[(KeyString)"fetch"] is not JSFunction currentFetch)
+                        return JSBoolean.False;
+
+                    var options = new JSObject();
+                    options[(KeyString)"method"] = new JSString("POST");
+                    options[(KeyString)"keepalive"] = JSBoolean.True;
+                    if (a.Length > 1 && !a[1].IsNullOrUndefined)
+                        options[(KeyString)"body"] = new JSString(a[1].ToString());
+
+                    currentFetch.InvokeFunction(new Arguments(currentFetch, a[0], options));
+                    return JSBoolean.True;
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.navigator.sendBeacon",
+                        $"sendBeacon error: {ex.Message}", ex);
+                    return JSBoolean.False;
+                }
+            }, "sendBeacon", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue(
             (KeyString)"navigator",

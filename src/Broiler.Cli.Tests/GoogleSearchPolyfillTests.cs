@@ -110,6 +110,52 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Navigator_SendBeacon_Forwards_Post_Body_And_Keepalive_To_Fetch()
+    {
+        var result = ExecJs(@"
+            var originalFetch = fetch;
+            fetch = window.fetch = function(url, opts) {
+                document.getElementById('result').textContent = [
+                    'RESULT',
+                    url,
+                    opts && opts.method,
+                    opts && opts.body,
+                    opts && (opts.keepalive === true)
+                ].join('|');
+                return {
+                    then: function(resolve) {
+                        if (typeof resolve === 'function') {
+                            resolve(new Response('', { status: 204 }));
+                        }
+                        return { catch: function() {} };
+                    }
+                };
+            };
+            var ok = navigator.sendBeacon('https://example.com/log', 'data=1');
+            fetch = window.fetch = originalFetch;
+            document.getElementById('result').textContent += '|' + ok;
+        ");
+
+        Assert.Contains("RESULT|https://example.com/log|POST|data=1|true|true", result);
+    }
+
+    [Fact]
+    public void Navigator_SendBeacon_Returns_False_When_Fetch_Throws()
+    {
+        var result = ExecJs(@"
+            var originalFetch = fetch;
+            fetch = window.fetch = function() {
+                throw new Error('boom');
+            };
+            var ok = navigator.sendBeacon('https://example.com/log', 'data');
+            fetch = window.fetch = originalFetch;
+            document.getElementById('result').textContent = 'RESULT:' + ok;
+        ");
+
+        Assert.Contains("RESULT:false", result);
+    }
+
+    [Fact]
     public void Navigator_UserAgent_Is_String()
     {
         var result = ExecJs(@"
