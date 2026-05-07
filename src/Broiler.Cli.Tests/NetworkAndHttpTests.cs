@@ -700,7 +700,7 @@ firstRead.then(function(text) {
         var exception = Assert.Throws<JSException>(() =>
             context.Eval("var response = new Response('{invalid json'); response.json().then(function() {});"));
 
-        Assert.Contains("Failed to parse response body as JSON.", exception.Message);
+        Assert.Contains("Failed to parse response body as JSON:", exception.Message);
         Assert.True(context.Eval("response.bodyUsed").BooleanValue);
     }
 

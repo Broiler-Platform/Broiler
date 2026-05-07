@@ -1723,9 +1723,9 @@ public sealed partial class DomBridge
             {
                 return ParseJsonText(jsonText);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw new JSException("Failed to parse response body as JSON.");
+                throw new JSException($"Failed to parse response body as JSON: {ex.Message}");
             }
         }
 
@@ -3136,6 +3136,8 @@ public sealed partial class DomBridge
                                     try {
                                         self.response = JSON.parse('' + bodyValue);
                                     } catch (e) {
+                                        // XHR exposes invalid JSON as a null response for
+                                        // responseType='json' while still completing the load path.
                                         self.response = null;
                                     }
                                     self.responseText = '';
