@@ -68,6 +68,10 @@ public sealed partial class DomBridge
         new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
     private readonly HashSet<JSObject> _closedMessagePorts =
         new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly HashSet<JSObject> _startedMessagePorts =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, List<JSObject>> _queuedMessagePortEvents =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;

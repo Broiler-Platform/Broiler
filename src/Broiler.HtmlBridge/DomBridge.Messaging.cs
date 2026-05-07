@@ -454,6 +454,7 @@ public sealed partial class DomBridge
         var effectiveOwner = ownerWindow ?? _windowJSObject ?? ResolveCurrentWindow() ?? port;
         _eventTargetOwnerWindows[port] = effectiveOwner;
         InstallEventTargetApi(port, "DomBridge.messagePort.dispatchEvent");
+        JSValue onMessageHandler = JSNull.Value;
 
         port.FastAddValue(
             (KeyString)"postMessage",
@@ -470,26 +471,42 @@ public sealed partial class DomBridge
                 var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value);
                 QueueFrameAction(() =>
                 {
+                    if (_closedMessagePorts.Contains(sourcePort) ||
+                        _closedMessagePorts.Contains(targetPort))
+                    {
+                        return;
+                    }
+
                     var evt = CreateMessageEvent(payload, null, string.Empty, new JSArray());
-                    var targetOwner = ResolveOwnerWindow(targetPort);
-                    if (targetOwner == null)
-                    {
-                        DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage");
-                    }
-                    else
-                    {
-                        RunWithWindowContext(targetOwner, () =>
-                            DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage"));
-                    }
+                    DispatchOrQueueMessagePortEvent(targetPort, evt);
                 });
 
                 return JSUndefined.Value;
             }, "postMessage", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        port.FastAddProperty(
+            (KeyString)"onmessage",
+            new JSFunction((in Arguments _) => onMessageHandler, "get onmessage"),
+            new JSFunction((in Arguments a) =>
+            {
+                onMessageHandler = a.Length > 0 ? a[0] : JSUndefined.Value;
+                if (!onMessageHandler.IsNullOrUndefined)
+                {
+                    ActivateMessagePort(a.This as JSObject ?? port);
+                }
+
+                return JSUndefined.Value;
+            }, "set onmessage"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         port.FastAddValue(
             (KeyString)"start",
-            new JSFunction((in Arguments _) => JSUndefined.Value, "start", 0),
+            new JSFunction((in Arguments a) =>
+            {
+                ActivateMessagePort(a.This as JSObject ?? port);
+                return JSUndefined.Value;
+            }, "start", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         port.FastAddValue(
@@ -498,6 +515,7 @@ public sealed partial class DomBridge
             {
                 var currentPort = a.This as JSObject ?? port;
                 _closedMessagePorts.Add(currentPort);
+                _queuedMessagePortEvents.Remove(currentPort);
                 return JSUndefined.Value;
             }, "close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -517,5 +535,62 @@ public sealed partial class DomBridge
         channel.FastAddValue((KeyString)"port1", port1, JSPropertyAttributes.EnumerableConfigurableValue);
         channel.FastAddValue((KeyString)"port2", port2, JSPropertyAttributes.EnumerableConfigurableValue);
         return channel;
+    }
+
+    private void DispatchOrQueueMessagePortEvent(JSObject targetPort, JSObject evt)
+    {
+        if (_closedMessagePorts.Contains(targetPort))
+            return;
+
+        if (CanDispatchMessagePortEvent(targetPort))
+        {
+            DispatchMessagePortEvent(targetPort, evt);
+            return;
+        }
+
+        if (!_queuedMessagePortEvents.TryGetValue(targetPort, out var queuedEvents))
+        {
+            queuedEvents = [];
+            _queuedMessagePortEvents[targetPort] = queuedEvents;
+        }
+
+        queuedEvents.Add(evt);
+    }
+
+    private bool CanDispatchMessagePortEvent(JSObject targetPort)
+        => _startedMessagePorts.Contains(targetPort) || HasOnMessageHandler(targetPort);
+
+    private bool HasOnMessageHandler(JSObject targetPort)
+        => targetPort[(KeyString)"onmessage"] is { } handler && !handler.IsNullOrUndefined;
+
+    private void ActivateMessagePort(JSObject port)
+    {
+        if (_closedMessagePorts.Contains(port))
+            return;
+
+        _startedMessagePorts.Add(port);
+
+        if (!_queuedMessagePortEvents.TryGetValue(port, out var queuedEvents) || queuedEvents.Count == 0)
+            return;
+
+        _queuedMessagePortEvents.Remove(port);
+        foreach (var evt in queuedEvents)
+        {
+            DispatchMessagePortEvent(port, evt);
+        }
+    }
+
+    private void DispatchMessagePortEvent(JSObject targetPort, JSObject evt)
+    {
+        var targetOwner = ResolveOwnerWindow(targetPort);
+        if (targetOwner == null)
+        {
+            DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage");
+        }
+        else
+        {
+            RunWithWindowContext(targetOwner, () =>
+                DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage"));
+        }
     }
 }

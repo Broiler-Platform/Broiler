@@ -214,4 +214,81 @@ public class WebMessagingTests
 
         Assert.Equal("3|3|true|0", result.ToString());
     }
+
+    [Fact]
+    public void MessageChannel_AddEventListener_Queues_Until_Start()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="result"></div></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                window.__channel = channel;
+
+                channel.port1.addEventListener('message', function(event) {
+                    document.getElementById('result').textContent = [
+                        event.data,
+                        event.source === null,
+                        event.ports.length
+                    ].join('|');
+                });
+
+                channel.port2.postMessage('queued');
+            })();
+            """);
+
+        bridge.FlushTimers();
+        Assert.Equal(string.Empty, context.Eval("document.getElementById('result').textContent").ToString());
+
+        context.Eval("window.__channel.port1.start();");
+        bridge.FlushTimers();
+
+        var result = context.Eval("document.getElementById('result').textContent");
+        Assert.Equal("queued|true|0", result.ToString());
+    }
+
+    [Fact]
+    public void MessageChannel_OnMessage_Assignment_AutoStarts_Queued_Port()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="result"></div></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                window.__channel = channel;
+                channel.port2.postMessage('auto-start');
+            })();
+            """);
+
+        bridge.FlushTimers();
+        Assert.Equal(string.Empty, context.Eval("document.getElementById('result').textContent").ToString());
+
+        context.Eval("""
+            window.__channel.port1.onmessage = function(event) {
+                document.getElementById('result').textContent = [
+                    event.data,
+                    event.source === null,
+                    event.ports.length
+                ].join('|');
+            };
+            """);
+        bridge.FlushTimers();
+
+        var result = context.Eval("document.getElementById('result').textContent");
+        Assert.Equal("auto-start|true|0", result.ToString());
+    }
 }
