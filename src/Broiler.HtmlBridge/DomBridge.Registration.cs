@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
@@ -1714,7 +1714,8 @@ public sealed partial class DomBridge
             return headersObject;
         }
 
-        JSValue ParseJsonText(string jsonText) => context.Eval($"JSON.parse({JsonSerializer.Serialize(jsonText)})");
+        static JSValue ParseJsonText(string jsonText)
+            => JSJSON.Parse(new Arguments(JSUndefined.Value, new JSString(jsonText)));
 
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
