@@ -1717,6 +1717,23 @@ public sealed partial class DomBridge
         static JSValue ParseJsonText(string jsonText)
             => JSJSON.Parse(new Arguments(JSUndefined.Value, new JSString(jsonText)));
 
+        static JSValue CreateBlobBody(string bodyText, JSObject headersObject)
+        {
+            var contentType = TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty;
+            var blobObject = new JSObject();
+            blobObject[(KeyString)"size"] = new JSNumber(Encoding.UTF8.GetByteCount(bodyText));
+            blobObject[(KeyString)"type"] = new JSString(contentType);
+            blobObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() => new JSString(bodyText));
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            blobObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(bodyText)));
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            return blobObject;
+        }
+
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
             string url;
@@ -1781,6 +1798,14 @@ public sealed partial class DomBridge
                     return new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty));
                 });
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return CreateBlobBody(body ?? string.Empty, headersObject);
+                });
+            }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
         }
@@ -1826,6 +1851,14 @@ public sealed partial class DomBridge
                     return new JSArrayBuffer(Encoding.UTF8.GetBytes(body));
                 });
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return CreateBlobBody(body, headersObject);
+                });
+            }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
                 CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
                 "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);

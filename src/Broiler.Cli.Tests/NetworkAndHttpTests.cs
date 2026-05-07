@@ -259,6 +259,37 @@ request.arrayBuffer().then(function(buffer) {
     }
 
     [Fact]
+    public void Fetch_Request_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: 'broiler'
+});
+request.blob().then(function(blob) {
+    blob.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            request.bodyUsed === true,
+            typeof blob.text === 'function',
+            blob.size,
+            blob.type,
+            text
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|7|application/json|broiler", result);
+    }
+
+    [Fact]
     public void Fetch_Request_Json_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -313,6 +344,35 @@ response.text().then(function(text) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|201|Created|text/plain|true|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.blob().then(function(blob) {
+    blob.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            response.bodyUsed === true,
+            typeof blob.text === 'function',
+            blob.size,
+            blob.type,
+            text
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|7|text/plain|created", result);
     }
 
     // ────────────────── fetch() method support ──────────────────
