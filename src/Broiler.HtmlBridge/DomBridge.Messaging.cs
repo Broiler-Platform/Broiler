@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
@@ -322,11 +323,12 @@ public sealed partial class DomBridge
             {
                 var targetWindow = a.This as JSObject ?? window;
                 var sourceWindow = ResolveCurrentWindow();
-                var (targetOrigin, ports) = GetPostMessageDispatchOptions(a, targetWindow);
+                var (targetOrigin, ports, cloneOptions, transferredPorts) = GetPostMessageDispatchOptions(a);
                 if (!ShouldDeliverWindowMessage(targetWindow, sourceWindow, targetOrigin))
                     return JSUndefined.Value;
 
-                var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value);
+                var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value, cloneOptions);
+                CommitTransferredPorts(transferredPorts, targetWindow);
                 var origin = GetWindowOrigin(sourceWindow);
                 QueueFrameAction(() =>
                 {
@@ -347,7 +349,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
-    private (string TargetOrigin, JSArray Ports) GetPostMessageDispatchOptions(in Arguments a, JSObject targetWindow)
+    private (string TargetOrigin, JSArray Ports, JSValue CloneOptions, List<JSObject> TransferredPorts) GetPostMessageDispatchOptions(in Arguments a)
     {
         var targetOrigin = "*";
         JSValue transferValue = JSUndefined.Value;
@@ -373,44 +375,70 @@ public sealed partial class DomBridge
         if (a.Length > 2)
             transferValue = a[2];
 
-        return (targetOrigin, ExtractTransferredPorts(transferValue, targetWindow));
+        var (ports, cloneOptions, transferredPorts) = ExtractTransferList(transferValue);
+        return (targetOrigin, ports, cloneOptions, transferredPorts);
     }
 
-    private JSArray ExtractTransferredPorts(JSValue transferValue, JSObject targetWindow)
+    private (JSArray Ports, JSValue CloneOptions, List<JSObject> TransferredPorts) ExtractTransferList(JSValue transferValue)
     {
         if (transferValue.IsNullOrUndefined)
-            return new JSArray();
+            return (new JSArray(), JSUndefined.Value, []);
 
         if (transferValue is not JSArray)
         {
             ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
-            return new JSArray();
+            return (new JSArray(), JSUndefined.Value, []);
         }
 
         var transferArray = (JSArray)transferValue;
 
         var transferredPorts = new List<JSValue>();
-        var portsInTransferList = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
+        var transferredPortObjects = new List<JSObject>();
+        var seenPorts = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
+        var transferredBuffers = new List<JSValue>();
+        var seenBuffers = new HashSet<JSArrayBuffer>(ReferenceEqualityComparer.Instance);
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
-            if (item is not JSObject port || !_messagePortPeers.ContainsKey(port))
+            if (item is JSObject port && _messagePortPeers.ContainsKey(port))
             {
-                ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+                if (!seenPorts.Add(port))
+                    ThrowDOMException(_jsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
+
+                transferredPorts.Add(port);
+                transferredPortObjects.Add(port);
                 continue;
             }
 
-            if (!portsInTransferList.Add(port))
+            if (item is JSArrayBuffer arrayBuffer)
             {
-                ThrowDOMException(_jsContext!, "The transfer list contains duplicate ports.", "DataCloneError");
+                if (arrayBuffer.Detached)
+                    ThrowDOMException(_jsContext!, "The transfer list contains a detached ArrayBuffer.", "DataCloneError");
+
+                if (!seenBuffers.Add(arrayBuffer))
+                    ThrowDOMException(_jsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
+
+                transferredBuffers.Add(arrayBuffer);
+                continue;
             }
 
-            transferredPorts.Add(port);
+            ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
         }
 
-        foreach (var item in transferredPorts)
-            _eventTargetOwnerWindows[(JSObject)item] = targetWindow;
+        JSValue cloneOptions = JSUndefined.Value;
+        if (transferredBuffers.Count > 0)
+        {
+            var transferOptions = new JSObject();
+            transferOptions.FastAddValue((KeyString)"transfer", new JSArray(transferredBuffers), JSPropertyAttributes.EnumerableConfigurableValue);
+            cloneOptions = transferOptions;
+        }
 
-        return new JSArray(transferredPorts);
+        return (new JSArray(transferredPorts), cloneOptions, transferredPortObjects);
+    }
+
+    private void CommitTransferredPorts(IEnumerable<JSObject> transferredPorts, JSObject targetWindow)
+    {
+        foreach (var port in transferredPorts)
+            _eventTargetOwnerWindows[port] = targetWindow;
     }
 
     private bool ShouldDeliverWindowMessage(JSObject targetWindow, JSObject? sourceWindow, string targetOrigin)
@@ -449,11 +477,14 @@ public sealed partial class DomBridge
         return string.Empty;
     }
 
-    private JSValue CloneForMessaging(JSValue value)
+    private JSValue CloneForMessaging(JSValue value, JSValue cloneOptions = default)
     {
         try
         {
-            return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+            if (cloneOptions == null || cloneOptions.IsNullOrUndefined)
+                return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+
+            return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value, cloneOptions));
         }
         catch (JSException)
         {
@@ -511,9 +542,10 @@ public sealed partial class DomBridge
                     }
                 }
 
-                var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value);
                 var targetOwner = ResolveOwnerWindow(targetPort) ?? _windowJSObject ?? sourcePort;
-                var ports = ExtractTransferredPorts(transferValue, targetOwner);
+                var (ports, cloneOptions, transferredPorts) = ExtractTransferList(transferValue);
+                var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value, cloneOptions);
+                CommitTransferredPorts(transferredPorts, targetOwner);
                 QueueFrameAction(() =>
                 {
                     if (_closedMessagePorts.Contains(sourcePort) ||

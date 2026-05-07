@@ -136,6 +136,61 @@ public class WebMessagingTests
     }
 
     [Fact]
+    public void Window_PostMessage_Options_Object_Transfers_ArrayBuffer()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                var source = new ArrayBuffer(4);
+                var bytes = new Uint8Array(source);
+                bytes[0] = 7;
+                bytes[1] = 11;
+
+                frame.contentWindow.addEventListener('message', function(event) {
+                    var cloneView = new Uint8Array(event.data);
+                    frame.contentDocument.body.setAttribute('data-buffer', [
+                        event.data instanceof ArrayBuffer,
+                        event.data.detached,
+                        event.data.byteLength,
+                        cloneView[0],
+                        cloneView[1]
+                    ].join('|'));
+                });
+
+                frame.contentWindow.postMessage(source, {
+                    targetOrigin: '*',
+                    transfer: [source]
+                });
+
+                document.body.setAttribute('data-source', source.detached);
+            })();
+            """);
+
+        bridge.FlushTimers();
+
+        var result = context.Eval("""
+            [
+                document.body.getAttribute('data-source'),
+                document.getElementById('frame').contentDocument.body.getAttribute('data-buffer')
+            ].join('||')
+            """);
+
+        Assert.Equal("true||true|false|4|7|11", result.ToString());
+    }
+
+    [Fact]
     public void Window_PostMessage_Options_Object_TargetOrigin_Matches_NonDefault_Port()
     {
         const string html = """
@@ -449,6 +504,59 @@ public class WebMessagingTests
             """);
 
         Assert.Equal("hello|true|1||reply|true|0", result.ToString());
+    }
+
+    [Fact]
+    public void MessagePort_PostMessage_Options_Object_Transfers_ArrayBuffer_Alongside_MessagePort()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                var replyChannel = new MessageChannel();
+                var source = new ArrayBuffer(4);
+                var bytes = new Uint8Array(source);
+                bytes[0] = 5;
+                bytes[1] = 9;
+
+                channel.port1.onmessage = function(event) {
+                    var cloneView = new Uint8Array(event.data);
+                    document.body.setAttribute('data-main', [
+                        event.data instanceof ArrayBuffer,
+                        event.data.detached,
+                        event.data.byteLength,
+                        cloneView[0],
+                        cloneView[1],
+                        event.ports.length
+                    ].join('|'));
+                };
+
+                channel.port2.postMessage(source, {
+                    transfer: [replyChannel.port2, source]
+                });
+
+                document.body.setAttribute('data-source', source.detached);
+            })();
+            """);
+
+        bridge.FlushTimers();
+
+        var result = context.Eval("""
+            [
+                document.body.getAttribute('data-source'),
+                document.body.getAttribute('data-main')
+            ].join('||')
+            """);
+
+        Assert.Equal("true||true|false|4|5|9|1", result.ToString());
     }
 
     [Fact]
