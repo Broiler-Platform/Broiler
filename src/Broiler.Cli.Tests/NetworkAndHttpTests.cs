@@ -1,3 +1,7 @@
+using Broiler.HtmlBridge;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
+
 namespace Broiler.Cli.Tests;
 
 /// <summary>
@@ -689,27 +693,15 @@ firstRead.then(function(text) {
     [Fact]
     public void Fetch_Response_Json_InvalidJson_Throws_Clear_Error()
     {
-        var html = @"<!DOCTYPE html>
-<html><body>
-<div id=""result""></div>
-<script>
-var response = new Response('{invalid json');
-try {
-    response.json().then(function() {
-        document.getElementById('result').textContent = 'NO_THROW';
-    });
-} catch (e) {
-    document.getElementById('result').textContent = [
-        response.bodyUsed === true,
-        e.message
-    ].join('|');
-}
-</script>
-</body></html>";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
 
-        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        var exception = Assert.Throws<JSException>(() =>
+            context.Eval("var response = new Response('{invalid json'); response.json().then(function() {});"));
 
-        Assert.Contains("true|Failed to parse response body as JSON.", result);
+        Assert.Contains("Failed to parse response body as JSON.", exception.Message);
+        Assert.True(context.Eval("response.bodyUsed").BooleanValue);
     }
 
     // ────────────────── fetch() method support ──────────────────

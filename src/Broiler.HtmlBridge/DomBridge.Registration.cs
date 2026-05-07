@@ -1723,7 +1723,7 @@ public sealed partial class DomBridge
             {
                 return ParseJsonText(jsonText);
             }
-            catch (JSException)
+            catch (Exception)
             {
                 throw new JSException("Failed to parse response body as JSON.");
             }
