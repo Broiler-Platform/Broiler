@@ -173,6 +173,112 @@ public class WebMessagingTests
     }
 
     [Fact]
+    public void Window_PostMessage_Throws_DataCloneError_For_Invalid_Transferred_Value()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                try {
+                    document.getElementById('frame').contentWindow.postMessage('hello', {
+                        targetOrigin: '*',
+                        transfer: [{}]
+                    });
+                    return 'no-throw';
+                } catch (e) {
+                    return [
+                        e instanceof DOMException,
+                        e.name,
+                        e.code
+                    ].join('|');
+                }
+            })();
+            """);
+
+        Assert.Equal("true|DataCloneError|25", result.ToString());
+    }
+
+    [Fact]
+    public void Window_PostMessage_Throws_DataCloneError_For_Duplicate_Transferred_Port()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                try {
+                    document.getElementById('frame').contentWindow.postMessage('hello', {
+                        targetOrigin: '*',
+                        transfer: [channel.port1, channel.port1]
+                    });
+                    return 'no-throw';
+                } catch (e) {
+                    return [
+                        e instanceof DOMException,
+                        e.name,
+                        e.code
+                    ].join('|');
+                }
+            })();
+            """);
+
+        Assert.Equal("true|DataCloneError|25", result.ToString());
+    }
+
+    [Fact]
+    public void Window_PostMessage_Throws_DataCloneError_For_Uncloneable_Payload()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                try {
+                    document.getElementById('frame').contentWindow.postMessage(function nope() {}, '*');
+                    return 'no-throw';
+                } catch (e) {
+                    return [
+                        e instanceof DOMException,
+                        e.name,
+                        e.code
+                    ].join('|');
+                }
+            })();
+            """);
+
+        Assert.Equal("true|DataCloneError|25", result.ToString());
+    }
+
+    [Fact]
     public void MessageChannel_PostMessage_Delivers_Cloned_Data()
     {
         const string html = """

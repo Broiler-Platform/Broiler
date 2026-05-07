@@ -378,18 +378,27 @@ public sealed partial class DomBridge
 
     private JSArray ExtractTransferredPorts(JSValue transferValue, JSObject targetWindow)
     {
-        if (transferValue is not JSObject transferObject || transferObject is not JSArray transferArray)
+        if (transferValue.IsNullOrUndefined)
             return new JSArray();
 
+        if (transferValue is not JSArray transferArray)
+            ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+
         var transferredPorts = new List<JSValue>();
+        var seenPorts = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
             if (item is not JSObject port || !_messagePortPeers.ContainsKey(port))
-                continue;
+                ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
 
-            _eventTargetOwnerWindows[port] = targetWindow;
+            if (!seenPorts.Add(port))
+                ThrowDOMException(_jsContext!, "The transfer list contains duplicate ports.", "DataCloneError");
+
             transferredPorts.Add(port);
         }
+
+        foreach (var item in transferredPorts)
+            _eventTargetOwnerWindows[(JSObject)item] = targetWindow;
 
         return new JSArray(transferredPorts);
     }
@@ -431,7 +440,17 @@ public sealed partial class DomBridge
     }
 
     private JSValue CloneForMessaging(JSValue value)
-        => Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+    {
+        try
+        {
+            return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+        }
+        catch (JSException)
+        {
+            ThrowDOMException(_jsContext!, "The object could not be cloned.", "DataCloneError");
+            return JSUndefined.Value;
+        }
+    }
 
     private JSObject CreateMessageEvent(JSValue data, JSObject? sourceWindow, string origin, JSArray ports)
     {
