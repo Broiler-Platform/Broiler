@@ -3002,6 +3002,8 @@ public sealed partial class DomBridge
                     this.ontimeout = null;
                     this.withCredentials = false;
                     this.timeout = 0;
+                    this._timeoutTimerId = null;
+                    this._timedOut = false;
                     this.upload = createXhrUploadTarget();
                     this._method = 'GET';
                     this._url = '';
@@ -3195,6 +3197,11 @@ public sealed partial class DomBridge
                     this.responseURL = '';
                     this._responseHeaders = {};
                     this._aborted = false;
+                    this._timedOut = false;
+                    if (this._timeoutTimerId !== null) {
+                        clearTimeout(this._timeoutTimerId);
+                        this._timeoutTimerId = null;
+                    }
                     this._dispatchReadyStateChange();
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
@@ -3220,6 +3227,11 @@ public sealed partial class DomBridge
                 };
                 XMLHttpRequest.prototype.abort = function() {
                     this._aborted = true;
+                    this._timedOut = false;
+                    if (this._timeoutTimerId !== null) {
+                        clearTimeout(this._timeoutTimerId);
+                        this._timeoutTimerId = null;
+                    }
                     this.readyState = 0;
                     this.status = 0;
                     this.statusText = '';
@@ -3231,9 +3243,18 @@ public sealed partial class DomBridge
                 };
                 XMLHttpRequest.prototype.send = function(body) {
                     var self = this;
-                    if (self._aborted) return;
+                    if (self._aborted || self._timedOut) return;
+                    if (self._timeoutTimerId !== null) {
+                        clearTimeout(self._timeoutTimerId);
+                        self._timeoutTimerId = null;
+                    }
+                    self._timedOut = false;
                     function handleRequestError() {
-                        if (self._aborted) return;
+                        if (self._aborted || self._timedOut) return;
+                        if (self._timeoutTimerId !== null) {
+                            clearTimeout(self._timeoutTimerId);
+                            self._timeoutTimerId = null;
+                        }
                         self.readyState = 4;
                         self.status = 0;
                         self.statusText = '';
@@ -3257,6 +3278,22 @@ public sealed partial class DomBridge
                         if (hasHeaders) {
                             opts.headers = self._headers;
                         }
+                        if (self.timeout > 0) {
+                            self._timeoutTimerId = setTimeout(function() {
+                                self._timeoutTimerId = null;
+                                if (self._aborted || self._timedOut || self.readyState === 4) return;
+                                self._timedOut = true;
+                                self.readyState = 4;
+                                self.status = 0;
+                                self.statusText = '';
+                                self.response = null;
+                                self.responseText = '';
+                                self.responseXML = null;
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createEvent('timeout'));
+                                self.dispatchEvent(self._createProgressEvent('loadend', 0, 0, false));
+                            }, self.timeout);
+                        }
                         if (requestBody !== undefined && self.upload) {
                             var uploadProgress = self._getProgressMetrics(requestBody);
                             self.upload.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false, self.upload));
@@ -3266,7 +3303,7 @@ public sealed partial class DomBridge
                         }
                         self.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false));
                         fetch(self._url, opts).then(function(response) {
-                            if (self._aborted) return;
+                            if (self._aborted || self._timedOut) return;
                             self.status = response.status;
                             self.statusText = response.statusText;
                             self.responseURL = response.url || self._url;
@@ -3294,7 +3331,11 @@ public sealed partial class DomBridge
                                 bodyPromise = response.text();
                             }
                             bodyPromise.then(function(bodyValue) {
-                                if (self._aborted) return;
+                                if (self._aborted || self._timedOut) return;
+                                if (self._timeoutTimerId !== null) {
+                                    clearTimeout(self._timeoutTimerId);
+                                    self._timeoutTimerId = null;
+                                }
                                 var progress = self._getProgressMetrics(bodyValue);
                                 var effectiveMimeType = self._mimeOverride;
                                 if (!effectiveMimeType) {

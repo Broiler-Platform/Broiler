@@ -1473,6 +1473,95 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("property,listener", result);
     }
 
+    [Fact]
+    public void XHR_Timeout_Fires_Event_And_LoadEnd_When_Request_Hangs()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function() {
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.timeout = 1;
+xhr.ontimeout = function() { events.push('timeout'); };
+xhr.onload = function() { events.push('load'); };
+xhr.onerror = function() { events.push('error'); };
+xhr.onloadend = function() {
+    events.push('loadend');
+    document.getElementById('result').textContent = [
+        events.join(','),
+        xhr.readyState === 4,
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("timeout,loadend|true|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Success_Clears_Timeout_Timer()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.timeout = 1;
+xhr.ontimeout = function() { events.push('timeout'); };
+xhr.onload = function() { events.push('load'); };
+xhr.onloadend = function() {
+    events.push('loadend');
+    setTimeout(function() {
+        document.getElementById('result').textContent = [
+            events.join(','),
+            xhr.status === 200,
+            xhr.responseText === 'payload'
+        ].join('|');
+    }, 5);
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("load,loadend|true|true", result);
+    }
+
     // ────────────────── Content-Type handling ──────────────────
 
     [Fact]
