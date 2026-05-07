@@ -263,6 +263,98 @@ request.text().then(function(text) {
     }
 
     [Fact]
+    public void Fetch_Request_Constructor_Exposes_Default_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data');
+document.getElementById('result').textContent = [
+    request.mode,
+    request.credentials,
+    request.cache,
+    request.redirect,
+    request.referrer,
+    request.integrity
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("cors|same-origin|default|follow|about:client|", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Constructor_Exposes_Explicit_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    mode: 'same-origin',
+    credentials: 'include',
+    cache: 'no-store',
+    redirect: 'manual',
+    referrer: 'http://example.com/source',
+    integrity: 'sha256-test'
+});
+document.getElementById('result').textContent = [
+    request.mode,
+    request.credentials,
+    request.cache,
+    request.redirect,
+    request.referrer,
+    request.integrity
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("same-origin|include|no-store|manual|http://example.com/source|sha256-test", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Clone_Preserves_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload',
+    mode: 'same-origin',
+    credentials: 'include',
+    cache: 'reload',
+    redirect: 'error',
+    referrer: 'http://example.com/source',
+    integrity: 'sha256-test'
+});
+var clone = request.clone();
+document.getElementById('result').textContent = [
+    clone.mode,
+    clone.credentials,
+    clone.cache,
+    clone.redirect,
+    clone.referrer,
+    clone.integrity,
+    clone.method,
+    clone.headers.get('content-type') === null,
+    clone.bodyUsed === false
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("same-origin|include|reload|error|http://example.com/source|sha256-test|POST|true|true", result);
+    }
+
+    [Fact]
     public void Fetch_Request_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>

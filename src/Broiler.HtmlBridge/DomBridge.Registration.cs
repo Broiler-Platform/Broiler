@@ -1921,6 +1921,12 @@ public sealed partial class DomBridge
             string? body;
             JSObject headersObject;
             JSValue signalValue = JSUndefined.Value;
+            string mode = "cors";
+            string credentials = "same-origin";
+            string cache = "default";
+            string redirect = "follow";
+            string referrer = "about:client";
+            string integrity = string.Empty;
 
             if (inputValue is JSObject inputObject && !string.IsNullOrEmpty(TryGetJsPropertyString(inputObject, "url", "href")))
             {
@@ -1931,6 +1937,12 @@ public sealed partial class DomBridge
                     ? CreateHeadersObject(inputHeaders)
                     : CreateHeadersObject();
                 signalValue = inputObject[(KeyString)"signal"] ?? JSUndefined.Value;
+                mode = TryGetJsPropertyString(inputObject, "mode") ?? mode;
+                credentials = TryGetJsPropertyString(inputObject, "credentials") ?? credentials;
+                cache = TryGetJsPropertyString(inputObject, "cache") ?? cache;
+                redirect = TryGetJsPropertyString(inputObject, "redirect") ?? redirect;
+                referrer = TryGetJsPropertyString(inputObject, "referrer") ?? referrer;
+                integrity = TryGetJsPropertyString(inputObject, "integrity") ?? integrity;
             }
             else
             {
@@ -1949,6 +1961,12 @@ public sealed partial class DomBridge
                     headersObject = CreateHeadersObject(initHeaders);
                 if (initObject[(KeyString)"signal"] is { } initSignal && !initSignal.IsUndefined && !initSignal.IsNull)
                     signalValue = initSignal;
+                mode = TryGetJsPropertyString(initObject, "mode") ?? mode;
+                credentials = TryGetJsPropertyString(initObject, "credentials") ?? credentials;
+                cache = TryGetJsPropertyString(initObject, "cache") ?? cache;
+                redirect = TryGetJsPropertyString(initObject, "redirect") ?? redirect;
+                referrer = TryGetJsPropertyString(initObject, "referrer") ?? referrer;
+                integrity = TryGetJsPropertyString(initObject, "integrity") ?? integrity;
             }
 
             var requestObject = new JSObject();
@@ -1958,6 +1976,12 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
             requestObject[(KeyString)"signal"] = signalValue;
+            requestObject[(KeyString)"mode"] = new JSString(mode);
+            requestObject[(KeyString)"credentials"] = new JSString(credentials);
+            requestObject[(KeyString)"cache"] = new JSString(cache);
+            requestObject[(KeyString)"redirect"] = new JSString(redirect);
+            requestObject[(KeyString)"referrer"] = new JSString(referrer);
+            requestObject[(KeyString)"integrity"] = new JSString(integrity);
             requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
