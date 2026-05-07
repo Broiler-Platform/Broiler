@@ -3179,10 +3179,10 @@ public sealed partial class DomBridge
                                 if (typeof self.onloadend === 'function') {
                                     self.onloadend();
                                 }
-                            }).catch(function() {
+                            }, function() {
                                 handleRequestError();
                             });
-                        }).catch(function() {
+                        }, function() {
                             handleRequestError();
                         });
                     } catch(e) {

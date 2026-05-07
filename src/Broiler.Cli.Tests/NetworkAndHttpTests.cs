@@ -1742,12 +1742,10 @@ fetch = window.fetch = originalFetch;
 var originalFetch = fetch;
 fetch = window.fetch = function() {
     return {
-        then: function() {
-            return {
-                catch: function(reject) {
-                    reject(new Error('network failed'));
-                }
-            };
+        then: function(resolve, reject) {
+            if (typeof reject === 'function') {
+                reject(new Error('network failed'));
+            }
         }
     };
 };
@@ -1794,12 +1792,10 @@ fetch = window.fetch = function() {
             });
             response.text = function() {
                 return {
-                    then: function() {
-                        return {
-                            catch: function(reject) {
-                                reject(new Error('read failed'));
-                            }
-                        };
+                    then: function(resolve, reject) {
+                        if (typeof reject === 'function') {
+                            reject(new Error('read failed'));
+                        }
                     }
                 };
             };
