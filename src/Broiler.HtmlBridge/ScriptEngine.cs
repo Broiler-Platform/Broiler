@@ -5,6 +5,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.HtmlBridge;
