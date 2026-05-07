@@ -258,8 +258,9 @@ public partial class JSGlobalStatic
             if (transferredBuffers.ContainsKey(arrayBuffer))
                 throw JSEngine.NewTypeError("structuredClone: duplicate ArrayBuffer in transfer list");
 
-            var clonedBuffer = new byte[arrayBuffer.Buffer.Length];
-            Array.Copy(arrayBuffer.Buffer, clonedBuffer, arrayBuffer.Buffer.Length);
+            var sourceBuffer = arrayBuffer.Buffer;
+            var clonedBuffer = new byte[sourceBuffer.Length];
+            Array.Copy(sourceBuffer, clonedBuffer, sourceBuffer.Length);
             transferredBuffers[arrayBuffer] = new JSArrayBuffer(clonedBuffer);
         }
 
