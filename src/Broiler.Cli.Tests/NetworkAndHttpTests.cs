@@ -744,6 +744,60 @@ fetch('http://example.com/aborted', { signal: controller.signal })
         Assert.Contains("AbortError|The operation was aborted.", result);
     }
 
+    [Fact]
+    public void Fetch_AbortSignal_Dispatches_Abort_Event_Once_And_Preserves_Custom_Reason()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+var removedCalls = 0;
+function removedListener() { removedCalls++; }
+controller.signal.addEventListener('abort', removedListener);
+controller.signal.removeEventListener('abort', removedListener);
+controller.signal.addEventListener('abort', function(event) {
+    document.getElementById('result').textContent = [
+        event.type,
+        this === controller.signal,
+        controller.signal.aborted,
+        controller.signal.reason,
+        removedCalls
+    ].join('|');
+});
+controller.abort('custom-reason');
+controller.abort('second-reason');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("abort|true|true|custom-reason|0", result);
+    }
+
+    [Fact]
+    public void Fetch_AbortSignal_ThrowIfAborted_Throws_Custom_Reason()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+controller.abort('custom-reason');
+try {
+    controller.signal.throwIfAborted();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = String(e);
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("custom-reason", result);
+    }
+
     // ────────────────── XMLHttpRequest enhancements ──────────────────
 
     [Fact]

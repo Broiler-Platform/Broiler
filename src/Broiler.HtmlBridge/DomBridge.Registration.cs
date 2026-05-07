@@ -2884,16 +2884,36 @@ public sealed partial class DomBridge
         // TODO-G16: AbortController / AbortSignal — basic stubs
         context.Eval(@"
                 function AbortController() {
-                    this.signal = { aborted: false, reason: undefined, onabort: null,
-                        addEventListener: function() {}, removeEventListener: function() {},
-                        throwIfAborted: function() { if (this.aborted) throw new DOMException('The operation was aborted.', 'AbortError'); }
+                    this.signal = {
+                        aborted: false,
+                        reason: undefined,
+                        onabort: null,
+                        _listeners: [],
+                        addEventListener: function(type, listener) {
+                            if (type !== 'abort' || typeof listener !== 'function') return;
+                            if (this._listeners.indexOf(listener) === -1) this._listeners.push(listener);
+                        },
+                        removeEventListener: function(type, listener) {
+                            if (type !== 'abort') return;
+                            var index = this._listeners.indexOf(listener);
+                            if (index !== -1) this._listeners.splice(index, 1);
+                        },
+                        throwIfAborted: function() {
+                            if (this.aborted) throw (this.reason !== undefined ? this.reason : new DOMException('The operation was aborted.', 'AbortError'));
+                        }
                     };
                 }
                 AbortController.prototype.abort = function(reason) {
+                    if (this.signal.aborted) return;
                     this.signal.aborted = true;
-                    this.signal.reason = reason || new DOMException('The operation was aborted.', 'AbortError');
+                    this.signal.reason = reason !== undefined ? reason : new DOMException('The operation was aborted.', 'AbortError');
+                    var event = { type: 'abort', target: this.signal, currentTarget: this.signal };
                     if (typeof this.signal.onabort === 'function') {
-                        try { this.signal.onabort(); } catch(e) {}
+                        try { this.signal.onabort(event); } catch(e) {}
+                    }
+                    var listeners = this.signal._listeners.slice();
+                    for (var i = 0; i < listeners.length; i++) {
+                        try { listeners[i].call(this.signal, event); } catch(e) {}
                     }
                 };
             ");
