@@ -641,6 +641,56 @@ fetch(request).then(function(response) {
         Assert.Contains("true|true", result);
     }
 
+    [Fact]
+    public void Fetch_Request_Constructor_Preserves_AbortSignal()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+var request = new Request('http://example.com/request-object', {
+    signal: controller.signal
+});
+document.getElementById('result').textContent = [
+    request.signal === controller.signal,
+    request.signal.aborted === false
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_With_PreAborted_Signal_Rejects_With_AbortError()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+controller.abort();
+fetch('http://example.com/aborted', { signal: controller.signal })
+    .then(function() {
+        document.getElementById('result').textContent = 'THEN';
+    })
+    .catch(function(error) {
+        document.getElementById('result').textContent = [
+            error.name,
+            error.message
+        ].join('|');
+    });
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("AbortError|The operation was aborted.", result);
+    }
+
     // ────────────────── XMLHttpRequest enhancements ──────────────────
 
     [Fact]

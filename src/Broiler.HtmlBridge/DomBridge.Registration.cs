@@ -1908,6 +1908,7 @@ public sealed partial class DomBridge
             string method;
             string? body;
             JSObject headersObject;
+            JSValue signalValue = JSUndefined.Value;
 
             if (inputValue is JSObject inputObject && !string.IsNullOrEmpty(TryGetJsPropertyString(inputObject, "url", "href")))
             {
@@ -1917,6 +1918,7 @@ public sealed partial class DomBridge
                 headersObject = inputObject[(KeyString)"headers"] is JSObject inputHeaders
                     ? CreateHeadersObject(inputHeaders)
                     : CreateHeadersObject();
+                signalValue = inputObject[(KeyString)"signal"] ?? JSUndefined.Value;
             }
             else
             {
@@ -1933,6 +1935,8 @@ public sealed partial class DomBridge
                     body = initBody;
                 if (initObject[(KeyString)"headers"] is JSObject initHeaders)
                     headersObject = CreateHeadersObject(initHeaders);
+                if (initObject[(KeyString)"signal"] is { } initSignal && !initSignal.IsUndefined && !initSignal.IsNull)
+                    signalValue = initSignal;
             }
 
             var requestObject = new JSObject();
@@ -1941,6 +1945,7 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"headers"] = headersObject;
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
+            requestObject[(KeyString)"signal"] = signalValue;
             requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
             {
                 if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
@@ -2060,6 +2065,21 @@ public sealed partial class DomBridge
             return responseObject;
         }
 
+        static JSValue CreateAbortErrorValue(JSValue signalValue)
+        {
+            if (signalValue is JSObject signalObject)
+            {
+                var reason = signalObject[(KeyString)"reason"];
+                if (reason != null && !reason.IsUndefined && !reason.IsNull)
+                    return reason;
+            }
+
+            var error = new JSObject();
+            error[(KeyString)"name"] = new JSString("AbortError");
+            error[(KeyString)"message"] = new JSString("The operation was aborted.");
+            return error;
+        }
+
         var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
         var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
         var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
@@ -2121,11 +2141,14 @@ public sealed partial class DomBridge
             var method = "GET";
             string? requestBody = null;
             var requestHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            JSValue signalValue = JSUndefined.Value;
 
             if (a[0] is JSObject requestObject)
             {
                 method = (TryGetJsPropertyString(requestObject, "method") ?? method).ToUpperInvariant();
                 requestBody = TryGetJsPropertyString(requestObject, "_bodyInit", "body");
+                if (requestObject[(KeyString)"signal"] is { } requestSignal && !requestSignal.IsUndefined && !requestSignal.IsNull)
+                    signalValue = requestSignal;
                 if (requestObject[(KeyString)"headers"] is JSObject requestHeadersObject)
                 {
                     foreach (var (key, value) in EnumerateObjectStringEntries(requestHeadersObject))
@@ -2137,6 +2160,8 @@ public sealed partial class DomBridge
             {
                 method = (TryGetJsPropertyString(opts, "method") ?? method).ToUpperInvariant();
                 requestBody = TryGetJsPropertyString(opts, "body") ?? requestBody;
+                if (opts[(KeyString)"signal"] is { } optionsSignal && !optionsSignal.IsUndefined && !optionsSignal.IsNull)
+                    signalValue = optionsSignal;
                 if (opts[(KeyString)"headers"] is JSObject optionsHeadersObject)
                 {
                     foreach (var (key, value) in EnumerateObjectStringEntries(optionsHeadersObject))
@@ -2144,38 +2169,50 @@ public sealed partial class DomBridge
                 }
             }
 
+            var rejected = false;
+            var rejectedValue = JSUndefined.Value;
+
+            if (signalValue is JSObject signalObject && signalObject[(KeyString)"aborted"].BooleanValue)
+            {
+                rejected = true;
+                rejectedValue = CreateAbortErrorValue(signalValue);
+            }
+
             try
             {
-                var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
-                if (requestBody != null)
-                    request.Content = new StringContent(requestBody, Encoding.UTF8,
-                        requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
-                foreach (var kv in requestHeaders)
+                if (!rejected)
                 {
-                    if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                        request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
-                }
+                    var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
+                    if (requestBody != null)
+                        request.Content = new StringContent(requestBody, Encoding.UTF8,
+                            requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
+                    foreach (var kv in requestHeaders)
+                    {
+                        if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                            request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+                    }
 
-                var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
-                var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                var statusCode = (int)response.StatusCode;
+                    var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
+                    var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    var statusCode = (int)response.StatusCode;
 
-                var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var h in response.Headers)
-                    allHeaders[h.Key] = string.Join(", ", h.Value);
-                if (response.Content.Headers != null)
-                {
-                    foreach (var h in response.Content.Headers)
+                    var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var h in response.Headers)
                         allHeaders[h.Key] = string.Join(", ", h.Value);
+                    if (response.Content.Headers != null)
+                    {
+                        foreach (var h in response.Content.Headers)
+                            allHeaders[h.Key] = string.Join(", ", h.Value);
+                    }
+                    responseObj = CreateResponse(
+                        body,
+                        statusCode,
+                        response.ReasonPhrase ?? string.Empty,
+                        fetchUrl,
+                        "basic",
+                        false,
+                        allHeaders);
                 }
-                responseObj = CreateResponse(
-                    body,
-                    statusCode,
-                    response.ReasonPhrase ?? string.Empty,
-                    fetchUrl,
-                    "basic",
-                    false,
-                    allHeaders);
             }
             catch (Exception ex)
             {
@@ -2194,7 +2231,7 @@ public sealed partial class DomBridge
             var promise = new JSObject();
             promise.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
             {
-                if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
+                if (!rejected && thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
                 {
                     try { cb.InvokeFunction(new Arguments(cb, responseObj)); }
                     catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.then", $"Callback error: {ex.Message}", ex); }
@@ -2203,7 +2240,11 @@ public sealed partial class DomBridge
             }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             promise.FastAddValue((KeyString)"catch", new JSFunction((in Arguments catchArgs) =>
             {
-                // catch is a no-op for successful fetches
+                if (rejected && catchArgs.Length > 0 && catchArgs[0] is JSFunction cb)
+                {
+                    try { cb.InvokeFunction(new Arguments(cb, rejectedValue)); }
+                    catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.catch", $"Callback error: {ex.Message}", ex); }
+                }
                 return promise;
             }, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             return promise;
