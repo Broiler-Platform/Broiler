@@ -1184,6 +1184,68 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void StructuredClone_TypedArray_Preserves_View_And_Copies_Buffer()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(10);
+            var bytes = new Uint8Array(source);
+            bytes[2] = 7;
+            bytes[3] = 11;
+            bytes[4] = 13;
+            bytes[5] = 17;
+            var sourceView = new Uint16Array(source, 2, 2);
+            var clone = structuredClone(sourceView);
+            bytes[2] = 99;
+            [
+              clone instanceof Uint16Array,
+              clone.buffer !== source,
+              clone.byteOffset,
+              clone.length,
+              clone[0],
+              clone[1]
+            ].join('|');
+        ");
+        Assert.Equal("true|true|2|2|2823|4365", result.ToString());
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Reuses_Transferred_Buffer_For_TypedArray_And_DataView()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(6);
+            var bytes = new Uint8Array(source);
+            bytes.set([1, 2, 3, 4, 5, 6]);
+            var payload = {
+              buffer: source,
+              typed: new Uint8Array(source, 1, 3),
+              view: new DataView(source, 2, 2)
+            };
+            var clone = structuredClone(payload, { transfer: [source] });
+            [
+              source.detached,
+              clone.buffer !== source,
+              clone.typed instanceof Uint8Array,
+              clone.typed.buffer === clone.buffer,
+              clone.typed.byteOffset,
+              clone.typed.length,
+              clone.typed[0],
+              clone.typed[2],
+              clone.view instanceof DataView,
+              clone.view.buffer === clone.buffer,
+              clone.view.byteOffset,
+              clone.view.byteLength,
+              clone.view.getUint8(0),
+              clone.view.getUint8(1)
+            ].join('|');
+        ");
+        Assert.Equal("true|true|true|true|1|3|2|4|true|true|2|2|3|4", result.ToString());
+    }
+
+    [Fact]
     public void StructuredClone_Transfer_Rejects_NonArrayBuffer_Entries()
     {
         EnsureBuiltInsLoaded();

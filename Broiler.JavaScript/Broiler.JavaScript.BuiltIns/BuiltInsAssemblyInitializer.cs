@@ -4,6 +4,7 @@ using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
+using Broiler.JavaScript.BuiltIns.DataView;
 using Broiler.JavaScript.BuiltIns.Disposable;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.Intl;
@@ -253,6 +254,26 @@ internal static class BuiltInsAssemblyInitializer
                 return clone;
             }
 
+            if (value is JSTypedArray typedArray)
+            {
+                var clonedBuffer = recurse(typedArray.buffer, seen) as JSArrayBuffer
+                    ?? throw JSEngine.NewTypeError("structuredClone: typed array buffer must be an ArrayBuffer");
+
+                var clone = CloneTypedArray(typedArray, clonedBuffer);
+                seen[value] = clone;
+                return clone;
+            }
+
+            if (value is DataView dataView)
+            {
+                var clonedBuffer = recurse(dataView.Buffer, seen) as JSArrayBuffer
+                    ?? throw JSEngine.NewTypeError("structuredClone: DataView buffer must be an ArrayBuffer");
+
+                var clone = new DataView(clonedBuffer, dataView.ByteOffset, dataView.ByteLength);
+                seen[value] = clone;
+                return clone;
+            }
+
             return null;
         };
 
@@ -288,5 +309,29 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize builders for generator/async function types
         JSGeneratorFunctionBuilderV2.Initialize(typeof(JSGeneratorFunctionV2));
         JSAsyncFunctionBuilder.Initialize(typeof(JSAsyncFunction), typeof(JSValue));
+    }
+
+    private static JSTypedArray CloneTypedArray(JSTypedArray typedArray, JSArrayBuffer clonedBuffer)
+    {
+        var args = new Arguments(
+            JSUndefined.Value,
+            clonedBuffer,
+            new JSNumber(typedArray.byteOffset),
+            new JSNumber(typedArray.Length * typedArray.bytesPerElement));
+
+        return typedArray switch
+        {
+            JSInt8Array => new JSInt8Array(args),
+            JSUInt8Array => new JSUInt8Array(args),
+            JSUint8ClampedArray => new JSUint8ClampedArray(args),
+            JSInt16Array => new JSInt16Array(args),
+            JSUInt16Array => new JSUInt16Array(args),
+            JSInt32Array => new JSInt32Array(args),
+            JSUInt32Array => new JSUInt32Array(args),
+            JSFloat16Array => new JSFloat16Array(args),
+            JSFloat32Array => new JSFloat32Array(args),
+            JSFloat64Array => new JSFloat64Array(args),
+            _ => throw JSEngine.NewTypeError($"structuredClone: unsupported typed array type {typedArray.GetType().Name}")
+        };
     }
 }
