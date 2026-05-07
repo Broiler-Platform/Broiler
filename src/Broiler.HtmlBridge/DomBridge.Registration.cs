@@ -2436,6 +2436,8 @@ public sealed partial class DomBridge
 
                 try
                 {
+                    // Per sendBeacon semantics, failure to queue because no live fetch entry
+                    // point is available should return false instead of throwing.
                     if (window[(KeyString)"fetch"] is not JSFunction currentFetch)
                         return JSBoolean.False;
 
