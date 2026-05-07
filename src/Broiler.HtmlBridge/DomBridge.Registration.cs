@@ -3037,27 +3037,27 @@ public sealed partial class DomBridge
                             if (typeof self.onreadystatechange === 'function') {
                                 self.onreadystatechange();
                             }
-                            var bodyReader;
+                            var bodyPromise;
                             if (self.responseType === 'arraybuffer' &&
                                 response &&
                                 typeof response.arrayBuffer === 'function') {
-                                bodyReader = response.arrayBuffer();
+                                bodyPromise = response.arrayBuffer();
                             } else if (self.responseType === 'blob' &&
                                 response &&
                                 typeof response.blob === 'function') {
-                                bodyReader = response.blob();
+                                bodyPromise = response.blob();
                             } else if (self.responseType === 'json' &&
                                 response &&
                                 typeof response.json === 'function') {
-                                bodyReader = response.json();
+                                bodyPromise = response.json();
                             } else {
-                                bodyReader = response.text();
+                                bodyPromise = response.text();
                             }
-                             bodyReader.then(function(bodyValue) {
+                             bodyPromise.then(function(bodyValue) {
                                  if (self._aborted) return;
                                  if (self.responseType === '' || self.responseType === 'text') {
-                                     // For the default/text response types, XHR exposes the
-                                     // same textual payload via both response and responseText.
+                                     // Per XHR semantics, the default/text response types expose
+                                     // the same textual payload via both response and responseText.
                                      self.response = bodyValue;
                                      self.responseText = '' + bodyValue;
                                      self.responseXML = null;
