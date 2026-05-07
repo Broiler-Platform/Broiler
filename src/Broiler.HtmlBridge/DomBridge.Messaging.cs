@@ -497,7 +497,23 @@ public sealed partial class DomBridge
                     return JSUndefined.Value;
                 }
 
+                JSValue transferValue = JSUndefined.Value;
+                if (a.Length > 1)
+                {
+                    if (a[1] is JSObject optionsObject &&
+                        optionsObject[(KeyString)"transfer"] is { })
+                    {
+                        transferValue = optionsObject[(KeyString)"transfer"] ?? JSUndefined.Value;
+                    }
+                    else
+                    {
+                        transferValue = a[1];
+                    }
+                }
+
                 var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value);
+                var targetOwner = ResolveOwnerWindow(targetPort) ?? _windowJSObject ?? sourcePort;
+                var ports = ExtractTransferredPorts(transferValue, targetOwner);
                 QueueFrameAction(() =>
                 {
                     if (_closedMessagePorts.Contains(sourcePort) ||
@@ -506,7 +522,7 @@ public sealed partial class DomBridge
                         return;
                     }
 
-                    var evt = CreateMessageEvent(payload, null, string.Empty, new JSArray());
+                    var evt = CreateMessageEvent(payload, null, string.Empty, ports);
                     DispatchOrQueueMessagePortEvent(targetPort, evt);
                 });
 

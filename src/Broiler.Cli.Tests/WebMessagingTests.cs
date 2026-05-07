@@ -397,4 +397,123 @@ public class WebMessagingTests
         var result = context.Eval("document.getElementById('result').textContent");
         Assert.Equal("auto-start|true|0", result.ToString());
     }
+
+    [Fact]
+    public void MessagePort_PostMessage_Options_Object_Transfers_MessagePort()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                var replyChannel = new MessageChannel();
+
+                replyChannel.port1.onmessage = function(event) {
+                    document.body.setAttribute('data-reply', [
+                        event.data,
+                        event.source === null,
+                        event.ports.length
+                    ].join('|'));
+                };
+
+                channel.port1.onmessage = function(event) {
+                    document.body.setAttribute('data-main', [
+                        event.data,
+                        event.source === null,
+                        event.ports.length
+                    ].join('|'));
+                    event.ports[0].postMessage('reply');
+                };
+
+                channel.port2.postMessage('hello', {
+                    transfer: [replyChannel.port2]
+                });
+            })();
+            """);
+
+        bridge.FlushTimers();
+        bridge.FlushTimers();
+
+        var result = context.Eval("""
+            [
+                document.body.getAttribute('data-main'),
+                document.body.getAttribute('data-reply')
+            ].join('||')
+            """);
+
+        Assert.Equal("hello|true|1||reply|true|0", result.ToString());
+    }
+
+    [Fact]
+    public void MessagePort_PostMessage_Throws_DataCloneError_For_Invalid_Transferred_Value()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        var result = context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                try {
+                    channel.port1.postMessage('hello', {
+                        transfer: [{}]
+                    });
+                    return 'no-throw';
+                } catch (e) {
+                    return [
+                        e instanceof DOMException,
+                        e.name,
+                        e.code
+                    ].join('|');
+                }
+            })();
+            """);
+
+        Assert.Equal("true|DataCloneError|25", result.ToString());
+    }
+
+    [Fact]
+    public void MessagePort_PostMessage_Throws_DataCloneError_For_Duplicate_Transferred_Port()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        var result = context.Eval("""
+            (() => {
+                var channel = new MessageChannel();
+                try {
+                    channel.port1.postMessage('hello', {
+                        transfer: [channel.port2, channel.port2]
+                    });
+                    return 'no-throw';
+                } catch (e) {
+                    return [
+                        e instanceof DOMException,
+                        e.name,
+                        e.code
+                    ].join('|');
+                }
+            })();
+            """);
+
+        Assert.Equal("true|DataCloneError|25", result.ToString());
+    }
 }
