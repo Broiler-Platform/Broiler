@@ -1,8 +1,10 @@
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Broiler.JavaScript.BuiltIns.Tests;
 
@@ -474,18 +476,14 @@ public class BuiltInsTests
     }
 
     [Fact]
-    public void Array_FromAsync_IsEnabled_WhenFlagIsOn()
+    public async Task Array_FromAsync_IsEnabled_WhenFlagIsOn()
     {
         EnsureBuiltInsLoaded();
         using var ctx = CreateContext(JavaScriptFeatureFlags.ArrayFromAsync);
-        var result = ctx.Eval("""
-            var output = '';
-            Array.fromAsync([1, 2, 3], function(value) { return value * 2; }).then(function(values) {
-                output = values.join(',');
-            });
-            output;
-            """);
-        Assert.Equal("2,4,6", result.ToString());
+        var promise = Assert.IsType<JSPromise>(ctx.Eval("Array.fromAsync([1, 2, 3], value => value * 2)"));
+        var result = Assert.IsType<JSArray>(await promise.Task);
+        ctx["resultArray"] = result;
+        Assert.Equal("2,4,6", ctx.Eval("resultArray.join(',')").ToString());
     }
 
     [Fact]
