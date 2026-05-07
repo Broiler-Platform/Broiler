@@ -3006,6 +3006,7 @@ public sealed partial class DomBridge
                     this._url = '';
                     this._async = true;
                     this._headers = {};
+                    this._listeners = {};
                     this._responseHeaders = {};
                     this._mimeOverride = null;
                     this._aborted = false;
@@ -3020,6 +3021,144 @@ public sealed partial class DomBridge
                 XMLHttpRequest.HEADERS_RECEIVED = 2;
                 XMLHttpRequest.LOADING = 3;
                 XMLHttpRequest.DONE = 4;
+                XMLHttpRequest.prototype.addEventListener = function(type, listener) {
+                    if (!type ||
+                        (typeof listener !== 'function' &&
+                         (!listener || typeof listener.handleEvent !== 'function'))) {
+                        return;
+                    }
+                    var key = '' + type;
+                    var listeners = this._listeners[key];
+                    if (!listeners) {
+                        listeners = [];
+                        this._listeners[key] = listeners;
+                    }
+                    if (listeners.indexOf(listener) < 0) {
+                        listeners.push(listener);
+                    }
+                };
+                XMLHttpRequest.prototype.removeEventListener = function(type, listener) {
+                    if (!type || !listener) return;
+                    var key = '' + type;
+                    var listeners = this._listeners[key];
+                    if (!listeners || !listeners.length) return;
+                    for (var i = listeners.length - 1; i >= 0; i--) {
+                        if (listeners[i] === listener) {
+                            listeners.splice(i, 1);
+                            break;
+                        }
+                    }
+                };
+                XMLHttpRequest.prototype._createEvent = function(type, init) {
+                    var event = {
+                        type: '' + type,
+                        target: this,
+                        currentTarget: this,
+                        srcElement: this,
+                        bubbles: false,
+                        cancelable: false,
+                        defaultPrevented: false,
+                        eventPhase: 2,
+                        preventDefault: function() {
+                            if (this.cancelable) this.defaultPrevented = true;
+                        },
+                        stopPropagation: function() {},
+                        stopImmediatePropagation: function() {
+                            this.__immediateStopped = true;
+                        }
+                    };
+                    if (init) {
+                        for (var key in init) {
+                            event[key] = init[key];
+                        }
+                    }
+                    return event;
+                };
+                XMLHttpRequest.prototype._createProgressEvent = function(type, loaded, total, lengthComputable) {
+                    return this._createEvent(type, {
+                        loaded: loaded || 0,
+                        total: total || 0,
+                        lengthComputable: !!lengthComputable
+                    });
+                };
+                XMLHttpRequest.prototype._getProgressMetrics = function(bodyValue) {
+                    if (bodyValue === null || bodyValue === undefined) {
+                        return { loaded: 0, total: 0, lengthComputable: false };
+                    }
+                    if (typeof bodyValue === 'string') {
+                        return {
+                            loaded: bodyValue.length,
+                            total: bodyValue.length,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.byteLength === 'number') {
+                        return {
+                            loaded: bodyValue.byteLength,
+                            total: bodyValue.byteLength,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.size === 'number') {
+                        return {
+                            loaded: bodyValue.size,
+                            total: bodyValue.size,
+                            lengthComputable: true
+                        };
+                    }
+                    return { loaded: 0, total: 0, lengthComputable: false };
+                };
+                XMLHttpRequest.prototype.dispatchEvent = function(event) {
+                    if (!event || typeof event.type !== 'string') return true;
+                    event.target = event.target || this;
+                    event.currentTarget = this;
+                    event.srcElement = this;
+                    event.eventPhase = 2;
+                    if (event.bubbles === undefined) event.bubbles = false;
+                    if (event.cancelable === undefined) event.cancelable = false;
+                    if (event.defaultPrevented === undefined) event.defaultPrevented = false;
+                    if (typeof event.preventDefault !== 'function') {
+                        event.preventDefault = function() {
+                            if (this.cancelable) this.defaultPrevented = true;
+                        };
+                    }
+                    if (typeof event.stopPropagation !== 'function') {
+                        event.stopPropagation = function() {};
+                    }
+                    if (typeof event.stopImmediatePropagation !== 'function') {
+                        event.stopImmediatePropagation = function() {
+                            this.__immediateStopped = true;
+                        };
+                    }
+
+                    var handler = this['on' + event.type];
+                    if (typeof handler === 'function') {
+                        handler.call(this, event);
+                    }
+
+                    if (!event.__immediateStopped) {
+                        var listeners = this._listeners[event.type];
+                        if (listeners && listeners.length) {
+                            var snapshot = listeners.slice();
+                            for (var i = 0; i < snapshot.length; i++) {
+                                var listener = snapshot[i];
+                                if (typeof listener === 'function') {
+                                    listener.call(this, event);
+                                } else if (listener && typeof listener.handleEvent === 'function') {
+                                    listener.handleEvent(event);
+                                }
+                                if (event.__immediateStopped) break;
+                            }
+                        }
+                    }
+
+                    event.currentTarget = null;
+                    event.eventPhase = 0;
+                    return !event.defaultPrevented;
+                };
+                XMLHttpRequest.prototype._dispatchReadyStateChange = function() {
+                    this.dispatchEvent(this._createEvent('readystatechange'));
+                };
                 XMLHttpRequest.prototype.open = function(method, url, isAsync) {
                     this._method = method;
                     this._url = url;
@@ -3033,9 +3172,7 @@ public sealed partial class DomBridge
                     this.responseURL = '';
                     this._responseHeaders = {};
                     this._aborted = false;
-                    if (typeof this.onreadystatechange === 'function') {
-                        this.onreadystatechange();
-                    }
+                    this._dispatchReadyStateChange();
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
                     this._headers[name] = value;
@@ -3066,12 +3203,8 @@ public sealed partial class DomBridge
                     this.response = null;
                     this.responseText = '';
                     this.responseXML = null;
-                    if (typeof this.onabort === 'function') {
-                        this.onabort();
-                    }
-                    if (typeof this.onloadend === 'function') {
-                        this.onloadend();
-                    }
+                    this.dispatchEvent(this._createEvent('abort'));
+                    this.dispatchEvent(this._createProgressEvent('loadend', 0, 0, false));
                 };
                 XMLHttpRequest.prototype.send = function(body) {
                     var self = this;
@@ -3084,15 +3217,9 @@ public sealed partial class DomBridge
                         self.response = null;
                         self.responseText = '';
                         self.responseXML = null;
-                        if (typeof self.onreadystatechange === 'function') {
-                            self.onreadystatechange();
-                        }
-                        if (typeof self.onerror === 'function') {
-                            self.onerror();
-                        }
-                        if (typeof self.onloadend === 'function') {
-                            self.onloadend();
-                        }
+                        self._dispatchReadyStateChange();
+                        self.dispatchEvent(self._createEvent('error'));
+                        self.dispatchEvent(self._createProgressEvent('loadend', 0, 0, false));
                     }
                     try {
                         var opts = { method: self._method };
@@ -3104,9 +3231,7 @@ public sealed partial class DomBridge
                         if (hasHeaders) {
                             opts.headers = self._headers;
                         }
-                        if (typeof self.onloadstart === 'function') {
-                            self.onloadstart();
-                        }
+                        self.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false));
                         fetch(self._url, opts).then(function(response) {
                             if (self._aborted) return;
                             self.status = response.status;
@@ -3118,9 +3243,7 @@ public sealed partial class DomBridge
                                     self._responseHeaders[name] = value;
                                 });
                             }
-                            if (typeof self.onreadystatechange === 'function') {
-                                self.onreadystatechange();
-                            }
+                            self._dispatchReadyStateChange();
                             var bodyPromise;
                             if (self.responseType === 'arraybuffer' &&
                                 response &&
@@ -3139,6 +3262,7 @@ public sealed partial class DomBridge
                             }
                             bodyPromise.then(function(bodyValue) {
                                 if (self._aborted) return;
+                                var progress = self._getProgressMetrics(bodyValue);
                                 var effectiveMimeType = self._mimeOverride;
                                 if (!effectiveMimeType) {
                                     effectiveMimeType = self.getResponseHeader('Content-Type') || '';
@@ -3190,22 +3314,12 @@ public sealed partial class DomBridge
                                     self.responseXML = null;
                                 }
                                 self.readyState = 3;
-                                if (typeof self.onreadystatechange === 'function') {
-                                    self.onreadystatechange();
-                                }
-                                if (typeof self.onprogress === 'function') {
-                                    self.onprogress();
-                                }
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createProgressEvent('progress', progress.loaded, progress.total, progress.lengthComputable));
                                 self.readyState = 4;
-                                if (typeof self.onreadystatechange === 'function') {
-                                    self.onreadystatechange();
-                                }
-                                if (typeof self.onload === 'function') {
-                                    self.onload();
-                                }
-                                if (typeof self.onloadend === 'function') {
-                                    self.onloadend();
-                                }
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createProgressEvent('load', progress.loaded, progress.total, progress.lengthComputable));
+                                self.dispatchEvent(self._createProgressEvent('loadend', progress.loaded, progress.total, progress.lengthComputable));
                             }, function() {
                                 handleRequestError();
                             });

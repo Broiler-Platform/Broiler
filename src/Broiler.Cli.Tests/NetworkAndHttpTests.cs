@@ -1130,6 +1130,26 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void XHR_Has_EventTarget_Methods()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var xhr = new XMLHttpRequest();
+var r = [];
+r.push(typeof xhr.addEventListener === 'function');
+r.push(typeof xhr.removeEventListener === 'function');
+r.push(typeof xhr.dispatchEvent === 'function');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
     public void XHR_Has_Static_State_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -1245,6 +1265,100 @@ document.getElementById('result').textContent = readyStates.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("1,2,3,4", result);
+    }
+
+    [Fact]
+    public void XHR_AddEventListener_Dispatches_Lifecycle_And_Progress_Events()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.addEventListener('readystatechange', function(event) {
+    events.push('rs:' + xhr.readyState + ':' + (event.target === xhr) + ':' + (event.currentTarget === xhr));
+});
+xhr.addEventListener('loadstart', function(event) {
+    events.push(['loadstart', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+});
+xhr.addEventListener('progress', function(event) {
+    events.push(['progress', event.lengthComputable, event.loaded, event.total, event.currentTarget === xhr].join(':'));
+});
+xhr.addEventListener('load', function(event) {
+    events.push(['load', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+});
+xhr.addEventListener('loadend', function(event) {
+    events.push(['loadend', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+    document.getElementById('result').textContent = events.join('|');
+});
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("rs:1:true:true", result);
+        Assert.Contains("loadstart:false:0:0:true", result);
+        Assert.Contains("rs:2:true:true", result);
+        Assert.Contains("rs:3:true:true", result);
+        Assert.Contains("progress:true:7:7:true", result);
+        Assert.Contains("rs:4:true:true", result);
+        Assert.Contains("load:true:7:7:true", result);
+        Assert.Contains("loadend:true:7:7:true", result);
+    }
+
+    [Fact]
+    public void XHR_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var order = [];
+xhr.onload = function() { order.push('property'); };
+xhr.addEventListener('load', function() { order.push('listener'); });
+xhr.addEventListener('loadend', function() {
+    document.getElementById('result').textContent = order.join(',');
+});
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("property,listener", result);
     }
 
     // ────────────────── Content-Type handling ──────────────────
