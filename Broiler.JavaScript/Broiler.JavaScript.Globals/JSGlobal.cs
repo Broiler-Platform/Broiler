@@ -3,6 +3,8 @@ using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.RegExp;
+using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Runtime;
@@ -221,7 +223,58 @@ public partial class JSGlobalStatic
     {
         var value = a.Get1();
         var seen = new Dictionary<JSValue, JSValue>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
-        return StructuredCloneValue(value, seen);
+        var transferredBuffers = GetTransferredArrayBuffers(a.Length > 1 ? a[1] : JSUndefined.Value);
+        foreach (var (source, clone) in transferredBuffers)
+            seen[source] = clone;
+
+        var result = StructuredCloneValue(value, seen);
+        DetachTransferredArrayBuffers(transferredBuffers);
+
+        return result;
+    }
+
+    private static Dictionary<JSValue, JSValue> GetTransferredArrayBuffers(JSValue options)
+    {
+        var transferredBuffers = new Dictionary<JSValue, JSValue>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        if (options is not JSObject optionsObject)
+            return transferredBuffers;
+
+        var transferValue = optionsObject[(KeyString)"transfer"];
+        if (transferValue == null || transferValue.IsNullOrUndefined)
+            return transferredBuffers;
+
+        if (transferValue is not JSArray transferArray)
+            throw JSEngine.NewTypeError("structuredClone: transfer must be an array");
+
+        foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
+        {
+            if (item is not JSArrayBuffer arrayBuffer)
+                throw JSEngine.NewTypeError("structuredClone: transfer list entries must be ArrayBuffers");
+
+            if (arrayBuffer.isDetached)
+                throw JSEngine.NewTypeError("structuredClone: cannot transfer a detached ArrayBuffer");
+
+            if (transferredBuffers.ContainsKey(arrayBuffer))
+                throw JSEngine.NewTypeError("structuredClone: duplicate ArrayBuffer in transfer list");
+
+            var clonedBuffer = new byte[arrayBuffer.buffer.Length];
+            Array.Copy(arrayBuffer.buffer, clonedBuffer, arrayBuffer.buffer.Length);
+            transferredBuffers[arrayBuffer] = new JSArrayBuffer(clonedBuffer);
+        }
+
+        return transferredBuffers;
+    }
+
+    private static void DetachTransferredArrayBuffers(Dictionary<JSValue, JSValue> transferredBuffers)
+    {
+        foreach (var source in transferredBuffers.Keys)
+        {
+            if (source is not JSArrayBuffer arrayBuffer)
+                continue;
+
+            arrayBuffer.isDetached = true;
+            arrayBuffer.buffer = Array.Empty<byte>();
+        }
     }
 
     private static JSValue StructuredCloneValue(JSValue value, Dictionary<JSValue, JSValue> seen)

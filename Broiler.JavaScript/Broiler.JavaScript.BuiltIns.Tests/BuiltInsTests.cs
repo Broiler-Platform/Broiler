@@ -1078,6 +1078,44 @@ public class BuiltInsTests
     }
 
     [Fact]
+    public void StructuredClone_Transfer_ArrayBuffer_Detaches_Source_And_Returns_Clone()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            var sourceView = new Uint8Array(source);
+            sourceView[0] = 7;
+            sourceView[1] = 11;
+            var clone = structuredClone(source, { transfer: [source] });
+            var cloneView = new Uint8Array(clone);
+            [source.detached, clone.detached, clone.byteLength, cloneView[0], cloneView[1], clone !== source].join('|');
+        ");
+        Assert.Equal("true|false|4|7|11|true", result.ToString());
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Rejects_NonArrayBuffer_Entries()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            structuredClone({ ok: true }, { transfer: [{}] });
+        "));
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Rejects_Duplicate_ArrayBuffers()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            structuredClone(source, { transfer: [source, source] });
+        "));
+    }
+
+    [Fact]
     public void ExperimentalEs2026Features_CanBeDisabled_PerContext()
     {
         EnsureBuiltInsLoaded();
