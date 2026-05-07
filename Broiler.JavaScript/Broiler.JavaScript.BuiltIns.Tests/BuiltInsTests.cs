@@ -446,6 +446,97 @@ public class BuiltInsTests
         Assert.Equal("present|1", result.ToString());
     }
 
+    [Fact]
+    public void Error_IsError_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ErrorIsError);
+        var result = ctx.Eval("typeof Error.isError");
+        Assert.Equal("undefined", result.ToString());
+    }
+
+    [Fact]
+    public void Error_IsError_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ErrorIsError);
+        var result = ctx.Eval("[Error.isError(new Error('x')), Error.isError(new TypeError('y')), Error.isError({})].join('|')");
+        Assert.Equal("true|true|false", result.ToString());
+    }
+
+    [Fact]
+    public void Array_FromAsync_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ArrayFromAsync);
+        var result = ctx.Eval("typeof Array.fromAsync");
+        Assert.Equal("undefined", result.ToString());
+    }
+
+    [Fact]
+    public void Array_FromAsync_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ArrayFromAsync);
+        var result = ctx.Eval("""
+            var output = '';
+            Array.fromAsync([1, 2, 3], function(value) { return value * 2; }).then(function(values) {
+                output = values.join(',');
+            });
+            output;
+            """);
+        Assert.Equal("2,4,6", result.ToString());
+    }
+
+    [Fact]
+    public void Object_And_Map_GroupBy_Are_Disabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ObjectMapGroupBy);
+        var result = ctx.Eval("typeof Object.groupBy + '|' + typeof Map.groupBy");
+        Assert.Equal("undefined|undefined", result.ToString());
+    }
+
+    [Fact]
+    public void Object_And_Map_GroupBy_Are_Enabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ObjectMapGroupBy);
+        var result = ctx.Eval("""
+            var objectGroups = Object.groupBy([1, 2, 3, 4], function(value) {
+                return value % 2 === 0 ? 'even' : 'odd';
+            });
+            var mapGroups = Map.groupBy([1, 2, 3, 4], function(value) {
+                return value % 2;
+            });
+            [
+                objectGroups.odd.join(','),
+                objectGroups.even.join(','),
+                mapGroups.get(1).join(','),
+                mapGroups.get(0).join(',')
+            ].join('|');
+            """);
+        Assert.Equal("1,3|2,4|1,3|2,4", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_Concat_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.IteratorConcat);
+        var result = ctx.Eval("typeof Iterator.concat + '|' + typeof Iterator.from");
+        Assert.Equal("undefined|function", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_Concat_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.IteratorConcat);
+        var result = ctx.Eval("Iterator.concat([1,2], new Set([3,4]).values()).reduce((sum, value) => sum + value, 0);");
+        Assert.Equal(10.0, result.DoubleValue);
+    }
+
     // ── M3: DataView tests ───────────────────────────────────────────
 
     [Fact]

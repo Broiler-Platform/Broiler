@@ -126,6 +126,33 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
                 weakMapCtor.prototype.Delete(KeyStrings.GetOrCreate("getOrInsertComputed"));
             }
         }
+
+        if (context[KeyStrings.GetOrCreate("Error")] is JSFunction errorCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.ErrorIsError))
+        {
+            errorCtor.Delete(KeyStrings.GetOrCreate("isError"));
+        }
+
+        if (context[KeyStrings.GetOrCreate("Array")] is JSFunction arrayCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.ArrayFromAsync))
+        {
+            arrayCtor.Delete(KeyStrings.GetOrCreate("fromAsync"));
+        }
+
+        if (!context.HasExperimentalFeature(JavaScriptFeatureFlags.ObjectMapGroupBy))
+        {
+            if (context[KeyStrings.GetOrCreate("Object")] is JSFunction objectCtor)
+                objectCtor.Delete(KeyStrings.GetOrCreate("groupBy"));
+
+            if (context[KeyStrings.GetOrCreate("Map")] is JSFunction mapCtor)
+                mapCtor.Delete(KeyStrings.GetOrCreate("groupBy"));
+        }
+
+        if (context[KeyStrings.GetOrCreate("Iterator")] is JSFunction iteratorCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.IteratorConcat))
+        {
+            iteratorCtor.Delete(KeyStrings.GetOrCreate("concat"));
+        }
     }
 
     private static void SetupIteratorPrototypeChain(JSContext context)
