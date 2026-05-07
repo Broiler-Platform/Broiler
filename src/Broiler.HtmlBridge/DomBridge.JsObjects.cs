@@ -1516,6 +1516,30 @@ public sealed partial class DomBridge
             }, "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        obj.FastAddValue(
+            (KeyString)"matches",
+            new JSFunction((in Arguments a) =>
+            {
+                var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
+            }, "matches", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"closest",
+            new JSFunction((in Arguments a) =>
+            {
+                var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
+                for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = current.Parent)
+                {
+                    if (MatchesSelector(current, sel, element))
+                        return bridge.ToJSObject(current);
+                }
+
+                return JSNull.Value;
+            }, "closest", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // getElementsByTagName on elements — searches descendants in tree order
         obj.FastAddValue(
             (KeyString)"getElementsByTagName",

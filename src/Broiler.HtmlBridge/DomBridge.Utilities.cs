@@ -98,21 +98,29 @@ public sealed partial class DomBridge
     private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
-        SearchDescendants(root, selector, results, bridge, all);
+        if (selector.IndexOf(":scope", StringComparison.Ordinal) >= 0 &&
+            MatchesSelector(root, selector, root))
+        {
+            results.Add(bridge.ToJSObject(root));
+            if (!all)
+                return results[0];
+        }
+
+        SearchDescendants(root, selector, results, bridge, all, root);
         if (all) return new JSArray(results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all)
+    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
     {
         foreach (var child in parent.Children)
         {
-            if (!child.IsTextNode && MatchesSelector(child, selector))
+            if (!child.IsTextNode && MatchesSelector(child, selector, scope))
             {
                 results.Add(bridge.ToJSObject(child));
                 if (!all) return;
             }
-            SearchDescendants(child, selector, results, bridge, all);
+            SearchDescendants(child, selector, results, bridge, all, scope);
             if (!all && results.Count > 0) return;
         }
     }
