@@ -381,18 +381,28 @@ public sealed partial class DomBridge
         if (transferValue.IsNullOrUndefined)
             return new JSArray();
 
-        if (transferValue is not JSArray transferArray)
+        if (transferValue is not JSArray)
+        {
             ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+            return new JSArray();
+        }
+
+        var transferArray = (JSArray)transferValue;
 
         var transferredPorts = new List<JSValue>();
         var seenPorts = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
             if (item is not JSObject port || !_messagePortPeers.ContainsKey(port))
+            {
                 ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+                continue;
+            }
 
             if (!seenPorts.Add(port))
+            {
                 ThrowDOMException(_jsContext!, "The transfer list contains duplicate ports.", "DataCloneError");
+            }
 
             transferredPorts.Add(port);
         }
