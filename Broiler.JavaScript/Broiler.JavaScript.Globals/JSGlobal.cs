@@ -10,6 +10,7 @@ using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine.Core;
 
@@ -251,14 +252,14 @@ public partial class JSGlobalStatic
             if (item is not JSArrayBuffer arrayBuffer)
                 throw JSEngine.NewTypeError("structuredClone: transfer list entries must be ArrayBuffers");
 
-            if (arrayBuffer.isDetached)
+            if (arrayBuffer.Detached)
                 throw JSEngine.NewTypeError("structuredClone: cannot transfer a detached ArrayBuffer");
 
             if (transferredBuffers.ContainsKey(arrayBuffer))
                 throw JSEngine.NewTypeError("structuredClone: duplicate ArrayBuffer in transfer list");
 
-            var clonedBuffer = new byte[arrayBuffer.buffer.Length];
-            Array.Copy(arrayBuffer.buffer, clonedBuffer, arrayBuffer.buffer.Length);
+            var clonedBuffer = new byte[arrayBuffer.Buffer.Length];
+            Array.Copy(arrayBuffer.Buffer, clonedBuffer, arrayBuffer.Buffer.Length);
             transferredBuffers[arrayBuffer] = new JSArrayBuffer(clonedBuffer);
         }
 
@@ -272,8 +273,7 @@ public partial class JSGlobalStatic
             if (source is not JSArrayBuffer arrayBuffer)
                 continue;
 
-            arrayBuffer.isDetached = true;
-            arrayBuffer.buffer = Array.Empty<byte>();
+            arrayBuffer.InvokeMethod((KeyString)"transfer", new Arguments(arrayBuffer));
         }
     }
 
