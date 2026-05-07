@@ -3110,10 +3110,15 @@ public sealed partial class DomBridge
                                         self.responseXML = null;
                                     }
                                 } else if (self.responseType === 'document') {
-                                    var responseDocument = document.implementation.createHTMLDocument('');
-                                    responseDocument.body.innerHTML = '' + bodyValue;
-                                    self.response = responseDocument;
-                                    self.responseXML = responseDocument;
+                                    if (shouldPopulateResponseXml) {
+                                        var responseDocument = document.implementation.createHTMLDocument('');
+                                        responseDocument.body.innerHTML = '' + bodyValue;
+                                        self.response = responseDocument;
+                                        self.responseXML = responseDocument;
+                                    } else {
+                                        self.response = null;
+                                        self.responseXML = null;
+                                    }
                                     self.responseText = '';
                                 } else {
                                     self.response = bodyValue;

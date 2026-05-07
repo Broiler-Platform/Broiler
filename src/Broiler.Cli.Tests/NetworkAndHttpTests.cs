@@ -1707,4 +1707,86 @@ fetch = window.fetch = originalFetch;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true|true|true|true|OK", result);
     }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Stays_Null_For_NonDocument_MimeType()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('plain text payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response === null,
+        xhr.responseXML === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Uses_OverrideMimeType_For_Text_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.overrideMimeType('text/html');
+xhr.onload = function() {
+    var payload = xhr.response && xhr.response.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseXML,
+        xhr.responseText === '',
+        xhr.response !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
+    }
 }
