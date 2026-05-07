@@ -3052,6 +3052,24 @@ public sealed partial class DomBridge
                 XMLHttpRequest.prototype.send = function(body) {
                     var self = this;
                     if (self._aborted) return;
+                    function handleRequestError() {
+                        if (self._aborted) return;
+                        self.readyState = 4;
+                        self.status = 0;
+                        self.statusText = '';
+                        self.response = null;
+                        self.responseText = '';
+                        self.responseXML = null;
+                        if (typeof self.onreadystatechange === 'function') {
+                            self.onreadystatechange();
+                        }
+                        if (typeof self.onerror === 'function') {
+                            self.onerror();
+                        }
+                        if (typeof self.onloadend === 'function') {
+                            self.onloadend();
+                        }
+                    }
                     try {
                         var opts = { method: self._method };
                         if (body && self._method !== 'GET' && self._method !== 'HEAD') {
@@ -3161,20 +3179,14 @@ public sealed partial class DomBridge
                                 if (typeof self.onloadend === 'function') {
                                     self.onloadend();
                                 }
+                            }).catch(function() {
+                                handleRequestError();
                             });
+                        }).catch(function() {
+                            handleRequestError();
                         });
                     } catch(e) {
-                        self.readyState = 4;
-                        self.status = 0;
-                        if (typeof self.onreadystatechange === 'function') {
-                            self.onreadystatechange();
-                        }
-                        if (typeof self.onerror === 'function') {
-                            self.onerror();
-                        }
-                        if (typeof self.onloadend === 'function') {
-                            self.onloadend();
-                        }
+                        handleRequestError();
                     }
                 };
             ");

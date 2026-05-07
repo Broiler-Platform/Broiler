@@ -1733,6 +1733,112 @@ fetch = window.fetch = originalFetch;
     }
 
     [Fact]
+    public void XHR_Rejected_Fetch_Triggers_Error_And_LoadEnd()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function() {
+            return {
+                catch: function(reject) {
+                    reject(new Error('network failed'));
+                }
+            };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.onload = function() { loadCalled = true; };
+xhr.onerror = function() { errorCalled = true; };
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        xhr.readyState === 4,
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("false|true|true|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Rejected_BodyReader_Triggers_Error_And_LoadEnd()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            var response = new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            });
+            response.text = function() {
+                return {
+                    then: function() {
+                        return {
+                            catch: function(reject) {
+                                reject(new Error('read failed'));
+                            }
+                        };
+                    }
+                };
+            };
+            resolve(response);
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var readyStates = [];
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.onreadystatechange = function() {
+    readyStates.push(xhr.readyState);
+};
+xhr.onload = function() { loadCalled = true; };
+xhr.onerror = function() { errorCalled = true; };
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        readyStates.join(','),
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("false|true|2,4|true|true|true", result);
+    }
+
+    [Fact]
     public void XHR_Document_ResponseType_Uses_Fetch_Text_Result_As_Document()
     {
         var html = @"<!DOCTYPE html>
