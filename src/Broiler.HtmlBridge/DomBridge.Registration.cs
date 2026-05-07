@@ -3002,6 +3002,7 @@ public sealed partial class DomBridge
                     this.ontimeout = null;
                     this.withCredentials = false;
                     this.timeout = 0;
+                    this.upload = createXhrUploadTarget();
                     this._method = 'GET';
                     this._url = '';
                     this._async = true;
@@ -3016,12 +3017,7 @@ public sealed partial class DomBridge
                     this.LOADING = 3;
                     this.DONE = 4;
                 }
-                XMLHttpRequest.UNSENT = 0;
-                XMLHttpRequest.OPENED = 1;
-                XMLHttpRequest.HEADERS_RECEIVED = 2;
-                XMLHttpRequest.LOADING = 3;
-                XMLHttpRequest.DONE = 4;
-                XMLHttpRequest.prototype.addEventListener = function(type, listener) {
+                function xhrAddEventListener(type, listener) {
                     if (!type ||
                         (typeof listener !== 'function' &&
                          (!listener || typeof listener.handleEvent !== 'function'))) {
@@ -3036,8 +3032,8 @@ public sealed partial class DomBridge
                     if (listeners.indexOf(listener) < 0) {
                         listeners.push(listener);
                     }
-                };
-                XMLHttpRequest.prototype.removeEventListener = function(type, listener) {
+                }
+                function xhrRemoveEventListener(type, listener) {
                     if (!type || !listener) return;
                     var key = '' + type;
                     var listeners = this._listeners[key];
@@ -3048,13 +3044,14 @@ public sealed partial class DomBridge
                             break;
                         }
                     }
-                };
-                XMLHttpRequest.prototype._createEvent = function(type, init) {
+                }
+                function createXhrEvent(type, init, target) {
+                    target = target || null;
                     var event = {
                         type: '' + type,
-                        target: this,
-                        currentTarget: this,
-                        srcElement: this,
+                        target: target,
+                        currentTarget: target,
+                        srcElement: target,
                         bubbles: false,
                         cancelable: false,
                         defaultPrevented: false,
@@ -3073,42 +3070,8 @@ public sealed partial class DomBridge
                         }
                     }
                     return event;
-                };
-                XMLHttpRequest.prototype._createProgressEvent = function(type, loaded, total, lengthComputable) {
-                    return this._createEvent(type, {
-                        loaded: loaded || 0,
-                        total: total || 0,
-                        lengthComputable: !!lengthComputable
-                    });
-                };
-                XMLHttpRequest.prototype._getProgressMetrics = function(bodyValue) {
-                    if (bodyValue === null || bodyValue === undefined) {
-                        return { loaded: 0, total: 0, lengthComputable: false };
-                    }
-                    if (typeof bodyValue === 'string') {
-                        return {
-                            loaded: bodyValue.length,
-                            total: bodyValue.length,
-                            lengthComputable: true
-                        };
-                    }
-                    if (typeof bodyValue.byteLength === 'number') {
-                        return {
-                            loaded: bodyValue.byteLength,
-                            total: bodyValue.byteLength,
-                            lengthComputable: true
-                        };
-                    }
-                    if (typeof bodyValue.size === 'number') {
-                        return {
-                            loaded: bodyValue.size,
-                            total: bodyValue.size,
-                            lengthComputable: true
-                        };
-                    }
-                    return { loaded: 0, total: 0, lengthComputable: false };
-                };
-                XMLHttpRequest.prototype.dispatchEvent = function(event) {
+                }
+                function xhrDispatchEvent(event) {
                     if (!event || typeof event.type !== 'string') return true;
                     event.target = event.target || this;
                     event.currentTarget = this;
@@ -3155,7 +3118,67 @@ public sealed partial class DomBridge
                     event.currentTarget = null;
                     event.eventPhase = 0;
                     return !event.defaultPrevented;
+                }
+                function createXhrUploadTarget() {
+                    return {
+                        _listeners: {},
+                        onabort: null,
+                        onerror: null,
+                        onload: null,
+                        onloadend: null,
+                        onloadstart: null,
+                        onprogress: null,
+                        ontimeout: null,
+                        addEventListener: xhrAddEventListener,
+                        removeEventListener: xhrRemoveEventListener,
+                        dispatchEvent: xhrDispatchEvent
+                    };
+                }
+                XMLHttpRequest.UNSENT = 0;
+                XMLHttpRequest.OPENED = 1;
+                XMLHttpRequest.HEADERS_RECEIVED = 2;
+                XMLHttpRequest.LOADING = 3;
+                XMLHttpRequest.DONE = 4;
+                XMLHttpRequest.prototype.addEventListener = xhrAddEventListener;
+                XMLHttpRequest.prototype.removeEventListener = xhrRemoveEventListener;
+                XMLHttpRequest.prototype._createEvent = function(type, init, target) {
+                    return createXhrEvent(type, init, target || this);
                 };
+                XMLHttpRequest.prototype._createProgressEvent = function(type, loaded, total, lengthComputable, target) {
+                    return this._createEvent(type, {
+                        loaded: loaded || 0,
+                        total: total || 0,
+                        lengthComputable: !!lengthComputable
+                    }, target);
+                };
+                XMLHttpRequest.prototype._getProgressMetrics = function(bodyValue) {
+                    if (bodyValue === null || bodyValue === undefined) {
+                        return { loaded: 0, total: 0, lengthComputable: false };
+                    }
+                    if (typeof bodyValue === 'string') {
+                        return {
+                            loaded: bodyValue.length,
+                            total: bodyValue.length,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.byteLength === 'number') {
+                        return {
+                            loaded: bodyValue.byteLength,
+                            total: bodyValue.byteLength,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.size === 'number') {
+                        return {
+                            loaded: bodyValue.size,
+                            total: bodyValue.size,
+                            lengthComputable: true
+                        };
+                    }
+                    return { loaded: 0, total: 0, lengthComputable: false };
+                };
+                XMLHttpRequest.prototype.dispatchEvent = xhrDispatchEvent;
                 XMLHttpRequest.prototype._dispatchReadyStateChange = function() {
                     this.dispatchEvent(this._createEvent('readystatechange'));
                 };
@@ -3223,13 +3246,23 @@ public sealed partial class DomBridge
                     }
                     try {
                         var opts = { method: self._method };
-                        if (body && self._method !== 'GET' && self._method !== 'HEAD') {
-                            opts.body = '' + body;
+                        var requestBody;
+                        if (body !== undefined && body !== null &&
+                            self._method !== 'GET' && self._method !== 'HEAD') {
+                            requestBody = '' + body;
+                            opts.body = requestBody;
                         }
                         var hasHeaders = false;
                         for (var k in self._headers) { hasHeaders = true; break; }
                         if (hasHeaders) {
                             opts.headers = self._headers;
+                        }
+                        if (requestBody !== undefined && self.upload) {
+                            var uploadProgress = self._getProgressMetrics(requestBody);
+                            self.upload.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('progress', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('load', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('loadend', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
                         }
                         self.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false));
                         fetch(self._url, opts).then(function(response) {

@@ -1150,6 +1150,31 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void XHR_Has_Upload_EventTarget()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var xhr = new XMLHttpRequest();
+var r = [];
+r.push(!!xhr.upload);
+r.push(typeof xhr.upload.addEventListener === 'function');
+r.push(typeof xhr.upload.removeEventListener === 'function');
+r.push(typeof xhr.upload.dispatchEvent === 'function');
+r.push(xhr.upload.onloadstart === null);
+r.push(xhr.upload.onprogress === null);
+r.push(xhr.upload.onload === null);
+r.push(xhr.upload.onloadend === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void XHR_Has_Static_State_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -1352,6 +1377,93 @@ xhr.addEventListener('loadend', function() {
 });
 xhr.open('GET', 'http://example.com/data');
 xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("property,listener", result);
+    }
+
+    [Fact]
+    public void XHR_Upload_AddEventListener_Dispatches_Upload_Progress_Events()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function(url, opts) {
+    return {
+        then: function(resolve) {
+            resolve(new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.upload.addEventListener('loadstart', function(event) {
+    events.push(['upload-loadstart', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('progress', function(event) {
+    events.push(['upload-progress', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('load', function(event) {
+    events.push(['upload-load', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('loadend', function(event) {
+    events.push(['upload-loadend', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+    document.getElementById('result').textContent = events.join('|');
+});
+xhr.open('POST', 'http://example.com/data');
+xhr.send('payload');
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("upload-loadstart:false:0:0:true:true", result);
+        Assert.Contains("upload-progress:true:7:7:true:true", result);
+        Assert.Contains("upload-load:true:7:7:true:true", result);
+        Assert.Contains("upload-loadend:true:7:7:true:true", result);
+    }
+
+    [Fact]
+    public void XHR_Upload_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var order = [];
+xhr.upload.onload = function() { order.push('property'); };
+xhr.upload.addEventListener('load', function() { order.push('listener'); });
+xhr.upload.addEventListener('loadend', function() {
+    document.getElementById('result').textContent = order.join(',');
+});
+xhr.open('POST', 'http://example.com/data');
+xhr.send('payload');
 fetch = window.fetch = originalFetch;
 </script>
 </body></html>";
