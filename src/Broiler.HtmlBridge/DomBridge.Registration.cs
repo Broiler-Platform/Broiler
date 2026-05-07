@@ -3004,21 +3004,21 @@ public sealed partial class DomBridge
                 XMLHttpRequest.HEADERS_RECEIVED = 2;
                 XMLHttpRequest.LOADING = 3;
                 XMLHttpRequest.DONE = 4;
-                 XMLHttpRequest.prototype.open = function(method, url, isAsync) {
-                     this._method = method;
-                     this._url = url;
-                     this._async = isAsync !== false;
-                     this.readyState = 1;
+                XMLHttpRequest.prototype.open = function(method, url, isAsync) {
+                    this._method = method;
+                    this._url = url;
+                    this._async = isAsync !== false;
+                    this.readyState = 1;
                     this.status = 0;
-                     this.statusText = '';
-                     this.response = null;
-                     this.responseText = '';
-                     this.responseXML = null;
-                     this.responseURL = '';
-                     this._responseHeaders = {};
-                     this._aborted = false;
-                     if (typeof this.onreadystatechange === 'function') {
-                         this.onreadystatechange();
+                    this.statusText = '';
+                    this.response = null;
+                    this.responseText = '';
+                    this.responseXML = null;
+                    this.responseURL = '';
+                    this._responseHeaders = {};
+                    this._aborted = false;
+                    if (typeof this.onreadystatechange === 'function') {
+                        this.onreadystatechange();
                     }
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
@@ -3103,25 +3103,25 @@ public sealed partial class DomBridge
                             } else {
                                 bodyPromise = response.text();
                             }
-                             bodyPromise.then(function(bodyValue) {
-                                 if (self._aborted) return;
-                                 if (self.responseType === '' || self.responseType === 'text') {
-                                     // Per XHR semantics, the default/text response types expose
-                                     // the same textual payload via both response and responseText.
-                                     self.response = bodyValue;
-                                     self.responseText = '' + bodyValue;
-                                     self.responseXML = null;
-                                 } else if (self.responseType === 'document') {
-                                     var responseDocument = document.implementation.createHTMLDocument('');
-                                     responseDocument.body.innerHTML = '' + bodyValue;
-                                     self.response = responseDocument;
-                                     self.responseXML = responseDocument;
-                                     self.responseText = '';
-                                 } else {
-                                     self.response = bodyValue;
-                                     self.responseText = '';
-                                     self.responseXML = null;
-                                 }
+                            bodyPromise.then(function(bodyValue) {
+                                if (self._aborted) return;
+                                if (self.responseType === '' || self.responseType === 'text') {
+                                    // Per XHR semantics, the default/text response types expose
+                                    // the same textual payload via both response and responseText.
+                                    self.response = bodyValue;
+                                    self.responseText = '' + bodyValue;
+                                    self.responseXML = null;
+                                } else if (self.responseType === 'document') {
+                                    var responseDocument = document.implementation.createHTMLDocument('');
+                                    responseDocument.body.innerHTML = '' + bodyValue;
+                                    self.response = responseDocument;
+                                    self.responseXML = responseDocument;
+                                    self.responseText = '';
+                                } else {
+                                    self.response = bodyValue;
+                                    self.responseText = '';
+                                    self.responseXML = null;
+                                }
                                  self.readyState = 3;
                                  if (typeof self.onprogress === 'function') {
                                      self.onprogress();
