@@ -686,6 +686,32 @@ firstRead.then(function(text) {
         Assert.Contains("true|Failed to execute body reader on 'Response': body is already used.|", result);
     }
 
+    [Fact]
+    public void Fetch_Response_Json_InvalidJson_Throws_Clear_Error()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('{invalid json');
+try {
+    response.json().then(function() {
+        document.getElementById('result').textContent = 'NO_THROW';
+    });
+} catch (e) {
+    document.getElementById('result').textContent = [
+        response.bodyUsed === true,
+        e.message
+    ].join('|');
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|Failed to parse response body as JSON.", result);
+    }
+
     // ────────────────── fetch() method support ──────────────────
 
     [Fact]
@@ -1663,6 +1689,55 @@ fetch = window.fetch = originalFetch;
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true|2|true", result);
+    }
+
+    [Fact]
+    public void XHR_Json_ResponseType_Invalid_Json_Yields_Null_And_Completes_Load()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('{invalid json', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'json';
+xhr.onload = function() {
+    loadCalled = true;
+};
+xhr.onerror = function() {
+    errorCalled = true;
+};
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        xhr.response === null,
+        xhr.responseText === '',
+        xhr.readyState === 4
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|false|true|true|true", result);
     }
 
     [Fact]

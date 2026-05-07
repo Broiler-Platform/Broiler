@@ -1717,6 +1717,18 @@ public sealed partial class DomBridge
         static JSValue ParseJsonText(string jsonText)
             => JSJSON.Parse(new Arguments(JSUndefined.Value, new JSString(jsonText)));
 
+        static JSValue ParseResponseJsonText(string jsonText)
+        {
+            try
+            {
+                return ParseJsonText(jsonText);
+            }
+            catch (JSException)
+            {
+                throw new JSException("Failed to parse response body as JSON.");
+            }
+        }
+
         static string DecodeFormComponent(string value)
             => Uri.UnescapeDataString(value.Replace("+", " "));
 
@@ -2035,7 +2047,7 @@ public sealed partial class DomBridge
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                    ParseJsonText(body));
+                    ParseResponseJsonText(body));
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
@@ -3078,8 +3090,8 @@ public sealed partial class DomBridge
                                 bodyPromise = response.blob();
                             } else if (self.responseType === 'json' &&
                                 response &&
-                                typeof response.json === 'function') {
-                                bodyPromise = response.json();
+                                typeof response.text === 'function') {
+                                bodyPromise = response.text();
                             } else {
                                 bodyPromise = response.text();
                             }
@@ -3120,6 +3132,14 @@ public sealed partial class DomBridge
                                         self.responseXML = null;
                                     }
                                     self.responseText = '';
+                                } else if (self.responseType === 'json') {
+                                    try {
+                                        self.response = JSON.parse('' + bodyValue);
+                                    } catch (e) {
+                                        self.response = null;
+                                    }
+                                    self.responseText = '';
+                                    self.responseXML = null;
                                 } else {
                                     self.response = bodyValue;
                                     self.responseText = '';
