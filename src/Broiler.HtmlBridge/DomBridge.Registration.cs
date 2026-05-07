@@ -3024,17 +3024,17 @@ public sealed partial class DomBridge
                 };
                 XMLHttpRequest.prototype.abort = function() {
                     this._aborted = true;
-                     this.readyState = 0;
-                     this.status = 0;
-                     this.statusText = '';
-                     this.response = null;
-                     this.responseText = '';
-                     this.responseXML = null;
-                     if (typeof this.onabort === 'function') {
-                         this.onabort();
-                     }
-                     if (typeof this.onloadend === 'function') {
-                         this.onloadend();
+                    this.readyState = 0;
+                    this.status = 0;
+                    this.statusText = '';
+                    this.response = null;
+                    this.responseText = '';
+                    this.responseXML = null;
+                    if (typeof this.onabort === 'function') {
+                        this.onabort();
+                    }
+                    if (typeof this.onloadend === 'function') {
+                        this.onloadend();
                     }
                 };
                 XMLHttpRequest.prototype.send = function(body) {
@@ -3125,10 +3125,10 @@ public sealed partial class DomBridge
                                     self.responseText = '';
                                     self.responseXML = null;
                                 }
-                                 self.readyState = 3;
-                                 if (typeof self.onprogress === 'function') {
-                                     self.onprogress();
-                                 }
+                                self.readyState = 3;
+                                if (typeof self.onprogress === 'function') {
+                                    self.onprogress();
+                                }
                                 self.readyState = 4;
                                 if (typeof self.onreadystatechange === 'function') {
                                     self.onreadystatechange();
