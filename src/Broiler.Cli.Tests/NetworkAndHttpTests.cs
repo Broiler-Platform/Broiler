@@ -1169,4 +1169,86 @@ fetch = window.fetch = originalFetch;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true|true|65|66", result);
     }
+
+    [Fact]
+    public void XHR_Blob_ResponseType_Uses_Fetch_Blob_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('AB', {
+                status: 200,
+                headers: { 'Content-Type': 'application/octet-stream' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'blob';
+xhr.onload = function() {
+    xhr.response.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            typeof xhr.response.text === 'function',
+            xhr.response.size,
+            xhr.response.type,
+            xhr.responseText === '',
+            text
+        ].join('|');
+    });
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|2|application/octet-stream|true|AB", result);
+    }
+
+    [Fact]
+    public void XHR_Json_ResponseType_Uses_Fetch_Json_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('{""ok"":true,""count"":2}', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'json';
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response.ok === true,
+        xhr.response.count,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|2|true", result);
+    }
 }

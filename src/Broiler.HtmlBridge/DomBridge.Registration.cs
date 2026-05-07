@@ -2984,22 +2984,32 @@ public sealed partial class DomBridge
                             if (typeof self.onreadystatechange === 'function') {
                                 self.onreadystatechange();
                             }
-                            var bodyReader =
-                                self.responseType === 'arraybuffer' &&
+                            var bodyReader;
+                            if (self.responseType === 'arraybuffer' &&
                                 response &&
-                                typeof response.arrayBuffer === 'function'
-                                    ? response.arrayBuffer()
-                                    : response.text();
+                                typeof response.arrayBuffer === 'function') {
+                                bodyReader = response.arrayBuffer();
+                            } else if (self.responseType === 'blob' &&
+                                response &&
+                                typeof response.blob === 'function') {
+                                bodyReader = response.blob();
+                            } else if (self.responseType === 'json' &&
+                                response &&
+                                typeof response.json === 'function') {
+                                bodyReader = response.json();
+                            } else {
+                                bodyReader = response.text();
+                            }
                             bodyReader.then(function(bodyValue) {
                                 if (self._aborted) return;
-                                if (self.responseType === 'arraybuffer') {
-                                    self.response = bodyValue;
-                                    self.responseText = '';
-                                } else {
+                                if (self.responseType === '' || self.responseType === 'text') {
                                     // For the default/text response types, XHR exposes the
                                     // same textual payload via both response and responseText.
                                     self.response = bodyValue;
                                     self.responseText = '' + bodyValue;
+                                } else {
+                                    self.response = bodyValue;
+                                    self.responseText = '';
                                 }
                                 self.readyState = 3;
                                 if (typeof self.onprogress === 'function') {
