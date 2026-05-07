@@ -429,6 +429,33 @@ request.json().then(function(value) {
     }
 
     [Fact]
+    public void Fetch_Request_Body_Readers_Throw_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+request.text().then(function() {
+    try {
+        request.arrayBuffer();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
     public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -568,6 +595,32 @@ response.formData().then(function(value) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Readers_Throw_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('{""name"":""broiler""}', {
+    headers: { 'Content-Type': 'application/json' }
+});
+response.text().then(function() {
+    try {
+        response.json();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
     }
 
     // ────────────────── fetch() method support ──────────────────
