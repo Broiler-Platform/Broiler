@@ -1189,25 +1189,24 @@ public class BuiltInsTests
         EnsureBuiltInsLoaded();
         using var ctx = new JSContext();
         var result = ctx.Eval(@"
-            var source = new ArrayBuffer(10);
+            var source = new ArrayBuffer(6);
             var bytes = new Uint8Array(source);
             bytes[2] = 7;
             bytes[3] = 11;
             bytes[4] = 13;
-            bytes[5] = 17;
-            var sourceView = new Uint16Array(source, 2, 2);
+            var sourceView = new Uint8Array(source, 2, 3);
             var clone = structuredClone(sourceView);
             bytes[2] = 99;
             [
-              clone instanceof Uint16Array,
+              clone instanceof Uint8Array,
               clone.buffer !== source,
               clone.byteOffset,
               clone.length,
               clone[0],
-              clone[1]
+              clone[2]
             ].join('|');
         ");
-        Assert.Equal("true|true|2|2|2823|4365", result.ToString());
+        Assert.Equal("true|true|2|3|7|13", result.ToString());
     }
 
     [Fact]

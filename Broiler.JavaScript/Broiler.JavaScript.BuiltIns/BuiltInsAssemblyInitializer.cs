@@ -4,7 +4,6 @@ using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
-using Broiler.JavaScript.BuiltIns.DataView;
 using Broiler.JavaScript.BuiltIns.Disposable;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.Intl;
@@ -264,12 +263,12 @@ internal static class BuiltInsAssemblyInitializer
                 return clone;
             }
 
-            if (value is DataView dataView)
+            if (value is Broiler.JavaScript.BuiltIns.DataView.DataView dataView)
             {
                 var clonedBuffer = recurse(dataView.Buffer, seen) as JSArrayBuffer
                     ?? throw JSEngine.NewTypeError("structuredClone: DataView buffer must be an ArrayBuffer");
 
-                var clone = new DataView(clonedBuffer, dataView.ByteOffset, dataView.ByteLength);
+                var clone = new Broiler.JavaScript.BuiltIns.DataView.DataView(clonedBuffer, dataView.ByteOffset, dataView.ByteLength);
                 seen[value] = clone;
                 return clone;
             }
