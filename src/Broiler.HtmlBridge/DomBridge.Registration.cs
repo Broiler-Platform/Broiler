@@ -2954,20 +2954,21 @@ public sealed partial class DomBridge
                 XMLHttpRequest.HEADERS_RECEIVED = 2;
                 XMLHttpRequest.LOADING = 3;
                 XMLHttpRequest.DONE = 4;
-                XMLHttpRequest.prototype.open = function(method, url, isAsync) {
-                    this._method = method;
-                    this._url = url;
-                    this._async = isAsync !== false;
-                    this.readyState = 1;
+                 XMLHttpRequest.prototype.open = function(method, url, isAsync) {
+                     this._method = method;
+                     this._url = url;
+                     this._async = isAsync !== false;
+                     this.readyState = 1;
                     this.status = 0;
-                    this.statusText = '';
-                    this.response = null;
-                    this.responseText = '';
-                    this.responseURL = '';
-                    this._responseHeaders = {};
-                    this._aborted = false;
-                    if (typeof this.onreadystatechange === 'function') {
-                        this.onreadystatechange();
+                     this.statusText = '';
+                     this.response = null;
+                     this.responseText = '';
+                     this.responseXML = null;
+                     this.responseURL = '';
+                     this._responseHeaders = {};
+                     this._aborted = false;
+                     if (typeof this.onreadystatechange === 'function') {
+                         this.onreadystatechange();
                     }
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
@@ -2993,16 +2994,17 @@ public sealed partial class DomBridge
                 };
                 XMLHttpRequest.prototype.abort = function() {
                     this._aborted = true;
-                    this.readyState = 0;
-                    this.status = 0;
-                    this.statusText = '';
-                    this.response = null;
-                    this.responseText = '';
-                    if (typeof this.onabort === 'function') {
-                        this.onabort();
-                    }
-                    if (typeof this.onloadend === 'function') {
-                        this.onloadend();
+                     this.readyState = 0;
+                     this.status = 0;
+                     this.statusText = '';
+                     this.response = null;
+                     this.responseText = '';
+                     this.responseXML = null;
+                     if (typeof this.onabort === 'function') {
+                         this.onabort();
+                     }
+                     if (typeof this.onloadend === 'function') {
+                         this.onloadend();
                     }
                 };
                 XMLHttpRequest.prototype.send = function(body) {
@@ -3051,21 +3053,29 @@ public sealed partial class DomBridge
                             } else {
                                 bodyReader = response.text();
                             }
-                            bodyReader.then(function(bodyValue) {
-                                if (self._aborted) return;
-                                if (self.responseType === '' || self.responseType === 'text') {
-                                    // For the default/text response types, XHR exposes the
-                                    // same textual payload via both response and responseText.
-                                    self.response = bodyValue;
-                                    self.responseText = '' + bodyValue;
-                                } else {
-                                    self.response = bodyValue;
-                                    self.responseText = '';
-                                }
-                                self.readyState = 3;
-                                if (typeof self.onprogress === 'function') {
-                                    self.onprogress();
-                                }
+                             bodyReader.then(function(bodyValue) {
+                                 if (self._aborted) return;
+                                 if (self.responseType === '' || self.responseType === 'text') {
+                                     // For the default/text response types, XHR exposes the
+                                     // same textual payload via both response and responseText.
+                                     self.response = bodyValue;
+                                     self.responseText = '' + bodyValue;
+                                     self.responseXML = null;
+                                 } else if (self.responseType === 'document') {
+                                     var responseDocument = document.implementation.createHTMLDocument('');
+                                     responseDocument.body.innerHTML = '' + bodyValue;
+                                     self.response = responseDocument;
+                                     self.responseXML = responseDocument;
+                                     self.responseText = '';
+                                 } else {
+                                     self.response = bodyValue;
+                                     self.responseText = '';
+                                     self.responseXML = null;
+                                 }
+                                 self.readyState = 3;
+                                 if (typeof self.onprogress === 'function') {
+                                     self.onprogress();
+                                 }
                                 self.readyState = 4;
                                 if (typeof self.onreadystatechange === 'function') {
                                     self.onreadystatechange();

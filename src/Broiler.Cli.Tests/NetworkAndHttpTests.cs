@@ -1413,4 +1413,47 @@ fetch = window.fetch = originalFetch;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true|2|true", result);
     }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Uses_Fetch_Text_Result_As_Document()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.onload = function() {
+    var doc = xhr.response;
+    var payload = doc && doc.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseXML,
+        xhr.responseText === '',
+        doc !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
+    }
 }
