@@ -78,6 +78,101 @@ public class WebMessagingTests
     }
 
     [Fact]
+    public void Window_PostMessage_Options_Object_Transfers_MessagePort()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                var channel = new MessageChannel();
+
+                channel.port1.onmessage = function(event) {
+                    document.body.setAttribute('data-parent', [
+                        event.data,
+                        event.source === null,
+                        event.origin,
+                        event.ports.length
+                    ].join('|'));
+                };
+
+                frame.contentWindow.addEventListener('message', function(event) {
+                    document.body.setAttribute('data-window', [
+                        event.data,
+                        event.origin,
+                        event.ports.length
+                    ].join('|'));
+                    event.ports[0].postMessage('reply');
+                });
+
+                frame.contentWindow.postMessage('hello', {
+                    targetOrigin: '*',
+                    transfer: [channel.port2]
+                });
+            })();
+            """);
+
+        bridge.FlushTimers();
+        bridge.FlushTimers();
+
+        var result = context.Eval("""
+            [
+                document.getElementById('frame').contentDocument.body.getAttribute('data-window'),
+                document.body.getAttribute('data-parent')
+            ].join('||')
+            """);
+
+        Assert.Equal("hello|https://example.com|1||reply|true||0", result.ToString());
+    }
+
+    [Fact]
+    public void Window_PostMessage_Options_Object_TargetOrigin_Matches_NonDefault_Port()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="frame" srcdoc="<!DOCTYPE html><html><body></body></html>"></iframe>
+</body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com:8443/index.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            (() => {
+                var frame = document.getElementById('frame');
+                frame.contentWindow.addEventListener('message', function(event) {
+                    document.body.setAttribute('data-result', [
+                        event.data,
+                        event.origin
+                    ].join('|'));
+                });
+
+                frame.contentWindow.postMessage('port-check', {
+                    targetOrigin: 'https://example.com:8443'
+                });
+            })();
+            """);
+
+        bridge.FlushTimers();
+
+        var result = context.Eval("document.getElementById('frame').contentDocument.body.getAttribute('data-result')");
+        Assert.Equal("port-check|https://example.com:8443", result.ToString());
+    }
+
+    [Fact]
     public void MessageChannel_PostMessage_Delivers_Cloned_Data()
     {
         const string html = """

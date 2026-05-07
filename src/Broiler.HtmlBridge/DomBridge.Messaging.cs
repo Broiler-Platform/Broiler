@@ -322,7 +322,7 @@ public sealed partial class DomBridge
             {
                 var targetWindow = a.This as JSObject ?? window;
                 var sourceWindow = ResolveCurrentWindow();
-                var targetOrigin = a.Length > 1 ? a[1].ToString() : "*";
+                var (targetOrigin, ports) = GetPostMessageDispatchOptions(a, targetWindow);
                 if (!ShouldDeliverWindowMessage(targetWindow, sourceWindow, targetOrigin))
                     return JSUndefined.Value;
 
@@ -330,7 +330,7 @@ public sealed partial class DomBridge
                 var origin = GetWindowOrigin(sourceWindow);
                 QueueFrameAction(() =>
                 {
-                    var evt = CreateMessageEvent(payload, sourceWindow, origin, new JSArray());
+                    var evt = CreateMessageEvent(payload, sourceWindow, origin, ports);
                     if (ReferenceEquals(targetWindow, _windowJSObject))
                     {
                         DispatchWindowEvent(evt);
@@ -345,6 +345,53 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }, "postMessage", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    private (string TargetOrigin, JSArray Ports) GetPostMessageDispatchOptions(in Arguments a, JSObject targetWindow)
+    {
+        var targetOrigin = "*";
+        JSValue transferValue = JSUndefined.Value;
+
+        if (a.Length > 1)
+        {
+            if (a[1] is JSObject optionsObject &&
+                (optionsObject[(KeyString)"targetOrigin"] is { } ||
+                 optionsObject[(KeyString)"transfer"] is { }))
+            {
+                var targetOriginValue = optionsObject[(KeyString)"targetOrigin"];
+                if (targetOriginValue != null && !targetOriginValue.IsNullOrUndefined)
+                    targetOrigin = targetOriginValue.ToString();
+
+                transferValue = optionsObject[(KeyString)"transfer"] ?? JSUndefined.Value;
+            }
+            else
+            {
+                targetOrigin = a[1].ToString();
+            }
+        }
+
+        if (a.Length > 2)
+            transferValue = a[2];
+
+        return (targetOrigin, ExtractTransferredPorts(transferValue, targetWindow));
+    }
+
+    private JSArray ExtractTransferredPorts(JSValue transferValue, JSObject targetWindow)
+    {
+        if (transferValue is not JSObject transferObject || transferObject is not JSArray transferArray)
+            return new JSArray();
+
+        var transferredPorts = new List<JSValue>();
+        foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
+        {
+            if (item is not JSObject port || !_messagePortPeers.ContainsKey(port))
+                continue;
+
+            _eventTargetOwnerWindows[port] = targetWindow;
+            transferredPorts.Add(port);
+        }
+
+        return new JSArray(transferredPorts);
     }
 
     private bool ShouldDeliverWindowMessage(JSObject targetWindow, JSObject? sourceWindow, string targetOrigin)
