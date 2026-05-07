@@ -1717,6 +1717,147 @@ public sealed partial class DomBridge
         static JSValue ParseJsonText(string jsonText)
             => JSJSON.Parse(new Arguments(JSUndefined.Value, new JSString(jsonText)));
 
+        static string DecodeFormComponent(string value)
+            => Uri.UnescapeDataString(value.Replace("+", " "));
+
+        static string EncodeFormComponent(string value)
+            => Uri.EscapeDataString(value).Replace("%20", "+");
+
+        static JSObject CreateFormDataObject(JSValue? initValue = null)
+        {
+            var formDataObject = new JSObject();
+            var entries = new List<KeyValuePair<string, string>>();
+
+            void AppendEntry(string name, string value)
+                => entries.Add(new KeyValuePair<string, string>(name, value));
+
+            void SetEntry(string name, string value)
+            {
+                var firstIndex = -1;
+                for (var i = 0; i < entries.Count; i++)
+                {
+                    if (!string.Equals(entries[i].Key, name, StringComparison.Ordinal))
+                        continue;
+
+                    if (firstIndex < 0)
+                    {
+                        firstIndex = i;
+                        entries[i] = new KeyValuePair<string, string>(name, value);
+                    }
+                    else
+                    {
+                        entries.RemoveAt(i);
+                        i--;
+                    }
+                }
+
+                if (firstIndex < 0)
+                    entries.Add(new KeyValuePair<string, string>(name, value));
+            }
+
+            if (initValue != null && !initValue.IsUndefined && !initValue.IsNull)
+            {
+                if (initValue is JSObject initObject)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                        AppendEntry(key, value);
+                }
+                else
+                {
+                    var initText = initValue.ToString();
+                    if (!string.IsNullOrEmpty(initText))
+                    {
+                        foreach (var segment in initText.Split('&', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var separatorIndex = segment.IndexOf('=');
+                            var rawName = separatorIndex >= 0 ? segment[..separatorIndex] : segment;
+                            var rawValue = separatorIndex >= 0 ? segment[(separatorIndex + 1)..] : string.Empty;
+                            AppendEntry(DecodeFormComponent(rawName), DecodeFormComponent(rawValue));
+                        }
+                    }
+                }
+            }
+
+            formDataObject.FastAddValue((KeyString)"append", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    AppendEntry(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"delete", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    entries.RemoveAll(entry => string.Equals(entry.Key, name, StringComparison.Ordinal));
+                }
+
+                return JSUndefined.Value;
+            }, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                {
+                    foreach (var entry in entries)
+                        cb.InvokeFunction(new Arguments(cb, new JSString(entry.Value), new JSString(entry.Key), formDataObject));
+                }
+
+                return JSUndefined.Value;
+            }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"get", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSNull.Value;
+
+                var name = a[0].ToString();
+                foreach (var entry in entries)
+                {
+                    if (string.Equals(entry.Key, name, StringComparison.Ordinal))
+                        return new JSString(entry.Value);
+                }
+
+                return JSNull.Value;
+            }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"getAll", new JSFunction((in Arguments a) =>
+            {
+                var result = new JSArray();
+                if (a.Length == 0)
+                    return result;
+
+                var name = a[0].ToString();
+                foreach (var entry in entries)
+                {
+                    if (string.Equals(entry.Key, name, StringComparison.Ordinal))
+                        result.Add(new JSString(entry.Value));
+                }
+
+                return result;
+            }, "getAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"has", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                var name = a[0].ToString();
+                return entries.Any(entry => string.Equals(entry.Key, name, StringComparison.Ordinal))
+                    ? JSBoolean.True
+                    : JSBoolean.False;
+            }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"set", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    SetEntry(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"toString", new JSFunction((in Arguments _) =>
+                new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
+                "toString", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return formDataObject;
+        }
+
         static JSValue CreateBlobBody(string bodyText, JSObject headersObject)
         {
             var contentType = TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty;
@@ -1806,6 +1947,14 @@ public sealed partial class DomBridge
                     return CreateBlobBody(body ?? string.Empty, headersObject);
                 });
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return CreateFormDataObject(new JSString(body ?? string.Empty));
+                });
+            }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
         }
@@ -1859,6 +2008,14 @@ public sealed partial class DomBridge
                     return CreateBlobBody(body, headersObject);
                 });
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() =>
+                {
+                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                    return CreateFormDataObject(new JSString(body));
+                });
+            }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
                 CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
                 "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1866,6 +2023,7 @@ public sealed partial class DomBridge
             return responseObject;
         }
 
+        var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
         var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
         var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
         var responseCtor = new JSFunction((in Arguments a) =>
@@ -1897,10 +2055,12 @@ public sealed partial class DomBridge
             return CreateResponse(body, status, statusText, url, type, redirected, headers);
         }, "Response", 2);
         var messageChannelCtor = new JSFunction((in Arguments _) => CreateMessageChannel(), "MessageChannel", 0);
+        window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["FormData"] = formDataCtor;
         context["Headers"] = headersCtor;
         context["Request"] = requestCtor;
         context["Response"] = responseCtor;

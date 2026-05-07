@@ -204,6 +204,33 @@ document.getElementById('result').textContent = r.join('|');
     }
 
     [Fact]
+    public void Fetch_FormData_Constructor_Supports_Common_Mutations()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var formData = new FormData({ name: 'broiler' });
+formData.append('name', 'oven bird');
+formData.set('count', 2);
+var names = formData.getAll('name').join(',');
+formData.delete('count');
+document.getElementById('result').textContent = [
+    typeof FormData === 'function',
+    formData.get('name'),
+    names,
+    formData.has('count'),
+    formData.toString().split('&').join(';')
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|broiler|broiler,oven bird|false|name=broiler;name=oven+bird", result);
+    }
+
+    [Fact]
     public void Fetch_Request_Constructor_Exposes_Url_Method_Headers_And_Body()
     {
         var html = @"<!DOCTYPE html>
@@ -290,6 +317,35 @@ request.blob().then(function(blob) {
     }
 
     [Fact]
+    public void Fetch_Request_FormData_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'name=broiler&name=oven+bird&count=2'
+});
+request.formData().then(function(value) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        typeof value.get === 'function',
+        value.get('name'),
+        value.getAll('name').join(','),
+        value.get('count')
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
+    }
+
+    [Fact]
     public void Fetch_Request_Json_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -373,6 +429,33 @@ response.blob().then(function(blob) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|true|7|text/plain|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_FormData_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('name=broiler&name=oven+bird&count=2', {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+});
+response.formData().then(function(value) {
+    document.getElementById('result').textContent = [
+        response.bodyUsed === true,
+        typeof value.get === 'function',
+        value.get('name'),
+        value.getAll('name').join(','),
+        value.get('count')
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
     }
 
     // ────────────────── fetch() method support ──────────────────
