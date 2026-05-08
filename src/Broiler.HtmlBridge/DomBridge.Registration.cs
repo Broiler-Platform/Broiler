@@ -1915,7 +1915,7 @@ public sealed partial class DomBridge
         }
 
         static bool IsBodyUnavailable(JSObject owner)
-            => owner[(KeyString)"bodyUsed"].BooleanValue || owner[(KeyString)"_bodyStreamLocked"].BooleanValue;
+            => (owner[(KeyString)"bodyUsed"]?.BooleanValue ?? false) || (owner[(KeyString)"_bodyStreamLocked"]?.BooleanValue ?? false);
 
         static JSObject CreateReadableStreamReadResult(JSValue value, bool done)
         {
