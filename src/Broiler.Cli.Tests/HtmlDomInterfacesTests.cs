@@ -725,6 +725,53 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
+    [Fact]
+    public void Node_CompareDocumentPosition_Reports_Self_Ancestor_And_Sibling_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><span id=""child1""></span><span id=""child2""></span></div>
+<div id=""result""></div>
+<script>
+var parent = document.getElementById('parent');
+var child1 = document.getElementById('child1');
+var child2 = document.getElementById('child2');
+var r = [];
+r.push(parent.compareDocumentPosition(parent) === 0);
+r.push((parent.compareDocumentPosition(child1) & 16) === 16);
+r.push((parent.compareDocumentPosition(child1) & 4) === 4);
+r.push((child1.compareDocumentPosition(parent) & 8) === 8);
+r.push((child1.compareDocumentPosition(parent) & 2) === 2);
+r.push((child1.compareDocumentPosition(child2) & 4) === 4);
+r.push((child2.compareDocumentPosition(child1) & 2) === 2);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Node_CompareDocumentPosition_Sets_Disconnected_Bit_For_Separate_Trees()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var first = document.createElement('div');
+var second = document.createElement('div');
+var r = [];
+r.push((first.compareDocumentPosition(second) & 1) === 1);
+r.push((second.compareDocumentPosition(first) & 1) === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
     [Fact]

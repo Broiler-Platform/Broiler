@@ -944,6 +944,40 @@ public sealed partial class DomBridge
             }, "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // compareDocumentPosition(otherNode)
+        obj.FastAddValue(
+            (KeyString)"compareDocumentPosition",
+            new JSFunction((in Arguments a) =>
+            {
+                const int documentPositionDisconnected = 0x01;
+                const int documentPositionPreceding = 0x02;
+                const int documentPositionFollowing = 0x04;
+                const int documentPositionContains = 0x08;
+                const int documentPositionContainedBy = 0x10;
+
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return new JSNumber(0);
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                if (otherEl == null || ReferenceEquals(element, otherEl))
+                    return new JSNumber(0);
+
+                if (!ReferenceEquals(GetTreeRoot(element), GetTreeRoot(otherEl)))
+                    return new JSNumber(documentPositionDisconnected);
+
+                if (IsDescendant(element, otherEl))
+                    return new JSNumber(documentPositionFollowing | documentPositionContainedBy);
+
+                if (IsDescendant(otherEl, element))
+                    return new JSNumber(documentPositionPreceding | documentPositionContains);
+
+                return new JSNumber(
+                    CompareTreeOrder(element, otherEl) < 0
+                        ? documentPositionFollowing
+                        : documentPositionPreceding);
+            }, "compareDocumentPosition", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         obj.FastAddValue(
             (KeyString)"getRootNode",
             new JSFunction((in Arguments a) =>

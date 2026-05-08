@@ -329,6 +329,53 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Compares two nodes in document tree order.
+    /// Returns -1 when <paramref name="first"/> precedes <paramref name="second"/>,
+    /// 1 when it follows, and 0 when no ordering can be determined.
+    /// </summary>
+    private static int CompareTreeOrder(DomElement first, DomElement second)
+    {
+        if (ReferenceEquals(first, second))
+            return 0;
+
+        var firstAncestors = new List<DomElement>();
+        for (var current = first; current != null; current = current.Parent)
+            firstAncestors.Add(current);
+        firstAncestors.Reverse();
+
+        var secondAncestors = new List<DomElement>();
+        for (var current = second; current != null; current = current.Parent)
+            secondAncestors.Add(current);
+        secondAncestors.Reverse();
+
+        var divergenceIndex = 0;
+        var sharedLength = Math.Min(firstAncestors.Count, secondAncestors.Count);
+        while (divergenceIndex < sharedLength &&
+               ReferenceEquals(firstAncestors[divergenceIndex], secondAncestors[divergenceIndex]))
+        {
+            divergenceIndex++;
+        }
+
+        if (divergenceIndex == 0 ||
+            divergenceIndex >= firstAncestors.Count ||
+            divergenceIndex >= secondAncestors.Count)
+        {
+            return 0;
+        }
+
+        var commonAncestor = firstAncestors[divergenceIndex - 1];
+        var firstChild = firstAncestors[divergenceIndex];
+        var secondChild = secondAncestors[divergenceIndex];
+        var firstIndex = commonAncestor.Children.IndexOf(firstChild);
+        var secondIndex = commonAncestor.Children.IndexOf(secondChild);
+
+        if (firstIndex == secondIndex)
+            return 0;
+
+        return firstIndex < secondIndex ? -1 : 1;
+    }
+
+    /// <summary>
     /// Updates the owning document root for <paramref name="node"/> and its
     /// descendants when the subtree is inserted into another document.
     /// Nested sub-document roots remain isolated browsing contexts and are not
