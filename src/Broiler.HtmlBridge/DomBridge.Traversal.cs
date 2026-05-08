@@ -1828,7 +1828,14 @@ public sealed partial class DomBridge
     /// Notifies all active ranges that a child was removed from <paramref name="parent"/>
     /// at the given <paramref name="index"/>.
     /// </summary>
-    private void NotifyChildRemoved(DomElement parent, DomElement removedChild, int index)
+    private void NotifyChildAdded(DomElement parent, DomElement addedChild, int index)
+    {
+        var previousSibling = index > 0 ? parent.Children[index - 1] : null;
+        var nextSibling = index + 1 < parent.Children.Count ? parent.Children[index + 1] : null;
+        NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
+    }
+
+    private void NotifyChildRemoved(DomElement parent, DomElement removedChild, int index, DomElement? previousSibling = null, DomElement? nextSibling = null)
     {
         for (var i = _activeRanges.Count - 1; i >= 0; i--)
         {
@@ -1836,6 +1843,54 @@ public sealed partial class DomBridge
                 state.AdjustForRemoval(parent, removedChild, index);
             else
                 _activeRanges.RemoveAt(i); // GC'd — prune
+        }
+
+        previousSibling ??= index > 0 ? parent.Children[index - 1] : null;
+        nextSibling ??= index < parent.Children.Count ? parent.Children[index] : null;
+        NotifyMutationObservers(parent, null, removedChild, previousSibling, nextSibling);
+    }
+
+    private void NotifyMutationObservers(
+        DomElement target,
+        DomElement? addedChild,
+        DomElement? removedChild,
+        DomElement? previousSibling,
+        DomElement? nextSibling)
+    {
+        if (_mutationObservers.Count == 0)
+            return;
+
+        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        {
+            if (!options.ChildList)
+                continue;
+
+            if (!ReferenceEquals(target, observedTarget) &&
+                !(options.Subtree && IsDescendant(observedTarget, target)))
+            {
+                continue;
+            }
+
+            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
+                continue;
+
+            var record = new JSObject();
+            record[(KeyString)"type"] = new JSString("childList");
+            record[(KeyString)"target"] = ToJSObject(target);
+            record[(KeyString)"addedNodes"] = addedChild != null
+                ? new JSArray([ToJSObject(addedChild)])
+                : new JSArray([]);
+            record[(KeyString)"removedNodes"] = removedChild != null
+                ? new JSArray([ToJSObject(removedChild)])
+                : new JSArray([]);
+            record[(KeyString)"previousSibling"] = previousSibling != null
+                ? ToJSObject(previousSibling)
+                : JSNull.Value;
+            record[(KeyString)"nextSibling"] = nextSibling != null
+                ? ToJSObject(nextSibling)
+                : JSNull.Value;
+
+            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
         }
     }
 

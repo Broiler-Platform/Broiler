@@ -959,11 +959,22 @@ public sealed partial class DomBridge
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-                childEl.Parent?.Children.Remove(childEl);
+                if (childEl.Parent != null)
+                {
+                    var oldParent = childEl.Parent;
+                    var oldIndex = oldParent.Children.IndexOf(childEl);
+                    if (oldIndex >= 0)
+                    {
+                        NotifyNodeIteratorPreRemoval(childEl);
+                        oldParent.Children.RemoveAt(oldIndex);
+                        NotifyChildRemoved(oldParent, childEl, oldIndex);
+                    }
+                }
                 childEl.Parent = element;
                 AdoptSubtreeIntoDocument(childEl, element.OwnerDocRoot);
                 element.Children.Add(childEl);
                 bridgeForAppend.InvalidateStyleScope(element);
+                bridgeForAppend.NotifyChildAdded(element, childEl, element.Children.Count - 1);
 
                 // Fire onload for iframe/object children after DOM insertion
                 var childTag = childEl.TagName?.ToLowerInvariant();
@@ -1018,6 +1029,8 @@ public sealed partial class DomBridge
 
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];
+                var previousSibling = idx > 0 ? element.Children[idx - 1] : null;
+                var nextSibling = idx + 1 < element.Children.Count ? element.Children[idx + 1] : null;
 
                 // If newChild is already in this parent, remove it first and re-find idx
                 if (ReferenceEquals(newEl.Parent, element))
@@ -1028,7 +1041,17 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    newEl.Parent?.Children.Remove(newEl);
+                    if (newEl.Parent != null)
+                    {
+                        var oldParent = newEl.Parent;
+                        var oldIndex = oldParent.Children.IndexOf(newEl);
+                        if (oldIndex >= 0)
+                        {
+                            NotifyNodeIteratorPreRemoval(newEl);
+                            oldParent.Children.RemoveAt(oldIndex);
+                            NotifyChildRemoved(oldParent, newEl, oldIndex);
+                        }
+                    }
                 }
 
                 oldEl.Parent = null;
@@ -1036,6 +1059,8 @@ public sealed partial class DomBridge
                 AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 element.Children[idx] = newEl;
                 bridgeForAppend.InvalidateStyleScope(element);
+                NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);
+                NotifyChildAdded(element, newEl, idx);
                 return a[1]; // returns the old child
             }, "replaceChild", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);

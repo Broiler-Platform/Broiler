@@ -702,8 +702,64 @@ public sealed partial class DomBridge
                 }
             ");
 
+        static bool GetMutationObserverOption(JSObject optionsObject, string propertyName)
+        {
+            var optionValue = optionsObject[(KeyString)propertyName];
+            return optionValue != null &&
+                   !optionValue.IsUndefined &&
+                   !optionValue.IsNull &&
+                   optionValue.BooleanValue;
+        }
+
+        MutationObserverOptions CreateMutationObserverOptions(JSValue? value)
+        {
+            if (value is not JSObject optionsObject)
+                return new MutationObserverOptions();
+
+            return new MutationObserverOptions
+            {
+                ChildList = GetMutationObserverOption(optionsObject, "childList"),
+                Attributes = GetMutationObserverOption(optionsObject, "attributes"),
+                CharacterData = GetMutationObserverOption(optionsObject, "characterData"),
+                Subtree = GetMutationObserverOption(optionsObject, "subtree")
+            };
+        }
+
+        void RegisterMutationObserver(JSObject observerObject, DomElement target, MutationObserverOptions options)
+        {
+            _mutationObservers.RemoveAll(entry =>
+                ReferenceEquals(entry.Observer, observerObject) &&
+                ReferenceEquals(entry.Target, target));
+            _mutationObservers.Add((observerObject, target, options));
+        }
+
+        void UnregisterMutationObserver(JSObject observerObject)
+        {
+            _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
+        }
+
+        var registerMutationObserverFn = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length < 2 || a[0] is not JSObject observerObject || a[1] is not JSObject targetObject)
+                return JSUndefined.Value;
+
+            var target = FindDomElementByJSObject(targetObject);
+            if (target == null)
+                return JSUndefined.Value;
+
+            RegisterMutationObserver(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
+            return JSUndefined.Value;
+        }, "__broilerRegisterMutationObserver", 3);
+        var unregisterMutationObserverFn = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length > 0 && a[0] is JSObject observerObject)
+                UnregisterMutationObserver(observerObject);
+            return JSUndefined.Value;
+        }, "__broilerUnregisterMutationObserver", 1);
+        context["__broilerRegisterMutationObserver"] = registerMutationObserverFn;
+        context["__broilerUnregisterMutationObserver"] = unregisterMutationObserverFn;
+
         // MutationObserver — DOM Level 4
-        var mutationObservers = _mutationObservers;
         context.Eval(@"
                 function MutationObserver(callback) {
                     this._callback = callback;
@@ -711,11 +767,18 @@ public sealed partial class DomBridge
                     this._records = [];
                 }
                 MutationObserver.prototype.observe = function(target, options) {
-                    this._targets.push({ target: target, options: options || {} });
+                    var normalizedOptions = options || {};
+                    this._targets.push({ target: target, options: normalizedOptions });
+                    if (typeof __broilerRegisterMutationObserver === 'function') {
+                        __broilerRegisterMutationObserver(this, target, normalizedOptions);
+                    }
                 };
                 MutationObserver.prototype.disconnect = function() {
                     this._targets = [];
                     this._records = [];
+                    if (typeof __broilerUnregisterMutationObserver === 'function') {
+                        __broilerUnregisterMutationObserver(this);
+                    }
                 };
                 MutationObserver.prototype.takeRecords = function() {
                     var r = this._records.slice();
@@ -1003,9 +1066,21 @@ public sealed partial class DomBridge
                 var childEl = FindDomElementByJSObject(childObj);
                 if (childEl != null)
                 {
-                    childEl.Parent?.Children.Remove(childEl);
+                    if (childEl.Parent != null)
+                    {
+                        var oldParent = childEl.Parent;
+                        var oldIndex = oldParent.Children.IndexOf(childEl);
+                        if (oldIndex >= 0)
+                        {
+                            NotifyNodeIteratorPreRemoval(childEl);
+                            oldParent.Children.RemoveAt(oldIndex);
+                            NotifyChildRemoved(oldParent, childEl, oldIndex);
+                        }
+                    }
+
                     childEl.Parent = docNodeForMutation;
                     docNodeForMutation.Children.Add(childEl);
+                    NotifyChildAdded(docNodeForMutation, childEl, docNodeForMutation.Children.Count - 1);
                 }
                 return a[0];
             }, "appendChild", 1),
@@ -1022,7 +1097,17 @@ public sealed partial class DomBridge
                 var newEl = FindDomElementByJSObject(newObj);
                 if (newEl == null) return a[0];
 
-                newEl.Parent?.Children.Remove(newEl);
+                if (newEl.Parent != null)
+                {
+                    var oldParent = newEl.Parent;
+                    var oldIndex = oldParent.Children.IndexOf(newEl);
+                    if (oldIndex >= 0)
+                    {
+                        NotifyNodeIteratorPreRemoval(newEl);
+                        oldParent.Children.RemoveAt(oldIndex);
+                        NotifyChildRemoved(oldParent, newEl, oldIndex);
+                    }
+                }
                 if (a.Length > 1 && a[1] is JSObject refObj && !a[1].IsNull)
                 {
                     var refEl = FindDomElementByJSObject(refObj);
@@ -1033,6 +1118,7 @@ public sealed partial class DomBridge
                         {
                             newEl.Parent = docNodeForMutation;
                             docNodeForMutation.Children.Insert(idx, newEl);
+                            NotifyChildAdded(docNodeForMutation, newEl, idx);
                             return a[0];
                         }
                     }
@@ -1040,6 +1126,7 @@ public sealed partial class DomBridge
                 // If refChild is null or not found, append
                 newEl.Parent = docNodeForMutation;
                 docNodeForMutation.Children.Add(newEl);
+                NotifyChildAdded(docNodeForMutation, newEl, docNodeForMutation.Children.Count - 1);
                 return a[0];
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);

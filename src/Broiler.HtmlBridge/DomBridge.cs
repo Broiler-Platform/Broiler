@@ -35,7 +35,7 @@ public sealed partial class DomBridge
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
     private readonly List<DomElement> _elements = [];
-    private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
+    private readonly List<(JSObject Observer, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<IteratorState>> _activeNodeIterators = [];
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);

@@ -2933,6 +2933,60 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void MutationObserver_Observe_AppendChild_Delivers_ChildList_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.body.appendChild(host);
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',TARGET:' + records[0].target.tagName.toLowerCase() +
+                    ',ADDED:' + records[0].addedNodes.length +
+                    ',REMOVED:' + records[0].removedNodes.length +
+                    ',TAG:' + records[0].addedNodes[0].tagName.toLowerCase();
+            });
+            obs.observe(host, { childList: true });
+            host.appendChild(document.createElement('span'));
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:childList", result);
+        Assert.Contains("TARGET:div", result);
+        Assert.Contains("ADDED:1", result);
+        Assert.Contains("REMOVED:0", result);
+        Assert.Contains("TAG:span", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_RemoveChild_Delivers_ChildList_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var child = document.createElement('span');
+            host.appendChild(child);
+            document.body.appendChild(host);
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',ADDED:' + records[0].addedNodes.length +
+                    ',REMOVED:' + records[0].removedNodes.length +
+                    ',TAG:' + records[0].removedNodes[0].tagName.toLowerCase();
+            });
+            obs.observe(host, { childList: true });
+            host.removeChild(child);
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:childList", result);
+        Assert.Contains("ADDED:0", result);
+        Assert.Contains("REMOVED:1", result);
+        Assert.Contains("TAG:span", result);
+    }
+
+    [Fact]
     public void MutationObserver_TakeRecords_Returns_And_Clears()
     {
         var result = ExecJs(@"
