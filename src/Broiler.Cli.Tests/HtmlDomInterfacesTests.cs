@@ -184,6 +184,76 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Document_CreateAttribute_Creates_Standalone_Attr_Node()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var attr = document.createAttribute('DATA-X');
+var r = [];
+r.push(attr !== null);
+r.push(attr.nodeType === 2);
+r.push(attr.name === 'data-x');
+r.push(attr.value === '');
+r.push(attr.ownerElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Document_CreateAttributeNS_Creates_Namespaced_Attr_Node()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var attr = document.createAttributeNS('http://example.com/ns', 'ex:data-x');
+var r = [];
+r.push(attr.name === 'ex:data-x');
+r.push(attr.localName === 'data-x');
+r.push(attr.prefix === 'ex');
+r.push(attr.namespaceURI === 'http://example.com/ns');
+r.push(attr.ownerElement === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Document_CreateAttribute_Can_Be_Attached_With_SetAttributeNode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var attr = document.createAttribute('data-x');
+attr.value = '42';
+var old = d.setAttributeNode(attr);
+var attached = d.getAttributeNode('data-x');
+var r = [];
+r.push(old === null);
+r.push(d.getAttribute('data-x') === '42');
+r.push(attached !== null);
+r.push(attached.ownerElement === d);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
     public void Element_GetAttributeNode_Returns_Attr_Node()
     {
         var html = @"<!DOCTYPE html>

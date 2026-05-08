@@ -232,7 +232,20 @@ public sealed partial class DomBridge
                 el.TextContent = text;
                 _elements.Add(el);
                 return ToJSObject(el);
-            }, "createTextNode", 1),
+             }, "createTextNode", 1),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createAttribute(name)
+        document.FastAddValue(
+            (KeyString)"createAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createAttribute': 1 argument required, but only 0 present.");
+                var name = a[0].ToString();
+                ValidateElementName(name, context);
+                return BuildStandaloneAttrNode(AsciiToLower(name), null);
+            }, "createAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.createDocumentFragment() — basic iframe/fragment support
@@ -1173,7 +1186,21 @@ public sealed partial class DomBridge
                     el.NamespaceURI = ns;
                 _elements.Add(el);
                 return ToJSObject(el);
-            }, "createElementNS", 2),
+             }, "createElementNS", 2),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createAttributeNS(namespace, qualifiedName)
+        document.FastAddValue(
+            (KeyString)"createAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+                if (a.Length < 2)
+                    throw new JSException("Failed to execute 'createAttributeNS': 2 arguments required, but fewer present.");
+                var qualifiedName = a[1].ToString();
+                ValidateQualifiedName(qualifiedName, ns, context);
+                return BuildStandaloneAttrNode(qualifiedName, ns);
+            }, "createAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images — collection of all <img> elements

@@ -8761,13 +8761,29 @@ public sealed partial class DomBridge
     /// </summary>
     private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
     {
+        return BuildAttrNodeCore(name, value, ownerObj, null);
+    }
+
+    private static JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri)
+    {
+        return BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
+    }
+
+    private static JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri)
+    {
         var attr = new JSObject();
+        var colonIdx = name.IndexOf(':');
+        var localName = colonIdx >= 0 ? name[(colonIdx + 1)..] : name;
+        var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
         attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"value", new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"ownerElement", ownerObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"ownerElement", ownerElement, JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
         return attr;
     }
 
