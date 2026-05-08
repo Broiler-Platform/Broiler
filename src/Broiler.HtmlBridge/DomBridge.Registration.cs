@@ -106,12 +106,8 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var id = a.Length > 0 ? a[0].ToString() : string.Empty;
-                foreach (var el in _elements)
-                {
-                    if (el.Id == id)
-                        return ToJSObject(el);
-                }
-                return JSNull.Value;
+                var found = FindInSubTree(DocumentElement, el => el.Id == id);
+                return found != null ? ToJSObject(found) : JSNull.Value;
             }, "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

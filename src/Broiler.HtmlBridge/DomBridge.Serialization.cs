@@ -37,6 +37,13 @@ public sealed partial class DomBridge
         return sb.ToString();
     }
 
+    private static string SerializeElementToHtml(DomElement element)
+    {
+        var sb = new StringBuilder();
+        SerializeElement(element, sb);
+        return sb.ToString();
+    }
+
     private void ApplySerializationTransforms()
     {
         if (_serializationTransformsApplied)

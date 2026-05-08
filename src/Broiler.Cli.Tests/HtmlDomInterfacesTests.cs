@@ -120,6 +120,49 @@ document.getElementById('result').textContent = d.outerText;
     }
 
     [Fact]
+    public void OuterHtml_Returns_Serialized_Element_Markup()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" class=""foo""><span>World</span></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+document.getElementById('result').textContent =
+    d.outerHTML === '<div id=""d"" class=""foo""><span>World</span></div>';
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true", result);
+    }
+
+    [Fact]
+    public void OuterHtml_Setter_Replaces_Element_In_Parent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""><div id=""target"">old</div></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var target = document.getElementById('target');
+target.outerHTML = '<span id=""replacement"">new</span><em>tail</em>';
+var r = [];
+r.push(document.getElementById('target') === null);
+r.push(host.childNodes.length === 2);
+r.push(host.firstChild.tagName.toLowerCase() === 'span');
+r.push(host.lastChild.tagName.toLowerCase() === 'em');
+r.push(document.getElementById('replacement').textContent === 'new');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void Append_Adds_Nodes_And_Text_In_Order()
     {
         var html = @"<!DOCTYPE html>

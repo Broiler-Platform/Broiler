@@ -109,6 +109,17 @@ public sealed partial class DomBridge
             }, "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // outerHTML (read/write)
+        obj.FastAddProperty(
+            (KeyString)"outerHTML",
+            new JSFunction((in Arguments _) => new JSString(SerializeElementToHtml(element)), "get outerHTML"),
+            new JSFunction((in Arguments a) =>
+            {
+                bridge.SetElementOuterHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
+                return JSUndefined.Value;
+            }, "set outerHTML"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         obj.FastAddProperty(
             (KeyString)"shadowRoot",
             new JSFunction((in Arguments _) =>
@@ -6968,6 +6979,54 @@ public sealed partial class DomBridge
 
         ExtractStyleBlocks(SerializeToHtml());
         InvalidateStyleScope(element);
+    }
+
+    private void SetElementOuterHtml(DomElement element, string html)
+    {
+        html ??= string.Empty;
+
+        var parent = element.Parent;
+        if (parent == null)
+            return;
+
+        var index = parent.Children.IndexOf(element);
+        if (index < 0)
+            return;
+
+        var previousSibling = index > 0 ? parent.Children[index - 1] : null;
+        var nextSibling = index + 1 < parent.Children.Count ? parent.Children[index + 1] : null;
+
+        DomElement? parsedContainer = null;
+        if (!string.IsNullOrEmpty(html))
+        {
+            var parsingContext = parent.TagName.StartsWith("#", StringComparison.Ordinal)
+                ? new DomElement("body", null, null, string.Empty)
+                : parent;
+            if (TryBuildInnerHtmlFragmentContainer(parsingContext, html, out var fragmentContainer))
+                parsedContainer = fragmentContainer;
+        }
+
+        NotifyNodeIteratorPreRemoval(element);
+        parent.Children.RemoveAt(index);
+        element.Parent = null;
+        NotifyChildRemoved(parent, element, index, previousSibling, nextSibling);
+
+        if (parsedContainer != null)
+        {
+            var insertIndex = index;
+            foreach (var child in parsedContainer.Children.ToArray())
+            {
+                child.Parent = parent;
+                AdoptSubtreeIntoDocument(child, parent.OwnerDocRoot);
+                parent.Children.Insert(insertIndex, child);
+                AddElementsRecursive(child);
+                NotifyChildAdded(parent, child, insertIndex);
+                insertIndex++;
+            }
+        }
+
+        ExtractStyleBlocks(SerializeToHtml());
+        InvalidateStyleScope(parent);
     }
 
     private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
