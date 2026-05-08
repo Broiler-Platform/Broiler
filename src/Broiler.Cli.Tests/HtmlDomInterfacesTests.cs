@@ -772,6 +772,31 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void Node_IsSameNode_Identifies_Identical_References()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d""></div>
+<div id=""result""></div>
+<script>
+var d1 = document.getElementById('d');
+var d2 = document.getElementById('d');
+var other = document.createElement('div');
+var r = [];
+r.push(d1.isSameNode(d1) === true);
+r.push(d1.isSameNode(d2) === true);
+r.push(d1.isSameNode(other) === false);
+r.push(other.isSameNode(other) === true);
+r.push(d1.isSameNode(null) === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
     [Fact]

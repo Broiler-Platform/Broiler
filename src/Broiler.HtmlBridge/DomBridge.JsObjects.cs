@@ -978,6 +978,19 @@ public sealed partial class DomBridge
             }, "compareDocumentPosition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // isSameNode(otherNode)
+        obj.FastAddValue(
+            (KeyString)"isSameNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return JSBoolean.False;
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                return ReferenceEquals(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+            }, "isSameNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         obj.FastAddValue(
             (KeyString)"getRootNode",
             new JSFunction((in Arguments a) =>
