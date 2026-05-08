@@ -85,6 +85,40 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
+    [Fact]
+    public void InnerText_Returns_Descendant_Text_Content()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"">Hello<span>World</span></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+document.getElementById('result').textContent = d.innerText;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("HelloWorld", result);
+    }
+
+    [Fact]
+    public void OuterText_Returns_Descendant_Text_Content()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"">Hello<span>World</span></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+document.getElementById('result').textContent = d.outerText;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("HelloWorld", result);
+    }
+
     // ────────────────────── 7.3: Attribute node interface ──────────────────────
 
     [Fact]

@@ -127,27 +127,29 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        JSValue GetNodeTextValue()
+        {
+            // For text nodes, return the direct text content
+            if (element.IsTextNode)
+                return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
+            // For element nodes with direct TextContent set (e.g., via JS setter)
+            if (element.TextContent != null && element.Children.Count == 0)
+                return new JSString(element.TextContent);
+            // For element nodes, recursively collect text from descendants
+            if (element.Children.Count > 0)
+            {
+                var sb = new StringBuilder();
+                CollectTextContent(element, sb);
+                return new JSString(sb.ToString());
+            }
+            // Fallback to InnerHtml if no children and no TextContent
+            return new JSString(element.InnerHtml);
+        }
+
         // textContent (read/write)
         obj.FastAddProperty(
             (KeyString)"textContent",
-            new JSFunction((in Arguments a) =>
-            {
-                // For text nodes, return the direct text content
-                if (element.IsTextNode)
-                    return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
-                // For element nodes with direct TextContent set (e.g., via JS setter)
-                if (element.TextContent != null && element.Children.Count == 0)
-                    return new JSString(element.TextContent);
-                // For element nodes, recursively collect text from descendants
-                if (element.Children.Count > 0)
-                {
-                    var sb = new StringBuilder();
-                    CollectTextContent(element, sb);
-                    return new JSString(sb.ToString());
-                }
-                // Fallback to InnerHtml if no children and no TextContent
-                return new JSString(element.InnerHtml);
-            }, "get textContent"),
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get textContent"),
             new JSFunction((in Arguments a) =>
             {
                 var text = a.Length > 0 ? a[0].ToString() : string.Empty;
@@ -161,6 +163,18 @@ public sealed partial class DomBridge
                 element.Children.Clear();
                 return JSUndefined.Value;
             }, "set textContent"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"innerText",
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get innerText"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"outerText",
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get outerText"),
+            null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style object — CSS property access and manipulation.
