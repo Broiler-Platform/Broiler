@@ -1011,4 +1011,56 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true", result);
     }
+
+    [Fact]
+    public void HTMLElement_Hidden_Property_Reflects_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var r = [];
+r.push(d.hidden === false);
+d.hidden = true;
+r.push(d.hidden === true);
+r.push(d.hasAttribute('hidden') === true);
+r.push(d.getAttribute('hidden') === '');
+d.hidden = false;
+r.push(d.hidden === false);
+r.push(d.hasAttribute('hidden') === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void HTMLElement_Hidden_Property_Uses_Existing_Hidden_Attribute_And_Ua_Display_None()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" hidden>hello</div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var r = [];
+r.push(d.hidden === true);
+r.push(d.hasAttribute('hidden') === true);
+r.push(d.getAttribute('hidden') === '');
+d.hidden = false;
+r.push(d.hasAttribute('hidden') === false);
+r.push(d.hidden === false);
+d.hidden = true;
+r.push(d.hasAttribute('hidden') === true);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
 }

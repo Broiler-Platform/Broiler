@@ -1773,7 +1773,24 @@ public sealed partial class DomBridge
                         element.Attributes.Remove("disabled");
                     bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
-                }, "set disabled"),
+                 }, "set disabled"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // hidden (read/write) — global reflected boolean attribute
+        obj.FastAddProperty(
+            (KeyString)"hidden",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.ContainsKey("hidden") ? JSBoolean.True : JSBoolean.False,
+                "get hidden"),
+            new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["hidden"] = string.Empty;
+                    else
+                        element.Attributes.Remove("hidden");
+                    bridge.InvalidateStyleScope(element);
+                    return JSUndefined.Value;
+                }, "set hidden"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation
