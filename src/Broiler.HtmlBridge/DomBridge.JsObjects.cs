@@ -779,6 +779,28 @@ public sealed partial class DomBridge
             }, "removeAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        obj.FastAddValue(
+            (KeyString)"removeAttributeNodeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var localName = GetAttrNodeLocalName(attrObj);
+                if (string.IsNullOrEmpty(localName))
+                    return JSNull.Value;
+
+                var ns = GetAttrNodeNamespace(attrObj);
+                if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) ||
+                    !element.Attributes.TryGetValue(qName, out var val))
+                    return JSNull.Value;
+
+                var removed = BuildAttrNode(qName, val, element, obj);
+                RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+                return removed;
+            }, "removeAttributeNodeNS", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // setAttributeNS(namespace, qualifiedName, value)
         obj.FastAddValue(
             (KeyString)"setAttributeNS",

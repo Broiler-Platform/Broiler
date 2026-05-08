@@ -308,6 +308,31 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Element_RemoveAttributeNodeNS_Removes_And_Returns_Namespaced_Attr()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var ns = 'http://www.w3.org/1999/xlink';
+var el = document.createElement('div');
+el.setAttributeNS(ns, 'xlink:href', 'http://example.com');
+var attr = el.getAttributeNodeNS(ns, 'href');
+var removed = el.removeAttributeNodeNS(attr);
+var r = [];
+r.push(removed !== null);
+r.push(removed.value === 'http://example.com');
+r.push(removed.namespaceURI === ns);
+r.push(el.getAttributeNS(ns, 'href') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
     public void NamedNodeMap_Namespace_Aware_Methods_Work()
     {
         var html = @"<!DOCTYPE html>
