@@ -382,6 +382,57 @@ request.arrayBuffer().then(function(buffer) {
     }
 
     [Fact]
+    public void Fetch_Request_Body_Stream_Reads_Uint8Array_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'ABC' });
+var reader = request.body.getReader();
+reader.read().then(function(result) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        result.done === false,
+        result.value instanceof Uint8Array,
+        result.value.length,
+        result.value[0],
+        result.value[1],
+        result.value[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|true|3|65|66|67", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Body_Stream_Lock_Blocks_Other_Body_Readers()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'payload' });
+request.body.getReader();
+try {
+    request.text();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
     public void Fetch_Request_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -696,6 +747,64 @@ response.blob().then(function(blob) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|true|7|text/plain|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Stream_Reads_Once_Then_Completes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('ABC', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+var reader = response.body.getReader();
+reader.read().then(function(first) {
+    reader.read().then(function(second) {
+        document.getElementById('result').textContent = [
+            response.bodyUsed === true,
+            first.done === false,
+            first.value instanceof Uint8Array,
+            first.value[0],
+            first.value[1],
+            first.value[2],
+            second.done === true,
+            second.value === undefined
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|true|65|66|67|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Stream_Lock_Blocks_Clone()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.body.getReader();
+try {
+    response.clone();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
     }
 
     [Fact]

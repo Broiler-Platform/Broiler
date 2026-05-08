@@ -1914,6 +1914,82 @@ public sealed partial class DomBridge
             return blobObject;
         }
 
+        static bool IsBodyUnavailable(JSObject owner)
+            => owner[(KeyString)"bodyUsed"].BooleanValue || owner[(KeyString)"_bodyStreamLocked"].BooleanValue;
+
+        static JSObject CreateReadableStreamReadResult(JSValue value, bool done)
+        {
+            var result = new JSObject();
+            result[(KeyString)"value"] = value;
+            result[(KeyString)"done"] = done ? JSBoolean.True : JSBoolean.False;
+            return result;
+        }
+
+        JSValue CreateUint8Array(byte[] bytes)
+        {
+            if (context[(KeyString)"Uint8Array"] is JSFunction uint8ArrayCtor)
+                return uint8ArrayCtor.CreateInstance(new Arguments(JSUndefined.Value, new JSArrayBuffer(bytes)));
+
+            return new JSArrayBuffer(bytes);
+        }
+
+        JSObject CreateReadableStreamBody(JSObject owner, string bodyText)
+        {
+            var bytes = Encoding.UTF8.GetBytes(bodyText);
+            var streamObject = new JSObject();
+            var readerLocked = false;
+            var chunkDelivered = false;
+
+            void SetLocked(bool locked)
+            {
+                readerLocked = locked;
+                var lockedValue = locked ? JSBoolean.True : JSBoolean.False;
+                owner[(KeyString)"_bodyStreamLocked"] = lockedValue;
+                streamObject[(KeyString)"locked"] = lockedValue;
+            }
+
+            streamObject[(KeyString)"locked"] = JSBoolean.False;
+            streamObject.FastAddValue((KeyString)"getReader", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(owner) || readerLocked)
+                    throw new JSException("Failed to execute 'getReader' on 'ReadableStream': stream is already locked or disturbed.");
+
+                SetLocked(true);
+
+                var readerObject = new JSObject();
+                readerObject.FastAddValue((KeyString)"read", new JSFunction((in Arguments _) =>
+                {
+                    if (!readerLocked)
+                        throw new JSException("Failed to execute 'read' on 'ReadableStreamDefaultReader': reader is released.");
+
+                    if (chunkDelivered)
+                        return CreateThenable(() => CreateReadableStreamReadResult(JSUndefined.Value, true));
+
+                    chunkDelivered = true;
+                    owner[(KeyString)"bodyUsed"] = JSBoolean.True;
+
+                    return CreateThenable(() => CreateReadableStreamReadResult(CreateUint8Array(bytes), false));
+                }, "read", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                readerObject.FastAddValue((KeyString)"cancel", new JSFunction((in Arguments _) =>
+                {
+                    if (readerLocked && !chunkDelivered)
+                        owner[(KeyString)"bodyUsed"] = JSBoolean.True;
+
+                    chunkDelivered = true;
+                    return CreateThenable(() => JSUndefined.Value);
+                }, "cancel", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                readerObject.FastAddValue((KeyString)"releaseLock", new JSFunction((in Arguments _) =>
+                {
+                    SetLocked(false);
+                    return JSUndefined.Value;
+                }, "releaseLock", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                return readerObject;
+            }, "getReader", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return streamObject;
+        }
+
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
             string url;
@@ -1974,7 +2050,9 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"method"] = new JSString(method);
             requestObject[(KeyString)"headers"] = headersObject;
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            requestObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
+            requestObject[(KeyString)"body"] = body == null ? JSNull.Value : CreateReadableStreamBody(requestObject, body);
             requestObject[(KeyString)"signal"] = signalValue;
             requestObject[(KeyString)"mode"] = new JSString(mode);
             requestObject[(KeyString)"credentials"] = new JSString(credentials);
@@ -1984,14 +2062,14 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"integrity"] = new JSString(integrity);
             requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute 'clone' on 'Request': body is already used.");
 
                 return CreateRequestObject(requestObject);
             }, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2000,7 +2078,7 @@ public sealed partial class DomBridge
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2009,7 +2087,7 @@ public sealed partial class DomBridge
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2018,7 +2096,7 @@ public sealed partial class DomBridge
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2027,7 +2105,7 @@ public sealed partial class DomBridge
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
             {
-                if (requestObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(requestObject))
                     throw new JSException("Failed to execute body reader on 'Request': body is already used.");
 
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2053,11 +2131,13 @@ public sealed partial class DomBridge
             responseObject[(KeyString)"redirected"] = redirected ? JSBoolean.True : JSBoolean.False;
             responseObject[(KeyString)"type"] = new JSString(type);
             responseObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            responseObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             responseObject[(KeyString)"headers"] = headersObject;
             responseObject[(KeyString)"_bodyText"] = new JSString(body);
+            responseObject[(KeyString)"body"] = CreateReadableStreamBody(responseObject, body);
             responseObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2066,7 +2146,7 @@ public sealed partial class DomBridge
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2075,7 +2155,7 @@ public sealed partial class DomBridge
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2084,7 +2164,7 @@ public sealed partial class DomBridge
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2093,7 +2173,7 @@ public sealed partial class DomBridge
             }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute body reader on 'Response': body is already used.");
 
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
@@ -2102,7 +2182,7 @@ public sealed partial class DomBridge
             }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
             {
-                if (responseObject[(KeyString)"bodyUsed"].BooleanValue)
+                if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute 'clone' on 'Response': body is already used.");
 
                 return CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase));
