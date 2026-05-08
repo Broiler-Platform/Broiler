@@ -254,6 +254,91 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Element_GetAttributeNodeNS_Returns_Namespaced_Attr_Node()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var ns = 'http://www.w3.org/1999/xlink';
+var el = document.createElement('div');
+el.setAttributeNS(ns, 'xlink:href', 'http://example.com');
+var attr = el.getAttributeNodeNS(ns, 'href');
+var r = [];
+r.push(attr !== null);
+r.push(attr.name === 'xlink:href');
+r.push(attr.localName === 'href');
+r.push(attr.namespaceURI === ns);
+r.push(attr.ownerElement === el);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_SetAttributeNodeNS_Adds_And_Replaces_Namespaced_Attr()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var ns = 'http://www.w3.org/1999/xlink';
+var el = document.createElement('div');
+var first = document.createAttributeNS(ns, 'xlink:href');
+first.value = 'http://example.com/a';
+var old1 = el.setAttributeNodeNS(first);
+var second = document.createAttributeNS(ns, 'xlink:href');
+second.value = 'http://example.com/b';
+var old2 = el.setAttributeNodeNS(second);
+var r = [];
+r.push(old1 === null);
+r.push(old2 !== null);
+r.push(old2.value === 'http://example.com/a');
+r.push(el.getAttributeNS(ns, 'href') === 'http://example.com/b');
+r.push(el.getAttributeNodeNS(ns, 'href').namespaceURI === ns);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void NamedNodeMap_Namespace_Aware_Methods_Work()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var ns = 'http://www.w3.org/1999/xlink';
+var el = document.createElement('div');
+var attrs = el.attributes;
+var attr = document.createAttributeNS(ns, 'xlink:href');
+attr.value = 'http://example.com';
+var old = attrs.setNamedItemNS(attr);
+var fetched = attrs.getNamedItemNS(ns, 'href');
+var beforeRemove = el.getAttributeNS(ns, 'href');
+var removed = attrs.removeNamedItemNS(ns, 'href');
+var r = [];
+r.push(old === null);
+r.push(fetched !== null);
+r.push(fetched.namespaceURI === ns);
+r.push(beforeRemove === 'http://example.com');
+r.push(removed.value === 'http://example.com');
+r.push(el.getAttributeNS(ns, 'href') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void Element_GetAttributeNode_Returns_Attr_Node()
     {
         var html = @"<!DOCTYPE html>
