@@ -60,6 +60,85 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("LEN:0", result);
     }
 
+    [Fact]
+    public void InsertAdjacentElement_BeforeBegin_Inserts_Sibling()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('p');
+            inserted.id = 'before';
+            host.insertAdjacentElement('beforebegin', inserted);
+            document.getElementById('result').textContent =
+                host.previousElementSibling.id + '|' +
+                inserted.nextElementSibling.id;
+        ");
+        Assert.Contains("before|host", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentText_AfterBegin_Prepends_Text()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var tail = document.createElement('span');
+            tail.textContent = 'tail';
+            document.body.appendChild(host);
+            host.appendChild(tail);
+            host.insertAdjacentText('afterbegin', 'hello');
+            document.getElementById('result').textContent =
+                host.firstChild.data + '|' + host.lastChild.textContent;
+        ");
+        Assert.Contains("hello|tail", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_BeforeEnd_Appends_Parsed_Nodes()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.insertAdjacentHTML('beforeend', '<span>one</span><span>two</span>');
+            document.getElementById('result').textContent =
+                'LEN:' + host.children.length +
+                ',FIRST:' + host.firstElementChild.textContent +
+                ',LAST:' + host.lastElementChild.textContent;
+        ");
+        Assert.Contains("LEN:2", result);
+        Assert.Contains("FIRST:one", result);
+        Assert.Contains("LAST:two", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_AfterEnd_Inserts_After_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            host.insertAdjacentHTML('afterend', '<section id=""after""></section>');
+            document.getElementById('result').textContent =
+                document.body.lastElementChild.id + '|' +
+                document.body.lastElementChild.previousElementSibling.id;
+        ");
+        Assert.Contains("after|host", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_Invalid_Position_Throws_SyntaxError()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            try {
+                host.insertAdjacentHTML('middle', '<span>x</span>');
+                document.getElementById('result').textContent = 'NO_THROW';
+            } catch (e) {
+                document.getElementById('result').textContent = e.name;
+            }
+        ");
+        Assert.Contains("SyntaxError", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G2: performance.now()
     // ---------------------------------------------------------------

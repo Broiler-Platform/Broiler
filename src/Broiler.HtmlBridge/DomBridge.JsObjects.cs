@@ -796,19 +796,7 @@ public sealed partial class DomBridge
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {
-                    newEl.Parent?.Children.Remove(newEl);
-                    newEl.Parent = element;
-                    AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
-                    element.Children.Add(newEl);
-                    bridgeForInsert.InvalidateStyleScope(element);
-
-                    // Fire onload for iframe/object children after DOM insertion
-                    var ntag = newEl.TagName?.ToLowerInvariant();
-                    if (ntag == "iframe" || ntag == "object")
-                        bridgeForInsert.FireSubDocumentOnload(newEl);
-                    else
-                        bridgeForInsert.FireDescendantOnloads(newEl);
-
+                    bridgeForInsert.InsertNodeAt(element, newEl, element.Children.Count);
                     return a[0];
                 }
 
@@ -816,26 +804,11 @@ public sealed partial class DomBridge
                 if (refChildObj == null) return a[0];
                 var refEl = FindDomElementByJSObject(refChildObj);
                 if (refEl == null) return a[0];
+                if (ReferenceEquals(newEl, refEl)) return a[0];
 
                 var idx = element.Children.IndexOf(refEl);
                 if (idx < 0) throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
-
-                newEl.Parent?.Children.Remove(newEl);
-                newEl.Parent = element;
-                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
-                // Re-find index: removing newEl from its old parent may have shifted
-                // indices if newEl was a sibling of refEl within this same parent.
-                idx = element.Children.IndexOf(refEl);
-                element.Children.Insert(idx, newEl);
-                bridgeForInsert.InvalidateStyleScope(element);
-
-                // Fire onload for iframe/object children after DOM insertion
-                var newTag = newEl.TagName?.ToLowerInvariant();
-                if (newTag == "iframe" || newTag == "object")
-                    bridgeForInsert.FireSubDocumentOnload(newEl);
-                else
-                    bridgeForInsert.FireDescendantOnloads(newEl);
-
+                bridgeForInsert.InsertNodeAt(element, newEl, idx);
                 return a[0];
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -974,30 +947,7 @@ public sealed partial class DomBridge
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-                if (childEl.Parent != null)
-                {
-                    var oldParent = childEl.Parent;
-                    var oldIndex = oldParent.Children.IndexOf(childEl);
-                    if (oldIndex >= 0)
-                    {
-                        NotifyNodeIteratorPreRemoval(childEl);
-                        oldParent.Children.RemoveAt(oldIndex);
-                        NotifyChildRemoved(oldParent, childEl, oldIndex);
-                    }
-                }
-                childEl.Parent = element;
-                AdoptSubtreeIntoDocument(childEl, element.OwnerDocRoot);
-                element.Children.Add(childEl);
-                bridgeForAppend.InvalidateStyleScope(element);
-                bridgeForAppend.NotifyChildAdded(element, childEl, element.Children.Count - 1);
-
-                // Fire onload for iframe/object children after DOM insertion
-                var childTag = childEl.TagName?.ToLowerInvariant();
-                if (childTag == "iframe" || childTag == "object")
-                    bridgeForAppend.FireSubDocumentOnload(childEl);
-                else
-                    bridgeForAppend.FireDescendantOnloads(childEl);
-
+                bridgeForAppend.InsertNodeAt(element, childEl, element.Children.Count);
                 return a[0];
             }, "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1578,6 +1528,84 @@ public sealed partial class DomBridge
 
                 return JSNull.Value;
             }, "closest", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentElement",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2)
+                    return JSNull.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var adjacentObject = a[1] as JSObject;
+                if (adjacentObject == null)
+                    return JSNull.Value;
+
+                var adjacentElement = FindDomElementByJSObject(adjacentObject);
+                if (adjacentElement == null)
+                    return JSNull.Value;
+
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                InsertNodeAt(parent, adjacentElement, index);
+                return a[1];
+            }, "insertAdjacentElement", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentText",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var text = a.Length > 1 ? a[1].ToString() : string.Empty;
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
+                {
+                    TextContent = text
+                };
+                _elements.Add(textNode);
+                InsertNodeAt(parent, textNode, index);
+                return JSUndefined.Value;
+            }, "insertAdjacentText", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentHTML",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var html = a.Length > 1 ? a[1].ToString() : string.Empty;
+                if (string.IsNullOrEmpty(html))
+                    return JSUndefined.Value;
+
+                DomElement parsingContext;
+                switch (position)
+                {
+                    case "beforebegin":
+                    case "afterend":
+                        if (element.Parent == null)
+                            ThrowDOMException(_jsContext!, "Cannot insert adjacent HTML without a parent node.", "NoModificationAllowedError");
+                        parsingContext = element.Parent!;
+                        break;
+                    default:
+                        parsingContext = element;
+                        break;
+                }
+
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                var nodes = BuildAdjacentHtmlNodes(parsingContext, html);
+                foreach (var node in nodes)
+                    InsertNodeAt(parent, node, index++);
+
+                ExtractStyleBlocks(SerializeToHtml());
+                return JSUndefined.Value;
+            }, "insertAdjacentHTML", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getElementsByTagName on elements — searches descendants in tree order
@@ -6507,6 +6535,96 @@ public sealed partial class DomBridge
 
         foreach (var child in element.Children)
             RemoveElementsRecursive(child);
+    }
+
+    private string NormalizeInsertAdjacentPosition(JSValue? value)
+    {
+        var position = value?.ToString().Trim().ToLowerInvariant() ?? string.Empty;
+        if (position is "beforebegin" or "afterbegin" or "beforeend" or "afterend")
+            return position;
+
+        ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
+        return string.Empty;
+    }
+
+    private (DomElement Parent, int Index) GetInsertAdjacentTarget(DomElement element, string position)
+    {
+        switch (position)
+        {
+            case "beforebegin":
+                if (element.Parent == null)
+                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
+                return (element.Parent!, element.Parent!.Children.IndexOf(element));
+            case "afterbegin":
+                return (element, 0);
+            case "beforeend":
+                return (element, element.Children.Count);
+            case "afterend":
+                if (element.Parent == null)
+                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
+                return (element.Parent!, element.Parent!.Children.IndexOf(element) + 1);
+            default:
+                ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
+                return (element, element.Children.Count);
+        }
+    }
+
+    private void InsertNodeAt(DomElement parent, DomElement node, int index)
+    {
+        if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
+            ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
+
+        if (index < 0)
+            index = 0;
+        if (index > parent.Children.Count)
+            index = parent.Children.Count;
+
+        if (node.Parent != null)
+        {
+            var oldParent = node.Parent;
+            var oldIndex = oldParent.Children.IndexOf(node);
+            if (oldIndex >= 0)
+            {
+                if (ReferenceEquals(oldParent, parent) && oldIndex < index)
+                    index--;
+
+                NotifyNodeIteratorPreRemoval(node);
+                oldParent.Children.RemoveAt(oldIndex);
+                NotifyChildRemoved(oldParent, node, oldIndex);
+            }
+        }
+
+        node.Parent = parent;
+        AdoptSubtreeIntoDocument(node, parent.OwnerDocRoot);
+        parent.Children.Insert(index, node);
+        InvalidateStyleScope(parent);
+        NotifyChildAdded(parent, node, index);
+
+        var insertedTag = node.TagName?.ToLowerInvariant();
+        if (insertedTag == "iframe" || insertedTag == "object")
+            FireSubDocumentOnload(node);
+        else
+            FireDescendantOnloads(node);
+    }
+
+    private List<DomElement> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
+    {
+        var nodes = new List<DomElement>();
+        if (string.IsNullOrEmpty(html))
+            return nodes;
+
+        if (!TryBuildInnerHtmlFragmentContainer(contextElement, html, out var fragmentContainer))
+            return nodes;
+
+        foreach (var child in fragmentContainer.Children.ToArray())
+        {
+            fragmentContainer.Children.Remove(child);
+            child.Parent = null;
+            AddElementsRecursive(child);
+            nodes.Add(child);
+        }
+
+        return nodes;
     }
 
     private void SetElementInnerHtml(DomElement element, string html)
