@@ -709,6 +709,22 @@ public sealed partial class DomBridge
             }, "hasAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // hasAttributes()
+        obj.FastAddValue(
+            (KeyString)"hasAttributes",
+            new JSFunction((in Arguments _) =>
+                element.Attributes.Count > 0 ? JSBoolean.True : JSBoolean.False,
+                "hasAttributes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getAttributeNames()
+        obj.FastAddValue(
+            (KeyString)"getAttributeNames",
+            new JSFunction((in Arguments _) =>
+                new JSArray(element.Attributes.Keys.Select(static name => (JSValue)new JSString(name)).ToArray()),
+                "getAttributeNames", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // removeAttribute(name)
         obj.FastAddValue(
             (KeyString)"removeAttribute",

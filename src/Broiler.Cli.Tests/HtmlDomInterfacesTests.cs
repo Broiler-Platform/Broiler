@@ -224,6 +224,52 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Element_HasAttributes_Reflects_Attribute_Presence()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""with-attrs"" class=""foo""></div>
+<div></div>
+<div id=""result""></div>
+<script>
+var withAttrs = document.getElementById('with-attrs');
+var withoutAttrs = document.getElementsByTagName('div')[1];
+var r = [];
+r.push(withAttrs.hasAttributes() === true);
+r.push(withoutAttrs.hasAttributes() === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Element_GetAttributeNames_Returns_All_Attribute_Names()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" class=""foo"" title=""bar""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var names = d.getAttributeNames();
+var r = [];
+r.push(Array.isArray(names));
+r.push(names.indexOf('id') >= 0);
+r.push(names.indexOf('class') >= 0);
+r.push(names.indexOf('title') >= 0);
+r.push(names.length >= 3);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void Attributes_SetNamedItem_Adds_Attribute()
     {
         var html = @"<!DOCTYPE html>
