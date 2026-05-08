@@ -760,6 +760,34 @@ public sealed partial class DomBridge
             }, "removeAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // toggleAttribute(name, force)
+        obj.FastAddValue(
+            (KeyString)"toggleAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                var attrName = a[0].ToString();
+                var hasAttribute = element.Attributes.ContainsKey(attrName);
+                var forceSpecified = a.Length > 1 && !a[1].IsUndefined;
+                var shouldHaveAttribute = forceSpecified
+                    ? a[1].BooleanValue
+                    : !hasAttribute;
+
+                if (shouldHaveAttribute)
+                {
+                    if (!hasAttribute)
+                        SetAttributeLikeSetAttribute(element, attrName, string.Empty);
+                    return JSBoolean.True;
+                }
+
+                if (hasAttribute)
+                    RemoveAttributeLikeRemoveAttribute(element, attrName);
+                return JSBoolean.False;
+            }, "toggleAttribute", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         obj.FastAddValue(
             (KeyString)"setAttributeNode",
             new JSFunction((in Arguments a) =>

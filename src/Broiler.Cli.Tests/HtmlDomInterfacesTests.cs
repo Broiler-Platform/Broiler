@@ -658,6 +658,73 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
+    [Fact]
+    public void Element_ToggleAttribute_Adds_Then_Removes_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var r = [];
+r.push(d.toggleAttribute('hidden') === true);
+r.push(d.hasAttribute('hidden') === true);
+r.push(d.getAttribute('hidden') === '');
+r.push(d.toggleAttribute('hidden') === false);
+r.push(d.hasAttribute('hidden') === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_ToggleAttribute_With_Force_True_Adds_Once_And_Returns_True()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var r = [];
+r.push(d.toggleAttribute('data-armed', true) === true);
+r.push(d.toggleAttribute('data-armed', true) === true);
+r.push(d.getAttribute('data-armed') === '');
+r.push(d.hasAttribute('data-armed') === true);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_ToggleAttribute_With_Force_False_Removes_And_Returns_False()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" title=""hello""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var r = [];
+r.push(d.toggleAttribute('title', false) === false);
+r.push(d.getAttribute('title') === null);
+r.push(d.toggleAttribute('title', false) === false);
+r.push(d.hasAttribute('title') === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
     [Fact]
