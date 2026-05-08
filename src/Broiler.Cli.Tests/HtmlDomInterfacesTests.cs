@@ -1063,4 +1063,32 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true,true,true", result);
     }
+
+    [Fact]
+    public void HTMLElement_TabIndex_Property_Reflects_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d1""></div>
+<div id=""d2"" tabindex=""5""></div>
+<div id=""result""></div>
+<script>
+var d1 = document.getElementById('d1');
+var d2 = document.getElementById('d2');
+var r = [];
+r.push(d1.tabIndex === -1);
+r.push(d2.tabIndex === 5);
+d1.tabIndex = 3;
+r.push(d1.getAttribute('tabindex') === '3');
+r.push(d1.tabIndex === 3);
+d2.tabIndex = -1;
+r.push(d2.getAttribute('tabindex') === '-1');
+r.push(d2.tabIndex === -1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
 }

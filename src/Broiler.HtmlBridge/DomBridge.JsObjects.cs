@@ -1790,7 +1790,31 @@ public sealed partial class DomBridge
                         element.Attributes.Remove("hidden");
                     bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
-                }, "set hidden"),
+                 }, "set hidden"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // tabIndex (read/write) — global reflected numeric attribute
+        obj.FastAddProperty(
+            (KeyString)"tabIndex",
+            new JSFunction((in Arguments _) =>
+            {
+                if (element.Attributes.TryGetValue("tabindex", out var rawTabIndex) &&
+                    int.TryParse(rawTabIndex, out var parsedTabIndex))
+                {
+                    return new JSNumber(parsedTabIndex);
+                }
+
+                return new JSNumber(-1);
+            }, "get tabIndex"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var tabIndex = (int)Math.Truncate(a[0].DoubleValue);
+                element.Attributes["tabindex"] = tabIndex.ToString();
+                return JSUndefined.Value;
+            }, "set tabIndex"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation
