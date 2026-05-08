@@ -2219,7 +2219,6 @@ public sealed partial class DomBridge
             {
                 if (TryGetJsPropertyString(initObject, "status") is string statusValue && int.TryParse(statusValue, out var parsedStatus))
                     status = parsedStatus;
-
                 statusText = TryGetJsPropertyString(initObject, "statusText") ?? string.Empty;
                 url = TryGetJsPropertyString(initObject, "url") ?? string.Empty;
                 type = TryGetJsPropertyString(initObject, "type") ?? "basic";
