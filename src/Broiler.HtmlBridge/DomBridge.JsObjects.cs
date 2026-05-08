@@ -98,6 +98,21 @@ public sealed partial class DomBridge
             }, "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // lang (read/write) — synced with attributes["lang"]
+        obj.FastAddProperty(
+            (KeyString)"lang",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("lang", out var lang)
+                    ? new JSString(lang)
+                    : new JSString(string.Empty),
+                "get lang"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["lang"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set lang"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",

@@ -1091,4 +1091,32 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true,true,true", result);
     }
+
+    [Fact]
+    public void HTMLElement_Lang_Property_Reflects_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d1""></div>
+<div id=""d2"" lang=""fr-CA""></div>
+<div id=""result""></div>
+<script>
+var d1 = document.getElementById('d1');
+var d2 = document.getElementById('d2');
+var r = [];
+r.push(d1.lang === '');
+r.push(d2.lang === 'fr-CA');
+d1.lang = 'en-US';
+r.push(d1.getAttribute('lang') === 'en-US');
+r.push(d1.lang === 'en-US');
+d2.lang = '';
+r.push(d2.getAttribute('lang') === '');
+r.push(d2.lang === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
 }
