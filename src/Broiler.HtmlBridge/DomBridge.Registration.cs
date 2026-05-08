@@ -2206,12 +2206,8 @@ public sealed partial class DomBridge
             return error;
         }
 
-        var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
-        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
-        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
-        var responseCtor = new JSFunction((in Arguments a) =>
+        (int status, string statusText, string url, string type, bool redirected, Dictionary<string, string> headers) ParseResponseInit(JSValue? initValue)
         {
-            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
             var status = 200;
             var statusText = string.Empty;
             var url = string.Empty;
@@ -2219,10 +2215,11 @@ public sealed partial class DomBridge
             var redirected = false;
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            if (a.Length > 1 && a[1] is JSObject initObject)
+            if (initValue is JSObject initObject)
             {
                 if (TryGetJsPropertyString(initObject, "status") is string statusValue && int.TryParse(statusValue, out var parsedStatus))
                     status = parsedStatus;
+
                 statusText = TryGetJsPropertyString(initObject, "statusText") ?? string.Empty;
                 url = TryGetJsPropertyString(initObject, "url") ?? string.Empty;
                 type = TryGetJsPropertyString(initObject, "type") ?? "basic";
@@ -2235,8 +2232,69 @@ public sealed partial class DomBridge
                 }
             }
 
+            return (status, statusText, url, type, redirected, headers);
+        }
+
+        string ResolveResponseRedirectUrl(string redirectUrl)
+        {
+            if (string.IsNullOrWhiteSpace(redirectUrl))
+                throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
+
+            if (Uri.TryCreate(redirectUrl, UriKind.Absolute, out var absoluteUri))
+                return absoluteUri.AbsoluteUri;
+
+            if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+                Uri.TryCreate(baseUri, redirectUrl, out var resolvedUri))
+            {
+                return resolvedUri.AbsoluteUri;
+            }
+
+            throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
+        }
+
+        var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
+        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
+        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
+        var responseCtor = new JSFunction((in Arguments a) =>
+        {
+            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
+            var (status, statusText, url, type, redirected, headers) = ParseResponseInit(a.Length > 1 ? a[1] : null);
+
             return CreateResponse(body, status, statusText, url, type, redirected, headers);
         }, "Response", 2);
+        responseCtor.FastAddValue((KeyString)"json", new JSFunction((in Arguments a) =>
+        {
+            var jsonBody = JSJSON.Stringify(a.Length > 0 ? a[0] : JSNull.Value);
+            var (status, statusText, url, type, redirected, headers) = ParseResponseInit(a.Length > 1 ? a[1] : null);
+
+            if (!headers.ContainsKey("Content-Type"))
+                headers["Content-Type"] = "application/json";
+
+            return CreateResponse(jsonBody, status, statusText, url, type, redirected, headers);
+        }, "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue((KeyString)"error", new JSFunction((in Arguments _) =>
+            CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in Arguments a) =>
+        {
+            if (a.Length == 0)
+                throw new JSException("Failed to execute 'redirect' on 'Response': 1 argument required.");
+
+            var status = 302;
+            if (a.Length > 1 && int.TryParse(a[1].ToString(), out var parsedStatus))
+                status = parsedStatus;
+
+            if (status is not (301 or 302 or 303 or 307 or 308))
+                throw new JSException("Failed to execute 'redirect' on 'Response': Invalid status code");
+
+            var resolvedUrl = ResolveResponseRedirectUrl(a[0].ToString());
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Location"] = resolvedUrl
+            };
+
+            return CreateResponse(string.Empty, status, string.Empty, string.Empty, "basic", false, headers);
+        }, "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         var messageChannelCtor = new JSFunction((in Arguments _) => CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);

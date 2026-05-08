@@ -666,6 +666,102 @@ response.text().then(function(text) {
     }
 
     [Fact]
+    public void Fetch_Response_Json_Static_Creates_Json_Response_With_Init_And_ContentType()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.json({ name: 'broiler', count: 2 }, {
+    status: 201,
+    statusText: 'Created',
+    headers: { 'X-Test': 'yes' }
+});
+response.json().then(function(value) {
+    document.getElementById('result').textContent = [
+        response.ok,
+        response.status,
+        response.statusText,
+        response.headers.get('content-type'),
+        response.headers.get('x-test'),
+        value.name,
+        value.count
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|201|Created|application/json|yes|broiler|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Error_Static_Creates_Error_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.error();
+document.getElementById('result').textContent = [
+    response.ok === false,
+    response.status,
+    response.type,
+    response.url === ''
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|0|error|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Redirect_Static_Sets_Status_And_Location_Header()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.redirect('/next', 301);
+document.getElementById('result').textContent = [
+    response.ok === false,
+    response.status,
+    response.headers.get('location'),
+    response.url === ''
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|301|file:///next|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Redirect_Static_Rejects_Invalid_Status_Code()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+try {
+    Response.redirect('/next', 200);
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("Invalid status code", result);
+    }
+
+    [Fact]
     public void Fetch_Response_Clone_Preserves_Body_Without_Consuming_Original()
     {
         var html = @"<!DOCTYPE html>
