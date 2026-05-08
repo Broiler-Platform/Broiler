@@ -872,6 +872,98 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
+    [Fact]
+    public void Node_IsEqualNode_Matches_Equal_Structure()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""><span class=""a"">text</span></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var clone = host.cloneNode(true);
+var r = [];
+r.push(host.isEqualNode(clone) === true);
+r.push(clone.isEqualNode(host) === true);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Node_IsEqualNode_Detects_Attribute_And_Text_Differences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var first = document.createElement('div');
+first.setAttribute('data-x', '1');
+first.appendChild(document.createTextNode('same'));
+var second = first.cloneNode(true);
+second.setAttribute('data-x', '2');
+var third = first.cloneNode(true);
+third.firstChild.data = 'different';
+var r = [];
+r.push(first.isEqualNode(second) === false);
+r.push(first.isEqualNode(third) === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Node_IsEqualNode_Detects_Nested_Descendant_Differences()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var first = document.createElement('div');
+var firstChild = document.createElement('span');
+firstChild.appendChild(document.createTextNode('nested'));
+first.appendChild(firstChild);
+var second = first.cloneNode(true);
+second.firstChild.appendChild(document.createElement('em'));
+var r = [];
+r.push(first.isEqualNode(second) === false);
+r.push(second.isEqualNode(first) === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Node_IsEqualNode_Returns_False_For_Null_And_True_For_Equal_Text_Nodes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var first = document.createTextNode('abc');
+var second = document.createTextNode('abc');
+var third = document.createTextNode('xyz');
+var r = [];
+r.push(first.isEqualNode(null) === false);
+r.push(first.isEqualNode(second) === true);
+r.push(first.isEqualNode(third) === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
     [Fact]

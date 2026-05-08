@@ -1001,6 +1001,19 @@ public sealed partial class DomBridge
             }, "normalize", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // isEqualNode(otherNode)
+        obj.FastAddValue(
+            (KeyString)"isEqualNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return JSBoolean.False;
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                return otherEl != null && NodesAreEqual(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+            }, "isEqualNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         obj.FastAddValue(
             (KeyString)"getRootNode",
             new JSFunction((in Arguments a) =>
@@ -6951,6 +6964,73 @@ public sealed partial class DomBridge
         child.Parent = null;
         InvalidateStyleScope(parent);
         NotifyChildRemoved(parent, child, index);
+    }
+
+    private static bool NodesAreEqual(DomElement first, DomElement second)
+    {
+        if (ReferenceEquals(first, second))
+            return true;
+
+        if (first.IsTextNode != second.IsTextNode ||
+            !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
+            !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
+            !string.Equals(first.TextContent ?? string.Empty, second.TextContent ?? string.Empty, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!AttributeMapsAreEqual(first.Attributes, second.Attributes) ||
+            !NamespaceAttributeMapsAreEqual(first.NsAttrMap, second.NsAttrMap) ||
+            first.Children.Count != second.Children.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < first.Children.Count; index++)
+        {
+            if (!NodesAreEqual(first.Children[index], second.Children[index]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool AttributeMapsAreEqual(
+        Dictionary<string, string> first,
+        Dictionary<string, string> second)
+    {
+        if (first.Count != second.Count)
+            return false;
+
+        foreach (var (name, value) in first)
+        {
+            if (!second.TryGetValue(name, out var otherValue) ||
+                !string.Equals(value, otherValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool NamespaceAttributeMapsAreEqual(
+        Dictionary<(string? Namespace, string LocalName), string> first,
+        Dictionary<(string? Namespace, string LocalName), string> second)
+    {
+        if (first.Count != second.Count)
+            return false;
+
+        foreach (var (key, value) in first)
+        {
+            if (!second.TryGetValue(key, out var otherValue) ||
+                !string.Equals(value, otherValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private string NormalizeInsertAdjacentPosition(JSValue? value)
