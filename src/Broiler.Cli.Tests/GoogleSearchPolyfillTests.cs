@@ -139,6 +139,60 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("SyntaxError", result);
     }
 
+    [Fact]
+    public void ChildNode_Before_Inserts_Node_And_Text_Before_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'before';
+            host.before('alpha', inserted);
+            document.getElementById('result').textContent =
+                host.previousSibling.id + '|' +
+                host.previousSibling.previousSibling.data + '|' +
+                host.id;
+        ");
+        Assert.Contains("before|alpha|host", result);
+    }
+
+    [Fact]
+    public void ChildNode_After_Inserts_Node_And_Text_After_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'after';
+            host.after(inserted, 'omega');
+            document.getElementById('result').textContent =
+                host.id + '|' +
+                host.nextSibling.id + '|' +
+                host.nextSibling.nextSibling.data;
+        ");
+        Assert.Contains("host|after|omega", result);
+    }
+
+    [Fact]
+    public void ChildNode_ReplaceWith_Replaces_Element_With_Node_And_Text()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'replacement';
+            host.replaceWith('alpha', inserted);
+            document.getElementById('result').textContent =
+                inserted.previousSibling.data + '|' +
+                inserted.id + '|' +
+                (host.parentNode === null);
+        ");
+        Assert.Contains("alpha|replacement|true", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G2: performance.now()
     // ---------------------------------------------------------------

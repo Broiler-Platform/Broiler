@@ -1052,6 +1052,71 @@ public sealed partial class DomBridge
             }, "remove", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        obj.FastAddValue(
+            (KeyString)"before",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null || a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Parent.Children.IndexOf(element);
+                if (insertIndex < 0)
+                    return JSUndefined.Value;
+
+                foreach (var node in nodes)
+                    InsertNodeAt(element.Parent, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "before", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"after",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null || a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Parent.Children.IndexOf(element);
+                if (insertIndex < 0)
+                    return JSUndefined.Value;
+
+                insertIndex++;
+                foreach (var node in nodes)
+                    InsertNodeAt(element.Parent, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "after", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"replaceWith",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null)
+                    return JSUndefined.Value;
+
+                var parent = element.Parent;
+                var replacementIndex = parent.Children.IndexOf(element);
+                if (replacementIndex < 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                NotifyNodeIteratorPreRemoval(element);
+                parent.Children.RemoveAt(replacementIndex);
+                element.Parent = null;
+                InvalidateStyleScope(parent);
+                NotifyChildRemoved(parent, element, replacementIndex);
+
+                foreach (var node in nodes)
+                    InsertNodeAt(parent, node, replacementIndex++);
+
+                return JSUndefined.Value;
+            }, "replaceWith", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // -- DOM events --
 
         // addEventListener(type, listener, useCapture)
@@ -6622,6 +6687,33 @@ public sealed partial class DomBridge
             child.Parent = null;
             AddElementsRecursive(child);
             nodes.Add(child);
+        }
+
+        return nodes;
+    }
+
+    private List<DomElement> BuildChildNodeArgumentNodes(in Arguments arguments)
+    {
+        var nodes = new List<DomElement>();
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var value = arguments[i];
+            if (value is JSObject candidateObject)
+            {
+                var candidateNode = FindDomElementByJSObject(candidateObject);
+                if (candidateNode != null)
+                {
+                    nodes.Add(candidateNode);
+                    continue;
+                }
+            }
+
+            var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
+            {
+                TextContent = value.ToString()
+            };
+            _elements.Add(textNode);
+            nodes.Add(textNode);
         }
 
         return nodes;
