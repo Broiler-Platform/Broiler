@@ -991,6 +991,16 @@ public sealed partial class DomBridge
             }, "isSameNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // normalize()
+        obj.FastAddValue(
+            (KeyString)"normalize",
+            new JSFunction((in Arguments _) =>
+            {
+                NormalizeNode(element);
+                return JSUndefined.Value;
+            }, "normalize", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         obj.FastAddValue(
             (KeyString)"getRootNode",
             new JSFunction((in Arguments a) =>
@@ -6897,6 +6907,50 @@ public sealed partial class DomBridge
 
         foreach (var child in element.Children)
             RemoveElementsRecursive(child);
+    }
+
+    private void NormalizeNode(DomElement node)
+    {
+        for (var index = 0; index < node.Children.Count;)
+        {
+            var child = node.Children[index];
+            if (!child.IsTextNode)
+            {
+                NormalizeNode(child);
+                index++;
+                continue;
+            }
+
+            var mergedText = child.TextContent ?? string.Empty;
+            var nextIndex = index + 1;
+            while (nextIndex < node.Children.Count && node.Children[nextIndex].IsTextNode)
+            {
+                mergedText += node.Children[nextIndex].TextContent ?? string.Empty;
+                RemoveChildAt(node, nextIndex);
+            }
+
+            if (mergedText.Length == 0)
+            {
+                RemoveChildAt(node, index);
+                continue;
+            }
+
+            SetCharacterData(child, mergedText);
+            index++;
+        }
+    }
+
+    private void RemoveChildAt(DomElement parent, int index)
+    {
+        if (index < 0 || index >= parent.Children.Count)
+            return;
+
+        var child = parent.Children[index];
+        NotifyNodeIteratorPreRemoval(child);
+        parent.Children.RemoveAt(index);
+        child.Parent = null;
+        InvalidateStyleScope(parent);
+        NotifyChildRemoved(parent, child, index);
     }
 
     private string NormalizeInsertAdjacentPosition(JSValue? value)

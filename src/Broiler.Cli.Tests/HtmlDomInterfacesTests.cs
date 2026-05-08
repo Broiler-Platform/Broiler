@@ -797,6 +797,81 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
+    [Fact]
+    public void Node_Normalize_Merges_Adjacent_Text_Nodes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+host.appendChild(document.createTextNode('hello'));
+host.appendChild(document.createTextNode(' '));
+host.appendChild(document.createTextNode('world'));
+var r = [];
+r.push(host.childNodes.length === 3);
+host.normalize();
+r.push(host.childNodes.length === 1);
+r.push(host.firstChild.data === 'hello world');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Node_Normalize_Removes_Empty_Text_Nodes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+host.appendChild(document.createTextNode(''));
+host.appendChild(document.createTextNode('text'));
+host.appendChild(document.createTextNode(''));
+var r = [];
+r.push(host.childNodes.length === 3);
+host.normalize();
+r.push(host.childNodes.length === 1);
+r.push(host.firstChild.data === 'text');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Node_Normalize_Recursively_Normalizes_Descendants()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""><span id=""child""></span></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var child = document.getElementById('child');
+child.appendChild(document.createTextNode('a'));
+child.appendChild(document.createTextNode('b'));
+var r = [];
+r.push(child.childNodes.length === 2);
+host.normalize();
+r.push(child.childNodes.length === 1);
+r.push(child.firstChild.data === 'ab');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
     [Fact]
