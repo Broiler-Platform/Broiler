@@ -151,6 +151,11 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var text = a.Length > 0 ? a[0].ToString() : string.Empty;
+                if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                {
+                    bridge.SetCharacterData(element, text);
+                    return JSUndefined.Value;
+                }
                 element.TextContent = text;
                 // Setting textContent clears all children per DOM spec
                 element.Children.Clear();
@@ -208,6 +213,7 @@ public sealed partial class DomBridge
                 {
                     var attrName = a[0].ToString();
                     var attrVal = a[1].ToString();
+                    element.Attributes.TryGetValue(attrName, out var previousAttrVal);
                     element.Attributes[attrName] = attrVal;
                     // Sync special properties
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
@@ -229,6 +235,9 @@ public sealed partial class DomBridge
 
                     if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
                         bridgeForSet.InvalidateStyleScope(element);
+
+                    if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
+                        bridgeForSet.NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
                 }
                 return JSUndefined.Value;
             }, "setAttribute", 2),
@@ -427,7 +436,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set nodeValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -444,7 +453,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -518,7 +527,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-                    element.TextContent = (element.TextContent ?? string.Empty) + data;
+                    bridge.SetCharacterData(element, (element.TextContent ?? string.Empty) + data);
                     return JSUndefined.Value;
                 }, "appendData", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -532,7 +541,7 @@ public sealed partial class DomBridge
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
                     var end = (int)Math.Min((long)offset + count, text.Length);
-                    element.TextContent = text.Remove(offset, end - offset);
+                    bridge.SetCharacterData(element, text.Remove(offset, end - offset));
                     return JSUndefined.Value;
                 }, "deleteData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -545,7 +554,7 @@ public sealed partial class DomBridge
                     var data = a.Length > 1 ? a[1].ToString() : string.Empty;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
-                    element.TextContent = text.Insert(offset, data);
+                    bridge.SetCharacterData(element, text.Insert(offset, data));
                     return JSUndefined.Value;
                 }, "insertData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -560,7 +569,7 @@ public sealed partial class DomBridge
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
                     var end = (int)Math.Min((long)offset + count, text.Length);
-                    element.TextContent = text.Remove(offset, end - offset).Insert(offset, data);
+                    bridge.SetCharacterData(element, text.Remove(offset, end - offset).Insert(offset, data));
                     return JSUndefined.Value;
                 }, "replaceData", 3),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -658,7 +667,8 @@ public sealed partial class DomBridge
                 if (a.Length > 0)
                 {
                     var attrName = a[0].ToString();
-                    element.Attributes.Remove(attrName);
+                    element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+                    var removed = element.Attributes.Remove(attrName);
                     // Sync special properties
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = null;
@@ -666,6 +676,8 @@ public sealed partial class DomBridge
                         element.ClassName = null;
 
                     bridgeForSet.InvalidateStyleScope(element);
+                    if (removed)
+                        bridgeForSet.NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
                 }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
@@ -682,9 +694,12 @@ public sealed partial class DomBridge
                     var qName = a[1].ToString();
                     var val = a[2].ToString();
                     var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
+                    element.Attributes.TryGetValue(qName, out var previousAttrVal);
                     element.Attributes[qName] = val;
                     element.NsAttrMap[(ns, localName)] = qName;
                     bridgeForSet.InvalidateStyleScope(element);
+                    if (!string.Equals(previousAttrVal, val, StringComparison.Ordinal))
+                        bridgeForSet.NotifyAttributeMutationObservers(element, qName, previousAttrVal);
                 }
                 return JSUndefined.Value;
             }, "setAttributeNS", 3),

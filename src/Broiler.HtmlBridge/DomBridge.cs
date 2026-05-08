@@ -988,8 +988,12 @@ public sealed class MutationObserverOptions
     public bool ChildList { get; set; }
     /// <summary>Whether to observe attribute changes.</summary>
     public bool Attributes { get; set; }
+    /// <summary>Whether to expose the previous attribute value in mutation records.</summary>
+    public bool AttributeOldValue { get; set; }
     /// <summary>Whether to observe character data changes.</summary>
     public bool CharacterData { get; set; }
+    /// <summary>Whether to expose the previous character data value in mutation records.</summary>
+    public bool CharacterDataOldValue { get; set; }
     /// <summary>Whether to observe the subtree.</summary>
     public bool Subtree { get; set; }
 }

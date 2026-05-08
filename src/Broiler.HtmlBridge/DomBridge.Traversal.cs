@@ -1894,6 +1894,74 @@ public sealed partial class DomBridge
         }
     }
 
+    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue)
+    {
+        if (_mutationObservers.Count == 0)
+            return;
+
+        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        {
+            if (!options.Attributes || !ShouldNotifyMutationObserver(target, observedTarget, options))
+                continue;
+
+            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
+                continue;
+
+            var record = new JSObject();
+            record[(KeyString)"type"] = new JSString("attributes");
+            record[(KeyString)"target"] = ToJSObject(target);
+            record[(KeyString)"attributeName"] = new JSString(attributeName);
+            record[(KeyString)"oldValue"] = options.AttributeOldValue && oldValue != null
+                ? new JSString(oldValue)
+                : JSNull.Value;
+
+            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
+        }
+    }
+
+    private void NotifyCharacterDataMutationObservers(DomElement target, string? oldValue)
+    {
+        if (_mutationObservers.Count == 0)
+            return;
+
+        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        {
+            if (!options.CharacterData || !ShouldNotifyMutationObserver(target, observedTarget, options))
+                continue;
+
+            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
+                continue;
+
+            var record = new JSObject();
+            record[(KeyString)"type"] = new JSString("characterData");
+            record[(KeyString)"target"] = ToJSObject(target);
+            record[(KeyString)"oldValue"] = options.CharacterDataOldValue && oldValue != null
+                ? new JSString(oldValue)
+                : JSNull.Value;
+
+            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
+        }
+    }
+
+    private static void UpdateCharacterData(DomElement target, string? newValue)
+    {
+        target.TextContent = newValue ?? string.Empty;
+    }
+
+    private void SetCharacterData(DomElement target, string? newValue)
+    {
+        var previousValue = target.TextContent;
+        UpdateCharacterData(target, newValue);
+        if (!string.Equals(previousValue, target.TextContent, StringComparison.Ordinal))
+            NotifyCharacterDataMutationObservers(target, previousValue);
+    }
+
+    private bool ShouldNotifyMutationObserver(DomElement target, DomElement observedTarget, MutationObserverOptions options)
+    {
+        return ReferenceEquals(target, observedTarget) ||
+               (options.Subtree && IsDescendant(observedTarget, target));
+    }
+
     /// <summary>
     /// Executes NodeIterator pre-removing steps per DOM §7.2.
     /// Must be called BEFORE the node is actually removed from the tree

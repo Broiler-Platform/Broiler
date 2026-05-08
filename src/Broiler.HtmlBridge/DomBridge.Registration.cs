@@ -720,7 +720,9 @@ public sealed partial class DomBridge
             {
                 ChildList = GetMutationObserverOption(optionsObject, "childList"),
                 Attributes = GetMutationObserverOption(optionsObject, "attributes"),
+                AttributeOldValue = GetMutationObserverOption(optionsObject, "attributeOldValue"),
                 CharacterData = GetMutationObserverOption(optionsObject, "characterData"),
+                CharacterDataOldValue = GetMutationObserverOption(optionsObject, "characterDataOldValue"),
                 Subtree = GetMutationObserverOption(optionsObject, "subtree")
             };
         }

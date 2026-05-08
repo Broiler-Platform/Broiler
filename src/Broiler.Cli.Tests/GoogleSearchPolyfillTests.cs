@@ -3033,6 +3033,99 @@ document.getElementById('result').textContent =
         Assert.Contains("TYPE:childList", result);
     }
 
+    [Fact]
+    public void MutationObserver_Observe_SetAttribute_Delivers_Attribute_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',NAME:' + records[0].attributeName +
+                    ',OLD:' + (records[0].oldValue === null) +
+                    ',VALUE:' + host.getAttribute('data-test');
+            });
+            obs.observe(host, { attributes: true });
+            host.setAttribute('data-test', 'value');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:attributes", result);
+        Assert.Contains("NAME:data-test", result);
+        Assert.Contains("OLD:true", result);
+        Assert.Contains("VALUE:value", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_RemoveAttribute_Captures_Old_Value()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.setAttribute('data-test', 'before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',NAME:' + records[0].attributeName +
+                    ',OLD:' + records[0].oldValue +
+                    ',HAS:' + host.hasAttribute('data-test');
+            });
+            obs.observe(host, { attributes: true, attributeOldValue: true });
+            host.removeAttribute('data-test');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:attributes", result);
+        Assert.Contains("NAME:data-test", result);
+        Assert.Contains("OLD:before", result);
+        Assert.Contains("HAS:false", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_CharacterData_Delivers_Record()
+    {
+        var result = ExecJs(@"
+            var text = document.createTextNode('before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',OLD:' + (records[0].oldValue === null) +
+                    ',VALUE:' + text.data;
+            });
+            obs.observe(text, { characterData: true });
+            text.data = 'after';
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:characterData", result);
+        Assert.Contains("OLD:true", result);
+        Assert.Contains("VALUE:after", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_CharacterData_Captures_Old_Value()
+    {
+        var result = ExecJs(@"
+            var text = document.createTextNode('before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',OLD:' + records[0].oldValue +
+                    ',VALUE:' + text.data;
+            });
+            obs.observe(text, { characterData: true, characterDataOldValue: true });
+            text.replaceData(0, 6, 'after');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:characterData", result);
+        Assert.Contains("OLD:before", result);
+        Assert.Contains("VALUE:after", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G20: Async script detection
     // ---------------------------------------------------------------
