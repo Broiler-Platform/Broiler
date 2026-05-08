@@ -184,6 +184,77 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Element_GetAttributeNode_Returns_Attr_Node()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" class=""x""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var attr = d.getAttributeNode('class');
+var r = [];
+r.push(attr !== null);
+r.push(attr.nodeType === 2);
+r.push(attr.nodeName === 'class');
+r.push(attr.ownerElement === d);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_SetAttributeNode_Replaces_And_Returns_Old_Attr()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" class=""old""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var attr = d.getAttributeNode('class');
+attr.value = 'new';
+var old = d.setAttributeNode(attr);
+var r = [];
+r.push(old !== null);
+r.push(old.value === 'old');
+r.push(d.getAttribute('class') === 'new');
+r.push(d.className === 'new');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Element_RemoveAttributeNode_Removes_And_Returns_Attr()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" title=""hello""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var attr = d.getAttributeNode('title');
+var removed = d.removeAttributeNode(attr);
+var r = [];
+r.push(removed !== null);
+r.push(removed.value === 'hello');
+r.push(d.getAttribute('title') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
     public void Attributes_Item_Returns_By_Index()
     {
         var html = @"<!DOCTYPE html>

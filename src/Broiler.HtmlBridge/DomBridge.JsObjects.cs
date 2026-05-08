@@ -250,10 +250,22 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSNull.Value;
                 var name = a[0].ToString();
+                 return element.Attributes.TryGetValue(name, out var val)
+                     ? new JSString(val)
+                     : JSNull.Value;
+             }, "getAttribute", 1),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var name = a[0].ToString();
                 return element.Attributes.TryGetValue(name, out var val)
-                    ? new JSString(val)
+                    ? BuildAttrNode(name, val, element, obj)
                     : JSNull.Value;
-            }, "getAttribute", 1),
+            }, "getAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM tree navigation --
@@ -691,6 +703,43 @@ public sealed partial class DomBridge
                 }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"setAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name))
+                    return JSNull.Value;
+
+                var old = element.Attributes.TryGetValue(name, out var oldVal)
+                    ? BuildAttrNode(name, oldVal, element, obj)
+                    : JSNull.Value;
+
+                SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
+                return old;
+            }, "setAttributeNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"removeAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name) || !element.Attributes.TryGetValue(name, out var val))
+                    return JSNull.Value;
+
+                var removed = BuildAttrNode(name, val, element, obj);
+                RemoveAttributeLikeRemoveAttribute(element, name);
+                return removed;
+            }, "removeAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setAttributeNS(namespace, qualifiedName, value)
@@ -8646,18 +8695,13 @@ public sealed partial class DomBridge
                 if (a.Length == 0) return JSNull.Value;
                 var attrObj = a[0] as JSObject;
                 if (attrObj == null) return JSNull.Value;
-                var name = attrObj[(KeyString)"name"].ToString();
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name)) return JSNull.Value;
                 var value = attrObj[(KeyString)"value"].ToString();
                 JSValue old = JSNull.Value;
                 if (element.Attributes.TryGetValue(name, out var oldVal))
                     old = BuildAttrNode(name, oldVal, element, ownerObj);
-                element.Attributes[name] = value;
-                // Sync special properties
-                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
-                    element.Id = value;
-                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                    element.ClassName = value;
-                InvalidateStyleScope(element);
+                SetAttributeLikeSetAttribute(element, name, value);
                 return old;
             }, "setNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -8671,14 +8715,9 @@ public sealed partial class DomBridge
                 var name = a[0].ToString();
                 if (!element.Attributes.TryGetValue(name, out var val))
                     return JSNull.Value;
-                element.Attributes.Remove(name);
-                // Sync special properties
-                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
-                    element.Id = null;
-                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                    element.ClassName = null;
-                InvalidateStyleScope(element);
-                return BuildAttrNode(name, val, element, ownerObj);
+                var removed = BuildAttrNode(name, val, element, ownerObj);
+                RemoveAttributeLikeRemoveAttribute(element, name);
+                return removed;
             }, "removeNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -8730,5 +8769,58 @@ public sealed partial class DomBridge
         attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         return attr;
+    }
+
+    private static string GetAttrNodeName(JSObject attrObj)
+    {
+        var nameValue = attrObj[(KeyString)"name"];
+        if (nameValue != null && !nameValue.IsUndefined && !nameValue.IsNull)
+            return nameValue.ToString();
+
+        var nodeNameValue = attrObj[(KeyString)"nodeName"];
+        return nodeNameValue != null && !nodeNameValue.IsUndefined && !nodeNameValue.IsNull
+            ? nodeNameValue.ToString()
+            : string.Empty;
+    }
+
+    private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
+    {
+        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+        element.Attributes[attrName] = attrVal;
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = attrVal;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = attrVal;
+        else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+        {
+            element.Style.Clear();
+            foreach (var kv in ParseStyle(attrVal))
+                element.Style[kv.Key] = kv.Value;
+            InvalidateStyleScope(element);
+        }
+        else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+        {
+            CompileInlineEventAttribute(element, attrName, attrVal);
+        }
+
+        if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+            InvalidateStyleScope(element);
+
+        if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
+    }
+
+    private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
+    {
+        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+        var removed = element.Attributes.Remove(attrName);
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = null;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = null;
+
+        InvalidateStyleScope(element);
+        if (removed)
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 }
