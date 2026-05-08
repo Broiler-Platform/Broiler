@@ -119,6 +119,83 @@ document.getElementById('result').textContent = d.outerText;
         Assert.Contains("HelloWorld", result);
     }
 
+    [Fact]
+    public void Append_Adds_Nodes_And_Text_In_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var strong = document.createElement('strong');
+strong.textContent = 'B';
+host.append('A', strong, 'C');
+document.getElementById('result').textContent =
+    host.firstChild.data + '|' +
+    host.childNodes[1].tagName.toLowerCase() + '|' +
+    host.childNodes[2].data + '|' +
+    host.childNodes.length;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("A|strong|C|3", result);
+    }
+
+    [Fact]
+    public void Prepend_Adds_Nodes_Before_Existing_Children()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""><span>tail</span></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var strong = document.createElement('strong');
+strong.textContent = 'mid';
+host.prepend('head', strong);
+document.getElementById('result').textContent =
+    host.firstChild.data + '|' +
+    host.childNodes[1].tagName.toLowerCase() + '|' +
+    host.lastChild.tagName.toLowerCase() + '|' +
+    host.childNodes.length;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("head|strong|span|3", result);
+    }
+
+    [Fact]
+    public void Append_Unpacks_DocumentFragment_Children()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""host""></div>
+<div id=""result""></div>
+<script>
+var host = document.getElementById('host');
+var fragment = document.createDocumentFragment();
+var first = document.createElement('span');
+first.textContent = 'one';
+var second = document.createElement('span');
+second.textContent = 'two';
+fragment.appendChild(first);
+fragment.appendChild(second);
+host.append(fragment);
+document.getElementById('result').textContent =
+    host.childNodes.length + '|' +
+    fragment.childNodes.length + '|' +
+    host.firstChild.tagName.toLowerCase() + '|' +
+    host.lastChild.tagName.toLowerCase();
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2|0|span|span", result);
+    }
+
     // ────────────────────── 7.3: Attribute node interface ──────────────────────
 
     [Fact]

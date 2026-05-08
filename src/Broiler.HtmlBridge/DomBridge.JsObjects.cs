@@ -1096,6 +1096,38 @@ public sealed partial class DomBridge
             }, "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        obj.FastAddValue(
+            (KeyString)"append",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Children.Count;
+                foreach (var node in nodes)
+                    InsertNodeAt(element, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "append", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"prepend",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = 0;
+                foreach (var node in nodes)
+                    InsertNodeAt(element, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "prepend", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // removeChild(child)
         obj.FastAddValue(
             (KeyString)"removeChild",
@@ -6866,6 +6898,13 @@ public sealed partial class DomBridge
                 var candidateNode = FindDomElementByJSObject(candidateObject);
                 if (candidateNode != null)
                 {
+                    if (string.Equals(candidateNode.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var fragmentChild in candidateNode.Children.ToArray())
+                            nodes.Add(fragmentChild);
+                        continue;
+                    }
+
                     nodes.Add(candidateNode);
                     continue;
                 }
@@ -7905,6 +7944,38 @@ public sealed partial class DomBridge
                 }
                 return a[0];
             }, "appendChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue(
+            (KeyString)"append",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = bridge.BuildChildNodeArgumentNodes(a);
+                var insertIndex = docRoot.Children.Count;
+                foreach (var node in nodes)
+                    bridge.InsertNodeAt(docRoot, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "append", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue(
+            (KeyString)"prepend",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = bridge.BuildChildNodeArgumentNodes(a);
+                var insertIndex = 0;
+                foreach (var node in nodes)
+                    bridge.InsertNodeAt(docRoot, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants
