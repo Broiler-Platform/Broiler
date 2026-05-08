@@ -193,6 +193,39 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("alpha|replacement|true", result);
     }
 
+    [Fact]
+    public void Node_IsConnected_Is_False_For_Detached_Node_And_True_After_Append()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.getElementById('result').textContent =
+                host.isConnected + '|' +
+                (host.getRootNode() === host);
+            document.body.appendChild(host);
+            document.getElementById('result').textContent += '|' +
+                host.isConnected + '|' +
+                (host.getRootNode() === document);
+        ");
+        Assert.Contains("false|true|true|true", result);
+    }
+
+    [Fact]
+    public void Node_GetRootNode_Defaults_To_Shadow_Root_Inside_Shadow_Tree()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.body.appendChild(host);
+            var shadow = host.attachShadow({ mode: 'open' });
+            var inner = document.createElement('span');
+            shadow.appendChild(inner);
+            document.getElementById('result').textContent =
+                inner.isConnected + '|' +
+                (inner.getRootNode() === shadow) + '|' +
+                (inner.getRootNode({ composed: true }) === document);
+        ");
+        Assert.Contains("true|true|true", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G2: performance.now()
     // ---------------------------------------------------------------

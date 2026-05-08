@@ -267,6 +267,16 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        obj.FastAddProperty(
+            (KeyString)"isConnected",
+            new JSFunction((in Arguments _) =>
+            {
+                var root = GetTreeRoot(element);
+                return ReferenceEquals(root, _documentNode) ? JSBoolean.True : JSBoolean.False;
+            }, "get isConnected"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // childNodes (read-only, dynamic)
         obj.FastAddProperty(
             (KeyString)"childNodes",
@@ -765,6 +775,28 @@ public sealed partial class DomBridge
                 if (ReferenceEquals(element, otherEl)) return JSBoolean.True;
                 return IsDescendant(element, otherEl) ? JSBoolean.True : JSBoolean.False;
             }, "contains", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getRootNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var composed = false;
+                if (a.Length > 0 && a[0] is JSObject options)
+                {
+                    var composedValue = options[(KeyString)"composed"];
+                    composed = composedValue != null && !composedValue.IsUndefined && !composedValue.IsNull && composedValue.BooleanValue;
+                }
+
+                if (!composed)
+                {
+                    var shadowRoot = FindContainingShadowRoot(element);
+                    if (shadowRoot != null)
+                        return ToJSObject(shadowRoot);
+                }
+
+                return ToJSRootNode(GetTreeRoot(element));
+            }, "getRootNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // cloneNode(deep)
@@ -3051,6 +3083,25 @@ public sealed partial class DomBridge
         }
 
         return null;
+    }
+
+    private DomElement GetTreeRoot(DomElement element)
+    {
+        var current = element;
+        while (current.Parent != null)
+            current = current.Parent;
+        return current;
+    }
+
+    private JSValue ToJSRootNode(DomElement root)
+    {
+        if (ReferenceEquals(root, _documentNode))
+            return _documentJSObject ?? JSNull.Value;
+
+        if (IsSubDocRoot(root) && _docRootToDocJSObject.TryGetValue(root, out var subDocument))
+            return subDocument;
+
+        return ToJSObject(root);
     }
 
     private DomElement? GetSlotHost(DomElement slot) => GetShadowHost(FindContainingShadowRoot(slot));
