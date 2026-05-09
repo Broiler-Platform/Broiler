@@ -1119,4 +1119,32 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true,true,true", result);
     }
+
+    [Fact]
+    public void HTMLElement_AccessKey_Property_Reflects_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d1""></div>
+<div id=""d2"" accesskey=""k""></div>
+<div id=""result""></div>
+<script>
+var d1 = document.getElementById('d1');
+var d2 = document.getElementById('d2');
+var r = [];
+r.push(d1.accessKey === '');
+r.push(d2.accessKey === 'k');
+d1.accessKey = 'x';
+r.push(d1.getAttribute('accesskey') === 'x');
+r.push(d1.accessKey === 'x');
+d2.accessKey = '';
+r.push(d2.getAttribute('accesskey') === '');
+r.push(d2.accessKey === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true", result);
+    }
 }

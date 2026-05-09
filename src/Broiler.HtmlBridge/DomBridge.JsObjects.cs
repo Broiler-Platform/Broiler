@@ -113,6 +113,21 @@ public sealed partial class DomBridge
             }, "set lang"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // accessKey (read/write) — synced with attributes["accesskey"]
+        obj.FastAddProperty(
+            (KeyString)"accessKey",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("accesskey", out var accessKey)
+                    ? new JSString(accessKey)
+                    : new JSString(string.Empty),
+                "get accessKey"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["accesskey"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set accessKey"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",
