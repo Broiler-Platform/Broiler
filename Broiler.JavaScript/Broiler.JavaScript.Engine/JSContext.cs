@@ -99,7 +99,7 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
 
     public JSContext(
         SynchronizationContext synchronizationContext = null,
-        JavaScriptFeatureFlags experimentalFeatures = JavaScriptFeatureFlags.AllExperimentalEs2026)
+        JavaScriptFeatureFlags experimentalFeatures = JavaScriptFeatureFlags.None)
     {
         JSEngine.EnsureBuiltInsAssemblyLoaded();
 

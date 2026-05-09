@@ -89,7 +89,7 @@ public class M7ValidationTests
         // ArrayBuffer StructuredClone is now handled by the extension delegate
         // in BuiltIns, not directly in Core's JSGlobal.
         EnsureAllAssembliesLoaded();
-        using var ctx = new JSContext();
+        using var ctx = new JSContext(experimentalFeatures: JavaScriptFeatureFlags.StructuredClone);
 
         var result = ctx.Eval(@"
             var buf = new ArrayBuffer(8);
