@@ -560,7 +560,7 @@ behavioral or performance-sensitive changes:
     - **Progress:** Started — `JavaScriptFeatureFlags` already gates the currently landed ES2026-facing APIs documented in [`../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`](../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md), so the remaining M3 work is to keep the staged surface, validation slice, and deferred backlog aligned with the roadmap of record.
     - [x] **Inventory the staged surface** — confirm the currently flag-guarded ES2026 APIs and keep their status in sync with [`../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`](../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md). **Owner:** JS-engine engineer.
     - [ ] **Publish the validation slice** — define the focused PR/nightly Test262 and unit-test signal for the staged ES2026 surface and link it from the roadmap/dashboard. **Owner:** test-infrastructure engineer.
-    - [ ] **Triage the remaining backlog** — keep `Temporal` and `Atomics` / `SharedArrayBuffer` filed as explicit follow-ups, and decide whether proposals not yet represented in the in-repo ECMAScript roadmap (for example Decorators / AsyncContext) enter M3 scope or stay deferred to the M5 standards-intake cadence. **Owner:** JS-engine engineer.
+    - [ ] **Triage the remaining backlog** — keep `Temporal` and `Atomics`/`SharedArrayBuffer` filed as explicit follow-ups, and decide whether proposals not yet represented in the in-repo ECMAScript roadmap (for example `Decorators`/`AsyncContext`) enter M3 scope or stay deferred to the M5 standards-intake cadence. **Owner:** JS-engine engineer.
     - [ ] **Hold the release policy** — keep already-landed ES2026 APIs experimental by default via per-proposal flags plus the aggregate `AllExperimentalEs2026` opt-in until the roadmap graduates them. **Owner:** JS-engine engineer.
   - [ ] **W4 / HTML** — continue the Selectors L4 matcher/cascade follow-up from [`wpt-failure-triage.md`](./wpt-failure-triage.md) and [`acid-test-triage.md`](./acid-test-triage.md). **Owner:** layout/CSS engineer. **Progress:** `:is()` / `:where()` / `:has()` specificity alignment is landed; remaining M3 work is matcher breadth, invalidation parity, and keeping the PR slice representative.
   - [ ] **W5 / Bridge** — continue the Fetch / structured clone / `MessageChannel` / `postMessage` / `queueMicrotask` hardening tracked in the bridge roadmap/tests. **Owner:** bridge / DOM-API engineer. **Progress:** the bridge surface and focused CLI coverage exist; remaining M3 work is spec-hardening, dashboard publication, and the final M3 pass-rate lift.
@@ -583,8 +583,8 @@ sub-issues was filed or re-prioritized.
   owners, tasks, and progress against the staged ES2026 surface already wired
   through `JavaScriptFeatureFlags`. The immediate blocker is now governance,
   not plumbing: the in-repo ECMAScript roadmap currently leaves `Temporal` and
-  `Atomics` / `SharedArrayBuffer` as the only unstarted ES2026 backlog, while
-  proposals such as Decorators / AsyncContext still need explicit roadmap
+  `Atomics`/`SharedArrayBuffer` as the only unstarted ES2026 backlog, while
+  proposals such as `Decorators`/`AsyncContext` still need explicit roadmap
   intake before they should be treated as M3 deliverables.
 - **2026-05-06** — W5 close-out: published the focused Bridge Milestone 2
   signal in
