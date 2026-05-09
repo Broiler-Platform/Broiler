@@ -1,6 +1,6 @@
 # ECMAScript Compliance Roadmap for YantraJS
 
-> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](../docs/roadmap/browser-compliance-roadmap.md)
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](../docs/roadmap/browser-compliance-roadmap.md)  
 > **Replacement**: [Unified Browser Compliance Roadmap](../docs/roadmap/browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 This document is a comprehensive roadmap for updating the YantraJS JavaScript
