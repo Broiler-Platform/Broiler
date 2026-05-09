@@ -20,6 +20,7 @@ internal static partial class Program
     private const string DefaultTest262OutputDir = "tests/m0-baseline/conformance/test262-subset";
     private const string DefaultBenchmarkOutputDir = "tests/m0-baseline/performance";
     private const string DefaultBenchmarkBaseline = "tests/m0-baseline/performance/engine-benchmark-baseline.json";
+    private const int GitDependencyRevisionSearchWindowSize = 600;
     internal const double DefaultBenchmarkSlowdownBudgetPercent = 2.0;
     private static readonly string[] DefaultTest262HarnessFiles = ["harness/sta.js", "harness/assert.js"];
     private static readonly Dictionary<string, string> Test262SourceCache = new(StringComparer.Ordinal);
@@ -703,7 +704,7 @@ internal static partial class Program
                 continue;
             }
 
-            var remainingLength = Math.Min(600, content.Length - entryIndex);
+            var remainingLength = Math.Min(GitDependencyRevisionSearchWindowSize, content.Length - entryIndex);
             var window = content.Substring(entryIndex, remainingLength);
             var match = Regex.Match(window, @"(?<revision>[0-9a-f]{40})", RegexOptions.CultureInvariant);
             if (match.Success)
