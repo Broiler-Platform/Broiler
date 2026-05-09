@@ -162,8 +162,8 @@ major version we are tracking.
 
 Before any per-release tracking can begin, we must establish the baseline:
 
-1. Pick a starting Chromium stable release **N₀** at the time of adoption.
-2. Capture Chromium N₀'s observable behaviour on the agreed suites (Test262
+1. Pick a starting Chromium stable release **N0** at the time of adoption.
+2. Capture Chromium N0's observable behaviour on the agreed suites (Test262
    subset, WPT subsets enumerated in W4/W5, Acid2/3 captures, and a small set
    of raster reference captures for W7).
 3. Run the same suites against `main` and publish the **initial delta** per
@@ -172,7 +172,7 @@ Before any per-release tracking can begin, we must establish the baseline:
    [Section 8](#8-compliance-gap-tracking)).
 
 Phase C0 is complete when the unified dashboard renders at least one full
-per-engine delta against Chromium N₀ in CI.
+per-engine delta against Chromium N0 in CI.
 
 ### Phase C-N — Per-release tracking (recurring, every ~4 weeks)
 
@@ -307,7 +307,7 @@ These are tracked as items for the first stakeholder review after adoption:
 
 1. **Subset selection.** Exactly which WPT directories under `html/`, `css/`,
    `dom/`, `fetch/`, and `content-security-policy/` form the gate sets in
-   W4/W5? The first Chromium-N₀ snapshot will propose an initial cut.
+   W4/W5? The first Chromium N0 snapshot will propose an initial cut.
 2. **Performance reference hardware.** W6 budgets need a fixed hardware
    profile; choosing it is a Phase C0 deliverable.
 3. **Origin-trial features.** Should any Chromium origin-trial features be
