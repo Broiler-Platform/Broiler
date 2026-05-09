@@ -7,6 +7,9 @@
 > **Owners**: Engines Working Group (JS, HTML, Bridge, Graphics) and Standards Steward  
 > **Review cadence**: Re-published every Chromium major release (~4 weeks); see
 > [Section 9](#9-governance-and-periodic-review)
+>
+> **Kickoff planning companion**:
+> [`docs/roadmap/chromium-alignment-engine-kickoff.md`](./chromium-alignment-engine-kickoff.md)
 
 ---
 
