@@ -1,5 +1,8 @@
 # Broiler.JavaScript (JavaScript-Engine) Assembly Refactor Roadmap
 
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
+
 ## 1. Overview
 
 This roadmap tracks the refactoring of the Broiler.JavaScript (JavaScript-Engine) core component into logically separated assemblies. The goal is to improve maintainability, testability, and modularity by giving each major subsystem its own assembly with well-defined boundaries and dependency directions.

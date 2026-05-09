@@ -1,7 +1,8 @@
 # Roadmap: Making Broiler ACID3 Compliant
 
-> **Status**: Active — last updated 2026-03-27 (deep visual comparison V1–V6, new TODOs 24–28)  
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
 > **Tracking issue**: Repeat acid3 image-comparison, update findings and tasks
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 ---
 

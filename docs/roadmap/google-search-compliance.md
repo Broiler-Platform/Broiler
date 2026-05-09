@@ -1,7 +1,8 @@
 # Roadmap: Making Broiler Google Search Compliant
 
-> **Status**: Active — created 2026-04-05  
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
 > **Tracking issue**: #816 — Make Broiler Google Search compliant via image and JS output comparison
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 ---
 

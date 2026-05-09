@@ -84,43 +84,27 @@ Broiler/
 
 ## Roadmap
 
-See [Issue #1](https://github.com/MaiRat/Broiler/issues/1) for the full development roadmap.
+Broiler engine and browser-compatibility work now follows the
+[Unified Browser Compliance Roadmap](docs/roadmap/browser-compliance-roadmap.md).
+It is the **only supported roadmap of record** for `Broiler.JavaScript`,
+`Broiler.HTML`, and `Broiler.HtmlBridge`, and it tracks Broiler against the
+latest major Chromium and Firefox releases.
 
-### HTML & JavaScript Engine
+The previous engine/browser-compliance roadmaps have been retained only as
+historical context and are explicitly deprecated in place:
 
-A comprehensive plan covering milestones from Enhanced MVP through to a
-production-grade, standards-compliant HTML and JavaScript engine.
-See the [HTML & JS Engine Roadmap](docs/roadmap/html-js-engine.md) for details.
-For the cross-engine standards/performance baseline and PR dashboard, see the
+- `docs/roadmap/engines-standards-and-performance-roadmap.md`
+- `docs/roadmap/acid3-compliance.md`
+- `docs/roadmap/acid-test-triage.md`
+- `docs/roadmap/wpt-failure-triage.md`
+- `docs/roadmap/google-search-compliance.md`
+- `docs/roadmap/javascript-engine-assembly-refactor.md`
+- `docs/roadmap/skia-replacement-roadmap.md`
+- `Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`
+
+For the active dashboard/baseline supporting that roadmap, see the
 [Engines M0 baseline](docs/roadmap/engines-m0-baseline.md) and the
 [HtmlBridge engine boundary map](docs/architecture/htmlbridge-engine-boundaries.md).
-
-### Development Console & Development Site
-
-A roadmap for integrating an in-app developer console and a dedicated
-development site to aid rendering investigation, debugging, and testing.
-See the [Dev Console & Site Roadmap](docs/roadmap/dev-console-and-site.md)
-for details.
-
-### AvaloniaUI Support
-
-A roadmap for integrating AvaloniaUI to enable cross-platform desktop rendering
-on Windows, macOS, and Linux.
-See the [AvaloniaUI Support Roadmap](docs/roadmap/avalonia-ui-support.md) for
-details.
-
-### CLI Website Capture Tool
-
-A cross-platform command-line tool for capturing website screenshots.
-See the [CLI Roadmap](docs/roadmap/cli-website-capture.md) and
-[ADR-004](docs/adr/004-os-independent-cli-capture-tool.md) for details.
-
-### Graphics Backend Replacement
-
-A roadmap for replacing SkiaSharp with a Broiler-owned graphics
-implementation while preserving rendering, tooling, and test workflows.
-See the [Skia Replacement Roadmap](docs/roadmap/skia-replacement-roadmap.md)
-for details.
 
 PDF conversion now lives in the standalone `Broiler.Pdf` app, which can be
 developed and versioned independently from the main website-capture CLI.

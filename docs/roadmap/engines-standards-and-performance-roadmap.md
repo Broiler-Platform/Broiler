@@ -1,8 +1,9 @@
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
-> **Status**: **M2 implementation complete** — W3, W4, and W5 are published/verified; the unified dashboard now carries the focused Phase 2 JS, HTML/CSS, and Bridge signals of record
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)
 > **Tracking issue**: [#1064 — Implement Engines Standards and Performance Roadmap](https://github.com/MaiRat/Broiler/issues/1064)
 > **Scope**: Cross-engine — covers `Broiler.JavaScript`, `Broiler.HTML`, and `Broiler.HtmlBridge`
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 ---
 

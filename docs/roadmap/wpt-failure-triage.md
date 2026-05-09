@@ -1,7 +1,8 @@
 # Roadmap: WPT Failure Reduction and Runner Triage
 
-> **Status**: Active — created 2026-04-18  
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
 > **Scope**: Investigate the failures captured in `tests/wpt-results/` and define the smallest practical plan for reducing them over time.
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 ## Implementation updates
 

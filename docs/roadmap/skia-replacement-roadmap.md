@@ -1,7 +1,8 @@
 # Roadmap: Replace SkiaSharp with a Broiler-Owned Graphics Implementation
 
-> **Status**: Draft for team review  
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
 > **Tracking issue**: Create a roadmap to replace SkiaSharp with a custom implementation
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
 
 ---
 

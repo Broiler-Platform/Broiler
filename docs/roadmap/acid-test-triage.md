@@ -1,5 +1,8 @@
 # Acid Test Triage Roadmap
 
+> **Status**: Deprecated — superseded on 2026-05-09 by the [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md)  
+> **Replacement**: [Unified Browser Compliance Roadmap](./browser-compliance-roadmap.md) is now the only supported plan of record for Broiler engine/browser compliance.
+
 This roadmap is the umbrella tracker for rendering the three classic acid
 tests with **Chromium/Playwright** and **`broiler.cli`**, comparing the
 outputs, and translating the remaining gaps into actionable renderer work.

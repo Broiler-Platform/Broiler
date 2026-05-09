@@ -1,7 +1,7 @@
 # Engines M0 baseline and instrumentation
 
-This page is the M0 **baseline of record** for the cross-engine roadmap in
-[`engines-standards-and-performance-roadmap.md`](./engines-standards-and-performance-roadmap.md).
+This page is the M0 **baseline of record** for the active cross-engine roadmap
+in [`browser-compliance-roadmap.md`](./browser-compliance-roadmap.md).
 It ties together the PR dashboard workflow, the published conformance numbers,
 the benchmark harness outputs, and the current bridge-boundary map.
 
