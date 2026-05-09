@@ -23,7 +23,7 @@
 9. [Governance and Periodic Review](#9-governance-and-periodic-review)
 10. [Stakeholder Review](#10-stakeholder-review)
 11. [Superseded Roadmaps](#11-superseded-roadmaps)
-12. [Open Questions](#12-open-questions)
+12. [Resolved Decisions](#12-resolved-decisions)
 
 ---
 
@@ -160,45 +160,162 @@ major version we are tracking.
 
 ### Phase C0 — Bootstrapping the Chromium baseline (one-time)
 
-Before any per-release tracking can begin, we must establish the baseline:
+Phase C0 establishes everything the recurring Phase C-N loop depends on. It is
+broken into six concrete deliverables, each with explicit acceptance criteria.
+Until **all** of them land on `main`, no per-release Chromium snapshot is
+considered authoritative.
 
-1. Pick a starting Chromium stable release **N0** at the time of adoption.
-2. Capture Chromium N0's observable behaviour on the agreed suites (Test262
-   subset, WPT subsets enumerated in W4/W5, Acid2/3 captures, and a small set
-   of raster reference captures for W7).
-3. Run the same suites against `main` and publish the **initial delta** per
-   workstream.
-4. Convert each non-zero delta into a tracked compliance gap (see
-   [Section 8](#8-compliance-gap-tracking)).
+Pick a starting Chromium stable release **N0** at the time of adoption. At
+roadmap-adoption time, **N0 = the latest Chromium stable on the day the first
+C0 PR opens** — the exact number is recorded in
+`docs/roadmap/snapshots/chromium-N0.md` once published.
 
-Phase C0 is complete when the unified dashboard renders at least one full
-per-engine delta against Chromium N0 in CI.
+#### C0.1 — Stand up the upstream-Chromium reference fetcher
+
+1. Add `scripts/chromium/fetch-reference.ps1` (and its `.sh` counterpart) that,
+   given a Chromium milestone number, downloads:
+   - the Chromium release notes JSON from `chromiumdash.appspot.com/fetch_milestones`;
+   - the matching V8 version and the WPT revision Chromium pinned for that
+     milestone (read from `DEPS` at the corresponding tag);
+   - the Test262 revision pinned by V8 at that release.
+2. The script writes the resolved versions to
+   `tests/m2-conformance/chromium-reference/chromium-N.lock.json`. This file
+   is the **single source of truth** for "what does Chromium N mean" for every
+   downstream step.
+3. **Acceptance:** running the script for at least two adjacent Chromium
+   stable versions produces deterministic lockfiles, and CI fails if a
+   snapshot PR is opened without the matching lockfile.
+
+#### C0.2 — Pin the WPT subsets that form the W4/W5 gate sets
+
+The W4/W5 gates do **not** run all of WPT — that would be both noisy and
+slower than Chromium's own WPT cadence. They run a fixed, version-controlled
+subset chosen so that (a) it covers behaviour Broiler actually exercises and
+(b) Chromium's own pass-rate on the subset is ≥ 99% (so any failure on our
+side is a real Broiler gap, not an upstream flake).
+
+The initial subset is fixed below and lives at
+`tests/m2-conformance/wpt-subsets/chromium-aligned.toml`:
+
+| Workstream | WPT directories included | Rationale |
+|---|---|---|
+| **W4 (HTML/CSS)** | `html/syntax/parsing/`, `html/semantics/forms/`, `html/semantics/scripting-1/`, `dom/nodes/`, `dom/ranges/`, `dom/traversal/`, `css/CSS2/`, `css/css-cascade/`, `css/css-color/`, `css/css-flexbox/`, `css/css-grid/`, `css/css-text/`, `css/css-fonts/`, `css/css-backgrounds/`, `css/css-display/` | Covers parser, DOM tree, cascade, layout primitives, and the CSS modules Broiler renders today (Acid3 surface + WPT visual subset). |
+| **W5 (DOM/Web API)** | `dom/events/`, `dom/abort/`, `html/webappapis/timers/`, `html/webappapis/microtask-queuing/`, `html/webappapis/scripting/`, `fetch/api/basic/`, `fetch/api/headers/`, `fetch/api/request/`, `fetch/api/response/`, `content-security-policy/script-src/`, `content-security-policy/style-src/` | Covers the Bridge surface (events, microtasks, fetch subset, CSP) without pulling in service workers, web RTC, or other features Broiler does not implement. |
+
+Adding or removing a directory from this table requires the **annual review**
+(Section 9). The list is not changed mid-cycle.
+
+#### C0.3 — Define the Test262 subset for G1
+
+G1 runs the **language scope** of Test262 at the revision V8 pinned for
+Chromium N (resolved by C0.1). Excluded by default:
+`test/intl402/`, `test/staging/`, and any test marked `[noStrict]` plus
+`[onlyStrict]` for the same feature (we run the strict variant only).
+
+The exclude-list is committed at
+`tests/m2-conformance/test262-es2025/chromium-aligned.exclude` and, like the
+WPT subset, only changes at the annual review.
+
+#### C0.4 — Lock the W6 performance reference hardware
+
+The W6 budgets are meaningless without a fixed reference profile. The
+adopted reference is:
+
+- **Reference runner:** `windows-2022` GitHub-hosted runner (4 vCPU, 16 GB RAM,
+  Standard_D4s_v3 class). This is what Broiler's CI already provisions, so
+  no infra change is required.
+- **Warm-up policy:** every benchmark runs 3 untimed warm-up iterations and
+  reports the median of the next 7 timed iterations.
+- **Numbers are only comparable within the reference profile.** Local
+  developer numbers are informational only.
+
+Phase C0 publishes a `bench/reference/README.md` documenting the profile and
+the warm-up policy, and `bench/reference/baseline-N0.json` capturing the
+first set of numbers so subsequent runs have something to diff against.
+
+#### C0.5 — Author the snapshot template
+
+Add `docs/roadmap/snapshots/_template.md` with the canonical structure every
+per-release snapshot follows (one H2 per workstream, a "Deferred items" H2,
+and a "Reference lockfile" pointer to the matching `chromium-N.lock.json`).
+This guarantees snapshots are diffable across releases.
+
+#### C0.6 — Bootstrap the unified dashboard CI job
+
+Wire a CI workflow `chromium-alignment.yml` that, on every PR and on a
+nightly schedule against `main`:
+
+1. Reads the latest `chromium-N.lock.json`.
+2. Runs the Test262 subset (C0.3), the WPT subsets (C0.2), the Acid2/Acid3
+   captures, and the W7 raster reference captures.
+3. Renders a single Markdown report under `artifacts/chromium-alignment/` and
+   posts a summary comment on the PR.
+4. **Fails the build** if any G1–G6 gate (Section 7) regresses against the
+   previous snapshot's numbers committed on `main`.
+
+**Phase C0 is complete** when (a) C0.1–C0.6 have all merged, (b) the first
+real `docs/roadmap/snapshots/chromium-N0.md` has been published from CI
+output (not hand-written), and (c) every non-zero delta in that snapshot has
+a tracked issue under the `chromium-alignment` label.
 
 ### Phase C-N — Per-release tracking (recurring, every ~4 weeks)
 
-For each subsequent Chromium stable release **N**:
+For each subsequent Chromium stable release **N**, the steps below are
+executed in order. Each step has an explicit owner and a concrete artefact;
+none is allowed to be skipped — if a step cannot complete, the snapshot
+records *why*, but the step is still attempted.
 
-1. **Day 0 (Chromium N ships).** Refresh the reference captures and WPT/Test262
-   expectations for Chromium N. This is mechanical and lives in
-   `tests/m2-conformance/` and the W7 reference set.
-2. **Day 0 – Day 7.** Recompute deltas per engine. Open or update sub-issues
-   for any new gaps surfaced by Chromium N.
-3. **Day 7 – Day 21.** Engineering work to close in-budget gaps (see
-   [Section 7](#7-compliance-gates-and-exit-criteria)).
-4. **Day 21 – Day 28.** Publish the **Chromium N compliance snapshot** in
-   `docs/roadmap/snapshots/chromium-N.md` (template added in Phase C0) and
-   update [Section 4](#4-current-state-snapshot) of this roadmap.
+#### Day 0 — Chromium N ships
 
-Snapshots are append-only: every release produces a new file, none are edited
-after publication. This gives a permanent, auditable history of Broiler's
-alignment over time.
+| # | Step | Owner | Artefact |
+|---|---|---|---|
+| 1 | Run `scripts/chromium/fetch-reference.ps1 N` to refresh `chromium-N.lock.json` | Standards Steward | Updated lockfile committed via PR |
+| 2 | Bump the WPT and Test262 submodule pins to the revisions in the lockfile | Standards Steward | Same PR as step 1 |
+| 3 | Re-capture the Acid2, Acid3, and WPT-visual reference PNGs by running them against the new Chromium build, store under `tests/m2-conformance/visual-reference/chromium-N/` | Graphics WG | PR adds the new reference set |
+| 4 | Open the snapshot PR from the template (`cp _template.md chromium-N.md`); leave bodies empty for now | Standards Steward | Draft PR |
+
+#### Day 1 – Day 7 — Delta computation and triage
+
+| # | Step | Owner | Artefact |
+|---|---|---|---|
+| 5 | Trigger the `chromium-alignment.yml` workflow against the Day-0 PR; download the report artefact | Standards Steward | Markdown delta report |
+| 6 | For each new failing test, file a `chromium-alignment` issue with: test ID, engine, workstream, the Chromium N it appeared in, and a candidate target Chromium release for closure | Engine maintainer (auto-routed by CODEOWNERS on the test path) | One issue per failing test, linked from the snapshot draft |
+| 7 | For each *behaviour change* in Chromium N (read from the Chromium release notes JSON in step 1) that intersects a Broiler engine, file a "tracking" issue even if no test fails today (so we don't get caught by lazy-triggered failures) | Standards Steward | Issues labelled `chromium-alignment`, `behaviour-change` |
+| 8 | Run the W6 benchmarks; if any metric is outside the ±5% band against the previous snapshot, file a `perf-regression` issue and link it from the snapshot | Performance Steward | Bench report committed under `bench/reports/chromium-N.json` |
+
+#### Day 8 – Day 21 — Closing in-budget gaps
+
+| # | Step | Owner | Artefact |
+|---|---|---|---|
+| 9 | Engine maintainers prioritise the issues opened in steps 6–8 by gate severity: G6 > G1 > G3 > G2 > G4 > G5 (i.e. dashboard-availability and JS-language regressions block the snapshot before pixel-fidelity ones) | Engines Working Group | Issues moved into "In progress" on the alignment project board |
+| 10 | Each fix lands as a normal PR that references its `chromium-alignment` issue. The PR description **must** include the before/after numbers from the dashboard | PR author | Merged PRs linked from the issue |
+| 11 | Issues that cannot land in this cycle are explicitly **deferred**: the issue is moved to the next Chromium release's milestone, and a one-line rationale is added to the snapshot's "Deferred items" section | Engine maintainer | Updated snapshot draft |
+
+#### Day 22 – Day 28 — Snapshot publication
+
+| # | Step | Owner | Artefact |
+|---|---|---|---|
+| 12 | Re-run the `chromium-alignment.yml` workflow against `main` and copy the rendered Markdown into the snapshot PR | Standards Steward | Filled-in `chromium-N.md` |
+| 13 | Update [Section 4](#4-current-state-snapshot) of this roadmap with one paragraph per engine summarising the new state | Standards Steward | Same PR as step 12 |
+| 14 | Get sign-off from each engine maintainer on the PR (one approving review per engine: JS, HTML, Bridge, Graphics) | Engine maintainers | Approved PR |
+| 15 | Merge. The merged commit is tagged `chromium-N-snapshot` so it is trivially reachable from external links | Standards Steward | Tag pushed |
+
+Snapshots are **append-only**: every release produces a new file, none are
+edited after the merge in step 15. This gives a permanent, auditable history
+of Broiler's alignment over time. Errata to a published snapshot live in the
+*next* snapshot's "Errata" section, not in edits to the historical file.
 
 ### Phase C-N+ — Forward-looking work (continuous)
 
-Work that *anticipates* the next Chromium release (origin-trial features,
-intent-to-ship items, TC39 stage-3 proposals) is allowed but is **not on the
-critical path**. It is staged behind feature flags and only counted toward
-compliance once it ships in a Chromium stable release.
+Work that *anticipates* the next Chromium release (intent-to-ship items,
+TC39 stage-3 proposals, draft CSS modules) is allowed but is **not on the
+critical path**. It is staged behind feature flags whose default is `off`,
+so it cannot affect the gate measurements above, and it is only counted
+toward compliance once it ships enabled-by-default in a Chromium stable
+release. **Chromium origin-trial features are explicitly excluded from the
+gate measurements** — origin trials are upstream experiments and
+implementing against them risks chasing features that get withdrawn. This
+default is reviewed at each annual revision (Section 9).
 
 ---
 
@@ -301,17 +418,21 @@ deprecated.
 
 ---
 
-## 12. Open Questions
+## 12. Resolved Decisions
 
-These are tracked as items for the first stakeholder review after adoption:
+These were the open questions raised during initial drafting; each has been
+answered and folded into the relevant section. They are kept here as a
+single-glance reference and as a decision log for future annual reviews.
 
-1. **Subset selection.** Exactly which WPT directories under `html/`, `css/`,
-   `dom/`, `fetch/`, and `content-security-policy/` form the gate sets in
-   W4/W5? The first Chromium N0 snapshot will propose an initial cut.
-2. **Performance reference hardware.** W6 budgets need a fixed hardware
-   profile; choosing it is a Phase C0 deliverable.
-3. **Origin-trial features.** Should any Chromium origin-trial features be
-   counted toward "current"? Default in this roadmap is **no**; revisit at
-   the first annual review.
-4. **Snapshot retention.** Per-release snapshots accumulate; agree on whether
-   any compaction is acceptable beyond ~24 months.
+| # | Question | Decision | Where it lives |
+|---|---|---|---|
+| 1 | Which WPT directories form the W4/W5 gate sets? | The fixed table in Phase C0.2 (15 dirs for W4, 11 for W5), pinned in `tests/m2-conformance/wpt-subsets/chromium-aligned.toml`. Membership only changes at the annual review. | Section 6, Phase C0.2 |
+| 2 | What is the W6 performance reference hardware? | GitHub-hosted `windows-2022` runner (4 vCPU / 16 GB / Standard_D4s_v3), 3 untimed warm-ups + median of 7 timed iterations. Local numbers are informational only. | Section 6, Phase C0.4 |
+| 3 | Are Chromium origin-trial features counted toward "current"? | **No.** Origin trials are upstream experiments and may be withdrawn; tracking them risks wasted work. Stage-3 TC39 proposals and intent-to-ship items follow the same rule (staged behind off-by-default flags, counted only once shipped enabled-by-default in Chromium stable). Reviewed annually. | Section 6, Phase C-N+ |
+| 4 | What is the snapshot retention policy? | Snapshots are **kept indefinitely** in `docs/roadmap/snapshots/`. They are tiny (~50 KB each), and at one snapshot per ~4 weeks that is well under 1 MB/year of repository growth — not worth compacting. The Day-22 snapshot tag (`chromium-N-snapshot`) is also kept indefinitely. | Section 6, Phase C-N step 15 |
+| 5 | What is the priority order between gates when work cannot finish in a cycle? | G6 > G1 > G3 > G2 > G4 > G5 — i.e. dashboard availability and JS-language regressions block before pixel and perf ones. Anything that cannot land is explicitly deferred to the next Chromium release with a one-line rationale in the snapshot. | Section 6, Phase C-N step 9 / step 11 |
+
+Future open questions raised during operation of this roadmap are filed as
+issues with the label `chromium-alignment` + `roadmap-question` and resolved
+at the next annual review (Section 9), at which point they move into the
+table above.
