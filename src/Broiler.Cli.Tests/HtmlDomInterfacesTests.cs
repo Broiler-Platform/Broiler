@@ -1175,4 +1175,35 @@ document.getElementById('result').textContent = r.join(',');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true,true,true", result);
     }
+
+    [Fact]
+    public void HTMLElement_Draggable_Property_Reflects_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d1""></div>
+<div id=""d2"" draggable=""true""></div>
+<div id=""d3"" draggable=""false""></div>
+<div id=""result""></div>
+<script>
+var d1 = document.getElementById('d1');
+var d2 = document.getElementById('d2');
+var d3 = document.getElementById('d3');
+var r = [];
+r.push(d1.draggable === false);
+r.push(d2.draggable === true);
+r.push(d3.draggable === false);
+d1.draggable = true;
+r.push(d1.getAttribute('draggable') === 'true');
+r.push(d1.draggable === true);
+d2.draggable = false;
+r.push(d2.getAttribute('draggable') === 'false');
+r.push(d2.draggable === false);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true", result);
+    }
 }

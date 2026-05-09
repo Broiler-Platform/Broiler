@@ -144,6 +144,25 @@ public sealed partial class DomBridge
             }, "set dir"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // draggable (read/write) — reflected enumerated attribute
+        obj.FastAddProperty(
+            (KeyString)"draggable",
+            new JSFunction((in Arguments _) =>
+            {
+                if (element.Attributes.TryGetValue("draggable", out var draggable))
+                    return string.Equals(draggable, "true", StringComparison.OrdinalIgnoreCase)
+                        ? JSBoolean.True
+                        : JSBoolean.False;
+
+                return JSBoolean.False;
+            }, "get draggable"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["draggable"] = a.Length > 0 && a[0].BooleanValue ? "true" : "false";
+                return JSUndefined.Value;
+            }, "set draggable"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",
