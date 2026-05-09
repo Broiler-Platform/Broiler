@@ -1,3 +1,20 @@
+> ## ⚠️ Deprecated
+>
+> **This roadmap has been superseded** by the unified, Chromium-aligned roadmap:
+> [`docs/roadmap/chromium-alignment-unified-roadmap.md`](./chromium-alignment-unified-roadmap.md).
+>
+> The cross-engine portfolio plan described below is now expressed there as
+> Sections 5–7 (workstreams W1–W7 and compliance gates G1–G6), anchored against
+> Chromium stable releases rather than internal milestone codes. New planning,
+> sub-issues, and gates should be filed against the unified roadmap.
+>
+> This document is retained for historical context only and is **no longer
+> maintained**. Per-release status now lives in
+> `docs/roadmap/snapshots/chromium-N.md` files as described in Section 6 of the
+> unified roadmap.
+
+---
+
 # Roadmap: Advancing Broiler Engines to Full Standards Compliance and Performance
 
 > **Status**: **M2 implementation complete** — W3, W4, and W5 are published/verified; the unified dashboard now carries the focused Phase 2 JS, HTML/CSS, and Bridge signals of record

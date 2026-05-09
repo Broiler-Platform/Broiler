@@ -1,3 +1,21 @@
+> ## ⚠️ Deprecated
+>
+> **This roadmap has been superseded** by the unified, Chromium-aligned roadmap:
+> [`docs/roadmap/chromium-alignment-unified-roadmap.md`](../../docs/roadmap/chromium-alignment-unified-roadmap.md).
+>
+> Acid2 visual fidelity is now expressed there as part of workstreams **W4**
+> (HTML/CSS rendering compliance) and **W7** (graphics backend completion),
+> with compliance gate **G4** measuring pixel-diff parity against the
+> *current Chromium stable release's* Acid2 capture rather than a one-shot
+> internal target. New planning, sub-issues, and gates should be filed against
+> the unified roadmap.
+>
+> This document is retained for historical context only and is **no longer
+> maintained**. Current Acid2 status per Chromium release is published in the
+> per-release snapshots described in Section 6 of the unified roadmap.
+
+---
+
 # Acid2 Compliance Roadmap
 
 ## Summary
