@@ -1,0 +1,44 @@
+{
+  "Milestone": 148,
+  "Channel": "Stable",
+  "Platform": "Windows",
+  "GeneratedAtUtc": "2026-05-09T14:47:03.7098538Z",
+  "Release": {
+    "Version": "148.0.7778.97",
+    "PreviousVersion": "148.0.7778.96",
+    "PublishedAtUtc": "2026-04-29T18:10:38.459Z",
+    "ChromiumMainBranchPosition": 1610480
+  },
+  "Chromium": {
+    "Version": "148.0.7778.97",
+    "MainBranch": "7778",
+    "MainBranchHash": "77f495ee216d4c3cc784d33658bad4778c0680ee",
+    "MainBranchPosition": 1610480,
+    "ReleaseCommit": "6b3fa66a923a9442c8ab0bc71b4b41ff24528d3b",
+    "DepsResolvedFrom": "148.0.7778.97"
+  },
+  "V8": {
+    "Branch": "14.8",
+    "Revision": "ddc9a95905de5268332a8f0216dc2bc67d26e829",
+    "Source": "Chromium DEPS @ 148.0.7778.97"
+  },
+  "WebPlatformTests": {
+    "Branch": null,
+    "Revision": null,
+    "Source": null
+  },
+  "Test262": {
+    "Branch": null,
+    "Revision": "5c8206929d81b2d3d727ca6aac56c18358c8d790",
+    "Source": "V8 DEPS @ ddc9a95905de5268332a8f0216dc2bc67d26e829"
+  },
+  "Sources": {
+    "MilestonesApi": "https://chromiumdash.appspot.com/fetch_milestones",
+    "ReleasesApi": "https://chromiumdash.appspot.com/fetch_releases?mstone=148\u0026channel=Stable\u0026platform=Windows",
+    "ChromiumDeps": "https://chromium.googlesource.com/chromium/src.git/\u002B/148.0.7778.97/DEPS?format=TEXT",
+    "V8Deps": "https://chromium.googlesource.com/v8/v8.git/\u002B/ddc9a95905de5268332a8f0216dc2bc67d26e829/DEPS?format=TEXT"
+  },
+  "Warnings": [
+    "Could not resolve the Chromium-pinned WPT revision from DEPS; the lockfile leaves webPlatformTests.revision unset for manual follow-up."
+  ]
+}
