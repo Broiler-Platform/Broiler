@@ -128,6 +128,22 @@ public sealed partial class DomBridge
             }, "set accessKey"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // dir (read/write) — synced with attributes["dir"]
+        obj.FastAddProperty(
+            (KeyString)"dir",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("dir", out var dir)
+                    ? new JSString(dir)
+                    : new JSString(string.Empty),
+                "get dir"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["dir"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                bridge.InvalidateStyleScope(element);
+                return JSUndefined.Value;
+            }, "set dir"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",
