@@ -65,6 +65,7 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
     public event LogEventHandler Log;
     public event ErrorEventHandler Error;
     public event ConsoleEvent ConsoleEvent;
+    public JavaScriptFeatureFlags ExperimentalFeatures { get; }
 
     SAUint32Map<JSVariable> globalVars = new();
 
@@ -96,11 +97,14 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
 
     internal void FillStackTrace(StringBuilder sb) { }
 
-    public JSContext(SynchronizationContext synchronizationContext = null)
+    public JSContext(
+        SynchronizationContext synchronizationContext = null,
+        JavaScriptFeatureFlags experimentalFeatures = JavaScriptFeatureFlags.AllExperimentalEs2026)
     {
         JSEngine.EnsureBuiltInsAssemblyLoaded();
 
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
+        ExperimentalFeatures = experimentalFeatures;
 
         JSEngine.CurrentContext = this;
 
@@ -131,6 +135,9 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
 
         this[KeyStrings.debug] = JSValue.CreateFunction(Debug);
     }
+
+    public bool HasExperimentalFeature(JavaScriptFeatureFlags feature)
+        => (ExperimentalFeatures & feature) == feature;
 
     internal void FireConsoleEvent(string type, in Arguments a) => ConsoleEvent?.Invoke(this, type, in a);
 

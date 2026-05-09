@@ -30,7 +30,7 @@ public sealed partial class DomBridge
     /// <c>:last-child</c>), pseudo-elements (<c>::before</c>,
     /// <c>::after</c>), <c>[attr]</c>, and <c>[attr=value]</c>.
     /// </summary>
-    private static bool MatchesSelector(DomElement el, string selector)
+    private static bool MatchesSelector(DomElement el, string selector, DomElement? scope = null)
     {
         selector = selector.Trim();
         if (string.IsNullOrEmpty(selector)) return false;
@@ -40,10 +40,10 @@ public sealed partial class DomBridge
         if (parts.Count == 0) return false;
 
         // Rightmost part must match the target element
-        if (!MatchesCompound(el, parts[^1].Compound)) return false;
+        if (!MatchesCompound(el, parts[^1].Compound, scope)) return false;
 
         // Match remaining parts from right to left with backtracking
-        return parts.Count == 1 || MatchPartsRecursive(parts, parts.Count - 2, el);
+        return parts.Count == 1 || MatchPartsRecursive(parts, parts.Count - 2, el, scope);
     }
 
     /// <summary>
@@ -52,7 +52,7 @@ public sealed partial class DomBridge
     /// the required relationship, and is stored in parts[partIndex+1].Combinator.
     /// </summary>
     private static bool MatchPartsRecursive(
-        List<(char Combinator, string Compound)> parts, int partIndex, DomElement current)
+        List<(char Combinator, string Compound)> parts, int partIndex, DomElement current, DomElement? scope = null)
     {
         if (partIndex < 0) return true; // All parts matched
         if (current == null) return false;
@@ -66,8 +66,8 @@ public sealed partial class DomBridge
                 var ancestor = current.Parent;
                 while (ancestor != null)
                 {
-                    if (MatchesCompound(ancestor, compound) &&
-                        MatchPartsRecursive(parts, partIndex - 1, ancestor))
+                    if (MatchesCompound(ancestor, compound, scope) &&
+                        MatchPartsRecursive(parts, partIndex - 1, ancestor, scope))
                         return true;
                     ancestor = ancestor.Parent;
                 }
@@ -75,21 +75,21 @@ public sealed partial class DomBridge
 
             case '>': // child — parent must match (no backtracking needed)
                 return current.Parent != null &&
-                       MatchesCompound(current.Parent, compound) &&
-                       MatchPartsRecursive(parts, partIndex - 1, current.Parent);
+                       MatchesCompound(current.Parent, compound, scope) &&
+                       MatchPartsRecursive(parts, partIndex - 1, current.Parent, scope);
 
             case '+': // adjacent sibling — only one candidate
                 var prev = PreviousSibling(current);
                 return prev != null &&
-                       MatchesCompound(prev, compound) &&
-                       MatchPartsRecursive(parts, partIndex - 1, prev);
+                       MatchesCompound(prev, compound, scope) &&
+                       MatchPartsRecursive(parts, partIndex - 1, prev, scope);
 
             case '~': // general sibling — try each preceding sibling, backtracking on failure
                 var sib = PreviousSibling(current);
                 while (sib != null)
                 {
-                    if (MatchesCompound(sib, compound) &&
-                        MatchPartsRecursive(parts, partIndex - 1, sib))
+                    if (MatchesCompound(sib, compound, scope) &&
+                        MatchPartsRecursive(parts, partIndex - 1, sib, scope))
                         return true;
                     sib = PreviousSibling(sib);
                 }
@@ -251,7 +251,7 @@ public sealed partial class DomBridge
     /// Matches a compound selector (no combinators) against an element.
     /// Handles tag, #id, .class, [attr], :pseudo-class, and ::pseudo-element.
     /// </summary>
-    private static bool MatchesCompound(DomElement el, string compound)
+    private static bool MatchesCompound(DomElement el, string compound, DomElement? scope = null)
     {
         if (string.IsNullOrEmpty(compound)) return false;
 
@@ -272,7 +272,7 @@ public sealed partial class DomBridge
         });
 
         // Extract and process pseudo-classes
-        if (!ProcessPseudoClasses(el, ref compound)) return false;
+        if (!ProcessPseudoClasses(el, ref compound, scope)) return false;
 
         string tagFilter = null;
         string idFilter = null;
@@ -384,7 +384,7 @@ public sealed partial class DomBridge
     /// Updates <paramref name="compound"/> in place (pseudo-classes removed).
     /// Returns <c>false</c> if a pseudo-class does not match.
     /// </summary>
-    private static bool ProcessPseudoClasses(DomElement el, ref string compound)
+    private static bool ProcessPseudoClasses(DomElement el, ref string compound, DomElement? scope = null)
     {
         var pseudoClasses = ExtractPseudoClasses(compound);
         if (pseudoClasses.Count == 0)
@@ -433,6 +433,9 @@ public sealed partial class DomBridge
                 case "root":
                     if (el.Parent != null && !el.Parent.TagName.StartsWith("#", StringComparison.Ordinal)) return false;
                     break;
+                case "scope":
+                    if (scope == null || !ReferenceEquals(el, scope)) return false;
+                    break;
                 case "not":
                     if (arg != null && MatchesAnySelectorInList(el, arg)) return false;
                     break;
@@ -441,7 +444,7 @@ public sealed partial class DomBridge
                     if (arg == null || !MatchesAnySelectorInList(el, arg)) return false;
                     break;
                 case "has":
-                    if (arg == null || !MatchesHas(el, arg)) return false;
+                    if (arg == null || !MatchesHas(el, arg, el)) return false;
                     break;
                 case "lang":
                     if (arg == null || !MatchesLang(el, arg)) return false;
@@ -593,26 +596,26 @@ public sealed partial class DomBridge
         return builder.ToString();
     }
 
-    private static bool MatchesHas(DomElement el, string selectorList)
+    private static bool MatchesHas(DomElement el, string selectorList, DomElement? scope = null)
     {
         foreach (var selector in SplitSelectorList(selectorList))
         {
-            if (MatchesRelativeSelector(el, selector))
+            if (MatchesRelativeSelector(el, selector, scope))
                 return true;
         }
 
         return false;
     }
 
-    private static bool MatchesRelativeSelector(DomElement scope, string selector)
+    private static bool MatchesRelativeSelector(DomElement scope, string selector, DomElement? selectorScope = null)
     {
         var parts = SplitSelectorParts(selector.Trim());
         if (parts.Count == 0)
             return false;
 
-        foreach (var candidate in EnumerateRelativeCandidates(scope, parts[0].Combinator, parts[0].Compound))
+        foreach (var candidate in EnumerateRelativeCandidates(scope, parts[0].Combinator, parts[0].Compound, selectorScope))
         {
-            if (MatchesRelativeSelectorParts(parts, 1, candidate))
+            if (MatchesRelativeSelectorParts(parts, 1, candidate, selectorScope))
                 return true;
         }
 
@@ -622,21 +625,22 @@ public sealed partial class DomBridge
     private static bool MatchesRelativeSelectorParts(
         List<(char Combinator, string Compound)> parts,
         int index,
-        DomElement current)
+        DomElement current,
+        DomElement? selectorScope = null)
     {
         if (index >= parts.Count)
             return true;
 
-        foreach (var candidate in EnumerateRelativeCandidates(current, parts[index].Combinator, parts[index].Compound))
+        foreach (var candidate in EnumerateRelativeCandidates(current, parts[index].Combinator, parts[index].Compound, selectorScope))
         {
-            if (MatchesRelativeSelectorParts(parts, index + 1, candidate))
+            if (MatchesRelativeSelectorParts(parts, index + 1, candidate, selectorScope))
                 return true;
         }
 
         return false;
     }
 
-    private static IEnumerable<DomElement> EnumerateRelativeCandidates(DomElement scope, char combinator, string compound)
+    private static IEnumerable<DomElement> EnumerateRelativeCandidates(DomElement scope, char combinator, string compound, DomElement? selectorScope = null)
     {
         combinator = combinator == '\0' ? ' ' : combinator;
 
@@ -645,7 +649,7 @@ public sealed partial class DomBridge
             case ' ':
                 foreach (var descendant in EnumerateDescendants(scope))
                 {
-                    if (MatchesCompound(descendant, compound))
+                    if (MatchesCompound(descendant, compound, selectorScope))
                         yield return descendant;
                 }
                 break;
@@ -653,14 +657,14 @@ public sealed partial class DomBridge
             case '>':
                 foreach (var child in scope.Children)
                 {
-                    if (!child.IsTextNode && MatchesCompound(child, compound))
+                    if (!child.IsTextNode && MatchesCompound(child, compound, selectorScope))
                         yield return child;
                 }
                 break;
 
             case '+':
                 var nextSibling = NextSibling(scope);
-                if (nextSibling != null && MatchesCompound(nextSibling, compound))
+                if (nextSibling != null && MatchesCompound(nextSibling, compound, selectorScope))
                     yield return nextSibling;
                 break;
 
@@ -668,7 +672,7 @@ public sealed partial class DomBridge
                 var sibling = NextSibling(scope);
                 while (sibling != null)
                 {
-                    if (MatchesCompound(sibling, compound))
+                    if (MatchesCompound(sibling, compound, selectorScope))
                         yield return sibling;
 
                     sibling = NextSibling(sibling);

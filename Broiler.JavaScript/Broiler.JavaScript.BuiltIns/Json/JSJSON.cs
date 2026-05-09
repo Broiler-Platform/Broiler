@@ -3,6 +3,8 @@ using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using System;
 using System.CodeDom.Compiler;
 using System.IO;
@@ -32,6 +34,13 @@ public partial class JSJSON : JSObject
             return JSJsonParser.Parse(text.ToString(), null) ?? JSNull.Value;
 
         var t = a.This;
+        if (JSEngine.Current is not JSContext context ||
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.JsonParseSourceTextAccess))
+        {
+            return JSJsonParser.Parse(text.ToString(),
+                p => function.f(new Arguments(t, new JSString(p.key), p.value))) ?? JSNull.Value;
+        }
+
         // ES2026 §4.7 — reviver receives (key, value, context) where
         // context = { source: rawSourceText } for primitive values.
         JSValue rws((string key, JSValue value, string source) p)

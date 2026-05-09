@@ -725,6 +725,20 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("data-order-before-defer-2=\"defer-1,micro\"", output);
     }
 
+    [Theory]
+    [InlineData("queueMicrotask();")]
+    [InlineData("queueMicrotask('not callable');")]
+    public void ScriptEngine_ExecuteDetailed_QueueMicrotask_Rejects_NonCallable_Callbacks(string script)
+    {
+        var engine = new ScriptEngine();
+
+        var result = engine.ExecuteDetailed(new[] { script });
+
+        Assert.False(result.Success);
+        var error = Assert.Single(result.Errors);
+        Assert.Contains("Callback must be a function", error.Message);
+    }
+
     [Fact]
     public void ScriptExtractor_FetchExternalScript_FileUrl()
     {

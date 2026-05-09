@@ -98,6 +98,71 @@ public sealed partial class DomBridge
             }, "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // lang (read/write) — synced with attributes["lang"]
+        obj.FastAddProperty(
+            (KeyString)"lang",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("lang", out var lang)
+                    ? new JSString(lang)
+                    : new JSString(string.Empty),
+                "get lang"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["lang"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set lang"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // accessKey (read/write) — synced with attributes["accesskey"]
+        obj.FastAddProperty(
+            (KeyString)"accessKey",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("accesskey", out var accessKey)
+                    ? new JSString(accessKey)
+                    : new JSString(string.Empty),
+                "get accessKey"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["accesskey"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set accessKey"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // dir (read/write) — synced with attributes["dir"]
+        obj.FastAddProperty(
+            (KeyString)"dir",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.TryGetValue("dir", out var dir)
+                    ? new JSString(dir)
+                    : new JSString(string.Empty),
+                "get dir"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["dir"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                bridge.InvalidateStyleScope(element);
+                return JSUndefined.Value;
+            }, "set dir"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // draggable (read/write) — reflected enumerated attribute
+        obj.FastAddProperty(
+            (KeyString)"draggable",
+            new JSFunction((in Arguments _) =>
+            {
+                if (element.Attributes.TryGetValue("draggable", out var draggable))
+                    return string.Equals(draggable, "true", StringComparison.OrdinalIgnoreCase)
+                        ? JSBoolean.True
+                        : JSBoolean.False;
+
+                return JSBoolean.False;
+            }, "get draggable"),
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["draggable"] = a.Length > 0 && a[0].BooleanValue ? "true" : "false";
+                return JSUndefined.Value;
+            }, "set draggable"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",
@@ -107,6 +172,17 @@ public sealed partial class DomBridge
                 bridge.SetElementInnerHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set innerHTML"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // outerHTML (read/write)
+        obj.FastAddProperty(
+            (KeyString)"outerHTML",
+            new JSFunction((in Arguments _) => new JSString(SerializeElementToHtml(element)), "get outerHTML"),
+            new JSFunction((in Arguments a) =>
+            {
+                bridge.SetElementOuterHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
+                return JSUndefined.Value;
+            }, "set outerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty(
@@ -127,35 +203,54 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        JSValue GetNodeTextValue()
+        {
+            // For text nodes, return the direct text content
+            if (element.IsTextNode)
+                return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
+            // For element nodes with direct TextContent set (e.g., via JS setter)
+            if (element.TextContent != null && element.Children.Count == 0)
+                return new JSString(element.TextContent);
+            // For element nodes, recursively collect text from descendants
+            if (element.Children.Count > 0)
+            {
+                var sb = new StringBuilder();
+                CollectTextContent(element, sb);
+                return new JSString(sb.ToString());
+            }
+            // Fallback to InnerHtml if no children and no TextContent
+            return new JSString(element.InnerHtml);
+        }
+
         // textContent (read/write)
         obj.FastAddProperty(
             (KeyString)"textContent",
-            new JSFunction((in Arguments a) =>
-            {
-                // For text nodes, return the direct text content
-                if (element.IsTextNode)
-                    return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
-                // For element nodes with direct TextContent set (e.g., via JS setter)
-                if (element.TextContent != null && element.Children.Count == 0)
-                    return new JSString(element.TextContent);
-                // For element nodes, recursively collect text from descendants
-                if (element.Children.Count > 0)
-                {
-                    var sb = new StringBuilder();
-                    CollectTextContent(element, sb);
-                    return new JSString(sb.ToString());
-                }
-                // Fallback to InnerHtml if no children and no TextContent
-                return new JSString(element.InnerHtml);
-            }, "get textContent"),
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get textContent"),
             new JSFunction((in Arguments a) =>
             {
                 var text = a.Length > 0 ? a[0].ToString() : string.Empty;
+                if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                {
+                    bridge.SetCharacterData(element, text);
+                    return JSUndefined.Value;
+                }
                 element.TextContent = text;
                 // Setting textContent clears all children per DOM spec
                 element.Children.Clear();
                 return JSUndefined.Value;
             }, "set textContent"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"innerText",
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get innerText"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"outerText",
+            new JSFunction((in Arguments _) => GetNodeTextValue(), "get outerText"),
+            null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style object — CSS property access and manipulation.
@@ -208,6 +303,7 @@ public sealed partial class DomBridge
                 {
                     var attrName = a[0].ToString();
                     var attrVal = a[1].ToString();
+                    element.Attributes.TryGetValue(attrName, out var previousAttrVal);
                     element.Attributes[attrName] = attrVal;
                     // Sync special properties
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
@@ -229,6 +325,9 @@ public sealed partial class DomBridge
 
                     if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
                         bridgeForSet.InvalidateStyleScope(element);
+
+                    if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
+                        bridgeForSet.NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
                 }
                 return JSUndefined.Value;
             }, "setAttribute", 2),
@@ -241,10 +340,36 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSNull.Value;
                 var name = a[0].ToString();
+                 return element.Attributes.TryGetValue(name, out var val)
+                     ? new JSString(val)
+                     : JSNull.Value;
+             }, "getAttribute", 1),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var name = a[0].ToString();
                 return element.Attributes.TryGetValue(name, out var val)
-                    ? new JSString(val)
+                    ? BuildAttrNode(name, val, element, obj)
                     : JSNull.Value;
-            }, "getAttribute", 1),
+            }, "getAttributeNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getAttributeNodeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSNull.Value;
+                var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                var localName = a[1].ToString();
+                if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) ||
+                    !element.Attributes.TryGetValue(qName, out var val))
+                    return JSNull.Value;
+                return BuildAttrNode(qName, val, element, obj);
+            }, "getAttributeNodeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM tree navigation --
@@ -255,6 +380,16 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
                 element.Parent != null ? ToJSObject(element.Parent) : JSNull.Value,
                 "get parentNode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"isConnected",
+            new JSFunction((in Arguments _) =>
+            {
+                var root = GetTreeRoot(element);
+                return ReferenceEquals(root, _documentNode) ? JSBoolean.True : JSBoolean.False;
+            }, "get isConnected"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -427,7 +562,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set nodeValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -444,7 +579,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
                 return JSUndefined.Value;
             }, "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -518,7 +653,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-                    element.TextContent = (element.TextContent ?? string.Empty) + data;
+                    bridge.SetCharacterData(element, (element.TextContent ?? string.Empty) + data);
                     return JSUndefined.Value;
                 }, "appendData", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -532,7 +667,7 @@ public sealed partial class DomBridge
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
                     var end = (int)Math.Min((long)offset + count, text.Length);
-                    element.TextContent = text.Remove(offset, end - offset);
+                    bridge.SetCharacterData(element, text.Remove(offset, end - offset));
                     return JSUndefined.Value;
                 }, "deleteData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -545,7 +680,7 @@ public sealed partial class DomBridge
                     var data = a.Length > 1 ? a[1].ToString() : string.Empty;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
-                    element.TextContent = text.Insert(offset, data);
+                    bridge.SetCharacterData(element, text.Insert(offset, data));
                     return JSUndefined.Value;
                 }, "insertData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -560,7 +695,7 @@ public sealed partial class DomBridge
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
                     var end = (int)Math.Min((long)offset + count, text.Length);
-                    element.TextContent = text.Remove(offset, end - offset).Insert(offset, data);
+                    bridge.SetCharacterData(element, text.Remove(offset, end - offset).Insert(offset, data));
                     return JSUndefined.Value;
                 }, "replaceData", 3),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -650,6 +785,22 @@ public sealed partial class DomBridge
             }, "hasAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // hasAttributes()
+        obj.FastAddValue(
+            (KeyString)"hasAttributes",
+            new JSFunction((in Arguments _) =>
+                element.Attributes.Count > 0 ? JSBoolean.True : JSBoolean.False,
+                "hasAttributes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getAttributeNames()
+        obj.FastAddValue(
+            (KeyString)"getAttributeNames",
+            new JSFunction((in Arguments _) =>
+                new JSArray(element.Attributes.Keys.Select(static name => (JSValue)new JSString(name)).ToArray()),
+                "getAttributeNames", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // removeAttribute(name)
         obj.FastAddValue(
             (KeyString)"removeAttribute",
@@ -658,7 +809,8 @@ public sealed partial class DomBridge
                 if (a.Length > 0)
                 {
                     var attrName = a[0].ToString();
-                    element.Attributes.Remove(attrName);
+                    element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+                    var removed = element.Attributes.Remove(attrName);
                     // Sync special properties
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = null;
@@ -666,9 +818,121 @@ public sealed partial class DomBridge
                         element.ClassName = null;
 
                     bridgeForSet.InvalidateStyleScope(element);
+                    if (removed)
+                        bridgeForSet.NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
                 }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // toggleAttribute(name, force)
+        obj.FastAddValue(
+            (KeyString)"toggleAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                var attrName = a[0].ToString();
+                var hasAttribute = element.Attributes.ContainsKey(attrName);
+                var forceSpecified = a.Length > 1 && !a[1].IsUndefined;
+                var shouldHaveAttribute = forceSpecified
+                    ? a[1].BooleanValue
+                    : !hasAttribute;
+
+                if (shouldHaveAttribute)
+                {
+                    if (!hasAttribute)
+                        SetAttributeLikeSetAttribute(element, attrName, string.Empty);
+                    return JSBoolean.True;
+                }
+
+                if (hasAttribute)
+                    RemoveAttributeLikeRemoveAttribute(element, attrName);
+                return JSBoolean.False;
+            }, "toggleAttribute", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"setAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name))
+                    return JSNull.Value;
+
+                var old = element.Attributes.TryGetValue(name, out var oldVal)
+                    ? BuildAttrNode(name, oldVal, element, obj)
+                    : JSNull.Value;
+
+                SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
+                return old;
+            }, "setAttributeNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"setAttributeNodeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var name = GetAttrNodeName(attrObj);
+                var localName = GetAttrNodeLocalName(attrObj);
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(localName))
+                    return JSNull.Value;
+
+                var ns = GetAttrNodeNamespace(attrObj);
+                JSValue old = JSNull.Value;
+                if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) &&
+                    element.Attributes.TryGetValue(oldQName, out var oldVal))
+                    old = BuildAttrNode(oldQName, oldVal, element, obj);
+
+                SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
+                return old;
+            }, "setAttributeNodeNS", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"removeAttributeNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name) || !element.Attributes.TryGetValue(name, out var val))
+                    return JSNull.Value;
+
+                var removed = BuildAttrNode(name, val, element, obj);
+                RemoveAttributeLikeRemoveAttribute(element, name);
+                return removed;
+            }, "removeAttributeNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"removeAttributeNodeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj)
+                    return JSNull.Value;
+
+                var localName = GetAttrNodeLocalName(attrObj);
+                if (string.IsNullOrEmpty(localName))
+                    return JSNull.Value;
+
+                var ns = GetAttrNodeNamespace(attrObj);
+                if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) ||
+                    !element.Attributes.TryGetValue(qName, out var val))
+                    return JSNull.Value;
+
+                var removed = BuildAttrNode(qName, val, element, obj);
+                RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+                return removed;
+            }, "removeAttributeNodeNS", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setAttributeNS(namespace, qualifiedName, value)
@@ -682,9 +946,7 @@ public sealed partial class DomBridge
                     var qName = a[1].ToString();
                     var val = a[2].ToString();
                     var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
-                    element.Attributes[qName] = val;
-                    element.NsAttrMap[(ns, localName)] = qName;
-                    bridgeForSet.InvalidateStyleScope(element);
+                    bridgeForSet.SetAttributeLikeSetAttributeNS(element, ns, qName, localName, val);
                 }
                 return JSUndefined.Value;
             }, "setAttributeNS", 3),
@@ -714,12 +976,7 @@ public sealed partial class DomBridge
                 {
                     var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
                     var localName = a[1].ToString();
-                    if (element.NsAttrMap.TryGetValue((ns, localName), out var qName))
-                    {
-                        element.Attributes.Remove(qName);
-                        element.NsAttrMap.Remove((ns, localName));
-                        bridgeForSet.InvalidateStyleScope(element);
-                    }
+                    bridgeForSet.RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
                 }
                 return JSUndefined.Value;
             }, "removeAttributeNS", 2),
@@ -752,6 +1009,98 @@ public sealed partial class DomBridge
             }, "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // compareDocumentPosition(otherNode)
+        obj.FastAddValue(
+            (KeyString)"compareDocumentPosition",
+            new JSFunction((in Arguments a) =>
+            {
+                const int documentPositionDisconnected = 0x01;
+                const int documentPositionPreceding = 0x02;
+                const int documentPositionFollowing = 0x04;
+                const int documentPositionContains = 0x08;
+                const int documentPositionContainedBy = 0x10;
+
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return new JSNumber(0);
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                if (otherEl == null || ReferenceEquals(element, otherEl))
+                    return new JSNumber(0);
+
+                if (!ReferenceEquals(GetTreeRoot(element), GetTreeRoot(otherEl)))
+                    return new JSNumber(documentPositionDisconnected);
+
+                if (IsDescendant(element, otherEl))
+                    return new JSNumber(documentPositionFollowing | documentPositionContainedBy);
+
+                if (IsDescendant(otherEl, element))
+                    return new JSNumber(documentPositionPreceding | documentPositionContains);
+
+                return new JSNumber(
+                    CompareTreeOrder(element, otherEl) < 0
+                        ? documentPositionFollowing
+                        : documentPositionPreceding);
+            }, "compareDocumentPosition", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // isSameNode(otherNode)
+        obj.FastAddValue(
+            (KeyString)"isSameNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return JSBoolean.False;
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                return ReferenceEquals(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+            }, "isSameNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // normalize()
+        obj.FastAddValue(
+            (KeyString)"normalize",
+            new JSFunction((in Arguments _) =>
+            {
+                NormalizeNode(element);
+                return JSUndefined.Value;
+            }, "normalize", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // isEqualNode(otherNode)
+        obj.FastAddValue(
+            (KeyString)"isEqualNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject otherObj)
+                    return JSBoolean.False;
+
+                var otherEl = FindDomElementByJSObject(otherObj);
+                return otherEl != null && NodesAreEqual(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+            }, "isEqualNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getRootNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var composed = false;
+                if (a.Length > 0 && a[0] is JSObject options)
+                {
+                    var composedValue = options[(KeyString)"composed"];
+                    composed = composedValue != null && !composedValue.IsUndefined && !composedValue.IsNull && composedValue.BooleanValue;
+                }
+
+                if (!composed)
+                {
+                    var shadowRoot = FindContainingShadowRoot(element);
+                    if (shadowRoot != null)
+                        return ToJSObject(shadowRoot);
+                }
+
+                return ToJSRootNode(GetTreeRoot(element));
+            }, "getRootNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // cloneNode(deep)
         obj.FastAddValue(
             (KeyString)"cloneNode",
@@ -781,19 +1130,7 @@ public sealed partial class DomBridge
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {
-                    newEl.Parent?.Children.Remove(newEl);
-                    newEl.Parent = element;
-                    AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
-                    element.Children.Add(newEl);
-                    bridgeForInsert.InvalidateStyleScope(element);
-
-                    // Fire onload for iframe/object children after DOM insertion
-                    var ntag = newEl.TagName?.ToLowerInvariant();
-                    if (ntag == "iframe" || ntag == "object")
-                        bridgeForInsert.FireSubDocumentOnload(newEl);
-                    else
-                        bridgeForInsert.FireDescendantOnloads(newEl);
-
+                    bridgeForInsert.InsertNodeAt(element, newEl, element.Children.Count);
                     return a[0];
                 }
 
@@ -801,26 +1138,11 @@ public sealed partial class DomBridge
                 if (refChildObj == null) return a[0];
                 var refEl = FindDomElementByJSObject(refChildObj);
                 if (refEl == null) return a[0];
+                if (ReferenceEquals(newEl, refEl)) return a[0];
 
                 var idx = element.Children.IndexOf(refEl);
                 if (idx < 0) throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
-
-                newEl.Parent?.Children.Remove(newEl);
-                newEl.Parent = element;
-                AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
-                // Re-find index: removing newEl from its old parent may have shifted
-                // indices if newEl was a sibling of refEl within this same parent.
-                idx = element.Children.IndexOf(refEl);
-                element.Children.Insert(idx, newEl);
-                bridgeForInsert.InvalidateStyleScope(element);
-
-                // Fire onload for iframe/object children after DOM insertion
-                var newTag = newEl.TagName?.ToLowerInvariant();
-                if (newTag == "iframe" || newTag == "object")
-                    bridgeForInsert.FireSubDocumentOnload(newEl);
-                else
-                    bridgeForInsert.FireDescendantOnloads(newEl);
-
+                bridgeForInsert.InsertNodeAt(element, newEl, idx);
                 return a[0];
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -959,21 +1281,41 @@ public sealed partial class DomBridge
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-                childEl.Parent?.Children.Remove(childEl);
-                childEl.Parent = element;
-                AdoptSubtreeIntoDocument(childEl, element.OwnerDocRoot);
-                element.Children.Add(childEl);
-                bridgeForAppend.InvalidateStyleScope(element);
-
-                // Fire onload for iframe/object children after DOM insertion
-                var childTag = childEl.TagName?.ToLowerInvariant();
-                if (childTag == "iframe" || childTag == "object")
-                    bridgeForAppend.FireSubDocumentOnload(childEl);
-                else
-                    bridgeForAppend.FireDescendantOnloads(childEl);
-
+                bridgeForAppend.InsertNodeAt(element, childEl, element.Children.Count);
                 return a[0];
             }, "appendChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"append",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Children.Count;
+                foreach (var node in nodes)
+                    InsertNodeAt(element, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "append", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"prepend",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = 0;
+                foreach (var node in nodes)
+                    InsertNodeAt(element, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeChild(child)
@@ -1018,6 +1360,8 @@ public sealed partial class DomBridge
 
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];
+                var previousSibling = idx > 0 ? element.Children[idx - 1] : null;
+                var nextSibling = idx + 1 < element.Children.Count ? element.Children[idx + 1] : null;
 
                 // If newChild is already in this parent, remove it first and re-find idx
                 if (ReferenceEquals(newEl.Parent, element))
@@ -1028,7 +1372,17 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    newEl.Parent?.Children.Remove(newEl);
+                    if (newEl.Parent != null)
+                    {
+                        var oldParent = newEl.Parent;
+                        var oldIndex = oldParent.Children.IndexOf(newEl);
+                        if (oldIndex >= 0)
+                        {
+                            NotifyNodeIteratorPreRemoval(newEl);
+                            oldParent.Children.RemoveAt(oldIndex);
+                            NotifyChildRemoved(oldParent, newEl, oldIndex);
+                        }
+                    }
                 }
 
                 oldEl.Parent = null;
@@ -1036,6 +1390,8 @@ public sealed partial class DomBridge
                 AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
                 element.Children[idx] = newEl;
                 bridgeForAppend.InvalidateStyleScope(element);
+                NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);
+                NotifyChildAdded(element, newEl, idx);
                 return a[1]; // returns the old child
             }, "replaceChild", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1060,6 +1416,71 @@ public sealed partial class DomBridge
                 }
                 return JSUndefined.Value;
             }, "remove", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"before",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null || a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Parent.Children.IndexOf(element);
+                if (insertIndex < 0)
+                    return JSUndefined.Value;
+
+                foreach (var node in nodes)
+                    InsertNodeAt(element.Parent, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "before", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"after",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null || a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                var insertIndex = element.Parent.Children.IndexOf(element);
+                if (insertIndex < 0)
+                    return JSUndefined.Value;
+
+                insertIndex++;
+                foreach (var node in nodes)
+                    InsertNodeAt(element.Parent, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "after", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"replaceWith",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null)
+                    return JSUndefined.Value;
+
+                var parent = element.Parent;
+                var replacementIndex = parent.Children.IndexOf(element);
+                if (replacementIndex < 0)
+                    return JSUndefined.Value;
+
+                var nodes = BuildChildNodeArgumentNodes(a);
+                NotifyNodeIteratorPreRemoval(element);
+                parent.Children.RemoveAt(replacementIndex);
+                element.Parent = null;
+                InvalidateStyleScope(parent);
+                NotifyChildRemoved(parent, element, replacementIndex);
+
+                foreach (var node in nodes)
+                    InsertNodeAt(parent, node, replacementIndex++);
+
+                return JSUndefined.Value;
+            }, "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM events --
@@ -1417,7 +1838,48 @@ public sealed partial class DomBridge
                         element.Attributes.Remove("disabled");
                     bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
-                }, "set disabled"),
+                 }, "set disabled"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // hidden (read/write) — global reflected boolean attribute
+        obj.FastAddProperty(
+            (KeyString)"hidden",
+            new JSFunction((in Arguments a) =>
+                element.Attributes.ContainsKey("hidden") ? JSBoolean.True : JSBoolean.False,
+                "get hidden"),
+            new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["hidden"] = string.Empty;
+                    else
+                        element.Attributes.Remove("hidden");
+                    bridge.InvalidateStyleScope(element);
+                    return JSUndefined.Value;
+                 }, "set hidden"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // tabIndex (read/write) — global reflected numeric attribute
+        obj.FastAddProperty(
+            (KeyString)"tabIndex",
+            new JSFunction((in Arguments _) =>
+            {
+                if (element.Attributes.TryGetValue("tabindex", out var rawTabIndex) &&
+                    int.TryParse(rawTabIndex, out var parsedTabIndex))
+                {
+                    return new JSNumber(parsedTabIndex);
+                }
+
+                return new JSNumber(-1);
+            }, "get tabIndex"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var tabIndex = (int)Math.Truncate(a[0].DoubleValue);
+                element.Attributes["tabindex"] = tabIndex.ToString();
+                return JSUndefined.Value;
+            }, "set tabIndex"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation
@@ -1514,6 +1976,108 @@ public sealed partial class DomBridge
                 var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
                 return FindInDescendants(element, sel, true, bridge);
             }, "querySelectorAll", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"matches",
+            new JSFunction((in Arguments a) =>
+            {
+                var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
+            }, "matches", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"closest",
+            new JSFunction((in Arguments a) =>
+            {
+                var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
+                for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = current.Parent)
+                {
+                    if (MatchesSelector(current, sel, element))
+                        return bridge.ToJSObject(current);
+                }
+
+                return JSNull.Value;
+            }, "closest", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentElement",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2)
+                    return JSNull.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var adjacentObject = a[1] as JSObject;
+                if (adjacentObject == null)
+                    return JSNull.Value;
+
+                var adjacentElement = FindDomElementByJSObject(adjacentObject);
+                if (adjacentElement == null)
+                    return JSNull.Value;
+
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                InsertNodeAt(parent, adjacentElement, index);
+                return a[1];
+            }, "insertAdjacentElement", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentText",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var text = a.Length > 1 ? a[1].ToString() : string.Empty;
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
+                {
+                    TextContent = text
+                };
+                _elements.Add(textNode);
+                InsertNodeAt(parent, textNode, index);
+                return JSUndefined.Value;
+            }, "insertAdjacentText", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertAdjacentHTML",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var position = NormalizeInsertAdjacentPosition(a[0]);
+                var html = a.Length > 1 ? a[1].ToString() : string.Empty;
+                if (string.IsNullOrEmpty(html))
+                    return JSUndefined.Value;
+
+                DomElement parsingContext;
+                switch (position)
+                {
+                    case "beforebegin":
+                    case "afterend":
+                        if (element.Parent == null)
+                            ThrowDOMException(_jsContext!, "Cannot insert adjacent HTML without a parent node.", "NoModificationAllowedError");
+                        parsingContext = element.Parent!;
+                        break;
+                    default:
+                        parsingContext = element;
+                        break;
+                }
+
+                var (parent, index) = GetInsertAdjacentTarget(element, position);
+                var nodes = BuildAdjacentHtmlNodes(parsingContext, html);
+                foreach (var node in nodes)
+                    InsertNodeAt(parent, node, index++);
+
+                ExtractStyleBlocks(SerializeToHtml());
+                return JSUndefined.Value;
+            }, "insertAdjacentHTML", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getElementsByTagName on elements — searches descendants in tree order
@@ -2894,6 +3458,25 @@ public sealed partial class DomBridge
         }
 
         return null;
+    }
+
+    private DomElement GetTreeRoot(DomElement element)
+    {
+        var current = element;
+        while (current.Parent != null)
+            current = current.Parent;
+        return current;
+    }
+
+    private JSValue ToJSRootNode(DomElement root)
+    {
+        if (ReferenceEquals(root, _documentNode))
+            return _documentJSObject ?? JSNull.Value;
+
+        if (IsSubDocRoot(root) && _docRootToDocJSObject.TryGetValue(root, out var subDocument))
+            return subDocument;
+
+        return ToJSObject(root);
     }
 
     private DomElement? GetSlotHost(DomElement slot) => GetShadowHost(FindContainingShadowRoot(slot));
@@ -5709,6 +6292,10 @@ public sealed partial class DomBridge
         var subDocument = GetOrCreateSubDocument(containerElement);
         var subWindow = new JSObject();
         _subWindowCache[containerElement] = subWindow;
+        _subWindowContainers[subWindow] = containerElement;
+        _eventTargetOwnerWindows[subWindow] = subWindow;
+        InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
+        RegisterWindowMessaging(subWindow);
 
         subWindow.FastAddProperty(
             (KeyString)"document",
@@ -5813,6 +6400,8 @@ public sealed partial class DomBridge
             subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         if (_jsContext?["UIEvent"] is { } uiEventCtor)
             subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_jsContext?["MessageChannel"] is { } messageChannelCtor)
+            subWindow.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
@@ -6032,33 +6621,10 @@ public sealed partial class DomBridge
             extraction.DeferredScripts.Count == 0)
             return;
 
-        var subDocument = GetOrCreateSubDocument(containerElement);
         var subWindow = GetOrCreateSubWindow(containerElement);
-        var location = subWindow[(KeyString)"location"];
 
-        JSValue? previousWindow = null;
-        JSValue? previousDocument = null;
-        JSValue? previousLocation = null;
-        JSValue? previousParent = null;
-        JSValue? previousSelf = null;
-        JSValue? previousTop = null;
-
-        try
+        RunWithWindowContext(subWindow, () =>
         {
-            previousWindow = _jsContext.Eval("typeof window === 'undefined' ? undefined : window");
-            previousDocument = _jsContext.Eval("typeof document === 'undefined' ? undefined : document");
-            previousLocation = _jsContext.Eval("typeof location === 'undefined' ? undefined : location");
-            previousParent = _jsContext.Eval("typeof parent === 'undefined' ? undefined : parent");
-            previousSelf = _jsContext.Eval("typeof self === 'undefined' ? undefined : self");
-            previousTop = _jsContext.Eval("typeof top === 'undefined' ? undefined : top");
-
-            _jsContext["window"] = subWindow;
-            _jsContext["document"] = subDocument;
-            _jsContext["location"] = location;
-            _jsContext["parent"] = GetParentWindowForSubDocument(containerElement) ?? JSUndefined.Value;
-            _jsContext["self"] = subWindow;
-            _jsContext["top"] = _windowJSObject ?? subWindow;
-
             foreach (var script in extraction.Scripts)
             {
                 try
@@ -6097,16 +6663,7 @@ public sealed partial class DomBridge
                         $"Sub-document deferred script error: {ex.Message}", ex);
                 }
             }
-        }
-        finally
-        {
-            _jsContext["window"] = previousWindow ?? JSUndefined.Value;
-            _jsContext["document"] = previousDocument ?? JSUndefined.Value;
-            _jsContext["location"] = previousLocation ?? JSUndefined.Value;
-            _jsContext["parent"] = previousParent ?? JSUndefined.Value;
-            _jsContext["self"] = previousSelf ?? JSUndefined.Value;
-            _jsContext["top"] = previousTop ?? JSUndefined.Value;
-        }
+        });
     }
 
     /// <summary>
@@ -6471,6 +7028,241 @@ public sealed partial class DomBridge
             RemoveElementsRecursive(child);
     }
 
+    private void NormalizeNode(DomElement node)
+    {
+        for (var index = 0; index < node.Children.Count;)
+        {
+            var child = node.Children[index];
+            if (!child.IsTextNode)
+            {
+                NormalizeNode(child);
+                index++;
+                continue;
+            }
+
+            var mergedText = child.TextContent ?? string.Empty;
+            var nextIndex = index + 1;
+            while (nextIndex < node.Children.Count && node.Children[nextIndex].IsTextNode)
+            {
+                mergedText += node.Children[nextIndex].TextContent ?? string.Empty;
+                RemoveChildAt(node, nextIndex);
+            }
+
+            if (mergedText.Length == 0)
+            {
+                RemoveChildAt(node, index);
+                continue;
+            }
+
+            SetCharacterData(child, mergedText);
+            index++;
+        }
+    }
+
+    private void RemoveChildAt(DomElement parent, int index)
+    {
+        if (index < 0 || index >= parent.Children.Count)
+            return;
+
+        var child = parent.Children[index];
+        NotifyNodeIteratorPreRemoval(child);
+        parent.Children.RemoveAt(index);
+        child.Parent = null;
+        InvalidateStyleScope(parent);
+        NotifyChildRemoved(parent, child, index);
+    }
+
+    private static bool NodesAreEqual(DomElement first, DomElement second)
+    {
+        if (ReferenceEquals(first, second))
+            return true;
+
+        if (first.IsTextNode != second.IsTextNode ||
+            !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
+            !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
+            !string.Equals(first.TextContent ?? string.Empty, second.TextContent ?? string.Empty, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!AttributeMapsAreEqual(first.Attributes, second.Attributes) ||
+            !NamespaceAttributeMapsAreEqual(first.NsAttrMap, second.NsAttrMap) ||
+            first.Children.Count != second.Children.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < first.Children.Count; index++)
+        {
+            if (!NodesAreEqual(first.Children[index], second.Children[index]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool AttributeMapsAreEqual(
+        Dictionary<string, string> first,
+        Dictionary<string, string> second)
+    {
+        if (first.Count != second.Count)
+            return false;
+
+        foreach (var (name, value) in first)
+        {
+            if (!second.TryGetValue(name, out var otherValue) ||
+                !string.Equals(value, otherValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool NamespaceAttributeMapsAreEqual(
+        Dictionary<(string? Namespace, string LocalName), string> first,
+        Dictionary<(string? Namespace, string LocalName), string> second)
+    {
+        if (first.Count != second.Count)
+            return false;
+
+        foreach (var (key, value) in first)
+        {
+            if (!second.TryGetValue(key, out var otherValue) ||
+                !string.Equals(value, otherValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private string NormalizeInsertAdjacentPosition(JSValue? value)
+    {
+        var position = value?.ToString().Trim().ToLowerInvariant() ?? string.Empty;
+        if (position is "beforebegin" or "afterbegin" or "beforeend" or "afterend")
+            return position;
+
+        ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
+        return string.Empty;
+    }
+
+    private (DomElement Parent, int Index) GetInsertAdjacentTarget(DomElement element, string position)
+    {
+        switch (position)
+        {
+            case "beforebegin":
+                if (element.Parent == null)
+                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
+                return (element.Parent!, element.Parent!.Children.IndexOf(element));
+            case "afterbegin":
+                return (element, 0);
+            case "beforeend":
+                return (element, element.Children.Count);
+            case "afterend":
+                if (element.Parent == null)
+                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
+                return (element.Parent!, element.Parent!.Children.IndexOf(element) + 1);
+            default:
+                ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
+                return (element, element.Children.Count);
+        }
+    }
+
+    private void InsertNodeAt(DomElement parent, DomElement node, int index)
+    {
+        if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
+            ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
+
+        if (index < 0)
+            index = 0;
+        if (index > parent.Children.Count)
+            index = parent.Children.Count;
+
+        if (node.Parent != null)
+        {
+            var oldParent = node.Parent;
+            var oldIndex = oldParent.Children.IndexOf(node);
+            if (oldIndex >= 0)
+            {
+                if (ReferenceEquals(oldParent, parent) && oldIndex < index)
+                    index--;
+
+                NotifyNodeIteratorPreRemoval(node);
+                oldParent.Children.RemoveAt(oldIndex);
+                NotifyChildRemoved(oldParent, node, oldIndex);
+            }
+        }
+
+        node.Parent = parent;
+        AdoptSubtreeIntoDocument(node, parent.OwnerDocRoot);
+        parent.Children.Insert(index, node);
+        InvalidateStyleScope(parent);
+        NotifyChildAdded(parent, node, index);
+
+        var insertedTag = node.TagName?.ToLowerInvariant();
+        if (insertedTag == "iframe" || insertedTag == "object")
+            FireSubDocumentOnload(node);
+        else
+            FireDescendantOnloads(node);
+    }
+
+    private List<DomElement> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
+    {
+        var nodes = new List<DomElement>();
+        if (string.IsNullOrEmpty(html))
+            return nodes;
+
+        if (!TryBuildInnerHtmlFragmentContainer(contextElement, html, out var fragmentContainer))
+            return nodes;
+
+        foreach (var child in fragmentContainer.Children.ToArray())
+        {
+            fragmentContainer.Children.Remove(child);
+            child.Parent = null;
+            AddElementsRecursive(child);
+            nodes.Add(child);
+        }
+
+        return nodes;
+    }
+
+    private List<DomElement> BuildChildNodeArgumentNodes(in Arguments arguments)
+    {
+        var nodes = new List<DomElement>();
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var value = arguments[i];
+            if (value is JSObject candidateObject)
+            {
+                var candidateNode = FindDomElementByJSObject(candidateObject);
+                if (candidateNode != null)
+                {
+                    if (string.Equals(candidateNode.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var fragmentChild in candidateNode.Children.ToArray())
+                            nodes.Add(fragmentChild);
+                        continue;
+                    }
+
+                    nodes.Add(candidateNode);
+                    continue;
+                }
+            }
+
+            var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
+            {
+                TextContent = value.ToString()
+            };
+            _elements.Add(textNode);
+            nodes.Add(textNode);
+        }
+
+        return nodes;
+    }
+
     private void SetElementInnerHtml(DomElement element, string html)
     {
         html ??= string.Empty;
@@ -6502,6 +7294,54 @@ public sealed partial class DomBridge
 
         ExtractStyleBlocks(SerializeToHtml());
         InvalidateStyleScope(element);
+    }
+
+    private void SetElementOuterHtml(DomElement element, string html)
+    {
+        html ??= string.Empty;
+
+        var parent = element.Parent;
+        if (parent == null)
+            return;
+
+        var index = parent.Children.IndexOf(element);
+        if (index < 0)
+            return;
+
+        var previousSibling = index > 0 ? parent.Children[index - 1] : null;
+        var nextSibling = index + 1 < parent.Children.Count ? parent.Children[index + 1] : null;
+
+        DomElement? parsedContainer = null;
+        if (!string.IsNullOrEmpty(html))
+        {
+            var parsingContext = parent.TagName.StartsWith("#", StringComparison.Ordinal)
+                ? new DomElement("body", null, null, string.Empty)
+                : parent;
+            if (TryBuildInnerHtmlFragmentContainer(parsingContext, html, out var fragmentContainer))
+                parsedContainer = fragmentContainer;
+        }
+
+        NotifyNodeIteratorPreRemoval(element);
+        parent.Children.RemoveAt(index);
+        element.Parent = null;
+        NotifyChildRemoved(parent, element, index, previousSibling, nextSibling);
+
+        if (parsedContainer != null)
+        {
+            var insertIndex = index;
+            foreach (var child in parsedContainer.Children.ToArray())
+            {
+                child.Parent = parent;
+                AdoptSubtreeIntoDocument(child, parent.OwnerDocRoot);
+                parent.Children.Insert(insertIndex, child);
+                AddElementsRecursive(child);
+                NotifyChildAdded(parent, child, insertIndex);
+                insertIndex++;
+            }
+        }
+
+        ExtractStyleBlocks(SerializeToHtml());
+        InvalidateStyleScope(parent);
     }
 
     private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
@@ -7496,6 +8336,38 @@ public sealed partial class DomBridge
             }, "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        doc.FastAddValue(
+            (KeyString)"append",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = bridge.BuildChildNodeArgumentNodes(a);
+                var insertIndex = docRoot.Children.Count;
+                foreach (var node in nodes)
+                    bridge.InsertNodeAt(docRoot, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "append", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue(
+            (KeyString)"prepend",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSUndefined.Value;
+
+                var nodes = bridge.BuildChildNodeArgumentNodes(a);
+                var insertIndex = 0;
+                foreach (var node in nodes)
+                    bridge.InsertNodeAt(docRoot, node, insertIndex++);
+
+                return JSUndefined.Value;
+            }, "prepend", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // Node type constants
         doc.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
         doc.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -8339,6 +9211,20 @@ public sealed partial class DomBridge
             }, "getNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        map.FastAddValue(
+            (KeyString)"getNamedItemNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSNull.Value;
+                var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                var localName = a[1].ToString();
+                if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) ||
+                    !element.Attributes.TryGetValue(qName, out var val))
+                    return JSNull.Value;
+                return BuildAttrNode(qName, val, element, ownerObj);
+            }, "getNamedItemNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // setNamedItem(attr) — adds/replaces attribute from Attr node, returns old Attr or null
         map.FastAddValue(
             (KeyString)"setNamedItem",
@@ -8347,20 +9233,34 @@ public sealed partial class DomBridge
                 if (a.Length == 0) return JSNull.Value;
                 var attrObj = a[0] as JSObject;
                 if (attrObj == null) return JSNull.Value;
-                var name = attrObj[(KeyString)"name"].ToString();
+                var name = GetAttrNodeName(attrObj);
+                if (string.IsNullOrEmpty(name)) return JSNull.Value;
                 var value = attrObj[(KeyString)"value"].ToString();
                 JSValue old = JSNull.Value;
                 if (element.Attributes.TryGetValue(name, out var oldVal))
                     old = BuildAttrNode(name, oldVal, element, ownerObj);
-                element.Attributes[name] = value;
-                // Sync special properties
-                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
-                    element.Id = value;
-                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                    element.ClassName = value;
-                InvalidateStyleScope(element);
+                SetAttributeLikeSetAttribute(element, name, value);
                 return old;
             }, "setNamedItem", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        map.FastAddValue(
+            (KeyString)"setNamedItemNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject attrObj) return JSNull.Value;
+                var name = GetAttrNodeName(attrObj);
+                var localName = GetAttrNodeLocalName(attrObj);
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(localName)) return JSNull.Value;
+                var ns = GetAttrNodeNamespace(attrObj);
+                var value = attrObj[(KeyString)"value"].ToString();
+                JSValue old = JSNull.Value;
+                if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) &&
+                    element.Attributes.TryGetValue(oldQName, out var oldVal))
+                    old = BuildAttrNode(oldQName, oldVal, element, ownerObj);
+                SetAttributeLikeSetAttributeNS(element, ns, name, localName, value);
+                return old;
+            }, "setNamedItemNS", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeNamedItem(name) — removes and returns the Attr node
@@ -8372,15 +9272,26 @@ public sealed partial class DomBridge
                 var name = a[0].ToString();
                 if (!element.Attributes.TryGetValue(name, out var val))
                     return JSNull.Value;
-                element.Attributes.Remove(name);
-                // Sync special properties
-                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
-                    element.Id = null;
-                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                    element.ClassName = null;
-                InvalidateStyleScope(element);
-                return BuildAttrNode(name, val, element, ownerObj);
+                var removed = BuildAttrNode(name, val, element, ownerObj);
+                RemoveAttributeLikeRemoveAttribute(element, name);
+                return removed;
             }, "removeNamedItem", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        map.FastAddValue(
+            (KeyString)"removeNamedItemNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSNull.Value;
+                var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                var localName = a[1].ToString();
+                if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) ||
+                    !element.Attributes.TryGetValue(qName, out var val))
+                    return JSNull.Value;
+                var removed = BuildAttrNode(qName, val, element, ownerObj);
+                RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+                return removed;
+            }, "removeNamedItemNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // item(index) — returns Attr node at position
@@ -8423,13 +9334,184 @@ public sealed partial class DomBridge
     /// </summary>
     private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
     {
+        var namespaceUri = TryGetAttachedAttrNamespace(element, name, out var ns, out var localName)
+            ? ns
+            : null;
+        return BuildAttrNodeCore(name, value, ownerObj, namespaceUri, localName);
+    }
+
+    private static JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri)
+    {
+        return BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
+    }
+
+    private static JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri, string? explicitLocalName = null)
+    {
         var attr = new JSObject();
+        var colonIdx = name.IndexOf(':');
+        var localName = explicitLocalName ?? (colonIdx >= 0 ? name[(colonIdx + 1)..] : name);
+        var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
         attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"value", new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"ownerElement", ownerObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"ownerElement", ownerElement, JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
         return attr;
+    }
+
+    private static bool TryGetAttachedAttrNamespace(DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
+    {
+        foreach (var kv in element.NsAttrMap)
+        {
+            if (!string.Equals(kv.Value, qualifiedName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            namespaceUri = kv.Key.Namespace;
+            localName = kv.Key.LocalName;
+            return true;
+        }
+
+        namespaceUri = null;
+        var colonIdx = qualifiedName.IndexOf(':');
+        localName = colonIdx >= 0 ? qualifiedName[(colonIdx + 1)..] : qualifiedName;
+        return false;
+    }
+
+    private static string GetAttrNodeName(JSObject attrObj)
+    {
+        var nameValue = attrObj[(KeyString)"name"];
+        if (nameValue != null && !nameValue.IsUndefined && !nameValue.IsNull)
+            return nameValue.ToString();
+
+        var nodeNameValue = attrObj[(KeyString)"nodeName"];
+        return nodeNameValue != null && !nodeNameValue.IsUndefined && !nodeNameValue.IsNull
+            ? nodeNameValue.ToString()
+            : string.Empty;
+    }
+
+    private static string GetAttrNodeLocalName(JSObject attrObj)
+    {
+        var localNameValue = attrObj[(KeyString)"localName"];
+        if (localNameValue != null && !localNameValue.IsUndefined && !localNameValue.IsNull)
+            return localNameValue.ToString();
+
+        var name = GetAttrNodeName(attrObj);
+        if (string.IsNullOrEmpty(name))
+            return string.Empty;
+
+        var colonIdx = name.IndexOf(':');
+        return colonIdx >= 0 ? name[(colonIdx + 1)..] : name;
+    }
+
+    private static string? GetAttrNodeNamespace(JSObject attrObj)
+    {
+        var namespaceValue = attrObj[(KeyString)"namespaceURI"];
+        return namespaceValue != null && !namespaceValue.IsUndefined && !namespaceValue.IsNull
+            ? namespaceValue.ToString()
+            : null;
+    }
+
+    private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
+    {
+        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+        element.Attributes[attrName] = attrVal;
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = attrVal;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = attrVal;
+        else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+        {
+            element.Style.Clear();
+            foreach (var kv in ParseStyle(attrVal))
+                element.Style[kv.Key] = kv.Value;
+            InvalidateStyleScope(element);
+        }
+        else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+        {
+            CompileInlineEventAttribute(element, attrName, attrVal);
+        }
+
+        if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+            InvalidateStyleScope(element);
+
+        if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
+    }
+
+    private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
+    {
+        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+        var removed = element.Attributes.Remove(attrName);
+        foreach (var key in element.NsAttrMap.Where(kv => string.Equals(kv.Value, attrName, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Key).ToList())
+            element.NsAttrMap.Remove(key);
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = null;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = null;
+
+        InvalidateStyleScope(element);
+        if (removed)
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
+    }
+
+    private void SetAttributeLikeSetAttributeNS(DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
+    {
+        string? previousAttrVal = null;
+        if (element.NsAttrMap.TryGetValue((namespaceUri, localName), out var previousQualifiedName))
+        {
+            element.Attributes.TryGetValue(previousQualifiedName, out previousAttrVal);
+            if (!string.Equals(previousQualifiedName, attrName, StringComparison.OrdinalIgnoreCase))
+                element.Attributes.Remove(previousQualifiedName);
+        }
+        else
+        {
+            element.Attributes.TryGetValue(attrName, out previousAttrVal);
+        }
+
+        element.Attributes[attrName] = attrVal;
+        element.NsAttrMap[(namespaceUri, localName)] = attrName;
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = attrVal;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = attrVal;
+        else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+        {
+            element.Style.Clear();
+            foreach (var kv in ParseStyle(attrVal))
+                element.Style[kv.Key] = kv.Value;
+            InvalidateStyleScope(element);
+        }
+        else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+        {
+            CompileInlineEventAttribute(element, attrName, attrVal);
+        }
+
+        if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+            InvalidateStyleScope(element);
+
+        if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
+    }
+
+    private void RemoveAttributeLikeRemoveAttributeNS(DomElement element, string? namespaceUri, string localName)
+    {
+        if (!element.NsAttrMap.TryGetValue((namespaceUri, localName), out var attrName))
+            return;
+
+        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
+        var removed = element.Attributes.Remove(attrName);
+        element.NsAttrMap.Remove((namespaceUri, localName));
+        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+            element.Id = null;
+        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+            element.ClassName = null;
+
+        InvalidateStyleScope(element);
+        if (removed)
+            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 }

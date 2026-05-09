@@ -80,6 +80,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
         // Register built-in types from satellite assemblies.
         AdditionalRegistrations?.Invoke(context);
+        ApplyExperimentalFeatureFlags(context);
 
         // Set up Iterator.prototype helpers and prototype chain (ES2025).
         SetupIteratorPrototypeChain(context);
@@ -87,6 +88,71 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         // Register the console object via factory delegate (wired by BuiltIns assembly).
         if (ConsoleFactory != null)
             context[KeyStrings.console] = JSEngine.ClrInterop.Marshal(ConsoleFactory(context));
+    }
+
+    private static void ApplyExperimentalFeatureFlags(JSContext context)
+    {
+        if (!context.HasExperimentalFeature(JavaScriptFeatureFlags.StructuredClone))
+            context.Delete(KeyStrings.GetOrCreate("structuredClone"));
+
+        if (!context.HasExperimentalFeature(JavaScriptFeatureFlags.MathSumPrecise) &&
+            context[KeyStrings.GetOrCreate("Math")] is JSObject mathObject)
+        {
+            mathObject.Delete(KeyStrings.GetOrCreate("sumPrecise"));
+        }
+
+        if (context[KeyStrings.GetOrCreate("Uint8Array")] is JSFunction uint8ArrayCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.Uint8ArrayBase64))
+        {
+            uint8ArrayCtor.Delete(KeyStrings.GetOrCreate("fromBase64"));
+            uint8ArrayCtor.Delete(KeyStrings.GetOrCreate("fromHex"));
+            uint8ArrayCtor.prototype.Delete(KeyStrings.GetOrCreate("toBase64"));
+            uint8ArrayCtor.prototype.Delete(KeyStrings.GetOrCreate("toHex"));
+            uint8ArrayCtor.prototype.Delete(KeyStrings.GetOrCreate("setFromBase64"));
+            uint8ArrayCtor.prototype.Delete(KeyStrings.GetOrCreate("setFromHex"));
+        }
+
+        if (!context.HasExperimentalFeature(JavaScriptFeatureFlags.MapUpsert))
+        {
+            if (context[KeyStrings.GetOrCreate("Map")] is JSFunction mapCtor)
+            {
+                mapCtor.prototype.Delete(KeyStrings.GetOrCreate("getOrInsert"));
+                mapCtor.prototype.Delete(KeyStrings.GetOrCreate("getOrInsertComputed"));
+            }
+
+            if (context[KeyStrings.GetOrCreate("WeakMap")] is JSFunction weakMapCtor)
+            {
+                weakMapCtor.prototype.Delete(KeyStrings.GetOrCreate("getOrInsert"));
+                weakMapCtor.prototype.Delete(KeyStrings.GetOrCreate("getOrInsertComputed"));
+            }
+        }
+
+        if (context[KeyStrings.GetOrCreate("Error")] is JSFunction errorCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.ErrorIsError))
+        {
+            errorCtor.Delete(KeyStrings.GetOrCreate("isError"));
+        }
+
+        if (context[KeyStrings.GetOrCreate("Array")] is JSFunction arrayCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.ArrayFromAsync))
+        {
+            arrayCtor.Delete(KeyStrings.GetOrCreate("fromAsync"));
+        }
+
+        if (!context.HasExperimentalFeature(JavaScriptFeatureFlags.ObjectMapGroupBy))
+        {
+            if (context[KeyStrings.GetOrCreate("Object")] is JSFunction objectCtor)
+                objectCtor.Delete(KeyStrings.GetOrCreate("groupBy"));
+
+            if (context[KeyStrings.GetOrCreate("Map")] is JSFunction mapCtor)
+                mapCtor.Delete(KeyStrings.GetOrCreate("groupBy"));
+        }
+
+        if (context[KeyStrings.GetOrCreate("Iterator")] is JSFunction iteratorCtor &&
+            !context.HasExperimentalFeature(JavaScriptFeatureFlags.IteratorConcat))
+        {
+            iteratorCtor.Delete(KeyStrings.GetOrCreate("concat"));
+        }
     }
 
     private static void SetupIteratorPrototypeChain(JSContext context)

@@ -6,8 +6,10 @@ using System.Net.Http;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
@@ -104,12 +106,8 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var id = a.Length > 0 ? a[0].ToString() : string.Empty;
-                foreach (var el in _elements)
-                {
-                    if (el.Id == id)
-                        return ToJSObject(el);
-                }
-                return JSNull.Value;
+                var found = FindInSubTree(DocumentElement, el => el.Id == id);
+                return found != null ? ToJSObject(found) : JSNull.Value;
             }, "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -230,7 +228,20 @@ public sealed partial class DomBridge
                 el.TextContent = text;
                 _elements.Add(el);
                 return ToJSObject(el);
-            }, "createTextNode", 1),
+             }, "createTextNode", 1),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createAttribute(name)
+        document.FastAddValue(
+            (KeyString)"createAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createAttribute': 1 argument required, but only 0 present.");
+                var name = a[0].ToString();
+                ValidateElementName(name, context);
+                return BuildStandaloneAttrNode(AsciiToLower(name), null);
+            }, "createAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.createDocumentFragment() — basic iframe/fragment support
@@ -700,8 +711,66 @@ public sealed partial class DomBridge
                 }
             ");
 
+        static bool GetMutationObserverOption(JSObject optionsObject, string propertyName)
+        {
+            var optionValue = optionsObject[(KeyString)propertyName];
+            return optionValue != null &&
+                   !optionValue.IsUndefined &&
+                   !optionValue.IsNull &&
+                   optionValue.BooleanValue;
+        }
+
+        MutationObserverOptions CreateMutationObserverOptions(JSValue? value)
+        {
+            if (value is not JSObject optionsObject)
+                return new MutationObserverOptions();
+
+            return new MutationObserverOptions
+            {
+                ChildList = GetMutationObserverOption(optionsObject, "childList"),
+                Attributes = GetMutationObserverOption(optionsObject, "attributes"),
+                AttributeOldValue = GetMutationObserverOption(optionsObject, "attributeOldValue"),
+                CharacterData = GetMutationObserverOption(optionsObject, "characterData"),
+                CharacterDataOldValue = GetMutationObserverOption(optionsObject, "characterDataOldValue"),
+                Subtree = GetMutationObserverOption(optionsObject, "subtree")
+            };
+        }
+
+        void RegisterMutationObserver(JSObject observerObject, DomElement target, MutationObserverOptions options)
+        {
+            _mutationObservers.RemoveAll(entry =>
+                ReferenceEquals(entry.Observer, observerObject) &&
+                ReferenceEquals(entry.Target, target));
+            _mutationObservers.Add((observerObject, target, options));
+        }
+
+        void UnregisterMutationObserver(JSObject observerObject)
+        {
+            _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
+        }
+
+        var registerMutationObserverFn = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length < 2 || a[0] is not JSObject observerObject || a[1] is not JSObject targetObject)
+                return JSUndefined.Value;
+
+            var target = FindDomElementByJSObject(targetObject);
+            if (target == null)
+                return JSUndefined.Value;
+
+            RegisterMutationObserver(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
+            return JSUndefined.Value;
+        }, "__broilerRegisterMutationObserver", 3);
+        var unregisterMutationObserverFn = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length > 0 && a[0] is JSObject observerObject)
+                UnregisterMutationObserver(observerObject);
+            return JSUndefined.Value;
+        }, "__broilerUnregisterMutationObserver", 1);
+        context["__broilerRegisterMutationObserver"] = registerMutationObserverFn;
+        context["__broilerUnregisterMutationObserver"] = unregisterMutationObserverFn;
+
         // MutationObserver — DOM Level 4
-        var mutationObservers = _mutationObservers;
         context.Eval(@"
                 function MutationObserver(callback) {
                     this._callback = callback;
@@ -709,11 +778,18 @@ public sealed partial class DomBridge
                     this._records = [];
                 }
                 MutationObserver.prototype.observe = function(target, options) {
-                    this._targets.push({ target: target, options: options || {} });
+                    var normalizedOptions = options || {};
+                    this._targets.push({ target: target, options: normalizedOptions });
+                    if (typeof __broilerRegisterMutationObserver === 'function') {
+                        __broilerRegisterMutationObserver(this, target, normalizedOptions);
+                    }
                 };
                 MutationObserver.prototype.disconnect = function() {
                     this._targets = [];
                     this._records = [];
+                    if (typeof __broilerUnregisterMutationObserver === 'function') {
+                        __broilerUnregisterMutationObserver(this);
+                    }
                 };
                 MutationObserver.prototype.takeRecords = function() {
                     var r = this._records.slice();
@@ -1001,9 +1077,21 @@ public sealed partial class DomBridge
                 var childEl = FindDomElementByJSObject(childObj);
                 if (childEl != null)
                 {
-                    childEl.Parent?.Children.Remove(childEl);
+                    if (childEl.Parent != null)
+                    {
+                        var oldParent = childEl.Parent;
+                        var oldIndex = oldParent.Children.IndexOf(childEl);
+                        if (oldIndex >= 0)
+                        {
+                            NotifyNodeIteratorPreRemoval(childEl);
+                            oldParent.Children.RemoveAt(oldIndex);
+                            NotifyChildRemoved(oldParent, childEl, oldIndex);
+                        }
+                    }
+
                     childEl.Parent = docNodeForMutation;
                     docNodeForMutation.Children.Add(childEl);
+                    NotifyChildAdded(docNodeForMutation, childEl, docNodeForMutation.Children.Count - 1);
                 }
                 return a[0];
             }, "appendChild", 1),
@@ -1020,7 +1108,17 @@ public sealed partial class DomBridge
                 var newEl = FindDomElementByJSObject(newObj);
                 if (newEl == null) return a[0];
 
-                newEl.Parent?.Children.Remove(newEl);
+                if (newEl.Parent != null)
+                {
+                    var oldParent = newEl.Parent;
+                    var oldIndex = oldParent.Children.IndexOf(newEl);
+                    if (oldIndex >= 0)
+                    {
+                        NotifyNodeIteratorPreRemoval(newEl);
+                        oldParent.Children.RemoveAt(oldIndex);
+                        NotifyChildRemoved(oldParent, newEl, oldIndex);
+                    }
+                }
                 if (a.Length > 1 && a[1] is JSObject refObj && !a[1].IsNull)
                 {
                     var refEl = FindDomElementByJSObject(refObj);
@@ -1031,6 +1129,7 @@ public sealed partial class DomBridge
                         {
                             newEl.Parent = docNodeForMutation;
                             docNodeForMutation.Children.Insert(idx, newEl);
+                            NotifyChildAdded(docNodeForMutation, newEl, idx);
                             return a[0];
                         }
                     }
@@ -1038,6 +1137,7 @@ public sealed partial class DomBridge
                 // If refChild is null or not found, append
                 newEl.Parent = docNodeForMutation;
                 docNodeForMutation.Children.Add(newEl);
+                NotifyChildAdded(docNodeForMutation, newEl, docNodeForMutation.Children.Count - 1);
                 return a[0];
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1082,7 +1182,21 @@ public sealed partial class DomBridge
                     el.NamespaceURI = ns;
                 _elements.Add(el);
                 return ToJSObject(el);
-            }, "createElementNS", 2),
+             }, "createElementNS", 2),
+             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createAttributeNS(namespace, qualifiedName)
+        document.FastAddValue(
+            (KeyString)"createAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+                if (a.Length < 2)
+                    throw new JSException("Failed to execute 'createAttributeNS': 2 arguments required, but fewer present.");
+                var qualifiedName = a[1].ToString();
+                ValidateQualifiedName(qualifiedName, ns, context);
+                return BuildStandaloneAttrNode(qualifiedName, ns);
+            }, "createAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images — collection of all <img> elements
@@ -1712,12 +1826,295 @@ public sealed partial class DomBridge
             return headersObject;
         }
 
+        static JSValue ParseJsonText(string jsonText)
+            => JSJSON.Parse(new Arguments(JSUndefined.Value, new JSString(jsonText)));
+
+        static JSValue ParseResponseJsonText(string jsonText)
+        {
+            try
+            {
+                return ParseJsonText(jsonText);
+            }
+            catch (Exception ex)
+            {
+                throw new JSException($"Failed to parse response body as JSON: {ex.Message}");
+            }
+        }
+
+        static string DecodeFormComponent(string value)
+            => Uri.UnescapeDataString(value.Replace("+", " "));
+
+        static bool IsFormComponentUnescapedByte(byte value)
+            => (value >= (byte)'a' && value <= (byte)'z')
+               || (value >= (byte)'A' && value <= (byte)'Z')
+               || (value >= (byte)'0' && value <= (byte)'9')
+               || value is (byte)'*' or (byte)'-' or (byte)'.' or (byte)'_';
+
+        static string EncodeFormComponent(string value)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            var builder = new StringBuilder(bytes.Length);
+            foreach (var current in bytes)
+            {
+                if (current == (byte)' ')
+                {
+                    builder.Append('+');
+                }
+                else if (IsFormComponentUnescapedByte(current))
+                {
+                    builder.Append((char)current);
+                }
+                else
+                {
+                    builder.Append('%');
+                    builder.Append(current.ToString("X2"));
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        static JSObject CreateFormDataObject(JSValue? initValue = null)
+        {
+            var formDataObject = new JSObject();
+            var entries = new List<KeyValuePair<string, string>>();
+
+            void AppendEntry(string name, string value)
+                => entries.Add(new KeyValuePair<string, string>(name, value));
+
+            void SetEntry(string name, string value)
+            {
+                var firstIndex = -1;
+                for (var i = 0; i < entries.Count; i++)
+                {
+                    if (!string.Equals(entries[i].Key, name, StringComparison.Ordinal))
+                        continue;
+
+                    if (firstIndex < 0)
+                    {
+                        firstIndex = i;
+                        entries[i] = new KeyValuePair<string, string>(name, value);
+                    }
+                    else
+                    {
+                        entries.RemoveAt(i);
+                        i--;
+                    }
+                }
+
+                if (firstIndex < 0)
+                    entries.Add(new KeyValuePair<string, string>(name, value));
+            }
+
+            if (initValue != null && !initValue.IsUndefined && !initValue.IsNull)
+            {
+                if (initValue is JSObject initObject)
+                {
+                    foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                        AppendEntry(key, value);
+                }
+                else
+                {
+                    var initText = initValue.ToString();
+                    if (!string.IsNullOrEmpty(initText))
+                    {
+                        foreach (var segment in initText.Split('&', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var separatorIndex = segment.IndexOf('=');
+                            var rawName = separatorIndex >= 0 ? segment[..separatorIndex] : segment;
+                            var rawValue = separatorIndex >= 0 ? segment[(separatorIndex + 1)..] : string.Empty;
+                            AppendEntry(DecodeFormComponent(rawName), DecodeFormComponent(rawValue));
+                        }
+                    }
+                }
+            }
+
+            formDataObject.FastAddValue((KeyString)"append", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    AppendEntry(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"delete", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    entries.RemoveAll(entry => string.Equals(entry.Key, name, StringComparison.Ordinal));
+                }
+
+                return JSUndefined.Value;
+            }, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSFunction cb)
+                {
+                    foreach (var entry in entries)
+                        cb.InvokeFunction(new Arguments(cb, new JSString(entry.Value), new JSString(entry.Key), formDataObject));
+                }
+
+                return JSUndefined.Value;
+            }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"get", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSNull.Value;
+
+                var name = a[0].ToString();
+                foreach (var entry in entries)
+                {
+                    if (string.Equals(entry.Key, name, StringComparison.Ordinal))
+                        return new JSString(entry.Value);
+                }
+
+                return JSNull.Value;
+            }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"getAll", new JSFunction((in Arguments a) =>
+            {
+                var result = new JSArray();
+                if (a.Length == 0)
+                    return result;
+
+                var name = a[0].ToString();
+                foreach (var entry in entries)
+                {
+                    if (string.Equals(entry.Key, name, StringComparison.Ordinal))
+                        result.Add(new JSString(entry.Value));
+                }
+
+                return result;
+            }, "getAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"has", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    return JSBoolean.False;
+
+                var name = a[0].ToString();
+                return entries.Any(entry => string.Equals(entry.Key, name, StringComparison.Ordinal))
+                    ? JSBoolean.True
+                    : JSBoolean.False;
+            }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"set", new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                    SetEntry(a[0].ToString(), a[1].ToString());
+
+                return JSUndefined.Value;
+            }, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue((KeyString)"toString", new JSFunction((in Arguments _) =>
+                new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
+                "toString", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return formDataObject;
+        }
+
+        static JSValue CreateBlobBody(string bodyText, JSObject headersObject)
+        {
+            var contentType = TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty;
+            var blobObject = new JSObject();
+            blobObject[(KeyString)"size"] = new JSNumber(Encoding.UTF8.GetByteCount(bodyText));
+            blobObject[(KeyString)"type"] = new JSString(contentType);
+            blobObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() => new JSString(bodyText));
+            }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            blobObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                return CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(bodyText)));
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            return blobObject;
+        }
+
+        static bool IsBodyUnavailable(JSObject owner)
+            => (owner[(KeyString)"bodyUsed"]?.BooleanValue ?? false) || (owner[(KeyString)"_bodyStreamLocked"]?.BooleanValue ?? false);
+
+        static JSObject CreateReadableStreamReadResult(JSValue value, bool done)
+        {
+            var result = new JSObject();
+            result[(KeyString)"value"] = value;
+            result[(KeyString)"done"] = done ? JSBoolean.True : JSBoolean.False;
+            return result;
+        }
+
+        JSValue CreateUint8Array(byte[] bytes)
+        {
+            if (context[(KeyString)"Uint8Array"] is JSFunction uint8ArrayCtor)
+                return uint8ArrayCtor.CreateInstance(new Arguments(JSUndefined.Value, new JSArrayBuffer(bytes)));
+
+            return new JSArrayBuffer(bytes);
+        }
+
+        JSObject CreateReadableStreamBody(JSObject owner, string bodyText)
+        {
+            var bytes = Encoding.UTF8.GetBytes(bodyText);
+            var streamObject = new JSObject();
+            var readerLocked = false;
+            var chunkDelivered = false;
+
+            void SetLocked(bool locked)
+            {
+                readerLocked = locked;
+                var lockedValue = locked ? JSBoolean.True : JSBoolean.False;
+                owner[(KeyString)"_bodyStreamLocked"] = lockedValue;
+                streamObject[(KeyString)"locked"] = lockedValue;
+            }
+
+            streamObject[(KeyString)"locked"] = JSBoolean.False;
+            streamObject.FastAddValue((KeyString)"getReader", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(owner) || readerLocked)
+                    throw new JSException("Failed to execute 'getReader' on 'ReadableStream': stream is already locked or disturbed.");
+
+                SetLocked(true);
+
+                var readerObject = new JSObject();
+                readerObject.FastAddValue((KeyString)"read", new JSFunction((in Arguments _) =>
+                {
+                    if (!readerLocked)
+                        throw new JSException("Failed to execute 'read' on 'ReadableStreamDefaultReader': reader is released.");
+
+                    if (chunkDelivered)
+                        return CreateThenable(() => CreateReadableStreamReadResult(JSUndefined.Value, true));
+
+                    chunkDelivered = true;
+                    owner[(KeyString)"bodyUsed"] = JSBoolean.True;
+
+                    return CreateThenable(() => CreateReadableStreamReadResult(CreateUint8Array(bytes), false));
+                }, "read", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                readerObject.FastAddValue((KeyString)"cancel", new JSFunction((in Arguments _) =>
+                {
+                    if (readerLocked && !chunkDelivered)
+                        owner[(KeyString)"bodyUsed"] = JSBoolean.True;
+
+                    chunkDelivered = true;
+                    return CreateThenable(() => JSUndefined.Value);
+                }, "cancel", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                readerObject.FastAddValue((KeyString)"releaseLock", new JSFunction((in Arguments _) =>
+                {
+                    SetLocked(false);
+                    return JSUndefined.Value;
+                }, "releaseLock", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                return readerObject;
+            }, "getReader", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return streamObject;
+        }
+
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
             string url;
             string method;
             string? body;
             JSObject headersObject;
+            JSValue signalValue = JSUndefined.Value;
+            string mode = "cors";
+            string credentials = "same-origin";
+            string cache = "default";
+            string redirect = "follow";
+            string referrer = "about:client";
+            string integrity = string.Empty;
 
             if (inputValue is JSObject inputObject && !string.IsNullOrEmpty(TryGetJsPropertyString(inputObject, "url", "href")))
             {
@@ -1727,6 +2124,13 @@ public sealed partial class DomBridge
                 headersObject = inputObject[(KeyString)"headers"] is JSObject inputHeaders
                     ? CreateHeadersObject(inputHeaders)
                     : CreateHeadersObject();
+                signalValue = inputObject[(KeyString)"signal"] ?? JSUndefined.Value;
+                mode = TryGetJsPropertyString(inputObject, "mode") ?? mode;
+                credentials = TryGetJsPropertyString(inputObject, "credentials") ?? credentials;
+                cache = TryGetJsPropertyString(inputObject, "cache") ?? cache;
+                redirect = TryGetJsPropertyString(inputObject, "redirect") ?? redirect;
+                referrer = TryGetJsPropertyString(inputObject, "referrer") ?? referrer;
+                integrity = TryGetJsPropertyString(inputObject, "integrity") ?? integrity;
             }
             else
             {
@@ -1743,6 +2147,14 @@ public sealed partial class DomBridge
                     body = initBody;
                 if (initObject[(KeyString)"headers"] is JSObject initHeaders)
                     headersObject = CreateHeadersObject(initHeaders);
+                if (initObject[(KeyString)"signal"] is { } initSignal && !initSignal.IsUndefined && !initSignal.IsNull)
+                    signalValue = initSignal;
+                mode = TryGetJsPropertyString(initObject, "mode") ?? mode;
+                credentials = TryGetJsPropertyString(initObject, "credentials") ?? credentials;
+                cache = TryGetJsPropertyString(initObject, "cache") ?? cache;
+                redirect = TryGetJsPropertyString(initObject, "redirect") ?? redirect;
+                referrer = TryGetJsPropertyString(initObject, "referrer") ?? referrer;
+                integrity = TryGetJsPropertyString(initObject, "integrity") ?? integrity;
             }
 
             var requestObject = new JSObject();
@@ -1750,16 +2162,68 @@ public sealed partial class DomBridge
             requestObject[(KeyString)"method"] = new JSString(method);
             requestObject[(KeyString)"headers"] = headersObject;
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            requestObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
-            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => CreateRequestObject(requestObject), "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject[(KeyString)"body"] = body == null ? JSNull.Value : CreateReadableStreamBody(requestObject, body);
+            requestObject[(KeyString)"signal"] = signalValue;
+            requestObject[(KeyString)"mode"] = new JSString(mode);
+            requestObject[(KeyString)"credentials"] = new JSString(credentials);
+            requestObject[(KeyString)"cache"] = new JSString(cache);
+            requestObject[(KeyString)"redirect"] = new JSString(redirect);
+            requestObject[(KeyString)"referrer"] = new JSString(referrer);
+            requestObject[(KeyString)"integrity"] = new JSString(integrity);
+            requestObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute 'clone' on 'Request': body is already used.");
+
+                return CreateRequestObject(requestObject);
+            }, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             requestObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
             {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute body reader on 'Request': body is already used.");
+
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return body == null ? new JSString(string.Empty) : new JSString(body);
-                });
+                    body == null ? new JSString(string.Empty) : new JSString(body));
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute body reader on 'Request': body is already used.");
+
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    ParseJsonText(body ?? string.Empty));
+            }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute body reader on 'Request': body is already used.");
+
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty)));
+            }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute body reader on 'Request': body is already used.");
+
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    CreateBlobBody(body ?? string.Empty, headersObject));
+            }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(requestObject))
+                    throw new JSException("Failed to execute body reader on 'Request': body is already used.");
+
+                requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    CreateFormDataObject(new JSString(body ?? string.Empty)));
+            }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
         }
@@ -1779,52 +2243,83 @@ public sealed partial class DomBridge
             responseObject[(KeyString)"redirected"] = redirected ? JSBoolean.True : JSBoolean.False;
             responseObject[(KeyString)"type"] = new JSString(type);
             responseObject[(KeyString)"bodyUsed"] = JSBoolean.False;
+            responseObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             responseObject[(KeyString)"headers"] = headersObject;
             responseObject[(KeyString)"_bodyText"] = new JSString(body);
+            responseObject[(KeyString)"body"] = CreateReadableStreamBody(responseObject, body);
             responseObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
             {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute body reader on 'Response': body is already used.");
+
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSString(body);
-                });
+                    new JSString(body));
             }, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"json", new JSFunction((in Arguments _) =>
             {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute body reader on 'Response': body is already used.");
+
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    var escaped = body
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"")
-                        .Replace("\n", "\\n")
-                        .Replace("\r", "\\r")
-                        .Replace("\t", "\\t")
-                        .Replace("\b", "\\b")
-                        .Replace("\f", "\\f");
-                    return context.Eval($"JSON.parse(\"{escaped}\")");
-                });
+                    ParseResponseJsonText(body));
             }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
             {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute body reader on 'Response': body is already used.");
+
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() =>
-                {
-                    responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return new JSObject();
-                });
+                    new JSArrayBuffer(Encoding.UTF8.GetBytes(body)));
             }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"blob", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute body reader on 'Response': body is already used.");
+
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    CreateBlobBody(body, headersObject));
+            }, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue((KeyString)"formData", new JSFunction((in Arguments _) =>
+            {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute body reader on 'Response': body is already used.");
+
+                responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
+                return CreateThenable(() =>
+                    CreateFormDataObject(new JSString(body)));
+            }, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             responseObject.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) =>
-                CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase)),
-                "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            {
+                if (IsBodyUnavailable(responseObject))
+                    throw new JSException("Failed to execute 'clone' on 'Response': body is already used.");
+
+                return CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase));
+            }, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return responseObject;
         }
 
-        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
-        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
-        var responseCtor = new JSFunction((in Arguments a) =>
+        static JSValue CreateAbortErrorValue(JSValue signalValue)
         {
-            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
+            if (signalValue is JSObject signalObject)
+            {
+                var reason = signalObject[(KeyString)"reason"];
+                if (reason != null && !reason.IsUndefined && !reason.IsNull)
+                    return reason;
+            }
+
+            var error = new JSObject();
+            error[(KeyString)"name"] = new JSString("AbortError");
+            error[(KeyString)"message"] = new JSString("The operation was aborted.");
+            return error;
+        }
+
+        (int status, string statusText, string url, string type, bool redirected, Dictionary<string, string> headers) ParseResponseInit(JSValue? initValue)
+        {
             var status = 200;
             var statusText = string.Empty;
             var url = string.Empty;
@@ -1832,7 +2327,7 @@ public sealed partial class DomBridge
             var redirected = false;
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            if (a.Length > 1 && a[1] is JSObject initObject)
+            if (initValue is JSObject initObject)
             {
                 if (TryGetJsPropertyString(initObject, "status") is string statusValue && int.TryParse(statusValue, out var parsedStatus))
                     status = parsedStatus;
@@ -1848,14 +2343,80 @@ public sealed partial class DomBridge
                 }
             }
 
+            return (status, statusText, url, type, redirected, headers);
+        }
+
+        string ResolveResponseRedirectUrl(string redirectUrl)
+        {
+            if (string.IsNullOrWhiteSpace(redirectUrl))
+                throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
+
+            if (Uri.TryCreate(redirectUrl, UriKind.Absolute, out var absoluteUri))
+                return absoluteUri.AbsoluteUri;
+
+            if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+                Uri.TryCreate(baseUri, redirectUrl, out var resolvedUri))
+            {
+                return resolvedUri.AbsoluteUri;
+            }
+
+            throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
+        }
+
+        var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
+        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
+        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
+        var responseCtor = new JSFunction((in Arguments a) =>
+        {
+            var body = a.Length > 0 && !a[0].IsUndefined && !a[0].IsNull ? a[0].ToString() : string.Empty;
+            var (status, statusText, url, type, redirected, headers) = ParseResponseInit(a.Length > 1 ? a[1] : null);
+
             return CreateResponse(body, status, statusText, url, type, redirected, headers);
         }, "Response", 2);
+        responseCtor.FastAddValue((KeyString)"json", new JSFunction((in Arguments a) =>
+        {
+            var jsonBody = JSJSON.Stringify(a.Length > 0 ? a[0] : JSNull.Value);
+            var (status, statusText, url, type, redirected, headers) = ParseResponseInit(a.Length > 1 ? a[1] : null);
+
+            if (!headers.ContainsKey("Content-Type"))
+                headers["Content-Type"] = "application/json";
+
+            return CreateResponse(jsonBody, status, statusText, url, type, redirected, headers);
+        }, "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue((KeyString)"error", new JSFunction((in Arguments _) =>
+            CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in Arguments a) =>
+        {
+            if (a.Length == 0)
+                throw new JSException("Failed to execute 'redirect' on 'Response': 1 argument required.");
+
+            var status = 302;
+            if (a.Length > 1 && int.TryParse(a[1].ToString(), out var parsedStatus))
+                status = parsedStatus;
+
+            if (status is not (301 or 302 or 303 or 307 or 308))
+                throw new JSException("Failed to execute 'redirect' on 'Response': Invalid status code");
+
+            var resolvedUrl = ResolveResponseRedirectUrl(a[0].ToString());
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Location"] = resolvedUrl
+            };
+
+            return CreateResponse(string.Empty, status, string.Empty, string.Empty, "basic", false, headers);
+        }, "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        var messageChannelCtor = new JSFunction((in Arguments _) => CreateMessageChannel(), "MessageChannel", 0);
+        window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["FormData"] = formDataCtor;
         context["Headers"] = headersCtor;
         context["Request"] = requestCtor;
         context["Response"] = responseCtor;
+        context["MessageChannel"] = messageChannelCtor;
 
         // fetch(url, options) — polyfill backed by HttpClient with headers, method support
         var fetchFn = new JSFunction((in Arguments a) =>
@@ -1875,11 +2436,14 @@ public sealed partial class DomBridge
             var method = "GET";
             string? requestBody = null;
             var requestHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            JSValue signalValue = JSUndefined.Value;
 
             if (a[0] is JSObject requestObject)
             {
                 method = (TryGetJsPropertyString(requestObject, "method") ?? method).ToUpperInvariant();
                 requestBody = TryGetJsPropertyString(requestObject, "_bodyInit", "body");
+                if (requestObject[(KeyString)"signal"] is { } requestSignal && !requestSignal.IsUndefined && !requestSignal.IsNull)
+                    signalValue = requestSignal;
                 if (requestObject[(KeyString)"headers"] is JSObject requestHeadersObject)
                 {
                     foreach (var (key, value) in EnumerateObjectStringEntries(requestHeadersObject))
@@ -1891,6 +2455,8 @@ public sealed partial class DomBridge
             {
                 method = (TryGetJsPropertyString(opts, "method") ?? method).ToUpperInvariant();
                 requestBody = TryGetJsPropertyString(opts, "body") ?? requestBody;
+                if (opts[(KeyString)"signal"] is { } optionsSignal && !optionsSignal.IsUndefined && !optionsSignal.IsNull)
+                    signalValue = optionsSignal;
                 if (opts[(KeyString)"headers"] is JSObject optionsHeadersObject)
                 {
                     foreach (var (key, value) in EnumerateObjectStringEntries(optionsHeadersObject))
@@ -1898,38 +2464,50 @@ public sealed partial class DomBridge
                 }
             }
 
+            var rejected = false;
+            var rejectedValue = JSUndefined.Value;
+
+            if (signalValue is JSObject signalObject && signalObject[(KeyString)"aborted"].BooleanValue)
+            {
+                rejected = true;
+                rejectedValue = CreateAbortErrorValue(signalValue);
+            }
+
             try
             {
-                var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
-                if (requestBody != null)
-                    request.Content = new StringContent(requestBody, Encoding.UTF8,
-                        requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
-                foreach (var kv in requestHeaders)
+                if (!rejected)
                 {
-                    if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                        request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
-                }
+                    var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
+                    if (requestBody != null)
+                        request.Content = new StringContent(requestBody, Encoding.UTF8,
+                            requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
+                    foreach (var kv in requestHeaders)
+                    {
+                        if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                            request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+                    }
 
-                var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
-                var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                var statusCode = (int)response.StatusCode;
+                    var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
+                    var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    var statusCode = (int)response.StatusCode;
 
-                var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var h in response.Headers)
-                    allHeaders[h.Key] = string.Join(", ", h.Value);
-                if (response.Content.Headers != null)
-                {
-                    foreach (var h in response.Content.Headers)
+                    var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var h in response.Headers)
                         allHeaders[h.Key] = string.Join(", ", h.Value);
+                    if (response.Content.Headers != null)
+                    {
+                        foreach (var h in response.Content.Headers)
+                            allHeaders[h.Key] = string.Join(", ", h.Value);
+                    }
+                    responseObj = CreateResponse(
+                        body,
+                        statusCode,
+                        response.ReasonPhrase ?? string.Empty,
+                        fetchUrl,
+                        "basic",
+                        false,
+                        allHeaders);
                 }
-                responseObj = CreateResponse(
-                    body,
-                    statusCode,
-                    response.ReasonPhrase ?? string.Empty,
-                    fetchUrl,
-                    "basic",
-                    false,
-                    allHeaders);
             }
             catch (Exception ex)
             {
@@ -1948,7 +2526,7 @@ public sealed partial class DomBridge
             var promise = new JSObject();
             promise.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
             {
-                if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
+                if (!rejected && thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
                 {
                     try { cb.InvokeFunction(new Arguments(cb, responseObj)); }
                     catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.then", $"Callback error: {ex.Message}", ex); }
@@ -1957,7 +2535,11 @@ public sealed partial class DomBridge
             }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             promise.FastAddValue((KeyString)"catch", new JSFunction((in Arguments catchArgs) =>
             {
-                // catch is a no-op for successful fetches
+                if (rejected && catchArgs.Length > 0 && catchArgs[0] is JSFunction cb)
+                {
+                    try { cb.InvokeFunction(new Arguments(cb, rejectedValue)); }
+                    catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.catch", $"Callback error: {ex.Message}", ex); }
+                }
                 return promise;
             }, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             return promise;
@@ -2093,16 +2675,44 @@ public sealed partial class DomBridge
             (KeyString)"vendor",
             new JSString(""),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        // sendBeacon(url, data) — no-op, returns true
+        // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
         navigatorObj.FastAddValue(
             (KeyString)"sendBeacon",
-            new JSFunction((in Arguments _) => JSBoolean.True, "sendBeacon", 2),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0].IsNullOrUndefined)
+                    return JSBoolean.False;
+
+                try
+                {
+                    // Per sendBeacon semantics, failure to queue because no live fetch entry
+                    // point is available should return false instead of throwing.
+                    if (window[(KeyString)"fetch"] is not JSFunction currentFetch)
+                        return JSBoolean.False;
+
+                    var options = new JSObject();
+                    options[(KeyString)"method"] = new JSString("POST");
+                    options[(KeyString)"keepalive"] = JSBoolean.True;
+                    if (a.Length > 1 && !a[1].IsNullOrUndefined)
+                        options[(KeyString)"body"] = new JSString(a[1].ToString());
+
+                    currentFetch.InvokeFunction(new Arguments(currentFetch, a[0], options));
+                    return JSBoolean.True;
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.navigator.sendBeacon",
+                        $"sendBeacon error: {ex.Message}", ex);
+                    return JSBoolean.False;
+                }
+            }, "sendBeacon", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue(
             (KeyString)"navigator",
             navigatorObj,
             JSPropertyAttributes.EnumerableConfigurableValue);
         context["navigator"] = navigatorObj;
+        context["postMessage"] = window[(KeyString)"postMessage"];
 
         // TODO-G4: window.innerWidth / innerHeight
         var vpWidth = _viewportWidth;
@@ -2223,6 +2833,7 @@ public sealed partial class DomBridge
                 return DispatchWindowEvent(evt);
             }, "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        RegisterWindowMessaging(window);
         window.FastAddProperty(
             (KeyString)"frames",
             new JSFunction((in Arguments _) => BuildWindowFramesArray(), "get frames"),
@@ -2565,16 +3176,36 @@ public sealed partial class DomBridge
         // TODO-G16: AbortController / AbortSignal — basic stubs
         context.Eval(@"
                 function AbortController() {
-                    this.signal = { aborted: false, reason: undefined, onabort: null,
-                        addEventListener: function() {}, removeEventListener: function() {},
-                        throwIfAborted: function() { if (this.aborted) throw new DOMException('The operation was aborted.', 'AbortError'); }
+                    this.signal = {
+                        aborted: false,
+                        reason: undefined,
+                        onabort: null,
+                        _listeners: [],
+                        addEventListener: function(type, listener) {
+                            if (type !== 'abort' || typeof listener !== 'function') return;
+                            if (this._listeners.indexOf(listener) === -1) this._listeners.push(listener);
+                        },
+                        removeEventListener: function(type, listener) {
+                            if (type !== 'abort') return;
+                            var index = this._listeners.indexOf(listener);
+                            if (index !== -1) this._listeners.splice(index, 1);
+                        },
+                        throwIfAborted: function() {
+                            if (this.aborted) throw (this.reason !== undefined ? this.reason : new DOMException('The operation was aborted.', 'AbortError'));
+                        }
                     };
                 }
                 AbortController.prototype.abort = function(reason) {
+                    if (this.signal.aborted) return;
                     this.signal.aborted = true;
-                    this.signal.reason = reason || new DOMException('The operation was aborted.', 'AbortError');
+                    this.signal.reason = reason !== undefined ? reason : new DOMException('The operation was aborted.', 'AbortError');
+                    var event = { type: 'abort', target: this.signal, currentTarget: this.signal };
                     if (typeof this.signal.onabort === 'function') {
-                        try { this.signal.onabort(); } catch(e) {}
+                        try { this.signal.onabort(event); } catch(e) {}
+                    }
+                    var listeners = this.signal._listeners.slice();
+                    for (var i = 0; i < listeners.length; i++) {
+                        try { listeners[i].call(this.signal, event); } catch(e) {}
                     }
                 };
             ");
@@ -2632,6 +3263,7 @@ public sealed partial class DomBridge
                     this.readyState = 0;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
                     this.responseType = '';
                     this.responseURL = '';
@@ -2646,10 +3278,14 @@ public sealed partial class DomBridge
                     this.ontimeout = null;
                     this.withCredentials = false;
                     this.timeout = 0;
+                    this._timeoutTimerId = null;
+                    this._timedOut = false;
+                    this.upload = createXhrUploadTarget();
                     this._method = 'GET';
                     this._url = '';
                     this._async = true;
                     this._headers = {};
+                    this._listeners = {};
                     this._responseHeaders = {};
                     this._mimeOverride = null;
                     this._aborted = false;
@@ -2659,11 +3295,171 @@ public sealed partial class DomBridge
                     this.LOADING = 3;
                     this.DONE = 4;
                 }
+                function xhrAddEventListener(type, listener) {
+                    if (!type ||
+                        (typeof listener !== 'function' &&
+                         (!listener || typeof listener.handleEvent !== 'function'))) {
+                        return;
+                    }
+                    var key = '' + type;
+                    var listeners = this._listeners[key];
+                    if (!listeners) {
+                        listeners = [];
+                        this._listeners[key] = listeners;
+                    }
+                    if (listeners.indexOf(listener) < 0) {
+                        listeners.push(listener);
+                    }
+                }
+                function xhrRemoveEventListener(type, listener) {
+                    if (!type || !listener) return;
+                    var key = '' + type;
+                    var listeners = this._listeners[key];
+                    if (!listeners || !listeners.length) return;
+                    for (var i = listeners.length - 1; i >= 0; i--) {
+                        if (listeners[i] === listener) {
+                            listeners.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+                function createXhrEvent(type, init, target) {
+                    target = target || null;
+                    var event = {
+                        type: '' + type,
+                        target: target,
+                        currentTarget: target,
+                        srcElement: target,
+                        bubbles: false,
+                        cancelable: false,
+                        defaultPrevented: false,
+                        eventPhase: 2,
+                        preventDefault: function() {
+                            if (this.cancelable) this.defaultPrevented = true;
+                        },
+                        stopPropagation: function() {},
+                        stopImmediatePropagation: function() {
+                            this.__immediateStopped = true;
+                        }
+                    };
+                    if (init) {
+                        for (var key in init) {
+                            event[key] = init[key];
+                        }
+                    }
+                    return event;
+                }
+                function xhrDispatchEvent(event) {
+                    if (!event || typeof event.type !== 'string') return true;
+                    event.target = event.target || this;
+                    event.currentTarget = this;
+                    event.srcElement = this;
+                    event.eventPhase = 2;
+                    if (event.bubbles === undefined) event.bubbles = false;
+                    if (event.cancelable === undefined) event.cancelable = false;
+                    if (event.defaultPrevented === undefined) event.defaultPrevented = false;
+                    if (typeof event.preventDefault !== 'function') {
+                        event.preventDefault = function() {
+                            if (this.cancelable) this.defaultPrevented = true;
+                        };
+                    }
+                    if (typeof event.stopPropagation !== 'function') {
+                        event.stopPropagation = function() {};
+                    }
+                    if (typeof event.stopImmediatePropagation !== 'function') {
+                        event.stopImmediatePropagation = function() {
+                            this.__immediateStopped = true;
+                        };
+                    }
+
+                    var handler = this['on' + event.type];
+                    if (typeof handler === 'function') {
+                        handler.call(this, event);
+                    }
+
+                    if (!event.__immediateStopped) {
+                        var listeners = this._listeners[event.type];
+                        if (listeners && listeners.length) {
+                            var snapshot = listeners.slice();
+                            for (var i = 0; i < snapshot.length; i++) {
+                                var listener = snapshot[i];
+                                if (typeof listener === 'function') {
+                                    listener.call(this, event);
+                                } else if (listener && typeof listener.handleEvent === 'function') {
+                                    listener.handleEvent(event);
+                                }
+                                if (event.__immediateStopped) break;
+                            }
+                        }
+                    }
+
+                    event.currentTarget = null;
+                    event.eventPhase = 0;
+                    return !event.defaultPrevented;
+                }
+                function createXhrUploadTarget() {
+                    return {
+                        _listeners: {},
+                        onabort: null,
+                        onerror: null,
+                        onload: null,
+                        onloadend: null,
+                        onloadstart: null,
+                        onprogress: null,
+                        ontimeout: null,
+                        addEventListener: xhrAddEventListener,
+                        removeEventListener: xhrRemoveEventListener,
+                        dispatchEvent: xhrDispatchEvent
+                    };
+                }
                 XMLHttpRequest.UNSENT = 0;
                 XMLHttpRequest.OPENED = 1;
                 XMLHttpRequest.HEADERS_RECEIVED = 2;
                 XMLHttpRequest.LOADING = 3;
                 XMLHttpRequest.DONE = 4;
+                XMLHttpRequest.prototype.addEventListener = xhrAddEventListener;
+                XMLHttpRequest.prototype.removeEventListener = xhrRemoveEventListener;
+                XMLHttpRequest.prototype._createEvent = function(type, init, target) {
+                    return createXhrEvent(type, init, target || this);
+                };
+                XMLHttpRequest.prototype._createProgressEvent = function(type, loaded, total, lengthComputable, target) {
+                    return this._createEvent(type, {
+                        loaded: loaded || 0,
+                        total: total || 0,
+                        lengthComputable: !!lengthComputable
+                    }, target);
+                };
+                XMLHttpRequest.prototype._getProgressMetrics = function(bodyValue) {
+                    if (bodyValue === null || bodyValue === undefined) {
+                        return { loaded: 0, total: 0, lengthComputable: false };
+                    }
+                    if (typeof bodyValue === 'string') {
+                        return {
+                            loaded: bodyValue.length,
+                            total: bodyValue.length,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.byteLength === 'number') {
+                        return {
+                            loaded: bodyValue.byteLength,
+                            total: bodyValue.byteLength,
+                            lengthComputable: true
+                        };
+                    }
+                    if (typeof bodyValue.size === 'number') {
+                        return {
+                            loaded: bodyValue.size,
+                            total: bodyValue.size,
+                            lengthComputable: true
+                        };
+                    }
+                    return { loaded: 0, total: 0, lengthComputable: false };
+                };
+                XMLHttpRequest.prototype.dispatchEvent = xhrDispatchEvent;
+                XMLHttpRequest.prototype._dispatchReadyStateChange = function() {
+                    this.dispatchEvent(this._createEvent('readystatechange'));
+                };
                 XMLHttpRequest.prototype.open = function(method, url, isAsync) {
                     this._method = method;
                     this._url = url;
@@ -2671,13 +3467,18 @@ public sealed partial class DomBridge
                     this.readyState = 1;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
+                    this.responseXML = null;
                     this.responseURL = '';
                     this._responseHeaders = {};
                     this._aborted = false;
-                    if (typeof this.onreadystatechange === 'function') {
-                        this.onreadystatechange();
+                    this._timedOut = false;
+                    if (this._timeoutTimerId !== null) {
+                        clearTimeout(this._timeoutTimerId);
+                        this._timeoutTimerId = null;
                     }
+                    this._dispatchReadyStateChange();
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
                     this._headers[name] = value;
@@ -2702,35 +3503,83 @@ public sealed partial class DomBridge
                 };
                 XMLHttpRequest.prototype.abort = function() {
                     this._aborted = true;
+                    this._timedOut = false;
+                    if (this._timeoutTimerId !== null) {
+                        clearTimeout(this._timeoutTimerId);
+                        this._timeoutTimerId = null;
+                    }
                     this.readyState = 0;
                     this.status = 0;
                     this.statusText = '';
+                    this.response = null;
                     this.responseText = '';
-                    if (typeof this.onabort === 'function') {
-                        this.onabort();
-                    }
-                    if (typeof this.onloadend === 'function') {
-                        this.onloadend();
-                    }
+                    this.responseXML = null;
+                    this.dispatchEvent(this._createEvent('abort'));
+                    this.dispatchEvent(this._createProgressEvent('loadend', 0, 0, false));
                 };
                 XMLHttpRequest.prototype.send = function(body) {
                     var self = this;
-                    if (self._aborted) return;
+                    if (self._aborted || self._timedOut) return;
+                    if (self._timeoutTimerId !== null) {
+                        clearTimeout(self._timeoutTimerId);
+                        self._timeoutTimerId = null;
+                    }
+                    self._timedOut = false;
+                    function handleRequestError() {
+                        if (self._aborted || self._timedOut) return;
+                        if (self._timeoutTimerId !== null) {
+                            clearTimeout(self._timeoutTimerId);
+                            self._timeoutTimerId = null;
+                        }
+                        self.readyState = 4;
+                        self.status = 0;
+                        self.statusText = '';
+                        self.response = null;
+                        self.responseText = '';
+                        self.responseXML = null;
+                        self._dispatchReadyStateChange();
+                        self.dispatchEvent(self._createEvent('error'));
+                        self.dispatchEvent(self._createProgressEvent('loadend', 0, 0, false));
+                    }
                     try {
                         var opts = { method: self._method };
-                        if (body && self._method !== 'GET' && self._method !== 'HEAD') {
-                            opts.body = '' + body;
+                        var requestBody;
+                        if (body !== undefined && body !== null &&
+                            self._method !== 'GET' && self._method !== 'HEAD') {
+                            requestBody = '' + body;
+                            opts.body = requestBody;
                         }
                         var hasHeaders = false;
                         for (var k in self._headers) { hasHeaders = true; break; }
                         if (hasHeaders) {
                             opts.headers = self._headers;
                         }
-                        if (typeof self.onloadstart === 'function') {
-                            self.onloadstart();
+                        if (self.timeout > 0) {
+                            self._timeoutTimerId = setTimeout(function() {
+                                self._timeoutTimerId = null;
+                                if (self._aborted || self._timedOut || self.readyState === 4) return;
+                                self._timedOut = true;
+                                self.readyState = 4;
+                                self.status = 0;
+                                self.statusText = '';
+                                self.response = null;
+                                self.responseText = '';
+                                self.responseXML = null;
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createEvent('timeout'));
+                                self.dispatchEvent(self._createProgressEvent('loadend', 0, 0, false));
+                            }, self.timeout);
                         }
+                        if (requestBody !== undefined && self.upload) {
+                            var uploadProgress = self._getProgressMetrics(requestBody);
+                            self.upload.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('progress', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('load', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
+                            self.upload.dispatchEvent(self._createProgressEvent('loadend', uploadProgress.loaded, uploadProgress.total, uploadProgress.lengthComputable, self.upload));
+                        }
+                        self.dispatchEvent(self._createProgressEvent('loadstart', 0, 0, false));
                         fetch(self._url, opts).then(function(response) {
-                            if (self._aborted) return;
+                            if (self._aborted || self._timedOut) return;
                             self.status = response.status;
                             self.statusText = response.statusText;
                             self.responseURL = response.url || self._url;
@@ -2740,40 +3589,95 @@ public sealed partial class DomBridge
                                     self._responseHeaders[name] = value;
                                 });
                             }
-                            if (typeof self.onreadystatechange === 'function') {
-                                self.onreadystatechange();
+                            self._dispatchReadyStateChange();
+                            var bodyPromise;
+                            if (self.responseType === 'arraybuffer' &&
+                                response &&
+                                typeof response.arrayBuffer === 'function') {
+                                bodyPromise = response.arrayBuffer();
+                            } else if (self.responseType === 'blob' &&
+                                response &&
+                                typeof response.blob === 'function') {
+                                bodyPromise = response.blob();
+                            } else if (self.responseType === 'json' &&
+                                response &&
+                                typeof response.text === 'function') {
+                                bodyPromise = response.text();
+                            } else {
+                                bodyPromise = response.text();
                             }
-                            response.text().then(function(text) {
-                                if (self._aborted) return;
-                                self.responseText = text;
+                            bodyPromise.then(function(bodyValue) {
+                                if (self._aborted || self._timedOut) return;
+                                if (self._timeoutTimerId !== null) {
+                                    clearTimeout(self._timeoutTimerId);
+                                    self._timeoutTimerId = null;
+                                }
+                                var progress = self._getProgressMetrics(bodyValue);
+                                var effectiveMimeType = self._mimeOverride;
+                                if (!effectiveMimeType) {
+                                    effectiveMimeType = self.getResponseHeader('Content-Type') || '';
+                                }
+                                var lowerMimeType = (effectiveMimeType || '').toLowerCase();
+                                var shouldPopulateResponseXml =
+                                    lowerMimeType.indexOf('text/html') >= 0 ||
+                                    lowerMimeType.indexOf('application/xhtml+xml') >= 0 ||
+                                    lowerMimeType.indexOf('application/xml') >= 0 ||
+                                    lowerMimeType.indexOf('text/xml') >= 0 ||
+                                    /\+xml(?:\s*;|$)/.test(lowerMimeType);
+
+                                if (self.responseType === '' || self.responseType === 'text') {
+                                    // Per XHR semantics, the default/text response types expose
+                                    // the same textual payload via both response and responseText.
+                                    self.response = bodyValue;
+                                    self.responseText = '' + bodyValue;
+                                    if (shouldPopulateResponseXml) {
+                                        var parsedDocument = document.implementation.createHTMLDocument('');
+                                        parsedDocument.body.innerHTML = '' + bodyValue;
+                                        self.responseXML = parsedDocument;
+                                    } else {
+                                        self.responseXML = null;
+                                    }
+                                } else if (self.responseType === 'document') {
+                                    if (shouldPopulateResponseXml) {
+                                        var responseDocument = document.implementation.createHTMLDocument('');
+                                        responseDocument.body.innerHTML = '' + bodyValue;
+                                        self.response = responseDocument;
+                                        self.responseXML = responseDocument;
+                                    } else {
+                                        self.response = null;
+                                        self.responseXML = null;
+                                    }
+                                    self.responseText = '';
+                                } else if (self.responseType === 'json') {
+                                    try {
+                                        self.response = JSON.parse('' + bodyValue);
+                                    } catch (e) {
+                                        // XHR exposes invalid JSON as a null response for
+                                        // responseType='json' while still completing the load path.
+                                        self.response = null;
+                                    }
+                                    self.responseText = '';
+                                    self.responseXML = null;
+                                } else {
+                                    self.response = bodyValue;
+                                    self.responseText = '';
+                                    self.responseXML = null;
+                                }
                                 self.readyState = 3;
-                                if (typeof self.onprogress === 'function') {
-                                    self.onprogress();
-                                }
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createProgressEvent('progress', progress.loaded, progress.total, progress.lengthComputable));
                                 self.readyState = 4;
-                                if (typeof self.onreadystatechange === 'function') {
-                                    self.onreadystatechange();
-                                }
-                                if (typeof self.onload === 'function') {
-                                    self.onload();
-                                }
-                                if (typeof self.onloadend === 'function') {
-                                    self.onloadend();
-                                }
+                                self._dispatchReadyStateChange();
+                                self.dispatchEvent(self._createProgressEvent('load', progress.loaded, progress.total, progress.lengthComputable));
+                                self.dispatchEvent(self._createProgressEvent('loadend', progress.loaded, progress.total, progress.lengthComputable));
+                            }, function() {
+                                handleRequestError();
                             });
+                        }, function() {
+                            handleRequestError();
                         });
                     } catch(e) {
-                        self.readyState = 4;
-                        self.status = 0;
-                        if (typeof self.onreadystatechange === 'function') {
-                            self.onreadystatechange();
-                        }
-                        if (typeof self.onerror === 'function') {
-                            self.onerror();
-                        }
-                        if (typeof self.onloadend === 'function') {
-                            self.onloadend();
-                        }
+                        handleRequestError();
                     }
                 };
             ");

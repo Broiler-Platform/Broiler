@@ -60,6 +60,172 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("LEN:0", result);
     }
 
+    [Fact]
+    public void InsertAdjacentElement_BeforeBegin_Inserts_Sibling()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('p');
+            inserted.id = 'before';
+            host.insertAdjacentElement('beforebegin', inserted);
+            document.getElementById('result').textContent =
+                host.previousElementSibling.id + '|' +
+                inserted.nextElementSibling.id;
+        ");
+        Assert.Contains("before|host", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentText_AfterBegin_Prepends_Text()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var tail = document.createElement('span');
+            tail.textContent = 'tail';
+            document.body.appendChild(host);
+            host.appendChild(tail);
+            host.insertAdjacentText('afterbegin', 'hello');
+            document.getElementById('result').textContent =
+                host.firstChild.data + '|' + host.lastChild.textContent;
+        ");
+        Assert.Contains("hello|tail", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_BeforeEnd_Appends_Parsed_Nodes()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.insertAdjacentHTML('beforeend', '<span>one</span><span>two</span>');
+            document.getElementById('result').textContent =
+                'LEN:' + host.children.length +
+                ',FIRST:' + host.firstElementChild.textContent +
+                ',LAST:' + host.lastElementChild.textContent;
+        ");
+        Assert.Contains("LEN:2", result);
+        Assert.Contains("FIRST:one", result);
+        Assert.Contains("LAST:two", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_AfterEnd_Inserts_After_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            host.insertAdjacentHTML('afterend', '<section id=""after""></section>');
+            document.getElementById('result').textContent =
+                document.body.lastElementChild.id + '|' +
+                document.body.lastElementChild.previousElementSibling.id;
+        ");
+        Assert.Contains("after|host", result);
+    }
+
+    [Fact]
+    public void InsertAdjacentHtml_Invalid_Position_Throws_SyntaxError()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            try {
+                host.insertAdjacentHTML('middle', '<span>x</span>');
+                document.getElementById('result').textContent = 'NO_THROW';
+            } catch (e) {
+                document.getElementById('result').textContent = e.name;
+            }
+        ");
+        Assert.Contains("SyntaxError", result);
+    }
+
+    [Fact]
+    public void ChildNode_Before_Inserts_Node_And_Text_Before_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'before';
+            host.before('alpha', inserted);
+            document.getElementById('result').textContent =
+                host.previousSibling.id + '|' +
+                host.previousSibling.previousSibling.data + '|' +
+                host.id;
+        ");
+        Assert.Contains("before|alpha|host", result);
+    }
+
+    [Fact]
+    public void ChildNode_After_Inserts_Node_And_Text_After_Element()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'after';
+            host.after(inserted, 'omega');
+            document.getElementById('result').textContent =
+                host.id + '|' +
+                host.nextSibling.id + '|' +
+                host.nextSibling.nextSibling.data;
+        ");
+        Assert.Contains("host|after|omega", result);
+    }
+
+    [Fact]
+    public void ChildNode_ReplaceWith_Replaces_Element_With_Node_And_Text()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.id = 'host';
+            document.body.appendChild(host);
+            var inserted = document.createElement('span');
+            inserted.id = 'replacement';
+            host.replaceWith('alpha', inserted);
+            document.getElementById('result').textContent =
+                inserted.previousSibling.data + '|' +
+                inserted.id + '|' +
+                (host.parentNode === null);
+        ");
+        Assert.Contains("alpha|replacement|true", result);
+    }
+
+    [Fact]
+    public void Node_IsConnected_Is_False_For_Detached_Node_And_True_After_Append()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.getElementById('result').textContent =
+                host.isConnected + '|' +
+                (host.getRootNode() === host);
+            document.body.appendChild(host);
+            document.getElementById('result').textContent += '|' +
+                host.isConnected + '|' +
+                (host.getRootNode() === document);
+        ");
+        Assert.Contains("false|true|true|true", result);
+    }
+
+    [Fact]
+    public void Node_GetRootNode_Defaults_To_Shadow_Root_Inside_Shadow_Tree()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.body.appendChild(host);
+            var shadow = host.attachShadow({ mode: 'open' });
+            var inner = document.createElement('span');
+            shadow.appendChild(inner);
+            document.getElementById('result').textContent =
+                inner.isConnected + '|' +
+                (inner.getRootNode() === shadow) + '|' +
+                (inner.getRootNode({ composed: true }) === document);
+        ");
+        Assert.Contains("true|true|true", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G2: performance.now()
     // ---------------------------------------------------------------
@@ -107,6 +273,52 @@ public class GoogleSearchPolyfillTests
             document.getElementById('result').textContent = 'RESULT:' + ok;
         ");
         Assert.Contains("RESULT:true", result);
+    }
+
+    [Fact]
+    public void Navigator_SendBeacon_Forwards_Post_Body_And_Keepalive_To_Fetch()
+    {
+        var result = ExecJs(@"
+            var originalFetch = fetch;
+            fetch = window.fetch = function(url, opts) {
+                document.getElementById('result').textContent = [
+                    'RESULT',
+                    url,
+                    opts && opts.method,
+                    opts && opts.body,
+                    opts && (opts.keepalive === true)
+                ].join('|');
+                return {
+                    then: function(resolve) {
+                        if (typeof resolve === 'function') {
+                            resolve(new Response('', { status: 204 }));
+                        }
+                        return { catch: function() {} };
+                    }
+                };
+            };
+            var ok = navigator.sendBeacon('https://example.com/log', 'data=1');
+            fetch = window.fetch = originalFetch;
+            document.getElementById('result').textContent += '|' + ok;
+        ");
+
+        Assert.Contains("RESULT|https://example.com/log|POST|data=1|true|true", result);
+    }
+
+    [Fact]
+    public void Navigator_SendBeacon_Returns_False_When_Fetch_Throws()
+    {
+        var result = ExecJs(@"
+            var originalFetch = fetch;
+            fetch = window.fetch = function() {
+                throw new Error('boom');
+            };
+            var ok = navigator.sendBeacon('https://example.com/log', 'data');
+            fetch = window.fetch = originalFetch;
+            document.getElementById('result').textContent = 'RESULT:' + ok;
+        ");
+
+        Assert.Contains("RESULT:false", result);
     }
 
     [Fact]
@@ -2887,6 +3099,60 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void MutationObserver_Observe_AppendChild_Delivers_ChildList_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            document.body.appendChild(host);
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',TARGET:' + records[0].target.tagName.toLowerCase() +
+                    ',ADDED:' + records[0].addedNodes.length +
+                    ',REMOVED:' + records[0].removedNodes.length +
+                    ',TAG:' + records[0].addedNodes[0].tagName.toLowerCase();
+            });
+            obs.observe(host, { childList: true });
+            host.appendChild(document.createElement('span'));
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:childList", result);
+        Assert.Contains("TARGET:div", result);
+        Assert.Contains("ADDED:1", result);
+        Assert.Contains("REMOVED:0", result);
+        Assert.Contains("TAG:span", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_RemoveChild_Delivers_ChildList_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var child = document.createElement('span');
+            host.appendChild(child);
+            document.body.appendChild(host);
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',ADDED:' + records[0].addedNodes.length +
+                    ',REMOVED:' + records[0].removedNodes.length +
+                    ',TAG:' + records[0].removedNodes[0].tagName.toLowerCase();
+            });
+            obs.observe(host, { childList: true });
+            host.removeChild(child);
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:childList", result);
+        Assert.Contains("ADDED:0", result);
+        Assert.Contains("REMOVED:1", result);
+        Assert.Contains("TAG:span", result);
+    }
+
+    [Fact]
     public void MutationObserver_TakeRecords_Returns_And_Clears()
     {
         var result = ExecJs(@"
@@ -2931,6 +3197,99 @@ document.getElementById('result').textContent =
         Assert.Contains("CALLED:true", result);
         Assert.Contains("LEN:1", result);
         Assert.Contains("TYPE:childList", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_SetAttribute_Delivers_Attribute_Record()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',NAME:' + records[0].attributeName +
+                    ',OLD:' + (records[0].oldValue === null) +
+                    ',VALUE:' + host.getAttribute('data-test');
+            });
+            obs.observe(host, { attributes: true });
+            host.setAttribute('data-test', 'value');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:attributes", result);
+        Assert.Contains("NAME:data-test", result);
+        Assert.Contains("OLD:true", result);
+        Assert.Contains("VALUE:value", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_RemoveAttribute_Captures_Old_Value()
+    {
+        var result = ExecJs(@"
+            var host = document.createElement('div');
+            host.setAttribute('data-test', 'before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',NAME:' + records[0].attributeName +
+                    ',OLD:' + records[0].oldValue +
+                    ',HAS:' + host.hasAttribute('data-test');
+            });
+            obs.observe(host, { attributes: true, attributeOldValue: true });
+            host.removeAttribute('data-test');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:attributes", result);
+        Assert.Contains("NAME:data-test", result);
+        Assert.Contains("OLD:before", result);
+        Assert.Contains("HAS:false", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_CharacterData_Delivers_Record()
+    {
+        var result = ExecJs(@"
+            var text = document.createTextNode('before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',OLD:' + (records[0].oldValue === null) +
+                    ',VALUE:' + text.data;
+            });
+            obs.observe(text, { characterData: true });
+            text.data = 'after';
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:characterData", result);
+        Assert.Contains("OLD:true", result);
+        Assert.Contains("VALUE:after", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Observe_CharacterData_Captures_Old_Value()
+    {
+        var result = ExecJs(@"
+            var text = document.createTextNode('before');
+            var summary = 'NONE';
+            var obs = new MutationObserver(function(records) {
+                summary =
+                    'TYPE:' + records[0].type +
+                    ',OLD:' + records[0].oldValue +
+                    ',VALUE:' + text.data;
+            });
+            obs.observe(text, { characterData: true, characterDataOldValue: true });
+            text.replaceData(0, 6, 'after');
+            document.getElementById('result').textContent = summary;
+        ");
+
+        Assert.Contains("TYPE:characterData", result);
+        Assert.Contains("OLD:before", result);
+        Assert.Contains("VALUE:after", result);
     }
 
     // ---------------------------------------------------------------

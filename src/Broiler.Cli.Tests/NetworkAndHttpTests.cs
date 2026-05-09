@@ -1,3 +1,7 @@
+using Broiler.HtmlBridge;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
+
 namespace Broiler.Cli.Tests;
 
 /// <summary>
@@ -151,6 +155,32 @@ fetch('http://example.com').then(function(response) {
     }
 
     [Fact]
+    public void Fetch_Response_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('ABC');
+response.arrayBuffer().then(function(buffer) {
+    var view = new Uint8Array(buffer);
+    document.getElementById('result').textContent = [
+        response.bodyUsed === true,
+        buffer instanceof ArrayBuffer,
+        buffer.byteLength,
+        view[0],
+        view[1],
+        view[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|3|65|66|67", result);
+    }
+
+    [Fact]
     public void Fetch_Headers_Constructor_Supports_Common_Mutations()
     {
         var html = @"<!DOCTYPE html>
@@ -175,6 +205,33 @@ document.getElementById('result').textContent = r.join('|');
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("text/plain|application/json|one, two|false", result);
+    }
+
+    [Fact]
+    public void Fetch_FormData_Constructor_Supports_Common_Mutations()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var formData = new FormData({ name: 'broiler' });
+formData.append('name', 'oven bird');
+formData.set('count', 2);
+var names = formData.getAll('name').join(',');
+formData.delete('count');
+document.getElementById('result').textContent = [
+    typeof FormData === 'function',
+    formData.get('name'),
+    names,
+    formData.has('count'),
+    formData.toString().split('&').join(';')
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|broiler|broiler,oven bird|false|name=broiler;name=oven+bird", result);
     }
 
     [Fact]
@@ -206,6 +263,378 @@ request.text().then(function(text) {
     }
 
     [Fact]
+    public void Fetch_Request_Constructor_Exposes_Default_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data');
+document.getElementById('result').textContent = [
+    request.mode,
+    request.credentials,
+    request.cache,
+    request.redirect,
+    request.referrer,
+    request.integrity
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("cors|same-origin|default|follow|about:client|", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Constructor_Exposes_Explicit_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    mode: 'same-origin',
+    credentials: 'include',
+    cache: 'no-store',
+    redirect: 'manual',
+    referrer: 'http://example.com/source',
+    integrity: 'sha256-test'
+});
+document.getElementById('result').textContent = [
+    request.mode,
+    request.credentials,
+    request.cache,
+    request.redirect,
+    request.referrer,
+    request.integrity
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("same-origin|include|no-store|manual|http://example.com/source|sha256-test", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Clone_Preserves_Request_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload',
+    mode: 'same-origin',
+    credentials: 'include',
+    cache: 'reload',
+    redirect: 'error',
+    referrer: 'http://example.com/source',
+    integrity: 'sha256-test'
+});
+var clone = request.clone();
+document.getElementById('result').textContent = [
+    clone.mode,
+    clone.credentials,
+    clone.cache,
+    clone.redirect,
+    clone.referrer,
+    clone.integrity,
+    clone.method,
+    clone.headers.get('content-type') === null,
+    clone.bodyUsed === false
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("same-origin|include|reload|error|http://example.com/source|sha256-test|POST|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'ABC' });
+request.arrayBuffer().then(function(buffer) {
+    var view = new Uint8Array(buffer);
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        buffer instanceof ArrayBuffer,
+        buffer.byteLength,
+        view[0],
+        view[1],
+        view[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|3|65|66|67", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Body_Stream_Reads_Uint8Array_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'ABC' });
+var reader = request.body.getReader();
+reader.read().then(function(result) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        result.done === false,
+        result.value instanceof Uint8Array,
+        result.value.length,
+        result.value[0],
+        result.value[1],
+        result.value[2]
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|true|3|65|66|67", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Body_Stream_Lock_Blocks_Other_Body_Readers()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', { method: 'POST', body: 'payload' });
+request.body.getReader();
+try {
+    request.text();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: 'broiler'
+});
+request.blob().then(function(blob) {
+    blob.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            request.bodyUsed === true,
+            typeof blob.text === 'function',
+            blob.size,
+            blob.type,
+            text
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|7|application/json|broiler", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Clone_Preserves_Body_Without_Consuming_Original()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+var clone = request.clone();
+clone.text().then(function(cloneText) {
+    request.text().then(function(originalText) {
+        document.getElementById('result').textContent = [
+            cloneText,
+            originalText,
+            request.bodyUsed === true,
+            clone.bodyUsed === true
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("payload|payload|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Clone_Throws_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+request.text().then(function() {
+    try {
+        request.clone();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_FormData_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'name=broiler&name=oven+bird&count=2'
+});
+request.formData().then(function(value) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        typeof value.get === 'function',
+        value.get('name'),
+        value.getAll('name').join(','),
+        value.get('count')
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Json_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: '{""name"":""broiler"",""count"":2}'
+});
+request.json().then(function(value) {
+    document.getElementById('result').textContent = [
+        request.bodyUsed === true,
+        value.name,
+        value.count
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|broiler|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Body_Readers_Throw_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+request.text().then(function() {
+    try {
+        request.arrayBuffer();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var request = new Request('http://example.com/data', {
+    method: 'POST',
+    body: 'payload'
+});
+var firstRead = request.text();
+var r = [];
+r.push(request.bodyUsed === true);
+try {
+    request.json();
+    r.push('NO_THROW');
+} catch (e) {
+    r.push(e.message);
+}
+firstRead.then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|Failed to execute body reader on 'Request': body is already used.|payload", result);
+    }
+
+    [Fact]
     public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -234,6 +663,342 @@ response.text().then(function(text) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|201|Created|text/plain|true|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Json_Static_Creates_Json_Response_With_Init_And_ContentType()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.json({ name: 'broiler', count: 2 }, {
+    status: 201,
+    statusText: 'Created',
+    headers: { 'X-Test': 'yes' }
+});
+response.json().then(function(value) {
+    document.getElementById('result').textContent = [
+        response.ok,
+        response.status,
+        response.statusText,
+        response.headers.get('content-type'),
+        response.headers.get('x-test'),
+        value.name,
+        value.count
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|201|Created|application/json|yes|broiler|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Error_Static_Creates_Error_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.error();
+document.getElementById('result').textContent = [
+    response.ok === false,
+    response.status,
+    response.type,
+    response.url === ''
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|0|error|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Redirect_Static_Sets_Status_And_Location_Header()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = Response.redirect('/next', 301);
+document.getElementById('result').textContent = [
+    response.ok === false,
+    response.status,
+    response.headers.get('location'),
+    response.url === ''
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|301|file:///next|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Redirect_Static_Rejects_Invalid_Status_Code()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+try {
+    Response.redirect('/next', 200);
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("Invalid status code", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Clone_Preserves_Body_Without_Consuming_Original()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+var clone = response.clone();
+clone.text().then(function(cloneText) {
+    response.text().then(function(originalText) {
+        document.getElementById('result').textContent = [
+            cloneText,
+            originalText,
+            response.bodyUsed === true,
+            clone.bodyUsed === true
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("created|created|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Clone_Throws_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.text().then(function() {
+    try {
+        response.clone();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.blob().then(function(blob) {
+    blob.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            response.bodyUsed === true,
+            typeof blob.text === 'function',
+            blob.size,
+            blob.type,
+            text
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|7|text/plain|created", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Stream_Reads_Once_Then_Completes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('ABC', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+var reader = response.body.getReader();
+reader.read().then(function(first) {
+    reader.read().then(function(second) {
+        document.getElementById('result').textContent = [
+            response.bodyUsed === true,
+            first.done === false,
+            first.value instanceof Uint8Array,
+            first.value[0],
+            first.value[1],
+            first.value[2],
+            second.done === true,
+            second.value === undefined
+        ].join('|');
+    });
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|true|65|66|67|true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Stream_Lock_Blocks_Clone()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('created', {
+    headers: { 'Content-Type': 'text/plain' }
+});
+response.body.getReader();
+try {
+    response.clone();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_FormData_Parses_Body_And_Sets_BodyUsed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('name=broiler&name=oven+bird&count=2', {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+});
+response.formData().then(function(value) {
+    document.getElementById('result').textContent = [
+        response.bodyUsed === true,
+        typeof value.get === 'function',
+        value.get('name'),
+        value.getAll('name').join(','),
+        value.get('count')
+    ].join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Readers_Throw_After_Body_Is_Used()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('{""name"":""broiler""}', {
+    headers: { 'Content-Type': 'application/json' }
+});
+response.text().then(function() {
+    try {
+        response.json();
+        document.getElementById('result').textContent = 'NO_THROW';
+    } catch (e) {
+        document.getElementById('result').textContent = e.message;
+    }
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("body is already used", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var response = new Response('{""name"":""broiler""}', {
+    headers: { 'Content-Type': 'application/json' }
+});
+var firstRead = response.text();
+var r = [];
+r.push(response.bodyUsed === true);
+try {
+    response.json();
+    r.push('NO_THROW');
+} catch (e) {
+    r.push(e.message);
+}
+firstRead.then(function(text) {
+    r.push(text);
+    document.getElementById('result').textContent = r.join('|');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|Failed to execute body reader on 'Response': body is already used.|", result);
+    }
+
+    [Fact]
+    public void Fetch_Response_Json_InvalidJson_Throws_Clear_Error()
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
+
+        var exception = Assert.Throws<JSException>(() =>
+            context.Eval("var response = new Response('{invalid json'); response.json().then(function() {});"));
+
+        Assert.Contains("Failed to parse response body as JSON:", exception.Message);
+        Assert.True(context.Eval("response.bodyUsed").BooleanValue);
     }
 
     // ────────────────── fetch() method support ──────────────────
@@ -305,6 +1070,110 @@ fetch(request).then(function(response) {
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         Assert.Contains("true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_Request_Constructor_Preserves_AbortSignal()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+var request = new Request('http://example.com/request-object', {
+    signal: controller.signal
+});
+document.getElementById('result').textContent = [
+    request.signal === controller.signal,
+    request.signal.aborted === false
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true", result);
+    }
+
+    [Fact]
+    public void Fetch_With_PreAborted_Signal_Rejects_With_AbortError()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+controller.abort();
+fetch('http://example.com/aborted', { signal: controller.signal })
+    .then(function() {
+        document.getElementById('result').textContent = 'THEN';
+    })
+    .catch(function(error) {
+        document.getElementById('result').textContent = [
+            error.name,
+            error.message
+        ].join('|');
+    });
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("AbortError|The operation was aborted.", result);
+    }
+
+    [Fact]
+    public void Fetch_AbortSignal_Dispatches_Abort_Event_Once_And_Preserves_Custom_Reason()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+var removedCalls = 0;
+function removedListener() { removedCalls++; }
+controller.signal.addEventListener('abort', removedListener);
+controller.signal.removeEventListener('abort', removedListener);
+controller.signal.addEventListener('abort', function(event) {
+    document.getElementById('result').textContent = [
+        event.type,
+        this === controller.signal,
+        controller.signal.aborted,
+        controller.signal.reason,
+        removedCalls
+    ].join('|');
+});
+controller.abort('custom-reason');
+controller.abort('second-reason');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("abort|true|true|custom-reason|0", result);
+    }
+
+    [Fact]
+    public void Fetch_AbortSignal_ThrowIfAborted_Throws_Custom_Reason()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var controller = new AbortController();
+controller.abort('custom-reason');
+try {
+    controller.signal.throwIfAborted();
+    document.getElementById('result').textContent = 'NO_THROW';
+} catch (e) {
+    document.getElementById('result').textContent = String(e);
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("custom-reason", result);
     }
 
     // ────────────────── XMLHttpRequest enhancements ──────────────────
@@ -466,6 +1335,51 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void XHR_Has_EventTarget_Methods()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var xhr = new XMLHttpRequest();
+var r = [];
+r.push(typeof xhr.addEventListener === 'function');
+r.push(typeof xhr.removeEventListener === 'function');
+r.push(typeof xhr.dispatchEvent === 'function');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void XHR_Has_Upload_EventTarget()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var xhr = new XMLHttpRequest();
+var r = [];
+r.push(!!xhr.upload);
+r.push(typeof xhr.upload.addEventListener === 'function');
+r.push(typeof xhr.upload.removeEventListener === 'function');
+r.push(typeof xhr.upload.dispatchEvent === 'function');
+r.push(xhr.upload.onloadstart === null);
+r.push(xhr.upload.onprogress === null);
+r.push(xhr.upload.onload === null);
+r.push(xhr.upload.onloadend === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true", result);
+    }
+
+    [Fact]
     public void XHR_Has_Static_State_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -544,6 +1458,313 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true", result);
+    }
+
+    [Fact]
+    public void XHR_ReadyStateChange_Fires_For_Loading_State_Before_Done()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var readyStates = [];
+xhr.onreadystatechange = function() {
+    readyStates.push(xhr.readyState);
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+document.getElementById('result').textContent = readyStates.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("1,2,3,4", result);
+    }
+
+    [Fact]
+    public void XHR_AddEventListener_Dispatches_Lifecycle_And_Progress_Events()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.addEventListener('readystatechange', function(event) {
+    events.push('rs:' + xhr.readyState + ':' + (event.target === xhr) + ':' + (event.currentTarget === xhr));
+});
+xhr.addEventListener('loadstart', function(event) {
+    events.push(['loadstart', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+});
+xhr.addEventListener('progress', function(event) {
+    events.push(['progress', event.lengthComputable, event.loaded, event.total, event.currentTarget === xhr].join(':'));
+});
+xhr.addEventListener('load', function(event) {
+    events.push(['load', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+});
+xhr.addEventListener('loadend', function(event) {
+    events.push(['loadend', event.lengthComputable, event.loaded, event.total, event.target === xhr].join(':'));
+    document.getElementById('result').textContent = events.join('|');
+});
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("rs:1:true:true", result);
+        Assert.Contains("loadstart:false:0:0:true", result);
+        Assert.Contains("rs:2:true:true", result);
+        Assert.Contains("rs:3:true:true", result);
+        Assert.Contains("progress:true:7:7:true", result);
+        Assert.Contains("rs:4:true:true", result);
+        Assert.Contains("load:true:7:7:true", result);
+        Assert.Contains("loadend:true:7:7:true", result);
+    }
+
+    [Fact]
+    public void XHR_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var order = [];
+xhr.onload = function() { order.push('property'); };
+xhr.addEventListener('load', function() { order.push('listener'); });
+xhr.addEventListener('loadend', function() {
+    document.getElementById('result').textContent = order.join(',');
+});
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("property,listener", result);
+    }
+
+    [Fact]
+    public void XHR_Upload_AddEventListener_Dispatches_Upload_Progress_Events()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function(url, opts) {
+    return {
+        then: function(resolve) {
+            resolve(new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.upload.addEventListener('loadstart', function(event) {
+    events.push(['upload-loadstart', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('progress', function(event) {
+    events.push(['upload-progress', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('load', function(event) {
+    events.push(['upload-load', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+});
+xhr.upload.addEventListener('loadend', function(event) {
+    events.push(['upload-loadend', event.lengthComputable, event.loaded, event.total, event.target === xhr.upload, event.currentTarget === xhr.upload].join(':'));
+    document.getElementById('result').textContent = events.join('|');
+});
+xhr.open('POST', 'http://example.com/data');
+xhr.send('payload');
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("upload-loadstart:false:0:0:true:true", result);
+        Assert.Contains("upload-progress:true:7:7:true:true", result);
+        Assert.Contains("upload-load:true:7:7:true:true", result);
+        Assert.Contains("upload-loadend:true:7:7:true:true", result);
+    }
+
+    [Fact]
+    public void XHR_Upload_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var order = [];
+xhr.upload.onload = function() { order.push('property'); };
+xhr.upload.addEventListener('load', function() { order.push('listener'); });
+xhr.upload.addEventListener('loadend', function() {
+    document.getElementById('result').textContent = order.join(',');
+});
+xhr.open('POST', 'http://example.com/data');
+xhr.send('payload');
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("property,listener", result);
+    }
+
+    [Fact]
+    public void XHR_Timeout_Fires_Event_And_LoadEnd_When_Request_Hangs()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function() {
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.timeout = 1;
+xhr.ontimeout = function() { events.push('timeout'); };
+xhr.onload = function() { events.push('load'); };
+xhr.onerror = function() { events.push('error'); };
+xhr.onloadend = function() {
+    events.push('loadend');
+    document.getElementById('result').textContent = [
+        events.join(','),
+        xhr.readyState === 4,
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("timeout,loadend|true|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Success_Clears_Timeout_Timer()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var events = [];
+xhr.timeout = 1;
+xhr.ontimeout = function() { events.push('timeout'); };
+xhr.onload = function() { events.push('load'); };
+xhr.onloadend = function() {
+    events.push('loadend');
+    setTimeout(function() {
+        document.getElementById('result').textContent = [
+            events.join(','),
+            xhr.status === 200,
+            xhr.responseText === 'payload'
+        ].join('|');
+    }, 5);
+};
+xhr.open('GET', 'http://example.com/data');
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("load,loadend|true|true", result);
     }
 
     // ────────────────── Content-Type handling ──────────────────
@@ -905,5 +2126,485 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true", result);
+    }
+
+    [Fact]
+    public void XHR_OverrideMimeType_Populates_ResponseXml_For_Default_Text_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.overrideMimeType('text/html');
+xhr.onload = function() {
+    var payload = xhr.responseXML && xhr.responseXML.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseText,
+        xhr.responseText.indexOf('payload') >= 0,
+        xhr.responseXML !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
+    }
+
+    [Fact]
+    public void XHR_OverrideMimeType_Leaves_ResponseXml_Null_For_Plain_Text_Override()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('plain text payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.overrideMimeType('text/plain');
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseText,
+        xhr.responseText,
+        xhr.responseXML === null
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|plain text payload|true", result);
+    }
+
+    [Fact]
+    public void XHR_ArrayBuffer_ResponseType_Uses_Fetch_ArrayBuffer_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('AB', {
+                status: 200,
+                headers: { 'Content-Type': 'application/octet-stream' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'arraybuffer';
+xhr.onload = function() {
+    var view = new Uint8Array(xhr.response);
+    document.getElementById('result').textContent = [
+        xhr.response instanceof ArrayBuffer,
+        xhr.responseText === '',
+        view[0],
+        view[1]
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|65|66", result);
+    }
+
+    [Fact]
+    public void XHR_Blob_ResponseType_Uses_Fetch_Blob_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('AB', {
+                status: 200,
+                headers: { 'Content-Type': 'application/octet-stream' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'blob';
+xhr.onload = function() {
+    xhr.response.text().then(function(text) {
+        document.getElementById('result').textContent = [
+            typeof xhr.response.text === 'function',
+            xhr.response.size,
+            xhr.response.type,
+            xhr.responseText === '',
+            text
+        ].join('|');
+    });
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|2|application/octet-stream|true|AB", result);
+    }
+
+    [Fact]
+    public void XHR_Json_ResponseType_Uses_Fetch_Json_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('{""ok"":true,""count"":2}', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'json';
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response.ok === true,
+        xhr.response.count,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|2|true", result);
+    }
+
+    [Fact]
+    public void XHR_Json_ResponseType_Invalid_Json_Yields_Null_And_Completes_Load()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('{invalid json', {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'json';
+xhr.onload = function() {
+    loadCalled = true;
+};
+xhr.onerror = function() {
+    errorCalled = true;
+};
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        xhr.response === null,
+        xhr.responseText === '',
+        xhr.readyState === 4
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|false|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Rejected_Fetch_Triggers_Error_And_LoadEnd()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve, reject) {
+            if (typeof reject === 'function') {
+                reject(new Error('network failed'));
+            }
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.onload = function() { loadCalled = true; };
+xhr.onerror = function() { errorCalled = true; };
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        xhr.readyState === 4,
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("false|true|true|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Rejected_BodyReader_Triggers_Error_And_LoadEnd()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            var response = new Response('payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            });
+            response.text = function() {
+                return {
+                    then: function(resolve, reject) {
+                        if (typeof reject === 'function') {
+                            reject(new Error('read failed'));
+                        }
+                    }
+                };
+            };
+            resolve(response);
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+var readyStates = [];
+var loadCalled = false;
+var errorCalled = false;
+xhr.open('GET', 'http://example.com/data');
+xhr.onreadystatechange = function() {
+    readyStates.push(xhr.readyState);
+};
+xhr.onload = function() { loadCalled = true; };
+xhr.onerror = function() { errorCalled = true; };
+xhr.onloadend = function() {
+    document.getElementById('result').textContent = [
+        loadCalled,
+        errorCalled,
+        readyStates.join(','),
+        xhr.status === 0,
+        xhr.response === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("false|true|2,4|true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Uses_Fetch_Text_Result_As_Document()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/html' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.onload = function() {
+    var doc = xhr.response;
+    var payload = doc && doc.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseXML,
+        xhr.responseText === '',
+        doc !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
+    }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Stays_Null_For_NonDocument_MimeType()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('plain text payload', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.onload = function() {
+    document.getElementById('result').textContent = [
+        xhr.response === null,
+        xhr.responseXML === null,
+        xhr.responseText === ''
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true", result);
+    }
+
+    [Fact]
+    public void XHR_Document_ResponseType_Uses_OverrideMimeType_For_Text_Response()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var originalFetch = fetch;
+fetch = window.fetch = function() {
+    return {
+        then: function(resolve) {
+            resolve(new Response('<section id=""payload""><span>OK</span></section>', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            }));
+            return { catch: function() {} };
+        }
+    };
+};
+
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'http://example.com/data');
+xhr.responseType = 'document';
+xhr.overrideMimeType('text/html');
+xhr.onload = function() {
+    var payload = xhr.response && xhr.response.getElementById('payload');
+    document.getElementById('result').textContent = [
+        xhr.response === xhr.responseXML,
+        xhr.responseText === '',
+        xhr.response !== null,
+        !!payload,
+        payload && payload.textContent
+    ].join('|');
+};
+xhr.send();
+fetch = window.fetch = originalFetch;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true|true|true|true|OK", result);
     }
 }

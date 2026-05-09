@@ -35,7 +35,7 @@ public sealed partial class DomBridge
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
     private readonly List<DomElement> _elements = [];
-    private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
+    private readonly List<(JSObject Observer, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<IteratorState>> _activeNodeIterators = [];
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
@@ -58,6 +58,21 @@ public sealed partial class DomBridge
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<JSObject, Dictionary<string, List<EventListenerRegistration>>> _eventTargetListeners =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, DomElement> _subWindowContainers =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, JSObject> _messagePortPeers =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly HashSet<JSObject> _closedMessagePorts =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly HashSet<JSObject> _startedMessagePorts =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<JSObject, List<JSObject>> _queuedMessagePortEvents =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+    private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
     private double _visualViewportPageTopOffset;
@@ -973,8 +988,12 @@ public sealed class MutationObserverOptions
     public bool ChildList { get; set; }
     /// <summary>Whether to observe attribute changes.</summary>
     public bool Attributes { get; set; }
+    /// <summary>Whether to expose the previous attribute value in mutation records.</summary>
+    public bool AttributeOldValue { get; set; }
     /// <summary>Whether to observe character data changes.</summary>
     public bool CharacterData { get; set; }
+    /// <summary>Whether to expose the previous character data value in mutation records.</summary>
+    public bool CharacterDataOldValue { get; set; }
     /// <summary>Whether to observe the subtree.</summary>
     public bool Subtree { get; set; }
 }

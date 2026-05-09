@@ -98,21 +98,29 @@ public sealed partial class DomBridge
     private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
-        SearchDescendants(root, selector, results, bridge, all);
+        if (selector.IndexOf(":scope", StringComparison.Ordinal) >= 0 &&
+            MatchesSelector(root, selector, root))
+        {
+            results.Add(bridge.ToJSObject(root));
+            if (!all)
+                return results[0];
+        }
+
+        SearchDescendants(root, selector, results, bridge, all, root);
         if (all) return new JSArray(results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all)
+    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
     {
         foreach (var child in parent.Children)
         {
-            if (!child.IsTextNode && MatchesSelector(child, selector))
+            if (!child.IsTextNode && MatchesSelector(child, selector, scope))
             {
                 results.Add(bridge.ToJSObject(child));
                 if (!all) return;
             }
-            SearchDescendants(child, selector, results, bridge, all);
+            SearchDescendants(child, selector, results, bridge, all, scope);
             if (!all && results.Count > 0) return;
         }
     }
@@ -318,6 +326,53 @@ public sealed partial class DomBridge
             current = current.Parent;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Compares two nodes in document tree order.
+    /// Returns -1 when <paramref name="first"/> precedes <paramref name="second"/>,
+    /// 1 when it follows, and 0 when no ordering can be determined.
+    /// </summary>
+    private static int CompareTreeOrder(DomElement first, DomElement second)
+    {
+        if (ReferenceEquals(first, second))
+            return 0;
+
+        var firstAncestors = new List<DomElement>();
+        for (var current = first; current != null; current = current.Parent)
+            firstAncestors.Add(current);
+        firstAncestors.Reverse();
+
+        var secondAncestors = new List<DomElement>();
+        for (var current = second; current != null; current = current.Parent)
+            secondAncestors.Add(current);
+        secondAncestors.Reverse();
+
+        var divergenceIndex = 0;
+        var sharedLength = Math.Min(firstAncestors.Count, secondAncestors.Count);
+        while (divergenceIndex < sharedLength &&
+               ReferenceEquals(firstAncestors[divergenceIndex], secondAncestors[divergenceIndex]))
+        {
+            divergenceIndex++;
+        }
+
+        if (divergenceIndex == 0 ||
+            divergenceIndex >= firstAncestors.Count ||
+            divergenceIndex >= secondAncestors.Count)
+        {
+            return 0;
+        }
+
+        var commonAncestor = firstAncestors[divergenceIndex - 1];
+        var firstChild = firstAncestors[divergenceIndex];
+        var secondChild = secondAncestors[divergenceIndex];
+        var firstIndex = commonAncestor.Children.IndexOf(firstChild);
+        var secondIndex = commonAncestor.Children.IndexOf(secondChild);
+
+        if (firstIndex == secondIndex)
+            return 0;
+
+        return firstIndex < secondIndex ? -1 : 1;
     }
 
     /// <summary>

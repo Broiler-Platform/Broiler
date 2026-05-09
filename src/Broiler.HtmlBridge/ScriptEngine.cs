@@ -5,6 +5,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.HtmlBridge;
@@ -319,14 +320,15 @@ public sealed class ScriptEngine : IScriptEngine
         // queueMicrotask(fn)
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
-            if (a.Length > 0 && a[0] is JSFunction fn)
+            if (a.Length == 0 || a[0] is not JSFunction fn)
+                throw JSEngine.NewTypeError("Callback must be a function");
+
+            MicroTasks.Enqueue(() =>
             {
-                MicroTasks.Enqueue(() =>
-                {
-                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                    catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.queueMicrotask", $"Callback error: {ex.Message}", ex); }
-                });
-            }
+                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.queueMicrotask", $"Callback error: {ex.Message}", ex); }
+            });
+
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
 

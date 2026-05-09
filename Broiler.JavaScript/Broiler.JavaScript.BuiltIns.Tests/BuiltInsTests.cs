@@ -1,13 +1,18 @@
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Broiler.JavaScript.BuiltIns.Tests;
 
 public class BuiltInsTests
 {
+    private static JSContext CreateContext(JavaScriptFeatureFlags experimentalFeatures = JavaScriptFeatureFlags.AllExperimentalEs2026)
+        => new(experimentalFeatures: experimentalFeatures);
+
     [Fact]
     public void WeakRef_Construct_And_Deref()
     {
@@ -406,6 +411,128 @@ public class BuiltInsTests
         using var ctx = new JSContext();
         var result = ctx.Eval("JSON.stringify({ a: 1 }, null, 2)");
         Assert.Contains("\"a\"", result.ToString());
+    }
+
+    [Fact]
+    public void JSON_Parse_SourceTextAccess_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.JsonParseSourceTextAccess);
+        var result = ctx.Eval("""
+            var seen = [];
+            JSON.parse('{"a":1}', function(key, value, context) {
+                seen.push(context === undefined ? 'missing' : 'present');
+                return value;
+            });
+            seen.join(',');
+            """);
+        Assert.Equal("missing", result.ToString());
+    }
+
+    [Fact]
+    public void JSON_Parse_SourceTextAccess_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.JsonParseSourceTextAccess);
+        var result = ctx.Eval("""
+            var seen = [];
+            JSON.parse('{"a":1}', function(key, value, context) {
+                if (key === 'a') {
+                    seen.push(context === undefined ? 'missing' : 'present');
+                    seen.push(context.source);
+                }
+                return value;
+            });
+            seen.join('|');
+            """);
+        Assert.Equal("present|1", result.ToString());
+    }
+
+    [Fact]
+    public void Error_IsError_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ErrorIsError);
+        var result = ctx.Eval("typeof Error.isError");
+        Assert.Equal("undefined", result.ToString());
+    }
+
+    [Fact]
+    public void Error_IsError_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ErrorIsError);
+        var result = ctx.Eval("[Error.isError(new Error('x')), Error.isError(new TypeError('y')), Error.isError({})].join('|')");
+        Assert.Equal("true|true|false", result.ToString());
+    }
+
+    [Fact]
+    public void Array_FromAsync_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ArrayFromAsync);
+        var result = ctx.Eval("typeof Array.fromAsync");
+        Assert.Equal("undefined", result.ToString());
+    }
+
+    [Fact]
+    public async Task Array_FromAsync_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ArrayFromAsync);
+        var promise = Assert.IsType<JSPromise>(ctx.Eval("Array.fromAsync([1, 2, 3], value => value * 2)"));
+        var result = Assert.IsType<JSArray>(await promise.Task);
+        ctx["resultArray"] = result;
+        Assert.Equal("2,4,6", ctx.Eval("resultArray.join(',')").ToString());
+    }
+
+    [Fact]
+    public void Object_And_Map_GroupBy_Are_Disabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.ObjectMapGroupBy);
+        var result = ctx.Eval("typeof Object.groupBy + '|' + typeof Map.groupBy");
+        Assert.Equal("undefined|undefined", result.ToString());
+    }
+
+    [Fact]
+    public void Object_And_Map_GroupBy_Are_Enabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.ObjectMapGroupBy);
+        var result = ctx.Eval("""
+            var objectGroups = Object.groupBy([1, 2, 3, 4], function(value) {
+                return value % 2 === 0 ? 'even' : 'odd';
+            });
+            var mapGroups = Map.groupBy([1, 2, 3, 4], function(value) {
+                return value % 2;
+            });
+            [
+                objectGroups.odd.join(','),
+                objectGroups.even.join(','),
+                mapGroups.get(1).join(','),
+                mapGroups.get(0).join(',')
+            ].join('|');
+            """);
+        Assert.Equal("1,3|2,4|1,3|2,4", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_Concat_IsDisabled_WhenFlagIsOff()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.AllExperimentalEs2026 & ~JavaScriptFeatureFlags.IteratorConcat);
+        var result = ctx.Eval("typeof Iterator.concat + '|' + typeof Iterator.from");
+        Assert.Equal("undefined|function", result.ToString());
+    }
+
+    [Fact]
+    public void Iterator_Concat_IsEnabled_WhenFlagIsOn()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.IteratorConcat);
+        var result = ctx.Eval("Iterator.concat([1,2], new Set([3,4]).values()).reduce((sum, value) => sum + value, 0);");
+        Assert.Equal(10.0, result.DoubleValue);
     }
 
     // ── M3: DataView tests ───────────────────────────────────────────
@@ -1037,6 +1164,139 @@ public class BuiltInsTests
             clone.size;
         ");
         Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_ArrayBuffer_Detaches_Source_And_Returns_Clone()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            var sourceView = new Uint8Array(source);
+            sourceView[0] = 7;
+            sourceView[1] = 11;
+            var clone = structuredClone(source, { transfer: [source] });
+            var cloneView = new Uint8Array(clone);
+            [source.detached, clone.detached, clone.byteLength, cloneView[0], cloneView[1], clone !== source].join('|');
+        ");
+        Assert.Equal("true|false|4|7|11|true", result.ToString());
+    }
+
+    [Fact]
+    public void StructuredClone_TypedArray_Preserves_View_And_Copies_Buffer()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(6);
+            var bytes = new Uint8Array(source);
+            bytes[2] = 7;
+            bytes[3] = 11;
+            bytes[4] = 13;
+            var sourceView = new Uint8Array(source, 2, 3);
+            var clone = structuredClone(sourceView);
+            bytes[2] = 99;
+            [
+              clone instanceof Uint8Array,
+              clone.buffer !== source,
+              clone.byteOffset,
+              clone.length,
+              clone[0],
+              clone[2]
+            ].join('|');
+        ");
+        Assert.Equal("true|true|2|3|7|13", result.ToString());
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Reuses_Transferred_Buffer_For_TypedArray_And_DataView()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var source = new ArrayBuffer(6);
+            var bytes = new Uint8Array(source);
+            bytes.set([1, 2, 3, 4, 5, 6]);
+            var payload = {
+              buffer: source,
+              typed: new Uint8Array(source, 1, 3),
+              view: new DataView(source, 2, 2)
+            };
+            var clone = structuredClone(payload, { transfer: [source] });
+            [
+              source.detached,
+              clone.buffer !== source,
+              clone.typed instanceof Uint8Array,
+              clone.typed.buffer === clone.buffer,
+              clone.typed.byteOffset,
+              clone.typed.length,
+              clone.typed[0],
+              clone.typed[2],
+              clone.view instanceof DataView,
+              clone.view.buffer === clone.buffer,
+              clone.view.byteOffset,
+              clone.view.byteLength,
+              clone.view.getUint8(0),
+              clone.view.getUint8(1)
+            ].join('|');
+        ");
+        Assert.Equal("true|true|true|true|1|3|2|4|true|true|2|2|3|4", result.ToString());
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Rejects_NonArrayBuffer_Entries()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            structuredClone({ ok: true }, { transfer: [{}] });
+        "));
+    }
+
+    [Fact]
+    public void StructuredClone_Transfer_Rejects_Duplicate_ArrayBuffers()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        Assert.Throws<JSException>(() => ctx.Eval(@"
+            var source = new ArrayBuffer(4);
+            structuredClone(source, { transfer: [source, source] });
+        "));
+    }
+
+    [Fact]
+    public void ExperimentalEs2026Features_CanBeDisabled_PerContext()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.None);
+        var result = ctx.Eval("""
+            [
+              typeof structuredClone,
+              typeof Math.sumPrecise,
+              typeof Uint8Array.fromBase64,
+              typeof Uint8Array.prototype.toBase64,
+              typeof Map.prototype.getOrInsert,
+              typeof WeakMap.prototype.getOrInsert
+            ].join('|');
+            """);
+        Assert.Equal("undefined|undefined|undefined|undefined|undefined|undefined", result.ToString());
+    }
+
+    [Fact]
+    public void ExperimentalEs2026Features_CanBeEnabled_Selectively()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone | JavaScriptFeatureFlags.MapUpsert);
+        var result = ctx.Eval("""
+            [
+              typeof structuredClone,
+              typeof Math.sumPrecise,
+              typeof Map.prototype.getOrInsert,
+              typeof Uint8Array.fromBase64
+            ].join('|');
+            """);
+        Assert.Equal("function|undefined|function|undefined", result.ToString());
     }
 
     /// <summary>
