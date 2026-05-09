@@ -1073,7 +1073,7 @@ public class BuiltInsTests
     public void Iterator_Concat_Reduce_Across_Iterables()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.IteratorConcat);
         var result = ctx.Eval("Iterator.concat([1,2], new Set([3,4]).values()).reduce((sum, value) => sum + value, 0);");
         Assert.Equal(10.0, result.DoubleValue);
     }
@@ -1143,7 +1143,7 @@ public class BuiltInsTests
     public void StructuredClone_Map()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         var result = ctx.Eval(@"
             var m = new Map();
             m.set('a', 1);
@@ -1157,7 +1157,7 @@ public class BuiltInsTests
     public void StructuredClone_Set()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         var result = ctx.Eval(@"
             var s = new Set([1, 2, 3]);
             var clone = structuredClone(s);
@@ -1170,7 +1170,7 @@ public class BuiltInsTests
     public void StructuredClone_Transfer_ArrayBuffer_Detaches_Source_And_Returns_Clone()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         var result = ctx.Eval(@"
             var source = new ArrayBuffer(4);
             var sourceView = new Uint8Array(source);
@@ -1187,7 +1187,7 @@ public class BuiltInsTests
     public void StructuredClone_TypedArray_Preserves_View_And_Copies_Buffer()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         var result = ctx.Eval(@"
             var source = new ArrayBuffer(6);
             var bytes = new Uint8Array(source);
@@ -1213,7 +1213,7 @@ public class BuiltInsTests
     public void StructuredClone_Transfer_Reuses_Transferred_Buffer_For_TypedArray_And_DataView()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         var result = ctx.Eval(@"
             var source = new ArrayBuffer(6);
             var bytes = new Uint8Array(source);
@@ -1248,7 +1248,7 @@ public class BuiltInsTests
     public void StructuredClone_Transfer_Rejects_NonArrayBuffer_Entries()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         Assert.Throws<JSException>(() => ctx.Eval(@"
             structuredClone({ ok: true }, { transfer: [{}] });
         "));
@@ -1258,7 +1258,7 @@ public class BuiltInsTests
     public void StructuredClone_Transfer_Rejects_Duplicate_ArrayBuffers()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = new JSContext();
+        using var ctx = CreateContext(JavaScriptFeatureFlags.StructuredClone);
         Assert.Throws<JSException>(() => ctx.Eval(@"
             var source = new ArrayBuffer(4);
             structuredClone(source, { transfer: [source, source] });
@@ -1269,7 +1269,7 @@ public class BuiltInsTests
     public void ExperimentalEs2026Features_CanBeDisabled_PerContext()
     {
         EnsureBuiltInsLoaded();
-        using var ctx = CreateContext(JavaScriptFeatureFlags.None);
+        using var ctx = new JSContext();
         var result = ctx.Eval("""
             [
               typeof structuredClone,

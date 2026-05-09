@@ -555,7 +555,15 @@ behavioral or performance-sensitive changes:
   - [x] **W3 / JS** — [Close the ES2025 compliance gap in `Broiler.JavaScript`](#close-the-es2025-compliance-gap-in-broilerjavascript)
   - [x] **W4 / HTML** — [Execute the targeted HTML/CSS compliance push](#execute-the-targeted-htmlcss-compliance-push)
   - [x] **W5 / Bridge** — [Bring `Broiler.HtmlBridge` DOM/Web APIs to current roadmap targets](#bring-broilerhtmlbridge-domweb-apis-to-current-roadmap-targets)
-- [ ] **M3** — expand W4/W5/W3 follow-ups for Fetch, structured clone, Selectors L4, and staged ES2026 work
+- [ ] **M3** — keep the W4/W5/W3 follow-up trackers current for Fetch, structured clone, Selectors L4, and staged ES2026 work
+  - [ ] **W3 / JS** — track [#1082](https://github.com/MaiRat/Broiler/issues/1082) against the current staged ES2026 surface in `Broiler.JavaScript`
+    - **Progress:** Started — `JavaScriptFeatureFlags` already gates the currently landed ES2026-facing APIs documented in [`../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`](../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md), so the remaining M3 work is to keep the staged surface, validation slice, and deferred backlog aligned with the roadmap of record.
+    - [x] **Inventory the staged surface** — confirm the currently flag-guarded ES2026 APIs and keep their status in sync with [`../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md`](../../Broiler.JavaScript/ECMASCRIPT_ROADMAP.md). **Owner:** JS-engine engineer.
+    - [ ] **Publish the validation slice** — define the focused PR/nightly Test262 and unit-test signal for the staged ES2026 surface and link it from the roadmap/dashboard. **Owner:** test-infrastructure engineer.
+    - [ ] **Triage the remaining backlog** — keep `Temporal` and `Atomics`/`SharedArrayBuffer` filed as explicit follow-ups, and decide whether proposals not yet represented in the in-repo ECMAScript roadmap (for example `Decorators`/`AsyncContext`) enter M3 scope or stay deferred to the M5 standards-intake cadence. **Owner:** JS-engine engineer.
+    - [ ] **Hold the release policy** — keep already-landed ES2026 APIs experimental by default via per-proposal flags plus the aggregate `AllExperimentalEs2026` opt-in until the roadmap graduates them. **Owner:** JS-engine engineer.
+  - [ ] **W4 / HTML** — continue the Selectors L4 matcher/cascade follow-up from [`wpt-failure-triage.md`](./wpt-failure-triage.md) and [`acid-test-triage.md`](./acid-test-triage.md). **Owner:** layout/CSS engineer. **Progress:** `:is()` / `:where()` / `:has()` specificity alignment is landed; remaining M3 work is matcher breadth, invalidation parity, and keeping the PR slice representative.
+  - [ ] **W5 / Bridge** — continue the Fetch / structured clone / `MessageChannel` / `postMessage` / `queueMicrotask` hardening tracked in the bridge roadmap/tests. **Owner:** bridge / DOM-API engineer. **Progress:** the bridge surface and focused CLI coverage exist; remaining M3 work is spec-hardening, dashboard publication, and the final M3 pass-rate lift.
 - [ ] **M4** — file optimization/gating follow-ups tied to the published benchmark budget deltas
 - [ ] **M5** — file sustaining-governance issue(s) for standards feed intake and support-matrix publication
 
@@ -570,6 +578,14 @@ sub-issues was filed or re-prioritized.
 
 ### 14.1 Implementation notes
 
+- **2026-05-09** — M3/W3 kickoff: expanded the Section 13.2 checklist so
+  [#1082](https://github.com/MaiRat/Broiler/issues/1082) now tracks explicit
+  owners, tasks, and progress against the staged ES2026 surface already wired
+  through `JavaScriptFeatureFlags`. The immediate blocker is now governance,
+  not plumbing: the in-repo ECMAScript roadmap currently leaves `Temporal` and
+  `Atomics`/`SharedArrayBuffer` as the only unstarted ES2026 backlog, while
+  proposals such as `Decorators`/`AsyncContext` still need explicit roadmap
+  intake before they should be treated as M3 deliverables.
 - **2026-05-06** — W5 close-out: published the focused Bridge Milestone 2
   signal in
   [`tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md`](../../tests/m2-conformance/bridge-targeted/bridge-targeted-summary.md),
@@ -1000,6 +1016,13 @@ and
   before the M2 compliance pushes are treated as milestone work.
   **Why:** The roadmap's stated exit criteria require published pass-rate and
   benchmark signals before later milestones can be objectively graded.
+- **Decision:** Stage Phase 3 ES2026 work via per-proposal
+  `JavaScriptFeatureFlags`, with `AllExperimentalEs2026` retained only as a
+  convenience aggregate for opt-in validation contexts.
+  **Why:** The runtime already uses independent flags to hide or expose the
+  currently landed ES2026 APIs, which keeps unfinished backlog items such as
+  `Temporal` separate from lower-risk utilities that are already implemented
+  and tested.
 
 ---
 
@@ -1044,8 +1067,10 @@ their **inter-engine ordering and gating**.
 4. Does the `Broiler.HtmlBridge` Fetch implementation share code with the
    existing `Broiler.JavaScript.Network` project, or does it own its own
    implementation? This decision shapes Phase 3.
-5. How are **ES2026** stage-3 proposals exposed during Phase 3 — a single
-   master flag, per-proposal flags, or build-time only?
+5. Which additional **ES2026** or stage-3 proposals beyond the current
+   flag-gated set should enter M3 scope? The staging mechanism is already
+   settled on per-proposal flags plus the aggregate `AllExperimentalEs2026`
+   opt-in.
 6. What is the policy for **breaking bridge surface changes** required by W2?
    Versioned `IScriptEngine` interface vs. additive-only evolution.
 7. Where does the unified conformance/perf dashboard live — in-repo static
