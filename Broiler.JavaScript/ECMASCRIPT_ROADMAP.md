@@ -1,3 +1,19 @@
+> ## ⚠️ Deprecated
+>
+> **This roadmap has been superseded** by the unified, Chromium-aligned roadmap:
+> [`docs/roadmap/chromium-alignment-unified-roadmap.md`](../docs/roadmap/chromium-alignment-unified-roadmap.md).
+>
+> ECMAScript edition tracking is now expressed there as workstream **W3**
+> (Section 5) with compliance gate **G1** (Section 7), anchored against the
+> JavaScript feature set actually shipped by V8 in each Chromium stable
+> release rather than against ECMA-262 editions. New planning, sub-issues,
+> and gates should be filed against the unified roadmap.
+>
+> This document is retained for historical context only and is **no longer
+> maintained**.
+
+---
+
 # ECMAScript Compliance Roadmap for YantraJS
 
 This document is a comprehensive roadmap for updating the YantraJS JavaScript

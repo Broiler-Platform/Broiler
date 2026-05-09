@@ -1,3 +1,20 @@
+> ## ⚠️ Deprecated
+>
+> **This roadmap has been superseded** by the unified, Chromium-aligned roadmap:
+> [`docs/roadmap/chromium-alignment-unified-roadmap.md`](./chromium-alignment-unified-roadmap.md).
+>
+> The graphics-backend cutover described below is now expressed there as
+> workstream **W7** (Section 5), with compliance gate **G4** (Section 7)
+> measuring pixel-diff parity of the Broiler-owned raster path against the
+> *current Chromium stable release's* reference captures rather than against
+> SkiaSharp parity. New planning, sub-issues, and gates should be filed
+> against the unified roadmap.
+>
+> This document is retained for historical context only and is **no longer
+> maintained**.
+
+---
+
 # Roadmap: Replace SkiaSharp with a Broiler-Owned Graphics Implementation
 
 > **Status**: Draft for team review  
