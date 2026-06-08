@@ -2,7 +2,7 @@
   "profiles": {
     "Broiler.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "--capture-image \"https://wpt.live/svg/as-image/external-resource-inline-sheet.html\" --output capture.png --width 800 --height 600"
+      "commandLineArgs": "--capture-image \"https://www.7-zip.org/\" --output capture.png --width 800 --height 600"
     }
   }
 }
