@@ -1,3 +1,9 @@
 [submodule "Broiler.Graphics"]
 	path = Broiler.Graphics
 	url = https://github.com/MaiRat/Broiler.Graphics.git
+[submodule "Broiler.JS"]
+	path = Broiler.JS
+	url = https://github.com/MaiRat/Broiler.JS.git
+[submodule "Broiler.HTML"]
+	path = Broiler.HTML
+	url = https://github.com/MaiRat/Broiler.HTML.git
