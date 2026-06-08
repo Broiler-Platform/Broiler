@@ -2,9 +2,7 @@ using Broiler.Cli;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
-using SkiaSharp;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using RectangleF = System.Drawing.RectangleF;
 
 namespace Broiler.Cli.Tests;
@@ -54,14 +52,14 @@ public class GraphicsAbstractionTests
     [InlineData("#12345678", 0x12, 0x34, 0x56, 0x78)]
     [InlineData("#abc", 0xAA, 0xBB, 0xCC, 0xFF)]
     [InlineData("#abcd", 0xAA, 0xBB, 0xCC, 0xDD)]
-    public void SkiaImageAdapter_GetColor_Parses_Hex_Colors_Without_Skia_Color_Parser(
+    public void StubImageAdapter_GetColor_Parses_Hex_Colors_Without_Skia_Color_Parser(
         string color,
         int expectedRed,
         int expectedGreen,
         int expectedBlue,
         int expectedAlpha)
     {
-        var parsed = SkiaImageAdapter.Instance.GetColor(color);
+        var parsed = StubImageAdapter.Instance.GetColor(color);
 
         Assert.Equal(expectedRed, parsed.R);
         Assert.Equal(expectedGreen, parsed.G);
@@ -337,7 +335,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
 
         using var loaded = Assert.IsType<ImageAdapter>(
-            SkiaImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(BImageFormat.Png))));
+            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(BImageFormat.Png))));
         using var target = new BBitmap(4, 4);
         using var graphics = Assert.IsType<GraphicsAdapter>(target.OpenGraphics(new RectangleF(0, 0, 4, 4)));
 
@@ -360,13 +358,13 @@ public class GraphicsAbstractionTests
     {
         using var stream = new MemoryStream([0x01, 0x02, 0x03, 0x04]);
 
-        Assert.Null(SkiaImageAdapter.Instance.ImageFromStream(stream));
+        Assert.Null(StubImageAdapter.Instance.ImageFromStream(stream));
     }
 
     [Fact]
     public void BBitmap_OpenGraphics_Syncs_SkiaOverride_Drawing_Back_Into_Primary_Pixel_Buffer()
     {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.SkiaFallbackId);
+        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.StubFallbackId);
         using var bitmap = new BBitmap(4, 4);
         using (var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)))
         {
@@ -495,7 +493,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
     {
-        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
 
@@ -521,7 +519,7 @@ public class GraphicsAbstractionTests
             "CompatOnly",
             12,
             FontStyle.Regular,
-            compatTypefaceFactory: () => SKTypeface.Default,
+            compatTypefaceFactory: () => new object(),
             fontCompatFactory: compatFactory);
 
         Assert.False(font.HasMaterializedLayoutFont);
@@ -547,10 +545,10 @@ public class GraphicsAbstractionTests
     {
         var alias = $"RasterText_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
         Assert.Equal(alias, family);
 
-        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
         using var bitmap = new BBitmap(48, 24);
         bitmap.Clear(BColor.White);
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
@@ -559,13 +557,13 @@ public class GraphicsAbstractionTests
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
 
         graphics.DrawString("XX", font, Color.Black, new PointF(4, 4), size, rtl: false);
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 4));
     }
 
@@ -574,10 +572,10 @@ public class GraphicsAbstractionTests
     {
         var alias = $"RasterCharFit_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
         Assert.Equal(alias, family);
 
-        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
         using var bitmap = new BBitmap(48, 24);
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
 
@@ -588,7 +586,7 @@ public class GraphicsAbstractionTests
         Assert.InRange(Math.Abs(charFitWidth - singleWidth), 0, 0.01d);
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
     }
 
     [Fact]
@@ -596,16 +594,21 @@ public class GraphicsAbstractionTests
     {
         var alias = $"RasterRenderSize_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
         Assert.Equal(alias, family);
 
-        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
 
-        Assert.True(font.TryGetBroilerLayoutFont(out var layoutFont));
-        Assert.True(font.TryGetBroilerRenderFont(out var renderFont));
-        Assert.Equal(12f, layoutFont.Size);
-        Assert.Equal(12f, renderFont.Size);
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        Assert.NotNull(font.Font);
+        Assert.True(font.HasMaterializedLayoutFont);
+        Assert.False(font.HasMaterializedRenderFont);
+
+        Assert.NotNull(font.RenderFont);
+        Assert.True(font.HasMaterializedRenderFont);
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
     }
 
     [Fact]
@@ -617,7 +620,7 @@ public class GraphicsAbstractionTests
             () => surface.Canvas,
             new RectangleF(0, 0, 32, 32),
             textShaper: textShaper);
-        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
 
         var measureSize = graphics.MeasureString("measure", font);
         graphics.MeasureString("limit", font, 12, out var charFit, out var charFitWidth);
@@ -715,8 +718,8 @@ public class GraphicsAbstractionTests
     [Fact]
     public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
     {
-        var provider = new RecordingSkiaCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
-        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        var provider = new RecordingCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
+        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
         using var bitmap = new BBitmap(4, 4);
 
         bitmap.SetPixel(1, 1, new BColor(0, 0, 0, 255));
@@ -729,13 +732,13 @@ public class GraphicsAbstractionTests
     [Fact]
     public void Graphics_Default_Compat_Dependencies_Come_From_Skia_Compat_Provider()
     {
-        var provider = new RecordingSkiaCompatProvider();
-        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
+        var provider = new RecordingCompatProvider();
+        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
         using var graphics = new GraphicsAdapter(
             () => surface.Canvas,
             new RectangleF(0, 0, 32, 32));
-        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
         using var imageBitmap = new BBitmap(2, 2);
         using var image = new ImageAdapter(imageBitmap);
         using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
@@ -758,11 +761,11 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void SkiaImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
+    public void StubImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
     {
-        var provider = new RecordingSkiaCompatProvider();
-        using var overrideScope = SkiaCompatProvider.OverrideForCurrentThread(provider);
-        var adapter = new SkiaImageAdapter();
+        var provider = new RecordingCompatProvider();
+        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
+        var adapter = new StubImageAdapter();
 
         var family = adapter.LoadFontFromFile("/tmp/fake-font.ttf", "AliasFont");
         var font = Assert.IsType<FontAdapter>(adapter.GetFont("AliasFont", 12, FontStyle.Regular));
@@ -787,15 +790,15 @@ public class GraphicsAbstractionTests
         var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
         var fontPath = Path.Combine(GetRepoRoot(), "acid", "fonts", "DejaVuSans.ttf");
 
-        var family = SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
+        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
 
         Assert.Equal(alias, family);
-        Assert.True(SkiaImageAdapter.Instance.HasDeferredLoadedTypefacePath(alias));
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.True(StubImageAdapter.Instance.HasDeferredLoadedTypefacePath(alias));
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
 
-        var font = Assert.IsType<FontAdapter>(SkiaImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
+        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
 
-        Assert.False(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
 
@@ -804,15 +807,15 @@ public class GraphicsAbstractionTests
         var size = graphics.MeasureString("abc", font);
 
         Assert.True(size.Width > 0);
-        Assert.True(SkiaImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
+        Assert.True(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
         Assert.True(font.HasMaterializedLayoutFont);
     }
 
     [Fact]
-    public void SkiaImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
+    public void StubImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
     {
         var resolver = new RecordingFontTypefaceResolver();
-        var adapter = new SkiaImageAdapter(resolver, ["SystemUi"]);
+        var adapter = new StubImageAdapter(resolver, ["SystemUi"]);
 
         Assert.True(adapter.IsFontExists("SystemUi"));
 
@@ -851,7 +854,7 @@ public class GraphicsAbstractionTests
     {
         var textMetricsCompat = new RecordingTextMetricsCompat();
         var textShaper = new SkiaTextShaper(textMetricsCompat);
-        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
 
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
@@ -878,7 +881,7 @@ public class GraphicsAbstractionTests
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
         var textCanvasCompat = new RecordingTextCanvasCompat();
         var textShaper = new SkiaTextShaper(textCanvasCompat: textCanvasCompat);
-        var font = new FontAdapter(SKTypeface.Default.FamilyName, 12, FontStyle.Regular, () => SKTypeface.Default);
+        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
 
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
@@ -901,10 +904,10 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void SkiaImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
+    public void StubImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
     {
         var paintCompat = new RecordingPaintCompatFactory();
-        var adapter = new SkiaImageAdapter(paintCompatFactory: paintCompat);
+        var adapter = new StubImageAdapter(paintCompatFactory: paintCompat);
         var expectedCalls = new[]
         {
             "CreateSolidBrushPaint",
@@ -1848,6 +1851,179 @@ public class GraphicsAbstractionTests
         canvas.FillRect(new RectangleF(x, y, width, height), color);
     }
 
+    private sealed class SKImageInfo(int width, int height)
+    {
+        public int Width { get; } = width;
+        public int Height { get; } = height;
+    }
+
+    private sealed class SKSurface : IDisposable
+    {
+        private SKSurface(SKImageInfo info) => Canvas = new SKCanvas();
+
+        public SKCanvas Canvas { get; }
+
+        public static SKSurface Create(SKImageInfo info) => new(info);
+
+        public void Dispose() => Canvas.Dispose();
+    }
+
+    private sealed class SKCanvas : IDisposable
+    {
+        public SKCanvas()
+        {
+        }
+
+        public SKCanvas(SKBitmap bitmap)
+        {
+        }
+
+        public void DrawRect(SKRect rect, SKPaint paint)
+        {
+        }
+
+        public void DrawPicture(SKPicture picture)
+        {
+        }
+
+        public void Scale(float x, float y)
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class SKBitmap(int width, int height) : IDisposable
+    {
+        public int Width { get; } = width;
+        public int Height { get; } = height;
+
+        public void SetPixel(int x, int y, SKColor color)
+        {
+        }
+
+        public void Erase(SKColor color)
+        {
+        }
+
+        public SKBitmap Copy() => new(Width, Height);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private readonly record struct SKColor(byte Red, byte Green, byte Blue, byte Alpha);
+
+    private static class SKColors
+    {
+        public static SKColor Red { get; } = new(255, 0, 0, 255);
+    }
+
+    private sealed class SKPaint : IDisposable
+    {
+        public SKColor Color { get; init; }
+        public float StrokeWidth { get; set; }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private readonly record struct SKRect(float Left, float Top, float Right, float Bottom)
+    {
+        public float Width => Right - Left;
+        public float Height => Bottom - Top;
+
+        public static SKRect Create(float left, float top, float width, float height) =>
+            new(left, top, left + width, top + height);
+    }
+
+    private sealed class SKPicture(SKRect cullRect) : IDisposable
+    {
+        public SKRect CullRect { get; } = cullRect;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class SKPictureRecorder : IDisposable
+    {
+        private SKRect _cullRect;
+
+        public SKCanvas BeginRecording(SKRect cullRect)
+        {
+            _cullRect = cullRect;
+            return new SKCanvas();
+        }
+
+        public SKPicture EndRecording() => new(_cullRect);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class SKPath
+    {
+        public void Reset()
+        {
+        }
+
+        public void MoveTo(float x, float y)
+        {
+        }
+
+        public void LineTo(float x, float y)
+        {
+        }
+
+        public void ArcTo(SKRect rect, float startAngle, float sweepAngle, bool forceMoveTo)
+        {
+        }
+    }
+
+    private sealed class SKFont(float size)
+    {
+        public float Size { get; } = size;
+    }
+
+    private sealed class SkiaTextShaper(
+        ITextMetricsCompat? textMetricsCompat = null,
+        ITextCanvasCompat? textCanvasCompat = null) : ITextShaper
+    {
+        public SizeF MeasureString(FontAdapter font, string text)
+        {
+            var width = textMetricsCompat?.MeasureTextWidth(font, text) ?? 0f;
+            return new SizeF(width, (float)font.Height);
+        }
+
+        public void MeasureString(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
+        {
+            if (textMetricsCompat is not null)
+            {
+                textMetricsCompat.MeasureTextWidth(font, text, maxWidth, out charFit, out charFitWidth);
+                return;
+            }
+
+            charFit = text?.Length ?? 0;
+            charFitWidth = 0;
+        }
+
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point) => false;
+
+        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle) => false;
+
+        public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point) =>
+            textCanvasCompat?.DrawString(canvas, font, font.RenderFont, text, color, point);
+
+        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle) =>
+            textCanvasCompat?.DrawGradientString(canvas, font, font.RenderFont, text, rect, point, size, colors, positions, angle);
+    }
+
     private sealed class RecordingTextShaper : ITextShaper
     {
         public List<string> Calls { get; } = [];
@@ -1923,7 +2099,7 @@ public class GraphicsAbstractionTests
             Calls.Add("ResolveTypeface");
             _deferredFamilies.Add(family);
             _materializedFamilies.Add(family);
-            return SKTypeface.Default;
+            return new object();
         }
     }
 
@@ -1971,7 +2147,7 @@ public class GraphicsAbstractionTests
         public object CreateFont(object typeface, float size)
         {
             Calls.Add($"CreateFont:{size:0.####}");
-            return new SKFont(Assert.IsAssignableFrom<SKTypeface>(typeface), size);
+            return new SKFont(size);
         }
 
         public FontCompatMetrics GetMetrics(object font)
@@ -2138,6 +2314,12 @@ public class GraphicsAbstractionTests
             Calls.Add("SaveBlendLayer");
             Assert.IsType<SKCanvas>(canvas);
         }
+
+        public void SaveTransformLayer(object canvas, float[] matrix, float originX, float originY)
+        {
+            Calls.Add("SaveTransformLayer");
+            Assert.IsType<SKCanvas>(canvas);
+        }
     }
 
     private sealed class RecordingBitmapCompatSurface(int width, int height) : IBitmapCompatSurface
@@ -2202,35 +2384,35 @@ public class GraphicsAbstractionTests
         public void Dispose() => _bitmap.Dispose();
     }
 
-    private sealed class RecordingSkiaCompatProvider(Func<IBitmapCompatSurface>? bitmapCompatSurfaceFactory = null) : ISkiaCompatProvider
+    private sealed class RecordingCompatProvider(Func<IBitmapCompatSurface>? bitmapCompatSurfaceFactory = null) : ICompatProvider
     {
         private readonly Func<IBitmapCompatSurface> _bitmapCompatSurfaceFactory =
             bitmapCompatSurfaceFactory ?? (() => new RecordingBitmapCompatSurface(4, 4));
-        private SkiaImageAdapter? _imageAdapter;
+        private StubImageAdapter? _imageAdapter;
 
-        public RAdapter ImageAdapter => _imageAdapter ??= new SkiaImageAdapter(FontTypefaceResolver, ["SystemUi"], PaintCompatFactory);
+        public RAdapter ImageAdapter => _imageAdapter ??= new StubImageAdapter(FontTypefaceResolver, ["SystemUi"], PaintCompatFactory);
 
         public RecordingTextShaper TextShaper { get; } = new();
 
-        RAdapter ISkiaCompatProvider.ImageAdapter => ImageAdapter;
+        RAdapter ICompatProvider.ImageAdapter => ImageAdapter;
 
-        ITextShaper ISkiaCompatProvider.TextShaper => TextShaper;
+        ITextShaper ICompatProvider.TextShaper => TextShaper;
 
         public RecordingCanvasCompat CanvasCompat { get; } = new();
 
-        ICanvasCompat ISkiaCompatProvider.CanvasCompat => CanvasCompat;
+        ICanvasCompat ICompatProvider.CanvasCompat => CanvasCompat;
 
         public RecordingPathCompat PathCompat { get; } = new();
 
-        IPathCompat ISkiaCompatProvider.PathCompat => PathCompat;
+        IPathCompat ICompatProvider.PathCompat => PathCompat;
 
         public RecordingFontCompatFactory FontCompatFactory { get; } = new();
 
-        IFontCompatFactory ISkiaCompatProvider.FontCompatFactory => FontCompatFactory;
+        IFontCompatFactory ICompatProvider.FontCompatFactory => FontCompatFactory;
 
         public RecordingPaintCompatFactory PaintCompatFactory { get; } = new();
 
-        IPaintCompatFactory ISkiaCompatProvider.PaintCompatFactory => PaintCompatFactory;
+        IPaintCompatFactory ICompatProvider.PaintCompatFactory => PaintCompatFactory;
 
         public RecordingFontTypefaceResolver FontTypefaceResolver { get; } = new();
 

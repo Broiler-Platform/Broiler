@@ -38,23 +38,23 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
   </Folder>
-  <Folder Name="/Broiler.JavaScript/">
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Clr/Broiler.JavaScript.Clr.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Compiler/Broiler.JavaScript.Compiler.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Debugger/Broiler.JavaScript.Debugger.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Engine/Broiler.JavaScript.Engine.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Extensions/Broiler.JavaScript.Extensions.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Globals/Broiler.JavaScript.Globals.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.LinqExpressions/Broiler.JavaScript.LinqExpressions.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ModuleExtensions/Broiler.JavaScript.ModuleExtensions.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
+  <Folder Name="/Broiler.JS/">
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Clr/Broiler.JavaScript.Clr.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Compiler/Broiler.JavaScript.Compiler.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Debugger/Broiler.JavaScript.Debugger.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Engine/Broiler.JavaScript.Engine.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Extensions/Broiler.JavaScript.Extensions.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Globals/Broiler.JavaScript.Globals.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.LinqExpressions/Broiler.JavaScript.LinqExpressions.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.ModuleExtensions/Broiler.JavaScript.ModuleExtensions.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
   </Folder>
 </Solution>

@@ -9,7 +9,7 @@ namespace Broiler.Cli.Tests;
 /// <summary>
 /// Tests for SVG image detection and rendering.
 /// Verifies that SVG data is properly detected by <see cref="ImageDecoder.DetectFormatFromBytes"/>
-/// and that <c>SkiaImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
+/// and that <c>StubImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
 /// via the Broiler-owned SVG rasterizer instead of silently returning null.
 /// </summary>
 public class SvgImageRenderingTests

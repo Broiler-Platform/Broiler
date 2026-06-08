@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Broiler.LogAnalyzer.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "--file \"C:\\Users\\proof\\Desktop\\Desktop alt\\logs\" --search mp3"
+    }
+  }
+}

@@ -123,7 +123,7 @@ public class SkiaDecouplingGuardTests
     }
 
     [Fact]
-    public void Only_Image_Project_Carries_Skia_And_Svg_Package_References()
+    public void No_Project_Carries_Skia_Package_References()
     {
         var actual = Directory.EnumerateFiles(RepoRoot, "*.csproj", SearchOption.AllDirectories)
             .Select(path => new
@@ -143,24 +143,11 @@ public class SkiaDecouplingGuardTests
             .OrderBy(project => project.RelativePath, StringComparer.Ordinal)
             .ToArray();
 
-        var expected = new[]
-        {
-            new
-            {
-                RelativePath = ImageCompatProjectRelativePath,
-                Packages = AllowedSkiaPackageReferences
-                    .OrderBy(static value => value, StringComparer.Ordinal)
-                    .ToArray(),
-            },
-        };
-
-        Assert.Equal(
-            expected.Select(project => $"{project.RelativePath}: {string.Join(", ", project.Packages)}"),
-            actual.Select(project => $"{project.RelativePath}: {string.Join(", ", project.Packages)}"));
+        Assert.Empty(actual);
     }
 
     [Fact]
-    public void Image_Project_Uses_The_Known_Good_Skia_Compatibility_Package_Versions()
+    public void Image_Compat_Project_Does_Not_Carry_SkiaSharp_Packages()
     {
         var projectPath = Path.Combine(RepoRoot, ImageCompatProjectRelativePath);
         var packages = XDocument.Load(projectPath)
@@ -174,8 +161,8 @@ public class SkiaDecouplingGuardTests
             .Where(static package => !string.IsNullOrWhiteSpace(package.Include))
             .ToDictionary(static package => package.Include!, static package => package.Version, StringComparer.Ordinal);
 
-        Assert.Equal("3.119.2", packages["SkiaSharp"]);
-        Assert.Equal("3.119.2", packages["SkiaSharp.NativeAssets.Linux"]);
+        Assert.DoesNotContain("SkiaSharp", packages.Keys);
+        Assert.DoesNotContain("SkiaSharp.NativeAssets.Linux", packages.Keys);
     }
 
     [Fact]
@@ -187,7 +174,7 @@ public class SkiaDecouplingGuardTests
             "Source",
             "Broiler.HTML.Image.Compat",
             "Adapters",
-            "SkiaImageAdapter.cs");
+            "StubImageAdapter.cs");
 
         var source = File.ReadAllText(adapterPath);
 
@@ -203,7 +190,7 @@ public class SkiaDecouplingGuardTests
             "Source",
             "Broiler.HTML.Image.Compat",
             "Adapters",
-            "SkiaImageAdapter.cs");
+            "StubImageAdapter.cs");
 
         var source = File.ReadAllText(adapterPath);
 

@@ -23,7 +23,7 @@ public class GraphicsBackendCutoverTests
 
         try
         {
-            Environment.SetEnvironmentVariable(legacyVariable, BGraphicsBackend.SkiaFallbackId);
+            Environment.SetEnvironmentVariable(legacyVariable, BGraphicsBackend.StubFallbackId);
 
             Assert.Equal(BGraphicsBackend.BroilerRasterId, BGraphicsBackend.CurrentId);
             Assert.Equal("Broiler raster", BGraphicsBackend.CurrentDisplayName);
@@ -37,7 +37,7 @@ public class GraphicsBackendCutoverTests
 
     [Theory]
     [InlineData(BGraphicsBackend.BroilerRasterId, "Broiler raster", true)]
-    [InlineData(BGraphicsBackend.SkiaFallbackId, "SkiaSharp fallback", false)]
+    [InlineData(BGraphicsBackend.StubFallbackId, "Stub compatibility fallback (no OS backend)", false)]
     public void BGraphicsBackend_OverrideForCurrentThread_Selects_Requested_Mode(
         string backendId,
         string expectedDisplayName,
@@ -62,7 +62,7 @@ public class GraphicsBackendCutoverTests
             """;
 
         using var broiler = RenderWithBackend(BGraphicsBackend.BroilerRasterId, html, 180, 140);
-        using var skia = RenderWithBackend(BGraphicsBackend.SkiaFallbackId, html, 180, 140);
+        using var skia = RenderWithBackend(BGraphicsBackend.StubFallbackId, html, 180, 140);
         using var diff = PixelDiffRunner.Compare(broiler, skia);
 
         Assert.True(diff.IsMatch);
@@ -82,7 +82,7 @@ public class GraphicsBackendCutoverTests
             """;
 
         using var broiler = RenderWithBackend(BGraphicsBackend.BroilerRasterId, html, 120, 60);
-        using var skia = RenderWithBackend(BGraphicsBackend.SkiaFallbackId, html, 120, 60);
+        using var skia = RenderWithBackend(BGraphicsBackend.StubFallbackId, html, 120, 60);
         using var diff = PixelDiffRunner.Compare(broiler, skia);
 
         Assert.True(diff.IsMatch);
@@ -101,7 +101,7 @@ public class GraphicsBackendCutoverTests
         {
             await File.WriteAllTextAsync(htmlPath, "<html><body style='margin:0'>fallback metadata</body></html>");
 
-            using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.SkiaFallbackId);
+            using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.StubFallbackId);
             var exitCode = await Program.Main([
                 "--capture-image", htmlPath,
                 "--output", outputPath,
@@ -113,8 +113,8 @@ public class GraphicsBackendCutoverTests
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
             var renderBackend = document.RootElement.GetProperty("renderBackend");
 
-            Assert.Equal(BGraphicsBackend.SkiaFallbackId, renderBackend.GetProperty("id").GetString());
-            Assert.Equal("SkiaSharp fallback", renderBackend.GetProperty("displayName").GetString());
+            Assert.Equal(BGraphicsBackend.StubFallbackId, renderBackend.GetProperty("id").GetString());
+            Assert.Equal("Stub compatibility fallback (no OS backend)", renderBackend.GetProperty("displayName").GetString());
             Assert.Equal(BGraphicsBackend.CurrentLabel, renderBackend.GetProperty("label").GetString());
         }
         finally

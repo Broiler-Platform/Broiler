@@ -60,7 +60,7 @@ public class GraphicsBackendStabilizationTests
     public void M5_Curated_Parity_Suite_Matches_Explicit_Skia_Fallback(CuratedCase testCase)
     {
         using var broiler = testCase.Render(BGraphicsBackend.BroilerRasterId);
-        using var skia = testCase.Render(BGraphicsBackend.SkiaFallbackId);
+        using var skia = testCase.Render(BGraphicsBackend.StubFallbackId);
         using var diff = PixelDiffRunner.Compare(
             broiler,
             skia,
@@ -84,7 +84,7 @@ public class GraphicsBackendStabilizationTests
         foreach (var testCase in cases)
         {
             long broilerMs = MeasureMedianMilliseconds(testCase, BGraphicsBackend.BroilerRasterId);
-            long skiaMs = MeasureMedianMilliseconds(testCase, BGraphicsBackend.SkiaFallbackId);
+            long skiaMs = MeasureMedianMilliseconds(testCase, BGraphicsBackend.StubFallbackId);
             samples.Add((testCase.Category, testCase.Name, broilerMs, skiaMs));
         }
 
