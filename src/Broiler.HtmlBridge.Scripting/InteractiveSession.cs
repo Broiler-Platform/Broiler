@@ -13,11 +13,11 @@ namespace Broiler.HtmlBridge;
 public sealed class InteractiveSession : IDisposable
 {
     private readonly JSContext _context;
-    private readonly DomBridge _bridge;
+    private readonly IDomBridgeRuntime _bridge;
     private readonly MicroTaskQueue _microTasks;
     private bool _disposed;
 
-    internal InteractiveSession(JSContext context, DomBridge bridge, MicroTaskQueue microTasks)
+    internal InteractiveSession(JSContext context, IDomBridgeRuntime bridge, MicroTaskQueue microTasks)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));

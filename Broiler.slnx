@@ -25,12 +25,16 @@
     <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
     <Project Path="src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj" />
+    <Project Path="src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />
+    <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />
+    <Project Path="src/Broiler.HtmlBridge.Rendering/Broiler.HtmlBridge.Rendering.csproj" />
+    <Project Path="src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj" />
     <Project Path="src/Broiler.HtmlBridge/Broiler.HtmlBridge.csproj" />
-    <Project Path="src/Broiler.LogAnalyzer/Broiler.LogAnalyzer.csproj" />
-    <Project Path="src/Broiler.LogAnalyzer.Cli/Broiler.LogAnalyzer.Cli.csproj" />
     <Project Path="src/Broiler.LogAnalyzer.Benchmarks/Broiler.LogAnalyzer.Benchmarks.csproj" />
+    <Project Path="src/Broiler.LogAnalyzer.Cli/Broiler.LogAnalyzer.Cli.csproj" />
     <Project Path="src/Broiler.LogAnalyzer.Tests/Broiler.LogAnalyzer.Tests.csproj" />
     <Project Path="src/Broiler.LogAnalyzer.Wpf/Broiler.LogAnalyzer.Wpf.csproj" />
+    <Project Path="src/Broiler.LogAnalyzer/Broiler.LogAnalyzer.csproj" />
     <Project Path="src/Broiler.Pdf.Tests/Broiler.Pdf.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
@@ -57,4 +61,8 @@
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
   </Folder>
+  <Project Path="Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj" />
+  <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeCldr.LocaleData/UnicodeCldr.LocaleData.csproj" />
+  <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeEmoji.StringProperties/UnicodeEmoji.StringProperties.csproj" />
+  <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeProperties/UnicodeProperties.csproj" />
 </Solution>

@@ -910,24 +910,7 @@ public sealed partial class DomBridge
         // getPropertyValue method (supports both kebab-case and camelCase lookups)
         obj.FastAddValue(
             (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var name = a[0].ToString();
-                    if (computed.TryGetValue(name, out var val))
-                        return new JSString(StripCssPriority(val));
-                    // Try kebab-case conversion for camelCase input
-                    var kebab = ToKebabCase(name);
-                    if (kebab != name && computed.TryGetValue(kebab, out val))
-                        return new JSString(StripCssPriority(val));
-                    // Try camelCase conversion for kebab-case input
-                    var camel = ToCamelCase(name);
-                    if (camel != name && computed.TryGetValue(camel, out val))
-                        return new JSString(StripCssPriority(val));
-                }
-                return new JSString(string.Empty);
-            }, "getPropertyValue", 1),
+            new JSFunction((in Arguments a) => JsCssGetPropertyValue001Core(computed, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddProperty(
@@ -938,16 +921,7 @@ public sealed partial class DomBridge
 
         obj.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
-                {
-                    if (index >= 0 && index < propertyNames.Count)
-                        return new JSString(propertyNames[index]);
-                }
-
-                return new JSString(string.Empty);
-            }, "item", 1),
+            new JSFunction((in Arguments a) => JsCssItem003Core(propertyNames, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue(
@@ -957,7 +931,7 @@ public sealed partial class DomBridge
 
         obj.FastAddProperty(
             (KeyString)"parentRule",
-            new JSFunction((in Arguments _) => JSNull.Value, "get parentRule"),
+            NullFunction("get parentRule"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 

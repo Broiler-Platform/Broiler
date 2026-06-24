@@ -15,8 +15,19 @@ namespace Broiler.HtmlBridge;
 /// A fresh <see cref="JSContext"/> is created for each call to
 /// <see cref="Execute(IReadOnlyList{string})"/> so that scripts from different pages are isolated.
 /// </summary>
-public sealed class ScriptEngine : IScriptEngine
+public sealed partial class ScriptEngine : IScriptEngine
 {
+    private readonly IDomBridgeRuntimeFactory _domBridgeFactory;
+
+    public ScriptEngine()
+        : this(new DomBridgeFactory())
+    {
+    }
+
+    public ScriptEngine(IDomBridgeRuntimeFactory domBridgeFactory)
+    {
+        _domBridgeFactory = domBridgeFactory ?? throw new ArgumentNullException(nameof(domBridgeFactory));
+    }
 
     /// <inheritdoc />
     public bool StrictModeEnabled { get; set; }
@@ -90,7 +101,7 @@ public sealed class ScriptEngine : IScriptEngine
         {
             using var context = new JSContext();
             RegisterRuntimeExtensions(context);
-            var bridge = new DomBridge();
+            var bridge = _domBridgeFactory.Create();
             bridge.Csp = Csp;
             bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
@@ -176,7 +187,7 @@ public sealed class ScriptEngine : IScriptEngine
         // InteractiveSession which will dispose it when the caller is done.
         var context = new JSContext();
         RegisterRuntimeExtensions(context);
-        var bridge = new DomBridge();
+        var bridge = _domBridgeFactory.Create();
         bridge.Csp = Csp;
         bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
@@ -282,9 +293,9 @@ public sealed class ScriptEngine : IScriptEngine
     /// Drain queued microtasks and timer tasks until the bridge-backed execution
     /// environment settles, matching the checkpointing used by the WPT harness.
     /// </summary>
-    private void DrainAsyncWork(DomBridge bridge)
+    private void DrainAsyncWork(IDomBridgeRuntime bridge)
     {
-        for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
+        for (var iteration = 0; iteration < DomBridgeRuntimeLimits.AsyncDrainIterationLimit; iteration++)
         {
             var hadWork = false;
 
@@ -318,28 +329,12 @@ public sealed class ScriptEngine : IScriptEngine
     private void RegisterRuntimeExtensions(JSContext context)
     {
         // queueMicrotask(fn)
-        context["queueMicrotask"] = new JSFunction((in Arguments a) =>
-        {
-            if (a.Length == 0 || a[0] is not JSFunction fn)
-                throw JSEngine.NewTypeError("Callback must be a function");
-
-            MicroTasks.Enqueue(() =>
-            {
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.queueMicrotask", $"Callback error: {ex.Message}", ex); }
-            });
-
-            return JSUndefined.Value;
-        }, "queueMicrotask", 1);
+        context["queueMicrotask"] = new JSFunction((in Arguments a) => JsScriptEngineQueueMicrotask001Core(in a), "queueMicrotask", 1);
 
         // CSP-gated eval wrapper
         if (Csp != null && !Csp.AllowsEval)
         {
-            context["eval"] = new JSFunction((in Arguments _) =>
-            {
-                throw new InvalidOperationException(
-                    "Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source in the Content Security Policy.");
-            }, "eval", 1);
+            context["eval"] = new JSFunction((in Arguments _) => JsScriptEngineEval002Core(in _), "eval", 1);
         }
 
         // WeakRef polyfill (YantraJS may not expose this natively)
@@ -365,22 +360,7 @@ public sealed class ScriptEngine : IScriptEngine
         }
         catch (Exception ex) { RenderLogger.LogDebug(LogCategory.JavaScript, "ScriptEngine.WeakRefPolyfill", $"WeakRef not present, installing polyfill: {ex.Message}"); }
 
-        var weakRefCtor = new JSFunction((in Arguments args) =>
-        {
-            if (args.Length == 0)
-                throw new InvalidOperationException("WeakRef requires a target object.");
-
-            var target = args[0];
-            var weakRef = new WeakReference<JSValue>(target);
-
-            var instance = new JSObject();
-            instance.FastAddValue((KeyString)"deref", new JSFunction((in Arguments _) =>
-            {
-                return weakRef.TryGetTarget(out var t) ? t : JSUndefined.Value;
-            }, "deref", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            return instance;
-        }, "WeakRef", 1);
+        var weakRefCtor = new JSFunction((in Arguments args) => JsScriptEngineWeakRef004Core(in args), "WeakRef", 1);
 
         context["WeakRef"] = weakRefCtor;
     }
@@ -400,28 +380,7 @@ public sealed class ScriptEngine : IScriptEngine
         }
         catch (Exception ex) { RenderLogger.LogDebug(LogCategory.JavaScript, "ScriptEngine.FinalizationRegistryPolyfill", $"FinalizationRegistry not present, installing polyfill: {ex.Message}"); }
 
-        var registryCtor = new JSFunction((in Arguments args) =>
-        {
-            // The callback is stored but invocation depends on .NET GC
-            var callback = args.Length > 0 ? args[0] as JSFunction : null;
-
-            var instance = new JSObject();
-
-            // register(target, heldValue [, unregisterToken])
-            instance.FastAddValue((KeyString)"register", new JSFunction((in Arguments regArgs) =>
-            {
-                // No-op in this polyfill; real cleanup requires GC integration
-                return JSUndefined.Value;
-            }, "register", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // unregister(unregisterToken)
-            instance.FastAddValue((KeyString)"unregister", new JSFunction((in Arguments unregArgs) =>
-            {
-                return JSBoolean.False;
-            }, "unregister", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            return instance;
-        }, "FinalizationRegistry", 1);
+        var registryCtor = new JSFunction((in Arguments args) => JsScriptEngineFinalizationRegistry007Core(in args), "FinalizationRegistry", 1);
 
         context["FinalizationRegistry"] = registryCtor;
     }

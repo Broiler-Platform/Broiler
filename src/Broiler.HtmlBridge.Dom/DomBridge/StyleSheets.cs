@@ -85,7 +85,7 @@ public sealed partial class DomBridge
         // href — null for inline stylesheets
         sheet.FastAddProperty(
             (KeyString)"href",
-            new JSFunction((in Arguments _) => JSNull.Value, "get href"),
+            NullFunction("get href"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -126,23 +126,13 @@ public sealed partial class DomBridge
         // length is a live getter that always reflects the current rule count
         liveCssRules.FastAddProperty(
             (KeyString)"length",
-            new JSFunction((in Arguments _) =>
-            {
-                EnsureRulesUpToDate();
-                return new JSNumber(rulesStorage.Count);
-            }, "get length"),
+            new JSFunction((in Arguments _) => JsStyleSheetsGetLength002Core(EnsureRulesUpToDate, rulesStorage, in _), "get length"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         liveCssRules.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) =>
-            {
-                SyncLiveCssRulesIndices();
-                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
-                var idx = double.IsNaN(dv) ? 0 : (int)dv;
-                return idx >= 0 && idx < rulesStorage.Count ? liveCssRules[(uint)idx] : JSNull.Value;
-            }, "item", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, rulesStorage, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Syncs indexed properties on the live cssRules object with rulesStorage
@@ -164,48 +154,20 @@ public sealed partial class DomBridge
         // cssRules — returns the live collection, syncing indices on access
         sheet.FastAddProperty(
             (KeyString)"cssRules",
-            new JSFunction((in Arguments _) =>
-            {
-                SyncLiveCssRulesIndices();
-                return liveCssRules;
-            }, "get cssRules"),
+            new JSFunction((in Arguments _) => JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // insertRule(rule, index) — invalidates the text cache so cssRules rebuilds
         sheet.FastAddValue(
             (KeyString)"insertRule",
-            new JSFunction((in Arguments a) =>
-            {
-                var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
-                var dv = a.Length > 1 ? a[1].DoubleValue : rulesStorage.Count;
-                var index = double.IsNaN(dv) ? rulesStorage.Count : (int)dv;
-
-                EnsureRulesUpToDate();
-                index = Math.Clamp(index, 0, rulesStorage.Count);
-                rulesStorage.Insert(index, ruleText);
-                SyncLiveCssRulesIndices();
-
-                return new JSNumber(index);
-            }, "insertRule", 2),
+            new JSFunction((in Arguments a) => JsStyleSheetsInsertRule005Core(EnsureRulesUpToDate, SyncLiveCssRulesIndices, rulesStorage, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // deleteRule(index) — removes a rule at the given index
         sheet.FastAddValue(
             (KeyString)"deleteRule",
-            new JSFunction((in Arguments a) =>
-            {
-                EnsureRulesUpToDate();
-                if (a.Length > 0)
-                {
-                    var dv = a[0].DoubleValue;
-                    var idx = double.IsNaN(dv) ? 0 : (int)dv;
-                    if (idx >= 0 && idx < rulesStorage.Count)
-                        rulesStorage.RemoveAt(idx);
-                    SyncLiveCssRulesIndices();
-                }
-                return JSUndefined.Value;
-            }, "deleteRule", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsDeleteRule006Core(EnsureRulesUpToDate, SyncLiveCssRulesIndices, rulesStorage, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         _styleSheetCache[styleElement] = sheet;
@@ -287,46 +249,17 @@ public sealed partial class DomBridge
 
         cssRuleList.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) =>
-            {
-                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
-                var index = double.IsNaN(dv) ? 0 : (int)dv;
-                return index >= 0 && index < rules.Count ? rules[index] : JSNull.Value;
-            }, "item", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsItem008Core(rules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         cssRuleList.FastAddValue(
             (KeyString)"insertRule",
-            new JSFunction((in Arguments a) =>
-            {
-                if (ruleFactory is null)
-                    return new JSNumber(0);
-
-                var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
-                var dv = a.Length > 1 ? a[1].DoubleValue : rules.Count;
-                var index = double.IsNaN(dv) ? rules.Count : (int)dv;
-                index = Math.Clamp(index, 0, rules.Count);
-
-                rules.Insert(index, ruleFactory(ruleText));
-                SyncIndices();
-                return new JSNumber(index);
-            }, "insertRule", 2),
+            new JSFunction((in Arguments a) => JsStyleSheetsInsertRule009Core(SyncIndices, ruleFactory, rules, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         cssRuleList.FastAddValue(
             (KeyString)"deleteRule",
-            new JSFunction((in Arguments a) =>
-            {
-                var dv = a.Length > 0 ? a[0].DoubleValue : 0;
-                var index = double.IsNaN(dv) ? 0 : (int)dv;
-                if (index >= 0 && index < rules.Count)
-                {
-                    rules.RemoveAt(index);
-                    SyncIndices();
-                }
-
-                return JSUndefined.Value;
-            }, "deleteRule", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsDeleteRule010Core(SyncIndices, rules, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return cssRuleList;
@@ -355,12 +288,7 @@ public sealed partial class DomBridge
             ruleObj.FastAddValue((KeyString)"keyText", new JSString(keyText), JSPropertyAttributes.EnumerableConfigurableValue);
             ruleObj.FastAddProperty(
                 (KeyString)"cssText",
-                new JSFunction((in Arguments _) =>
-                {
-                    var styleObj = ruleObj[(KeyString)"style"];
-                    var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
-                    return new JSString($"{keyText} {{ {styleText} }}");
-                }, "get cssText"),
+                new JSFunction((in Arguments _) => JsStyleSheetsGetCssText013Core(keyText, ruleObj, in _), "get cssText"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -454,11 +382,7 @@ public sealed partial class DomBridge
             ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
             ruleObj.FastAddProperty(
                 (KeyString)"cssText",
-                new JSFunction((in Arguments _) =>
-                {
-                    var mediaSuffix = string.IsNullOrEmpty(mediaText) ? string.Empty : $" {mediaText}";
-                    return new JSString($"@import url(\"{href}\"){mediaSuffix};");
-                }, "get cssText"),
+                new JSFunction((in Arguments _) => JsStyleSheetsGetCssText017Core(href, mediaText, in _), "get cssText"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
@@ -483,13 +407,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var nestedCssText = string.Join(" ",
-                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
-                                .Where(text => !string.IsNullOrEmpty(text)));
-                        return new JSString($"@media {mediaText} {{ {nestedCssText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText018Core(mediaText, nestedRuleObjects, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -509,11 +427,7 @@ public sealed partial class DomBridge
                 var styleObj = BuildStyleObject(styleMap, ruleObj);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var cssText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
-                        return new JSString($"@font-face {{ {cssText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText019Core(styleObj, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -541,13 +455,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var nestedCssText = string.Join(" ",
-                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
-                                .Where(text => !string.IsNullOrEmpty(text)));
-                        return new JSString($"@keyframes {name} {{ {nestedCssText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText020Core(name, nestedRuleObjects, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -580,19 +488,7 @@ public sealed partial class DomBridge
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var serialized = new List<string>
-                        {
-                            $"syntax: \"{EscapeCssPropertyRuleSyntax(syntax)}\"",
-                            $"inherits: {(inherits ? "true" : "false")}"
-                        };
-
-                        if (!string.IsNullOrEmpty(initialValue))
-                            serialized.Add($"initial-value: {initialValue}");
-
-                        return new JSString($"@property {propertyName} {{ {string.Join("; ", serialized)}; }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText021Core(inherits, initialValue, propertyName, syntax, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -636,22 +532,7 @@ public sealed partial class DomBridge
 
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var serialized = new List<string>();
-                        foreach (var (cssName, jsName) in descriptorMap)
-                        {
-                            var value = ruleObj[(KeyString)jsName];
-                            if (value is null || value == JSUndefined.Value)
-                                continue;
-
-                            var text = value.ToString();
-                            if (!string.IsNullOrEmpty(text))
-                                serialized.Add($"{cssName}: {text}");
-                        }
-
-                        return new JSString($"@counter-style {ruleName} {{ {string.Join("; ", serialized)}; }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText022Core(descriptorMap, ruleName, ruleObj, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -678,13 +559,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var nestedCssText = string.Join(" ",
-                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
-                                .Where(text => !string.IsNullOrEmpty(text)));
-                        return new JSString($"@supports {conditionText} {{ {nestedCssText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText023Core(conditionText, nestedRuleObjects, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -715,14 +590,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var nestedCssText = string.Join(" ",
-                            nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString())
-                                .Where(text => !string.IsNullOrEmpty(text)));
-                        var namePrefix = string.IsNullOrEmpty(nameText) ? string.Empty : $"{nameText} ";
-                        return new JSString($"@layer {namePrefix}{{ {nestedCssText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText024Core(nameText, nestedRuleObjects, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -736,11 +604,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var nameSuffix = string.IsNullOrEmpty(nameText) ? string.Empty : $" {nameText}";
-                        return new JSString($"@layer{nameSuffix};");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText025Core(nameText, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -772,11 +636,7 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableValue);
             ruleObj.FastAddProperty(
                 (KeyString)"cssText",
-                new JSFunction((in Arguments _) =>
-                {
-                    var prefixPart = string.IsNullOrEmpty(prefix) ? string.Empty : $"{prefix} ";
-                    return new JSString($"@namespace {prefixPart}\"{namespaceUri}\";");
-                }, "get cssText"),
+                new JSFunction((in Arguments _) => JsStyleSheetsGetCssText026Core(namespaceUri, prefix, in _), "get cssText"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
@@ -798,12 +658,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var styleText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
-                        var selectorSuffix = string.IsNullOrEmpty(selectorText) ? string.Empty : $" {selectorText}";
-                        return new JSString($"@page{selectorSuffix} {{ {styleText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText027Core(selectorText, styleObj, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -821,12 +676,7 @@ public sealed partial class DomBridge
                 ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddProperty(
                     (KeyString)"cssText",
-                    new JSFunction((in Arguments _) =>
-                    {
-                        var styleObj = ruleObj[(KeyString)"style"];
-                        var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
-                        return new JSString($"{selectorText} {{ {styleText} }}");
-                    }, "get cssText"),
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText028Core(ruleObj, selectorText, in _), "get cssText"),
                     null,
                     JSPropertyAttributes.EnumerableConfigurableProperty);
 

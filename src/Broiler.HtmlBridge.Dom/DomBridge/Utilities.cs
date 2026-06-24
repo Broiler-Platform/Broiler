@@ -591,11 +591,7 @@ public sealed partial class DomBridge
 
         collection.FastAddProperty(
             (KeyString)"length",
-            new JSFunction((in Arguments _) =>
-            {
-                var currentControls = CollectFormControls(form);
-                return new JSNumber(currentControls.Count);
-            }, "get length"),
+            new JSFunction((in Arguments _) => JsUtilitiesGetLength002Core(form, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return collection;
@@ -886,53 +882,14 @@ public sealed partial class DomBridge
         // style.cssText (getter / setter)
         style.FastAddProperty(
             (KeyString)"cssText",
-            new JSFunction((in Arguments a) =>
-            {
-                var parts = element.Style.Select(kv => $"{kv.Key}: {kv.Value}");
-                var text = string.Join("; ", parts);
-                return new JSString(text.Length > 0 ? text + ";" : text);
-            }, "get cssText"),
-            new JSFunction((in Arguments a) =>
-            {
-                element.Style.Clear();
-                element.JsSetStyleProps.Clear();
-                if (a.Length > 0)
-                {
-                    foreach (var kv in ParseStyle(a[0].ToString()))
-                    {
-                        element.Style[kv.Key] = kv.Value;
-                        element.JsSetStyleProps.Add(kv.Key);
-                    }
-                }
-                onMutation?.Invoke();
-                return JSUndefined.Value;
-            }, "set cssText"),
+            new JSFunction((in Arguments a) => JsUtilitiesGetCssText003Core(element, in a), "get cssText"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetCssText004Core(element, onMutation, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style.setProperty(property, value)
         style.FastAddValue(
             (KeyString)"setProperty",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length >= 2)
-                {
-                    var prop = a[0].ToString();
-                    var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
-                    if (string.IsNullOrEmpty(value))
-                    {
-                        element.Style.Remove(prop);
-                        element.JsSetStyleProps.Remove(prop);
-                    }
-                    else
-                    {
-                        element.Style[prop] = value;
-                        element.JsSetStyleProps.Add(prop);
-                    }
-
-                    onMutation?.Invoke();
-                }
-                return JSUndefined.Value;
-            }, "setProperty", 2),
+            new JSFunction((in Arguments a) => JsUtilitiesSetProperty005Core(element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.getPropertyValue(property) — checks element.Style dict first, then
@@ -940,61 +897,20 @@ public sealed partial class DomBridge
         // and also checks JSObject properties (set via el.style.camelCase = value).
         style.FastAddValue(
             (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var prop = a[0].ToString();
-                    if (TryGetStylePropertyRawValue(element, prop, out var val))
-                        return new JSString(StripCssPriority(val));
-                    // Try camelCase version of kebab-case input
-                    var camel = ToCamelCaseStatic(prop);
-                    // Check JSObject properties (set via el.style.propertyName = value)
-                    var jsVal = a.This?[(KeyString)camel];
-                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
-                        return jsVal;
-                    jsVal = a.This?[(KeyString)prop];
-                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
-                        return jsVal;
-                }
-                return new JSString(string.Empty);
-            }, "getPropertyValue", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyValue006Core(element, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.removeProperty(property)
         style.FastAddValue(
             (KeyString)"removeProperty",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var prop = a[0].ToString();
-                    var removed = element.Style.TryGetValue(prop, out var val) ? val : string.Empty;
-                    element.Style.Remove(prop);
-                    element.JsSetStyleProps.Remove(prop);
-                    onMutation?.Invoke();
-                    return new JSString(removed);
-                }
-                return new JSString(string.Empty);
-            }, "removeProperty", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesRemoveProperty007Core(element, onMutation, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.cssFloat (getter/setter) — maps to CSS "float" property
         style.FastAddProperty(
             (KeyString)"cssFloat",
-            new JSFunction((in Arguments a) =>
-            {
-                if (element.Style.TryGetValue("float", out var val))
-                    return new JSString(val);
-                return new JSString(string.Empty);
-            }, "get cssFloat"),
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                    element.Style["float"] = a[0].ToString();
-                onMutation?.Invoke();
-                return JSUndefined.Value;
-            }, "set cssFloat"),
+            new JSFunction((in Arguments a) => JsUtilitiesGetCssFloat008Core(element, in a), "get cssFloat"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetCssFloat009Core(element, onMutation, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style.length (read-only)
@@ -1007,27 +923,13 @@ public sealed partial class DomBridge
         // style.item(index)
         style.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
-                {
-                    var propertyNames = GetStylePropertyNames(element);
-                    if (index >= 0 && index < propertyNames.Count)
-                        return new JSString(propertyNames[index]);
-                }
-                return new JSString(string.Empty);
-            }, "item", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesItem011Core(element, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.getPropertyPriority(property)
         style.FastAddValue(
             (KeyString)"getPropertyPriority",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
-                    return new JSString(GetCssPriority(value));
-                return new JSString(string.Empty);
-            }, "getPropertyPriority", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyPriority012Core(element, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty(
@@ -1045,93 +947,29 @@ public sealed partial class DomBridge
 
         style.FastAddProperty(
             (KeyString)"cssText",
-            new JSFunction((in Arguments _) =>
-            {
-                var parts = styleMap.Select(kv => $"{kv.Key}: {kv.Value}");
-                var text = string.Join("; ", parts);
-                return new JSString(text.Length > 0 ? text + ";" : text);
-            }, "get cssText"),
-            new JSFunction((in Arguments a) =>
-            {
-                styleMap.Clear();
-                if (a.Length > 0)
-                {
-                    foreach (var kv in ParseStyle(a[0].ToString()))
-                        styleMap[kv.Key] = kv.Value;
-                }
-                return JSUndefined.Value;
-            }, "set cssText"),
+            new JSFunction((in Arguments _) => JsUtilitiesGetCssText014Core(styleMap, in _), "get cssText"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetCssText015Core(styleMap, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue(
             (KeyString)"setProperty",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length >= 2)
-                {
-                    var prop = a[0].ToString();
-                    var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
-                    if (string.IsNullOrEmpty(value))
-                        styleMap.Remove(prop);
-                    else
-                        styleMap[prop] = value;
-                }
-                return JSUndefined.Value;
-            }, "setProperty", 2),
+            new JSFunction((in Arguments a) => JsUtilitiesSetProperty016Core(styleMap, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue(
             (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var prop = a[0].ToString();
-                    if (TryGetStylePropertyRawValue(styleMap, prop, out var val))
-                        return new JSString(StripCssPriority(val));
-
-                    var camel = ToCamelCaseStatic(prop);
-                    var jsVal = a.This?[(KeyString)camel];
-                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
-                        return jsVal;
-                    jsVal = a.This?[(KeyString)prop];
-                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
-                        return jsVal;
-                }
-                return new JSString(string.Empty);
-            }, "getPropertyValue", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyValue017Core(styleMap, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue(
             (KeyString)"removeProperty",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var prop = a[0].ToString();
-                    var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? StripCssPriority(val) : string.Empty;
-                    styleMap.Remove(prop);
-                    styleMap.Remove(ToKebabCase(prop));
-                    return new JSString(removed);
-                }
-                return new JSString(string.Empty);
-            }, "removeProperty", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesRemoveProperty018Core(styleMap, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty(
             (KeyString)"cssFloat",
-            new JSFunction((in Arguments _) =>
-            {
-                if (styleMap.TryGetValue("float", out var val))
-                    return new JSString(val);
-                return new JSString(string.Empty);
-            }, "get cssFloat"),
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                    styleMap["float"] = a[0].ToString();
-                return JSUndefined.Value;
-            }, "set cssFloat"),
+            new JSFunction((in Arguments _) => JsUtilitiesGetCssFloat019Core(styleMap, in _), "get cssFloat"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetCssFloat020Core(styleMap, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddProperty(
@@ -1142,26 +980,12 @@ public sealed partial class DomBridge
 
         style.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
-                {
-                    var propertyNames = GetStylePropertyNames(styleMap);
-                    if (index >= 0 && index < propertyNames.Count)
-                        return new JSString(propertyNames[index]);
-                }
-                return new JSString(string.Empty);
-            }, "item", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesItem022Core(styleMap, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue(
             (KeyString)"getPropertyPriority",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && TryGetStylePropertyRawValue(styleMap, a[0].ToString(), out var value))
-                    return new JSString(GetCssPriority(value));
-                return new JSString(string.Empty);
-            }, "getPropertyPriority", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyPriority023Core(styleMap, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty(
@@ -1184,83 +1008,25 @@ public sealed partial class DomBridge
         // classList.contains(className)
         classList.FastAddValue(
             (KeyString)"contains",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length == 0) return JSBoolean.False;
-                var cls = a[0].ToString();
-                var classes = new HashSet<string>(
-                    (element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0),
-                    StringComparer.Ordinal);
-                return classes.Contains(cls) ? JSBoolean.True : JSBoolean.False;
-            }, "contains", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesContains025Core(element, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.add(...classNames)
         classList.FastAddValue(
             (KeyString)"add",
-            new JSFunction((in Arguments a) =>
-            {
-                var classes = (element.ClassName ?? string.Empty)
-                    .Split(' ').Where(s => s.Length > 0).ToList();
-                var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
-                for (var i = 0; i < a.Length; i++)
-                {
-                    var cls = a[i].ToString();
-                    if (!string.IsNullOrEmpty(cls) && classSet.Add(cls))
-                        classes.Add(cls);
-                }
-                element.ClassName = string.Join(" ", classes);
-                onClassChanged?.Invoke(element);
-                return JSUndefined.Value;
-            }, "add"),
+            new JSFunction((in Arguments a) => JsUtilitiesAdd026Core(element, onClassChanged, in a), "add"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.remove(...classNames)
         classList.FastAddValue(
             (KeyString)"remove",
-            new JSFunction((in Arguments a) =>
-            {
-                var toRemove = new HashSet<string>(StringComparer.Ordinal);
-                for (var i = 0; i < a.Length; i++)
-                    toRemove.Add(a[i].ToString());
-                var classes = (element.ClassName ?? string.Empty)
-                    .Split(' ').Where(s => s.Length > 0 && !toRemove.Contains(s)).ToList();
-                element.ClassName = string.Join(" ", classes);
-                onClassChanged?.Invoke(element);
-                return JSUndefined.Value;
-            }, "remove"),
+            new JSFunction((in Arguments a) => JsUtilitiesRemove027Core(element, onClassChanged, in a), "remove"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.toggle(className[, force])
         classList.FastAddValue(
             (KeyString)"toggle",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length == 0) return JSBoolean.False;
-                var cls = a[0].ToString();
-                var classes = (element.ClassName ?? string.Empty)
-                    .Split(' ').Where(s => s.Length > 0).ToList();
-                var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
-
-                bool shouldAdd = a.Length >= 2 && a[1] is not JSUndefined
-                    ? a[1].BooleanValue
-                    : !classSet.Contains(cls);
-
-                if (shouldAdd)
-                {
-                    if (classSet.Add(cls)) classes.Add(cls);
-                    element.ClassName = string.Join(" ", classes);
-                    onClassChanged?.Invoke(element);
-                    return JSBoolean.True;
-                }
-                else
-                {
-                    classes.Remove(cls);
-                    element.ClassName = string.Join(" ", classes);
-                    onClassChanged?.Invoke(element);
-                    return JSBoolean.False;
-                }
-            }, "toggle", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return classList;
@@ -1280,55 +1046,25 @@ public sealed partial class DomBridge
         // localStorage.getItem(key)
         storage.FastAddValue(
             (KeyString)"getItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length == 0) return JSNull.Value;
-                var key = a[0].ToString();
-                return store.TryGetValue(key, out var val) ? new JSString(val) : JSNull.Value;
-            }, "getItem", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesGetItem029Core(store, in a), "getItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.setItem(key, value)
         storage.FastAddValue(
             (KeyString)"setItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length >= 2)
-                {
-                    var key = a[0].ToString();
-                    var val = a[1].ToString();
-                    store[key] = val;
-                    storage[(KeyString)key] = new JSString(val);
-                }
-                return JSUndefined.Value;
-            }, "setItem", 2),
+            new JSFunction((in Arguments a) => JsUtilitiesSetItem030Core(storage, store, in a), "setItem", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.removeItem(key)
         storage.FastAddValue(
             (KeyString)"removeItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var key = a[0].ToString();
-                    store.Remove(key);
-                    storage.Delete((KeyString)key);
-                }
-                return JSUndefined.Value;
-            }, "removeItem", 1),
+            new JSFunction((in Arguments a) => JsUtilitiesRemoveItem031Core(storage, store, in a), "removeItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.clear()
         storage.FastAddValue(
             (KeyString)"clear",
-            new JSFunction((in Arguments a) =>
-            {
-                foreach (var key in store.Keys.ToList())
-                    storage.Delete((KeyString)key);
-                store.Clear();
-                return JSUndefined.Value;
-            }, "clear", 0),
+            new JSFunction((in Arguments a) => JsUtilitiesClear032Core(storage, store, in a), "clear", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return storage;
@@ -1353,35 +1089,35 @@ public sealed partial class DomBridge
         ctx.FastAddProperty(
             (KeyString)"fillStyle",
             new JSFunction((in Arguments _) => new JSString(context2d.FillStyle), "get fillStyle"),
-            new JSFunction((in Arguments a) => { if (a.Length > 0) context2d.FillStyle = a[0].ToString(); return JSUndefined.Value; }, "set fillStyle"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetFillStyle034Core(context2d, in a), "set fillStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // strokeStyle (get/set)
         ctx.FastAddProperty(
             (KeyString)"strokeStyle",
             new JSFunction((in Arguments _) => new JSString(context2d.StrokeStyle), "get strokeStyle"),
-            new JSFunction((in Arguments a) => { if (a.Length > 0) context2d.StrokeStyle = a[0].ToString(); return JSUndefined.Value; }, "set strokeStyle"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetStrokeStyle036Core(context2d, in a), "set strokeStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lineWidth (get/set)
         ctx.FastAddProperty(
             (KeyString)"lineWidth",
             new JSFunction((in Arguments _) => new JSNumber(context2d.LineWidth), "get lineWidth"),
-            new JSFunction((in Arguments a) => { if (a.Length > 0 && a[0] is JSNumber n) context2d.LineWidth = (float)n.DoubleValue; return JSUndefined.Value; }, "set lineWidth"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetLineWidth038Core(context2d, in a), "set lineWidth"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // font (get/set)
         ctx.FastAddProperty(
             (KeyString)"font",
             new JSFunction((in Arguments _) => new JSString(context2d.Font), "get font"),
-            new JSFunction((in Arguments a) => { if (a.Length > 0) context2d.Font = a[0].ToString(); return JSUndefined.Value; }, "set font"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetFont040Core(context2d, in a), "set font"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // globalAlpha (get/set)
         ctx.FastAddProperty(
             (KeyString)"globalAlpha",
             new JSFunction((in Arguments _) => new JSNumber(context2d.GlobalAlpha), "get globalAlpha"),
-            new JSFunction((in Arguments a) => { if (a.Length > 0 && a[0] is JSNumber n) context2d.GlobalAlpha = (float)n.DoubleValue; return JSUndefined.Value; }, "set globalAlpha"),
+            new JSFunction((in Arguments a) => JsUtilitiesSetGlobalAlpha042Core(context2d, in a), "set globalAlpha"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // canvas property
@@ -1392,80 +1128,36 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // Drawing methods
-        ctx.FastAddValue((KeyString)"fillRect", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 4) context2d.FillRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
-            return JSUndefined.Value;
-        }, "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillRect", new JSFunction((in Arguments a) => JsUtilitiesFillRect044Core(context2d, in a), "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeRect", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 4) context2d.StrokeRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
-            return JSUndefined.Value;
-        }, "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeRect", new JSFunction((in Arguments a) => JsUtilitiesStrokeRect045Core(context2d, in a), "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"clearRect", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 4) context2d.ClearRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
-            return JSUndefined.Value;
-        }, "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"clearRect", new JSFunction((in Arguments a) => JsUtilitiesClearRect046Core(context2d, in a), "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"beginPath", new JSFunction((in Arguments _) =>
-        { context2d.BeginPath(); return JSUndefined.Value; }, "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"beginPath", new JSFunction((in Arguments _) => JsUtilitiesBeginPath047Core(context2d, in _), "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"moveTo", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 2) context2d.MoveTo((float)a[0].DoubleValue, (float)a[1].DoubleValue);
-            return JSUndefined.Value;
-        }, "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"moveTo", new JSFunction((in Arguments a) => JsUtilitiesMoveTo048Core(context2d, in a), "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"lineTo", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 2) context2d.LineTo((float)a[0].DoubleValue, (float)a[1].DoubleValue);
-            return JSUndefined.Value;
-        }, "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"lineTo", new JSFunction((in Arguments a) => JsUtilitiesLineTo049Core(context2d, in a), "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"arc", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 5) context2d.Arc((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue, (float)a[4].DoubleValue);
-            return JSUndefined.Value;
-        }, "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"arc", new JSFunction((in Arguments a) => JsUtilitiesArc050Core(context2d, in a), "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"closePath", new JSFunction((in Arguments _) =>
-        { context2d.ClosePath(); return JSUndefined.Value; }, "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"closePath", new JSFunction((in Arguments _) => JsUtilitiesClosePath051Core(context2d, in _), "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fill", new JSFunction((in Arguments _) =>
-        { context2d.Fill(); return JSUndefined.Value; }, "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fill", new JSFunction((in Arguments _) => JsUtilitiesFill052Core(context2d, in _), "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"stroke", new JSFunction((in Arguments _) =>
-        { context2d.Stroke(); return JSUndefined.Value; }, "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"stroke", new JSFunction((in Arguments _) => JsUtilitiesStroke053Core(context2d, in _), "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fillText", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 3) context2d.FillText(a[0].ToString(), (float)a[1].DoubleValue, (float)a[2].DoubleValue);
-            return JSUndefined.Value;
-        }, "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillText", new JSFunction((in Arguments a) => JsUtilitiesFillText054Core(context2d, in a), "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeText", new JSFunction((in Arguments a) =>
-        {
-            if (a.Length >= 3) context2d.StrokeText(a[0].ToString(), (float)a[1].DoubleValue, (float)a[2].DoubleValue);
-            return JSUndefined.Value;
-        }, "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeText", new JSFunction((in Arguments a) => JsUtilitiesStrokeText055Core(context2d, in a), "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"save", new JSFunction((in Arguments _) =>
-        { context2d.Save(); return JSUndefined.Value; }, "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"save", new JSFunction((in Arguments _) => JsUtilitiesSave056Core(context2d, in _), "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"restore", new JSFunction((in Arguments _) =>
-        { context2d.Restore(); return JSUndefined.Value; }, "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"restore", new JSFunction((in Arguments _) => JsUtilitiesRestore057Core(context2d, in _), "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // measureText(text) — returns { width: ... }
-        ctx.FastAddValue((KeyString)"measureText", new JSFunction((in Arguments a) =>
-        {
-            var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-            var result = new JSObject();
-            result.FastAddValue((KeyString)"width", new JSNumber(text.Length * 8.0), JSPropertyAttributes.EnumerableConfigurableValue);
-            return result;
-        }, "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"measureText", new JSFunction((in Arguments a) => JsUtilitiesMeasureText058Core(in a), "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return ctx;
     }

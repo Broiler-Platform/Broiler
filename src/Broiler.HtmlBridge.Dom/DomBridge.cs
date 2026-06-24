@@ -21,7 +21,7 @@ namespace Broiler.HtmlBridge;
 /// so that JavaScript executed via YantraJS can perform basic DOM queries
 /// against the current page HTML.
 /// </summary>
-public sealed partial class DomBridge
+public sealed partial class DomBridge : IDomBridgeRuntime
 {
     /// <summary>
     /// Safety cap for draining bridge-backed microtask/timer work so promise/timer
@@ -84,6 +84,12 @@ public sealed partial class DomBridge
     /// running.
     /// </summary>
     internal int CurrentScriptIndex { get; set; } = -1;
+
+    int IDomBridgeRuntime.CurrentScriptIndex
+    {
+        get => CurrentScriptIndex;
+        set => CurrentScriptIndex = value;
+    }
 
     /// <summary>
     /// Optional local base path for resolving relative sub-resource URLs to local files.
@@ -442,61 +448,23 @@ public sealed partial class DomBridge
         var legacyCancelBubble = false;
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) =>
-            {
-                legacyCancelBubble = true;
-                return JSUndefined.Value;
-            }, "stopPropagation", 0),
+            new JSFunction((in Arguments _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) =>
-            {
-                immediateStopped = true;
-                legacyCancelBubble = true;
-                return JSUndefined.Value;
-            }, "stopImmediatePropagation", 0),
+            new JSFunction((in Arguments _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in Arguments _) =>
-            {
-                var cancelable = evt[(KeyString)"cancelable"];
-                if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
-                {
-                    prevented = true;
-                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
-                }
-                return JSUndefined.Value;
-            }, "preventDefault", 0),
+            new JSFunction((in Arguments _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddProperty(
             (KeyString)"cancelBubble",
             new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in Arguments setArgs) =>
-            {
-                if (setArgs.Length > 0 && setArgs[0].BooleanValue)
-                {
-                    legacyCancelBubble = true;
-                }
-                return JSUndefined.Value;
-            }, "set cancelBubble"),
+            new JSFunction((in Arguments setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddProperty(
             (KeyString)"returnValue",
             new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in Arguments setArgs) =>
-            {
-                var cancelable = evt[(KeyString)"cancelable"];
-                if (setArgs.Length > 0 &&
-                    !setArgs[0].BooleanValue &&
-                    !currentListenerPassive &&
-                    cancelable != null &&
-                    cancelable.BooleanValue)
-                {
-                    prevented = true;
-                    evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
-                }
-                return JSUndefined.Value;
-            }, "set returnValue"),
+            new JSFunction((in Arguments setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddValue((KeyString)"composedPath",
             new JSFunction((in Arguments _) => new JSArray(_windowJSObject), "composedPath", 0),
@@ -911,91 +879,6 @@ public sealed partial class DomBridge
         return false;
     }
 
-}
-
-/// <summary>
-/// Lightweight representation of an HTML element for the DOM bridge.
-/// </summary>
-public sealed class DomElement(
-    string tagName,
-    string? id,
-    string? className,
-    string innerHtml,
-    Dictionary<string, string>? style = null,
-    Dictionary<string, string>? attributes = null,
-    bool isTextNode = false)
-{
-    public string TagName { get; } = tagName;
-    public string? Id { get; set; } = id;
-
-    /// <summary>The element's CSS class string; mutable via <c>classList</c> or <c>className</c>.</summary>
-    public string? ClassName { get; set; } = className;
-
-    /// <summary>The element's inner HTML content; mutable via the <c>innerHTML</c> setter.</summary>
-    public string InnerHtml { get; set; } = innerHtml;
-
-    /// <summary>Parsed inline CSS style declarations, keyed case-insensitively by property name.</summary>
-    public Dictionary<string, string> Style { get; } = style ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>All HTML attributes of the element, keyed case-insensitively by attribute name.</summary>
-    public Dictionary<string, string> Attributes { get; } = attributes ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Parent element in the DOM tree.</summary>
-    public DomElement? Parent { get; set; }
-
-    /// <summary>Ordered child elements in the DOM tree.</summary>
-    public List<DomElement> Children { get; } = [];
-
-    /// <summary>Whether this element represents a text node created via <c>document.createTextNode</c>.</summary>
-    public bool IsTextNode { get; } = isTextNode;
-
-    /// <summary>Text content for text nodes.</summary>
-    public string? TextContent { get; set; }
-
-    /// <summary>Tracks CSS property names that were set via JavaScript
-    /// (<c>element.style.prop = value</c>, <c>setProperty</c>, or <c>cssText</c>).
-    /// These must be preserved by <see cref="DomBridge.InvalidateElementStyles"/>
-    /// when the cascade is recalculated after class changes.</summary>
-    public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>IDL-level properties that are NOT reflected as content attributes
-    /// (e.g. input.value, option.defaultSelected). Keyed by property name.</summary>
-    public Dictionary<string, object?> DomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").</summary>
-    public Dictionary<string, List<EventListenerRegistration>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Inline event handler properties keyed by event type (e.g. "click" for onclick).</summary>
-    public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Namespace URI for elements created with createElementNS.</summary>
-    public string? NamespaceURI { get; set; }
-
-    /// <summary>The document root element (<c>#subdoc-root</c>) that owns this element,
-    /// used to resolve <c>ownerDocument</c> for sub-document elements.</summary>
-    public DomElement? OwnerDocRoot { get; set; }
-
-    /// <summary>Maps (namespace, localName) → qualifiedName for namespace-aware attribute methods.</summary>
-    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = new();
-}
-
-public readonly record struct EventListenerRegistration(JSValue Listener, bool Capture, bool Once = false, bool Passive = false);
-
-/// <summary>Options for MutationObserver.observe().</summary>
-public sealed class MutationObserverOptions
-{
-    /// <summary>Whether to observe child list changes.</summary>
-    public bool ChildList { get; set; }
-    /// <summary>Whether to observe attribute changes.</summary>
-    public bool Attributes { get; set; }
-    /// <summary>Whether to expose the previous attribute value in mutation records.</summary>
-    public bool AttributeOldValue { get; set; }
-    /// <summary>Whether to observe character data changes.</summary>
-    public bool CharacterData { get; set; }
-    /// <summary>Whether to expose the previous character data value in mutation records.</summary>
-    public bool CharacterDataOldValue { get; set; }
-    /// <summary>Whether to observe the subtree.</summary>
-    public bool Subtree { get; set; }
 }
 
 /// <summary>
