@@ -1,4 +1,4 @@
-using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Dom;
 
 namespace Broiler.DevConsole;
 

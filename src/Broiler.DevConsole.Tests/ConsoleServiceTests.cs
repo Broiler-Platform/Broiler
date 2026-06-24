@@ -1,5 +1,5 @@
+using Broiler.HTML.Dom;
 using Broiler.HtmlBridge;
-using Broiler.HTML.Dom.Core.Dom;
 
 namespace Broiler.DevConsole.Tests;
 

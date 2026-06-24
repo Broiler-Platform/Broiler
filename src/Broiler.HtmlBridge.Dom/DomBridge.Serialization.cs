@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Text;
-using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Dom.Utils;
 
 namespace Broiler.HtmlBridge;
 

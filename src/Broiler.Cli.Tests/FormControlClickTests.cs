@@ -1,9 +1,7 @@
-using Broiler.HTML.Dom.Core.Dom;
-using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Dom;
+using Broiler.HTML.Dom.Utils;
 using Broiler.HTML.Image;
-using Broiler.HTML.Orchestration.Core;
 using System.Drawing;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 

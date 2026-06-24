@@ -951,7 +951,7 @@ public class GraphicsAbstractionTests
 
         path.Start(1, 2);
         path.LineTo(3, 4);
-        path.ArcTo(5, 6, 2, Broiler.HTML.Adapters.Adapters.RGraphicsPath.Corner.TopRight);
+        path.ArcTo(5, 6, 2, Broiler.HTML.Adapters.RGraphicsPath.Corner.TopRight);
 
         Assert.False(path.HasMaterializedPath);
         Assert.Empty(pathCompat.Calls);
@@ -1557,7 +1557,7 @@ public class GraphicsAbstractionTests
         pen.Width = 1;
         using var path = graphics.GetGraphicsPath();
         path.Start(1, 4);
-        path.ArcTo(4, 1, 3, Broiler.HTML.Adapters.Adapters.RGraphicsPath.Corner.TopLeft);
+        path.ArcTo(4, 1, 3, Broiler.HTML.Adapters.RGraphicsPath.Corner.TopLeft);
         path.LineTo(5, 1);
 
         graphics.DrawPath(pen, path);
@@ -2022,6 +2022,11 @@ public class GraphicsAbstractionTests
 
         public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle) =>
             textCanvasCompat?.DrawGradientString(canvas, font, font.RenderFont, text, rect, point, size, colors, positions, angle);
+
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point, float glyphRotationDeg = 0)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     private sealed class RecordingTextShaper : ITextShaper
@@ -2063,6 +2068,11 @@ public class GraphicsAbstractionTests
         {
             Calls.Add("DrawGradientString");
             Assert.IsType<SKCanvas>(canvas);
+        }
+
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point, float glyphRotationDeg = 0)
+        {
+            throw new NotImplementedException();
         }
     }
 

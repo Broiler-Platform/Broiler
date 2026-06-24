@@ -1,6 +1,6 @@
-using System.Drawing;
-using Broiler.HTML.Adapters.Adapters;
-using Broiler.HTML.Rendering.Core.Handlers;
+
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Rendering.Handlers;
 
 namespace Broiler.Cli.Tests;
 

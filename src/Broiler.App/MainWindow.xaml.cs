@@ -7,8 +7,8 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Broiler.App.Rendering;
 using Broiler.HtmlBridge;
-using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.WPF;
+using Broiler.HTML.Core.Entities;
 
 namespace Broiler.App;
 

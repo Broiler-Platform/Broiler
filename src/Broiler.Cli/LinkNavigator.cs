@@ -1,4 +1,4 @@
-using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Entities;
 using Broiler.HTML.Image;
 using System.Drawing;
 

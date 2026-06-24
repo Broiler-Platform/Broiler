@@ -1,5 +1,5 @@
 using System.Drawing;
-using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Core.IR;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli;

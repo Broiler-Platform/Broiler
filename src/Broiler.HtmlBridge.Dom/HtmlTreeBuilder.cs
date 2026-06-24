@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Broiler.HTML.Dom.Core.Parse;
+using Broiler.HTML.Dom.Parse;
 
 namespace Broiler.HtmlBridge;
 

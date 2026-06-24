@@ -1,5 +1,5 @@
+using Broiler.HTML.Core.Entities;
 using Broiler.HtmlBridge;
-using Broiler.HTML.Core.Core.Entities;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Engine;
 
