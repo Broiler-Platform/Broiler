@@ -2232,12 +2232,13 @@ public sealed partial class DomBridge
         string? value,
         DomElement? referenceElement = null,
         bool forLineHeight = false,
-        double? percentageBasis = null)
+        double? percentageBasis = null,
+        bool forFontSize = false)
     {
         if (string.IsNullOrWhiteSpace(value))
             return 0;
 
-        return TryEvaluateCssLengthWithViewport(value, referenceElement, forLineHeight, percentageBasis, out var px)
+        return TryEvaluateCssLengthWithViewport(value, referenceElement, forLineHeight, percentageBasis, out var px, forFontSize)
             ? px
             : 0;
     }
@@ -2247,7 +2248,8 @@ public sealed partial class DomBridge
         DomElement? referenceElement,
         bool forLineHeight,
         double? percentageBasis,
-        out double result)
+        out double result,
+        bool forFontSize = false)
     {
         result = 0;
         if (string.IsNullOrWhiteSpace(value))
@@ -2262,7 +2264,7 @@ public sealed partial class DomBridge
             normalized = normalized[1..^1].Trim();
         }
 
-        if (TryEvaluateMathLengthFunction(normalized, referenceElement, forLineHeight, percentageBasis, out result))
+        if (TryEvaluateMathLengthFunction(normalized, referenceElement, forLineHeight, percentageBasis, out result, forFontSize))
             return true;
 
         var additiveOperatorIndex = FindTopLevelAdditiveOperator(normalized);
@@ -2273,13 +2275,15 @@ public sealed partial class DomBridge
                     referenceElement,
                     forLineHeight,
                     percentageBasis,
-                    out var left) ||
+                    out var left,
+                    forFontSize) ||
                 !TryEvaluateCssLengthWithViewport(
                     normalized[(additiveOperatorIndex + 1)..],
                     referenceElement,
                     forLineHeight,
                     percentageBasis,
-                    out var right))
+                    out var right,
+                    forFontSize))
             {
                 return false;
             }
@@ -2314,7 +2318,21 @@ public sealed partial class DomBridge
             double.TryParse(lower[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var em))
         {
-            result = em * ResolveFontSizeForLength(referenceElement, rootRelative: false);
+            // For the font-size property itself, em resolves against the parent's
+            // font-size (not the element's own), otherwise resolving the element's
+            // font-size would recurse into itself.
+            double emBasis;
+            if (forFontSize)
+            {
+                var parent = referenceElement.Parent;
+                emBasis = parent != null ? ResolveFontSizeForElement(parent) : 16;
+            }
+            else
+            {
+                emBasis = ResolveFontSizeForLength(referenceElement, rootRelative: false);
+            }
+
+            result = em * emBasis;
             return true;
         }
 
@@ -2349,7 +2367,8 @@ public sealed partial class DomBridge
         DomElement? referenceElement,
         bool forLineHeight,
         double? percentageBasis,
-        out double result)
+        out double result,
+        bool forFontSize = false)
     {
         result = 0;
         if (string.IsNullOrWhiteSpace(value) || value[^1] != ')')
@@ -2362,7 +2381,7 @@ public sealed partial class DomBridge
         {
             var content = value[5..^1];
             return HasBalancedParens(content) &&
-                   TryEvaluateCssLengthWithViewport(content, referenceElement, forLineHeight, percentageBasis, out result);
+                   TryEvaluateCssLengthWithViewport(content, referenceElement, forLineHeight, percentageBasis, out result, forFontSize);
         }
 
         if (!StartsWithFunction(value, "min") && !StartsWithFunction(value, "max"))
@@ -2380,7 +2399,7 @@ public sealed partial class DomBridge
         double? candidate = null;
         foreach (var part in parts)
         {
-            if (!TryEvaluateCssLengthWithViewport(part, referenceElement, forLineHeight, percentageBasis, out var parsed))
+            if (!TryEvaluateCssLengthWithViewport(part, referenceElement, forLineHeight, percentageBasis, out var parsed, forFontSize))
                 return false;
 
             candidate = candidate.HasValue
@@ -2569,7 +2588,7 @@ public sealed partial class DomBridge
     private double ResolveFontSizeForElement(DomElement element)
     {
         var props = GetComputedProps(element);
-        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element);
+        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element, forFontSize: true);
         if (fontSize > 0)
             return fontSize;
 
@@ -2581,7 +2600,7 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            var attributeFontSize = ParseCssLengthToPixelsWithViewport(attributeValue, current);
+            var attributeFontSize = ParseCssLengthToPixelsWithViewport(attributeValue, current, forFontSize: true);
             if (attributeFontSize > 0)
                 return attributeFontSize;
         }
