@@ -11,7 +11,7 @@ alongside the per-phase records in [`broiler-css-component.md`](broiler-css-comp
 |---|---|
 | 0–3 (guards, kernel, parser, selectors) | Done (earlier). |
 | 4 — cascade & computed style | **Done** (`getComputedStyle()` cutover + anchor Pattern B scans migrated to a document-scoped enumeration, §4b). |
-| 5 — renderer cutover | **Slice 1 done** (dual-run scaffold behind a default-off flag, §4c); parity work + flip pixel-gated. |
+| 5 — renderer cutover | **Done — flag flipped ON (2026-06-26, §4d).** Both render paths cascade through the shared engine; verified against Acid3 + WPT pixel gates (no pass/fail regressions; fixes several important/border cascade tests). |
 | 6 — CSSOM on shared model | **Done** (slices 6a + 6b: model storage, store unification, model-driven nested wrappers; §4a). |
 | 7 — compatibility cleanup | **Not started.** Depends on 5 + 6. |
 
@@ -164,6 +164,57 @@ sheet, inline `style=`, `!important`/origin tracking, external `<link>` + `@impo
 pseudo-elements + `::selection`, `@font-face`/`@keyframes`, real viewport threading; then
 dual-run pixel-diff, flip the flag, and retire `GetComputedProps`' internal `CssRules`.
 
+## 4d. Phase 5 — renderer cutover complete, flag flipped ON (2026-06-26)
+
+Slice 1's scaffold was a no-op for the gate: it only hooked `GenerateCssTree(DomDocument)`
+(the `SetDocument` path), but the test gate and app render through the HTML-string path
+(`HtmlRender.RenderToImage` → `SetHtml` → `GenerateCssTree(string)`). The cutover moved the
+engine into the shared `PrepareCssTree`/`CascadeApplyStyles`, so **both** paths now cascade
+through the shared engine. Both `GenerateCssTree(string)` and `…(DomDocument)` already build a
+canonical `DomDocument` (the string overload goes through `HtmlDocumentParser` →
+`HtmlParser.ParseDocument(DomDocument)`), so `CssBox.SourceElement` is set on both — the
+"null on the string path" note in §4c is stale.
+
+- **Non-clobbering projection.** New `CssStyleEngine.GetCascadedStyle(element)` returns the
+  cascade-resolved *declared* longhands (UA + author cascade by origin/importance/specificity/
+  order, custom-property/`var()`, CSS-wide keywords, shorthand expansion, `attr()`, relative
+  font-weight) **without** inheritance backfill, initial backfill, or form-control/logical-size
+  synthesis, and folds `inherit` to the parent's computed value. So the renderer keeps its own
+  `InheritStyle` + per-box defaults; only explicitly-cascaded values are projected. This avoids
+  the full-`GetComputedStyle` clobbering (which backfills `display:inline`, `font-family:serif`,
+  etc. over the renderer's defaults).
+- **Border shorthand reset.** `GetCascadedStyle` resets a `border`/`border-<side>` shorthand's
+  omitted longhands to their initial (e.g. an important `border:1px solid` now projects
+  `border-color: rgb(0,0,0)`), so it overrides a prior `border:… red` — fixes
+  `Acid3CascadeDebugTests.Important_Override_Reduces_Border_Width`.
+- **Integration.** `DomParser.PrepareCssTree` builds one engine (UA sheet at `CssOrigin.UserAgent`
+  + author `<style>` text + viewport) via `SharedRendererCascade.BuildEngine`/`FindCanonicalDocument`;
+  `CascadeApplyStyles` projects `GetCascadedStyle` in place of the legacy `AssignCssBlocks` block
+  when the flag is on, keeping `InheritStyle`, presentational attributes, inline style,
+  pseudo-elements, animations, and `::selection` (the latter still driven by the legacy `cssData`,
+  which is still built).
+- **Flag flipped.** `SharedRendererCascade.UseSharedRendererCascade` defaults **`true`**.
+
+**Verification (2026-06-26).** Dual-run, single-threaded to neutralise the suite's pre-existing
+±2-3 parallel/order flakiness:
+- Cli gate (`CssExtraction|SelectorsAndCssom|CssRendering|CssImportantCascade|WptCssVariables|
+  CssSelectorsPolish|Acid3`): serial-OFF 24 fail → serial-ON 21-22 fail. **Net improvement**;
+  every "new failure" candidate (`Important_Override`, `Important_Low_Specificity`,
+  `Border_Shorthand_Resets`, `Root_Selector_Overrides_Html_Border_Top`) **passes in isolation**
+  → pre-existing flakiness, not cascade regressions. Fixes confirmed: Important-cascade,
+  FirstChild, VerticalAlign, border-shorthand.
+- WPT pixel subset (`tests/wpt`, 145 cases): OFF **67/73/5** == ON **67/73/5** — **0 pass/fail
+  regressions, 0 improvements**. Three already-failing tests render a lower match% with the
+  engine: `css-backgrounds/background-attachment-margin-root-001/002` (35%→0% — background on
+  root edge case) and `css-anchor-position/position-area-percents-001` (93.5%→91.7%).
+- Engine units: `Broiler.CSS.Dom.Tests` 37 pass / 1 (the standalone path-resolution quirk
+  baseline); `Phase5SharedCascadeTests` 4/4. Full `Broiler.slnx` build green.
+
+**Follow-ups (not blockers):** (a) the `background-attachment` on-root match drop — investigate the
+background-shorthand reset / root background propagation in the engine path; (b) the suite's
+parallel/order-dependent flakiness in the Acid3 rendering tests (shared process state), which makes
+the parallel gate noisy by ±2-3 independent of this work.
+
 ## 5. Findings that shape the rest
 
 1. **The CSSOM/rendering split is the heart of Phase 6.** ~~There are **three** rule
@@ -248,7 +299,9 @@ dual-run pixel-diff, flip the flag, and retire `GetComputedProps`' internal `Css
   `getComputedStyle()` to the legacy cascade if a regression surfaces under the pixel
   suite. `BuildComputedStyleMapLegacy` is retained for exactly this.
 - `SharedRendererCascade.UseSharedRendererCascade` (`Broiler.HTML.Orchestration/Parse/`)
-  — Phase 5 renderer dual-run; default **off** (legacy `CascadeApplyStyles` is observable).
+  — Phase 5 renderer cascade; default **on** as of the 2026-06-26 cutover (§4d). Flip to
+  `false` to revert to the legacy `CascadeApplyStyles` selector matching if a regression
+  surfaces; the legacy `else` branch is retained for exactly this.
 
 ## 9. Phase 7 readiness — what's blocked, and why (audit 2026-06-26)
 

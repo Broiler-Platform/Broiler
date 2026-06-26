@@ -911,6 +911,15 @@ submodule layout.
 
 ### Phase 5 - Adapt the HTML renderer
 
+**Status:** Done — flag flipped on (2026-06-26). The renderer's element cascade now runs
+through `Broiler.CSS.Dom.CssStyleEngine.GetCascadedStyle` for both the HTML-string and
+typed-document paths (unified in `DomParser.PrepareCssTree`/`CascadeApplyStyles`), replacing
+the legacy `AssignCssBlocks` selector matching while keeping layout-owned used-value resolution,
+inheritance, presentational attributes, inline style, pseudo-elements, and animations. Verified
+against the Acid3 + WPT pixel gates with no pass/fail regressions (details in
+[`broiler-css-next-steps.md`](broiler-css-next-steps.md) §4d). Retiring `GetComputedProps`'
+internal `CssRules` is the remaining Phase 5/7 tail.
+
 Deliverables:
 
 - make `Broiler.HTML.Orchestration` build a style context from the canonical
