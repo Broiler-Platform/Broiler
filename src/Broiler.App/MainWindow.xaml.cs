@@ -167,7 +167,7 @@ public partial class MainWindow : Window
             if (_activeSession != null)
             {
                 // Render the post-script initial state (before any timers).
-                HtmlPanel.Text = HtmlPostProcessor.Process(_activeSession.CurrentHtml());
+                HtmlPanel.SetDocument(_activeSession.CurrentDocument());
 
                 if (_activeSession.HasPendingWork)
                 {
@@ -228,9 +228,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        var html = _activeSession.Step();
-        if (html != null)
-            HtmlPanel.Text = HtmlPostProcessor.Process(html);
+        var document = _activeSession.StepDocument();
+        if (document != null)
+            HtmlPanel.SetDocument(document);
 
         // If there's no more work after this step, stop the timer.
         if (!_activeSession.HasPendingWork)

@@ -89,7 +89,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement? FindElementByAnchorName(string anchorName)
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (el.IsTextNode) continue;
             // Check inline styles first.
@@ -99,7 +99,7 @@ public sealed partial class DomBridge
         }
 
         // Fall back to CSS rules.
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (el.IsTextNode) continue;
             foreach (var (sel, _, decls) in CssRules)
@@ -144,7 +144,7 @@ public sealed partial class DomBridge
                     return true;
 
                 // Check if the anchor is scrolled out of this container.
-                if (el.DomProperties.TryGetValue("_scrollTop", out var st) &&
+                if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) &&
                     st is double scrollTop && scrollTop > 0)
                 {
                     double containerH =

@@ -28,9 +28,9 @@ public sealed partial class DomBridge
         {
             double scrollTop = 0;
             double scrollLeft = 0;
-            if (el.DomProperties.TryGetValue("_scrollTop", out var st) && st is double stv)
+            if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
                 scrollTop = stv;
-            if (el.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double slv)
+            if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
                 scrollLeft = slv;
 
             var scrollScale = GetScrollSimulationScaleFactor();
@@ -58,10 +58,7 @@ public sealed partial class DomBridge
                     // container's overflow:hidden at all edges (including top),
                     // avoiding the rendering artefact where negative-margin
                     // spacers can leak above the container's top edge.
-                    var wrapper = new DomElement("div", null, null, "")
-                    {
-                        Parent = el,
-                    };
+                    var wrapper = new DomElement(_document, "div", null, null, "");
                     wrapper.Style["position"] = "relative";
                     if (scrollTop != 0)
                         wrapper.Style["top"] =

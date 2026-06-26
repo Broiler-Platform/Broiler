@@ -32,7 +32,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// The element backing <c>document.documentElement</c> (the &lt;html&gt; element).
     /// </summary>
-    public DomElement DocumentElement { get; } = new("html", null, null, string.Empty);
+    public DomElement DocumentElement { get; }
 
     private void RegisterDocument(JSContext context)
     {

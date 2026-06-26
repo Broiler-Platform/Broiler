@@ -390,10 +390,10 @@ public sealed partial class DomBridge
 
                     // Store resolved offsets for JS offset property queries.
                     // Use border-box dimensions (matching offsetWidth/offsetHeight).
-                    element.DomProperties["_resolvedLeft"] = finalLeft;
-                    element.DomProperties["_resolvedTop"] = finalTop;
-                    element.DomProperties["_resolvedWidth"] = borderBoxW;
-                    element.DomProperties["_resolvedHeight"] = borderBoxH;
+                    GetElementRuntimeState(element).Layout.Left.Set(finalLeft);
+                    GetElementRuntimeState(element).Layout.Top.Set(finalTop);
+                    GetElementRuntimeState(element).Layout.Width.Set(borderBoxW);
+                    GetElementRuntimeState(element).Layout.Height.Set(borderBoxH);
                 }
             }
         }

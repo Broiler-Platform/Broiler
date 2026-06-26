@@ -18,7 +18,7 @@ public sealed partial class DomBridge
 {
     private static DomElement? GetShadowRoot(DomElement element)
     {
-        if (element.DomProperties.TryGetValue("_shadowRoot", out var rawShadowRoot) &&
+        if (GetElementRuntimeState(element).Shadow.Root.TryGet(out var rawShadowRoot) &&
             rawShadowRoot is DomElement root)
         {
             return root;
@@ -31,7 +31,7 @@ public sealed partial class DomBridge
     {
         if (shadowRoot != null &&
             string.Equals(shadowRoot.TagName, "#shadow-root", StringComparison.Ordinal) &&
-            shadowRoot.DomProperties.TryGetValue("_host", out var rawHost) &&
+            GetElementRuntimeState(shadowRoot).Shadow.Host.TryGet(out var rawHost) &&
             rawHost is DomElement host)
         {
             return host;

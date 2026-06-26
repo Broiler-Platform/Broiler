@@ -59,7 +59,10 @@ public sealed partial class DomBridge
     private JSObject BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var tw = new JSObject();
-        var currentNode = root;
+        var walker = new Broiler.Dom.DomTreeWalker(
+            root,
+            (Broiler.Dom.DomWhatToShow)(uint)whatToShow,
+            node => (Broiler.Dom.DomFilterResult)ApplyFilter((DomElement)node, whatToShow, filterFn));
 
         tw.FastAddValue(
             (KeyString)"root",
@@ -68,8 +71,16 @@ public sealed partial class DomBridge
 
         tw.FastAddProperty(
             (KeyString)"currentNode",
-            new JSFunction((in Arguments a) => ToJSObject(currentNode), "get currentNode"),
-            new JSFunction((in Arguments a) => JsTraversalSetCurrentNode002Core(ref currentNode, in a), "set currentNode"),
+            new JSFunction((in Arguments a) => ToJSObject((DomElement)walker.CurrentNode), "get currentNode"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSObject nodeObject &&
+                    FindDomElementByJSObject(nodeObject) is { } node)
+                {
+                    walker.CurrentNode = node;
+                }
+                return JSUndefined.Value;
+            }, "set currentNode"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         tw.FastAddValue(
@@ -80,47 +91,50 @@ public sealed partial class DomBridge
         // parentNode()
         tw.FastAddValue(
             (KeyString)"parentNode",
-            new JSFunction((in Arguments a) => JsTraversalParentNode003Core(ref currentNode, filterFn, root, whatToShow, in a), "parentNode", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.ParentNode()), "parentNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // firstChild()
         tw.FastAddValue(
             (KeyString)"firstChild",
-            new JSFunction((in Arguments a) => TreeWalkerTraverseChildren(currentNode, true, root, whatToShow, filterFn, ref currentNode), "firstChild", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.FirstChild()), "firstChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // lastChild()
         tw.FastAddValue(
             (KeyString)"lastChild",
-            new JSFunction((in Arguments a) => TreeWalkerTraverseChildren(currentNode, false, root, whatToShow, filterFn, ref currentNode), "lastChild", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.LastChild()), "lastChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // nextSibling()
         tw.FastAddValue(
             (KeyString)"nextSibling",
-            new JSFunction((in Arguments a) => TreeWalkerTraverseSiblings(currentNode, true, root, whatToShow, filterFn, ref currentNode), "nextSibling", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.NextSibling()), "nextSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // previousSibling()
         tw.FastAddValue(
             (KeyString)"previousSibling",
-            new JSFunction((in Arguments a) => TreeWalkerTraverseSiblings(currentNode, false, root, whatToShow, filterFn, ref currentNode), "previousSibling", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.PreviousSibling()), "previousSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // nextNode() — depth-first pre-order traversal forward
         tw.FastAddValue(
             (KeyString)"nextNode",
-            new JSFunction((in Arguments a) => JsTraversalNextNode008Core(ref currentNode, filterFn, root, whatToShow, in a), "nextNode", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // previousNode() — depth-first pre-order traversal backward
         tw.FastAddValue(
             (KeyString)"previousNode",
-            new JSFunction((in Arguments a) => JsTraversalPreviousNode009Core(ref currentNode, filterFn, root, whatToShow, in a), "previousNode", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(walker.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return tw;
     }
+
+    private JSValue ToTraversalJsValue(Broiler.Dom.DomNode? node) =>
+        node is DomElement element ? ToJSObject(element) : JSNull.Value;
 
     /// <summary>Helper: get next sibling or ancestor's next sibling, skipping subtree.</summary>
     private static DomElement? GetNextSkippingChildren(DomElement node, DomElement root)
@@ -215,11 +229,11 @@ public sealed partial class DomBridge
     private JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var iter = new JSObject();
-        var state = new IteratorState(root);
-        var detached = false;
-
-        // Register this iterator for mutation tracking
-        _activeNodeIterators.Add(new WeakReference<IteratorState>(state));
+        var iterator = new Broiler.Dom.DomNodeIterator(
+            root,
+            (Broiler.Dom.DomWhatToShow)(uint)whatToShow,
+            node => (Broiler.Dom.DomFilterResult)ApplyFilter((DomElement)node, whatToShow, filterFn));
+        _activeNodeIterators.Add(new WeakReference<Broiler.Dom.DomNodeIterator>(iterator));
 
         iter.FastAddValue(
             (KeyString)"root",
@@ -233,32 +247,36 @@ public sealed partial class DomBridge
 
         iter.FastAddProperty(
             (KeyString)"referenceNode",
-            new JSFunction((in Arguments a) => state.ReferenceNode != null ? ToJSObject(state.ReferenceNode) : JSNull.Value, "get referenceNode"),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(iterator.ReferenceNode), "get referenceNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         iter.FastAddProperty(
             (KeyString)"pointerBeforeReferenceNode",
-            new JSFunction((in Arguments a) => state.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
+            new JSFunction((in Arguments a) => iterator.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // nextNode()
         iter.FastAddValue(
             (KeyString)"nextNode",
-            new JSFunction((in Arguments a) => JsTraversalNextNode012Core(detached, filterFn, root, state, whatToShow, in a), "nextNode", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(iterator.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // previousNode()
         iter.FastAddValue(
             (KeyString)"previousNode",
-            new JSFunction((in Arguments a) => JsTraversalPreviousNode013Core(detached, filterFn, root, state, whatToShow, in a), "previousNode", 0),
+            new JSFunction((in Arguments a) => ToTraversalJsValue(iterator.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // detach()
         iter.FastAddValue(
             (KeyString)"detach",
-            new JSFunction((in Arguments a) => JsTraversalDetach014Core(ref detached, in a), "detach", 0),
+            new JSFunction((in Arguments a) =>
+            {
+                iterator.Dispose();
+                return JSUndefined.Value;
+            }, "detach", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return iter;
@@ -658,7 +676,7 @@ public sealed partial class DomBridge
         // Create text node with extracted content
         var extractedTextNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
         extractedTextNode.TextContent = extractedText;
-        bridge._elements.Add(extractedTextNode);
+        bridge._knownNodes.Add(extractedTextNode);
 
         if (chain.Count == 1)
         {
@@ -673,7 +691,7 @@ public sealed partial class DomBridge
         {
             var original = chain[i];
             var clone = new DomElement(original.TagName, null, null, string.Empty);
-            bridge._elements.Add(clone);
+            bridge._knownNodes.Add(clone);
 
             if (topClone == null) topClone = clone;
             if (currentParent != null)
@@ -835,7 +853,7 @@ public sealed partial class DomBridge
         {
             var original = chain[i];
             var clone = bridge.CloneDomElement(original, false);
-            bridge._elements.Add(clone);
+            bridge._knownNodes.Add(clone);
             clones[i] = clone;
             if (i < chain.Count - 1)
             {
@@ -924,7 +942,7 @@ public sealed partial class DomBridge
         {
             var original = chain[i];
             var clone = bridge.CloneDomElement(original, false);
-            bridge._elements.Add(clone);
+            bridge._knownNodes.Add(clone);
             clones[i] = clone;
         }
 
@@ -1202,8 +1220,8 @@ public sealed partial class DomBridge
     {
         for (var i = _activeNodeIterators.Count - 1; i >= 0; i--)
         {
-            if (_activeNodeIterators[i].TryGetTarget(out var iterState))
-                iterState.AdjustForRemoval(nodeToBeRemoved);
+            if (_activeNodeIterators[i].TryGetTarget(out _))
+                continue;
             else
                 _activeNodeIterators.RemoveAt(i); // GC'd — prune
         }

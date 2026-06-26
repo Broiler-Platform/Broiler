@@ -21,10 +21,10 @@ public sealed partial class DomBridge
         ResolvePositionAreaForElement(DomElement element)
     {
         // Check for pre-resolved values first.
-        if (element.DomProperties.TryGetValue("_resolvedLeft", out var rl) && rl is double resolvedLeft &&
-            element.DomProperties.TryGetValue("_resolvedTop", out var rt) && rt is double resolvedTop &&
-            element.DomProperties.TryGetValue("_resolvedWidth", out var rw) && rw is double resolvedWidth &&
-            element.DomProperties.TryGetValue("_resolvedHeight", out var rh) && rh is double resolvedHeight)
+        if (GetElementRuntimeState(element).Layout.Left.TryGet(out var rl) && rl is double resolvedLeft &&
+            GetElementRuntimeState(element).Layout.Top.TryGet(out var rt) && rt is double resolvedTop &&
+            GetElementRuntimeState(element).Layout.Width.TryGet(out var rw) && rw is double resolvedWidth &&
+            GetElementRuntimeState(element).Layout.Height.TryGet(out var rh) && rh is double resolvedHeight)
             return (resolvedLeft, resolvedTop, resolvedWidth, resolvedHeight);
 
         // Resolve on-the-fly from CSS properties and inline styles.
@@ -57,10 +57,10 @@ public sealed partial class DomBridge
         if (rect == null) return null;
 
         // Cache the resolved values.
-        element.DomProperties["_resolvedLeft"] = rect.Value.Left;
-        element.DomProperties["_resolvedTop"] = rect.Value.Top;
-        element.DomProperties["_resolvedWidth"] = rect.Value.Width;
-        element.DomProperties["_resolvedHeight"] = rect.Value.Height;
+        GetElementRuntimeState(element).Layout.Left.Set(rect.Value.Left);
+        GetElementRuntimeState(element).Layout.Top.Set(rect.Value.Top);
+        GetElementRuntimeState(element).Layout.Width.Set(rect.Value.Width);
+        GetElementRuntimeState(element).Layout.Height.Set(rect.Value.Height);
 
         return (rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
     }

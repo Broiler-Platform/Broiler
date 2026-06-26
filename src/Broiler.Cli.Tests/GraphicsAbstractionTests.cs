@@ -2,6 +2,8 @@ using Broiler.Cli;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
+using Broiler.Dom.Html;
+using Broiler.HTML.Core.IR;
 using System.Drawing;
 using RectangleF = System.Drawing.RectangleF;
 
@@ -205,6 +207,49 @@ public class GraphicsAbstractionTests
 
         Assert.NotNull(container.LatestFragmentTree);
         Assert.NotNull(container.GetElementRectangle("target"));
+    }
+
+    [Fact]
+    public void HtmlContainer_Typed_And_Serialized_Paths_Produce_Equivalent_Fragment_Trees()
+    {
+        const string html = "<html><body style='margin:0'><div id='target' style='width:20px;height:10px'>value</div></body></html>";
+        var document = new HtmlDocumentParser().ParseDocument(html).Document;
+
+        using var serialized = new HtmlContainer();
+        using var typed = new HtmlContainer();
+        serialized.MaxSize = typed.MaxSize = new SizeF(50, 50);
+        serialized.SetHtml(html);
+        typed.SetDocument(document);
+
+        var viewport = new RectangleF(0, 0, 50, 50);
+        serialized.PerformLayout(viewport);
+        typed.PerformLayout(viewport);
+
+        Assert.Equal(
+            FragmentJsonDumper.ToJson(serialized.LatestFragmentTree!),
+            FragmentJsonDumper.ToJson(typed.LatestFragmentTree!));
+    }
+
+    [Fact]
+    public void HtmlContainer_Typed_Path_Rebuilds_After_Canonical_Dom_Mutation()
+    {
+        var document = new HtmlDocumentParser()
+            .ParseDocument("<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>")
+            .Document;
+        var target = document.GetElementById("target")!;
+
+        using var container = new HtmlContainer();
+        container.MaxSize = new SizeF(100, 50);
+        container.SetDocument(document);
+        container.PerformLayout(new RectangleF(0, 0, 100, 50));
+        var before = container.GetElementRectangle("target");
+
+        target.SetAttribute("style", "width: 35px; height: 10px");
+        container.PerformLayout(new RectangleF(0, 0, 100, 50));
+        var after = container.GetElementRectangle("target");
+
+        Assert.Equal(20, before!.Value.Width);
+        Assert.Equal(35, after!.Value.Width);
     }
 
     [Fact]

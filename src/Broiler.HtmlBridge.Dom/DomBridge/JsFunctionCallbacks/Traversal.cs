@@ -511,15 +511,15 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalCloneContents032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement("#document-fragment", null, null, string.Empty);
-        bridge._elements.Add(fragment);
+        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        bridge._knownNodes.Add(fragment);
         var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
         foreach (var node in nodes)
         {
             var clone = bridge.CloneDomElement(node, true);
             clone.Parent = fragment;
             fragment.Children.Add(clone);
-            bridge._elements.Add(clone);
+            bridge._knownNodes.Add(clone);
         }
 
         return bridge.ToJSObject(fragment);
@@ -528,8 +528,8 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalExtractContents033Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement("#document-fragment", null, null, string.Empty);
-        bridge._elements.Add(fragment);
+        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        bridge._knownNodes.Add(fragment);
         // Handle same-container text node case
         if (ReferenceEquals(state.StartContainer, state.EndContainer) && (state.StartContainer.IsTextNode || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
         {
@@ -538,11 +538,11 @@ public sealed partial class DomBridge
             var e2 = Math.Max(s, Math.Min(state.EndOffset, text.Length));
             var extractedText = text.Substring(s, e2 - s);
             state.StartContainer.TextContent = text.Substring(0, s) + text.Substring(e2);
-            var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+            var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             textNode.TextContent = extractedText;
             textNode.Parent = fragment;
             fragment.Children.Add(textNode);
-            bridge._elements.Add(textNode);
+            bridge._knownNodes.Add(textNode);
             state.EndContainer = state.StartContainer;
             state.EndOffset = state.StartOffset;
             state.Collapsed = true;
@@ -612,9 +612,9 @@ public sealed partial class DomBridge
                     var text = state.StartContainer.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(state.StartOffset);
                     state.StartContainer.TextContent = text.Substring(0, state.StartOffset);
-                    var extractedNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
                     extractedNode.TextContent = extractedPart;
-                    bridge._elements.Add(extractedNode);
+                    bridge._knownNodes.Add(extractedNode);
                     extractedNode.Parent = fragment;
                     fragment.Children.Add(extractedNode);
                 }
@@ -622,7 +622,7 @@ public sealed partial class DomBridge
                 {
                     // Element: clone and extract children from startOffset
                     var clone = CloneDomElement(state.StartContainer, false);
-                    bridge._elements.Add(clone);
+                    bridge._knownNodes.Add(clone);
                     for (var ci = state.StartOffset; ci < state.StartContainer.Children.Count;)
                     {
                         var child = state.StartContainer.Children[ci];
@@ -670,16 +670,16 @@ public sealed partial class DomBridge
                     var text = state.EndContainer.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(0, state.EndOffset);
                     state.EndContainer.TextContent = text.Substring(state.EndOffset);
-                    var extractedNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
                     extractedNode.TextContent = extractedPart;
-                    bridge._elements.Add(extractedNode);
+                    bridge._knownNodes.Add(extractedNode);
                     extractedNode.Parent = fragment;
                     fragment.Children.Add(extractedNode);
                 }
                 else
                 {
                     var clone = CloneDomElement(state.EndContainer, false);
-                    bridge._elements.Add(clone);
+                    bridge._knownNodes.Add(clone);
                     for (var ci = 0; ci < state.EndOffset && state.EndContainer.Children.Count > 0; ci++)
                     {
                         var child = state.EndContainer.Children[0];
@@ -756,9 +756,9 @@ public sealed partial class DomBridge
             // Update original text node
             state.StartContainer.TextContent = beforeText;
             // Create remainder text node
-            var remainder = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+            var remainder = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             remainder.TextContent = afterText;
-            bridge._elements.Add(remainder);
+            bridge._knownNodes.Add(remainder);
             // Insert: [before] [insertedNode] [after]
             var textIdx = parent.Children.IndexOf(state.StartContainer);
             el.Parent = parent;

@@ -13,6 +13,28 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class ScriptEngineExecuteTests
 {
+    [Fact]
+    public void ScriptEngine_Typed_Handoff_Renders_The_Mutated_Canonical_Document()
+    {
+        const string html = "<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>";
+        var engine = new ScriptEngine();
+        var document = engine.ExecuteToDocument(
+            ["document.getElementById('target').style.width = '35px';"],
+            [],
+            html,
+            "file:///typed-render.html");
+
+        Assert.NotNull(document);
+        using var container = new Broiler.HTML.Image.HtmlContainer
+        {
+            MaxSize = new System.Drawing.SizeF(100, 50)
+        };
+        container.SetDocument(document!);
+        container.PerformLayout(new System.Drawing.RectangleF(0, 0, 100, 50));
+
+        Assert.Equal(35, container.GetElementRectangle("target")!.Value.Width);
+    }
+
     // ---------------------------------------------------------------
     //  Body onload event firing via DomBridge (matches ScriptEngine)
     // ---------------------------------------------------------------

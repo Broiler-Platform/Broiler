@@ -1299,8 +1299,7 @@ public sealed partial class DomBridge
         if (!CanProgrammaticallyScroll(element, vertical))
             return 0;
 
-        var propertyName = vertical ? "_scrollTop" : "_scrollLeft";
-        return element.DomProperties.TryGetValue(propertyName, out var offset) && offset is double scrollOffset
+        return TryGetStoredScrollOffset(element, vertical, out var scrollOffset)
             ? scrollOffset
             : 0;
     }
@@ -1308,8 +1307,8 @@ public sealed partial class DomBridge
     private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
     {
         var (nextLeft, nextTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
-        element.DomProperties["_scrollLeft"] = nextLeft;
-        element.DomProperties["_scrollTop"] = nextTop;
+        GetElementRuntimeState(element).Scroll.Left.Set(nextLeft);
+        GetElementRuntimeState(element).Scroll.Top.Set(nextTop);
     }
 
     private (double Left, double Top) ResolveElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
@@ -1367,8 +1366,8 @@ public sealed partial class DomBridge
                     var queuedPreviousTop = GetElementScrollOffset(element, vertical: true);
                     var queuedPreviousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
                     var queuedPreviousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
-                    element.DomProperties["_scrollLeft"] = targetLeft;
-                    element.DomProperties["_scrollTop"] = targetTop;
+                    GetElementRuntimeState(element).Scroll.Left.Set(targetLeft);
+                    GetElementRuntimeState(element).Scroll.Top.Set(targetTop);
                     NotifyVisualViewportScrollIfNeeded(queuedPreviousVisualPageLeft, queuedPreviousVisualPageTop, trackVisualViewport);
                     DispatchScrollEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
                     DispatchScrollEndEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
@@ -1378,15 +1377,15 @@ public sealed partial class DomBridge
 
             // Approximate smooth scrolling with a visible intermediate frame before
             // finishing on the next queued frame.
-            element.DomProperties["_scrollLeft"] = previousLeft + ((targetLeft - previousLeft) / 2.0);
-            element.DomProperties["_scrollTop"] = previousTop + ((targetTop - previousTop) / 2.0);
+            GetElementRuntimeState(element).Scroll.Left.Set(previousLeft + ((targetLeft - previousLeft) / 2.0));
+            GetElementRuntimeState(element).Scroll.Top.Set(previousTop + ((targetTop - previousTop) / 2.0));
             NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
             DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
             return;
         }
 
-        element.DomProperties["_scrollLeft"] = targetLeft;
-        element.DomProperties["_scrollTop"] = targetTop;
+        GetElementRuntimeState(element).Scroll.Left.Set(targetLeft);
+        GetElementRuntimeState(element).Scroll.Top.Set(targetTop);
         NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
         DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
         DispatchScrollEndEventIfNeeded(element, previousLeft, previousTop);
@@ -1761,7 +1760,7 @@ public sealed partial class DomBridge
         if (options.Count == 0)
             return -1;
 
-        if (element.DomProperties.TryGetValue("_selectedIndex", out var explicitIndex) &&
+        if (GetElementRuntimeState(element).FormControl.SelectedIndex.TryGet(out var explicitIndex) &&
             explicitIndex is int dirtyIndex)
         {
             return dirtyIndex >= 0 && dirtyIndex < options.Count ? dirtyIndex : -1;
@@ -1771,7 +1770,7 @@ public sealed partial class DomBridge
         {
             var option = options[index];
             if (option.Attributes.ContainsKey("selected") ||
-                (option.DomProperties.TryGetValue("_defaultSelected", out var defaultSelected) && defaultSelected is true))
+                (GetElementRuntimeState(option).FormControl.DefaultSelected.TryGet(out var defaultSelected) && defaultSelected is true))
             {
                 return index;
             }
@@ -1785,14 +1784,14 @@ public sealed partial class DomBridge
         var options = CollectSelectOptions(element);
         if (options.Count == 0)
         {
-            element.DomProperties["_selectedIndex"] = -1;
+            GetElementRuntimeState(element).FormControl.SelectedIndex.Set(-1);
             return;
         }
 
         if (index < 0 || index >= options.Count)
             index = -1;
 
-        element.DomProperties["_selectedIndex"] = index;
+        GetElementRuntimeState(element).FormControl.SelectedIndex.Set(index);
     }
 
     private static string GetSelectValue(DomElement element)
@@ -1803,7 +1802,7 @@ public sealed partial class DomBridge
             return string.Empty;
 
         var option = options[selectedIndex];
-        if (option.DomProperties.TryGetValue("_value", out var domValue) && domValue is string stringValue)
+        if (GetElementRuntimeState(option).FormControl.Value.TryGet(out var domValue) && domValue is string stringValue)
             return stringValue;
 
         if (option.Attributes.TryGetValue("value", out var attrValue))
@@ -1823,12 +1822,12 @@ public sealed partial class DomBridge
                 : option.TextContent;
             if (string.Equals(optionValue, value, StringComparison.Ordinal))
             {
-                element.DomProperties["_selectedIndex"] = index;
+                GetElementRuntimeState(element).FormControl.SelectedIndex.Set(index);
                 return;
             }
         }
 
-        element.DomProperties["_selectedIndex"] = -1;
+        GetElementRuntimeState(element).FormControl.SelectedIndex.Set(-1);
     }
 
     private IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)

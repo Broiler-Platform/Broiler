@@ -548,7 +548,7 @@ public sealed partial class DomBridge
         if (docRoot == null)
             return true;
 
-        return !docRoot.DomProperties.TryGetValue("_hasViewport", out var value) ||
+        return !GetElementRuntimeState(docRoot).Document.HasViewport.TryGet(out var value) ||
                value is not bool hasViewport ||
                hasViewport;
     }

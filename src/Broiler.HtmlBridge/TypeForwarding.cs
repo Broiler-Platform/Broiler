@@ -57,7 +57,5 @@ using System.Runtime.CompilerServices;
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.IScriptEngine))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.InteractiveSession))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.DomElement))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.EventListenerRegistration))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.MutationObserverOptions))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.DomBridge))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.HtmlTreeBuilder))]

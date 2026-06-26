@@ -64,8 +64,8 @@ public sealed partial class DomBridge
         var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
             return ToJSObject(cap);
-        cap = new DomElement("caption", null, null, string.Empty);
-        bridge._elements.Add(cap);
+        cap = new DomElement(_document, "caption", null, null, string.Empty);
+        bridge._knownNodes.Add(cap);
         cap.Parent = element;
         element.Children.Insert(0, cap);
         return ToJSObject(cap);
@@ -77,8 +77,8 @@ public sealed partial class DomBridge
         var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
             return ToJSObject(th);
-        th = new DomElement("thead", null, null, string.Empty);
-        bridge._elements.Add(th);
+        th = new DomElement(_document, "thead", null, null, string.Empty);
+        bridge._knownNodes.Add(th);
         th.Parent = element;
         element.Children.Add(th);
         return ToJSObject(th);
@@ -90,8 +90,8 @@ public sealed partial class DomBridge
         var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
             return ToJSObject(tf);
-        tf = new DomElement("tfoot", null, null, string.Empty);
-        bridge._elements.Add(tf);
+        tf = new DomElement(_document, "tfoot", null, null, string.Empty);
+        bridge._knownNodes.Add(tf);
         tf.Parent = element;
         element.Children.Add(tf);
         return ToJSObject(tf);
@@ -183,8 +183,8 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesInsertRow017Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
-        var tr = new DomElement("tr", null, null, string.Empty);
-        bridge._elements.Add(tr);
+        var tr = new DomElement(_document, "tr", null, null, string.Empty);
+        bridge._knownNodes.Add(tr);
         tr.Parent = element;
         var trRows = element.Children.Where(c => string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
         if (index < 0 || index >= trRows.Count)
@@ -251,8 +251,8 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesInsertCell022Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
-        var td = new DomElement("td", null, null, string.Empty);
-        bridge._elements.Add(td);
+        var td = new DomElement(_document, "td", null, null, string.Empty);
+        bridge._knownNodes.Add(td);
         td.Parent = element;
         var cells = element.Children.Where(c => !c.IsTextNode && IsTableCellElement(c)).ToList();
         if (index < 0 || index >= cells.Count)
@@ -318,8 +318,8 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesShowModal030Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         element.Attributes["open"] = "";
-        element.DomProperties["_modal"] = true;
-        element.DomProperties["_topLayerOrder"] = ++bridge._topLayerCounter;
+        GetElementRuntimeState(element).Dialog.Modal.Set(true);
+        GetElementRuntimeState(element).Dialog.TopLayerOrder.Set(++bridge._topLayerCounter);
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -336,9 +336,9 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesClose032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         element.Attributes.Remove("open");
-        element.DomProperties.Remove("_modal");
+        GetElementRuntimeState(element).Dialog.Modal.Remove();
         if (a.Length > 0)
-            element.DomProperties["_returnValue"] = a[0].ToString();
+            GetElementRuntimeState(element).FormControl.ReturnValue.Set(a[0].ToString());
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -357,7 +357,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetReturnValue036Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.DomProperties["_returnValue"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        GetElementRuntimeState(element).FormControl.ReturnValue.Set(a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
@@ -447,7 +447,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetDefaultSelected045Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.DomProperties["_defaultSelected"] = a.Length > 0 && a[0].BooleanValue;
+        GetElementRuntimeState(element).FormControl.DefaultSelected.Set(a.Length > 0 && a[0].BooleanValue);
         return JSUndefined.Value;
     }
 

@@ -77,10 +77,10 @@ public sealed partial class DomBridge
         var systemId = match.Groups[3].Success ? match.Groups[3].Value : string.Empty;
 
         var doctype = new DomElement("#doctype", null, null, string.Empty);
-        doctype.DomProperties["name"] = name;
-        doctype.DomProperties["publicId"] = publicId;
-        doctype.DomProperties["systemId"] = systemId;
-        doctype.DomProperties["internalSubset"] = null;
+        GetElementRuntimeState(doctype).DocumentType.Name.Set(name);
+        GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
+        GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
+        GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
 
         return doctype;
     }
@@ -88,7 +88,7 @@ public sealed partial class DomBridge
     /// <summary>Gets the lowercase name from a DOCTYPE DomElement.</summary>
     private static string GetDocTypeName(DomElement element)
     {
-        var dtName = element.DomProperties.TryGetValue("name", out var n) ? n?.ToString() ?? "html" : "html";
+        var dtName = GetElementRuntimeState(element).DocumentType.Name.TryGet(out var n) ? n?.ToString() ?? "html" : "html";
         return dtName.ToLowerInvariant();
     }
 
@@ -407,9 +407,8 @@ public sealed partial class DomBridge
         clone.NamespaceURI = source.NamespaceURI;
         foreach (var kv in source.NsAttrMap)
             clone.NsAttrMap[kv.Key] = kv.Value;
-        // Copy DomProperties (e.g., checked state for inputs)
-        foreach (var kv in source.DomProperties)
-            clone.DomProperties[kv.Key] = kv.Value;
+        // Copy browser-runtime values (e.g., checked state for inputs).
+        GetElementRuntimeState(source).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
 
         if (deep)
         {
@@ -418,7 +417,7 @@ public sealed partial class DomBridge
                 var childClone = CloneDomElement(child, true);
                 childClone.Parent = clone;
                 clone.Children.Add(childClone);
-                _elements.Add(childClone);
+                _knownNodes.Add(childClone);
             }
         }
         return clone;
@@ -484,7 +483,7 @@ public sealed partial class DomBridge
     private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
     {
         var tr = new DomElement("tr", null, null, string.Empty);
-        bridge._elements.Add(tr);
+        bridge._knownNodes.Add(tr);
 
         var allRows = CollectTableRows(table);
         if (allRows.Count == 0 || index == -1 || index == allRows.Count)
@@ -504,7 +503,7 @@ public sealed partial class DomBridge
             {
                 // No sections and no rows at all: create a new tbody per spec
                 var tbody = new DomElement("tbody", null, null, string.Empty);
-                bridge._elements.Add(tbody);
+                bridge._knownNodes.Add(tbody);
                 tbody.Parent = table;
                 table.Children.Add(tbody);
                 lastSection = tbody;
@@ -568,7 +567,7 @@ public sealed partial class DomBridge
                     child.Attributes.TryGetValue("name", out var sn) &&
                     string.Equals(sn, radioName, StringComparison.Ordinal))
                 {
-                    child.DomProperties["checked"] = false;
+                    GetElementRuntimeState(child).FormControl.Checked.Set(false);
                 }
                 UncheckRadioSiblings(child, except, radioName);
             }
@@ -714,10 +713,10 @@ public sealed partial class DomBridge
                 // properties change so offset queries recompute.
                 if (kebab is "position-area" or "position-anchor")
                 {
-                    _element.DomProperties.Remove("_resolvedLeft");
-                    _element.DomProperties.Remove("_resolvedTop");
-                    _element.DomProperties.Remove("_resolvedWidth");
-                    _element.DomProperties.Remove("_resolvedHeight");
+                    GetElementRuntimeState(_element).Layout.Left.Remove();
+                    GetElementRuntimeState(_element).Layout.Top.Remove();
+                    GetElementRuntimeState(_element).Layout.Width.Remove();
+                    GetElementRuntimeState(_element).Layout.Height.Remove();
                 }
 
                 _onMutation?.Invoke();

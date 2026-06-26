@@ -115,7 +115,7 @@ public sealed partial class DomBridge
         var shadowRoot = GetShadowRoot(element);
         if (shadowRoot == null)
             return JSNull.Value;
-        var mode = element.DomProperties.TryGetValue("_shadowRootMode", out var rawMode) ? rawMode as string : null;
+        var mode = GetElementRuntimeState(element).Shadow.Mode.TryGet(out var rawMode) ? rawMode as string : null;
         return string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) ? ToJSObject(shadowRoot) : JSNull.Value;
     }
 
@@ -410,9 +410,9 @@ public sealed partial class DomBridge
             throw new JSException("Failed to execute 'splitText' on 'Text': The offset " + offset + " is larger than the node's length " + text.Length + ".");
         var remainingText = text.Substring(offset);
         element.TextContent = text.Substring(0, offset);
-        var newNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+        var newNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
         newNode.TextContent = remainingText;
-        _elements.Add(newNode);
+        _knownNodes.Add(newNode);
         // Insert new node as next sibling
         if (element.Parent != null)
         {
@@ -488,14 +488,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetPublicId055Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var pubId = element.DomProperties.TryGetValue("publicId", out var p) ? p?.ToString() ?? string.Empty : string.Empty;
+        var pubId = GetElementRuntimeState(element).DocumentType.PublicId.TryGet(out var p) ? p?.ToString() ?? string.Empty : string.Empty;
         return new JSString(pubId);
     }
 
 
     private JSValue JsJsObjectsGetSystemId056Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var sysId = element.DomProperties.TryGetValue("systemId", out var s) ? s?.ToString() ?? string.Empty : string.Empty;
+        var sysId = GetElementRuntimeState(element).DocumentType.SystemId.TryGet(out var s) ? s?.ToString() ?? string.Empty : string.Empty;
         return new JSString(sysId);
     }
 
@@ -766,7 +766,7 @@ public sealed partial class DomBridge
     {
         var deep = a.Length > 0 && a[0].BooleanValue;
         var clone = CloneDomElement(element, deep);
-        _elements.Add(clone);
+        _knownNodes.Add(clone);
         return ToJSObject(clone);
     }
 
@@ -880,14 +880,14 @@ public sealed partial class DomBridge
         }
 
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
-        var shadowRoot = new DomElement("#shadow-root", null, null, string.Empty);
+        var shadowRoot = new DomElement(_document, "#shadow-root", null, null, string.Empty);
         shadowRoot.Parent = element;
         shadowRoot.OwnerDocRoot = element.OwnerDocRoot;
-        shadowRoot.DomProperties["_host"] = element;
-        shadowRoot.DomProperties["_shadowRootMode"] = mode;
-        element.DomProperties["_shadowRoot"] = shadowRoot;
-        element.DomProperties["_shadowRootMode"] = mode;
-        _elements.Add(shadowRoot);
+        GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
+        GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
+        GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
+        GetElementRuntimeState(element).Shadow.Mode.Set(mode);
+        _knownNodes.Add(shadowRoot);
         return ToJSObject(shadowRoot);
     }
 
@@ -1086,10 +1086,10 @@ public sealed partial class DomBridge
             return JSUndefined.Value;
         var type = a[0].ToString();
         var listener = a[1];
-        if (!element.EventListeners.TryGetValue(type, out var listeners))
+        if (!GetEventListeners(element).TryGetValue(type, out var listeners))
         {
             listeners = [];
-            element.EventListeners[type] = listeners;
+            GetEventListeners(element)[type] = listeners;
         }
 
         var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
@@ -1106,7 +1106,7 @@ public sealed partial class DomBridge
         var type = a[0].ToString();
         var listener = a[1];
         var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (element.EventListeners.TryGetValue(type, out var listeners))
+        if (GetEventListeners(element).TryGetValue(type, out var listeners))
         {
             for (int i = listeners.Count - 1; i >= 0; i--)
             {
@@ -1141,12 +1141,12 @@ public sealed partial class DomBridge
             var inputType = element.Attributes.TryGetValue("type", out var t) ? t.ToLowerInvariant() : "text";
             if (inputType == "checkbox")
             {
-                bool wasChecked = element.DomProperties.TryGetValue("checked", out var cv) && cv is true || (!element.DomProperties.ContainsKey("checked") && element.Attributes.ContainsKey("checked"));
-                element.DomProperties["checked"] = !wasChecked;
+                bool wasChecked = GetElementRuntimeState(element).FormControl.Checked.TryGet(out var cv) && cv is true || (!GetElementRuntimeState(element).FormControl.Checked.IsSet && element.Attributes.ContainsKey("checked"));
+                GetElementRuntimeState(element).FormControl.Checked.Set(!wasChecked);
             }
             else if (inputType == "radio")
             {
-                element.DomProperties["checked"] = true;
+                GetElementRuntimeState(element).FormControl.Checked.Set(true);
                 // Radio mutual exclusion
                 if (element.Attributes.TryGetValue("name", out var radioName) && !string.IsNullOrEmpty(radioName))
                 {
@@ -1258,7 +1258,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsCallback104Core(global::Broiler.HtmlBridge.DomElement element, global::System.String? eventName, in Arguments _)
     {
-        if (element.InlineEventHandlers.TryGetValue(eventName, out var handler))
+        if (GetInlineEventHandlers(element).TryGetValue(eventName, out var handler))
             return handler;
         return JSNull.Value;
     }
@@ -1267,9 +1267,9 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsCallback105Core(global::Broiler.HtmlBridge.DomElement element, global::System.String? eventName, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSFunction fn)
-            element.InlineEventHandlers[eventName] = fn;
+            GetInlineEventHandlers(element)[eventName] = fn;
         else
-            element.InlineEventHandlers.Remove(eventName);
+            GetInlineEventHandlers(element).Remove(eventName);
         return JSUndefined.Value;
     }
 
@@ -1278,7 +1278,7 @@ public sealed partial class DomBridge
     {
         if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
             return new JSString(GetSelectValue(element));
-        if (element.DomProperties.TryGetValue("_value", out var domVal) && domVal is string sv)
+        if (GetElementRuntimeState(element).FormControl.Value.TryGet(out var domVal) && domVal is string sv)
             return new JSString(sv);
         if (element.Attributes.TryGetValue("value", out var val))
             return new JSString(val);
@@ -1291,7 +1291,7 @@ public sealed partial class DomBridge
         var tag = element.TagName.ToLowerInvariant();
         var v = a.Length > 0 ? a[0].ToString() : string.Empty;
         if (tag == "input")
-            element.DomProperties["_value"] = v; // IDL value, not reflected
+            GetElementRuntimeState(element).FormControl.Value.Set(v); // IDL value, not reflected
         else if (tag == "select")
             SetSelectValue(element, v);
         else
@@ -1303,7 +1303,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetChecked108Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         // IDL property takes precedence over content attribute
-        if (element.DomProperties.TryGetValue("checked", out var v))
+        if (GetElementRuntimeState(element).FormControl.Checked.TryGet(out var v))
             return v is true ? JSBoolean.True : JSBoolean.False;
         return element.Attributes.ContainsKey("checked") ? JSBoolean.True : JSBoolean.False;
     }
@@ -1312,7 +1312,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetChecked109Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         bool newVal = a.Length > 0 && a[0].BooleanValue;
-        element.DomProperties["checked"] = newVal;
+        GetElementRuntimeState(element).FormControl.Checked.Set(newVal);
         if (newVal)
         {
             // Radio button mutual exclusion: uncheck others in same group
@@ -1446,7 +1446,7 @@ public sealed partial class DomBridge
 
             submitEvt.FastAddValue((KeyString)"preventDefault", new JSFunction(JsJsObjectsPreventDefault124, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             submitEvt.FastAddValue((KeyString)"stopPropagation", UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            if (element.EventListeners.TryGetValue("submit", out var submitListeners))
+            if (GetEventListeners(element).TryGetValue("submit", out var submitListeners))
             {
                 foreach (var registration in submitListeners.ToList())
                 {
@@ -1523,11 +1523,11 @@ public sealed partial class DomBridge
         var position = NormalizeInsertAdjacentPosition(a[0]);
         var text = a.Length > 1 ? a[1].ToString() : string.Empty;
         var (parent, index) = GetInsertAdjacentTarget(element, position);
-        var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
+        var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true)
         {
             TextContent = text
         };
-        _elements.Add(textNode);
+        _knownNodes.Add(textNode);
         InsertNodeAt(parent, textNode, index);
         return JSUndefined.Value;
     }

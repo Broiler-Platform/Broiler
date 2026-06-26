@@ -587,10 +587,10 @@ public sealed partial class DomBridge
         htmlEl.Children.Add(bodyEl);
 
         containerElement.Children.Insert(0, docRoot);
-        _elements.Add(docRoot);
-        _elements.Add(htmlEl);
-        _elements.Add(headEl);
-        _elements.Add(bodyEl);
+        _knownNodes.Add(docRoot);
+        _knownNodes.Add(htmlEl);
+        _knownNodes.Add(headEl);
+        _knownNodes.Add(bodyEl);
 
         return docRoot;
     }
@@ -627,12 +627,12 @@ public sealed partial class DomBridge
         preEl.Children.Add(textNode);
 
         containerElement.Children.Insert(0, docRoot);
-        _elements.Add(docRoot);
-        _elements.Add(htmlEl);
-        _elements.Add(headEl);
-        _elements.Add(bodyEl);
-        _elements.Add(preEl);
-        _elements.Add(textNode);
+        _knownNodes.Add(docRoot);
+        _knownNodes.Add(htmlEl);
+        _knownNodes.Add(headEl);
+        _knownNodes.Add(bodyEl);
+        _knownNodes.Add(preEl);
+        _knownNodes.Add(textNode);
 
         return docRoot;
     }
@@ -868,11 +868,8 @@ public sealed partial class DomBridge
         var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
         docRoot.Parent = containerElement;
 
-        if (!Regex.IsMatch(html, @"<\s*html(?=[\s>/])", RegexOptions.IgnoreCase))
-            html = BuildInnerHtmlParsingDocument("body", html);
-
         var builder = new HtmlTreeBuilder();
-        var (parsedRoot, allElements, _) = builder.Build(html);
+        var (parsedRoot, allElements, _) = builder.Build(html, _document);
 
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Move it under #subdoc-root as the documentElement.
@@ -880,16 +877,16 @@ public sealed partial class DomBridge
         docRoot.Children.Add(parsedRoot);
 
         containerElement.Children.Insert(0, docRoot);
-        _elements.Add(docRoot);
-        _elements.Add(parsedRoot);
+        _knownNodes.Add(docRoot);
+        _knownNodes.Add(parsedRoot);
         // Add structural children (head, body) that HtmlTreeBuilder does not include in allElements
         foreach (var child in parsedRoot.Children)
             AddElementsRecursive(child);
         // Add non-structural elements from the builder (skip any already registered)
         foreach (var el in allElements)
         {
-            if (!_elements.Contains(el))
-                _elements.Add(el);
+            if (!_knownNodes.Contains(el))
+                _knownNodes.Add(el);
         }
 
         return docRoot;
@@ -902,15 +899,15 @@ public sealed partial class DomBridge
     /// </summary>
     private void AddElementsRecursive(DomElement element)
     {
-        if (!_elements.Contains(element))
-            _elements.Add(element);
+        if (!_knownNodes.Contains(element))
+            _knownNodes.Add(element);
         foreach (var child in element.Children)
             AddElementsRecursive(child);
     }
 
     private void RemoveElementsRecursive(DomElement element)
     {
-        _elements.Remove(element);
+        _knownNodes.Remove(element);
         _jsObjectCache.Remove(element);
         _styleSheetCache.Remove(element);
 
@@ -992,8 +989,8 @@ public sealed partial class DomBridge
     }
 
     private static bool AttributeMapsAreEqual(
-        Dictionary<string, string> first,
-        Dictionary<string, string> second)
+        IReadOnlyDictionary<string, string> first,
+        IReadOnlyDictionary<string, string> second)
     {
         if (first.Count != second.Count)
             return false;
@@ -1146,7 +1143,7 @@ public sealed partial class DomBridge
             {
                 TextContent = value.ToString()
             };
-            _elements.Add(textNode);
+            _knownNodes.Add(textNode);
             nodes.Add(textNode);
         }
 
@@ -1243,38 +1240,10 @@ public sealed partial class DomBridge
             return false;
 
         var builder = new HtmlTreeBuilder();
-        var (parsedRoot, _, _) = builder.Build(BuildInnerHtmlParsingDocument(contextTag, html));
-        var head = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase));
-        var body = parsedRoot.Children.FirstOrDefault(child => string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase));
-
-        container = contextTag switch
-        {
-            "html" => parsedRoot,
-            "head" => head ?? parsedRoot,
-            "body" => body ?? parsedRoot,
-            "table" or "thead" or "tbody" or "tfoot" or "tr" or "td" or "th" or "colgroup" or "caption" or "select" or "template" =>
-                FindFirstElementByTag(body ?? parsedRoot, contextTag),
-            _ => body?.Children.FirstOrDefault() ?? FindFirstElementByTag(parsedRoot, contextTag)
-        } ?? parsedRoot;
-
+        var (fragment, _) = builder.BuildFragment(html, contextTag, _document);
+        container = fragment;
         return true;
     }
-
-    private static string BuildInnerHtmlParsingDocument(string contextTag, string html) => contextTag switch
-    {
-        "html" => $"<html>{html}</html>",
-        "head" => $"<html><head>{html}</head><body></body></html>",
-        "body" => $"<html><head></head><body>{html}</body></html>",
-        "table" => $"<html><head></head><body><table>{html}</table></body></html>",
-        "thead" or "tbody" or "tfoot" => $"<html><head></head><body><table><{contextTag}>{html}</{contextTag}></table></body></html>",
-        "tr" => $"<html><head></head><body><table><tbody><tr>{html}</tr></tbody></table></body></html>",
-        "td" or "th" => $"<html><head></head><body><table><tbody><tr><{contextTag}>{html}</{contextTag}></tr></tbody></table></body></html>",
-        "colgroup" => $"<html><head></head><body><table><colgroup>{html}</colgroup></table></body></html>",
-        "caption" => $"<html><head></head><body><table><caption>{html}</caption></table></body></html>",
-        "select" => $"<html><head></head><body><select>{html}</select></body></html>",
-        "template" => $"<html><head></head><body><template>{html}</template></body></html>",
-        _ => $"<html><head></head><body><{contextTag}>{html}</{contextTag}></body></html>"
-    };
 
     private static DomElement? FindFirstElementByTag(DomElement root, string tag)
     {
@@ -1320,7 +1289,7 @@ public sealed partial class DomBridge
             if (xdoc.Root == null)
             {
                 containerElement.Children.Insert(0, docRoot);
-                _elements.Add(docRoot);
+                _knownNodes.Add(docRoot);
                 return docRoot;
             }
 
@@ -1343,8 +1312,8 @@ public sealed partial class DomBridge
             docRoot.Children.Add(rootEl);
 
             containerElement.Children.Insert(0, docRoot);
-            _elements.Add(docRoot);
-            _elements.Add(rootEl);
+            _knownNodes.Add(docRoot);
+            _knownNodes.Add(rootEl);
 
             // Execute scripts in XHTML documents with correct namespace
             if (isXhtml && hasCorrectXhtmlNs)
@@ -1356,7 +1325,7 @@ public sealed partial class DomBridge
         {
             // XML well-formedness error — return empty document, don't execute scripts
             containerElement.Children.Insert(0, docRoot);
-            _elements.Add(docRoot);
+            _knownNodes.Add(docRoot);
         }
 
         return docRoot;
@@ -1383,7 +1352,7 @@ public sealed partial class DomBridge
                 var childEl = BuildDomElementFromXElement(childXe);
                 childEl.Parent = el;
                 el.Children.Add(childEl);
-                _elements.Add(childEl);
+                _knownNodes.Add(childEl);
             }
             else if (child is System.Xml.Linq.XText childText)
             {
@@ -1391,7 +1360,7 @@ public sealed partial class DomBridge
                 textNode.TextContent = childText.Value;
                 textNode.Parent = el;
                 el.Children.Add(textNode);
-                _elements.Add(textNode);
+                _knownNodes.Add(textNode);
             }
         }
 

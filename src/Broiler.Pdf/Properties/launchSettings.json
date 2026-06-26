@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Broiler.Pdf": {
-      "commandName": "Project",
-      "commandLineArgs": "--input \"C:\\Users\\proof\\Downloads\\care-contract.pdf\" --output \"C:\\Users\\proof\\Downloads\\care-contract2.docx\" --preserve-layout"
-    }
-  }
-}

@@ -102,7 +102,7 @@ public sealed partial class DomBridge
         // innerHTML (read/write)
         obj.FastAddProperty(
             (KeyString)"innerHTML",
-            new JSFunction((in Arguments a) => new JSString(element.InnerHtml), "get innerHTML"),
+            new JSFunction((in Arguments a) => new JSString(SerializeChildrenToHtml(element)), "get innerHTML"),
             new JSFunction((in Arguments a) => JsJsObjectsSetInnerHTML016Core(bridge, element, in a), "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -685,7 +685,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // checked (read/write) — for checkbox and radio inputs
-        // Uses DomProperties["checked"] as the "dirty" IDL state that tracks
+        // Uses the typed checked-state slot as the "dirty" IDL state that tracks
         // programmatic changes. setAttribute("checked") only sets the content
         // attribute and does NOT affect this IDL state.
         obj.FastAddProperty(

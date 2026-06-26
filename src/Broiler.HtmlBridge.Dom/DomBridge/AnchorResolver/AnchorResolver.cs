@@ -130,7 +130,7 @@ public sealed partial class DomBridge
 
         var combinedZoom = GetUsedZoomForElement(DocumentElement) * scale;
         DocumentElement.Style["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
-        DocumentElement.DomProperties["_scrollLeft"] = GetVisualViewportPageOffset(vertical: false);
-        DocumentElement.DomProperties["_scrollTop"] = GetVisualViewportPageOffset(vertical: true);
+        GetElementRuntimeState(DocumentElement).Scroll.Left.Set(GetVisualViewportPageOffset(vertical: false));
+        GetElementRuntimeState(DocumentElement).Scroll.Top.Set(GetVisualViewportPageOffset(vertical: true));
     }
 }

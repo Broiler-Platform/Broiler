@@ -14,6 +14,7 @@ public sealed class RenderingPipeline(
     IScriptExtractor scriptExtractor,
     IScriptEngine scriptEngine) : IDisposable
 {
+    public RendererHandoffMode HandoffMode { get; set; } = RendererHandoffMode.TypedDocument;
 
     /// <summary>
     /// Load a page from <paramref name="url"/>, extract inline scripts,
@@ -54,6 +55,29 @@ public sealed class RenderingPipeline(
     }
 
     /// <summary>
+    /// Executes scripts and returns either the canonical document or the
+    /// serialized compatibility payload according to <see cref="HandoffMode"/>.
+    /// </summary>
+    public RenderHandoff ExecuteScriptsForRendering(PageContent content)
+    {
+        if (HandoffMode == RendererHandoffMode.TypedDocument &&
+            scriptEngine is ITypedScriptEngine typedScriptEngine)
+        {
+            var document = typedScriptEngine.ExecuteToDocument(
+                content.Scripts,
+                content.DeferredScripts,
+                content.Html,
+                content.Url);
+            return new RenderHandoff(document, null, RendererHandoffMode.TypedDocument);
+        }
+
+        return new RenderHandoff(
+            null,
+            ExecuteScripts(content),
+            RendererHandoffMode.SerializedHtml);
+    }
+
+    /// <summary>
     /// Starts an interactive script-execution session for
     /// <paramref name="content"/>.  Scripts and deferred scripts execute
     /// immediately but pending timer / rAF callbacks are <b>not</b> flushed.
@@ -71,3 +95,14 @@ public sealed class RenderingPipeline(
 
     public void Dispose() => pageLoader.Dispose();
 }
+
+public enum RendererHandoffMode
+{
+    TypedDocument,
+    SerializedHtml
+}
+
+public sealed record RenderHandoff(
+    Broiler.Dom.DomDocument? Document,
+    string? Html,
+    RendererHandoffMode Mode);

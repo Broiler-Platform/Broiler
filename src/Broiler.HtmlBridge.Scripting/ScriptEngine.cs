@@ -15,7 +15,7 @@ namespace Broiler.HtmlBridge;
 /// A fresh <see cref="JSContext"/> is created for each call to
 /// <see cref="Execute(IReadOnlyList{string})"/> so that scripts from different pages are isolated.
 /// </summary>
-public sealed partial class ScriptEngine : IScriptEngine
+public sealed partial class ScriptEngine : ITypedScriptEngine
 {
     private readonly IDomBridgeRuntimeFactory _domBridgeFactory;
 
@@ -90,6 +90,27 @@ public sealed partial class ScriptEngine : IScriptEngine
 
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url)
+        => ExecuteCore(scripts, deferredScripts, html, url, static bridge => bridge.SerializeToHtml());
+
+    /// <summary>
+    /// Executes scripts against the canonical DOM and returns that same
+    /// document for direct renderer consumption, avoiding serialization and
+    /// reparsing between script execution and layout.
+    /// </summary>
+    public Broiler.Dom.DomDocument? ExecuteToDocument(
+        IReadOnlyList<string> scripts,
+        IReadOnlyList<string> deferredScripts,
+        string html,
+        string? url)
+        => ExecuteCore(scripts, deferredScripts, html, url, static bridge => bridge.GetRenderDocument());
+
+    private T? ExecuteCore<T>(
+        IReadOnlyList<string> scripts,
+        IReadOnlyList<string> deferredScripts,
+        string html,
+        string? url,
+        Func<IDomBridgeRuntime, T> createResult)
+        where T : class
     {
         if (scripts.Count == 0 && deferredScripts.Count == 0)
             return null;
@@ -166,7 +187,7 @@ public sealed partial class ScriptEngine : IScriptEngine
             // the test runner via <body onload="update()">.
             bridge.FireWindowLoadEvent();
             DrainAsyncWork(bridge);
-            return bridge.SerializeToHtml();
+            return createResult(bridge);
         }
         finally
         {

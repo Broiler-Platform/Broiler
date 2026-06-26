@@ -231,7 +231,7 @@ public sealed partial class DomBridge
             // returnValue (getter/setter)
             obj.FastAddProperty(
                 (KeyString)"returnValue",
-                new JSFunction((in Arguments _) => element.DomProperties.TryGetValue("_returnValue", out var rv) && rv is string s ? new JSString(s) : new JSString(string.Empty),
+                new JSFunction((in Arguments _) => GetElementRuntimeState(element).FormControl.ReturnValue.TryGet(out var rv) && rv is string s ? new JSString(s) : new JSString(string.Empty),
                     "get returnValue"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetReturnValue036Core(element, in a), "set returnValue"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -274,7 +274,7 @@ public sealed partial class DomBridge
             // defaultSelected (read/write)
             obj.FastAddProperty(
                 (KeyString)"defaultSelected",
-                new JSFunction((in Arguments _) => element.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true ? JSBoolean.True : JSBoolean.False,
+                new JSFunction((in Arguments _) => GetElementRuntimeState(element).FormControl.DefaultSelected.TryGet(out var ds) && ds is true ? JSBoolean.True : JSBoolean.False,
                     "get defaultSelected"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetDefaultSelected045Core(element, in a), "set defaultSelected"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);

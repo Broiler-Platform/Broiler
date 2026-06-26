@@ -49,12 +49,33 @@ public sealed class InteractiveSession : IDisposable
     }
 
     /// <summary>
+    /// Executes one pending callback batch and returns the live canonical
+    /// document for direct rendering.
+    /// </summary>
+    public Broiler.Dom.DomDocument? StepDocument()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (!_bridge.FlushTimerStep())
+            return null;
+
+        _microTasks.Drain();
+        return _bridge.GetRenderDocument();
+    }
+
+    /// <summary>
     /// Serialises the current DOM state without executing any callbacks.
     /// </summary>
     public string CurrentHtml()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _bridge.SerializeToHtml();
+    }
+
+    public Broiler.Dom.DomDocument CurrentDocument()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _bridge.GetRenderDocument();
     }
 
     /// <summary>

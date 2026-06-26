@@ -14,7 +14,7 @@ public sealed partial class DomBridge
 
     private void BuildInlineAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (el.Style.TryGetValue("anchor-name", out var anchorName) &&
                 !string.IsNullOrWhiteSpace(anchorName))
@@ -126,7 +126,7 @@ public sealed partial class DomBridge
     }
     private DomElement? FindBodyElement()
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (!el.IsTextNode &&
                 string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase))

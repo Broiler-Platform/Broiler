@@ -281,6 +281,37 @@ internal static partial class Program
                 using var bitmap = HtmlRender.RenderToImage(BenchmarkSamples.HtmlDocument, 1024, 768, default, null, null, null, "https://example.test/");
                 _ = bitmap.Encode(BImageFormat.Png, 100);
             }),
+            MeasureNanosecondsPerOperation("css.parse", "Parse the CSS Phase 0 stylesheet with the renderer parser", 12, 100, () =>
+            {
+                for (var i = 0; i < 100; i++)
+                    _ = HtmlRender.ParseStyleSheet(BenchmarkSamples.CssStyleSheet, combineWithDefault: false);
+            }),
+            MeasureNanosecondsPerOperation("css.selector-match", "Run repeated Selectors Level 4 matches through querySelectorAll", 12, 1000, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
+                context.Eval("for (var i = 0; i < 1000; i++) document.querySelectorAll('#host > .card[data-state=\"active\"]:nth-child(2)');");
+            }),
+            MeasureNanosecondsPerOperation("css.computed-style", "Resolve and read a cached computed style through the bridge", 12, 1000, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
+                context.Eval("var target = document.getElementById('target'); for (var i = 0; i < 1000; i++) window.getComputedStyle(target).getPropertyValue('margin-left');");
+            }),
+            MeasureNanosecondsPerOperation("css.invalidation", "Invalidate class-dependent style and recompute it through the bridge", 12, 250, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
+                context.Eval("var target = document.getElementById('target'); for (var i = 0; i < 250; i++) { target.className = i % 2 ? 'card active' : 'card'; window.getComputedStyle(target).getPropertyValue('color'); }");
+            }),
+            MeasureMilliseconds("css.renderer-style-apply", "Parse HTML and apply the renderer cascade for a style-heavy document", 15, () =>
+            {
+                using var container = CreateHtmlContainer();
+                container.SetHtml(BenchmarkSamples.CssBridgeDocument, baseUrl: "https://example.test/");
+            }),
             MeasureNanosecondsPerOperation("bridge.dom-call", "Repeated document.getElementById().getAttribute() calls", 12, 2000, () =>
             {
                 using var context = new JSContext();
@@ -294,6 +325,31 @@ internal static partial class Program
                 var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.BridgeDocument, "https://example.test/");
                 context.Eval(@"var host = document.getElementById('host'); for (var i = 0; i < 500; i++) { var item = document.createElement('span'); item.textContent = 'node-' + i; host.appendChild(item); }");
+            }),
+            MeasureMilliseconds("bridge.serialize", "Attach and serialize the bridge-owned DOM", 15, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
+                _ = bridge.SerializeToHtml();
+            }),
+            MeasureMilliseconds("bridge.render-handoff", "Serialize the bridge-owned DOM and reparse it for raster rendering", 10, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
+                var serialized = bridge.SerializeToHtml();
+                using var bitmap = HtmlRender.RenderToImage(serialized, 1024, 768, default, null, null, null, "https://example.test/");
+            }),
+            MeasureMilliseconds("bridge.typed-render-handoff", "Hand the canonical DOM directly to layout without serialization or reparsing", 10, () =>
+            {
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
+                using var container = CreateHtmlContainer();
+                container.MaxSize = new SizeF(1024, 768);
+                container.SetDocument(bridge.GetRenderDocument(), baseUrl: "https://example.test/");
+                container.PerformLayout(new RectangleF(0, 0, 1024, 768));
             }),
         };
 
@@ -878,9 +934,11 @@ internal static partial class Program
             if (slowdownPercent > slowdownBudgetPercent)
             {
                 regressions.Add(
-                    $"{current.Name}: mean regressed by {slowdownPercent:F2}% " +
-                    $"(baseline {baseline.Mean:F3} {baseline.Unit} → current {current.Mean:F3} {current.Unit}; " +
-                    $"budget {slowdownBudgetPercent:F1}%).");
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"{current.Name}: mean regressed by {slowdownPercent:F2}% " +
+                        $"(baseline {baseline.Mean:F3} {baseline.Unit} → current {current.Mean:F3} {current.Unit}; " +
+                        $"budget {slowdownBudgetPercent:F1}%)."));
             }
         }
 
@@ -900,8 +958,10 @@ internal static partial class Program
         if (comparison is not null)
         {
             builder.AppendLine(
-                $"- Baseline comparison: {(comparison.HasRegression ? "REGRESSION" : "within budget")} " +
-                $"(slowdown budget ≤ {comparison.SlowdownBudgetPercent:F1}%)");
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"- Baseline comparison: {(comparison.HasRegression ? "REGRESSION" : "within budget")} " +
+                    $"(slowdown budget ≤ {comparison.SlowdownBudgetPercent:F1}%)"));
         }
         builder.AppendLine($"- Gated metrics: {string.Join(", ", GatedBenchmarkMetrics.OrderBy(static metric => metric, StringComparer.Ordinal).Select(static metric => $"`{metric}`"))}");
         builder.AppendLine();
@@ -909,7 +969,10 @@ internal static partial class Program
         builder.AppendLine("|---|---|---:|---:|---:|---:|---|");
         foreach (var result in report.Results)
         {
-            builder.AppendLine($"| `{result.Name}` | {result.Unit} | {result.Mean:F3} | {result.Median:F3} | {result.Min:F3} | {result.Max:F3} | {EscapeMarkdown(result.Description)} |");
+            builder.AppendLine(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"| `{result.Name}` | {result.Unit} | {result.Mean:F3} | {result.Median:F3} | {result.Min:F3} | {result.Max:F3} | {EscapeMarkdown(result.Description)} |"));
         }
 
         if (comparison is { Regressions.Count: > 0 })
@@ -1131,6 +1194,32 @@ internal static partial class Program
 <body>
   <div id='target' data-value='42'>ready</div>
   <div id='host'></div>
+</body>
+</html>";
+
+        public const string CssStyleSheet = @"
+:root { --space: 12px; color: #111827; }
+#host > .card[data-state='active']:nth-child(2) {
+  margin: var(--space) 16px;
+  padding: 8px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  background: linear-gradient(#ffffff, #f8fafc);
+}
+.card { color: rgb(30, 41, 59); font: 16px/1.5 Arial, sans-serif; }
+.card.active { color: hsl(221, 83%, 53%); transform: translateX(calc(2px + 1%)); }
+@media screen and (min-width: 640px) { .card { display: block; } }
+@font-face { font-family: 'Phase Zero'; src: url('phase-zero.woff2'); }
+@keyframes pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }";
+
+        public const string CssBridgeDocument = @"<!DOCTYPE html>
+<html>
+<head><style>" + CssStyleSheet + @"</style></head>
+<body>
+  <main id='host'>
+    <article class='card' data-state='idle'>one</article>
+    <article id='target' class='card active' data-state='active'>two</article>
+    <article class='card' data-state='idle'>three</article>
+  </main>
 </body>
 </html>";
     }

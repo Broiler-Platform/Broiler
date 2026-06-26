@@ -39,14 +39,6 @@ public sealed partial class DomBridge
 
     private sealed record KeyframeEntry(float Position, Dictionary<string, string> Properties);
 
-    private static readonly Regex KeyframesRulePattern = new(
-        @"@keyframes\s+(?<name>[^\s{]+)\s*\{(?<body>(?:[^{}]|\{[^{}]*\})*)\}",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-
-    private static readonly Regex KeyframeBlockPattern = new(
-        @"(?<selectors>[^{]+)\{(?<declarations>[^}]*)\}",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-
     private static void CollectKeyframes(DomElement root, Dictionary<string, List<KeyframeEntry>> map)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
@@ -59,11 +51,14 @@ public sealed partial class DomBridge
                     .Where(c => c.IsTextNode)
                     .Select(c => c.TextContent ?? string.Empty));
             }
-            foreach (Match m in KeyframesRulePattern.Matches(css))
+            var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
+            foreach (var atRule in styleSheet.Rules.OfType<Broiler.CSS.CssAtRule>())
             {
-                var name = m.Groups["name"].Value.Trim().Trim('"', '\'');
-                var body = m.Groups["body"].Value;
-                var entries = ParseKeyframeEntries(body);
+                if (!atRule.Name.Equals("keyframes", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var name = atRule.Prelude.Trim().Trim('"', '\'');
+                var entries = ParseKeyframeEntries(atRule);
                 if (entries.Count > 0)
                     map[name] = entries;
             }
@@ -73,18 +68,18 @@ public sealed partial class DomBridge
             CollectKeyframes(child, map);
     }
 
-    private static List<KeyframeEntry> ParseKeyframeEntries(string body)
+    private static List<KeyframeEntry> ParseKeyframeEntries(Broiler.CSS.CssAtRule keyframesRule)
     {
         var entries = new List<KeyframeEntry>();
 
-        foreach (Match m in KeyframeBlockPattern.Matches(body))
+        foreach (var styleRule in keyframesRule.Rules.OfType<Broiler.CSS.CssStyleRule>())
         {
-            var selectorText = m.Groups["selectors"].Value.Trim();
-            var declarations = ParseDeclarations(m.Groups["declarations"].Value);
+            var declarations = ParseDeclarations(
+                Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
 
-            foreach (var sel in selectorText.Split(','))
+            foreach (var selector in styleRule.Selectors.Selectors)
             {
-                var s = sel.Trim().ToLowerInvariant();
+                var s = selector.Text.Trim().ToLowerInvariant();
                 float? pos = s switch
                 {
                     "from" => 0f,
@@ -102,25 +97,16 @@ public sealed partial class DomBridge
         return entries.OrderBy(e => e.Position).ToList();
     }
 
-    private static readonly Regex CssCommentPattern = new(
-        @"/\*.*?\*/",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-
     private static Dictionary<string, string> ParseDeclarations(string text)
     {
-        // Strip CSS comments before parsing declarations so that comment
-        // text doesn't become part of property names or values.
-        text = CssCommentPattern.Replace(text, string.Empty);
-
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var decl in text.Split(';'))
+        var declarations = new Broiler.CSS.CssParser().ParseDeclarations(text);
+        foreach (var declaration in declarations.Declarations)
         {
-            var colon = decl.IndexOf(':');
-            if (colon <= 0) continue;
-            var prop = decl.Substring(0, colon).Trim();
-            var val = decl.Substring(colon + 1).Trim();
-            if (!string.IsNullOrEmpty(prop))
-                result[prop] = val;
+            var value = declaration.Value.Text;
+            if (declaration.Important)
+                value += " !important";
+            result[declaration.Name] = value;
         }
         return result;
     }
@@ -173,10 +159,6 @@ public sealed partial class DomBridge
     // Stylesheet animation property matching
     // -----------------------------------------------------------------
 
-    private static readonly Regex AnimCssRulePattern = new(
-        @"(?<selector>[^{@]+)\{(?<declarations>[^}]*)\}",
-        RegexOptions.Compiled | RegexOptions.Singleline);
-
     /// <summary>
     /// Collects animation-related properties from <c>&lt;style&gt;</c> elements
     /// whose selectors match the given element.  This is a simplified matcher
@@ -206,22 +188,23 @@ public sealed partial class DomBridge
                     .Select(c => c.TextContent ?? string.Empty));
             }
 
-            // Strip @keyframes rules first to avoid matching their inner blocks.
-            var stripped = KeyframesRulePattern.Replace(css, string.Empty);
-
-            foreach (Match m in AnimCssRulePattern.Matches(stripped))
+            var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
+            foreach (var styleRule in styleSheet.Rules.OfType<Broiler.CSS.CssStyleRule>())
             {
-                var selector = m.Groups["selector"].Value.Trim();
-                if (!SimpleMatchesElement(selector, target))
-                    continue;
-
-                var declarations = ParseDeclarations(m.Groups["declarations"].Value);
-                foreach (var kv in declarations)
+                foreach (var selector in styleRule.Selectors.Selectors)
                 {
-                    if (kv.Key.StartsWith("animation", StringComparison.OrdinalIgnoreCase))
+                    if (!SimpleMatchesElement(selector.Text, target))
+                        continue;
+
+                    var declarations = ParseDeclarations(
+                        Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
+                    foreach (var kv in declarations)
                     {
-                        result ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                        result[kv.Key] = kv.Value;
+                        if (kv.Key.StartsWith("animation", StringComparison.OrdinalIgnoreCase))
+                        {
+                            result ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            result[kv.Key] = kv.Value;
+                        }
                     }
                 }
             }
@@ -316,7 +299,7 @@ public sealed partial class DomBridge
 
         double currentTimeMs = 0;
         var hasCurrentTimeOverride = false;
-        if (element.DomProperties.TryGetValue("_animationCurrentTimeMs", out var currentTimeValue) &&
+        if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var currentTimeValue) &&
             currentTimeValue is double currentTimeMsValue)
         {
             currentTimeMs = currentTimeMsValue;

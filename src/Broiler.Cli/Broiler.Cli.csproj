@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broiler.Dom\Broiler.Dom.csproj" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
   </ItemGroup>
 

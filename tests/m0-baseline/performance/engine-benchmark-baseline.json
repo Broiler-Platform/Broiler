@@ -1,85 +1,165 @@
 {
-  "GeneratedAtUtc": "2026-05-05T09:21:02.7253631Z",
+  "GeneratedAtUtc": "2026-06-25T06:50:22.4995461Z",
   "Results": [
     {
       "Name": "js.startup",
       "Description": "Create a fresh JSContext and evaluate a trivial expression",
       "Unit": "ms",
       "SampleCount": 20,
-      "Mean": 2.9141000000000004,
-      "Median": 2.51305,
-      "Min": 0.8225,
-      "Max": 7.6417
+      "Mean": 1.9950350000000001,
+      "Median": 1.5674000000000001,
+      "Min": 1.3995,
+      "Max": 4.7801
     },
     {
       "Name": "js.micro",
       "Description": "Evaluate a hot arithmetic loop in one context",
       "Unit": "ms",
       "SampleCount": 20,
-      "Mean": 3.559515,
-      "Median": 3.78845,
-      "Min": 1.8226,
-      "Max": 7.0845
+      "Mean": 6.798135,
+      "Median": 6.59,
+      "Min": 6.2514,
+      "Max": 8.786
     },
     {
       "Name": "html.parse",
       "Description": "HtmlContainer.SetHtml on the baseline sample document",
       "Unit": "ms",
       "SampleCount": 15,
-      "Mean": 3.8611133333333334,
-      "Median": 1.7055,
-      "Min": 1.3655,
-      "Max": 13.4993
+      "Mean": 6.703033333333334,
+      "Median": 1.4641,
+      "Min": 1.0387,
+      "Max": 79.9273
     },
     {
       "Name": "html.layout",
       "Description": "HtmlContainer.SetHtml \u002B PerformLayout on the baseline sample document",
       "Unit": "ms",
       "SampleCount": 15,
-      "Mean": 5.0484,
-      "Median": 3.5078,
-      "Min": 3.1717,
-      "Max": 14.5079
+      "Mean": 2.6486733333333334,
+      "Median": 2.6501,
+      "Min": 2.1816,
+      "Max": 3.2029
     },
     {
       "Name": "html.paint",
       "Description": "HtmlContainer.PerformPaint after layout on the baseline sample document",
       "Unit": "ms",
       "SampleCount": 15,
-      "Mean": 325.04824666666667,
-      "Median": 264.3272,
-      "Min": 257.5192,
-      "Max": 838.3561
+      "Mean": 173.37627999999998,
+      "Median": 159.4036,
+      "Min": 134.7444,
+      "Max": 365.2216
     },
     {
       "Name": "html.raster",
       "Description": "Render and PNG-encode the baseline sample document",
       "Unit": "ms",
       "SampleCount": 10,
-      "Mean": 286.41360999999995,
-      "Median": 285.76685,
-      "Min": 284.1153,
-      "Max": 294.5337
+      "Mean": 190.51507999999998,
+      "Median": 184.88569999999999,
+      "Min": 161.7763,
+      "Max": 223.4521
+    },
+    {
+      "Name": "css.parse",
+      "Description": "Parse the CSS Phase 0 stylesheet with the renderer parser",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 98091.58333333333,
+      "Median": 103087.5,
+      "Min": 64564,
+      "Max": 131882
+    },
+    {
+      "Name": "css.selector-match",
+      "Description": "Run repeated Selectors Level 4 matches through querySelectorAll",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 111219.07500000001,
+      "Median": 127242.75,
+      "Min": 57582.4,
+      "Max": 204416.1
+    },
+    {
+      "Name": "css.computed-style",
+      "Description": "Resolve and read a cached computed style through the bridge",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 231812.68333333335,
+      "Median": 211465.4,
+      "Min": 173949.8,
+      "Max": 373220.6
+    },
+    {
+      "Name": "css.invalidation",
+      "Description": "Invalidate class-dependent style and recompute it through the bridge",
+      "Unit": "ns/op",
+      "SampleCount": 12,
+      "Mean": 385127.06666666665,
+      "Median": 383600.19999999995,
+      "Min": 280820.4,
+      "Max": 439472
+    },
+    {
+      "Name": "css.renderer-style-apply",
+      "Description": "Parse HTML and apply the renderer cascade for a style-heavy document",
+      "Unit": "ms",
+      "SampleCount": 15,
+      "Mean": 1.3327466666666667,
+      "Median": 1.2475,
+      "Min": 1.1319,
+      "Max": 2.7124
     },
     {
       "Name": "bridge.dom-call",
       "Description": "Repeated document.getElementById().getAttribute() calls",
       "Unit": "ns/op",
       "SampleCount": 12,
-      "Mean": 2238.079166666667,
-      "Median": 1763.25,
-      "Min": 1717.1,
-      "Max": 5241.7
+      "Mean": 5030.545833333333,
+      "Median": 4735.825,
+      "Min": 3592.05,
+      "Max": 7270.6
     },
     {
       "Name": "bridge.mutation",
       "Description": "Repeated textContent mutations through the DOM bridge",
       "Unit": "ns/op",
       "SampleCount": 12,
-      "Mean": 818681.5833333334,
-      "Median": 795240,
-      "Min": 693577.8,
-      "Max": 1084894.6
+      "Mean": 1099027.366666667,
+      "Median": 1108983.4,
+      "Min": 921150.4,
+      "Max": 1260281
+    },
+    {
+      "Name": "bridge.serialize",
+      "Description": "Attach and serialize the bridge-owned DOM",
+      "Unit": "ms",
+      "SampleCount": 15,
+      "Mean": 6.870046666666667,
+      "Median": 1.9415,
+      "Min": 1.2998,
+      "Max": 43.705
+    },
+    {
+      "Name": "bridge.render-handoff",
+      "Description": "Serialize the bridge-owned DOM and reparse it for raster rendering",
+      "Unit": "ms",
+      "SampleCount": 10,
+      "Mean": 151.18803,
+      "Median": 148.87415,
+      "Min": 133.7194,
+      "Max": 175.953
+    },
+    {
+      "Name": "bridge.typed-render-handoff",
+      "Description": "Hand the canonical DOM directly to layout without serialization or reparsing",
+      "Unit": "ms",
+      "SampleCount": 10,
+      "Mean": 7.7789899999999985,
+      "Median": 6.6558,
+      "Min": 3.3003,
+      "Max": 16.6145
     }
   ]
 }

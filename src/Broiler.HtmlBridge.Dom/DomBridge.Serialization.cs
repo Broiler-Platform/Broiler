@@ -4,6 +4,9 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Text;
 using Broiler.HTML.Dom.Utils;
+using SharedHtmlSerializer = Broiler.Dom.Html.HtmlSerializer;
+using LegacyHtmlSerializer = Broiler.HTML.Dom.Utils.HtmlSerializer;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge;
 
@@ -31,18 +34,73 @@ public sealed partial class DomBridge
     public string SerializeToHtml()
     {
         ApplySerializationTransforms();
-        var sb = new StringBuilder();
-        sb.AppendLine("<!DOCTYPE html>");
-        SerializeElement(DocumentElement, sb);
-        return sb.ToString();
+        return SharedHtmlSerializer.Serialize(
+            DocumentElement,
+            CreateSerializationAdapter(),
+            new HtmlSerializationOptions(
+                IncludeHtmlDoctype: true,
+                MaximumDepth: MaxSerializationDepth,
+                EncodeTextNodes: false,
+                NewLineAfterDoctype: true));
     }
 
-    private static string SerializeElementToHtml(DomElement element)
+    /// <summary>
+    /// Returns the canonical document prepared for direct renderer consumption.
+    /// Bridge-owned style and form-control state is reflected into canonical
+    /// attributes because the typed renderer intentionally depends only on
+    /// <see cref="Broiler.Dom.DomDocument"/>.
+    /// </summary>
+    public Broiler.Dom.DomDocument GetRenderDocument()
     {
-        var sb = new StringBuilder();
-        SerializeElement(element, sb);
-        return sb.ToString();
+        ApplySerializationTransforms();
+        ReflectRenderState(DocumentElement);
+        return _document;
     }
+
+    private void ReflectRenderState(DomElement element)
+    {
+        if (!element.IsTextNode && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+        {
+            if (element.Style.Count == 0)
+            {
+                if (element.Attributes.ContainsKey("style"))
+                    element.Attributes.Remove("style");
+            }
+            else
+            {
+                var styleText = string.Join(
+                    "; ",
+                    element.Style
+                        .OrderBy(kv => LegacyHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+                        .Select(static kv => $"{kv.Key}: {kv.Value}"));
+                if (!element.Attributes.TryGetValue("style", out var currentStyle) ||
+                    !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
+                {
+                    element.Attributes["style"] = styleText;
+                }
+            }
+
+            if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
+                !element.Attributes.ContainsKey("value") &&
+                GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
+                idlValue is string { Length: > 0 } idlString)
+            {
+                element.Attributes["value"] = idlString;
+            }
+        }
+
+        foreach (var child in element.Children)
+            ReflectRenderState(child);
+    }
+
+    private string SerializeElementToHtml(DomElement element) =>
+        SharedHtmlSerializer.Serialize(
+            element,
+            CreateSerializationAdapter(),
+            new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
+
+    private string SerializeChildrenToHtml(DomElement element) =>
+        string.Concat(element.Children.Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms()
     {
@@ -714,143 +772,61 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static void SerializeElement(DomElement element, StringBuilder sb, int depth = 0)
+    private HtmlSerializationAdapter<DomElement> CreateSerializationAdapter() => new(
+        GetKind: static element => element.TagName.ToLowerInvariant() switch
+        {
+            "#text" => HtmlSerializationNodeKind.Text,
+            "#comment" => HtmlSerializationNodeKind.Comment,
+            "#document-fragment" => HtmlSerializationNodeKind.Fragment,
+            "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
+            "#doctype" => HtmlSerializationNodeKind.DocumentType,
+            _ => HtmlSerializationNodeKind.Element
+        },
+        GetName: static element => element.TagName,
+        GetChildren: element => TrySerializeCurrentSrcDoc(element) is null
+            ? element.Children
+            : element.Children.Where(static child =>
+                !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
+        GetAttributes: GetSerializableAttributes,
+        GetStyles: static element =>
+            element.Style.OrderBy(kv => LegacyHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
+        GetText: static element => element.TextContent,
+        GetRawInnerHtml: static element => element.InnerHtml);
+
+    private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
     {
-        // Guard against excessively deep or circular DOM trees
-        if (depth > MaxSerializationDepth)
-            throw new InvalidOperationException(
-                $"Maximum DOM serialization depth ({MaxSerializationDepth}) exceeded. " +
-                "This may indicate a circular reference in the DOM tree.");
-
-        // Text nodes
-        if (element.IsTextNode)
-        {
-            sb.Append(element.TextContent ?? string.Empty);
-            return;
-        }
-
-        // Document fragments have no tag wrapper
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var child in element.Children)
-                SerializeElement(child, sb, depth + 1);
-            return;
-        }
-
-        // Comment nodes → <!-- content -->
-        if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-        {
-            sb.Append("<!--").Append(element.TextContent ?? string.Empty).Append("-->");
-            return;
-        }
-
-        // Sub-document roots (from iframe/object contentDocument) → unwrap children
-        if (string.Equals(element.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var child in element.Children)
-                SerializeElement(child, sb, depth + 1);
-            return;
-        }
-
-        // DOCTYPE nodes → skip (already emitted at the top of SerializeToHtml)
-        if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        var tag = element.TagName.ToLowerInvariant();
-        var serializedSrcDoc = TrySerializeCurrentSrcDoc(element, depth);
-        sb.Append('<').Append(tag);
-
-        // Emit id attribute
         if (!string.IsNullOrEmpty(element.Id))
-            sb.Append(" id=\"").Append(HtmlSerializer.HtmlEncode(element.Id)).Append('"');
-
-        // Emit class attribute
+            yield return new("id", element.Id);
         if (!string.IsNullOrEmpty(element.ClassName))
-            sb.Append(" class=\"").Append(HtmlSerializer.HtmlEncode(element.ClassName)).Append('"');
+            yield return new("class", element.ClassName);
 
-        // Emit remaining attributes (skip id/class/style since already emitted separately)
-        foreach (var kvp in element.Attributes)
+        var serializedSrcDoc = TrySerializeCurrentSrcDoc(element);
+        foreach (var (name, value) in element.Attributes)
         {
-            if (string.Equals(kvp.Key, "id", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(kvp.Key, "style", StringComparison.OrdinalIgnoreCase))
+            if (name.Equals("id", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("class", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("style", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
-            var attributeValue =
-                string.Equals(kvp.Key, "srcdoc", StringComparison.OrdinalIgnoreCase) && serializedSrcDoc != null
+            yield return new(
+                name,
+                name.Equals("srcdoc", StringComparison.OrdinalIgnoreCase) && serializedSrcDoc is not null
                     ? serializedSrcDoc
-                    : kvp.Value;
-            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(attributeValue)).Append('"');
+                    : value);
         }
 
-        // For <input> elements, if the IDL value property was set via
-        // JavaScript (stored as DomProperties["_value"]) but no content
-        // attribute "value" exists, emit it so the CSS rendering engine's
-        // HtmlParser can inject the text content for submit/button/reset
-        // inputs and show placeholder text for text-like inputs.
-        if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase)
-            && !element.Attributes.ContainsKey("value")
-            && element.DomProperties.TryGetValue("_value", out var idlValue)
-            && idlValue is string idlStr
-            && !string.IsNullOrEmpty(idlStr))
+        if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
+            !element.Attributes.ContainsKey("value") &&
+            GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
+            idlValue is string { Length: > 0 } idlString)
         {
-            sb.Append(" value=\"").Append(HtmlSerializer.HtmlEncode(idlStr)).Append('"');
+            yield return new("value", idlString);
         }
-
-        // Emit inline style from the style dictionary.
-        // CSS shorthand properties (e.g. "margin", "border", "padding") must
-        // appear before their longhand counterparts ("margin-left", etc.) so
-        // that the longhands override the shorthand defaults.
-        if (element.Style.Count > 0)
-        {
-            sb.Append(" style=\"");
-            var first = true;
-            // Emit shorthands first, then longhands, preserving original order within each group.
-            foreach (var kvp in element.Style.OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1))
-            {
-                if (!first) sb.Append("; ");
-                sb.Append(kvp.Key).Append(": ").Append(HtmlSerializer.HtmlEncode(kvp.Value));
-                first = false;
-            }
-            sb.Append('"');
-        }
-
-        sb.Append('>');
-
-        // Void elements have no closing tag
-        if (HtmlSerializer.VoidTags.Contains(tag))
-            return;
-
-        // Raw text elements (<script>, <style>) must not HTML-encode their content
-        var isRawText = tag == "script" || tag == "style";
-
-        // Children, textContent, or innerHTML
-        if (element.Children.Count > 0)
-        {
-            foreach (var child in element.Children)
-            {
-                if (serializedSrcDoc != null &&
-                    string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                SerializeElement(child, sb, depth + 1);
-            }
-        }
-        else if (!string.IsNullOrEmpty(element.TextContent))
-        {
-            sb.Append(isRawText ? element.TextContent : HtmlSerializer.HtmlEncode(element.TextContent));
-        }
-        else if (!string.IsNullOrEmpty(element.InnerHtml))
-        {
-            sb.Append(element.InnerHtml);
-        }
-
-        sb.Append("</").Append(tag).Append('>');
     }
 
-    private static string? TrySerializeCurrentSrcDoc(DomElement element, int depth)
+    private string? TrySerializeCurrentSrcDoc(DomElement element)
     {
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
             !element.Attributes.ContainsKey("srcdoc"))
@@ -863,10 +839,6 @@ public sealed partial class DomBridge
         if (subDocumentRoot == null || subDocumentRoot.Children.Count == 0)
             return null;
 
-        var sb = new StringBuilder();
-        foreach (var child in subDocumentRoot.Children)
-            SerializeElement(child, sb, depth + 1);
-
-        return sb.ToString();
+        return string.Concat(subDocumentRoot.Children.Select(SerializeElementToHtml));
     }
 }

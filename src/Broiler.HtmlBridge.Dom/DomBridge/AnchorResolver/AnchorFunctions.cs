@@ -62,14 +62,14 @@ public sealed partial class DomBridge
             // position is used instead of its document position.
             bool targetIsFixed =
                 (cssProps.GetValueOrDefault("position") ?? element.Style.GetValueOrDefault("position")) == "fixed" ||
-                (element.DomProperties.TryGetValue("_modal", out var tModal) && tModal is true);
+                (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var tModal) && tModal is true);
             double scrollAdjY = 0, scrollAdjX = 0;
             if (targetIsFixed)
             {
                 var docEl = DocumentElement;
-                if (docEl.DomProperties.TryGetValue("_scrollTop", out var stv) && stv is double scrollTop)
+                if (GetElementRuntimeState(docEl).Scroll.Top.TryGet(out var stv) && stv is double scrollTop)
                     scrollAdjY = scrollTop;
-                if (docEl.DomProperties.TryGetValue("_scrollLeft", out var slv) && slv is double scrollLeft)
+                if (GetElementRuntimeState(docEl).Scroll.Left.TryGet(out var slv) && slv is double scrollLeft)
                     scrollAdjX = scrollLeft;
             }
 

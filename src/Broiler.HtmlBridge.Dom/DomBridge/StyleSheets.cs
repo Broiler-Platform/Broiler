@@ -195,32 +195,11 @@ public sealed partial class DomBridge
     /// <summary>Parses CSS text into individual rule strings.</summary>
     private static List<string> ParseCssRuleStrings(string cssText)
     {
-        var rules = new List<string>();
-        var depth = 0;
-        var start = 0;
-        for (int i = 0; i < cssText.Length; i++)
-        {
-            if (cssText[i] == '{') depth++;
-            else if (cssText[i] == ';' && depth == 0)
-            {
-                var rule = cssText.Substring(start, i - start + 1).Trim();
-                if (rule.Length > 0 && rule.StartsWith("@", StringComparison.Ordinal))
-                    rules.Add(rule);
-                start = i + 1;
-            }
-            else if (cssText[i] == '}')
-            {
-                depth--;
-                if (depth == 0)
-                {
-                    var rule = cssText.Substring(start, i - start + 1).Trim();
-                    if (rule.Length > 0)
-                        rules.Add(rule);
-                    start = i + 1;
-                }
-            }
-        }
-        return rules;
+        return new Broiler.CSS.CssParser()
+            .ParseStyleSheet(cssText)
+            .Rules
+            .Select(Broiler.CSS.CssSerializer.Serialize)
+            .ToList();
     }
 
     private static JSObject BuildCssRuleListObject(List<JSObject> rules, Func<string, JSObject>? ruleFactory = null)

@@ -210,7 +210,7 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // document.links — collection of all <a> and <area> elements with href
-        // Uses tree-order traversal instead of _elements insertion order
+        // Uses tree-order traversal instead of _knownNodes insertion order
         // to correctly reflect dynamically appended elements.
         document.FastAddProperty(
             (KeyString)"links",

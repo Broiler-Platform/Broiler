@@ -26,7 +26,7 @@ public sealed partial class DomBridge
             if (!declarations.TryGetValue("anchor-name", out var anchorName))
                 continue;
 
-            foreach (var el in _elements)
+            foreach (var el in Elements)
             {
                 if (!MatchesSelector(el, selector))
                     continue;

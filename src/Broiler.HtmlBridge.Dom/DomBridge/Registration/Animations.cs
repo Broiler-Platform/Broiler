@@ -22,7 +22,7 @@ public sealed partial class DomBridge
     private JSArray BuildAnimationList(DomElement? target)
     {
         var animations = new List<JSValue>();
-        foreach (var element in _elements)
+        foreach (var element in Elements)
         {
             if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -67,7 +67,7 @@ public sealed partial class DomBridge
         string? animationShorthand,
         string? animationDelay)
     {
-        if (element.DomProperties.ContainsKey("_animationCurrentTimeMs"))
+        if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.IsSet)
             return;
 
         double delaySec = 0;
@@ -90,7 +90,7 @@ public sealed partial class DomBridge
         }
 
         var currentTimeMs = delaySec > 0 ? (delaySec * 1000.0) + 1.0 : Math.Abs(delaySec) * 1000.0;
-        element.DomProperties["_animationCurrentTimeMs"] = currentTimeMs;
+        GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(currentTimeMs);
     }
 
     private static JSObject BuildAnimationObject(DomElement element)

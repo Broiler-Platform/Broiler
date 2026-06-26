@@ -219,14 +219,6 @@ public sealed partial class DomBridge
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex CssRulePattern = new(
-        @"(?<selector>[^{}@]+)\{(?<declarations>[^}]*)\}",
-        RegexOptions.Compiled);
-
-    private static readonly Regex MediaQueryPattern = new(
-        @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
     private static readonly Regex LengthAttrFunctionPattern = new(
         @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -299,260 +291,11 @@ public sealed partial class DomBridge
     /// b = class / attribute / pseudo-class selectors, and c = type selectors /
     /// pseudo-elements. Inline styles are handled separately.
     /// </summary>
-    public static int CalculateSpecificity(string selector)
-    {
-        var (a, b, c) = CalculateSpecificityComponents(selector);
-        return EncodeSpecificity(a, b, c);
-    }
-
-    private static int EncodeSpecificity(int a, int b, int c) => (a * 1_000_000) + (b * 1_000) + c;
-
-    private static (int A, int B, int C) CalculateSpecificityComponents(string selector)
-    {
-        var max = (A: 0, B: 0, C: 0);
-        foreach (var candidate in SplitCommaSelectors(selector))
-        {
-            var trimmed = candidate.Trim();
-            if (string.IsNullOrEmpty(trimmed))
-                continue;
-
-            var components = CalculateComplexSelectorSpecificity(trimmed);
-            if (EncodeSpecificity(components.A, components.B, components.C) >
-                EncodeSpecificity(max.A, max.B, max.C))
-            {
-                max = components;
-            }
-        }
-
-        return max;
-    }
-
-    private static (int A, int B, int C) CalculateComplexSelectorSpecificity(string selector)
-    {
-        int a = 0, b = 0, c = 0;
-        foreach (var (_, compound) in SplitSelectorParts(selector))
-        {
-            var (ca, cb, cc) = CalculateCompoundSpecificity(compound);
-            a += ca;
-            b += cb;
-            c += cc;
-        }
-
-        return (a, b, c);
-    }
-
-    private static (int A, int B, int C) CalculateCompoundSpecificity(string compound)
-    {
-        if (string.IsNullOrWhiteSpace(compound))
-            return (0, 0, 0);
-
-        int a = 0, b = 0, c = 0;
-        var working = compound.Trim();
-
-        working = Regex.Replace(working, @"::[A-Za-z-]+", _ =>
-        {
-            c++;
-            return string.Empty;
-        });
-
-        working = AttributeSelectorPattern.Replace(working, _ =>
-        {
-            b++;
-            return string.Empty;
-        });
-
-        var pseudoClasses = ExtractPseudoClasses(working);
-        foreach (var pseudo in pseudoClasses)
-        {
-            var (pa, pb, pc) = CalculatePseudoSpecificity(pseudo.Name, pseudo.Argument);
-            a += pa;
-            b += pb;
-            c += pc;
-        }
-
-        working = RemovePseudoClasses(working, pseudoClasses);
-
-        for (int i = 0; i < working.Length; i++)
-        {
-            var current = working[i];
-            switch (current)
-            {
-                case '#':
-                    a++;
-                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
-                    break;
-                case '.':
-                    b++;
-                    i = ConsumeSimpleSelectorName(working, i + 1) - 1;
-                    break;
-                case '*':
-                case '|':
-                    break;
-                default:
-                    if (IsTypeSelectorStart(working, i))
-                    {
-                        c++;
-                        i = ConsumeTypeSelectorName(working, i) - 1;
-                    }
-                    break;
-            }
-        }
-
-        return (a, b, c);
-    }
-
-    private static (int A, int B, int C) CalculatePseudoSpecificity(string name, string? argument)
-    {
-        var pseudoName = name.ToLowerInvariant();
-        if (pseudoName is "before" or "after" or "first-line" or "first-letter")
-            return (0, 0, 1);
-
-        return pseudoName switch
-        {
-            "is" or "not" or "has" => CalculateSpecificityComponents(argument ?? string.Empty),
-            "where" => (0, 0, 0),
-            "nth-child" or "nth-last-child" => AddSpecificity((0, 1, 0), GetNthOfSelectorSpecificity(argument)),
-            "nth-of-type" or "nth-last-of-type" => (0, 1, 0),
-            _ => (0, 1, 0)
-        };
-    }
-
-    private static (int A, int B, int C) GetNthOfSelectorSpecificity(string? argument)
-    {
-        if (string.IsNullOrWhiteSpace(argument))
-            return (0, 0, 0);
-
-        var selectorList = ExtractNthOfSelectorList(argument);
-        return string.IsNullOrWhiteSpace(selectorList)
-            ? (0, 0, 0)
-            : CalculateSpecificityComponents(selectorList);
-    }
-
-    private static string? ExtractNthOfSelectorList(string argument)
-    {
-        int parenDepth = 0;
-        int bracketDepth = 0;
-        bool inString = false;
-        char stringDelimiter = '\0';
-
-        for (int i = 0; i < argument.Length; i++)
-        {
-            var c = argument[i];
-            if (inString)
-            {
-                if (c == '\\')
-                {
-                    i++;
-                    continue;
-                }
-
-                if (c == stringDelimiter)
-                    inString = false;
-
-                continue;
-            }
-
-            if (c == '"' || c == '\'')
-            {
-                inString = true;
-                stringDelimiter = c;
-                continue;
-            }
-
-            switch (c)
-            {
-                case '(':
-                    parenDepth++;
-                    continue;
-                case ')':
-                    parenDepth = Math.Max(0, parenDepth - 1);
-                    continue;
-                case '[':
-                    bracketDepth++;
-                    continue;
-                case ']':
-                    bracketDepth = Math.Max(0, bracketDepth - 1);
-                    continue;
-            }
-
-            if (parenDepth != 0 || bracketDepth != 0 || !IsStandaloneOfKeyword(argument, i))
-                continue;
-
-            return argument[(i + 2)..].Trim();
-        }
-
-        return null;
-    }
-
-    private static bool IsStandaloneOfKeyword(string text, int index)
-    {
-        if (index + 1 >= text.Length ||
-            char.ToLowerInvariant(text[index]) != 'o' ||
-            char.ToLowerInvariant(text[index + 1]) != 'f')
-            return false;
-
-        var hasLeadingBoundary = index == 0 || char.IsWhiteSpace(text[index - 1]);
-        var trailingIndex = index + 2;
-        var hasTrailingBoundary = trailingIndex >= text.Length || char.IsWhiteSpace(text[trailingIndex]);
-        return hasLeadingBoundary && hasTrailingBoundary;
-    }
-
-    private static (int A, int B, int C) AddSpecificity((int A, int B, int C) left, (int A, int B, int C) right)
-        => (left.A + right.A, left.B + right.B, left.C + right.C);
-
-    private static bool IsTypeSelectorStart(string text, int index)
-    {
-        var current = text[index];
-        if (!char.IsLetter(current) && current != '_')
-            return false;
-
-        if (index > 0)
-        {
-            var previous = text[index - 1];
-            if (char.IsLetterOrDigit(previous) || previous is '-' or '_' or '#' or '.' or ':')
-                return false;
-        }
-
-        return true;
-    }
-
-    private static int ConsumeSimpleSelectorName(string text, int index)
-    {
-        while (index < text.Length)
-        {
-            var c = text[index];
-            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '\\')
-            {
-                index++;
-                continue;
-            }
-
-            break;
-        }
-
-        return index;
-    }
-
-    private static int ConsumeTypeSelectorName(string text, int index)
-    {
-        while (index < text.Length)
-        {
-            var c = text[index];
-            if (char.IsLetterOrDigit(c) || c is '-' or '_' || c == '|' || c == '\\')
-            {
-                index++;
-                continue;
-            }
-
-            break;
-        }
-
-        return index;
-    }
+    public static int CalculateSpecificity(string selector) =>
+        Broiler.CSS.CssSelectorParser.CalculateSpecificity(selector).Encoded;
 
     /// <summary>
-    /// Extracts CSS rules from all <c>&lt;style&gt;</c> blocks in the HTML source
-    /// and stores them in <see cref="_cssRules"/> ordered by specificity.
+    /// Extracts CSS rules from all style blocks and stores them by specificity.
     /// </summary>
     private void ExtractStyleBlocks(string html)
     {
@@ -568,149 +311,37 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Strips block-style at-rules (e.g. <c>@keyframes</c>, <c>@font-face</c>,
-    /// <c>@supports</c>) from CSS text so that their inner content is not parsed
-    /// as regular CSS rules.  Balanced <c>{…}</c> pairs are tracked so that
-    /// nested rules inside at-rule blocks are completely removed.
-    /// </summary>
-    private static readonly Regex BlockAtRulePattern = new(
-        @"@(?:keyframes|font-face|supports|layer|counter-style|property|container)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static string StripBlockAtRules(string css)
-    {
-        var match = BlockAtRulePattern.Match(css);
-        if (!match.Success)
-            return css;
-
-        var sb = new StringBuilder(css.Length);
-        int pos = 0;
-
-        while (match.Success)
-        {
-            sb.Append(css, pos, match.Index - pos);
-
-            // Find the opening brace.
-            int braceStart = css.IndexOf('{', match.Index);
-            if (braceStart < 0)
-            {
-                pos = css.Length;
-                break;
-            }
-
-            // Scan for the balanced closing brace.
-            int count = 1;
-            int endIdx = braceStart + 1;
-            while (count > 0 && endIdx < css.Length)
-            {
-                if (css[endIdx] == '{') count++;
-                else if (css[endIdx] == '}') count--;
-                endIdx++;
-            }
-
-            pos = endIdx;
-            match = match.NextMatch();
-            // Skip matches that fall inside the range we just consumed.
-            while (match.Success && match.Index < pos)
-                match = match.NextMatch();
-        }
-
-        if (pos < css.Length)
-            sb.Append(css, pos, css.Length - pos);
-
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Parses raw CSS text into rules, handling <c>@media</c> queries.
-    /// Rules inside <c>@media screen</c> are included; <c>@media print</c> rules are skipped.
-    /// Block-style at-rules (<c>@keyframes</c>, etc.) are stripped before rule extraction.
+    /// Parses raw CSS through <c>Broiler.CSS</c> and imports style rules plus
+    /// matching media-rule contents into the bridge's existing cascade.
     /// </summary>
     private void ParseCssText(string cssText)
     {
-        // Strip block-style at-rules (@keyframes, @font-face, etc.) before
-        // processing so that their internal selectors (e.g. "from", "50%", "to")
-        // are not mistakenly added to _cssRules.
-        cssText = StripBlockAtRules(cssText);
-        ExtractRulesFromCssWithMediaQueries(cssText);
+        var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(cssText);
+        ImportParsedRules(styleSheet.Rules);
     }
 
-    private void ExtractRulesFromCssWithMediaQueries(string cssText)
+    private void ImportParsedRules(IReadOnlyList<Broiler.CSS.CssRule> rules)
     {
-        int pos = 0;
-        int lastRuleStart = 0;
-        while (pos < cssText.Length)
+        foreach (var rule in rules)
         {
-            SkipWhitespaceAndComments(cssText, ref pos);
-            if (pos >= cssText.Length)
-                break;
-
-            if (cssText.Length >= pos + 6 &&
-                cssText.AsSpan(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
+            if (rule is Broiler.CSS.CssStyleRule styleRule)
             {
-                if (pos > lastRuleStart)
-                    ExtractRulesFromCss(cssText[lastRuleStart..pos]);
-
-                pos += 6;
-                SkipWhitespaceAndComments(cssText, ref pos);
-                int braceStart = IndexOfSkippingComments(cssText, '{', pos);
-                if (braceStart < 0)
-                    break;
-
-                var mediaQuery = StripCssComments(cssText[pos..braceStart]).Trim();
-                pos = braceStart + 1;
-
-                int depth = 1;
-                int blockStart = pos;
-                while (pos < cssText.Length && depth > 0)
+                var declarations = ParseStyle(Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
+                foreach (var parsedSelector in styleRule.Selectors.Selectors)
                 {
-                    if (pos + 1 < cssText.Length && cssText[pos] == '/' && cssText[pos + 1] == '*')
-                    {
-                        pos += 2;
-                        while (pos + 1 < cssText.Length && !(cssText[pos] == '*' && cssText[pos + 1] == '/'))
-                            pos++;
-                        if (pos + 1 < cssText.Length)
-                            pos += 2;
-                    }
-                    else
-                    {
-                        if (cssText[pos] == '{') depth++;
-                        else if (cssText[pos] == '}') depth--;
-                        if (depth > 0)
-                            pos++;
-                    }
+                    var selector = parsedSelector.Text.Trim();
+                    if (selector.Length == 0)
+                        continue;
+                    _cssRules.Add((selector, CalculateSpecificity(selector), declarations));
                 }
-
-                if (pos > blockStart && EvaluateMediaQuery(mediaQuery, _viewportWidth, _viewportHeight))
-                    ExtractRulesFromCss(cssText[blockStart..pos]);
-
-                if (pos < cssText.Length)
-                    pos++;
-
-                lastRuleStart = pos;
                 continue;
             }
 
-            pos++;
-        }
-
-        if (lastRuleStart < cssText.Length)
-            ExtractRulesFromCss(cssText[lastRuleStart..]);
-    }
-
-    private void ExtractRulesFromCss(string css)
-    {
-        foreach (Match ruleMatch in CssRulePattern.Matches(css))
-        {
-            var selectorGroup = ruleMatch.Groups["selector"].Value.Trim();
-            var declarations = ParseStyle(ruleMatch.Groups["declarations"].Value);
-
-            foreach (var sel in SplitCommaSelectors(selectorGroup))
+            if (rule is Broiler.CSS.CssAtRule atRule &&
+                atRule.Name.Equals("media", StringComparison.OrdinalIgnoreCase) &&
+                EvaluateMediaQuery(atRule.Prelude, _viewportWidth, _viewportHeight))
             {
-                var selector = sel.Trim();
-                if (string.IsNullOrEmpty(selector)) continue;
-                var specificity = CalculateSpecificity(selector);
-                _cssRules.Add((selector, specificity, declarations));
+                ImportParsedRules(atRule.Rules);
             }
         }
     }
@@ -721,7 +352,7 @@ public sealed partial class DomBridge
     /// </summary>
     private void ApplyCascadedStyles()
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             foreach (var (selector, _, declarations) in _cssRules)
             {
@@ -1080,7 +711,7 @@ public sealed partial class DomBridge
             if (cssText.Length == 0 && styleEl.TextContent != null)
                 cssText.Append(styleEl.TextContent);
 
-            if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+            if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
                 insertedObj is List<(int Index, string Rule)> insertedRules)
             {
                 foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
@@ -1092,7 +723,7 @@ public sealed partial class DomBridge
                 styleEl.Attributes.TryGetValue("href", out var href) &&
                 !string.IsNullOrEmpty(href))
             {
-                if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+                if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
                 {
                     cssText.Append(cachedStr);
                 }
@@ -1103,7 +734,7 @@ public sealed partial class DomBridge
                         var fetchedCss = FetchExternalStylesheet(href);
                         if (!string.IsNullOrEmpty(fetchedCss))
                         {
-                            styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                            GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.Set(fetchedCss);
                             cssText.Append(fetchedCss);
                         }
                     }
@@ -1339,7 +970,7 @@ public sealed partial class DomBridge
         if (cssText.Length == 0 && styleEl.TextContent != null)
             cssText.Append(styleEl.TextContent);
 
-        if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+        if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
             insertedObj is List<(int Index, string Rule)> insertedRules)
         {
             foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
@@ -1351,7 +982,7 @@ public sealed partial class DomBridge
             styleEl.Attributes.TryGetValue("href", out var href) &&
             !string.IsNullOrEmpty(href))
         {
-            if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+            if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
             {
                 cssText.Append(cachedStr);
             }
@@ -1362,7 +993,7 @@ public sealed partial class DomBridge
                     var fetchedCss = FetchExternalStylesheet(href);
                     if (!string.IsNullOrEmpty(fetchedCss))
                     {
-                        styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                        GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.Set(fetchedCss);
                         cssText.Append(fetchedCss);
                     }
                 }
@@ -2335,43 +1966,6 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Splits a CSS declaration block into individual declarations on <c>;</c>,
-    /// respecting parenthesised groups so that semicolons inside <c>url()</c>
-    /// or other CSS functions (e.g. <c>data:image/gif;base64,…</c>) are not
-    /// treated as declaration separators.
-    /// </summary>
-    internal static string[] SplitCssDeclarations(string declarations)
-    {
-        // Strip CSS comments (/* ... */) before splitting so that comments
-        // between declarations don't pollute property names or values.
-        declarations = StripCssComments(declarations);
-
-        var parts = new List<string>();
-        var sb = new StringBuilder();
-        int depth = 0;
-        foreach (char c in declarations)
-        {
-            if (c == '(') depth++;
-            else if (c == ')' && depth > 0) depth--;
-
-            if (c == ';' && depth == 0)
-            {
-                if (sb.Length > 0)
-                {
-                    parts.Add(sb.ToString());
-                    sb.Clear();
-                }
-            }
-            else
-            {
-                sb.Append(c);
-            }
-        }
-        if (sb.Length > 0) parts.Add(sb.ToString());
-        return parts.ToArray();
-    }
-
-    /// <summary>
     /// Resolves CSS relative font-weight keywords (<c>bolder</c>, <c>lighter</c>)
     /// to numeric values per CSS 2.1 §15.6.  Also normalizes <c>normal</c> → 400
     /// and <c>bold</c> → 700 so that <c>getComputedStyle</c> always returns a number.
@@ -2467,7 +2061,7 @@ public sealed partial class DomBridge
             if (cssText.Length == 0 && styleEl.TextContent != null)
                 cssText.Append(styleEl.TextContent);
 
-            if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+            if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
                 insertedObj is List<(int Index, string Rule)> insertedRules)
             {
                 foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))

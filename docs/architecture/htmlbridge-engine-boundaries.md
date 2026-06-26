@@ -62,8 +62,34 @@ members that are now frozen so M2+ work cannot silently add new leaks.
 | `Attach(JSContext, string)` | concrete `JSContext` | Current registration path still binds directly to YantraJS globals | Replace with a bridge-owned context abstraction in a later boundary-version bump |
 | `Attach(JSContext, string, string)` | concrete `JSContext` | Same as above, plus URL seeding | Same follow-up as above |
 | `RegisterNamedElementGlobals(JSContext)` | concrete `JSContext` | Legacy HTML named-access wiring still edits the engine global object directly | Fold into the future abstracted attach/runtime surface |
-| `DocumentElement` | `DomElement` | Existing test/WPT helpers still walk the bridge-owned DOM tree directly | Replace with a typed bridge DTO or internal-only test seam |
-| `Elements` | `IReadOnlyList<DomElement>` | Existing capture/execution helpers still enumerate parsed `<script>` elements directly | Replace with bridge-owned script/document snapshots |
+| `DocumentElement` | compatibility `DomElement` facade over `Broiler.Dom.DomElement` | Existing test/WPT helpers still use the legacy surface | Migrate callers to canonical nodes or typed snapshots before removing the facade |
+| `Elements` | tree-derived `IReadOnlyList<DomElement>` | Existing capture/execution helpers still enumerate nodes through the compatibility view | Replace remaining callers with canonical queries or typed snapshots |
+
+As of 2026-06-24, `DomBridge` owns a canonical `Broiler.Dom.DomDocument`, and
+the legacy `DomElement` type derives from the canonical node type. Child and
+attribute mutations route through canonical mutation APIs. JavaScript listeners,
+observer options, and IDL runtime state remain bridge-owned. The legacy public
+type remains only as a source-compatibility facade.
+
+HTML tokenization, document/fragment tree construction, and deterministic
+serialization are owned by `Broiler.Dom.Html`. The bridge keeps only a
+compatibility materializer for its temporary `DomElement` facade, while the
+renderer consumes the same shared parser contract. `innerHTML`,
+`document.write`, and subdocument parsing therefore no longer carry separate
+tree-builder implementations.
+
+The optional `ITypedScriptEngine` extension and renderer
+`SetDocument(DomDocument, ...)` entry points form the Phase 5 typed hand-off.
+The WPF interactive path uses this route by default. The frozen
+`IScriptEngine.Execute(...)` string methods and `SetHtml(...)` renderer methods
+remain compatibility surfaces, selectable through
+`RenderingPipeline.HandoffMode.SerializedHtml`.
+
+TreeWalker and NodeIterator state and traversal are now canonical
+`Broiler.Dom` algorithms. The bridge only converts JavaScript filters and node
+wrappers. Canonical `DomRange` provides engine-neutral boundary and mutation
+semantics; bridge-only range geometry and content operations remain outside the
+kernel.
 
 ## PR dashboard surfaces tied to this boundary
 

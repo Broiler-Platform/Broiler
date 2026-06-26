@@ -21,13 +21,13 @@ public sealed partial class DomBridge
     /// </summary>
     private void ApplyDialogUAPositioning(DomElement root)
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (!string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
                 continue;
             if (!el.Attributes.ContainsKey("open"))
                 continue;
-            if (!(el.DomProperties.TryGetValue("_modal", out var m) && m is true))
+            if (!(GetElementRuntimeState(el).Dialog.Modal.TryGet(out var m) && m is true))
                 continue;
 
             // Check if position is already set (inline or CSS).
@@ -179,9 +179,9 @@ public sealed partial class DomBridge
         if (anchorElement == null) return true;
 
         bool anchorIsTopLayer =
-            anchorElement.DomProperties.TryGetValue("_modal", out var am) && am is true;
+            GetElementRuntimeState(anchorElement).Dialog.Modal.TryGet(out var am) && am is true;
         bool targetIsTopLayer =
-            targetElement.DomProperties.TryGetValue("_modal", out var tm) && tm is true;
+            GetElementRuntimeState(targetElement).Dialog.Modal.TryGet(out var tm) && tm is true;
 
         if (!anchorIsTopLayer)
             return true; // Non-top-layer anchors are accessible from anywhere.
@@ -190,8 +190,8 @@ public sealed partial class DomBridge
             return false; // Non-top-layer target cannot see top-layer anchor.
 
         // Both are in top layer — anchor must have been added BEFORE the target.
-        int anchorOrder = anchorElement.DomProperties.TryGetValue("_topLayerOrder", out var ao) && ao is int aoi ? aoi : 0;
-        int targetOrder = targetElement.DomProperties.TryGetValue("_topLayerOrder", out var to) && to is int toi ? toi : 0;
+        int anchorOrder = GetElementRuntimeState(anchorElement).Dialog.TopLayerOrder.TryGet(out var ao) && ao is int aoi ? aoi : 0;
+        int targetOrder = GetElementRuntimeState(targetElement).Dialog.TopLayerOrder.TryGet(out var to) && to is int toi ? toi : 0;
 
         return anchorOrder < targetOrder;
     }
@@ -199,7 +199,7 @@ public sealed partial class DomBridge
     {
         if (string.Equals(element.TagName, "dialog", StringComparison.OrdinalIgnoreCase) &&
             element.Attributes.ContainsKey("open") &&
-            element.DomProperties.TryGetValue("_modal", out var isModal) &&
+            GetElementRuntimeState(element).Dialog.Modal.TryGet(out var isModal) &&
             isModal is bool modal && modal &&
             element.Parent != null)
         {

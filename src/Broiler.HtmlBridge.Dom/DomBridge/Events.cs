@@ -228,7 +228,7 @@ public sealed partial class DomBridge
     private static void FireListeners(DomElement el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
     {
-        if (el.EventListeners.TryGetValue(eventType, out var listeners))
+        if (GetEventListeners(el).TryGetValue(eventType, out var listeners))
         {
             foreach (var registration in listeners.ToList())
             {
@@ -249,7 +249,7 @@ public sealed partial class DomBridge
         // and during bubble phase on ancestors (like a bubble listener).
         if (!immediateStopped && (capturePhase == null || capturePhase == false))
         {
-            if (el.InlineEventHandlers.TryGetValue(eventType, out var inlineHandler) && inlineHandler is JSFunction inlineFn)
+            if (GetInlineEventHandlers(el).TryGetValue(eventType, out var inlineHandler) && inlineHandler is JSFunction inlineFn)
             {
                 // Inline on* handlers behave like regular non-passive listeners.
                 currentListenerPassive = false;
@@ -261,7 +261,7 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Compiles all <c>on*</c> HTML attributes (e.g. <c>onclick="code"</c>) on the given
-    /// element into <see cref="JSFunction"/> instances stored in <see cref="DomElement.InlineEventHandlers"/>.
+    /// element into <see cref="JSFunction"/> instances stored in <see cref="bridge-owned inline event handler state"/>.
     /// Only compiles attributes that have not already been compiled.
     /// </summary>
     private void CompileInlineEventAttributes(DomElement element)
@@ -271,7 +271,7 @@ public sealed partial class DomBridge
             var attrName = $"on{eventName}";
             if (element.Attributes.TryGetValue(attrName, out var code) &&
                 !string.IsNullOrEmpty(code) &&
-                !element.InlineEventHandlers.ContainsKey(eventName))
+                !GetInlineEventHandlers(element).ContainsKey(eventName))
             {
                 CompileInlineEventAttribute(element, attrName, code);
             }
@@ -280,7 +280,7 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Compiles a single <c>on*</c> attribute value into a <see cref="JSFunction"/>
-    /// and stores it in <see cref="DomElement.InlineEventHandlers"/>.
+    /// and stores it in <see cref="bridge-owned inline event handler state"/>.
     /// </summary>
     internal void CompileInlineEventAttribute(DomElement element, string attrName, string code)
     {
@@ -288,7 +288,7 @@ public sealed partial class DomBridge
         var eventName = attrName[2..].ToLowerInvariant();
         if (Csp != null && !Csp.AllowsInlineEventHandler(code))
         {
-            element.InlineEventHandlers.Remove(eventName);
+            GetInlineEventHandlers(element).Remove(eventName);
             return;
         }
 
@@ -296,7 +296,7 @@ public sealed partial class DomBridge
         {
             var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;
             if (fn != null)
-                element.InlineEventHandlers[eventName] = fn;
+                GetInlineEventHandlers(element)[eventName] = fn;
         }
         catch (Exception ex)
         {

@@ -21,9 +21,17 @@
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
     <Project Path="src/Broiler.Cli/Broiler.Cli.csproj" />
+    <Project Path="src/Broiler.CSS.Dom.Tests/Broiler.CSS.Dom.Tests.csproj" />
+    <Project Path="src/Broiler.CSS.Dom/Broiler.CSS.Dom.csproj" />
+    <Project Path="src/Broiler.CSS.Tests/Broiler.CSS.Tests.csproj" />
+    <Project Path="src/Broiler.CSS/Broiler.CSS.csproj" />
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
+    <Project Path="src/Broiler.Dom.Tests/Broiler.Dom.Tests.csproj" />
+    <Project Path="src/Broiler.Dom.Html.Tests/Broiler.Dom.Html.Tests.csproj" />
+    <Project Path="src/Broiler.Dom.Html/Broiler.Dom.Html.csproj" />
+    <Project Path="src/Broiler.Dom/Broiler.Dom.csproj" />
     <Project Path="src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />

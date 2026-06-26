@@ -7448,7 +7448,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         FindDomElement(bridge.DocumentElement, "sc", ref sc);
         Assert.NotNull(sc);
         Assert.True(
-            sc!.DomProperties.TryGetValue("_scrollTop", out var st) && st is double stv && stv == 100,
+            bridge.TryGetStoredScrollOffset(sc!, vertical: true, out var stv) && stv == 100,
             "scrollTop not stored");
 
         // Resolve anchor positions (includes position-visibility)
@@ -7486,9 +7486,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         FindDomElement(bridge.DocumentElement, "sc", ref sc);
         Assert.NotNull(sc);
         Assert.True(
-            sc!.DomProperties.TryGetValue("_scrollLeft", out var scrollLeft) && scrollLeft is double left && left == 75 &&
-            sc.DomProperties.TryGetValue("_scrollTop", out var scrollTop) && scrollTop is double top && top == 75,
-            $"Expected scrollLeft=75 and scrollTop=75, got left={sc.DomProperties.GetValueOrDefault("_scrollLeft")}, top={sc.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(sc!, vertical: false, out var left) && left == 75 &&
+            bridge.TryGetStoredScrollOffset(sc, vertical: true, out var top) && top == 75,
+            $"Expected scrollLeft=75 and scrollTop=75, got left={bridge.GetStoredScrollOffsetOrDefault(sc, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(sc, vertical: true)}");
     }
 
     [Fact]
@@ -8004,17 +8004,17 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         FindDomElement(bridge.DocumentElement, "rtl", ref rtl);
         Assert.NotNull(rtl);
         Assert.True(
-            rtl!.DomProperties.TryGetValue("_scrollLeft", out var rtlLeftValue) && rtlLeftValue is double rtlLeft && rtlLeft == -150 &&
-            rtl.DomProperties.TryGetValue("_scrollTop", out var rtlTopValue) && rtlTopValue is double rtlTop && rtlTop == 300,
-            $"Expected rtl scroller left=-150 top=300, got left={rtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={rtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(rtl!, vertical: false, out var rtlLeft) && rtlLeft == -150 &&
+            bridge.TryGetStoredScrollOffset(rtl, vertical: true, out var rtlTop) && rtlTop == 300,
+            $"Expected rtl scroller left=-150 top=300, got left={bridge.GetStoredScrollOffsetOrDefault(rtl, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(rtl, vertical: true)}");
 
         Broiler.HtmlBridge.DomElement? verticalRtl = null;
         FindDomElement(bridge.DocumentElement, "verticalRtl", ref verticalRtl);
         Assert.NotNull(verticalRtl);
         Assert.True(
-            verticalRtl!.DomProperties.TryGetValue("_scrollLeft", out var verticalLeftValue) && verticalLeftValue is double verticalLeft && verticalLeft == -150 &&
-            verticalRtl.DomProperties.TryGetValue("_scrollTop", out var verticalTopValue) && verticalTopValue is double verticalTop && verticalTop == -300,
-            $"Expected vertical rtl scroller left=-150 top=-300, got left={verticalRtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={verticalRtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(verticalRtl!, vertical: false, out var verticalLeft) && verticalLeft == -150 &&
+            bridge.TryGetStoredScrollOffset(verticalRtl, vertical: true, out var verticalTop) && verticalTop == -300,
+            $"Expected vertical rtl scroller left=-150 top=-300, got left={bridge.GetStoredScrollOffsetOrDefault(verticalRtl, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(verticalRtl, vertical: true)}");
     }
 
     [Fact]
@@ -8048,25 +8048,25 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         FindDomElement(bridge.DocumentElement, "hidden", ref hidden);
         Assert.NotNull(hidden);
         Assert.True(
-            hidden!.DomProperties.TryGetValue("_scrollLeft", out var hiddenLeftValue) && hiddenLeftValue is double hiddenLeft && hiddenLeft == 40 &&
-            hidden.DomProperties.TryGetValue("_scrollTop", out var hiddenTopValue) && hiddenTopValue is double hiddenTop && hiddenTop == 50,
-            $"Expected overflow:hidden element to scroll to 40,50 but got left={hidden.DomProperties.GetValueOrDefault("_scrollLeft")}, top={hidden.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(hidden!, vertical: false, out var hiddenLeft) && hiddenLeft == 40 &&
+            bridge.TryGetStoredScrollOffset(hidden, vertical: true, out var hiddenTop) && hiddenTop == 50,
+            $"Expected overflow:hidden element to scroll to 40,50 but got left={bridge.GetStoredScrollOffsetOrDefault(hidden, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(hidden, vertical: true)}");
 
         Broiler.HtmlBridge.DomElement? visible = null;
         FindDomElement(bridge.DocumentElement, "visible", ref visible);
         Assert.NotNull(visible);
         Assert.True(
-            visible!.DomProperties.TryGetValue("_scrollLeft", out var visibleLeftValue) && visibleLeftValue is double visibleLeft && visibleLeft == 0 &&
-            visible.DomProperties.TryGetValue("_scrollTop", out var visibleTopValue) && visibleTopValue is double visibleTop && visibleTop == 0,
-            $"Expected overflow:visible element to stay at 0,0 but got left={visible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={visible.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(visible!, vertical: false, out var visibleLeft) && visibleLeft == 0 &&
+            bridge.TryGetStoredScrollOffset(visible, vertical: true, out var visibleTop) && visibleTop == 0,
+            $"Expected overflow:visible element to stay at 0,0 but got left={bridge.GetStoredScrollOffsetOrDefault(visible, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(visible, vertical: true)}");
 
         Broiler.HtmlBridge.DomElement? implicitVisible = null;
         FindDomElement(bridge.DocumentElement, "implicit", ref implicitVisible);
         Assert.NotNull(implicitVisible);
         Assert.True(
-            implicitVisible!.DomProperties.TryGetValue("_scrollLeft", out var implicitLeftValue) && implicitLeftValue is double implicitLeft && implicitLeft == 0 &&
-            implicitVisible.DomProperties.TryGetValue("_scrollTop", out var implicitTopValue) && implicitTopValue is double implicitTop && implicitTop == 0,
-            $"Expected default overflow element to stay at 0,0 but got left={implicitVisible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={implicitVisible.DomProperties.GetValueOrDefault("_scrollTop")}");
+            bridge.TryGetStoredScrollOffset(implicitVisible!, vertical: false, out var implicitLeft) && implicitLeft == 0 &&
+            bridge.TryGetStoredScrollOffset(implicitVisible, vertical: true, out var implicitTop) && implicitTop == 0,
+            $"Expected default overflow element to stay at 0,0 but got left={bridge.GetStoredScrollOffsetOrDefault(implicitVisible, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(implicitVisible, vertical: true)}");
     }
 
     [Fact]
@@ -9237,26 +9237,13 @@ iframe {
         FindDomElement(bridge.DocumentElement, id, ref el);
         if (el == null) return null;
 
-        double left = 0, top = 0, width = 0, height = 0;
-        if (el.DomProperties.TryGetValue("_resolvedLeft", out var rl))
-            left = (double)rl;
-        else if (el.Style.TryGetValue("left", out var ls))
-            left = double.TryParse(ls.Replace("px", ""), out var lv) ? lv : 0;
+        if (bridge.TryGetResolvedLayout(el, out var left, out var top, out var width, out var height))
+            return (left, top, width, height);
 
-        if (el.DomProperties.TryGetValue("_resolvedTop", out var rt))
-            top = (double)rt;
-        else if (el.Style.TryGetValue("top", out var ts))
-            top = double.TryParse(ts.Replace("px", ""), out var tv) ? tv : 0;
-
-        if (el.DomProperties.TryGetValue("_resolvedWidth", out var rw))
-            width = (double)rw;
-        else if (el.Style.TryGetValue("width", out var ws))
-            width = double.TryParse(ws.Replace("px", ""), out var wv) ? wv : 0;
-
-        if (el.DomProperties.TryGetValue("_resolvedHeight", out var rh))
-            height = (double)rh;
-        else if (el.Style.TryGetValue("height", out var hs))
-            height = double.TryParse(hs.Replace("px", ""), out var hv) ? hv : 0;
+        left = el.Style.TryGetValue("left", out var ls) && double.TryParse(ls.Replace("px", ""), out var lv) ? lv : 0;
+        top = el.Style.TryGetValue("top", out var ts) && double.TryParse(ts.Replace("px", ""), out var tv) ? tv : 0;
+        width = el.Style.TryGetValue("width", out var ws) && double.TryParse(ws.Replace("px", ""), out var wv) ? wv : 0;
+        height = el.Style.TryGetValue("height", out var hs) && double.TryParse(hs.Replace("px", ""), out var hv) ? hv : 0;
 
         return (left, top, width, height);
     }

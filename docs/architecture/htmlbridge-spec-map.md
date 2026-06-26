@@ -28,7 +28,7 @@ the surface is standard-facing, Broiler-specific, or known to be incomplete.
 |---|---|---|---|
 | `DomBridge` stable orchestration members (`FlushTimers`, `FireWindowLoadEvent`, `SerializeToHtml`, viewport helpers) | HTML event loop, load events, CSSOM View, DOM Parsing/Serialization concepts | Partial | Public orchestrator over a bridge-owned DOM/runtime |
 | `DomBridge.Attach(...)`, `RegisterNamedElementGlobals(...)` | HTML Window named access; script execution environment setup | Partial | Still leaks concrete `JSContext`; frozen as compatibility-only surface |
-| `DomBridge.DocumentElement`, `Elements`, `DomElement`, `MutationObserverOptions` | WHATWG DOM concepts | Partial | Bridge-owned DOM representation, not a browser-compatible DOM interface surface |
+| `DomBridge.Document`, `DocumentElement`, `Elements`, `DomElement` | WHATWG DOM concepts | Partial | `DomBridge` now owns a canonical `Broiler.Dom.DomDocument`; the legacy `DomElement` surface is a temporary compatibility facade over canonical nodes |
 | `DomBridge.CalculateSpecificity(...)`, `CssRules` | Selectors Level 4, CSSOM | Partial | Shared internal/bridge cache surface, not a browser-native CSSOM API |
 | DOM event plumbing inside `DomBridge` | DOM Standard events / UI Events | Partial | Coverage is expanding via targeted bridge tests; constructors/legacy init methods remain selectively implemented |
 | DOM traversal/range plumbing inside `DomBridge` | DOM Standard traversal and Range | Partial | Bridge-owned state types still surface internally/publicly in places |

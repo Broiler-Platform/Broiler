@@ -7,12 +7,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using CanonicalDocument = Broiler.Dom.DomDocument;
 
 namespace Broiler.HtmlBridge;
 
@@ -34,11 +36,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
-    private readonly List<DomElement> _elements = [];
+    private readonly HashSet<DomElement> _knownNodes =
+        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
     private readonly List<(JSObject Observer, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
-    private readonly List<WeakReference<IteratorState>> _activeNodeIterators = [];
-    private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
+    private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
+    private readonly CanonicalDocument _document;
+    private readonly DomElement _documentNode;
+    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = new();
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -78,7 +83,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private double _visualViewportPageTopOffset;
 
     /// <summary>
-    /// Index into <see cref="_elements"/> of the <c>&lt;script&gt;</c> element
+    /// Index into the tree-derived <see cref="Elements"/> view of the
+    /// <c>&lt;script&gt;</c> element
     /// that is currently executing.  Used by <c>document.write()</c> to insert
     /// content at the correct DOM position.  Set to &lt;0 when no script is
     /// running.
@@ -124,6 +130,20 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private string _pageHash = string.Empty;
     private string _pageOrigin = string.Empty;
 
+    public DomBridge()
+    {
+        _document = new CanonicalDocument();
+        _documentNode = new DomElement(_document, "#document", null, null, string.Empty);
+        DocumentElement = new DomElement(_document, "html", null, null, string.Empty);
+        _document.AppendChild(_documentNode);
+        _documentNode.Children.Add(DocumentElement);
+    }
+
+    /// <summary>
+    /// The canonical document that owns every bridge-visible DOM node.
+    /// </summary>
+    public CanonicalDocument Document => _document;
+
     /// <summary>
     /// The current document title, kept in sync with JavaScript reads/writes.
     /// </summary>
@@ -132,7 +152,66 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>
     /// All elements parsed from the HTML source.
     /// </summary>
-    public IReadOnlyList<DomElement> Elements => _elements;
+    public IReadOnlyList<DomElement> Elements =>
+        _documentNode
+            .InclusiveDescendants()
+            .OfType<DomElement>()
+            .Where(element => !ReferenceEquals(element, _documentNode))
+            .ToArray();
+
+    private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
+        ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
+
+    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomElement element) =>
+        GetElementRuntimeState(element).EventListeners;
+
+    private static Dictionary<string, JSValue> GetInlineEventHandlers(DomElement element) =>
+        GetElementRuntimeState(element).InlineEventHandlers;
+
+    internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
+    {
+        var slot = vertical
+            ? GetElementRuntimeState(element).Scroll.Top
+            : GetElementRuntimeState(element).Scroll.Left;
+        if (slot.TryGet(out var value) && value is double storedOffset)
+        {
+            offset = storedOffset;
+            return true;
+        }
+
+        offset = 0;
+        return false;
+    }
+
+    internal double? GetStoredScrollOffsetOrDefault(DomElement element, bool vertical) =>
+        TryGetStoredScrollOffset(element, vertical, out var offset) ? offset : null;
+
+    internal bool TryGetResolvedLayout(
+        DomElement element,
+        out double left,
+        out double top,
+        out double width,
+        out double height)
+    {
+        var layout = GetElementRuntimeState(element).Layout;
+        var hasLeft = TryRead(layout.Left, out left);
+        var hasTop = TryRead(layout.Top, out top);
+        var hasWidth = TryRead(layout.Width, out width);
+        var hasHeight = TryRead(layout.Height, out height);
+        return hasLeft && hasTop && hasWidth && hasHeight;
+
+        static bool TryRead(RuntimeValue<double> slot, out double result)
+        {
+            if (slot.TryGet(out var value) && value is double number)
+            {
+                result = number;
+                return true;
+            }
+
+            result = 0;
+            return false;
+        }
+    }
 
     /// <summary>
     /// Parse the supplied <paramref name="html"/> and register a
@@ -177,7 +256,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void RegisterNamedElementGlobals(JSContext context)
     {
-        foreach (var el in _elements)
+        foreach (var el in Elements)
         {
             if (el.IsTextNode || string.IsNullOrEmpty(el.Id))
                 continue;
@@ -354,7 +433,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
         _jsContext["frames"] = BuildWindowFramesArray();
 
-        var htmlEl = _elements.FirstOrDefault(e =>
+        var htmlEl = Elements.FirstOrDefault(e =>
             string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
         if (htmlEl != null)
             FireDescendantOnloads(htmlEl);
@@ -393,7 +472,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // Find the <body> element by traversing the document tree.
         // The body is a child of <html> (documentElement), which is a
         // child of the document node. It may not appear in the flat
-        // _elements list because html/head/body are structural elements
+        // _knownNodes list because html/head/body are structural elements
         // pre-created by HtmlTreeBuilder.
         DomElement? body = null;
         if (htmlEl != null)
@@ -558,7 +637,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     private void ParseHtml(string html)
     {
-        _elements.Clear();
+        _knownNodes.Clear();
         _jsObjectCache.Clear();
         _computedPropsCache.Clear();
         _documentNode.Children.Clear();
@@ -570,15 +649,15 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         {
             doctype.Parent = _documentNode;
             _documentNode.Children.Add(doctype);
-            _elements.Add(doctype);
+            _knownNodes.Add(doctype);
         }
 
         // Use WHATWG-aligned tokeniser & tree builder
         var builder = new HtmlTreeBuilder();
-        var (docElement, allElements, title) = builder.Build(html);
+        var (docElement, allElements, title) = builder.Build(html, _document);
         Title = title;
         DocumentElement.Children.Clear();
-        foreach (var child in docElement.Children)
+        foreach (var child in docElement.Children.ToArray())
         {
             child.Parent = DocumentElement;
             DocumentElement.Children.Add(child);
@@ -596,7 +675,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         foreach (var kv in docElement.Style)
             DocumentElement.Style[kv.Key] = kv.Value;
 
-        _elements.AddRange(allElements);
+        _knownNodes.UnionWith(allElements);
 
         // Connect DocumentElement to _documentNode so that document.firstChild works
         // and structural pseudo-classes correctly detect the document root boundary
@@ -604,9 +683,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         if (!_documentNode.Children.Contains(DocumentElement))
             _documentNode.Children.Add(DocumentElement);
 
-        // Ensure DocumentElement is in _elements so querySelector can find it
-        if (!_elements.Contains(DocumentElement))
-            _elements.Insert(0, DocumentElement);
+        _knownNodes.Add(DocumentElement);
 
         // Extract <style> blocks for getComputedStyle() resolution.
         // Note: We intentionally do NOT call ApplyCascadedStyles() here.
@@ -683,21 +760,21 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static Dictionary<string, string> ParseStyle(string styleValue)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var declaration in SplitCssDeclarations(styleValue))
+        var declarations = new Broiler.CSS.CssParser().ParseDeclarations(styleValue);
+        foreach (var declaration in declarations.Declarations)
         {
-            var colonIdx = declaration.IndexOf(':');
-            if (colonIdx > 0)
+            var prop = declaration.Name;
+            var val = declaration.Value.Text;
+            if (declaration.Important)
+                val += " !important";
+
+            if (IsAcceptableCssValue(prop, val))
             {
-                var prop = declaration[..colonIdx].Trim();
-                var val = declaration[(colonIdx + 1)..].Trim();
-                if (!string.IsNullOrEmpty(prop) && IsAcceptableCssValue(prop, val))
-                {
-                    result[prop] = val;
-                    // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
-                    var unprefixed = StripVendorPrefix(prop);
-                    if (unprefixed != prop && !result.ContainsKey(unprefixed))
-                        result[unprefixed] = val;
-                }
+                result[prop] = val;
+                // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
+                var unprefixed = StripVendorPrefix(prop);
+                if (unprefixed != prop && !result.ContainsKey(unprefixed))
+                    result[unprefixed] = val;
             }
         }
         return result;

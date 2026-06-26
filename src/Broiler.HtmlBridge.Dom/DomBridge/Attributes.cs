@@ -282,7 +282,7 @@ public sealed partial class DomBridge
             element.Attributes.TryGetValue(attrName, out previousAttrVal);
         }
 
-        element.Attributes[attrName] = attrVal;
+        element.SetAttributeNS(namespaceUri, attrName, attrVal);
         element.NsAttrMap[(namespaceUri, localName)] = attrName;
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = attrVal;

@@ -129,9 +129,9 @@ public sealed partial class DomBridge
         var tagName = a[0].ToString();
         ValidateElementName(tagName, _jsContext!);
         tagName = AsciiToLower(tagName);
-        var el = new DomElement(tagName, null, null, string.Empty);
+        var el = new DomElement(_document, tagName, null, null, string.Empty);
         el.OwnerDocRoot = docRoot;
-        _elements.Add(el);
+        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -139,10 +139,10 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsCreateTextNode017Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+        var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
         el.TextContent = text;
         el.OwnerDocRoot = docRoot;
-        _elements.Add(el);
+        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -150,10 +150,10 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsCreateComment018Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement("#comment", null, null, string.Empty);
+        var el = new DomElement(_document, "#comment", null, null, string.Empty);
         el.TextContent = data;
         el.OwnerDocRoot = docRoot;
-        _elements.Add(el);
+        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -163,11 +163,11 @@ public sealed partial class DomBridge
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
         ValidateQualifiedName(localName, ns, _jsContext!);
-        var el = new DomElement(localName, null, null, string.Empty);
+        var el = new DomElement(_document, localName, null, null, string.Empty);
         if (!string.IsNullOrEmpty(ns))
             el.NamespaceURI = ns;
         el.OwnerDocRoot = docRoot;
-        _elements.Add(el);
+        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -525,19 +525,19 @@ public sealed partial class DomBridge
             {
                 doctype.Parent = docRoot;
                 docRoot.Children.Add(doctype);
-                bridge._elements.Add(doctype);
+                bridge._knownNodes.Add(doctype);
             }
 
             // parsedDoc is the <html> element from HtmlTreeBuilder.
             // Add it directly to docRoot (not its children).
             parsedDoc.Parent = docRoot;
             docRoot.Children.Add(parsedDoc);
-            if (!bridge._elements.Contains(parsedDoc))
-                bridge._elements.Add(parsedDoc);
+            if (!bridge._knownNodes.Contains(parsedDoc))
+                bridge._knownNodes.Add(parsedDoc);
             foreach (var el in allEls)
             {
-                if (!bridge._elements.Contains(el))
-                    bridge._elements.Add(el);
+                if (!bridge._knownNodes.Contains(el))
+                    bridge._knownNodes.Add(el);
             }
         }
         else
@@ -558,8 +558,8 @@ public sealed partial class DomBridge
 
             foreach (var el in allEls)
             {
-                if (!bridge._elements.Contains(el))
-                    bridge._elements.Add(el);
+                if (!bridge._knownNodes.Contains(el))
+                    bridge._knownNodes.Add(el);
             }
         }
 
@@ -668,12 +668,12 @@ public sealed partial class DomBridge
         var publicId = a[1].ToString();
         var systemId = a[2].ToString();
         ValidateElementName(qualifiedName, _jsContext!);
-        var dt = new DomElement("#doctype", null, null, string.Empty);
-        dt.DomProperties["name"] = qualifiedName;
-        dt.DomProperties["publicId"] = publicId;
-        dt.DomProperties["systemId"] = systemId;
-        dt.DomProperties["internalSubset"] = null;
-        _elements.Add(dt);
+        var dt = new DomElement(_document, "#doctype", null, null, string.Empty);
+        GetElementRuntimeState(dt).DocumentType.Name.Set(qualifiedName);
+        GetElementRuntimeState(dt).DocumentType.PublicId.Set(publicId);
+        GetElementRuntimeState(dt).DocumentType.SystemId.Set(systemId);
+        GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
+        _knownNodes.Add(dt);
         return ToJSObject(dt);
     }
 
@@ -685,9 +685,9 @@ public sealed partial class DomBridge
         var doctypeArg = a.Length > 2 ? a[2] : null;
         if (!string.IsNullOrEmpty(qName))
             ValidateQualifiedName(qName, ns, _jsContext!);
-        var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
-        subDocRoot.DomProperties["_hasViewport"] = false;
-        _elements.Add(subDocRoot);
+        var subDocRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
+        _knownNodes.Add(subDocRoot);
         if (doctypeArg is JSObject dtObj)
         {
             foreach (var kvp in _jsObjectCache)
@@ -705,13 +705,13 @@ public sealed partial class DomBridge
 
         if (!string.IsNullOrEmpty(qName))
         {
-            var docEl = new DomElement(qName, null, null, string.Empty);
+            var docEl = new DomElement(_document, qName, null, null, string.Empty);
             if (!string.IsNullOrEmpty(ns))
                 docEl.NamespaceURI = ns;
             docEl.Parent = subDocRoot;
             docEl.OwnerDocRoot = subDocRoot;
             subDocRoot.Children.Add(docEl);
-            _elements.Add(docEl);
+            _knownNodes.Add(docEl);
         }
 
         return BuildSubDocument(subDocRoot);
@@ -721,49 +721,49 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsCreateHTMLDocument050Core(in Arguments a)
     {
         var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
-        var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
-        subDocRoot.DomProperties["_hasViewport"] = false;
-        _elements.Add(subDocRoot);
-        var dt = new DomElement("#doctype", null, null, string.Empty);
-        dt.DomProperties["name"] = "html";
-        dt.DomProperties["publicId"] = string.Empty;
-        dt.DomProperties["systemId"] = string.Empty;
-        dt.DomProperties["internalSubset"] = null;
+        var subDocRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
+        _knownNodes.Add(subDocRoot);
+        var dt = new DomElement(_document, "#doctype", null, null, string.Empty);
+        GetElementRuntimeState(dt).DocumentType.Name.Set("html");
+        GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
+        GetElementRuntimeState(dt).DocumentType.SystemId.Set(string.Empty);
+        GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
         dt.Parent = subDocRoot;
         dt.OwnerDocRoot = subDocRoot;
         subDocRoot.Children.Add(dt);
-        _elements.Add(dt);
-        var subHtml = new DomElement("html", null, null, string.Empty);
+        _knownNodes.Add(dt);
+        var subHtml = new DomElement(_document, "html", null, null, string.Empty);
         subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
         subHtml.Parent = subDocRoot;
         subHtml.OwnerDocRoot = subDocRoot;
         subDocRoot.Children.Add(subHtml);
-        _elements.Add(subHtml);
-        var subHead = new DomElement("head", null, null, string.Empty);
+        _knownNodes.Add(subHtml);
+        var subHead = new DomElement(_document, "head", null, null, string.Empty);
         subHead.Parent = subHtml;
         subHead.OwnerDocRoot = subDocRoot;
         subHtml.Children.Add(subHead);
-        _elements.Add(subHead);
+        _knownNodes.Add(subHead);
         if (subTitle != null)
         {
-            var subTitleEl = new DomElement("title", null, null, string.Empty);
+            var subTitleEl = new DomElement(_document, "title", null, null, string.Empty);
             subTitleEl.Parent = subHead;
             subTitleEl.OwnerDocRoot = subDocRoot;
             subHead.Children.Add(subTitleEl);
-            _elements.Add(subTitleEl);
-            var subTitleText = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+            _knownNodes.Add(subTitleEl);
+            var subTitleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             subTitleText.TextContent = subTitle;
             subTitleText.Parent = subTitleEl;
             subTitleText.OwnerDocRoot = subDocRoot;
             subTitleEl.Children.Add(subTitleText);
-            _elements.Add(subTitleText);
+            _knownNodes.Add(subTitleText);
         }
 
-        var subBody = new DomElement("body", null, null, string.Empty);
+        var subBody = new DomElement(_document, "body", null, null, string.Empty);
         subBody.Parent = subHtml;
         subBody.OwnerDocRoot = subDocRoot;
         subHtml.Children.Add(subBody);
-        _elements.Add(subBody);
+        _knownNodes.Add(subBody);
         return BuildSubDocument(subDocRoot);
     }
 

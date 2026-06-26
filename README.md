@@ -43,8 +43,10 @@ Broiler is a lightweight, extensible web browser for Windows built entirely in m
 | Component | Description |
 |-----------|-------------|
 | `Broiler.App` | WPF application entry point and main window |
+| `Broiler.Dom` | Dependency-free canonical DOM tree and mutation kernel |
+| `Broiler.Dom.Html` | Shared HTML tokenizer, canonical tree builder, fragment parser, and serializer |
 | `Broiler.HtmlBridge` | Bridge component connecting HTML rendering with JavaScript execution (DomBridge, ScriptEngine, shared utilities) |
-| `Broiler.HTML.Dom` | Shared HTML parsing and DOM utilities (WHATWG tokenizer, serialization) |
+| `Broiler.HTML.Dom` | Renderer-facing CSS box construction and legacy rendering utilities |
 | `Broiler.HTML` | Cross-platform HTML/CSS parsing and rendering engine |
 | `Broiler.JavaScript` | JavaScript engine with ES2020+ support |
 
@@ -94,6 +96,8 @@ See the [HTML & JS Engine Roadmap](docs/roadmap/html-js-engine.md) for details.
 For the cross-engine standards/performance baseline and PR dashboard, see the
 [Engines M0 baseline](docs/roadmap/engines-m0-baseline.md) and the
 [HtmlBridge engine boundary map](docs/architecture/htmlbridge-engine-boundaries.md).
+The canonical, engine-neutral document tree and its bridge migration are
+tracked in the [Broiler DOM Component Plan](docs/roadmap/broiler-dom-component.md).
 
 ### Development Console & Development Site
 
@@ -319,7 +323,7 @@ PageContent (HTML + Scripts)
 ┌────────────────────────────────────────┐
 │         Broiler.HtmlBridge             │
 │  ┌──────────┐   ┌──────────────────┐  │
-│  │DomBridge │──▶│ HtmlTreeBuilder  │  │  Parses HTML → DomElement tree
+│  │DomBridge │──▶│ HtmlTreeBuilder  │  │  Parses HTML → canonical DomDocument
 │  └──────────┘   └──────────────────┘  │
 │  ┌──────────┐   ┌──────────────────┐  │
 │  │Script    │──▶│ JSContext         │  │  Executes scripts with DOM
@@ -343,7 +347,7 @@ Broiler.HTML.Dom (shared layer)
        │    (HtmlParser → CssBox tree → layout → paint)
        │
        └──▶ Broiler.HtmlBridge
-            (HtmlTreeBuilder → DomElement tree → JS bridge)
+            (HtmlTreeBuilder → Broiler.Dom tree → JS bridge)
 ```
 
 | Shared Component | Location | Used By |

@@ -30,6 +30,8 @@ public interface IDomBridgeRuntime
     void FlushTimers();
 
     string SerializeToHtml();
+
+    Broiler.Dom.DomDocument GetRenderDocument();
 }
 
 /// <summary>

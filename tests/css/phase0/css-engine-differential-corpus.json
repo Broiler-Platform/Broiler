@@ -1,0 +1,54 @@
+[
+  {
+    "id": "shorthand-and-value-normalization",
+    "css": ".card { margin: 1px 2px; color: RED; }",
+    "selector": ".card",
+    "elementClass": "card",
+    "rendererProperties": {
+      "margin-top": "1px",
+      "margin-right": "2px",
+      "margin-bottom": "1px",
+      "margin-left": "2px",
+      "color": "red"
+    },
+    "bridgeProperties": {
+      "margin": "1px 2px",
+      "color": "RED"
+    },
+    "rendererFontFaceCount": 0,
+    "rendererKeyframeCount": 0,
+    "intentionalDifference": "The renderer expands shorthands and lowercases keyword values during parsing; the bridge preserves the raw shorthand and value spelling."
+  },
+  {
+    "id": "data-uri-semicolon",
+    "css": ".asset { background-image: url(data:image/png;base64,AAAA); width: 10px; }",
+    "selector": ".asset",
+    "elementClass": "asset",
+    "rendererProperties": {
+      "background-image": "data:image/png;base64,AAAA",
+      "width": "10px"
+    },
+    "bridgeProperties": {
+      "background-image": "url(data:image/png;base64,AAAA)",
+      "width": "10px"
+    },
+    "rendererFontFaceCount": 0,
+    "rendererKeyframeCount": 0,
+    "intentionalDifference": "Both parsers recover the semicolon inside the data URL, but the renderer stores the URL payload without the url(...) wrapper while the bridge preserves it."
+  },
+  {
+    "id": "renderer-at-rule-metadata",
+    "css": "@font-face { font-family: 'Phase Zero'; src: url(phase-zero.woff2); } @keyframes pulse { from { opacity: 0; } to { opacity: 1; } } .animated { opacity: .5; }",
+    "selector": ".animated",
+    "elementClass": "animated",
+    "rendererProperties": {
+      "opacity": ".5"
+    },
+    "bridgeProperties": {
+      "opacity": ".5"
+    },
+    "rendererFontFaceCount": 1,
+    "rendererKeyframeCount": 1,
+    "intentionalDifference": "The renderer parser stores font-face and keyframe metadata; the bridge style-rule cache strips those at-rules and exposes them through a separate CSSOM parser."
+  }
+]
