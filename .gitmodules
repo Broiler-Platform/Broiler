@@ -13,6 +13,8 @@
 [submodule "Broiler.CSS"]
 	path = Broiler.CSS
 	url = https://github.com/MaiRat/Broiler.CSS.git
+	branch = main
 [submodule "Broiler.DOM"]
 	path = Broiler.DOM
 	url = https://github.com/MaiRat/Broiler.DOM.git
+	branch = main
