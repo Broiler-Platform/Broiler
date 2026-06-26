@@ -1,6 +1,8 @@
 
 using Broiler.HTML.Dom;
+using Broiler.Layout;
 
+using HtmlTag = Broiler.Layout.HtmlTag;
 namespace Broiler.DevConsole.Tests;
 
 public class DomQueryHelperTests

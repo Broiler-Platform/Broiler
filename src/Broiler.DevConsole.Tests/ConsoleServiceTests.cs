@@ -1,6 +1,8 @@
 using Broiler.HTML.Dom;
+using Broiler.Layout;
 using Broiler.HtmlBridge;
 
+using HtmlTag = Broiler.Layout.HtmlTag;
 namespace Broiler.DevConsole.Tests;
 
 public class ConsoleServiceTests : IDisposable

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.Layout</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>CSS box-model and layout engine over the canonical Broiler DOM and computed style, independent of any graphics backend.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj" />
+    <ProjectReference Include="..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj" />
+    <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
+  </ItemGroup>
+
+  <!-- The relocated layout types (CssBox, CssBoxProperties, …) are internal; expose them to
+       the renderer assembly that still owns them (Broiler.HTML.Dom) and to the consumers that
+       reach them via InternalsVisibleTo, mirroring the old Broiler.HTML.Dom IVT set. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.HTML.Dom" />
+    <InternalsVisibleTo Include="Broiler.HTML" />
+    <InternalsVisibleTo Include="Broiler.HTML.Core" />
+    <InternalsVisibleTo Include="Broiler.HTML.CSS" />
+    <InternalsVisibleTo Include="Broiler.HTML.Orchestration" />
+    <InternalsVisibleTo Include="Broiler.HTML.Image" />
+    <InternalsVisibleTo Include="Broiler.HTML.Image.Compat" />
+    <InternalsVisibleTo Include="Broiler.HTML.Image.Tests" />
+    <InternalsVisibleTo Include="Broiler.HTML.WPF" />
+    <InternalsVisibleTo Include="Broiler" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge" />
+    <InternalsVisibleTo Include="Broiler.HtmlBridge.Dom" />
+    <InternalsVisibleTo Include="Broiler.Cli" />
+    <InternalsVisibleTo Include="Broiler.Cli.Tests" />
+    <InternalsVisibleTo Include="Broiler.DevConsole" />
+    <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
+  </ItemGroup>
+
+</Project>
