@@ -72,7 +72,9 @@ internal sealed class ElementRuntimeState
         Shadow.Host.CopyTo(target.Shadow.Host);
         Shadow.Mode.CopyTo(target.Shadow.Mode);
         StyleSheet.FetchedCss.CopyTo(target.StyleSheet.FetchedCss);
-        StyleSheet.InsertedRules.CopyTo(target.StyleSheet.InsertedRules);
+        target.StyleSheet.Rules = StyleSheet.Rules is null ? null : [.. StyleSheet.Rules];
+        target.StyleSheet.RulesSourceText = StyleSheet.RulesSourceText;
+        target.StyleSheet.RulesMutated = StyleSheet.RulesMutated;
         Document.HasViewport.CopyTo(target.Document.HasViewport);
         Animation.CurrentTimeMilliseconds.CopyTo(target.Animation.CurrentTimeMilliseconds);
         DocumentType.Name.CopyTo(target.DocumentType.Name);
@@ -121,7 +123,31 @@ internal sealed class ShadowRuntimeState
 internal sealed class StyleSheetRuntimeState
 {
     public RuntimeValue<string> FetchedCss { get; } = new();
-    public RuntimeValue<object> InsertedRules { get; } = new();
+
+    /// <summary>
+    /// The live, mutable CSSOM rule list backing this style element's stylesheet —
+    /// the single source of truth shared by the CSSOM (<c>cssRules</c>/<c>insertRule</c>/
+    /// <c>deleteRule</c>), the renderer/legacy-cascade text, and the
+    /// <c>getComputedStyle</c> engine sheet (Phase 6 store unification). <c>null</c>
+    /// until first materialized from <see cref="RulesSourceText"/>.
+    /// </summary>
+    public List<Broiler.CSS.CssRule>? Rules { get; set; }
+
+    /// <summary>
+    /// The source text <see cref="Rules"/> was last parsed from. When the element's
+    /// current source text differs (e.g. <c>textContent</c> was replaced), the rules
+    /// are reparsed — discarding any <c>insertRule</c>/<c>deleteRule</c> mutations,
+    /// per CSSOM semantics.
+    /// </summary>
+    public string? RulesSourceText { get; set; }
+
+    /// <summary>
+    /// <c>true</c> once <c>insertRule</c>/<c>deleteRule</c> has mutated <see cref="Rules"/>
+    /// away from the parsed source. While <c>false</c>, the renderer text is the raw
+    /// author source (byte-identical to pre-Phase-6); once <c>true</c>, the renderer
+    /// text is serialized from the model so the mutation is observed downstream.
+    /// </summary>
+    public bool RulesMutated { get; set; }
 }
 
 internal sealed class DocumentRuntimeState

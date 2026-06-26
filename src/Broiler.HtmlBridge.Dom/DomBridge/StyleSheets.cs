@@ -89,31 +89,13 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // Internal rules storage for this stylesheet — backed by shared
-        // Broiler.CSS model objects (Phase 6), not serialized rule strings.
-        var rulesStorage = new List<Broiler.CSS.CssRule>();
-        // Parse initial rules from the style element's text content
-        var initialText = CollectStyleElementText(styleElement);
-        if (!string.IsNullOrWhiteSpace(initialText))
-            rulesStorage.AddRange(new Broiler.CSS.CssParser().ParseStyleSheet(initialText).Rules);
-
-        // Track last known text content to detect changes
-        var lastTextHash = initialText ?? string.Empty;
-
-        // Ensure rulesStorage is up-to-date with text content
-        void EnsureRulesUpToDate()
-        {
-            var currentText = CollectStyleElementText(styleElement);
-            var currentHash = currentText ?? string.Empty;
-            if (currentHash == lastTextHash)
-                return;
-
-            rulesStorage.Clear();
-            if (!string.IsNullOrWhiteSpace(currentText))
-                rulesStorage.AddRange(new Broiler.CSS.CssParser().ParseStyleSheet(currentText).Rules);
-
-            lastTextHash = currentHash;
-        }
+        // Internal rules storage for this stylesheet — the single shared, mutable
+        // Broiler.CSS rule model held in the element's runtime state (Phase 6 store
+        // unification). The same list backs the renderer text and the
+        // getComputedStyle engine, so a script insertRule/deleteRule here is observed
+        // by both. CurrentRules() reparses on textContent change before returning it.
+        List<Broiler.CSS.CssRule> CurrentRules() => EnsureStyleSheetRulesCurrent(styleElement);
+        void MarkRulesMutated() => GetElementRuntimeState(styleElement).StyleSheet.RulesMutated = true;
 
         // Live cssRules object — single instance that always reflects current state
         var liveCssRules = new JSObject();
@@ -121,29 +103,29 @@ public sealed partial class DomBridge
         // length is a live getter that always reflects the current rule count
         liveCssRules.FastAddProperty(
             (KeyString)"length",
-            new JSFunction((in Arguments _) => JsStyleSheetsGetLength002Core(EnsureRulesUpToDate, rulesStorage, in _), "get length"),
+            new JSFunction((in Arguments _) => JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         liveCssRules.FastAddValue(
             (KeyString)"item",
-            new JSFunction((in Arguments a) => JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, rulesStorage, in a), "item", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // Syncs indexed properties on the live cssRules object with rulesStorage
+        // Syncs indexed properties on the live cssRules object with the shared model
         void SyncLiveCssRulesIndices()
         {
-            EnsureRulesUpToDate();
-            for (var i = 0; i < rulesStorage.Count; i++)
+            var rules = CurrentRules();
+            for (var i = 0; i < rules.Count; i++)
             {
-                var ruleObj = BuildCssRuleObject(rulesStorage[i], sheet);
+                var ruleObj = BuildCssRuleObject(rules[i], sheet);
                 liveCssRules[(uint)i] = ruleObj;
             }
 
-            for (var i = rulesStorage.Count; i < lastSyncedRuleCount; i++)
+            for (var i = rules.Count; i < lastSyncedRuleCount; i++)
                 liveCssRules.GetElements().RemoveAt((uint)i);
 
-            lastSyncedRuleCount = rulesStorage.Count;
+            lastSyncedRuleCount = rules.Count;
         }
 
         // cssRules — returns the live collection, syncing indices on access
@@ -153,38 +135,21 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // insertRule(rule, index) — invalidates the text cache so cssRules rebuilds
+        // insertRule(rule, index) — mutates the shared model (marking it mutated so
+        // the renderer/engine serialize from it) and resyncs the live collection
         sheet.FastAddValue(
             (KeyString)"insertRule",
-            new JSFunction((in Arguments a) => JsStyleSheetsInsertRule005Core(EnsureRulesUpToDate, SyncLiveCssRulesIndices, rulesStorage, in a), "insertRule", 2),
+            new JSFunction((in Arguments a) => JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // deleteRule(index) — removes a rule at the given index
+        // deleteRule(index) — removes a rule from the shared model
         sheet.FastAddValue(
             (KeyString)"deleteRule",
-            new JSFunction((in Arguments a) => JsStyleSheetsDeleteRule006Core(EnsureRulesUpToDate, SyncLiveCssRulesIndices, rulesStorage, in a), "deleteRule", 1),
+            new JSFunction((in Arguments a) => JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         _styleSheetCache[styleElement] = sheet;
         return sheet;
-    }
-
-    /// <summary>Collects all text content from a style element's children.</summary>
-    private static string CollectStyleElementText(DomElement styleElement)
-    {
-        var sb = new StringBuilder();
-        foreach (var child in styleElement.Children)
-        {
-            if (child.IsTextNode && child.TextContent != null)
-                sb.Append(child.TextContent);
-        }
-        // Check direct TextContent (set via JS textContent setter, which clears children)
-        if (sb.Length == 0 && !string.IsNullOrEmpty(styleElement.TextContent))
-            sb.Append(styleElement.TextContent);
-        // Also check InnerHtml as fallback
-        if (sb.Length == 0 && !string.IsNullOrEmpty(styleElement.InnerHtml))
-            sb.Append(styleElement.InnerHtml);
-        return sb.ToString();
     }
 
     /// <summary>Parses CSS text into individual rule strings.</summary>
@@ -238,6 +203,37 @@ public sealed partial class DomBridge
 
         return cssRuleList;
     }
+
+    /// <summary>
+    /// Builds the nested rule objects for an at-rule wrapper — from the model
+    /// (<paramref name="nestedModelRules"/>) when available, otherwise by parsing
+    /// <paramref name="nestedCss"/>. The model path avoids the serialize→reparse
+    /// round-trip for initial construction (Phase 6); nested <c>insertRule</c> still
+    /// feeds strings through the list factory, which is correct (JS supplies text).
+    /// </summary>
+    private static List<JSObject> BuildNestedRuleObjects(
+        string nestedCss,
+        IReadOnlyList<Broiler.CSS.CssRule>? nestedModelRules,
+        JSObject parentStyleSheet,
+        JSObject parentRule) =>
+        (nestedModelRules is not null
+            ? nestedModelRules.Select(rule => BuildCssRuleObject(rule, parentStyleSheet, parentRule))
+            : ParseCssRuleStrings(nestedCss).Select(rule => BuildCssRuleObject(rule, parentStyleSheet, parentRule)))
+        .ToList();
+
+    /// <summary>Keyframe-rule variant of <see cref="BuildNestedRuleObjects"/>.</summary>
+    private static List<JSObject> BuildNestedKeyframeObjects(
+        string nestedCss,
+        IReadOnlyList<Broiler.CSS.CssRule>? nestedModelRules,
+        JSObject parentStyleSheet,
+        JSObject parentRule) =>
+        (nestedModelRules is not null
+            ? nestedModelRules.Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, parentRule))
+            : ParseCssRuleStrings(nestedCss).Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, parentRule)))
+        .ToList();
+
+    private static JSObject BuildCssKeyframeRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject parentRule) =>
+        BuildCssKeyframeRuleObject(Broiler.CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
 
     private static JSObject BuildCssKeyframeRuleObject(string ruleText, JSObject parentStyleSheet, JSObject parentRule)
     {
@@ -299,9 +295,19 @@ public sealed partial class DomBridge
     /// identical while the CSSOM's rule storage is the model, not strings.
     /// </summary>
     private static JSObject BuildCssRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject? parentRule = null) =>
-        BuildCssRuleObject(Broiler.CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+        BuildCssRuleObject(
+            Broiler.CSS.CssSerializer.Serialize(rule),
+            parentStyleSheet,
+            parentRule,
+            // Drive the nested @media/@keyframes/@supports/@layer rule objects from the
+            // model (CssAtRule.Rules) instead of re-parsing serialized text, when the
+            // rule actually has nested rules. Gating on Count > 0 keeps declaration-bodied
+            // at-rules and empty blocks on the string path (Phase 6 tail).
+            rule is Broiler.CSS.CssAtRule { Declarations: null, HasBlock: true, Rules.Count: > 0 } atRule
+                ? atRule.Rules
+                : null);
 
-    private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
+    private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null, IReadOnlyList<Broiler.CSS.CssRule>? nestedModelRules = null)
     {
         var ruleObj = new JSObject();
         ruleObj.FastAddProperty(
@@ -379,9 +385,7 @@ public sealed partial class DomBridge
             {
                 var mediaText = ruleText.Substring(6, braceOpen - 6).Trim();
                 var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
-                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
-                    .ToList();
+                var nestedRuleObjects = BuildNestedRuleObjects(nestedCss, nestedModelRules, parentStyleSheet, ruleObj);
                 var nestedCssRules = BuildCssRuleListObject(
                     nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
@@ -427,9 +431,7 @@ public sealed partial class DomBridge
             {
                 var name = ruleText.Substring(10, braceOpen - 10).Trim().Trim('"', '\'');
                 var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
-                    .Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj))
-                    .ToList();
+                var nestedRuleObjects = BuildNestedKeyframeObjects(nestedCss, nestedModelRules, parentStyleSheet, ruleObj);
                 var nestedCssRules = BuildCssRuleListObject(
                     nestedRuleObjects,
                     rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj));
@@ -531,9 +533,7 @@ public sealed partial class DomBridge
             {
                 var conditionText = ruleText.Substring(9, braceOpen - 9).Trim();
                 var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
-                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
-                    .ToList();
+                var nestedRuleObjects = BuildNestedRuleObjects(nestedCss, nestedModelRules, parentStyleSheet, ruleObj);
                 var nestedCssRules = BuildCssRuleListObject(
                     nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
@@ -559,9 +559,7 @@ public sealed partial class DomBridge
             {
                 var nameText = ruleText.Substring(6, braceOpen - 6).Trim();
                 var nestedCss = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
-                var nestedRuleObjects = ParseCssRuleStrings(nestedCss)
-                    .Select(rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj))
-                    .ToList();
+                var nestedRuleObjects = BuildNestedRuleObjects(nestedCss, nestedModelRules, parentStyleSheet, ruleObj);
                 var nestedCssRules = BuildCssRuleListObject(
                     nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));

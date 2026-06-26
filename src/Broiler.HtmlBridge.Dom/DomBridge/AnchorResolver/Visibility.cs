@@ -102,7 +102,7 @@ public sealed partial class DomBridge
         foreach (var el in Elements)
         {
             if (el.IsTextNode) continue;
-            foreach (var (sel, _, decls) in CssRules)
+            foreach (var (sel, _, decls) in EnumerateScopedStyleRules(el))
             {
                 if (MatchesSelector(el, sel) &&
                     decls.TryGetValue("anchor-name", out var name) &&
