@@ -8,6 +8,9 @@ name: Build & Test
 # preview targets the Broiler-owned Win32/Direct2D stack — no external UI
 # dependency. See docs/roadmap/public-preview-roadmap.md.
 
+on:
+  workflow_dispatch:
+  
 permissions:
   contents: read
 
