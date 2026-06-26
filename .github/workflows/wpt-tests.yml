@@ -1,5 +1,20 @@
 name: WPT Tests
+
+# Two entry points:
+#   * Scheduled per-segment matrix (weekly) — the standing coverage signal for
+#     the public-preview roadmap. Each segment is gated against a committed
+#     baseline so CI alarms on *regressions*, not on the absolute backlog of
+#     skipped/failing tests.
+#   * Manual single-subset run (workflow_dispatch) — for targeted investigation.
+#
+# Reference-image generation (Chromium via Playwright) is expensive, so the
+# matrix runs weekly and caches both the WPT checkout and the generated
+# references. Bump CACHE_EPOCH to force a refresh of WPT master and references.
+
 on:
+  schedule:
+    # Weekly, Sunday 03:00 UTC.
+    - cron: '0 3 * * 0'
   workflow_dispatch:
     inputs:
       subset:
@@ -8,17 +23,117 @@ on:
           Examples: "css/css-flexbox", "css/CSS2;css/css-*", leave empty for all.
         required: false
         default: ''
+
 permissions:
   contents: read
+
+env:
+  # Bump to invalidate the cached WPT checkout + references.
+  CACHE_EPOCH: '1'
+
 jobs:
-  wpt:
+  # ── Scheduled per-segment coverage matrix ────────────────────────────────
+  matrix:
+    name: WPT ${{ matrix.segment.id }}
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # The "gated" coverage set for the preview. Add segments here as their
+        # references land and (for testharness segments like dom/html) as the
+        # harness-reporting work in Phase 1 makes their results meaningful.
+        segment:
+          - { id: css-css2,    pattern: 'css/CSS2' }
+          - { id: css-flexbox, pattern: 'css/css-flexbox' }
+          - { id: css-text,    pattern: 'css/css-text' }
+          - { id: css-selectors, pattern: 'css/selectors' }
+          # testharness-heavy segments: scaffolded now, meaningful once the
+          # testharness result-reporting work (roadmap task 1.1) lands.
+          - { id: dom,         pattern: 'dom' }
+          - { id: html-parsing, pattern: 'html/syntax' }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache WPT checkout
+        uses: actions/cache@v4
+        with:
+          path: tests/wpt/checkout
+          key: wpt-checkout-${{ env.CACHE_EPOCH }}-${{ matrix.segment.id }}
+
+      - name: Cache reference images
+        uses: actions/cache@v4
+        with:
+          path: tests/wpt/references
+          key: wpt-refs-${{ env.CACHE_EPOCH }}-${{ matrix.segment.id }}
+
+      - name: Run WPT segment
+        id: wpt
+        run: |
+          EXIT=0
+          bash scripts/run-wpt-tests.sh --subset "${{ matrix.segment.pattern }}" || EXIT=$?
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+
+      - name: Regression gate
+        run: |
+          bash scripts/check-wpt-regression.sh \
+            --results tests/wpt-results/wpt-results.json \
+            --baseline "tests/wpt-baseline/${{ matrix.segment.id }}.json"
+
+      - name: Print summary
+        if: always()
+        run: |
+          SUMMARY="tests/wpt-results/wpt-summary.txt"
+          if [ -f "$SUMMARY" ]; then
+            echo "### WPT ${{ matrix.segment.id }} (${{ matrix.segment.pattern }})" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          TRIAGE="tests/wpt-results/wpt-triage-summary.md"
+          if [ -f "$TRIAGE" ]; then
+            cat "$TRIAGE" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wpt-results-${{ matrix.segment.id }}
+          path: |
+            tests/wpt-results/wpt-results.log
+            tests/wpt-results/wpt-summary.txt
+            tests/wpt-results/wpt-root-cause-analysis.txt
+            tests/wpt-results/wpt-results.json
+            tests/wpt-results/wpt-triage-summary.md
+
+  # ── Manual single-subset run ─────────────────────────────────────────────
+  manual:
+    name: WPT manual subset
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -33,8 +148,6 @@ jobs:
           EXIT=0
           bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
           echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
-          # Allow the step to succeed so artifacts are uploaded,
-          # but record the exit code for the final check step.
 
       - name: Print summary
         if: always()
