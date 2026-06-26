@@ -23,7 +23,7 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static readonly Regex ImportantSuffixPattern = new(@"\s*!\s*important\s*$",
+    private static readonly System.Text.RegularExpressions.Regex ImportantSuffixPattern = new(@"\s*!\s*important\s*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly HashSet<string> CssStyleDeclarationNonCssNames = new(StringComparer.Ordinal)
     {
@@ -238,7 +238,7 @@ public sealed partial class DomBridge
         {
             var decoded = Uri.UnescapeDataString(payload);
             // Strip whitespace (RFC 2045 allows folding)
-            decoded = Regex.Replace(decoded, @"\s", string.Empty);
+            decoded = System.Text.RegularExpressions.Regex.Replace(decoded, @"\s", string.Empty);
             try
             {
                 var bytes = Convert.FromBase64String(decoded);
@@ -1173,7 +1173,7 @@ public sealed partial class DomBridge
     /// such as U+212A (Kelvin sign).
     /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
     /// </summary>
-    private static readonly Regex ValidXmlNamePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex ValidXmlNamePattern = new(
         @"^[\p{L}_][\p{L}\p{N}_.\-]*$",
         RegexOptions.Compiled);
 
@@ -1182,7 +1182,7 @@ public sealed partial class DomBridge
     /// where both prefix and localName are valid XML names (no colons).
     /// Uses Unicode categories per XML 1.0 §2.3.
     /// </summary>
-    private static readonly Regex ValidXmlQualifiedNamePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePattern = new(
         @"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$",
         RegexOptions.Compiled);
 

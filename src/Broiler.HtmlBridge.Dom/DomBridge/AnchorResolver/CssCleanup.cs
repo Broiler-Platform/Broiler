@@ -32,13 +32,13 @@ public sealed partial class DomBridge
         foreach (var child in root.Children)
             NeutralizeStyleElementsForAnchorRules(child);
     }
-    private static readonly Regex CssRuleBlockPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex CssRuleBlockPattern = new(
         @"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}",
         RegexOptions.Compiled);
     /// <summary>
     /// Matches <c>@position-try</c> at-rules (with their full block).
     /// </summary>
-    private static readonly Regex PositionTryAtRulePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex PositionTryAtRulePattern = new(
         @"@position-try\s+[^{]+\{[^}]*\}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     /// <summary>

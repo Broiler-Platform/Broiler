@@ -12,7 +12,7 @@ public sealed partial class DomBridge
     // @position-try parsing and fallback resolution
     // -----------------------------------------------------------------
 
-    private static readonly Regex PositionTryParsePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex PositionTryParsePattern = new(
         @"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     /// <summary>

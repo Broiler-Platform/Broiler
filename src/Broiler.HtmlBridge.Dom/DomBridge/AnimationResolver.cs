@@ -427,11 +427,11 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private static readonly Regex StepsPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex StepsPattern = new(
         @"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)",
         RegexOptions.Compiled);
 
-    private static readonly Regex CubicBezierPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex CubicBezierPattern = new(
         @"cubic-bezier\(\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*\)",
         RegexOptions.Compiled);
 
@@ -624,11 +624,11 @@ public sealed partial class DomBridge
     // Value interpolation
     // -----------------------------------------------------------------
 
-    private static readonly Regex RgbPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex RgbPattern = new(
         @"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly Regex RgbaPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex RgbaPattern = new(
         @"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

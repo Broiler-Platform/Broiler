@@ -10,3 +10,9 @@
 	path = Broiler.HTML
 	url = https://github.com/MaiRat/Broiler.HTML.git
 	branch = main
+[submodule "Broiler.CSS"]
+	path = Broiler.CSS
+	url = https://github.com/MaiRat/Broiler.CSS.git
+[submodule "Broiler.DOM"]
+	path = Broiler.DOM
+	url = https://github.com/MaiRat/Broiler.DOM.git

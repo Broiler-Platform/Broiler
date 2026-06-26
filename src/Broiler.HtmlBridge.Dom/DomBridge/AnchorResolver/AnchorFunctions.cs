@@ -12,10 +12,10 @@ public sealed partial class DomBridge
     // anchor() resolution
     // -----------------------------------------------------------------
 
-    private static readonly Regex AnchorFunctionPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex AnchorFunctionPattern = new(
         @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex AnchorSizeFunctionPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex AnchorSizeFunctionPattern = new(
         @"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private void ResolveAnchorFunctions(

@@ -515,7 +515,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = Regex.Replace(
+        element.Attributes[attributeName] = System.Text.RegularExpressions.Regex.Replace(
             value,
             @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
             match => ScaleSvgNumericMatch(match, usedZoom));
@@ -526,7 +526,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = Regex.Replace(
+        element.Attributes[attributeName] = System.Text.RegularExpressions.Regex.Replace(
             value,
             @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
             match => ScaleSvgNumericMatch(match, usedZoom));
@@ -630,7 +630,7 @@ public sealed partial class DomBridge
         if (!specified.TryGetValue("font", out var fontShorthand) || string.IsNullOrWhiteSpace(fontShorthand))
             return false;
 
-        var sizeMatch = Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
+        var sizeMatch = System.Text.RegularExpressions.Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
         if (!sizeMatch.Success ||
             !double.TryParse(sizeMatch.Groups[1].Value,
                 System.Globalization.NumberStyles.Float,

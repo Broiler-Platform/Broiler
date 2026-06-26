@@ -825,7 +825,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(transform))
             return 1;
 
-        var match = Regex.Match(transform, @"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase);
+        var match = System.Text.RegularExpressions.Regex.Match(transform, @"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase);
         if (match.Success &&
             double.TryParse(match.Groups["value"].Value, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out double scale))
@@ -844,7 +844,7 @@ public sealed partial class DomBridge
 
         double translateX = 0;
         double translateY = 0;
-        foreach (Match match in Regex.Matches(
+        foreach (Match match in System.Text.RegularExpressions.Regex.Matches(
                      transform,
                      @"translate\(\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[,\s]+(?<y>[-+]?[0-9]*\.?[0-9]+))?\s*\)",
                      RegexOptions.IgnoreCase))
@@ -1075,7 +1075,7 @@ public sealed partial class DomBridge
             return false;
         }
 
-        var moveMatch = Regex.Match(
+        var moveMatch = System.Text.RegularExpressions.Regex.Match(
             pathData,
             @"[Mm]\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[\s,]+(?<y>[-+]?[0-9]*\.?[0-9]+))",
             RegexOptions.CultureInvariant);

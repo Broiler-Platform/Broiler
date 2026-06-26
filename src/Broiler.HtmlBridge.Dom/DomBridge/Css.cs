@@ -215,11 +215,11 @@ public sealed partial class DomBridge
         public string? InitialValue { get; init; }
     }
 
-    private static readonly Regex StyleTagPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex StyleTagPattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex LengthAttrFunctionPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex LengthAttrFunctionPattern = new(
         @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 

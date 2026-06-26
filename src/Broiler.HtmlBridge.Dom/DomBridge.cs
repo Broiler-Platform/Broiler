@@ -600,11 +600,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     //  HTML parsing helpers
     // ------------------------------------------------------------------
 
-    private static readonly Regex TitlePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex TitlePattern = new(
         @"<title[^>]*>(?<content>[\s\S]*?)</title>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex OpenTagPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex OpenTagPattern = new(
         @"<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b(?<attrs>[^>]*)\/?>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -619,19 +619,19 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         "link", "meta", "param", "source", "track", "wbr"
     };
 
-    private static readonly Regex IdPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex IdPattern = new(
         @"\bid\s*=\s*[""'](?<id>[^""']+)[""']",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex ClassPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex ClassPattern = new(
         @"\bclass\s*=\s*[""'](?<cls>[^""']+)[""']",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex AttributeSelectorPattern = new(
+    private static readonly System.Text.RegularExpressions.Regex AttributeSelectorPattern = new(
         @"\[(?<name>[a-zA-Z][a-zA-Z0-9_:-]*)(?:(?<op>[~|^$*]?=)(?<value>[""'][^""']*[""']|[^\]]*))?\]",
         RegexOptions.Compiled);
 
-    private static readonly Regex DocTypePattern = new(
+    private static readonly System.Text.RegularExpressions.Regex DocTypePattern = new(
         @"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
