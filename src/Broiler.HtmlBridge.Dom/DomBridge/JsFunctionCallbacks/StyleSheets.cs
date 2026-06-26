@@ -21,14 +21,14 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsStyleSheetsGetLength002Core(global::System.Action ensureRulesUpToDate, global::System.Collections.Generic.List<global::System.String>? rulesStorage, in Arguments _)
+    private JSValue JsStyleSheetsGetLength002Core(global::System.Action ensureRulesUpToDate, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments _)
     {
         ensureRulesUpToDate();
         return new JSNumber(rulesStorage.Count);
     }
 
 
-    private JSValue JsStyleSheetsItem003Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, global::System.Collections.Generic.List<global::System.String>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsItem003Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
     {
         syncLiveCssRulesIndices();
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
@@ -44,20 +44,24 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsInsertRule005Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::System.String>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsInsertRule005Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
     {
         var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
         var dv = a.Length > 1 ? a[1].DoubleValue : rulesStorage.Count;
         var index = double.IsNaN(dv) ? rulesStorage.Count : (int)dv;
         ensureRulesUpToDate();
         index = Math.Clamp(index, 0, rulesStorage.Count);
-        rulesStorage.Insert(index, ruleText);
+        // Route the mutation through the shared model: parse the inserted text
+        // into a CssRule rather than storing the raw string (Phase 6).
+        var parsed = new global::Broiler.CSS.CssParser().ParseStyleSheet(ruleText).Rules;
+        if (parsed.Count > 0)
+            rulesStorage.Insert(index, parsed[0]);
         syncLiveCssRulesIndices();
         return new JSNumber(index);
     }
 
 
-    private JSValue JsStyleSheetsDeleteRule006Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::System.String>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsDeleteRule006Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
     {
         ensureRulesUpToDate();
         if (a.Length > 0)

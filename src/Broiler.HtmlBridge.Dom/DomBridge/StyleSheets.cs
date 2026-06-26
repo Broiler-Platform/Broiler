@@ -89,15 +89,13 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // Internal rules storage for this stylesheet
-        var rulesStorage = new List<string>();
+        // Internal rules storage for this stylesheet — backed by shared
+        // Broiler.CSS model objects (Phase 6), not serialized rule strings.
+        var rulesStorage = new List<Broiler.CSS.CssRule>();
         // Parse initial rules from the style element's text content
         var initialText = CollectStyleElementText(styleElement);
         if (!string.IsNullOrWhiteSpace(initialText))
-        {
-            foreach (var rule in ParseCssRuleStrings(initialText))
-                rulesStorage.Add(rule);
-        }
+            rulesStorage.AddRange(new Broiler.CSS.CssParser().ParseStyleSheet(initialText).Rules);
 
         // Track last known text content to detect changes
         var lastTextHash = initialText ?? string.Empty;
@@ -112,10 +110,7 @@ public sealed partial class DomBridge
 
             rulesStorage.Clear();
             if (!string.IsNullOrWhiteSpace(currentText))
-            {
-                foreach (var rule in ParseCssRuleStrings(currentText))
-                    rulesStorage.Add(rule);
-            }
+                rulesStorage.AddRange(new Broiler.CSS.CssParser().ParseStyleSheet(currentText).Rules);
 
             lastTextHash = currentHash;
         }
@@ -297,6 +292,15 @@ public sealed partial class DomBridge
     /// <c>inherits</c>, <c>initialValue</c>, <c>namespaceURI</c>, <c>cssRules</c>,
     /// and <c>style</c> properties as appropriate.
     /// </summary>
+    /// <summary>
+    /// Builds a CSSRule JSObject from a shared <see cref="Broiler.CSS.CssRule"/>
+    /// model object (Phase 6). Rule detail extraction is shared with the
+    /// string-based builder via deterministic serialization, so behaviour is
+    /// identical while the CSSOM's rule storage is the model, not strings.
+    /// </summary>
+    private static JSObject BuildCssRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject? parentRule = null) =>
+        BuildCssRuleObject(Broiler.CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null)
     {
         var ruleObj = new JSObject();

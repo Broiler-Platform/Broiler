@@ -19,7 +19,7 @@ public sealed class CssExtractionPhaseZeroTests
 {
     private static readonly string[] ExpectedCssProjectReferences =
     [
-        @"..\..\..\src\Broiler.CSS\Broiler.CSS.csproj",
+        @"..\..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj",
         @"..\Broiler.HTML.Core\Broiler.HTML.Core.csproj",
         @"..\Broiler.HTML.Primitives\Broiler.HTML.Primitives.csproj",
         @"..\Broiler.HTML.Utils\Broiler.HTML.Utils.csproj",

@@ -81,13 +81,7 @@ public sealed partial class DomBridge
             !string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             // Collect all CSS + inline properties to find position-try-fallbacks.
-            var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (selector, _, declarations) in CssRules)
-            {
-                if (MatchesSelector(element, selector))
-                    foreach (var kv in declarations)
-                        cssProps[kv.Key] = kv.Value;
-            }
+            var cssProps = CollectMatchedRuleProperties(element);
             foreach (var kv in element.Style)
                 cssProps[kv.Key] = kv.Value;
 
@@ -283,13 +277,7 @@ public sealed partial class DomBridge
         foreach (var child in element.Children)
         {
             if (child.IsTextNode) continue;
-            var childProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(child, sel))
-                    foreach (var kv in decls)
-                        childProps[kv.Key] = kv.Value;
-            }
+            var childProps = CollectMatchedRuleProperties(child);
             foreach (var kv in child.Style)
                 childProps[kv.Key] = kv.Value;
 

@@ -18,14 +18,14 @@ public sealed class CssExtractionPhaseTwoTests
                 "Source",
                 "Broiler.HTML.CSS",
                 "Broiler.HTML.CSS.csproj"),
-            @"..\..\..\src\Broiler.CSS\Broiler.CSS.csproj");
+            @"..\..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj");
         AssertProjectReferences(
             Path.Combine(
                 root,
                 "src",
                 "Broiler.HtmlBridge.Dom",
                 "Broiler.HtmlBridge.Dom.csproj"),
-            @"..\Broiler.CSS\Broiler.CSS.csproj");
+            @"..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj");
     }
 
     [Fact]

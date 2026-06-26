@@ -19,7 +19,7 @@ public sealed class CssExtractionPhaseThreeTests
             .Where(static reference => reference is not null)
             .ToArray();
 
-        Assert.Contains(@"..\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj", references);
+        Assert.Contains(@"..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj", references);
     }
 
     [Fact]
