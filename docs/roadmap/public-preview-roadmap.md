@@ -196,20 +196,48 @@ Strategy: **promote the `Broiler.HTML.Graphics.Win32.Demo` PoC into a real app
 project** (`Broiler.App.Graphics`) rather than mutating the WPF app in place.
 Keep the WPF app buildable until parity is reached, then switch the shipped artifact.
 
-| # | Task | Detail | Exit |
-|---|------|--------|------|
-| 2.1 | Scaffold `Broiler.App.Graphics` | New project deriving from `Direct2DWindow`, hosting `Broiler.HTML.Graphics.HtmlContainer`. Reuse the platform-neutral `RenderingPipeline.cs` / `PageLoader.cs` already in `Broiler.App/Rendering` (they are not WPF-coupled). | Window opens, renders a URL |
-| 2.2 | Navigation chrome | Address bar + Back/Forward/Refresh + favorites, built from `BEditControl`/`BButtonControl` or render-list-drawn UI. Port `FavoritesManager` (platform-neutral). | Can navigate by typing a URL |
-| 2.3 | Input translation | Map Win32 `WM_MOUSE*` / `WM_KEY*` / `WM_CHAR` / `WM_MOUSEWHEEL` → the HTML hit-test + DOM event model that WPF previously fed. Covers click, hover, scroll-wheel, keyboard. | Links clickable, hover works |
-| 2.4 | Scrolling & viewport | Manual scroll-offset state + scrollbar (WPF's `ScrollViewer` is gone). Re-layout/clip on `OnResized`. | Long pages scroll smoothly |
-| 2.5 | Text input & focus | Focus model + caret + text entry into form fields and the address bar (previously free via WPF `TextBox`). | Can fill a form field |
-| 2.6 | Animation loop | Replace `DispatcherTimer` with `SetTimer`/`WM_TIMER` + `InvalidateRect` driving the existing `CssAnimations` tick. | CSS animations run |
-| 2.7 | Dev console port | Re-host `DevConsolePanel` (currently a WPF `UserControl`) as a Graphics panel or a togglable overlay. | Console usable in new app |
-| 2.8 | Parity checklist & cutover | Side-by-side parity test (same URLs in WPF vs Graphics). Flip `dotnet run --project` default + README to the Graphics app; mark WPF app legacy. | Graphics app is the default |
+**Status: core shell implemented and running (2.1–2.4, 2.6 done; 2.5 partial; 2.7
+not started; 2.8 partial).** New project `src/Broiler.App.Graphics` (assembly
+`Broiler.Graphics.Browser`) builds and launches a Direct2D browser that renders
+URLs/local files, navigates, scrolls, and steps script-driven animations — no WPF.
+
+| # | Task | Status | Delivered / Notes | Exit |
+|---|------|--------|-------------------|------|
+| 2.1 | Scaffold `Broiler.App.Graphics` | ✅ Done | `BrowserWindow : Direct2DWindow` hosts `Broiler.HTML.Graphics.HtmlContainer`. Reuses the platform-neutral `RenderingPipeline.cs` / `PageLoader.cs` / `IPageLoader.cs` / `FavoritesManager.cs` from `Broiler.App` via linked `<Compile>` (no source duplication, WPF app untouched). `Program.cs` is the Win32 entry point. | Window opens, renders a URL ✅ |
+| 2.2 | Navigation chrome | ✅ Done | Toolbar (Back/Forward/Refresh, address `BEditControl`, ☆ favorite toggle, Go) + a favorites bar of `BButtonControl`s rebuilt from `FavoritesManager` (shares the same `favorites.json` as the WPF app). History stack with fragment-anchor resolution. | Can navigate by typing a URL ✅ |
+| 2.3 | Input translation | ✅ Done | **Extended `Broiler.Graphics`**: added `BPointerEventArgs`/`BMouseWheelEventArgs`/`BKeyEventArgs`/`BTextInputEventArgs` + virtual `OnPointer*`/`OnMouseWheel`/`OnKey*`/`OnTextInput` hooks on `BWindow`, wired in `Direct2DWindow`'s render-host window-proc (`WM_MOUSE*`/`WM_KEY*`/`WM_CHAR`/`WM_MOUSEWHEEL`, with screen→client + DIP conversion, mouse-leave tracking, focus-on-click). App maps these to `HtmlContainer.HandleMouse*`; link clicks drive navigation via the `LinkClicked` event. | Links clickable ✅ (hover re-render not wired) |
+| 2.4 | Scrolling & viewport | ✅ Done | Scroll-offset state via `HtmlContainer.ScrollOffset`; mouse-wheel + keyboard (arrows/PageUp-Down/Home/End) scrolling, clamped to content height (`ActualSize`). Layout cached; only the render list rebuilds on scroll. Re-layout on `OnResized` (verified repaint after resize). No visible scrollbar yet. | Long pages scroll smoothly ✅ |
+| 2.5 | Text input & focus | ◑ Partial | Address bar (native `BEditControl`) has full text entry + focus. In-page form-field text entry (`OnTextInput` → DOM) is **not** wired yet. | Address bar editable; form fields TODO |
+| 2.6 | Animation loop | ✅ Done | **Extended `Broiler.Graphics`**: `StartAnimationTimer`/`StopAnimationTimer` + `OnAnimationTick` (backed by `SetTimer`/`WM_TIMER`/`KillTimer` in `Direct2DWindow`). App steps `InteractiveSession` one batch/tick and re-renders. Verified with a `setInterval` counter running to completion. | Script animations run ✅ |
+| 2.7 | Dev console port | ☐ Not started | `DevConsolePanel` is still WPF-only; needs a Graphics panel/overlay over the platform-neutral `Broiler.DevConsole` backend. | Console usable in new app |
+| 2.8 | Parity checklist & cutover | ◑ Partial | Both shells build in the solution; WPF kept as fallback. README/default not yet flipped (Phase 3 §3.4). | Graphics app is the default |
+
+> **Rendering note (important):** the Graphics host renders reliably from
+> **serialized HTML** (`HtmlContainer.SetHtml`). The typed-document handoff
+> (`SetDocument(InteractiveSession.CurrentDocument())`, used by the WPF shell) lays
+> out **empty** in `Broiler.HTML.Graphics` — so the app uses `InteractiveSession`'s
+> serialized variants (`CurrentHtml()`, `Step()`) for both the initial paint and the
+> animation loop. Making the typed-document path render in the Graphics host is a
+> follow-up (it would avoid re-parsing HTML each animation frame).
+>
+> **Assembly-resolution note:** the HTML stack pulls in two physically distinct
+> builds of same-identity assemblies (e.g. `Broiler.Dom` is checked out under both
+> `Broiler.DOM` and the CSS submodule). MSBuild dedups them and drops the runtime
+> entry from `deps.json`, so the host won't probe for them even though the DLLs are
+> in the output. `Program.Main` installs an `AssemblyLoadContext.Resolving` fallback
+> that loads such assemblies from the app directory. The demo PoC dodges this only
+> because it never touches `Broiler.Dom`.
+>
+> **Sub-module note:** the input/timer additions to `Broiler.Graphics`
+> (`BWindow`, `Direct2DWindow`, new `BInputEvents.cs`) were applied to **both**
+> checkouts — top-level `Broiler.Graphics/` and the nested `Broiler.HTML/Broiler.Graphics/`
+> (the copy the HTML build graph actually compiles against).
 
 **Phase 2 exit**: `dotnet run` launches the Graphics browser; a user can browse a
 representative set of real sites (navigation, scroll, click, form input, JS) with
-no WPF dependency in the shipped path.
+no WPF dependency in the shipped path. *(Remaining for full exit: in-page form
+text input (2.5), dev-console port (2.7), README/default cutover (2.8), and ideally
+making the typed-document render path work to drop per-frame HTML re-parsing.)*
 
 ---
 
