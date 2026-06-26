@@ -1,4 +1,5 @@
 using Broiler.HTML.Dom;
+using Broiler.Layout;
 using Broiler.HTML.Dom.Utils;
 using Broiler.HTML.Image;
 using System.Drawing;

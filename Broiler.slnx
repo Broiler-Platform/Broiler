@@ -9,6 +9,9 @@
     <Project Path="Broiler.CSS/Broiler.CSS/Broiler.CSS.csproj" />
     <Project Path="Broiler.CSS/Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj" />
   </Folder>
+  <Folder Name="/Dependencies/Layout/">
+    <Project Path="Broiler.Layout/Broiler.Layout/Broiler.Layout.csproj" />
+  </Folder>
   <Folder Name="/Dependencies/HTML/">
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Adapters/Broiler.HTML.Adapters.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Core/Broiler.HTML.Core.csproj" />
