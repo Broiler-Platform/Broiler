@@ -1,12 +1,12 @@
 using System.Text.RegularExpressions;
 using Broiler.HtmlBridge;
-using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Broiler.HTML.Core.Entities;
 
 namespace Broiler.Wpt;
 
