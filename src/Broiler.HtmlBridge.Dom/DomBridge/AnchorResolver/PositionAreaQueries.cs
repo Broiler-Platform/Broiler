@@ -28,13 +28,7 @@ public sealed partial class DomBridge
             return (resolvedLeft, resolvedTop, resolvedWidth, resolvedHeight);
 
         // Resolve on-the-fly from CSS properties and inline styles.
-        var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (selector, _, declarations) in CssRules)
-        {
-            if (MatchesSelector(element, selector))
-                foreach (var kv in declarations)
-                    cssProps[kv.Key] = kv.Value;
-        }
+        var cssProps = CollectMatchedRuleProperties(element);
         foreach (var kv in element.Style)
             cssProps[kv.Key] = kv.Value;
 

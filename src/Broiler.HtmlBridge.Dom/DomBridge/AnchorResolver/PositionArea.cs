@@ -26,13 +26,7 @@ public sealed partial class DomBridge
     {
         if (!element.IsTextNode)
         {
-            var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (selector, _, declarations) in CssRules)
-            {
-                if (MatchesSelector(element, selector))
-                    foreach (var kv in declarations)
-                        cssProps[kv.Key] = kv.Value;
-            }
+            var cssProps = CollectMatchedRuleProperties(element);
             foreach (var kv in element.Style)
                 cssProps[kv.Key] = kv.Value;
 

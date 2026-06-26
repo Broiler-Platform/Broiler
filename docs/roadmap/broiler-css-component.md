@@ -739,8 +739,12 @@ warnings remain.
 ### Phase 4 - Extract cascade and computed style
 
 **Status:** In progress. The shared cascade/computed-style engine is implemented
-in `Broiler.CSS.Dom` (2026-06-26); the bridge `getComputedStyle()` cutover and
-the anchor/animation `CssRules`-tuple migration remain.
+in `Broiler.CSS.Dom` (2026-06-26). The bridge `getComputedStyle()` cutover is
+**done** (2026-06-26): the engine gained per-declaration value validation / error
+recovery and `UseSharedComputedStyleEngine` is now on. The anchor/animation
+`CssRules`-tuple migration is **partly done** — `AnimationResolver` uses no tuples,
+and the six per-element declared-value anchor collectors now use the shared engine;
+four global rule-scan sites plus `GetComputedProps` internals still read the tuple.
 
 Deliverables:
 
@@ -820,6 +824,91 @@ extraction, selector, cascade, and computed-style guard suite in
 canonical-DOM integration failures (the same Phase 3 baseline), confirming the
 additive engine introduces no regressions.
 
+#### Phase 4 cutover slice — `getComputedStyle()` dual-run wiring (2026-06-26)
+
+The bridge now resolves `getComputedStyle()` (and pseudo-element serialization
+styles) through the shared `CssStyleEngine`:
+
+- `DomBridge.ComputedStyleEngine.cs` adds `BuildComputedStyleMapViaEngine`, which
+  keeps one `CssStyleEngine` per document root (preserving the engine's
+  mutation-driven cache and its single `DomDocument.Mutated` subscription),
+  re-syncs the scoped `<style>`/`<link>`/inserted-CSSOM stylesheet text only when
+  it changes, supplies the viewport via `CssEnvironment`, and projects
+  `CssComputedStyle.Properties` back into the bridge's `Dictionary<string,string>`
+  contract. The bridge's `DomElement` derives from canonical `Broiler.Dom.DomElement`,
+  so the engine runs directly on bridge nodes — no adapter needed.
+- `DomBridge.BuildComputedStyleMap` dispatches to either the engine path or the
+  retained `BuildComputedStyleMapLegacy` via the `UseSharedComputedStyleEngine`
+  gate (per §8.6: one authority drives observable behavior). The gate is **off**
+  by default because a differential run showed the engine is not yet at parity.
+
+Differential findings (engine ON vs. legacy), separating real cutover regressions
+from this tree's pre-existing rendering/known-limitation failures: the engine
+passes the focused selector/cascade/computed-style guard suite with no new
+failures, but regresses the **value-validation / error-recovery** family — the
+legacy bridge cascade discards invalid declarations so the previous valid value
+wins (`#t{display:inline-block;display:supergrid}` ⇒ `inline-block`), whereas the
+engine has no validity tables and keeps the last-parsed value. Affected tests
+include `Acid3CssComplianceTests.Invalid_{Display,Visibility,Overflow}_Value_Discarded`,
+`WhiteSpace_Invalid_Value_Discarded_By_Error_Recovery`,
+`Acid3_Instructions_{Color,WhiteSpace}_Error_Recovery`,
+`Border_Shorthand_Expands_Color_To_Individual_Sides`, and
+`Acid3RegressionTests.GetComputedStyle_CssErrorRecovery_InvalidValue_Ignored`.
+
+Reconciliation needed before flipping `UseSharedComputedStyleEngine` to `true`:
+add per-declaration value validation / error recovery to the `CssStyleEngine`
+cascade (skip invalid keyword/length values during `ApplyStyleRule` so the prior
+valid declaration cascades), and confirm border-shorthand color→side expansion
+parity. The remaining Acid3/WPT/form-control failures observed while toggling the
+gate are pre-existing in this submodule-pinned tree (rendering/pixel/image-capture
+and documented cascade-ordering known-limitations such as
+`Acid3CascadeDebugTests.Without_Important_Higher_Specificity_Red_Wins`), unchanged
+by the gated cutover.
+
+#### Phase 4 cutover slice — gate flipped on + anchor tuple migration (2026-06-26b)
+
+- **Value validation ported to the engine.** `CssStyleEngine.Values.cs` gained
+  `IsAcceptableDeclarationValue` (the legacy `DomBridge.IsAcceptableCssValue`
+  closed-keyword table, validating the importance-stripped value). It runs at the
+  engine's two declaration-ingestion points — `ApplyStyleRule` (cascade) and the
+  inline-style step in `ComputeStyle` — so an invalid declaration is dropped and a
+  prior valid value wins. `Broiler.CSS.Dom.Tests` adds eight error-recovery cases
+  (invalid `display`/`visibility`/`overflow`/`position`/`white-space` keywords,
+  unknown vendor colors, invalid inline values, custom-property pass-through);
+  with this in place `UseSharedComputedStyleEngine` is **on** and the focused
+  selector/cascade/computed-style guard suite holds at its 5-failure baseline.
+- **Anchor declared-value collectors moved off the tuple.** `CssStyleEngine`
+  exposes `GetCascadedDeclaredValues` (raw cascade-winning author values — no
+  inline, inheritance, shorthand expansion, or initial-value backfill, so an
+  undeclared property reads as absent, which the anchor code relies on). The
+  bridge's `GetSyncedScopedEngine`/`CollectMatchedRuleProperties` route the six
+  per-element `foreach (… in CssRules) if (MatchesSelector(…))` collectors
+  (`PositionArea`, `PositionAreaQueries`, `FixedPosition`, `PositionTry` ×2,
+  `ContainingBlocks`) through it; each still merges `element.Style` on top exactly
+  as before, so behaviour is preserved by construction (same raw winners, same
+  merge). `AnimationResolver` uses no tuples.
+
+Still on `DomBridge.CssRules` (intentionally deferred — heterogeneous global
+rule-scans whose only meaningful verification is the anchor-positioning/WPT suites):
+`Visibility` and `AnchorRegistry` `anchor-name` scans, `Dialogs` `::backdrop`
+scan, `AnchorFunctions`, and the `GetComputedProps` internal cascade (78 layout/hit-
+test consumers). Migrating these needs a shared rule-enumeration (or per-element
+declared-value) path plus anchor/WPT verification.
+
+Per the user's instruction, this slice was validated with the fast engine unit
+tests and the focused CSS guard suite only; the heavy Acid3/WPT pixel suites were
+not re-run and should be run before merge to confirm full `getComputedStyle`
+parity (e.g. `Border_Shorthand_Expands_Color_To_Individual_Sides`).
+
+Build prerequisite resolved this session: the working tree did not build — the
+`Broiler.HTML` submodule's six csprojs still referenced the pre-relocation
+`..\..\..\src\Broiler.CSS` / `src\Broiler.Dom*` paths (repointed to the
+`Broiler.CSS\` / `Broiler.DOM\` submodules), the `Broiler.JS` submodule's
+`Broiler.Regex` reference leaked its namespace downstream (added
+`<PrivateAssets>all</PrivateAssets>` beside its `BRegex` alias), and the three
+`CssExtractionPhase{Zero,Two,Three}Tests` path guards were updated to the
+submodule layout.
+
 ### Phase 5 - Adapt the HTML renderer
 
 Deliverables:
@@ -858,6 +947,32 @@ Exit criteria:
 - script mutations and renderer output observe the same stylesheet state;
 - CSSOM no longer reparses independently from rendering;
 - JavaScript types remain confined to the bridge.
+
+#### Phase 6 implementation record (in progress, 2026-06-26)
+
+**Slice 6a — model-backed CSSOM rule storage (done).** `DomBridge/StyleSheets.cs`
+now stores each `CSSStyleSheet`'s rules as a `List<Broiler.CSS.CssRule>` instead of
+a `List<string>` of serialized rule text. `EnsureRulesUpToDate` parses the style
+element's text through `Broiler.CSS.CssParser` into model objects;
+`insertRule()`/`deleteRule()` (`JsStyleSheets{InsertRule005,DeleteRule006}Core`)
+mutate that model list — `insertRule` parses the inserted text into a `CssRule`
+rather than storing the raw string. A new `BuildCssRuleObject(CssRule, …)` overload
+drives the JS wrapper from the model, sharing detail extraction with the existing
+string builder via `CssSerializer` so the wrapper output is byte-identical. Live
+`cssRules` identity and the per-style-element sheet cache are unchanged.
+Verified: `SelectorsAndCssomTests` is 53 passing / 5 pre-existing selector-baseline
+failures (no CSSOM regressions).
+
+**Still remaining for Phase 6** (the deep unification — larger, deferred): nested
+at-rule wrappers (`@media`/`@keyframes`/`@supports`/`@layer`) still build their
+children from serialized strings via `ParseCssRuleStrings`; and the three separate
+rule stores — the CSSOM `rulesStorage`, the renderer-visible `InsertedRules`
+runtime state + style-element text read by `GetStyleElementCssText`, and the
+`getComputedStyle` engine sheets — are not yet a single shared mutable model, so a
+script `insertRule()` updates the CSSOM view but not rendering/`getComputedStyle`
+(the "script mutations and renderer output observe the same stylesheet state" exit
+criterion). Closing this means routing all three through one per-style-element
+mutable `CssStyleSheet` and invalidating the style engine on CSSOM mutation.
 
 ### Phase 7 - Compatibility cleanup
 

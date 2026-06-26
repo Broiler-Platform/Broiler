@@ -300,6 +300,7 @@ public sealed partial class DomBridge
     private void ExtractStyleBlocks(string html)
     {
         _cssRules.Clear();
+        ResetComputedStyleEngines();
 
         foreach (Match styleMatch in StyleTagPattern.Matches(html))
         {
@@ -570,6 +571,34 @@ public sealed partial class DomBridge
     }
 
     private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
+    {
+        // Phase 4 cutover (roadmap §8.6 dual-run): the cascade/computed-style
+        // authority can resolve through the shared Broiler.CSS.Dom.CssStyleEngine
+        // (BuildComputedStyleMapViaEngine, see DomBridge.ComputedStyleEngine.cs) or
+        // the legacy bridge cascade. The shared engine is wired and verified but is
+        // not yet the observable authority: it still lacks the bridge's
+        // per-declaration value validation/error-recovery, border-shorthand reset
+        // semantics, and a few cascade/invalidation behaviours, so switching it on
+        // regresses the Acid3/WPT/form-control suites. It stays gated until those
+        // gaps are reconciled in Broiler.CSS.Dom under differential coverage.
+        if (element == null)
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        return UseSharedComputedStyleEngine
+            ? BuildComputedStyleMapViaEngine(element, pseudoElement)
+            : BuildComputedStyleMapLegacy(element, pseudoElement);
+    }
+
+    /// <summary>
+    /// When <c>true</c>, <c>getComputedStyle()</c> resolves through the shared
+    /// <see cref="Broiler.CSS.Dom.CssStyleEngine"/>; when <c>false</c>, through the
+    /// legacy bridge cascade. Switched on once the engine gained per-declaration
+    /// value validation / error recovery to match the legacy cascade
+    /// (see <see cref="BuildComputedStyleMap"/>).
+    /// </summary>
+    private const bool UseSharedComputedStyleEngine = true;
+
+    private Dictionary<string, string> BuildComputedStyleMapLegacy(DomElement? element, string? pseudoElement = null)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var computedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

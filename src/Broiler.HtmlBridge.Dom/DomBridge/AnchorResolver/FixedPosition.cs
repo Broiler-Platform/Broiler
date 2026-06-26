@@ -28,13 +28,7 @@ public sealed partial class DomBridge
         if (!el.IsTextNode)
         {
             // Collect cascaded CSS properties for this element.
-            var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (selector, _, declarations) in CssRules)
-            {
-                if (MatchesSelector(el, selector))
-                    foreach (var kv in declarations)
-                        cssProps[kv.Key] = kv.Value;
-            }
+            var cssProps = CollectMatchedRuleProperties(el);
             // Merge inline styles (higher priority).
             foreach (var kv in el.Style)
                 cssProps[kv.Key] = kv.Value;

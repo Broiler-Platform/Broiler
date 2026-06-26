@@ -27,13 +27,7 @@ public sealed partial class DomBridge
     {
         if (!el.IsTextNode && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
-            var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(el, sel))
-                    foreach (var kv in decls)
-                        props[kv.Key] = kv.Value;
-            }
+            var props = CollectMatchedRuleProperties(el);
             foreach (var kv in el.Style)
                 props[kv.Key] = kv.Value;
 
