@@ -115,7 +115,7 @@ public sealed partial class DomBridge
         // Alpha-blending: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
         const string defaultBg = "rgb(229, 229, 229)";
 
-        foreach (var (selector, _, declarations) in CssRules)
+        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(dialog))
         {
             // Check for selectors ending in ::backdrop
             if (!selector.Contains("::backdrop", StringComparison.OrdinalIgnoreCase))

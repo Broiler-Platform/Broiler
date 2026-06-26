@@ -21,19 +21,18 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsStyleSheetsGetLength002Core(global::System.Action ensureRulesUpToDate, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments _)
+    private JSValue JsStyleSheetsGetLength002Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, in Arguments _)
     {
-        ensureRulesUpToDate();
-        return new JSNumber(rulesStorage.Count);
+        return new JSNumber(currentRules().Count);
     }
 
 
-    private JSValue JsStyleSheetsItem003Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsItem003Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, in Arguments a)
     {
         syncLiveCssRulesIndices();
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
         var idx = double.IsNaN(dv) ? 0 : (int)dv;
-        return idx >= 0 && idx < rulesStorage.Count ? liveCssRules[(uint)idx] : JSNull.Value;
+        return idx >= 0 && idx < currentRules().Count ? liveCssRules[(uint)idx] : JSNull.Value;
     }
 
 
@@ -44,32 +43,42 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsInsertRule005Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsInsertRule005Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, global::System.Action markRulesMutated, global::System.Action syncLiveCssRulesIndices, in Arguments a)
     {
         var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var dv = a.Length > 1 ? a[1].DoubleValue : rulesStorage.Count;
-        var index = double.IsNaN(dv) ? rulesStorage.Count : (int)dv;
-        ensureRulesUpToDate();
-        index = Math.Clamp(index, 0, rulesStorage.Count);
+        // currentRules() reparses on any pending textContent change before we mutate,
+        // so the index is clamped against the up-to-date shared model.
+        var rules = currentRules();
+        var dv = a.Length > 1 ? a[1].DoubleValue : rules.Count;
+        var index = double.IsNaN(dv) ? rules.Count : (int)dv;
+        index = Math.Clamp(index, 0, rules.Count);
         // Route the mutation through the shared model: parse the inserted text
         // into a CssRule rather than storing the raw string (Phase 6).
         var parsed = new global::Broiler.CSS.CssParser().ParseStyleSheet(ruleText).Rules;
         if (parsed.Count > 0)
-            rulesStorage.Insert(index, parsed[0]);
+        {
+            rules.Insert(index, parsed[0]);
+            markRulesMutated();
+        }
+
         syncLiveCssRulesIndices();
         return new JSNumber(index);
     }
 
 
-    private JSValue JsStyleSheetsDeleteRule006Core(global::System.Action ensureRulesUpToDate, global::System.Action syncLiveCssRulesIndices, global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>? rulesStorage, in Arguments a)
+    private JSValue JsStyleSheetsDeleteRule006Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, global::System.Action markRulesMutated, global::System.Action syncLiveCssRulesIndices, in Arguments a)
     {
-        ensureRulesUpToDate();
+        var rules = currentRules();
         if (a.Length > 0)
         {
             var dv = a[0].DoubleValue;
             var idx = double.IsNaN(dv) ? 0 : (int)dv;
-            if (idx >= 0 && idx < rulesStorage.Count)
-                rulesStorage.RemoveAt(idx);
+            if (idx >= 0 && idx < rules.Count)
+            {
+                rules.RemoveAt(idx);
+                markRulesMutated();
+            }
+
             syncLiveCssRulesIndices();
         }
 

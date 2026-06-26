@@ -1956,6 +1956,36 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void StyleSheet_InsertRule_Is_Observed_By_GetComputedStyle()
+    {
+        // Phase 6 store unification: a script CSSOM insertRule()/deleteRule() must be
+        // observed by getComputedStyle(), not just the cssRules view. The inserted
+        // rule comes after the base rule (same specificity) so it wins the cascade.
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { z-index: 1; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+r.push(window.getComputedStyle(target).zIndex === '1');
+document.styleSheets[0].insertRule('#target { z-index: 99; }', 1);
+r.push(window.getComputedStyle(target).zIndex === '99');
+document.styleSheets[0].deleteRule(1);
+r.push(window.getComputedStyle(target).zIndex === '1');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
     public void Cursor_Property_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>

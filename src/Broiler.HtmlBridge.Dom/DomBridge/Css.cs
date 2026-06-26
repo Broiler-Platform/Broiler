@@ -232,6 +232,38 @@ public sealed partial class DomBridge
     /// <summary>Parsed CSS rules from embedded style blocks.</summary>
     public IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> CssRules => _cssRules;
 
+    /// <summary>
+    /// Shared, <em>document-scoped</em> author-rule enumeration for global rule scans
+    /// (anchor registry, <c>anchor()</c> resolution, <c>::backdrop</c>,
+    /// <c>position-visibility</c>). Returns (selector, specificity, declarations) triples
+    /// for the document that <paramref name="scope"/> belongs to.
+    ///
+    /// <para>For the main document this is the document-wide <see cref="_cssRules"/>
+    /// verbatim, so existing main-document scans are byte-for-byte unchanged. For any
+    /// other document root it is built from that root's own <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c>
+    /// elements (via the Phase 6 unified <see cref="GetStyleElementCssText"/> + the same
+    /// <c>Broiler.CSS</c> parse/@media-filter/selector-flatten as <see cref="_cssRules"/>),
+    /// so a sub-document scan no longer sees the main document's rules — fixing the
+    /// non-document-scoped behaviour the four scans previously relied on.</para>
+    /// </summary>
+    private IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> EnumerateScopedStyleRules(DomElement scope)
+    {
+        if (ReferenceEquals(GetDocumentRootFor(scope), GetDocumentRootFor(DocumentElement)))
+            return _cssRules;
+
+        var scoped = new List<(string Selector, int Specificity, Dictionary<string, string> Declarations)>();
+        var styleElements = new List<DomElement>();
+        CollectStyleElementsInTree(GetDocumentRootFor(scope), styleElements);
+        foreach (var styleEl in styleElements)
+        {
+            var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(GetStyleElementCssText(styleEl));
+            ImportParsedRules(sheet.Rules, scoped);
+        }
+
+        scoped.Sort((x, y) => x.Specificity.CompareTo(y.Specificity));
+        return scoped;
+    }
+
     private static bool IsRecognizedLengthValue(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -321,7 +353,12 @@ public sealed partial class DomBridge
         ImportParsedRules(styleSheet.Rules);
     }
 
-    private void ImportParsedRules(IReadOnlyList<Broiler.CSS.CssRule> rules)
+    private void ImportParsedRules(IReadOnlyList<Broiler.CSS.CssRule> rules) =>
+        ImportParsedRules(rules, _cssRules);
+
+    private void ImportParsedRules(
+        IReadOnlyList<Broiler.CSS.CssRule> rules,
+        List<(string Selector, int Specificity, Dictionary<string, string> Declarations)> target)
     {
         foreach (var rule in rules)
         {
@@ -333,7 +370,7 @@ public sealed partial class DomBridge
                     var selector = parsedSelector.Text.Trim();
                     if (selector.Length == 0)
                         continue;
-                    _cssRules.Add((selector, CalculateSpecificity(selector), declarations));
+                    target.Add((selector, CalculateSpecificity(selector), declarations));
                 }
                 continue;
             }
@@ -342,7 +379,7 @@ public sealed partial class DomBridge
                 atRule.Name.Equals("media", StringComparison.OrdinalIgnoreCase) &&
                 EvaluateMediaQuery(atRule.Prelude, _viewportWidth, _viewportHeight))
             {
-                ImportParsedRules(atRule.Rules);
+                ImportParsedRules(atRule.Rules, target);
             }
         }
     }
@@ -730,48 +767,7 @@ public sealed partial class DomBridge
     {
         foreach (var styleEl in styleElements)
         {
-            var cssText = new StringBuilder();
-            foreach (var child in styleEl.Children)
-            {
-                if (child.IsTextNode && child.TextContent != null)
-                    cssText.Append(child.TextContent);
-            }
-
-            if (cssText.Length == 0 && styleEl.TextContent != null)
-                cssText.Append(styleEl.TextContent);
-
-            if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
-                insertedObj is List<(int Index, string Rule)> insertedRules)
-            {
-                foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
-                    cssText.Append(' ').Append(rule);
-            }
-
-            if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
-                cssText.Length == 0 &&
-                styleEl.Attributes.TryGetValue("href", out var href) &&
-                !string.IsNullOrEmpty(href))
-            {
-                if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
-                {
-                    cssText.Append(cachedStr);
-                }
-                else
-                {
-                    try
-                    {
-                        var fetchedCss = FetchExternalStylesheet(href);
-                        if (!string.IsNullOrEmpty(fetchedCss))
-                        {
-                            GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.Set(fetchedCss);
-                            cssText.Append(fetchedCss);
-                        }
-                    }
-                    catch { }
-                }
-            }
-
-            ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
+            ParseAndApplyCssRules(GetStyleElementCssText(styleEl), element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
         }
     }
 
@@ -987,7 +983,14 @@ public sealed partial class DomBridge
                !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
-    private string GetStyleElementCssText(DomElement styleEl)
+    /// <summary>
+    /// Raw author <em>source</em> text for a style element — its text-node children,
+    /// the <c>textContent</c>/<c>InnerHtml</c> fallback, or a cached/fetched linked
+    /// stylesheet — <em>without</em> any CSSOM <c>insertRule</c>/<c>deleteRule</c>
+    /// mutations applied. This is the input from which the shared rule model is
+    /// (re)parsed; <see cref="GetStyleElementCssText"/> applies mutations on top.
+    /// </summary>
+    private string GetStyleElementSourceText(DomElement styleEl)
     {
         var cssText = new StringBuilder();
         foreach (var child in styleEl.Children)
@@ -999,12 +1002,8 @@ public sealed partial class DomBridge
         if (cssText.Length == 0 && styleEl.TextContent != null)
             cssText.Append(styleEl.TextContent);
 
-        if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
-            insertedObj is List<(int Index, string Rule)> insertedRules)
-        {
-            foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
-                cssText.Append(' ').Append(rule);
-        }
+        if (cssText.Length == 0 && !string.IsNullOrEmpty(styleEl.InnerHtml))
+            cssText.Append(styleEl.InnerHtml);
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&
@@ -1034,6 +1033,47 @@ public sealed partial class DomBridge
         }
 
         return cssText.ToString();
+    }
+
+    /// <summary>
+    /// Ensures the style element's live rule model
+    /// (<see cref="StyleSheetRuntimeState.Rules"/>) reflects its current source text,
+    /// reparsing when the source changed. Returns the shared mutable rule list — the
+    /// single store behind the CSSOM (<c>cssRules</c>/<c>insertRule</c>/<c>deleteRule</c>),
+    /// the renderer/legacy-cascade text, and the <c>getComputedStyle</c> engine sheet
+    /// (Phase 6 store unification). Replacing the element's <c>textContent</c> changes
+    /// the source text and thus discards prior <c>insertRule</c>/<c>deleteRule</c>
+    /// mutations, matching CSSOM semantics.
+    /// </summary>
+    private List<Broiler.CSS.CssRule> EnsureStyleSheetRulesCurrent(DomElement styleEl)
+    {
+        var state = GetElementRuntimeState(styleEl).StyleSheet;
+        var sourceText = GetStyleElementSourceText(styleEl);
+        if (state.Rules is null ||
+            !string.Equals(state.RulesSourceText, sourceText, StringComparison.Ordinal))
+        {
+            state.Rules = [.. new Broiler.CSS.CssParser().ParseStyleSheet(sourceText).Rules];
+            state.RulesSourceText = sourceText;
+            state.RulesMutated = false;
+        }
+
+        return state.Rules;
+    }
+
+    /// <summary>
+    /// The effective CSS text for a style element, as seen by the renderer/legacy
+    /// cascade and the <c>getComputedStyle</c> engine. Returns the raw author source
+    /// byte-for-byte while unmutated (so unchanged stylesheets are identical to
+    /// pre-Phase-6), and the serialized live model once <c>insertRule</c>/<c>deleteRule</c>
+    /// has mutated it — so script CSSOM mutations are observed downstream.
+    /// </summary>
+    private string GetStyleElementCssText(DomElement styleEl)
+    {
+        var rules = EnsureStyleSheetRulesCurrent(styleEl);
+        var state = GetElementRuntimeState(styleEl).StyleSheet;
+        return state.RulesMutated
+            ? string.Join("\n", rules.Select(Broiler.CSS.CssSerializer.Serialize))
+            : state.RulesSourceText ?? string.Empty;
     }
 
     private static void CollectCustomPropertyRegistrations(
@@ -2081,23 +2121,7 @@ public sealed partial class DomBridge
 
         foreach (var styleEl in styleElements)
         {
-            var cssText = new StringBuilder();
-            foreach (var child in styleEl.Children)
-            {
-                if (child.IsTextNode && child.TextContent != null)
-                    cssText.Append(child.TextContent);
-            }
-            if (cssText.Length == 0 && styleEl.TextContent != null)
-                cssText.Append(styleEl.TextContent);
-
-            if (GetElementRuntimeState(styleEl).StyleSheet.InsertedRules.TryGet(out var insertedObj) &&
-                insertedObj is List<(int Index, string Rule)> insertedRules)
-            {
-                foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
-                    cssText.Append(' ').Append(rule);
-            }
-
-            ParseAndApplyCssRules(cssText.ToString(), element, parentComputed, parentSpecificity, vpWidth, vpHeight);
+            ParseAndApplyCssRules(GetStyleElementCssText(styleEl), element, parentComputed, parentSpecificity, vpWidth, vpHeight);
         }
 
         if (parentComputed.TryGetValue("font-weight", out var cascadedFw))

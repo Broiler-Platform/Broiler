@@ -23,7 +23,7 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (selector, _, declarations) in CssRules)
+        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(element))
         {
             if (MatchesSelector(element, selector))
                 foreach (var kv in declarations)

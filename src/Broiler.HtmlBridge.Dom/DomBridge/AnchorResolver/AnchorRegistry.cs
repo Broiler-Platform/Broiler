@@ -21,7 +21,7 @@ public sealed partial class DomBridge
     }
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
-        foreach (var (selector, _, declarations) in CssRules)
+        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(DocumentElement))
         {
             if (!declarations.TryGetValue("anchor-name", out var anchorName))
                 continue;
