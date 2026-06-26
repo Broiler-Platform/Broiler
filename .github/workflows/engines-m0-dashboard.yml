@@ -1,7 +1,6 @@
 name: Engines M0 Dashboard
 
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:
