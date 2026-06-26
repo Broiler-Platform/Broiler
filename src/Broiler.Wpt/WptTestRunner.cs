@@ -552,6 +552,69 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Sentinel <c>--shard-index</c> value meaning "run every shard" (no
+    /// sharding filter is applied).
+    /// </summary>
+    internal const int AllShards = -1;
+
+    /// <summary>
+    /// Filters <paramref name="tests"/> down to the single shard identified by
+    /// <paramref name="shardIndex"/> out of <paramref name="shardCount"/>.
+    /// Shard assignment is a content-independent FNV-1a hash of each test's
+    /// path relative to <paramref name="wptRoot"/> (forward-slash separators),
+    /// so it is stable across runs and — crucially — reproducible byte-for-byte
+    /// by the JavaScript reference generator, which shards the same way. That
+    /// lets shard <c>N</c> generate references for exactly the tests shard
+    /// <c>N</c> later runs. When <paramref name="shardIndex"/> is
+    /// <see cref="AllShards"/> the input is returned unchanged.
+    /// </summary>
+    internal static IEnumerable<string> ApplyShard(
+        IEnumerable<string> tests,
+        string wptRoot,
+        int shardCount,
+        int shardIndex)
+    {
+        if (shardCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(shardCount), shardCount, "shardCount must be greater than 0.");
+
+        if (shardIndex == AllShards || shardCount == 1)
+            return tests;
+
+        if (shardIndex < 0 || shardIndex >= shardCount)
+            throw new ArgumentOutOfRangeException(
+                nameof(shardIndex),
+                shardIndex,
+                $"shardIndex must be {AllShards} or between 0 and {shardCount - 1}.");
+
+        return tests.Where(testPath =>
+        {
+            var relativePath = Path.GetRelativePath(wptRoot, testPath).Replace('\\', '/');
+            return GetShardIndex(relativePath, shardCount) == shardIndex;
+        });
+    }
+
+    /// <summary>
+    /// Returns the deterministic shard index in <c>[0, shardCount)</c> for a
+    /// forward-slash relative path, using a 32-bit FNV-1a hash of its UTF-8
+    /// bytes. This algorithm is intentionally simple so the reference generator
+    /// (<c>scripts/generate-wpt-references.js</c>) can reproduce it exactly.
+    /// </summary>
+    internal static int GetShardIndex(string relativePath, int shardCount)
+    {
+        const uint fnvOffsetBasis = 2166136261;
+        const uint fnvPrime = 16777619;
+
+        uint hash = fnvOffsetBasis;
+        foreach (var b in System.Text.Encoding.UTF8.GetBytes(relativePath))
+        {
+            hash ^= b;
+            hash *= fnvPrime;
+        }
+
+        return (int)(hash % (uint)shardCount);
+    }
+
+    /// <summary>
     /// Parses a semicolon-separated subset string into individual patterns,
     /// trimming whitespace and discarding empty entries.
     /// </summary>

@@ -53,6 +53,8 @@ public class Program
         string? rerunJsonPath = null;
         RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
         double? timeoutSeconds = null;
+        int shardCount = 1;
+        int shardIndex = WptTestRunner.AllShards;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -93,6 +95,22 @@ public class Program
 
                     timeoutSeconds = parsedTimeoutSeconds;
                     break;
+                case "--shard-count" when i + 1 < args.Length:
+                    if (!int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out shardCount) || shardCount < 1)
+                    {
+                        Console.Error.WriteLine("Error: '--shard-count' must be a positive integer.");
+                        return 1;
+                    }
+
+                    break;
+                case "--shard-index" when i + 1 < args.Length:
+                    if (!int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out shardIndex) || shardIndex < WptTestRunner.AllShards)
+                    {
+                        Console.Error.WriteLine($"Error: '--shard-index' must be {WptTestRunner.AllShards} (all shards) or a non-negative integer.");
+                        return 1;
+                    }
+
+                    break;
                 case "--wpt-dir":
                 case "--reference-dir":
                 case "--json-output":
@@ -101,6 +119,8 @@ public class Program
                 case "--rerun-json":
                 case "--rerun-kind":
                 case "--timeout":
+                case "--shard-count":
+                case "--shard-index":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -145,11 +165,19 @@ public class Program
             return 1;
         }
 
+        if (shardIndex != WptTestRunner.AllShards && shardIndex >= shardCount)
+        {
+            Console.Error.WriteLine($"Error: '--shard-index' ({shardIndex}) must be less than '--shard-count' ({shardCount}).");
+            return 1;
+        }
+
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
         Console.WriteLine($"Timeout       : {runTestTimeout.TotalSeconds:0.###} second(s)");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
+        if (shardIndex != WptTestRunner.AllShards)
+            Console.WriteLine($"Shard         : {shardIndex + 1}/{shardCount}");
         if (!string.IsNullOrWhiteSpace(rerunJsonPath))
         {
             Console.WriteLine($"Rerun JSON    : {Path.GetFullPath(rerunJsonPath)}");
@@ -170,6 +198,15 @@ public class Program
 
             discoveredTests = discoveredTests
                 .Where(testPath => rerunTests.Contains(Path.GetFullPath(testPath)))
+                .ToList();
+        }
+
+        // Apply the shard filter last so each shard runs a deterministic,
+        // disjoint slice of the (optionally subset/rerun-filtered) test set.
+        if (shardIndex != WptTestRunner.AllShards && shardCount > 1)
+        {
+            discoveredTests = WptTestRunner
+                .ApplyShard(discoveredTests, wptPath, shardCount, shardIndex)
                 .ToList();
         }
 
@@ -312,7 +349,7 @@ public class Program
 
         if (jsonOutputPath is not null)
         {
-            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath);
+            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath, shardCount, shardIndex);
             Console.WriteLine();
             Console.WriteLine($"JSON report written to: {jsonOutputPath}");
         }
@@ -544,7 +581,9 @@ public class Program
         int passed,
         int failed,
         int skipped,
-        string wptPath)
+        string wptPath,
+        int shardCount = 1,
+        int shardIndex = WptTestRunner.AllShards)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -572,6 +611,11 @@ public class Program
                 ["failed"] = failed,
                 ["skipped"] = skipped,
                 ["total"] = allResults.Count,
+            },
+            ["shard"] = new Dictionary<string, object>
+            {
+                ["index"] = shardIndex,
+                ["count"] = shardCount,
             },
             ["triage"] = new Dictionary<string, object?>
             {
@@ -1202,6 +1246,8 @@ public class Program
         Console.WriteLine("                             Example: \"css/CSS2;css/css-*\"");
         Console.WriteLine("  --rerun-json <PATH>        Rerun only the previous failure/timeout set from a JSON report");
         Console.WriteLine("  --rerun-kind <KIND>        Filter reruns to 'failures' (default) or 'timeouts'");
+        Console.WriteLine("  --shard-count <N>          Split discovered tests into N deterministic shards (default: 1)");
+        Console.WriteLine("  --shard-index <I>          Run only shard I (0-based), or -1 for all shards (default: -1)");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");

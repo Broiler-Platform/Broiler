@@ -27,6 +27,11 @@ OUTPUT_DIR="$REPO_ROOT/tests/wpt-results"
 WPT_DIR=""
 SHALLOW=true
 SUBSET=""
+SHARD_INDEX=-1
+SHARD_COUNT=1
+RERUN_JSON=""
+RERUN_KIND=""
+SKIP_REFERENCE_GENERATION=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -47,16 +52,41 @@ while [[ $# -gt 0 ]]; do
             SUBSET="$2"
             shift 2
             ;;
+        --shard-index)
+            SHARD_INDEX="$2"
+            shift 2
+            ;;
+        --shard-count)
+            SHARD_COUNT="$2"
+            shift 2
+            ;;
+        --rerun-json)
+            RERUN_JSON="$2"
+            shift 2
+            ;;
+        --rerun-kind)
+            RERUN_KIND="$2"
+            shift 2
+            ;;
+        --skip-reference-generation)
+            SKIP_REFERENCE_GENERATION=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --output-dir <dir>   Directory for results (default: tests/wpt-results)"
-            echo "  --wpt-dir <dir>      Use an existing WPT checkout instead of cloning"
-            echo "  --shallow            Shallow-clone only (depth 1, faster; default)"
-            echo "  --subset <patterns>  Semicolon-separated sub-path patterns with wildcards"
-            echo "                       (e.g. \"css/CSS2;css/css-*\" or \"css/css-flexbox\")"
-            echo "  -h, --help           Show this help message"
+            echo "  --output-dir <dir>            Directory for results (default: tests/wpt-results)"
+            echo "  --wpt-dir <dir>               Use an existing WPT checkout instead of cloning"
+            echo "  --shallow                     Shallow-clone only (depth 1, faster; default)"
+            echo "  --subset <patterns>           Semicolon-separated sub-path patterns with wildcards"
+            echo "                                (e.g. \"css/CSS2;css/css-*\" or \"css/css-flexbox\")"
+            echo "  --shard-count <N>             Split the suite into N deterministic shards (default: 1)"
+            echo "  --shard-index <I>             Run only shard I (0-based), or -1 for all (default: -1)"
+            echo "  --rerun-json <path>           Rerun only tests from a prior JSON report (incremental)"
+            echo "  --rerun-kind <failures|timeouts>  Which prior results to rerun (default: failures)"
+            echo "  --skip-reference-generation   Reuse already-generated/cached reference images"
+            echo "  -h, --help                    Show this help message"
             exit 0
             ;;
         *)
@@ -65,6 +95,21 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Shard arguments shared by the reference generator and the C# runner. Both
+# implement the same FNV-1a(relative-path) % shard-count assignment, so a shard
+# generates references for exactly the tests it runs.
+SHARD_ARGS=()
+if [[ "$SHARD_INDEX" != "-1" || "$SHARD_COUNT" != "1" ]]; then
+    SHARD_ARGS=(--shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX")
+fi
+
+# Incremental rerun arguments for the C# runner.
+RERUN_ARGS=()
+if [[ -n "$RERUN_JSON" ]]; then
+    RERUN_ARGS=(--rerun-json "$RERUN_JSON")
+    [[ -n "$RERUN_KIND" ]] && RERUN_ARGS+=(--rerun-kind "$RERUN_KIND")
+fi
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -119,7 +164,9 @@ REFERENCE_DIR="$REPO_ROOT/tests/wpt/references"
 echo "--- Step 2: Generating reference images with Chromium (Playwright) ---"
 
 # Install Playwright dependencies if needed.
-if command -v npx &>/dev/null; then
+if [[ "$SKIP_REFERENCE_GENERATION" == "true" ]]; then
+    echo "  ⏭ Skipping reference generation (--skip-reference-generation); reusing cached/existing references."
+elif command -v npx &>/dev/null; then
     pushd "$REPO_ROOT/tests/wpt" > /dev/null
     if [[ -f package-lock.json ]]; then
         npm ci 2>&1 | tail -10
@@ -152,7 +199,8 @@ if command -v npx &>/dev/null; then
                     echo "  Generating refs for: ${MATCH_DIR#"$WPT_DIR/"}"
                     if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
                         node "$SCRIPT_DIR/generate-wpt-references.js" \
-                        "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 --base-dir "$WPT_DIR" 2>&1; then
+                        "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 --base-dir "$WPT_DIR" \
+                        "${SHARD_ARGS[@]}" 2>&1; then
                         echo "  ✗ Reference generation failed for $MATCH_DIR" >&2
                         REF_GEN_OK=false
                     fi
@@ -166,7 +214,7 @@ if command -v npx &>/dev/null; then
     else
         if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
             node "$SCRIPT_DIR/generate-wpt-references.js" \
-            "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+            "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 "${SHARD_ARGS[@]}" 2>&1; then
             REF_GEN_OK=false
         fi
     fi
@@ -215,7 +263,8 @@ REF_ARGS+=(--markdown-output "$MARKDOWN_REPORT")
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
-    --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" "${SUBSET_ARGS[@]}" 2>&1 | tee "$LOGFILE"
+    --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" "${SUBSET_ARGS[@]}" \
+    "${SHARD_ARGS[@]}" "${RERUN_ARGS[@]}" 2>&1 | tee "$LOGFILE"
 WPT_EXIT=$?
 set -e
 

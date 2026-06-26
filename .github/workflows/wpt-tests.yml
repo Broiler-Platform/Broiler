@@ -1,15 +1,23 @@
 name: WPT Tests
 
-# Two entry points:
-#   * Scheduled per-segment matrix (weekly) — the standing coverage signal for
-#     the public-preview roadmap. Each segment is gated against a committed
-#     baseline so CI alarms on *regressions*, not on the absolute backlog of
-#     skipped/failing tests.
-#   * Manual single-subset run (workflow_dispatch) — for targeted investigation.
+# Full-suite Web Platform Tests runner, sharded for parallelism.
 #
-# Reference-image generation (Chromium via Playwright) is expensive, so the
-# matrix runs weekly and caches both the WPT checkout and the generated
-# references. Bump CACHE_EPOCH to force a refresh of WPT master and references.
+# Modeled on Broiler.JS's test262.yml. The whole WPT checkout (~60K+ tests) is
+# split into SHARD_COUNT deterministic shards; each shard is an independent job
+# that generates its own Chromium references and runs only its slice. Shard
+# assignment (FNV-1a of the relative path) is identical in
+# scripts/generate-wpt-references.js and the C# runner, so a shard's references
+# always cover the tests it executes.
+#
+# Entry points:
+#   * Scheduled (weekly): runs every shard of the full suite, merges the
+#     results, and — when failures exist — files a summarizing GitHub issue and
+#     persists the failing-test manifest for incremental reruns.
+#   * Manual (workflow_dispatch): target a subset, a single shard, or rerun only
+#     the previously-failed tests for fast feedback.
+#
+# Reference generation (Chromium via Playwright) is expensive, so each shard
+# caches its reference slice. Bump CACHE_EPOCH to refresh WPT master + refs.
 
 on:
   schedule:
@@ -20,39 +28,112 @@ on:
       subset:
         description: >
           Semicolon-separated WPT subset patterns with optional wildcards.
-          Examples: "css/css-flexbox", "css/CSS2;css/css-*", leave empty for all.
+          Examples: "css/css-flexbox", "css/CSS2;css/css-*". Empty = full suite.
         required: false
         default: ''
+      shard_index:
+        description: Zero-based shard index to run, or -1 for all shards.
+        required: false
+        default: '-1'
+      rerun_failed_only:
+        description: >
+          Rerun only the previously-failed tests from the committed manifest
+          (tests/wpt-baseline/failed-tests.json), reusing cached references.
+        type: boolean
+        required: false
+        default: false
+      test_timeout_seconds:
+        description: Per-test timeout in seconds.
+        required: false
+        default: '30'
 
 permissions:
-  contents: read
+  contents: write   # persist-failed commits the failing-test manifest
+  issues: write
 
 env:
   # Bump to invalidate the cached WPT checkout + references.
   CACHE_EPOCH: '1'
+  SHARD_COUNT: '8'
+  WPT_CHECKOUT_DIR: tests/wpt/checkout
+  REFERENCE_DIR: tests/wpt/references
+  RESULTS_DIR: tests/wpt-results
+  FAILED_TESTS_FILE: tests/wpt-baseline/failed-tests.json
 
 jobs:
-  # ── Scheduled per-segment coverage matrix ────────────────────────────────
-  matrix:
-    name: WPT ${{ matrix.segment.id }}
-    if: github.event_name == 'schedule'
+  # ── Resolve the shard matrix and whether to run incrementally ────────────
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
+      rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve plan
+        id: resolve
+        shell: bash
+        env:
+          SELECTED_SHARD_INDEX: ${{ github.event.inputs.shard_index || '-1' }}
+          RERUN_FAILED_ONLY: ${{ github.event.inputs.rerun_failed_only || 'false' }}
+        run: |
+          python <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          shard_count = int(os.environ["SHARD_COUNT"])
+          try:
+              selected = int(os.environ["SELECTED_SHARD_INDEX"])
+          except ValueError:
+              sys.exit(f"shard_index must be an integer, got {os.environ['SELECTED_SHARD_INDEX']!r}")
+
+          if selected == -1:
+              matrix = [{"shard-index": i} for i in range(shard_count)]
+          elif 0 <= selected < shard_count:
+              matrix = [{"shard-index": selected}]
+          else:
+              sys.exit(f"shard_index must be -1 or between 0 and {shard_count - 1}, got {selected}")
+
+          rerun_requested = os.environ["RERUN_FAILED_ONLY"].strip().lower() == "true"
+          rerun_failed = rerun_requested and Path(os.environ["FAILED_TESTS_FILE"]).exists()
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"shard-matrix={json.dumps(matrix)}\n")
+              fh.write(f"rerun-failed={'true' if rerun_failed else 'false'}\n")
+          PY
+
+  # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache WPT checkout
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.WPT_CHECKOUT_DIR }}
+          key: wpt-checkout-${{ env.CACHE_EPOCH }}
+
+      - name: Clone WPT (shallow) on cache miss
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --single-branch --branch master --depth 1 \
+            https://github.com/web-platform-tests/wpt.git "$WPT_CHECKOUT_DIR"
+
+  # ── Run one shard of the suite ───────────────────────────────────────────
+  run:
+    needs: [plan, prepare]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        # The "gated" coverage set for the preview. Add segments here as their
-        # references land and (for testharness segments like dom/html) as the
-        # harness-reporting work in Phase 1 makes their results meaningful.
-        segment:
-          - { id: css-css2,    pattern: 'css/CSS2' }
-          - { id: css-flexbox, pattern: 'css/css-flexbox' }
-          - { id: css-text,    pattern: 'css/css-text' }
-          - { id: css-selectors, pattern: 'css/selectors' }
-          # testharness-heavy segments: scaffolded now, meaningful once the
-          # testharness result-reporting work (roadmap task 1.1) lands.
-          - { id: dom,         pattern: 'dom' }
-          - { id: html-parsing, pattern: 'html/syntax' }
+        include: ${{ fromJson(needs.plan.outputs.shard-matrix) }}
+    env:
+      BROILER_WPT_TIMEOUT_SECONDS: ${{ github.event.inputs.test_timeout_seconds || '30' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,138 +149,183 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Cache WPT checkout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore WPT checkout
         uses: actions/cache@v4
         with:
-          path: tests/wpt/checkout
-          key: wpt-checkout-${{ env.CACHE_EPOCH }}-${{ matrix.segment.id }}
+          path: ${{ env.WPT_CHECKOUT_DIR }}
+          key: wpt-checkout-${{ env.CACHE_EPOCH }}
 
-      - name: Cache reference images
+      - name: Cache shard references
         uses: actions/cache@v4
         with:
-          path: tests/wpt/references
-          key: wpt-refs-${{ env.CACHE_EPOCH }}-${{ matrix.segment.id }}
+          path: ${{ env.REFERENCE_DIR }}
+          key: wpt-refs-${{ env.CACHE_EPOCH }}-shard-${{ matrix.shard-index }}
 
-      - name: Run WPT segment
+      - name: Run WPT shard ${{ matrix.shard-index }}
         id: wpt
+        shell: bash
+        env:
+          SUBSET: ${{ github.event.inputs.subset || '' }}
+          RERUN_FAILED: ${{ needs.plan.outputs.rerun-failed }}
         run: |
-          EXIT=0
-          bash scripts/run-wpt-tests.sh --subset "${{ matrix.segment.pattern }}" || EXIT=$?
-          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
-
-      - name: Regression gate
-        run: |
-          bash scripts/check-wpt-regression.sh \
-            --results tests/wpt-results/wpt-results.json \
-            --baseline "tests/wpt-baseline/${{ matrix.segment.id }}.json"
-
-      - name: Print summary
-        if: always()
-        run: |
-          SUMMARY="tests/wpt-results/wpt-summary.txt"
-          if [ -f "$SUMMARY" ]; then
-            echo "### WPT ${{ matrix.segment.id }} (${{ matrix.segment.pattern }})" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ARGS=(--shard-index "${{ matrix.shard-index }}" --shard-count "$SHARD_COUNT")
+          if [ -n "$SUBSET" ]; then
+            ARGS+=(--subset "$SUBSET")
           fi
-          TRIAGE="tests/wpt-results/wpt-triage-summary.md"
-          if [ -f "$TRIAGE" ]; then
-            cat "$TRIAGE" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: wpt-results-${{ matrix.segment.id }}
-          path: |
-            tests/wpt-results/wpt-results.log
-            tests/wpt-results/wpt-summary.txt
-            tests/wpt-results/wpt-root-cause-analysis.txt
-            tests/wpt-results/wpt-results.json
-            tests/wpt-results/wpt-triage-summary.md
-
-  # ── Manual single-subset run ─────────────────────────────────────────────
-  manual:
-    name: WPT manual subset
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Run WPT tests
-        id: wpt
-        run: |
-          ARGS=()
-          if [ -n "${{ github.event.inputs.subset }}" ]; then
-            ARGS+=(--subset "${{ github.event.inputs.subset }}")
+          if [ "$RERUN_FAILED" = "true" ]; then
+            # Incremental: rerun only previously-failed tests, reusing cached refs.
+            ARGS+=(--rerun-json "$FAILED_TESTS_FILE" --skip-reference-generation)
           fi
           EXIT=0
           bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
           echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+          echo "Shard ${{ matrix.shard-index }} finished (exit $EXIT)."
 
-      - name: Print summary
+      - name: Collect shard result
         if: always()
         run: |
-          SUMMARY="tests/wpt-results/wpt-summary.txt"
+          mkdir -p shard-out
+          cp "$RESULTS_DIR/wpt-results.json" "shard-out/wpt-shard-${{ matrix.shard-index }}.json" 2>/dev/null || true
+          cp "$RESULTS_DIR/wpt-results.log"  "shard-out/wpt-shard-${{ matrix.shard-index }}.log"  2>/dev/null || true
+
+      - name: Shard step summary
+        if: always()
+        run: |
+          SUMMARY="$RESULTS_DIR/wpt-summary.txt"
           if [ -f "$SUMMARY" ]; then
-            echo "### WPT Test Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "### WPT shard ${{ matrix.shard-index }}/${SHARD_COUNT}" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat "$SUMMARY"
-          else
-            echo "No summary file found."
-          fi
-
-          ANALYSIS="tests/wpt-results/wpt-root-cause-analysis.txt"
-          if [ -f "$ANALYSIS" ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "### Root Cause Analysis" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat "$ANALYSIS" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo ""
-            echo "--- Root Cause Analysis ---"
-            cat "$ANALYSIS"
-          fi
-
-          TRIAGE="tests/wpt-results/wpt-triage-summary.md"
-          if [ -f "$TRIAGE" ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            cat "$TRIAGE" >> "$GITHUB_STEP_SUMMARY"
-            echo ""
-            echo "--- Triage Summary ---"
-            cat "$TRIAGE"
           fi
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: wpt-results
-          path: |
-            tests/wpt-results/wpt-results.log
-            tests/wpt-results/wpt-summary.txt
-            tests/wpt-results/wpt-root-cause-analysis.txt
-            tests/wpt-results/wpt-results.json
-            tests/wpt-results/wpt-triage-summary.md
+          name: wpt-shard-${{ matrix.shard-index }}
+          path: shard-out
 
-      - name: Check test result
+  # ── Merge shard results; file an issue when there are failures ───────────
+  report:
+    needs: run
+    if: always() && needs.run.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download shard results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
+
+      - name: Merge shard results
+        id: merge
+        shell: bash
+        env:
+          WPT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE_TOKEN: ${{ secrets.ISSUE_TOKEN }}
+        run: |
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --merged-json wpt-merged/wpt-results.json \
+            --issue-md wpt-merged/issue.md \
+            --github-output "$GITHUB_OUTPUT"
+          if [ -n "${ISSUE_TOKEN:-}" ]; then
+            echo "issue_token_available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "issue_token_available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish merged summary
         if: always()
         run: |
-          EXIT="${{ steps.wpt.outputs.exit_code }}"
-          if [ "$EXIT" != "0" ]; then
-            echo "::error::WPT tests failed (exit code $EXIT). See wpt-results.log for details."
-            exit 1
+          if [ -f wpt-merged/issue.md ]; then
+            cat wpt-merged/issue.md >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wpt-merged
+          path: wpt-merged
+
+      - name: Report missing ISSUE_TOKEN
+        if: github.event_name == 'schedule' && steps.merge.outputs.create_issue == 'true' && steps.merge.outputs.issue_token_available != 'true'
+        run: |
+          {
+            echo "### WPT issue creation"
+            echo "- Failures were found, but \`ISSUE_TOKEN\` is not configured, so no issue was filed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub issue for failures
+        if: github.event_name == 'schedule' && steps.merge.outputs.create_issue == 'true' && steps.merge.outputs.issue_token_available == 'true'
+        uses: actions/github-script@v7
+        env:
+          FAILED_COUNT: ${{ steps.merge.outputs.failed_count }}
+        with:
+          github-token: ${{ secrets.ISSUE_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `WPT scheduled run: ${process.env.FAILED_COUNT} failing test(s) (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created issue #${issue.data.number}: ${issue.data.html_url}`);
+
+  # ── Persist the failing-test manifest for incremental reruns ─────────────
+  persist-failed:
+    needs: run
+    # Only the scheduled full-suite run maintains the canonical manifest; manual
+    # subset/shard runs would persist a narrower set and shrink it incorrectly.
+    if: always() && github.event_name == 'schedule' && needs.run.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download shard results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
+
+      - name: Build failed-tests manifest
+        run: |
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --merged-json "$FAILED_TESTS_FILE"
+
+      - name: Commit manifest
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- "$FAILED_TESTS_FILE"; then
+            echo "No manifest changes to commit."
+            exit 0
+          fi
+          git add "$FAILED_TESTS_FILE"
+          git commit -m "ci: update WPT failed-tests manifest [skip ci]"
+          git push origin "HEAD:$BRANCH_NAME"

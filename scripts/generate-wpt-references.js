@@ -29,6 +29,27 @@ const TEST_EXTENSIONS = new Set(['.html', '.htm', '.xhtml']);
 const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const DEFAULT_CONCURRENCY = 8;
+const ALL_SHARDS = -1;              // --shard-index sentinel meaning "all shards"
+
+/**
+ * Deterministic shard index in [0, shardCount) for a forward-slash relative
+ * path, using a 32-bit FNV-1a hash of its UTF-8 bytes.
+ *
+ * This MUST stay byte-for-byte identical to WptTestRunner.GetShardIndex in
+ * src/Broiler.Wpt/WptTestRunner.cs: the C# runner shards the test set the same
+ * way, so shard N here generates references for exactly the tests shard N runs
+ * there. Drift between the two would silently leave tests without references.
+ */
+function shardIndexForPath(relativePath, shardCount) {
+    let hash = 2166136261;            // FNV offset basis (unsigned 32-bit)
+    const bytes = Buffer.from(relativePath, 'utf8');
+    for (const byte of bytes) {
+        hash ^= byte;
+        // Math.imul performs the multiply in 32-bit space; >>> 0 keeps it unsigned.
+        hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return hash % shardCount;
+}
 
 /**
  * WPT crashtests (filename ending in `-crash.{html,htm,xhtml}`) are security
@@ -76,12 +97,18 @@ function ensureDir(filePath) {
     let outputDir = null;
     let baseDir = null;
     let concurrency = DEFAULT_CONCURRENCY;
+    let shardCount = 1;
+    let shardIndex = ALL_SHARDS;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--concurrency' && i + 1 < args.length) {
             concurrency = parseInt(args[++i], 10) || DEFAULT_CONCURRENCY;
         } else if (args[i] === '--base-dir' && i + 1 < args.length) {
             baseDir = args[++i];
+        } else if (args[i] === '--shard-count' && i + 1 < args.length) {
+            shardCount = parseInt(args[++i], 10);
+        } else if (args[i] === '--shard-index' && i + 1 < args.length) {
+            shardIndex = parseInt(args[++i], 10);
         } else if (!testDir) {
             testDir = args[i];
         } else if (!outputDir) {
@@ -90,7 +117,16 @@ function ensureDir(filePath) {
     }
 
     if (!testDir || !outputDir) {
-        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>]');
+        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>] [--shard-count N --shard-index I]');
+        process.exit(1);
+    }
+
+    if (!Number.isInteger(shardCount) || shardCount < 1) {
+        console.error(`Error: --shard-count must be a positive integer (got ${shardCount}).`);
+        process.exit(1);
+    }
+    if (!Number.isInteger(shardIndex) || (shardIndex !== ALL_SHARDS && (shardIndex < 0 || shardIndex >= shardCount))) {
+        console.error(`Error: --shard-index must be ${ALL_SHARDS} (all) or between 0 and ${shardCount - 1} (got ${shardIndex}).`);
         process.exit(1);
     }
 
@@ -108,8 +144,19 @@ function ensureDir(filePath) {
     }
 
     console.log(`Discovering test files in: ${testDir}`);
-    const testFiles = discoverTests(testDir);
+    let testFiles = discoverTests(testDir);
     console.log(`Found ${testFiles.length} test files`);
+
+    // When sharding, keep only the files assigned to this shard by the same
+    // FNV-1a(relative-path) % shardCount rule the C# runner uses, so this shard
+    // generates references for exactly the tests it will later execute.
+    if (shardIndex !== ALL_SHARDS && shardCount > 1) {
+        testFiles = testFiles.filter((testFile) => {
+            const relative = path.relative(baseDir, testFile).split(path.sep).join('/');
+            return shardIndexForPath(relative, shardCount) === shardIndex;
+        });
+        console.log(`Shard ${shardIndex + 1}/${shardCount}: ${testFiles.length} test files in this shard`);
+    }
 
     if (testFiles.length === 0) {
         console.log('Nothing to do.');
