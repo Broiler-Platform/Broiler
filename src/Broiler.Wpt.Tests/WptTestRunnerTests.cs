@@ -10504,4 +10504,74 @@ div {{ width: 256px; height: 768px; }}
         Assert.True(result.MatchPercent >= 90,
             $"clip-text-text-decorations: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public void ApplyShard_Returns_All_Tests_When_Not_Sharding(int shardIndex)
+    {
+        var tests = Enumerable.Range(0, 50)
+            .Select(i => Path.Combine(_tempDir, $"dir{i % 5}", $"test{i}.html"))
+            .ToList();
+
+        // shardCount 1 (or shardIndex -1) disables filtering entirely.
+        var result = WptTestRunner.ApplyShard(tests, _tempDir, shardCount: 1, shardIndex).ToList();
+
+        Assert.Equal(tests, result);
+    }
+
+    [Fact]
+    public void ApplyShard_Partitions_Tests_Into_Disjoint_Shards_Covering_The_Whole_Set()
+    {
+        const int shardCount = 8;
+        var tests = Enumerable.Range(0, 500)
+            .Select(i => Path.Combine(_tempDir, $"css/dir{i % 13}", $"test-{i}.html"))
+            .ToList();
+
+        var union = new List<string>();
+        for (int shardIndex = 0; shardIndex < shardCount; shardIndex++)
+        {
+            var shard = WptTestRunner.ApplyShard(tests, _tempDir, shardCount, shardIndex).ToList();
+            union.AddRange(shard);
+        }
+
+        // Every test lands in exactly one shard: the disjoint shards reassemble
+        // the original set with no duplicates and no omissions.
+        Assert.Equal(tests.Count, union.Count);
+        Assert.Equal(new HashSet<string>(tests), new HashSet<string>(union));
+    }
+
+    [Fact]
+    public void ApplyShard_Is_Stable_For_The_Same_Relative_Path()
+    {
+        var tests = Enumerable.Range(0, 100)
+            .Select(i => Path.Combine(_tempDir, "css", $"test-{i}.html"))
+            .ToList();
+
+        var first = WptTestRunner.ApplyShard(tests, _tempDir, shardCount: 4, shardIndex: 2).ToList();
+        var second = WptTestRunner.ApplyShard(tests, _tempDir, shardCount: 4, shardIndex: 2).ToList();
+
+        Assert.Equal(first, second);
+    }
+
+    [Theory]
+    [InlineData("css/CSS2/foo.html", 8)]
+    [InlineData("dom/nodes/bar.xhtml", 8)]
+    [InlineData("html/syntax/baz.htm", 16)]
+    public void GetShardIndex_Is_Within_Range(string relativePath, int shardCount)
+    {
+        var shard = WptTestRunner.GetShardIndex(relativePath, shardCount);
+
+        Assert.InRange(shard, 0, shardCount - 1);
+    }
+
+    [Fact]
+    public void GetShardIndex_Matches_The_FNV1a_Reference_Value()
+    {
+        // Pins the FNV-1a algorithm so it cannot silently drift from the
+        // identical implementation in scripts/generate-wpt-references.js, which
+        // must assign the same shard to keep reference generation and execution
+        // in lock-step. FNV-1a/32 of "css/CSS2/foo.html" is 0x418AB4DC.
+        Assert.Equal((int)(0x418AB4DCu % 8u), WptTestRunner.GetShardIndex("css/CSS2/foo.html", 8));
+    }
 }

@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""Merge per-shard Broiler.Wpt JSON reports into a single view.
+
+The sharded WPT workflow runs each shard as an independent job that emits its
+own ``wpt-results.json``. This script combines those shard reports to produce:
+
+* ``--merged-json``  — aggregate summary plus the union of every shard's
+  *failing* results, shaped so the C# runner's ``--rerun-json`` can consume it
+  directly (top-level ``results`` array with ``relativeTestPath`` / ``passed`` /
+  ``skipped`` / ``category``). This doubles as the persisted "failed tests"
+  manifest that drives incremental reruns.
+* ``--issue-md``     — a Markdown body summarising totals and the top failing
+  directories / categories, suitable for posting as a GitHub issue.
+
+When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
+writes ``failed_count``, ``total_count`` and ``create_issue`` step outputs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from collections import Counter
+from pathlib import Path
+
+TOP_BUCKET_LIMIT = 15
+
+
+def _bucket_directory(relative_path: str) -> str:
+    """Group a test by its first two path segments (e.g. ``css/css-flexbox``)."""
+    parts = [segment for segment in relative_path.split("/") if segment]
+    if len(parts) <= 1:
+        return parts[0] if parts else "."
+    return "/".join(parts[:2])
+
+
+def _iter_shard_reports(shard_dir: Path):
+    # Recurse so it does not matter whether artifacts were downloaded flat or
+    # into per-shard subdirectories.
+    for path in sorted(shard_dir.rglob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        # Only consider documents that look like a Broiler.Wpt report.
+        if isinstance(data, dict) and "summary" in data and "results" in data:
+            yield path, data
+
+
+def merge(shard_dir: Path) -> dict:
+    passed = failed = skipped = total = 0
+    shard_count = 0
+    failures: list[dict] = []
+    seen_failures: set[str] = set()
+    directory_counter: Counter[str] = Counter()
+    category_counter: Counter[str] = Counter()
+
+    for _path, report in _iter_shard_reports(shard_dir):
+        shard_count += 1
+        summary = report.get("summary", {})
+        passed += int(summary.get("passed", 0) or 0)
+        failed += int(summary.get("failed", 0) or 0)
+        skipped += int(summary.get("skipped", 0) or 0)
+        total += int(summary.get("total", 0) or 0)
+
+        for result in report.get("results", []):
+            if not isinstance(result, dict):
+                continue
+            if result.get("passed") or result.get("skipped"):
+                continue
+
+            relative_path = result.get("relativeTestPath") or result.get("testPath") or ""
+            if not relative_path or relative_path in seen_failures:
+                continue
+            seen_failures.add(relative_path)
+
+            category = result.get("category") or "Unknown"
+            failures.append(
+                {
+                    "relativeTestPath": relative_path,
+                    "passed": False,
+                    "skipped": False,
+                    "category": category,
+                }
+            )
+            directory_counter[_bucket_directory(relative_path)] += 1
+            category_counter[category] += 1
+
+    failures.sort(key=lambda item: item["relativeTestPath"])
+
+    return {
+        "summary": {
+            "passed": passed,
+            "failed": failed,
+            "skipped": skipped,
+            "total": total,
+        },
+        "shardCount": shard_count,
+        "topFailingDirectories": directory_counter.most_common(TOP_BUCKET_LIMIT),
+        "failuresByCategory": category_counter.most_common(),
+        "results": failures,
+    }
+
+
+def render_issue_markdown(merged: dict, run_url: str | None) -> str:
+    summary = merged["summary"]
+    lines = [
+        "## WPT scheduled run — failing tests",
+        "",
+        f"- Shards merged: {merged['shardCount']}",
+        f"- Total: {summary['total']}",
+        f"- Passed: {summary['passed']}",
+        f"- Failed: {summary['failed']}",
+        f"- Skipped: {summary['skipped']}",
+        "",
+        "### Failures by category",
+        "",
+    ]
+    if merged["failuresByCategory"]:
+        lines += [f"- `{category}` — {count}" for category, count in merged["failuresByCategory"]]
+    else:
+        lines.append("- None")
+
+    lines += ["", "### Top failing directories", ""]
+    if merged["topFailingDirectories"]:
+        lines += [f"- `{directory}` — {count} failure(s)" for directory, count in merged["topFailingDirectories"]]
+    else:
+        lines.append("- None")
+
+    lines += [
+        "",
+        "### CI metadata",
+        f"- Workflow run: {run_url}" if run_url else "- Workflow run: (unknown)",
+        "- Artifact: `wpt-merged`",
+        "",
+        "_Auto-generated by `.github/workflows/wpt-tests.yml`. The full per-shard"
+        " logs and the rerun manifest are attached to the run artifacts._",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--shard-dir", required=True, type=Path, help="Directory containing per-shard JSON reports")
+    parser.add_argument("--merged-json", type=Path, help="Where to write the merged report / rerun manifest")
+    parser.add_argument("--issue-md", type=Path, help="Where to write the Markdown issue body")
+    parser.add_argument("--run-url", default=os.environ.get("WPT_RUN_URL"), help="Workflow run URL for the issue footer")
+    parser.add_argument("--github-output", type=Path, help="Path to $GITHUB_OUTPUT for step outputs")
+    args = parser.parse_args()
+
+    merged = merge(args.shard_dir)
+
+    if args.merged_json:
+        args.merged_json.parent.mkdir(parents=True, exist_ok=True)
+        args.merged_json.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
+
+    if args.issue_md:
+        args.issue_md.parent.mkdir(parents=True, exist_ok=True)
+        args.issue_md.write_text(render_issue_markdown(merged, args.run_url), encoding="utf-8")
+
+    failed = merged["summary"]["failed"]
+    total = merged["summary"]["total"]
+    print(f"Merged {merged['shardCount']} shard(s): {merged['summary']['passed']} passed, "
+          f"{failed} failed, {merged['summary']['skipped']} skipped, {total} total.")
+
+    if args.github_output:
+        with args.github_output.open("a", encoding="utf-8") as handle:
+            handle.write(f"failed_count={failed}\n")
+            handle.write(f"total_count={total}\n")
+            handle.write(f"create_issue={'true' if failed > 0 else 'false'}\n")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
