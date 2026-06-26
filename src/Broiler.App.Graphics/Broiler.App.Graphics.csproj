@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Broiler.App.Graphics</RootNamespace>
+    <AssemblyName>Broiler.Graphics.Browser</AssemblyName>
+    <!-- Preview UI is built entirely on Broiler.Graphics (Win32 + Direct2D); no WPF. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.HTML\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Graphics\Broiler.HTML.Graphics.csproj" />
+    <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
+    <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
+    <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+    <!-- Bridge component connecting HTML rendering with JavaScript execution -->
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
+  </ItemGroup>
+
+  <!-- Platform-neutral pieces shared with the WPF app (Broiler.App). Linked rather than
+       duplicated so both shells stay in lock-step until the WPF app is retired. -->
+  <ItemGroup>
+    <Compile Include="..\Broiler.App\Rendering\RenderingPipeline.cs" Link="Rendering\RenderingPipeline.cs" />
+    <Compile Include="..\Broiler.App\Rendering\PageLoader.cs" Link="Rendering\PageLoader.cs" />
+    <Compile Include="..\Broiler.App\Rendering\IPageLoader.cs" Link="Rendering\IPageLoader.cs" />
+    <Compile Include="..\Broiler.App\FavoritesManager.cs" Link="FavoritesManager.cs" />
+  </ItemGroup>
+
+</Project>

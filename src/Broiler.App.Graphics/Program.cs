@@ -1,0 +1,61 @@
+using System;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Loader;
+using System.Runtime.Versioning;
+
+namespace Broiler.App.Graphics;
+
+/// <summary>
+/// Entry point for the Broiler browser built on Broiler.Graphics (Win32 + Direct2D).
+/// This is the preview shell that replaces the WPF host (<c>Broiler.App</c>).
+/// </summary>
+[SupportedOSPlatform("windows7.0")]
+internal static class Program
+{
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        // The HTML stack pulls in two physically distinct builds of the same-identity
+        // assemblies (e.g. Broiler.Dom is checked out under both Broiler.DOM and the
+        // CSS submodule). MSBuild dedups them and drops their runtime entry from deps.json,
+        // so the host never probes for them even though the DLLs are in the output folder.
+        // Fall back to loading any such assembly directly from the application directory.
+        AssemblyLoadContext.Default.Resolving += ResolveFromAppDirectory;
+
+        _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
+
+        string? initialUrl = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : null;
+
+        try
+        {
+            using var window = new BrowserWindow(initialUrl);
+            return window.Run();
+        }
+        catch (Exception ex)
+        {
+            MessageBox(IntPtr.Zero, ex.ToString(), "Broiler", MbIconError | MbOk);
+            return 1;
+        }
+    }
+
+    private static Assembly? ResolveFromAppDirectory(AssemblyLoadContext context, AssemblyName name)
+    {
+        if (string.IsNullOrEmpty(name.Name))
+            return null;
+
+        string candidate = Path.Combine(AppContext.BaseDirectory, name.Name + ".dll");
+        return File.Exists(candidate) ? context.LoadFromAssemblyPath(candidate) : null;
+    }
+
+    private const uint MbOk = 0x00000000;
+    private const uint MbIconError = 0x00000010;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBox(IntPtr hwnd, string text, string caption, uint type);
+}
