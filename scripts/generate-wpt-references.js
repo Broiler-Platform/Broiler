@@ -30,14 +30,31 @@ const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const DEFAULT_CONCURRENCY = 8;
 
-/** Recursively discover test files. */
+/**
+ * WPT crashtests (filename ending in `-crash.{html,htm,xhtml}`) are security
+ * regression tests that deliberately try to crash the browser engine.  They
+ * are not reftests, never have a reference screenshot, and — by design — kill
+ * the Chromium renderer when loaded.  Skip them so they neither waste a render
+ * slot nor poison the worker that loads them.
+ */
+function isCrashTest(name) {
+    // Matches `foo-crash.html` as well as flagged variants like
+    // `foo-crash.https.html` (WPT appends `.flag` segments before the
+    // extension).
+    return /-crash(?:\.[^.]+)*\.(?:html|htm|xhtml)$/i.test(name);
+}
+
+/** Recursively discover test files (excluding WPT crashtests). */
 function discoverTests(dir) {
     const results = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
             results.push(...discoverTests(full));
-        } else if (TEST_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+        } else if (
+            TEST_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) &&
+            !isCrashTest(entry.name)
+        ) {
             results.push(full);
         }
     }
@@ -124,40 +141,47 @@ function ensureDir(filePath) {
     let errors = 0;
     const total = testFiles.length;
 
+    // Intercept root-relative /fonts/ requests and serve them from the
+    // local fonts directory.  WPT tests use paths like /fonts/ahem.css
+    // which a real WPT server resolves relative to the WPT root.  When
+    // loading via file://, Chrome resolves them as file:///fonts/... which
+    // does not exist on disk.  Playwright can intercept these requests via
+    // context.route() for both http:// and file:// origin requests.
+    async function fontRouteHandler(route) {
+        const url = route.request().url();
+        // Strip the file:///fonts/ prefix to get the filename/subpath.
+        const subpath = decodeURIComponent(url.replace(/^file:\/\/\/fonts\//i, ''));
+        const localPath = path.join(localFontsDir, subpath);
+        if (fs.existsSync(localPath)) {
+            const body = fs.readFileSync(localPath);
+            const ext = path.extname(localPath).toLowerCase();
+            const contentType =
+                ext === '.css'  ? 'text/css; charset=utf-8' :
+                ext === '.ttf'  ? 'font/truetype' :
+                ext === '.otf'  ? 'font/opentype' :
+                ext === '.woff' ? 'font/woff' :
+                ext === '.woff2'? 'font/woff2' :
+                'application/octet-stream';
+            await route.fulfill({ status: 200, contentType, body });
+        } else {
+            await route.abort('failed');
+        }
+    }
+
+    // Create a fresh context + page, registering the font route.  Used both
+    // for a worker's initial page and to recover after a renderer crash.
+    async function newRenderTarget() {
+        const context = await browser.newContext({ viewport: VIEWPORT });
+        if (hasFontsDir) {
+            await context.route(/file:\/\/\/fonts\//i, fontRouteHandler);
+        }
+        const page = await context.newPage();
+        return { context, page };
+    }
+
     // Worker function — processes one file at a time from the queue.
     async function worker(queue) {
-        const context = await browser.newContext({ viewport: VIEWPORT });
-
-        // Intercept root-relative /fonts/ requests and serve them from the
-        // local fonts directory.  WPT tests use paths like /fonts/ahem.css
-        // which a real WPT server resolves relative to the WPT root.  When
-        // loading via file://, Chrome resolves them as file:///fonts/... which
-        // does not exist on disk.  Playwright can intercept these requests via
-        // context.route() for both http:// and file:// origin requests.
-        if (hasFontsDir) {
-            await context.route(/file:\/\/\/fonts\//i, async (route) => {
-                const url = route.request().url();
-                // Strip the file:///fonts/ prefix to get the filename/subpath.
-                const subpath = decodeURIComponent(url.replace(/^file:\/\/\/fonts\//i, ''));
-                const localPath = path.join(localFontsDir, subpath);
-                if (fs.existsSync(localPath)) {
-                    const body = fs.readFileSync(localPath);
-                    const ext = path.extname(localPath).toLowerCase();
-                    const contentType =
-                        ext === '.css'  ? 'text/css; charset=utf-8' :
-                        ext === '.ttf'  ? 'font/truetype' :
-                        ext === '.otf'  ? 'font/opentype' :
-                        ext === '.woff' ? 'font/woff' :
-                        ext === '.woff2'? 'font/woff2' :
-                        'application/octet-stream';
-                    await route.fulfill({ status: 200, contentType, body });
-                } else {
-                    await route.abort('failed');
-                }
-            });
-        }
-
-        const page = await context.newPage();
+        let { context, page } = await newRenderTarget();
 
         while (queue.length > 0) {
             const testFile = queue.pop();
@@ -183,6 +207,23 @@ function ensureDir(filePath) {
                     console.error(`  ⚠ Failed: ${rel}: ${err.message || err}`);
                 }
                 errors++;
+
+                // A renderer crash leaves `page` permanently dead: every
+                // subsequent goto on it throws "Page crashed", so a single
+                // crashing test would cascade into hundreds of false failures
+                // for unrelated files this worker later picks up.  Rebuild the
+                // context+page so the worker recovers and keeps going.
+                const crashed = page.isClosed() ||
+                    /crash|Target (?:closed|page).*closed|browser has been closed/i.test(String(err && err.message));
+                if (crashed) {
+                    try { await context.close(); } catch { /* already gone */ }
+                    try {
+                        ({ context, page } = await newRenderTarget());
+                    } catch (rebuildErr) {
+                        console.error(`  ⚠ Failed to recover worker after crash: ${rebuildErr.message || rebuildErr}`);
+                        break;   // browser itself is unusable; let other workers finish.
+                    }
+                }
             }
 
             completed++;
@@ -192,8 +233,8 @@ function ensureDir(filePath) {
             }
         }
 
-        await page.close();
-        await context.close();
+        try { await page.close(); } catch { /* may already be closed */ }
+        try { await context.close(); } catch { /* may already be closed */ }
     }
 
     // Shallow-copy as a mutable queue (pop from end is O(1)).
