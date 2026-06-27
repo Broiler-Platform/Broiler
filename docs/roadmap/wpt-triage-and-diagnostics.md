@@ -25,6 +25,20 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 7 | Prefixed-attribute DOM crash (`xlink:href`) | ✅ merged | Broiler.DOM |
 | 8 | `display:inline-table` dropped by value validator (300 drops → MissingContent) | ✅ fixed | Broiler.CSS |
 | 9 | Abspos block-axis `align-self` (unresolved CB height + no height-shrink) | ✅ fixed | Broiler.Layout |
+| 10 | `@position-try` fallback dropped by comment-in-body parse bug | 🟡 partial | Broiler.HtmlBridge.Dom |
+
+Cluster 10 (issue [#1105](https://github.com/MaiRat/Broiler/issues/1105), the
+`css-anchor-position` position-try/fallback sub-cluster, ~23 tests) was a parse bug in
+the hand-rolled `@position-try` reader (`AnchorResolver/PositionTry.cs`). Its
+`ParsePositionTryRules` split each rule body on `;`/`:` **without stripping CSS comments**,
+so a comment inside a fallback body — ubiquitous in these WPT files, e.g.
+`/* 2: Position to the right of the anchor. */` — had its `:` mistaken for a declaration
+separator. The real declarations (`left: anchor(--a right)`, …) were silently dropped and the
+fallback applied with the *base* style's insets. Found by reproducing `position-try-002.html`
+against the live renderer (orange target rendered 400×100 at offset-x=0 instead of 200×100 at
+offset-x=200); fixed by stripping `/*…*/` before matching (`CssCommentPattern`). Regression test
+`PositionTryFallbackTests`. The cluster is **partial** — see the position-try sub-tasks checklist
+below for what remains.
 
 Cluster 9 was the deferred "abspos block-axis paint double-apply" blocker below — but
 the real root cause, found by reproducing `align-self-htb-ltr-htb.html` against the live
@@ -58,6 +72,40 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
   static (auto-inset) block-axis model re-added on top of the now-correct block-axis
   apply; the `align-self`/`justify-self` *inset* path (cluster 9) is the prerequisite
   that is now in place.
+
+### Position-try fallback — sub-task checklist (cluster 10)
+
+The `@position-try` fallback resolver (`AnchorResolver/PositionTry.cs`) runs as a static
+pre-pass: it detects whether the base style overflows the inset-modified containing block and,
+if so, rewrites the element's inline insets to the first fallback that *fits*. Tracking the
+pieces so the cluster can be closed incrementally:
+
+- [x] **Comment-in-body parse** — strip `/*…*/` from `@position-try` bodies before declaration
+  parsing. ✅ done (cluster 10), verified by `position-try-002.html` + `PositionTryFallbackTests`.
+- ⛔ **Grid-area containing block** — *blocked on real grid track layout* (see "Real flex/grid
+  layout" below), **not** on the position-try resolver. An abspos grid item's containing block is
+  its **grid area**, and `FindContainingBlockWidth` (`InlineContainingBlocks.cs:43`) does return the
+  viewport (1024px) for an auto-width grid CB — but fixing only that is futile here. Probing
+  `position-try-grid-001.html` against the live renderer shows Broiler lays the grid out as a
+  **vertical block stack**, not 4 columns: the orange anchor renders at ~(23, 133) (far left,
+  stacked) instead of grid column 2 at ~(115, 70), and the gray items form a thin vertical strip.
+  The anchor is in grid *flow*, so it is mislaid before position-try runs; the Broiler-vs-Chromium
+  pixel compare already mismatches on the anchor alone. Grid-area CB math (track resolution +
+  `grid-column`/`grid-row` line placement → area rect, then offset the resolved insets by the area
+  origin) becomes worthwhile **only once grid tracks are actually laid out**. Deferred behind the
+  flex/grid feature; revisit then.
+- [ ] **Fit-check geometry parity** — the resolver re-implements anchor coords / CB sizing
+  approximately (its own `ResolveAnchorEdge`, `FindContainingBlock*`, `EstimateMinContentWidth`),
+  so its "fits?" decision can diverge from what the layout engine actually produces. Longer-term:
+  drive the fit-check from real laid-out rects rather than a parallel estimator.
+- [ ] **`last-successful-*` (stateful)** — the CSS "last successful position option" is stateful
+  across layout passes / fallback mutation; not reproducible in a one-shot static renderer
+  without modelling the position-option history. Large; see the LayoutShift note below.
+- [ ] **Cascade interactions** (`position-try-cascade.html`) — `@position-try` vs `!important` /
+  animations / transitions / `revert` / `revert-layer`. Requires cascade-origin tracking the
+  pre-pass does not have. Large.
+- [ ] **`try-tactic` flips** (`flip-block` / `flip-inline` / `flip-start`) — the other fallback
+  mechanism (axis-mirroring tactics) distinct from named `@position-try` rules. Not yet modelled.
 
 ### Remaining failure landscape (after the merged clusters)
 
@@ -217,3 +265,9 @@ consume it), not a temporary shim.
    diffs; biggest diagnostic payoff.
 4. **Abspos *static-position* alignment (cluster 3)** — now unblocked by the
    block-axis `align-self` fix (cluster 9); re-add the static (auto-inset) model.
+5. **Position-try fallback (cluster 10)** — the comment-parse win is shipped; the
+   remaining sub-tasks (see the cluster-10 checklist) are all large or blocked. The
+   highest-value *unblocked* one is **fit-check geometry parity** (drive the
+   "fits?" decision from real laid-out rects instead of the resolver's parallel
+   estimator); **grid-area CB** is gated on real grid track layout; `last-successful`
+   and cascade interactions need stateful cascade modelling the static pre-pass lacks.

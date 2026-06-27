@@ -15,6 +15,9 @@ public sealed partial class DomBridge
     private static readonly System.Text.RegularExpressions.Regex PositionTryParsePattern = new(
         @"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly System.Text.RegularExpressions.Regex CssCommentPattern = new(
+        @"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Singleline);
     /// <summary>
     /// Parses all <c>@position-try</c> at-rules from <c>&lt;style&gt;</c>
     /// elements, returning a dictionary mapping rule name to its property
@@ -36,7 +39,11 @@ public sealed partial class DomBridge
             {
                 if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
                 {
-                    foreach (Match m in PositionTryParsePattern.Matches(child.TextContent))
+                    // Strip CSS comments first: a comment inside a @position-try
+                    // body (common in WPT, e.g. "/* 2: position right */") contains
+                    // ':' and ';' that would otherwise corrupt declaration parsing.
+                    var styleText = CssCommentPattern.Replace(child.TextContent, " ");
+                    foreach (Match m in PositionTryParsePattern.Matches(styleText))
                     {
                         var name = m.Groups["name"].Value;
                         var body = m.Groups["body"].Value;
