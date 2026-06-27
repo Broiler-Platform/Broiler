@@ -82,6 +82,7 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
     seen_failures: set[str] = set()
     directory_counter: Counter[str] = Counter()
     category_counter: Counter[str] = Counter()
+    dropped_declaration_counter: Counter[str] = Counter()
     problem_groups: dict[str, dict] = {}
     reported_shard_indexes: set[int] = set()
 
@@ -98,6 +99,18 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         failed += int(summary.get("failed", 0) or 0)
         skipped += int(summary.get("skipped", 0) or 0)
         total += int(summary.get("total", 0) or 0)
+
+        # CSS declarations the style engine dropped as invalid/unsupported. A
+        # high cross-shard count usually points at a missing feature that
+        # silently gates many tests (see issue #1100).
+        triage = report.get("triage")
+        if isinstance(triage, dict):
+            for entry in triage.get("droppedDeclarations", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                declaration = entry.get("declaration")
+                if declaration:
+                    dropped_declaration_counter[str(declaration)] += int(entry.get("count", 0) or 0)
 
         for result in report.get("results", []):
             if not isinstance(result, dict):
@@ -182,6 +195,7 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         "topProblems": top_problems,
         "topFailingDirectories": directory_counter.most_common(problem_limit),
         "failuresByCategory": category_counter.most_common(),
+        "droppedDeclarations": dropped_declaration_counter.most_common(problem_limit),
         "results": failures,
     }
 
@@ -215,6 +229,20 @@ def render_issue_markdown(merged: dict, run_url: str | None) -> str:
         lines += [f"- `{directory}` — {count} failure(s)" for directory, count in merged["topFailingDirectories"]]
     else:
         lines.append("- None")
+
+    # Silently-dropped CSS declarations: a high count usually means a single
+    # unsupported value is gating many tests (e.g. text-align:-webkit-right).
+    dropped = merged.get("droppedDeclarations") or []
+    if dropped:
+        lines += [
+            "",
+            f"### Top {merged['problemLimit']} dropped CSS declarations",
+            "",
+            "_Values the style engine rejected as invalid/unsupported. A high count"
+            " often points at a missing feature gating many tests._",
+            "",
+        ]
+        lines += [f"- `{declaration}` — {count} occurrence(s)" for declaration, count in dropped]
 
     lines += [
         "",
