@@ -23,16 +23,41 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 5 | `justify-self` yields to auto margins | ✅ merged | Broiler.Layout |
 | 6 | `justify-self`/`justify-items`/`-webkit-*` tandem | ✅ merged | Broiler.CSS + Broiler.Layout |
 | 7 | Prefixed-attribute DOM crash (`xlink:href`) | ✅ merged | Broiler.DOM |
+| 8 | `display:inline-table` dropped by value validator (300 drops → MissingContent) | ✅ fixed | Broiler.CSS |
+| 9 | Abspos block-axis `align-self` (unresolved CB height + no height-shrink) | ✅ fixed | Broiler.Layout |
+
+Cluster 9 was the deferred "abspos block-axis paint double-apply" blocker below — but
+the real root cause, found by reproducing `align-self-htb-ltr-htb.html` against the live
+renderer, was **two layout defects**, not a paint double-apply in the current code:
+(1) `GetAbsoluteContainingBlockPaddingBox` derived the containing block's height from
+`cb.ActualBottom`, which is unresolved when an abspos descendant aligns on the block axis
+(heights resolve bottom-up; widths top-down — hence inline `justify-self` worked but block
+`align-self` produced `cbPadHeight≈0` → `dy=0` → box stuck at its static position); and
+(2) a non-stretch `align-self` computed the right offset but never shrank the box from the
+stretched inset height to its content height. Fixed both in `CssBox`; the inline axis was
+already correct. Regression test `AbsposBlockAxisAlignTests` locks start/center/end/stretch.
+
+Cluster 8 was the **first win surfaced by diagnostic #1** (dropped-declaration logging):
+issue [#1103](https://github.com/MaiRat/Broiler/issues/1103)'s "Top dropped CSS declarations"
+section flagged `display: inline-table` **300×** alongside the #1 failure category
+(`PixelMismatch / MissingContent`, 344, concentrated in `css-anchor-position` + `css-align`).
+The `display` allowlist in `CssStyleEngine.Values.cs` (`IsAcceptableDeclarationValue`) omitted
+`inline-table` even though the layout engine + paint walker fully render it, so the renderer
+cascade (Phase 5 routes through this engine) silently dropped it and the boxes collapsed. Same
+shape as cluster 6's `-webkit-right`. Fix added `inline-table` (the real win) plus the other
+valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
-- **Abspos block-axis paint double-apply** (blocks cluster 3). The *layout* is
-  correct (`Location.Y` lands right, single `OffsetTop`), but the renderer paints
-  the block-axis offset twice (`static + 2·dy`); the inline axis paints fine.
-  This lives in the render path, not in `Broiler.Layout`. Fixing it unblocks the
-  ~10 `css-align/abspos/*-static-position-*` tests (whose layout fix is already
-  validated and can be re-applied) and likely helps abspos block-axis cases in
-  `css-anchor-position`. **Highest-value layout/paint follow-up.**
+- **Abspos block-axis `align-self`** — ✅ fixed (cluster 9 above). The earlier
+  "paint double-apply" diagnosis was superseded: re-reproducing against the live
+  renderer showed the box was stuck at its static position (offset `dy=0`) because
+  the containing block's height was unresolved, plus a missing content-height
+  shrink. Both were in `Broiler.Layout`, not the render path.
+- **Abspos *static-position* alignment (cluster 3)** — still deferred. It needs the
+  static (auto-inset) block-axis model re-added on top of the now-correct block-axis
+  apply; the `align-self`/`justify-self` *inset* path (cluster 9) is the prerequisite
+  that is now in place.
 
 ### Remaining failure landscape (after the merged clusters)
 
@@ -50,6 +75,15 @@ gates on substantial features:
   + overflow + `vertical-align`→`align-self` mapping).
 - **Shadow DOM `::part`** — `animation-name-in-shadow-part*`.
 - **Scroll-driven anchor positioning** — the large `anchor-scroll-*` family.
+
+> **`css-anchor-position` LayoutShift cluster (58, issue #1103) — triaged, no single fix.**
+> These are the residual hard tail, *not* one systematic bug: 550 tests pass including the
+> simple anchor cases, so the anchor-resolution core (the mature 8-step heuristic pipeline in
+> `src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/`) is correct. The representative
+> failures are advanced/dynamic gaps — `last-successful-*` (the CSS "last successful position
+> option" is stateful across layout passes / fallback mutation → not reproducible in a static
+> one-shot renderer) and `anchor-position-multicol-fixed` (multicol + `anchor-size()` + fixed).
+> Enumerating the exact 58 from the merged artifact is currently impossible — see diagnostic #10.
 
 ---
 
@@ -131,6 +165,29 @@ classification is visible, not hidden in the failure total.
 See what a test *claims* to verify — the fastest way to spot that a `css-align`
 failure is actually a paint/parse bug.
 
+### #10 — Preserve per-test `subCategory` in the merged `results` (small, do next)
+
+*Motivated by the `css-anchor-position` LayoutShift triage above.* The per-shard
+report already carries the pixel-mismatch sub-category per test
+(`mismatchDiagnostics.subCategory`, e.g. `LayoutShift` / `MissingContent` /
+`ColorShift`), and `merge-wpt-shards.py` uses it for the **aggregate** "Top
+problems" section. But the merged **`results`** array — the persisted per-test
+record attached to the issue/artifact and consumed by `--rerun-json` — keeps only
+`relativeTestPath` / `passed` / `skipped` / `category`. The sub-category is
+**dropped**, so a cluster like "the 58 LayoutShift tests" cannot be enumerated
+from the artifact after the fact (only the 3 example paths in `topProblems`
+survive), which is exactly what blocked the triage above.
+
+**Change** (one line, no new computation): in `merge-wpt-shards.py::merge`, the
+loop already computes `sub_category` via `_problem_identity(result)` right after
+building the `failure` dict — add `failure["subCategory"] = sub_category` (or move
+the `_problem_identity` call above the dict literal and include the field). This
+makes every failing-test record self-describing: filtering the merged artifact by
+`subCategory == "LayoutShift"` then yields the full list directly. Backward-
+compatible (additive field; `--rerun-json` ignores unknown keys). Add a merge
+unit test asserting the field round-trips (mirrors
+`test_merge_aggregates_dropped_declarations`).
+
 ---
 
 ## 3. Performance & permanence of the diagnostics hook
@@ -158,5 +215,5 @@ consume it), not a temporary shim.
    classified most of this session's "misleading category" failures correctly.
 3. **#4** — convert the most common `css-align` test shape into exact numeric
    diffs; biggest diagnostic payoff.
-4. **Abspos block-axis paint double-apply** — the one layout/paint follow-up that
-   unblocks an already-validated fix (cluster 3) and helps anchor-position.
+4. **Abspos *static-position* alignment (cluster 3)** — now unblocked by the
+   block-axis `align-self` fix (cluster 9); re-add the static (auto-inset) model.
