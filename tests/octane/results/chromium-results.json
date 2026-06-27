@@ -1,0 +1,74 @@
+{
+  "engine": "chromium",
+  "engineLabel": "Chromium 149.0.7827.55",
+  "octaneVersion": "9",
+  "perSuiteTimeoutSec": 180,
+  "benchmarks": {
+    "Richards": 47661,
+    "DeltaBlue": 136983,
+    "Crypto": 54816,
+    "RayTrace": 152660,
+    "EarleyBoyer": 107010,
+    "RegExp": 12936,
+    "Splay": 64989,
+    "SplayLatency": 103730,
+    "NavierStokes": 51443,
+    "PdfJS": 93507,
+    "Mandreel": 62584,
+    "MandreelLatency": 101739,
+    "Gameboy": 146337,
+    "CodeLoad": 38151,
+    "Box2D": 148019,
+    "zlib": 115594,
+    "Typescript": 148262
+  },
+  "suiteStatus": {
+    "Richards": {
+      "status": "ok"
+    },
+    "DeltaBlue": {
+      "status": "ok"
+    },
+    "Crypto": {
+      "status": "ok"
+    },
+    "RayTrace": {
+      "status": "ok"
+    },
+    "EarleyBoyer": {
+      "status": "ok"
+    },
+    "RegExp": {
+      "status": "ok"
+    },
+    "Splay": {
+      "status": "ok"
+    },
+    "NavierStokes": {
+      "status": "ok"
+    },
+    "PdfJS": {
+      "status": "ok"
+    },
+    "Mandreel": {
+      "status": "ok"
+    },
+    "Gameboy": {
+      "status": "ok"
+    },
+    "CodeLoad": {
+      "status": "ok"
+    },
+    "Box2D": {
+      "status": "ok"
+    },
+    "zlib": {
+      "status": "ok"
+    },
+    "Typescript": {
+      "status": "ok"
+    }
+  },
+  "geomean": 79915,
+  "generatedAt": "2026-06-27T16:34:30.991Z"
+}
