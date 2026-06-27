@@ -98,17 +98,14 @@ public sealed partial class DomBridge
                 return el;
         }
 
-        // Fall back to CSS rules.
+        // Fall back to the shared cascade.
         foreach (var el in Elements)
         {
             if (el.IsTextNode) continue;
-            foreach (var (sel, _, decls) in EnumerateScopedStyleRules(el))
-            {
-                if (MatchesSelector(el, sel) &&
-                    decls.TryGetValue("anchor-name", out var name) &&
-                    string.Equals(name.Trim(), anchorName, StringComparison.Ordinal))
-                    return el;
-            }
+            var declarations = CollectMatchedRuleProperties(el);
+            if (declarations.TryGetValue("anchor-name", out var name) &&
+                string.Equals(name.Trim(), anchorName, StringComparison.Ordinal))
+                return el;
         }
         return null;
     }

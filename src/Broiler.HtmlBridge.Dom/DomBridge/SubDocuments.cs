@@ -1179,7 +1179,7 @@ public sealed partial class DomBridge
             }
         }
 
-        ExtractStyleBlocks(SerializeToHtml());
+        ResetComputedStyleEngines();
         InvalidateStyleScope(element);
     }
 
@@ -1227,7 +1227,7 @@ public sealed partial class DomBridge
             }
         }
 
-        ExtractStyleBlocks(SerializeToHtml());
+        ResetComputedStyleEngines();
         InvalidateStyleScope(parent);
     }
 

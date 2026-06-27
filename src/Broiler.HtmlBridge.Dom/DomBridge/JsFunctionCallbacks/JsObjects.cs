@@ -1559,7 +1559,7 @@ public sealed partial class DomBridge
         var nodes = BuildAdjacentHtmlNodes(parsingContext, html);
         foreach (var node in nodes)
             InsertNodeAt(parent, node, index++);
-        ExtractStyleBlocks(SerializeToHtml());
+        ResetComputedStyleEngines();
         return JSUndefined.Value;
     }
 

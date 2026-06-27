@@ -22,13 +22,7 @@ public sealed partial class DomBridge
         DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
-        var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(element))
-        {
-            if (MatchesSelector(element, selector))
-                foreach (var kv in declarations)
-                    cssProps[kv.Key] = kv.Value;
-        }
+        var cssProps = CollectMatchedRuleProperties(element);
 
         bool hasAnchorRef = false;
         bool hasAnchorSizeRef = false;

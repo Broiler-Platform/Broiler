@@ -4,7 +4,8 @@
 
 **Audit date:** 2026-06-27
 
-**Audited baseline:** `114b31bd` (`main`) plus the test-path correction made by this audit
+**Audited baseline:** `decbb55c` plus the RF-CSS-1/RF-CSS-2 working-tree changes
+recorded below
 
 This register is the closeout authority for the refactors described by:
 
@@ -23,7 +24,7 @@ gates are satisfied.
 
 | Refactor | Current state | Complete? |
 |---|---|---|
-| CSS | Phases 0-6 are implemented and the shared paths default on. Phase 7 cleanup and legacy retirement remain. | No |
+| CSS | Phases 0-6 are implemented. Phase 7 has retired the bridge/renderer fallbacks, bridge rule tuple store, and `Broiler.HTML.CSS` assembly; the public `CssData` adapter tail remains. | No |
 | Renderer layout | The engine and namespace move to `Broiler.Layout` is complete and its dependency boundary is green. Cleanup and final visual/conformance closeout remain. | No |
 | DOM/HTML | The canonical `Broiler.Dom`/`Broiler.Dom.Html` model is implemented and is the default typed hand-off. Compatibility tree/parser surfaces and deferred behavior remain. | No |
 | HtmlBridge layout | The separate Track C extraction/unification has not started. | No |
@@ -32,28 +33,25 @@ gates are satisfied.
 
 ### RF-CSS-1 — Complete Phase 7 compatibility cleanup
 
-Evidence on the audited tree:
+Evidence on the current tree:
 
-- four production projects still reference `Broiler.HTML.CSS` (`Broiler.HTML`,
-  `Broiler.HTML.Dom`, `Broiler.HTML.Orchestration`, and `Broiler.HTML.WPF`);
+- no production project references the former `Broiler.HTML.CSS` project;
+- `DomBridge` no longer contains `_cssRules`, `BuildComputedStyleMapLegacy`,
+  `ParseAndApplyCssRules`, `EnumerateScopedStyleRules`, or its manual stylesheet
+  parser/cascade path;
+- the renderer no longer has the `UseSharedRendererCascade` fallback; and
 - `Broiler.HTML.Core.CssData` remains in public Image, Graphics, WPF, adapter,
-  container, stylesheet-event, and tooling APIs;
-- `DomBridge` still contains `_cssRules`, `BuildComputedStyleMapLegacy`, and its
-  parser/selector compatibility path; and
-- the renderer still retains the `UseSharedRendererCascade` fallback and legacy
-  `CssData`-based helpers.
+  container, stylesheet-event, and tooling APIs.
 
 Close when no production project references `Broiler.HTML.CSS`, public callers have
 an approved migration/compatibility story, the bridge and renderer legacy parsers
 and selectors are retired, and broad compatibility-only `InternalsVisibleTo` grants
 are trimmed.
 
-#### Progress — internal dual-run fallbacks retired (2026-06-27)
+#### Progress — legacy runtime ownership retired (2026-06-27)
 
-Decision: public `CssData` keeps a one-release adapter (deferred); internal fallbacks
-first. Landed this pass (no behaviour change — both removed paths were already dead at
-runtime; focused suites unchanged at the documented 6-failure baseline, full
-`Broiler.slnx` build green):
+Decision: public `CssData` keeps a one-release adapter while internal runtime
+ownership moves to the shared model. Landed:
 
 - **Renderer `UseSharedRendererCascade` fallback — retired.** The flag is gone and the
   legacy `else` branch in `DomParser.CascadeApplyStyles` (the `AssignCssBlocks`
@@ -68,34 +66,63 @@ runtime; focused suites unchanged at the documented 6-failure baseline, full
   through `BuildComputedStyleMapViaEngine`. Removed ~565 lines of orphaned legacy
   computed-style helpers (the custom-property registration/resolution cluster,
   `ResolveCssWideKeywordProperties`/`IsInheritedCssProperty`, and the relative
-  font-weight cluster). `ParseAndApplyCssRules` is retained (still used by
-  `BuildSpecifiedStyleMap`).
+  font-weight cluster).
+- **Bridge tuple cascade — retired.** `_cssRules` and its parse/match/apply helpers
+  are deleted. Computed-style, specified-style, mutation invalidation, anchors,
+  visibility, and `::backdrop` now query `CssStyleEngine`. The public `CssRules`
+  member is an obsolete on-demand projection only; architecture tests prevent it
+  from becoming runtime state again.
+- **Legacy project — removed.** `Broiler.HTML.CSS.csproj` is gone from both solution
+  graphs and all project references. Its short-lived compatibility parser source is
+  compiled into `Broiler.HTML.Orchestration`; the namespace is preserved for source
+  compatibility, but there is no separate production assembly. Obsolete friend grants
+  to the removed assembly were deleted.
+- **`CssData` adapter — started.** It now carries the canonical immutable
+  `Broiler.CSS.CssStyleSheet`, combines/clones that shared model, and is explicitly
+  documented as a one-release adapter. Image, Graphics, and WPF expose
+  `ParseStyleSheetModel` as the new shared-model entry point.
 
-Still open under RF-CSS-1 (unchanged):
+Still open under RF-CSS-1:
 
-- **`_cssRules` field is NOT retired.** It is not a fallback but the bridge's live
-  primary cascade: `InvalidateElementStyles` (mutation-time re-cascade into
-  `element.Style`) and the anchor scans (`AnchorRegistry.GetComputedProps`,
-  `EnumerateScopedStyleRules`) still read it. Removing it requires migrating that
-  mutation cascade and the anchor declared-value collection onto the shared engine —
-  an observable, anchor-positioning-sensitive change that the roadmap has never
-  pixel-validated. It should be a dedicated, pixel-gated pass (fold into RF-CSS-2's
-  gates), not a blind internal edit. (`ApplyCascadedStyles` appears to have no caller
-  and is a separate dead-code follow-up.)
-- Public `CssData` facade migration (one-release adapter), removal of
-  `Broiler.HTML.CSS` + obsolete `Broiler.HTML.Core` CSS models (and the
-  `CssExtractionPhase*` friend-list guard updates that gates), and the
-  `InternalsVisibleTo` trim — all still pending.
+- migrate the remaining public render/container/stylesheet-event signatures from
+  `CssData` to `CssStyleSheet` or an approved style-set API, then mark the old
+  signatures obsolete for the compatibility window;
+- migrate renderer-only pseudo-element, animation, selection, serialization, and
+  font-face consumers off the legacy `CssData` block indexes so those obsolete
+  `Broiler.HTML.Core` models can be removed; and
+- audit and trim the remaining broad renderer/layout `InternalsVisibleTo` grants.
 
 ### RF-CSS-2 — Record final CSS cutover validation
 
-The focused unit and architecture suites are green, but the roadmap definition of
-done also requires current Acid, WPT, pixel, and performance evidence after legacy
-retirement. Historical intermediate records disagree about which heavy suites were
-run, so they are not sufficient closeout evidence.
+The repeatable runner is `scripts/run-rf-css-validation.ps1`. It serially rebuilds
+the solution and every standalone test assembly it executes, emits TRX files and a
+Markdown summary, rejects failures outside the explicit baseline, and optionally
+runs visual and performance gates.
 
-Close by recording the exact baseline, commands, pass/fail deltas, artifacts, and
-accepted deviations from a post-RF-CSS-1 run.
+Current post-cutover evidence (`artifacts/rf-css-validation/verified`, 2026-06-27):
+
+- CSS kernel 22/22, CSS DOM 49/49, extraction architecture 20/20, and bridge
+  mutation/cascade 21/21 passed;
+- broad CLI CSS: 151 passed and the five pre-existing selector/invalidation cases
+  remained accepted (`Has_NthChild_Invalidation_Tracks_Removals`,
+  `Root_Matches_DocumentElement_Only`,
+  `Has_GeneralSibling_NestedNthChild_Invalidation_Tracks_Removals`,
+  `Lang_Matches_XmlLang_Ancestor`, and
+  `Has_IsAndWhereWrappedSelectors_Invalidation_Tracks_Removals`);
+- Acid3 CSS/layout: 65 passed with two accepted cascade failures; WPT anchor/
+  visibility/backdrop: 17 passed with the same nine accepted pixel failures; no new
+  visual failure or former-assembly load failure appeared. Synchronizing the image
+  compatibility provider's lazy registration also removed two order-dependent Acid
+  harness failures; and
+- the clean no-build benchmark confirmation was within the 2% budget on all gated
+  metrics (`html.raster` 168.675 ms, `bridge.mutation` 916,890 ns/op,
+  `js.startup` 1.459 ms). The immediately preceding build-loaded sample was noisy and
+  failed only `html.raster`; the runner now builds before launching the timed process
+  with `--no-build` to keep compilation outside sampling.
+
+RF-CSS-2 remains open only as a final closeout gate after the public/renderer adapter
+tail in RF-CSS-1 changes; rerun with `-IncludeVisual -IncludePerformance` then record
+any approved baseline delta.
 
 ### RF-LAYOUT-1 — Finish the cleanup phase
 
@@ -158,14 +185,15 @@ retain computed-style, offset-geometry, and bridge-test parity.
 
 ## Verification captured by this audit
 
-- `dotnet build Broiler.slnx --no-restore --nologo`: passed, 0 errors (34 warnings).
+- serial `dotnet build Broiler.slnx`: passed, 0 errors.
 - `Broiler.CSS.Tests`: 22/22 passed.
-- `Broiler.CSS.Dom.Tests`: 46/46 passed.
+- `Broiler.CSS.Dom.Tests`: 49/49 passed.
 - `Broiler.Layout.Tests`: 12/12 passed.
 - `Broiler.Dom.Tests`: 19/19 passed.
 - `Broiler.Dom.Html.Tests`: 4/4 passed.
-- focused CSS/DOM/HtmlBridge extraction and shared-cascade tests in
-  `Broiler.Cli.Tests`: 35/35 passed.
+- RF-CSS extraction + bridge mutation groups: 41/41 passed.
+- visual and broad CSS results, accepted baselines, and performance evidence are
+  recorded under RF-CSS-2 above.
 
 The CSS architecture tests initially failed only because their project locator still
 assumed the old `src/` checkout shape. This audit made both locators accept the current
@@ -173,7 +201,7 @@ submodule layout and retained the old layout as a supported fallback.
 
 ## Closeout order
 
-1. Complete CSS Phase 7 and retire its dual-run fallbacks (RF-CSS-1).
+1. Complete the public/renderer `CssData` adapter tail (RF-CSS-1).
 2. Trim the renderer layout seam and compatibility grants (RF-LAYOUT-1).
 3. Resolve DOM/HTML compatibility surfaces and deferred geometry (RF-DOM-1/2).
 4. Decide the bridge layout end state, then extract or unify it (RF-BRIDGE-1).

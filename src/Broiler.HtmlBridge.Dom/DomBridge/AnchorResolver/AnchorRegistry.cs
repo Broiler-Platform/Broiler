@@ -21,20 +21,18 @@ public sealed partial class DomBridge
     }
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
-        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(DocumentElement))
+        foreach (var el in Elements)
         {
+            if (el.IsTextNode)
+                continue;
+
+            var declarations = CollectMatchedRuleProperties(el);
             if (!declarations.TryGetValue("anchor-name", out var anchorName))
                 continue;
 
-            foreach (var el in Elements)
-            {
-                if (!MatchesSelector(el, selector))
-                    continue;
-
-                var box = ComputeElementBox(el);
-                if (box != null)
-                    registry[anchorName] = box with { SourceElement = el };
-            }
+            var box = ComputeElementBox(el);
+            if (box != null)
+                registry[anchorName] = box with { SourceElement = el };
         }
     }
     private AnchorInfo? ComputeElementBox(DomElement element)
@@ -211,12 +209,8 @@ public sealed partial class DomBridge
         {
             ApplyUserAgentDisplayDefaults(props, element);
 
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(element, sel))
-                    foreach (var kv in decls)
-                        props[kv.Key] = kv.Value;
-            }
+            foreach (var kv in CollectMatchedRuleProperties(element))
+                props[kv.Key] = kv.Value;
             foreach (var kv in element.Style)
                 props[kv.Key] = kv.Value;
 

@@ -990,8 +990,10 @@ mutable `CssStyleSheet` and invalidating the style engine on CSSOM mutation.
 
 ### Phase 7 - Compatibility cleanup
 
-**Status:** Not implemented as of the 2026-06-27 audit. See
-[`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
+**Status:** In progress as of 2026-06-27. Runtime fallbacks, the bridge tuple
+cascade/parser, and the `Broiler.HTML.CSS` project are retired. Public `CssData`
+signatures, renderer-only compatibility indexes, and broad friend grants remain;
+see [`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
 
 Deliverables:
 
@@ -1010,6 +1012,19 @@ Exit criteria:
 - no parser or selector implementation remains in `DomBridge`;
 - the CSS component has explicit, narrow dependencies and tests;
 - all supported public compatibility decisions are documented.
+
+#### Phase 7 implementation record (2026-06-27)
+
+- Removed both dual-run flags and legacy branches; the shared engine is the sole
+  bridge and renderer cascade authority.
+- Removed bridge `_cssRules`, manual stylesheet parse/apply and selector paths, and
+  migrated anchor/visibility/backdrop/specified-style reads to `CssStyleEngine`.
+- Removed `Broiler.HTML.CSS.csproj` and all production references. Compatibility
+  parser sources compile temporarily into `Broiler.HTML.Orchestration`.
+- Made `CssData` carry the canonical `CssStyleSheet` and added shared-model parse
+  facades for Image, Graphics, and WPF.
+- Added `scripts/run-rf-css-validation.ps1` with architecture, mutation, broad CSS,
+  Acid3, WPT pixel, and performance gates plus explicit accepted baselines.
 
 ## 11. Recommended pull-request slices
 

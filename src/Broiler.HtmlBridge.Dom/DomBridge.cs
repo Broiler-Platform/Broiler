@@ -685,15 +685,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
         _knownNodes.Add(DocumentElement);
 
-        // Extract <style> blocks for getComputedStyle() resolution.
-        // Note: We intentionally do NOT call ApplyCascadedStyles() here.
-        // Merging CSS rules into element.Style would bake them into inline styles,
-        // which persist even after JS changes element classes (e.g. Acid3 bucket
-        // elements change from class="z" to "zPPPP..." but the .z { visibility:
-        // hidden } would remain in their inline style). HtmlRenderer has its own
-        // CSS engine that applies stylesheet rules at render time, so cascaded
-        // styles are correctly resolved without pre-merging.
-        ExtractStyleBlocks(html);
+        // Stylesheet discovery is document-scoped and lazy through the shared
+        // CssStyleEngine. A rebuilt document must not retain the prior engines.
+        ResetComputedStyleEngines();
     }
 
     /// <summary>

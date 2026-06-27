@@ -115,49 +115,22 @@ public sealed partial class DomBridge
         // Alpha-blending: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
         const string defaultBg = "rgb(229, 229, 229)";
 
-        foreach (var (selector, _, declarations) in EnumerateScopedStyleRules(dialog))
+        var declarations = GetSyncedScopedEngine(dialog)
+            .GetCascadedDeclaredValues(dialog, "::backdrop");
+
+        if (declarations.TryGetValue("background", out var bg))
         {
-            // Check for selectors ending in ::backdrop
-            if (!selector.Contains("::backdrop", StringComparison.OrdinalIgnoreCase))
-                continue;
+            if (string.Equals(bg.Trim(), "transparent", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(bg.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+                return "transparent";
+            return bg;
+        }
 
-            // Extract the base selector before ::backdrop
-            var parts = selector.Split("::backdrop", StringSplitOptions.None);
-            if (parts.Length < 2) continue;
-
-            string baseSelector = parts[0].Trim();
-
-            // Check if the base selector matches this dialog
-            bool matches = false;
-            if (string.IsNullOrEmpty(baseSelector) ||
-                string.Equals(baseSelector, "dialog", StringComparison.OrdinalIgnoreCase))
-            {
-                // Bare "::backdrop" or "dialog::backdrop" matches all dialogs
-                matches = string.Equals(dialog.TagName, "dialog", StringComparison.OrdinalIgnoreCase);
-            }
-            else
-            {
-                // Try matching specific selectors like "#target::backdrop"
-                matches = MatchesSelector(dialog, baseSelector);
-            }
-
-            if (matches)
-            {
-                // Check for background or background-color in the declarations
-                if (declarations.TryGetValue("background", out var bg))
-                {
-                    if (string.Equals(bg.Trim(), "transparent", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(bg.Trim(), "none", StringComparison.OrdinalIgnoreCase))
-                        return "transparent";
-                    return bg;
-                }
-                if (declarations.TryGetValue("background-color", out var bgColor))
-                {
-                    if (string.Equals(bgColor.Trim(), "transparent", StringComparison.OrdinalIgnoreCase))
-                        return "transparent";
-                    return bgColor;
-                }
-            }
+        if (declarations.TryGetValue("background-color", out var bgColor))
+        {
+            if (string.Equals(bgColor.Trim(), "transparent", StringComparison.OrdinalIgnoreCase))
+                return "transparent";
+            return bgColor;
         }
 
         return defaultBg;

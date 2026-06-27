@@ -21,7 +21,6 @@
     <InternalsVisibleTo Include="Broiler.HTML.Dom" />
     <InternalsVisibleTo Include="Broiler.HTML" />
     <InternalsVisibleTo Include="Broiler.HTML.Core" />
-    <InternalsVisibleTo Include="Broiler.HTML.CSS" />
     <InternalsVisibleTo Include="Broiler.HTML.Orchestration" />
     <InternalsVisibleTo Include="Broiler.HTML.Image" />
     <InternalsVisibleTo Include="Broiler.HTML.Image.Compat" />

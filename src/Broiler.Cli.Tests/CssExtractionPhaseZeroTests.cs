@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Xml.Linq;
 using Broiler.HTML.Core;
 using Broiler.HTML.Core.Entities;
 using Broiler.HTML.CSS;
@@ -17,25 +16,15 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CssExtractionPhaseZeroTests
 {
-    private static readonly string[] ExpectedCssProjectReferences =
-    [
-        @"..\..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj",
-        @"..\Broiler.HTML.Core\Broiler.HTML.Core.csproj",
-        @"..\Broiler.HTML.Primitives\Broiler.HTML.Primitives.csproj",
-        @"..\Broiler.HTML.Utils\Broiler.HTML.Utils.csproj",
-    ];
-
     private static readonly string[] ExpectedCssFriendAssemblies =
     [
         "Broiler.Cli.Tests",
         "Broiler.HTML",
-        "Broiler.HTML.CSS",
         "Broiler.HTML.Core",
         "Broiler.HTML.Dom",
         "Broiler.HTML.Image",
         "Broiler.HTML.Image.Compat",
         "Broiler.HTML.Image.Tests",
-        "Broiler.HTML.Orchestration",
         "Broiler.HTML.Rendering",
         "Broiler.HTML.WPF",
     ];
@@ -50,10 +39,11 @@ public sealed class CssExtractionPhaseZeroTests
         "Property:FontFaces",
         "Property:FontFeatureValues",
         "Property:Keyframes",
+        "Property:StyleSheet",
     ];
 
     [Fact]
-    public void Existing_Css_Project_Dependencies_Are_Frozen()
+    public void Phase7_Obsolete_Css_Project_Is_Removed()
     {
         var repositoryRoot = FindRepositoryRoot();
         var projectPath = Path.Combine(
@@ -62,16 +52,12 @@ public sealed class CssExtractionPhaseZeroTests
             "Source",
             "Broiler.HTML.CSS",
             "Broiler.HTML.CSS.csproj");
-        var project = XDocument.Load(projectPath);
 
-        var references = project
-            .Descendants("ProjectReference")
-            .Select(static element => (string?)element.Attribute("Include"))
-            .Where(static include => include is not null)
-            .OrderBy(static include => include, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(ExpectedCssProjectReferences, references);
+        Assert.False(File.Exists(projectPath));
+        Assert.DoesNotContain(
+            "Broiler.HTML.CSS.csproj",
+            File.ReadAllText(Path.Combine(repositoryRoot, "Broiler.slnx")),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -93,7 +79,7 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.Equal("Broiler.HTML.Core", typeof(CssData).Assembly.GetName().Name);
         Assert.Equal("Broiler.HTML.Core", typeof(CssBlock).Assembly.GetName().Name);
         Assert.Equal("Broiler.HTML.Core", typeof(Broiler.HTML.Core.IR.ComputedStyle).Assembly.GetName().Name);
-        Assert.Equal("Broiler.HTML.CSS", typeof(CssDataParser).Assembly.GetName().Name);
+        Assert.Equal("Broiler.HTML.Orchestration", typeof(CssDataParser).Assembly.GetName().Name);
 
         var cssDataMembers = typeof(CssData)
             .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
@@ -121,7 +107,21 @@ public sealed class CssExtractionPhaseZeroTests
             wpfFacade,
             StringComparison.Ordinal);
         Assert.NotNull(typeof(DomBridge).GetMethod(nameof(DomBridge.CalculateSpecificity), [typeof(string)]));
-        Assert.NotNull(typeof(DomBridge).GetProperty(nameof(DomBridge.CssRules)));
+        var cssRules = typeof(DomBridge).GetProperty(nameof(DomBridge.CssRules));
+        Assert.NotNull(cssRules);
+        Assert.NotNull(cssRules.GetCustomAttribute<ObsoleteAttribute>());
+    }
+
+    [Fact]
+    public void Phase7_Bridge_Has_No_Legacy_Cascade_Store_Or_Parser()
+    {
+        const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
+
+        Assert.Null(typeof(DomBridge).GetField("_cssRules", PrivateInstance));
+        Assert.Null(typeof(DomBridge).GetMethod("ApplyCascadedStyles", PrivateInstance));
+        Assert.Null(typeof(DomBridge).GetMethod("BuildComputedStyleMapLegacy", PrivateInstance));
+        Assert.Null(typeof(DomBridge).GetMethod("EnumerateScopedStyleRules", PrivateInstance));
+        Assert.Null(typeof(DomBridge).GetMethod("ParseAndApplyCssRules", PrivateInstance));
     }
 
     [Fact]
@@ -147,6 +147,24 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.Equal("red", block.Properties["border-top-color"]);
         Assert.Equal("12px", block.Properties["--gap"]);
         Assert.Equal("12px", block.Properties["padding-left"]);
+    }
+
+    [Fact]
+    public void Phase7_CssData_Exposes_The_Shared_Model_And_New_Facade()
+    {
+        const string css = ".card { color: red; margin: 1px 2px; }";
+
+        var compatibilityData = Broiler.HTML.Image.HtmlRender.ParseStyleSheet(
+            css,
+            combineWithDefault: false);
+        var shared = Broiler.HTML.Image.HtmlRender.ParseStyleSheetModel(
+            css,
+            combineWithDefault: false);
+
+        Assert.Same(compatibilityData.StyleSheet.Rules[0].GetType(), shared.Rules[0].GetType());
+        Assert.Equal(
+            Broiler.CSS.CssSerializer.Serialize(compatibilityData.StyleSheet),
+            Broiler.CSS.CssSerializer.Serialize(shared));
     }
 
     [Fact]

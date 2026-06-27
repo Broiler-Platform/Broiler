@@ -1,12 +1,17 @@
 # Broiler.CSS extraction — status, findings & next steps
 
-**Date:** 2026-06-26
+**Date:** 2026-06-27
 
-**Current closeout status:** Phases 0-6 are implemented; Phase 7 and final gates
-remain open in [`refactor-gap.md`](refactor-gap.md).
+**Current closeout status:** Phases 0-6 are implemented. Phase 7 has retired the
+legacy bridge/renderer runtime paths and removed the `Broiler.HTML.CSS` assembly;
+the public/renderer `CssData` adapter tail and final post-tail gate remain open in
+[`refactor-gap.md`](refactor-gap.md).
 **Scope of this note:** what landed in the Phase 4 / Phase 6 work, the findings that
 shape the rest, and a concrete, prioritized plan for the remaining phases. Read
 alongside the per-phase records in [`broiler-css-component.md`](broiler-css-component.md).
+Sections 3-7 are chronological implementation records; references there to a retained
+legacy path describe that slice at the time. Section 9 and `refactor-gap.md` are the
+current-state authorities.
 
 ## 1. Where the extraction stands
 
@@ -16,7 +21,7 @@ alongside the per-phase records in [`broiler-css-component.md`](broiler-css-comp
 | 4 — cascade & computed style | **Done** (`getComputedStyle()` cutover + anchor Pattern B scans migrated to a document-scoped enumeration, §4b). |
 | 5 — renderer cutover | **Done — flag flipped ON (2026-06-26, §4d).** Both render paths cascade through the shared engine; verified against Acid3 + WPT pixel gates (no pass/fail regressions; fixes several important/border cascade tests). |
 | 6 — CSSOM on shared model | **Done** (slices 6a + 6b: model storage, store unification, model-driven nested wrappers; §4a). |
-| 7 — compatibility cleanup | **Not started.** Prerequisites 5 + 6 are complete; see `refactor-gap.md`. |
+| 7 — compatibility cleanup | **In progress.** Runtime fallbacks, bridge tuple cascade, and the old project are gone; public `CssData` signatures and renderer-only compatibility indexes remain. |
 
 ## 2. Build prerequisites that were broken (now fixed)
 
@@ -304,31 +309,31 @@ rollback path remains; the shared engine is the sole authority for both
 
 ## 9. Phase 7 readiness — current audit
 
-Phase 5 and Phase 6 are complete and their shared paths default on. Phase 7 is no
-longer blocked by those phases, but it has not been implemented. The authoritative
-remaining work and acceptance criteria are in
-[`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
+Phase 5 and Phase 6 are complete, and Phase 7 is materially underway. The current
+tree has one bridge CSS authority and no `Broiler.HTML.CSS` production assembly:
 
-**Still load-bearing (removal would break the build):**
+- renderer and bridge dual-run flags and their legacy branches are deleted;
+- bridge `_cssRules`, manual parse/apply/selector helpers, and scoped tuple scans are
+  deleted; anchors, visibility, mutation reads, specified style, and `::backdrop`
+  resolve through `CssStyleEngine`;
+- the old CSS project is removed from both solution graphs and every project
+  reference. Compatibility parser sources now compile into Orchestration while their
+  namespace remains temporarily source-compatible;
+- `CssData` carries the shared `CssStyleSheet`, and Image/Graphics/WPF expose
+  `ParseStyleSheetModel`; and
+- architecture guards prevent the retired bridge state and project from returning.
 
-- `Broiler.HTML.CSS` is referenced by **4 production projects**: `Broiler.HTML`,
-  `Broiler.HTML.Dom`, `Broiler.HTML.Orchestration`, `Broiler.HTML.WPF`. The shared
-  renderer cascade defaults on, but the legacy project and model remain load-bearing.
-- `CssData` is woven through **public** facade APIs: `HtmlContainer.CssData` /
-  `SetHtml` / `SetDocument` (Image + Graphics), `IAdapter.DefaultCssData`,
-  `IHtmlContainerInt.{CssData,DefaultCssData}`, `HtmlStylesheetLoadEventArgs.SetStyleSheetData`,
-  `HtmlRender.ParseStyleSheet`, `CssDataJsonDumper`. These need a compatibility adapter or
-  signature migration (roadmap Phase 7 deliverable #1–2) before `CssData` can move/retire.
-- `DomBridge` `BuildComputedStyleMapLegacy` is **retired** (2026-06-27). It still owns
-  `_cssRules` + `MatchesSelector` as its live primary cascade (`InvalidateElementStyles`
-  on mutation) and the anchor rule-scans — these are not fallbacks and their migration
-  to the shared engine is a pixel-gated pass, not part of this internal cleanup.
+**Still load-bearing:** `CssData` remains in public facade/container/event APIs and
+its block indexes still serve renderer-only pseudo-element, animation, selection,
+serialization, and font-face paths. Those consumers need shared-model projections
+before the old Core CSS types can be removed. Broad renderer/layout friend grants
+also still need a consumer-by-consumer trim.
 
-Architecture/API documentation records the compatibility surface, but documentation
-alone does not satisfy Phase 7.
+The authoritative remaining work, accepted visual baselines, and repeatable
+validation command are in [`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and
+RF-CSS-2.
 
-**Closeout order:** (1) migrate the public `CssData` facade signatures to
-`CssStyleSheet`/a style-set API, keeping a one-release `CssData` adapter; (2) drop the
-renderer's `Broiler.HTML.CSS` parse/cascade; (3) remove `Broiler.HTML.CSS` +
-obsolete `Broiler.HTML.Core` CSS models; (4) retire `DomBridge` legacy parser/selector +
-`GetComputedProps` `CssRules`; (5) trim the now-unneeded `InternalsVisibleTo` grants.
+**Closeout order:** (1) add shared-model/style-set facade signatures and obsolete the
+old `CssData` signatures for one release; (2) migrate renderer-only compatibility
+indexes; (3) remove obsolete Core CSS models and compatibility parser sources; (4)
+trim `InternalsVisibleTo`; (5) rerun the visual and performance closeout gate.

@@ -476,8 +476,8 @@ These issues prevent specific content elements from appearing.
     detected by `CollectStyleElements()` and `CollectStyleElementsInTree()`.
     External CSS content is fetched via `FetchExternalStylesheet()` (HTTP/
     HTTPS/file URLs) and cached in `DomProperties["_fetchedCss"]`. The
-    fetched CSS is processed by the existing `ParseAndApplyCssRules()`
-    pipeline for `getComputedStyle()` and `document.styleSheets`.
+    fetched CSS is synchronized into the shared `CssStyleEngine`/model pipeline for
+    `getComputedStyle()` and `document.styleSheets`.
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.StyleSheets.cs`,
     `src/Broiler.HtmlBridge/DomBridge.Css.cs`
   - **Priority**: P3
