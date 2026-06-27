@@ -260,6 +260,12 @@ making the typed-document render path work to drop per-frame HTML re-parsing.)*
 *Goal: purify HtmlBridge by extracting a dedicated `Broiler.HtmlBridge.Layout`
 assembly. Runs alongside A/B; recommended before preview but not a gate.*
 
+> **Audit 2026-06-27:** This track remains open. The completed `Broiler.Layout`
+> extraction moved the renderer engine, not the parallel HtmlBridge box model.
+> `CssBoxModel.cs` and `CssTextProperties.cs` still live in
+> `Broiler.HtmlBridge.Rendering`; see
+> [`refactor-gap.md`](refactor-gap.md), RF-BRIDGE-1.
+
 | # | Slice | Detail |
 |---|------|--------|
 | C.1 | Define boundary | New `src/Broiler.HtmlBridge.Layout`. Introduce `IDomElement` + `ICssPropertyResolver` so layout no longer hard-references the bridge's concrete `DomElement` (`CssBoxModel.cs:124`, `:211`). |

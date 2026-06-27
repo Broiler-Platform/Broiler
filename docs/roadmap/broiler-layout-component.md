@@ -1,6 +1,6 @@
 # Broiler.Layout Component Plan
 
-**Status:** ✅ **EXTRACTION COMPLETE (2026-06-27).** Phases 1–4 done — the ~9.7k-line layout engine now
+**Status:** **Core extraction complete; roadmap closeout incomplete (2026-06-27).** Phases 1–4 done — the ~9.7k-line layout engine now
 physically lives in `Broiler.Layout` (project references only `Broiler.CSS`/`Broiler.CSS.Dom`/`Broiler.Dom`).
 Full `Broiler.slnx` builds green; behavior preserved (only known flaky/pre-existing test failures); Layout
 arch tests 3/3. Polish done 2026-06-27: **namespace flip** (the 16 moved files are now `namespace Broiler.Layout`;
@@ -9,7 +9,9 @@ full slnx green, arch 3/3, behavior preserved) and **identical-copy dedup** (`Cs
 removed from the renderer → it now uses the `Broiler.CSS` versions; `Broiler.HTML.Utils` gained a `Broiler.CSS` ref for
 its `CommonUtils`). Remaining = the **inherent** duplication that can't be deduped (`Broiler.Layout` can't reference the
 renderer, and the renderer's `CssLength`/`CssValueParser` carry colour the layout copies don't; `HtmlConstants`/
-`CommonUtils`/`HtmlUtils` are layout subsets vs renderer full) + re-running the WPT pixel gate on the final state before merge.
+`CommonUtils`/`HtmlUtils` are layout subsets vs renderer full). Phase 5 cleanup and the
+final WPT/pixel closeout are tracked in [`refactor-gap.md`](refactor-gap.md),
+RF-LAYOUT-1 and RF-LAYOUT-2.
 **Date:** 2026-06-26
 
 **Progress (Phase 1):** `Broiler.Layout/Broiler.Layout/` created in the parent repo

@@ -1,7 +1,10 @@
 # Broiler CSS Component Plan
 
-**Status:** In progress (Phases 0-3 implemented)  
-**Date:** 2026-06-24  
+**Status:** Core Phases 0-6 implemented; roadmap closeout incomplete. Phase 7,
+legacy-path retirement, and final validation are tracked in
+[`refactor-gap.md`](refactor-gap.md).
+
+**Date:** 2026-06-24
 **Scope:** Extract reusable CSS parsing, selector, cascade, and computed-style
 support into a separate `Broiler.CSS` component without moving renderer layout,
 JavaScript bindings, resource loading, or painting into that component.
@@ -738,13 +741,9 @@ warnings remain.
 
 ### Phase 4 - Extract cascade and computed style
 
-**Status:** In progress. The shared cascade/computed-style engine is implemented
-in `Broiler.CSS.Dom` (2026-06-26). The bridge `getComputedStyle()` cutover is
-**done** (2026-06-26): the engine gained per-declaration value validation / error
-recovery and `UseSharedComputedStyleEngine` is now on. The anchor/animation
-`CssRules`-tuple migration is **partly done** — `AnimationResolver` uses no tuples,
-and the six per-element declared-value anchor collectors now use the shared engine;
-four global rule-scan sites plus `GetComputedProps` internals still read the tuple.
+**Status:** Implemented on 2026-06-26. The shared cascade/computed-style engine is
+the default bridge path. Remaining legacy tuple/parser removal belongs to Phase 7
+and is tracked in [`refactor-gap.md`](refactor-gap.md).
 
 Deliverables:
 
@@ -799,7 +798,10 @@ shorthand expansion, custom-property inheritance and `var()` fallback, media
 evaluation, pseudo-element targeting, relative font-weight, and
 mutation-driven recomputation.
 
-Remaining for Phase 4 (subsequent validated slices, per the dual-run guidance
+Historical Phase 4 checkpoint (subsequently completed by the cutover records below;
+retained for chronology):
+
+Remaining at that checkpoint (subsequent validated slices, per the dual-run guidance
 in §8.6 and PR slices #8-#9):
 
 - cut bridge `getComputedStyle()` over to `CssStyleEngine` behind a differential
@@ -942,6 +944,9 @@ Exit criteria:
 
 ### Phase 6 - Back CSSOM with the shared model
 
+**Status:** Implemented on 2026-06-26 (slices 6a and 6b). Phase 7 legacy cleanup
+remains separate.
+
 Deliverables:
 
 - make `CSSStyleSheet`, `CSSRule`, and declaration wrappers reference shared
@@ -957,7 +962,7 @@ Exit criteria:
 - CSSOM no longer reparses independently from rendering;
 - JavaScript types remain confined to the bridge.
 
-#### Phase 6 implementation record (in progress, 2026-06-26)
+#### Phase 6 implementation record (completed, 2026-06-26)
 
 **Slice 6a — model-backed CSSOM rule storage (done).** `DomBridge/StyleSheets.cs`
 now stores each `CSSStyleSheet`'s rules as a `List<Broiler.CSS.CssRule>` instead of
@@ -972,7 +977,7 @@ string builder via `CssSerializer` so the wrapper output is byte-identical. Live
 Verified: `SelectorsAndCssomTests` is 53 passing / 5 pre-existing selector-baseline
 failures (no CSSOM regressions).
 
-**Still remaining for Phase 6** (the deep unification — larger, deferred): nested
+**Historical slice 6a remainder (completed by slice 6b):** nested
 at-rule wrappers (`@media`/`@keyframes`/`@supports`/`@layer`) still build their
 children from serialized strings via `ParseCssRuleStrings`; and the three separate
 rule stores — the CSSOM `rulesStorage`, the renderer-visible `InsertedRules`
@@ -984,6 +989,9 @@ criterion). Closing this means routing all three through one per-style-element
 mutable `CssStyleSheet` and invalidating the style engine on CSSOM mutation.
 
 ### Phase 7 - Compatibility cleanup
+
+**Status:** Not implemented as of the 2026-06-27 audit. See
+[`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
 
 Deliverables:
 

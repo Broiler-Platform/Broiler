@@ -1,7 +1,10 @@
 # Broiler DOM Component Plan
 
-**Status:** Proposed  
-**Date:** 2026-06-24  
+**Status:** Core Phases 0-6 implemented; roadmap closeout incomplete. Compatibility
+surface retirement and deferred validation are tracked in
+[`refactor-gap.md`](refactor-gap.md), RF-DOM-1 and RF-DOM-2.
+
+**Date:** 2026-06-24
 **Scope:** Extract a canonical, engine-neutral DOM component from the current
 HTML renderer and JavaScript bridge without changing observable browser
 behavior during the extraction.
