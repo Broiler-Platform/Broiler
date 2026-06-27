@@ -1,0 +1,72 @@
+{
+  "engine": "broiler",
+  "engineLabel": "Broiler.JS (BroilerJS --script-host)",
+  "octaneVersion": "9",
+  "perSuiteTimeoutSec": 180,
+  "benchmarks": {
+    "Richards": 45.8,
+    "DeltaBlue": 69.3,
+    "RayTrace": 201,
+    "EarleyBoyer": 161,
+    "RegExp": 78,
+    "Splay": 257,
+    "SplayLatency": 1100,
+    "NavierStokes": 276,
+    "Gameboy": 712
+  },
+  "suiteStatus": {
+    "Richards": {
+      "status": "ok"
+    },
+    "DeltaBlue": {
+      "status": "ok"
+    },
+    "Crypto": {
+      "status": "crash",
+      "error": "Unhandled exception. Broiler.JavaScript.Runtime.JSException: Object reference not set to an instance of an object."
+    },
+    "RayTrace": {
+      "status": "ok"
+    },
+    "EarleyBoyer": {
+      "status": "ok"
+    },
+    "RegExp": {
+      "status": "ok"
+    },
+    "Splay": {
+      "status": "ok"
+    },
+    "NavierStokes": {
+      "status": "ok"
+    },
+    "PdfJS": {
+      "status": "error",
+      "error": "Malformed PDF: stream must have data"
+    },
+    "Mandreel": {
+      "status": "timeout"
+    },
+    "Gameboy": {
+      "status": "ok"
+    },
+    "CodeLoad": {
+      "status": "error",
+      "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context59' was not present in the dictionary."
+    },
+    "Box2D": {
+      "status": "error",
+      "error": "System.InvalidProgramException: Common Language Runtime detected an invalid program."
+    },
+    "zlib": {
+      "status": "error",
+      "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context50' was not present in the dictionary."
+    },
+    "Typescript": {
+      "status": "error",
+      "error": "Cannot get property getScopedTypeNameEx of null"
+    }
+  },
+  "geomean": 197,
+  "generatedAt": "2026-06-27T16:34:30.991Z"
+}

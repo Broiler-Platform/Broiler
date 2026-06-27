@@ -1,0 +1,20 @@
+{
+  "_comment": "Octane 2.0 benchmark suites in run.js load order. Each suite is run as an isolated process/page so a crash or hang in one engine does not lose the others. `files` are concatenated after base.js (and the shared runner) for a self-contained single-suite run.",
+  "suites": [
+    { "name": "Richards",     "files": ["richards.js"] },
+    { "name": "DeltaBlue",    "files": ["deltablue.js"] },
+    { "name": "Crypto",       "files": ["crypto.js"] },
+    { "name": "RayTrace",     "files": ["raytrace.js"] },
+    { "name": "EarleyBoyer",  "files": ["earley-boyer.js"] },
+    { "name": "RegExp",       "files": ["regexp.js"] },
+    { "name": "Splay",        "files": ["splay.js"] },
+    { "name": "NavierStokes", "files": ["navier-stokes.js"] },
+    { "name": "PdfJS",        "files": ["pdfjs.js"] },
+    { "name": "Mandreel",     "files": ["mandreel.js"] },
+    { "name": "Gameboy",      "files": ["gbemu-part1.js", "gbemu-part2.js"] },
+    { "name": "CodeLoad",     "files": ["code-load.js"] },
+    { "name": "Box2D",        "files": ["box2d.js"] },
+    { "name": "zlib",         "files": ["zlib.js", "zlib-data.js"] },
+    { "name": "Typescript",   "files": ["typescript.js", "typescript-input.js", "typescript-compiler.js"] }
+  ]
+}

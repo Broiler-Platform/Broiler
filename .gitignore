@@ -73,6 +73,9 @@ capture.png
 # WPT testsuite results (generated at runtime)
 tests/wpt-results/
 tests/wpt/checkout/
+
+# Octane benchmark suite (cloned at runtime); results are committed.
+tests/octane/checkout/
 # Ignore bulk-generated WPT references but allow curated CSS regression images.
 tests/wpt/references/*
 !tests/wpt/references/css/
@@ -91,3 +94,7 @@ node_modules/
 package.json
 package-lock.json
 __pycache__
+
+# Octane harness manifest files (re-included after the broad package*.json ignores above).
+!tests/octane/package.json
+!tests/octane/package-lock.json

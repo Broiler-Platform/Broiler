@@ -1,0 +1,226 @@
+{
+  "generatedAt": "2026-06-27T16:34:30.991Z",
+  "octaneVersion": "9",
+  "engines": {
+    "chromium": {
+      "label": "Chromium 149.0.7827.55",
+      "geomean": 79915
+    },
+    "broiler": {
+      "label": "Broiler.JS (BroilerJS --script-host)",
+      "geomean": 197
+    }
+  },
+  "benchmarks": [
+    {
+      "name": "Box2D",
+      "chromium": {
+        "score": 148019,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "error",
+        "error": "System.InvalidProgramException: Common Language Runtime detected an invalid program."
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "CodeLoad",
+      "chromium": {
+        "score": 38151,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "error",
+        "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context59' was not present in the dictionary."
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "Crypto",
+      "chromium": {
+        "score": 54816,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "crash",
+        "error": "Unhandled exception. Broiler.JavaScript.Runtime.JSException: Object reference not set to an instance of an object."
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "DeltaBlue",
+      "chromium": {
+        "score": 136983,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 69.3,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.001
+    },
+    {
+      "name": "EarleyBoyer",
+      "chromium": {
+        "score": 107010,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 161,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.002
+    },
+    {
+      "name": "Gameboy",
+      "chromium": {
+        "score": 146337,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 712,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005
+    },
+    {
+      "name": "Mandreel",
+      "chromium": {
+        "score": 62584,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "timeout"
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "MandreelLatency",
+      "chromium": {
+        "score": 101739,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "n/a"
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "NavierStokes",
+      "chromium": {
+        "score": 51443,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 276,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005
+    },
+    {
+      "name": "PdfJS",
+      "chromium": {
+        "score": 93507,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "error",
+        "error": "Malformed PDF: stream must have data"
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "RayTrace",
+      "chromium": {
+        "score": 152660,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 201,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.001
+    },
+    {
+      "name": "RegExp",
+      "chromium": {
+        "score": 12936,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 78,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.006
+    },
+    {
+      "name": "Richards",
+      "chromium": {
+        "score": 47661,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 45.8,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.001
+    },
+    {
+      "name": "Splay",
+      "chromium": {
+        "score": 64989,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 257,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.004
+    },
+    {
+      "name": "SplayLatency",
+      "chromium": {
+        "score": 103730,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 1100,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.011
+    },
+    {
+      "name": "Typescript",
+      "chromium": {
+        "score": 148262,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "error",
+        "error": "Cannot get property getScopedTypeNameEx of null"
+      },
+      "broilerVsChromium": null
+    },
+    {
+      "name": "zlib",
+      "chromium": {
+        "score": 115594,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": null,
+        "status": "error",
+        "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context50' was not present in the dictionary."
+      },
+      "broilerVsChromium": null
+    }
+  ]
+}
