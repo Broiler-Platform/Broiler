@@ -4869,6 +4869,31 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-background-margin-opacity.html"));
     }
 
+    // ──────────── Manual test detection (WPT issue #1100) ─────────────
+    // Manual tests need human interaction and cannot be pixel-compared; they
+    // must be skipped, not failed. 59 css-animations -manual tests were being
+    // reported as failures before this was added.
+
+    [Theory]
+    [InlineData("/wpt/css/css-animations/animation-delay-001-manual.html")]
+    [InlineData("/wpt/css/css-animations/animation-fill-mode-006-manual.html")]
+    [InlineData("C:\\wpt\\css\\css-animations\\animation-direction-002-manual.htm")]
+    [InlineData("/wpt/css/foo-MANUAL.xhtml")]
+    public void IsManualTest_Detects_ManualSuffix(string path)
+    {
+        Assert.True(WptTestRunner.IsManualTest(path));
+    }
+
+    [Theory]
+    [InlineData("/wpt/css/css-animations/animation-delay-009.html")]
+    [InlineData("/wpt/css/css-align/abspos/align-self-static-position-003.html")]
+    // "-manual" only counts as a suffix of the base name, not anywhere in it.
+    [InlineData("/wpt/css/manual-override-001.html")]
+    public void IsManualTest_Returns_False_For_Automated_Tests(string path)
+    {
+        Assert.False(WptTestRunner.IsManualTest(path));
+    }
+
     // ──────────── Non-test file detection ────────────────────────────
 
     [Fact]
@@ -10606,5 +10631,85 @@ div {{ width: 256px; height: 768px; }}
         // must assign the same shard to keep reference generation and execution
         // in lock-step. FNV-1a/32 of "css/CSS2/foo.html" is 0x418AB4DC.
         Assert.Equal((int)(0x418AB4DCu % 8u), WptTestRunner.GetShardIndex("css/CSS2/foo.html", 8));
+    }
+
+    // CSS2.1 Appendix E Step 2 (WPT issue #1100): a positioned descendant with a
+    // NEGATIVE z-index must paint BENEATH the in-flow content, not on top of it.
+    // This is the ubiquitous WPT reftest pattern "passes if green, no red" where
+    // a `z-index:-1` red box is a reference the correctly-placed content covers.
+    // Before the fix, negative-z elements painted in Steps 6–7 (above), so the
+    // red overlay hid the green content. See PaintWalker.PaintChildrenBackgroundPhase.
+    // CSS Box Alignment §justify-abspos (WPT issue #1100,
+    // css-align/blocks/justify-self-auto-margins): auto margins resolve during
+    // block layout and consume the inline free space, so a non-default
+    // 'justify-self' must have NO effect on an auto-margin block. The box stays
+    // centred rather than being shoved to the justify-self edge. Verified by
+    // rendering identically to the same box with justify-self removed.
+    // CSS Box Alignment (WPT issue #1100, css-align/blocks/justify-self-text-align-2):
+    // text-align:-webkit-*, justify-items and justify-self work in tandem on block
+    // children. justify-self:normal follows the parent's legacy -webkit-right block
+    // alignment (→ right edge), justify-self:auto follows justify-items:center
+    // (→ centred), and justify-self:left wins (→ left). Verified against an explicit
+    // margin-positioned reference with the same right-aligned inline text.
+    [Fact]
+    public void Wpt_BlockJustifySelf_TextAlignWebkit_JustifyItems_Tandem()
+    {
+        const string css = ".container{width:200px;position:relative;outline:solid;} .item{background:lightblue;width:100px;height:100px;outline:solid;}";
+        const string test = "<!DOCTYPE html><style>" + css +
+            " .container{justify-items:center;text-align:-webkit-right;}</style>" +
+            "<div class=container>" +
+            "<div class=item style='justify-self:normal'>normal</div>" +
+            "<div class=item style='justify-self:auto'>auto</div>" +
+            "<div class=item style='justify-self:left'>left</div></div>";
+        const string reference = "<!DOCTYPE html><style>" + css + " .item{text-align:right;}</style>" +
+            "<div class=container>" +
+            "<div class=item style='margin-left:100px'>normal</div>" +
+            "<div class=item style='margin-left:50px'>auto</div>" +
+            "<div class=item style='margin-left:0px'>left</div></div>";
+        var result = RunTempMatchTest(test, reference, "justify-self-text-align-tandem");
+        Assert.True(result.Passed,
+            $"normal→right(100), auto→center(50), left→0. Match={result.MatchPercent:F1}% {result.Message}");
+    }
+
+    // WPT issue #1100 (css-animations/crashtests/svg-use-animation-crash): inline
+    // SVG carrying a prefixed attribute (xlink:href) must not crash HTML parsing.
+    // Regression for the DomElement.SetAttribute prefixed-name fix.
+    [Fact]
+    public void Wpt_Crashtest_SvgUseWithXlinkHref_DoesNotCrash()
+    {
+        const string html = @"<!DOCTYPE html><svg>
+<defs><rect id=""target"" width=""100"" height=""100"" fill=""green""/></defs>
+<use x=""0"" xlink:href=""#target""/></svg>";
+        var dir = Path.Combine(_tempDir, "crashtests");
+        Directory.CreateDirectory(dir);
+        var file = Path.Combine(dir, "svg-use-xlink.html");
+        File.WriteAllText(file, html);
+        var result = new WptTestRunner(320, 240).RunTest(file, _tempDir, null);
+        Assert.True(result.Passed, $"crashtest should pass (no throw). Cat={result.Category} Msg={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BlockJustifySelf_AutoMarginsWin_NoShift()
+    {
+        const string test = @"<!DOCTYPE html><div style=""width:200px;"">
+<div style=""width:100px;height:100px;margin:auto;justify-self:right;background:green;""></div></div>";
+        const string reference = @"<!DOCTYPE html><div style=""width:200px;"">
+<div style=""width:100px;height:100px;margin:auto;background:green;""></div></div>";
+        var result = RunTempMatchTest(test, reference, "justify-self-auto-margins");
+        Assert.True(result.Passed,
+            $"justify-self must not move an auto-margin (centred) block. Match={result.MatchPercent:F1}% {result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Stacking_NegativeZIndexBox_PaintsBehindInFlowContent()
+    {
+        const string test = @"<!DOCTYPE html>
+<div style=""position:absolute;background:red;width:100px;height:100px;z-index:-1;""></div>
+<div style=""width:100px;height:100px;background:green;""></div>";
+        const string reference = @"<!DOCTYPE html>
+<div style=""width:100px;height:100px;background:green;""></div>";
+        var result = RunTempMatchTest(test, reference, "negative-z-behind");
+        Assert.True(result.Passed,
+            $"z-index:-1 box must paint behind in-flow content (no red). Match={result.MatchPercent:F1}% {result.Message}");
     }
 }

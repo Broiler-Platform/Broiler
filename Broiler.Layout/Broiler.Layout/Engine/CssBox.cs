@@ -1950,8 +1950,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                         Size = new SizeF((float)boxWidth, Size.Height);
 
                         bool isRtl = Direction == "rtl";
+                        // Inline-axis start edge follows the CB's direction.
+                        bool startIsLow = cb.Direction != "rtl";
                         double dx = ResolveAbsposSelfAlignment(
-                            jsPost, imcbWidth, boxWidth, isRtl);
+                            jsPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
+                            boxWidth, isRtl, startIsLow);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                     else if (cbVertical && hasT && hasB)
@@ -1963,8 +1966,12 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                         double boxHeight = GetShrinkToFitHeight();
 
+                        // Inline axis is vertical here; its start runs top→bottom
+                        // unless the CB's direction is rtl.
+                        bool startIsLow = cb.Direction != "rtl";
                         double dy = ResolveAbsposSelfAlignment(
-                            jsPost, imcbHeight, boxHeight, false);
+                            jsPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
+                            boxHeight, false, startIsLow);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                 }
@@ -1983,8 +1990,10 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                         double boxHeight = GetShrinkToFitHeight();
 
+                        // Block-axis start is the top edge for horizontal-tb.
                         double dy = ResolveAbsposSelfAlignment(
-                            asPost, imcbHeight, boxHeight, false);
+                            asPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
+                            boxHeight, false, startIsLow: true);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                     else if (cbVertical && hasL && hasR)
@@ -1998,8 +2007,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                         Size = new SizeF((float)boxWidth, Size.Height);
 
                         bool isRtl = Direction == "rtl";
+                        // Block-axis start runs L→R for vertical-lr, R→L for
+                        // vertical-rl (so the low edge is the start only for lr).
+                        bool startIsLow = cb.WritingMode == "vertical-lr";
                         double dx = ResolveAbsposSelfAlignment(
-                            asPost, imcbWidth, boxWidth, isRtl);
+                            asPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
+                            boxWidth, isRtl, startIsLow);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                 }
@@ -2132,20 +2145,52 @@ internal class CssBox : CssBoxProperties, IDisposable
         //   end/flex-end/self-end/right → right-aligned
         //   center → centered
         // Floated and absolutely/fixed positioned boxes are unaffected.
-        if (JustifySelf != null && JustifySelf != "auto" && JustifySelf != "normal"
-            && JustifySelf != "stretch"
-            && Float == CssConstants.None
+        //
+        // 'auto' and 'normal' are not literally no-ops — they resolve:
+        //   • justify-self:auto → the containing block's 'justify-items'
+        //     (CSS Box Alignment §justify-self).
+        //   • a still-unresolved 'normal'/'stretch' on a definite-width block →
+        //     the parent's legacy 'text-align:-webkit-{left,right,center}' block
+        //     alignment, if any (non-standard but widely supported; WPT
+        //     css-align/blocks/justify-self-text-align exercises it).
+        if (Float == CssConstants.None
             && Position != CssConstants.Absolute && Position != CssConstants.Fixed
             && (IsBlock || Display == CssConstants.ListItem)
             && ParentBox != null)
         {
+            string js = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
+            if (js == "auto")
+                js = ParentBox.JustifyItems?.Trim().ToLowerInvariant() ?? "normal";
+            if (js is "normal" or "stretch" or "auto" or "legacy")
+            {
+                js = (ParentBox.TextAlign?.Trim().ToLowerInvariant()) switch
+                {
+                    "-webkit-right" => "right",
+                    "-webkit-center" => "center",
+                    "-webkit-left" => "left",
+                    _ => js,
+                };
+            }
+
+            // Only a concrete edge/center alignment actually moves the box;
+            // normal/stretch/baseline leave it at its in-flow position.
+            if (js is not ("center" or "end" or "flex-end" or "self-end" or "right"
+                or "start" or "flex-start" or "self-start" or "left"))
+                js = null!;
+
             double boxWidth = ActualRight - Location.X;
             double containerWidth = ParentBox.ClientRectangle.Width;
-            double freeSpace = containerWidth - boxWidth;
+            // Free space is what remains AFTER the box's own margins. Auto margins
+            // are resolved during block layout (e.g. margin:auto centres the box by
+            // splitting the free space), so they leave nothing here — which makes
+            // 'justify-self' a no-op, per CSS Box Alignment §justify-abspos ("auto
+            // margins make justify-self have no effect"). Accounting for margins
+            // also keeps explicit-margin boxes aligned to the correct edge.
+            double freeSpace = containerWidth - boxWidth
+                - ActualMarginLeft - ActualMarginRight;
 
-            if (freeSpace > 0.5)
+            if (js != null && freeSpace > 0.5)
             {
-                string js = JustifySelf.Trim().ToLowerInvariant();
                 // CSS Box Alignment §6.1: 'start'/'end' use the containing
                 // block's writing direction; 'self-start'/'self-end' use the
                 // element's own writing direction.
@@ -3701,29 +3746,81 @@ internal class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
-    /// CSS Box Alignment Level 3 §6.1: Resolves justify-self / align-self
-    /// alignment for an absolutely-positioned box within its inset-modified
-    /// containing block (IMCB).  Returns the offset from the IMCB start
-    /// edge.  Default overflow behaviour for abspos is 'safe': when the
-    /// content would overflow the strong CB edge, it is shifted to align
-    /// with the start of the writing direction.
+    /// CSS Box Alignment Level 3 §"Aligning Abspos"
+    /// (https://drafts.csswg.org/css-align-3/#align-abspos): resolves
+    /// justify-self / align-self for an absolutely-positioned box along ONE
+    /// axis. The box is aligned within its inset-modified containing block
+    /// (IMCB), then — in the DEFAULT overflow mode (no safe/unsafe keyword) —
+    /// its final position is clamped to the range that <b>encloses both the
+    /// IMCB and the actual containing block (CB)</b>, with the start edge
+    /// winning when the two conflict:
+    /// <code>
+    ///   p0 = imcbStart + alignmentOffset                 // unsafe align in IMCB
+    ///   lo = min(imcbStart, cbStart)
+    ///   hi = max(imcbStart + imcbSize, cbStart + cbSize) - boxSize
+    ///   pos = startIsLow ? max(lo, min(p0, hi))          // start = low  edge
+    ///                    : min(hi, max(p0, lo))          // start = high edge
+    /// </code>
+    /// Explicit <c>unsafe</c> → align per keyword, no clamping. Explicit
+    /// <c>safe</c> → on overflow, fall back to start alignment within the IMCB
+    /// (the legacy behaviour, preserved unchanged).
+    ///
+    /// <para>
+    /// DIAGNOSTIC NOTE (WPT issue #1100, css-align/abspos cluster): if abspos
+    /// elements carrying align-self/justify-self render in the wrong place, or
+    /// the <c>css-align/abspos/{align,justify}-self-default-overflow-*</c> WPT
+    /// family regresses, THIS clamp and the IMCB construction at the four call
+    /// sites (the "Post-layout self-alignment for absolutely positioned
+    /// elements" block above) are the first suspects. The historic bug was
+    /// clamping to the IMCB alone instead of the IMCB∪CB union, which placed the
+    /// box correctly only when it fit inside the IMCB. The eight pinned offsets
+    /// of <c>justify-self-default-overflow-htb-ltr-htb.html</c> live in
+    /// <c>Broiler.Layout.Tests.AbsposSelfAlignmentTests</c> — run those first.
+    /// </para>
     /// </summary>
-    private static double ResolveAbsposSelfAlignment(
-        string alignment, double containerSize, double boxSize, bool isRtl)
+    /// <param name="alignment">The justify-self/align-self value (may carry a
+    /// leading <c>safe</c>/<c>unsafe</c> keyword).</param>
+    /// <param name="imcbStart">Start coordinate of the IMCB along this axis
+    /// (absolute layout coords).</param>
+    /// <param name="imcbSize">Size of the IMCB along this axis.</param>
+    /// <param name="cbStart">Start coordinate of the actual containing-block
+    /// padding box along this axis.</param>
+    /// <param name="cbSize">Size of the containing-block padding box along this
+    /// axis.</param>
+    /// <param name="boxSize">Border-box size of the aligned box along this
+    /// axis.</param>
+    /// <param name="isRtl">Whether the box's inline direction is RTL — flips
+    /// start/end keyword resolution. (Does not affect <c>center</c>.)</param>
+    /// <param name="startIsLow">Whether the containing block's start edge is the
+    /// LOW coordinate edge along this axis (true for LTR inline / top-down
+    /// block; false e.g. for an RTL inline axis or a vertical-rl block axis).
+    /// Drives the overflow tie-break.</param>
+    /// <returns>Offset to add to <paramref name="imcbStart"/>; the caller
+    /// computes <c>pos = imcbStart + returnValue + leading margin</c>.</returns>
+    internal static double ResolveAbsposSelfAlignment(
+        string alignment,
+        double imcbStart, double imcbSize,
+        double cbStart, double cbSize,
+        double boxSize, bool isRtl, bool startIsLow)
     {
-        double freeSpace = containerSize - boxSize;
+        double freeSpace = imcbSize - boxSize;
 
-        // Strip safe/unsafe prefix.
+        // Strip an explicit safe/unsafe prefix. Track whether one was present:
+        // the abspos DEFAULT mode is neither plain "safe" nor "unsafe" — it
+        // aligns unsafely in the IMCB and then clamps to the IMCB∪CB union.
         string a = alignment;
-        bool isSafe = true; // default for abspos is safe
+        bool hasKeyword = false;
+        bool isSafe = true;
         if (a.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
         {
             a = a.Substring(5).Trim();
+            hasKeyword = true;
             isSafe = true;
         }
         else if (a.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
         {
             a = a.Substring(7).Trim();
+            hasKeyword = true;
             isSafe = false;
         }
 
@@ -3735,8 +3832,6 @@ internal class CssBox : CssBoxProperties, IDisposable
                 break;
             case "end":
             case "flex-end":
-                dx = isRtl ? 0 : freeSpace;
-                break;
             case "self-end":
                 dx = isRtl ? 0 : freeSpace;
                 break;
@@ -3745,8 +3840,6 @@ internal class CssBox : CssBoxProperties, IDisposable
                 break;
             case "start":
             case "flex-start":
-                dx = isRtl ? freeSpace : 0;
-                break;
             case "self-start":
                 dx = isRtl ? freeSpace : 0;
                 break;
@@ -3758,23 +3851,33 @@ internal class CssBox : CssBoxProperties, IDisposable
                 break;
         }
 
-        // Safe overflow: clamp so the element does not overflow the
-        // strong edge (start edge in the writing direction).
-        if (isSafe)
+        // Explicit safe/unsafe: preserve the legacy single-box behaviour.
+        if (hasKeyword)
         {
-            if (isRtl)
+            // Safe overflow: clamp so the element does not overflow the
+            // strong (start) edge of the IMCB in the writing direction.
+            if (isSafe)
             {
-                // Strong edge is right (end of CB) — clamp dx ≤ freeSpace
-                dx = Math.Min(dx, Math.Max(freeSpace, 0));
+                if (isRtl)
+                    dx = Math.Min(dx, Math.Max(freeSpace, 0)); // strong edge = right
+                else
+                    dx = Math.Max(dx, 0);                       // strong edge = left
             }
-            else
-            {
-                // Strong edge is left (start of CB) — clamp dx ≥ 0
-                dx = Math.Max(dx, 0);
-            }
+            // Unsafe: honour the alignment with no clamping.
+            return dx;
         }
 
-        return dx;
+        // DEFAULT overflow mode: clamp the resolved POSITION to the union of the
+        // IMCB and the actual containing block, with the start edge winning when
+        // the box is larger than the union (lo > hi). See the summary/diagnostic
+        // note above; validated against the htb-ltr-htb WPT offsets.
+        double pos = imcbStart + dx;
+        double lo = Math.Min(imcbStart, cbStart);
+        double hi = Math.Max(imcbStart + imcbSize, cbStart + cbSize) - boxSize;
+        pos = startIsLow
+            ? Math.Max(lo, Math.Min(pos, hi))
+            : Math.Min(hi, Math.Max(pos, lo));
+        return pos - imcbStart;
     }
 
     /// <summary>

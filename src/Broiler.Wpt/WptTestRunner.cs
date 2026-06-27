@@ -41,6 +41,15 @@ internal enum SkipReason
     None,
     MissingReferenceImage,
     UnsupportedMediaPlayback,
+
+    /// <summary>
+    /// A WPT <em>manual</em> test (filename ends in <c>-manual</c>). These
+    /// require human interaction and cannot be validated by an automated pixel
+    /// harness, so — like the upstream wptrunner, which excludes them unless
+    /// <c>--include-manual</c> — Broiler reports them as skipped rather than
+    /// failed. See <see cref="WptTestRunner.IsManualTest"/>.
+    /// </summary>
+    ManualTest,
 }
 
 /// <summary>
@@ -787,6 +796,31 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Determines whether the given test path is a WPT <em>manual</em> test.
+    /// Per WPT convention a test is manual when its filename (without the
+    /// extension) ends in <c>-manual</c> — e.g.
+    /// <c>animation-delay-001-manual.html</c>. Such tests require human
+    /// interaction (they have no automated pass condition) and therefore cannot
+    /// be pixel-compared against a Chromium screenshot; the upstream wptrunner
+    /// skips them unless <c>--include-manual</c> is passed.
+    /// <para>
+    /// DIAGNOSTIC NOTE (WPT issue #1100): before this check existed, all 59
+    /// <c>-manual</c> tests under <c>css/css-animations</c> were rendered and
+    /// reported as PixelMismatch failures, inflating the failure count by ~12%.
+    /// If manual tests reappear as failures, or a legitimately-automated test is
+    /// wrongly skipped, this helper and its call site in <c>RunSingleTest</c> are
+    /// the place to look. (The rarer <c>&lt;meta name="flags" content="manual"&gt;</c>
+    /// form is not detected here — the filename suffix is WPT's primary signal
+    /// and covers the observed cases.)
+    /// </para>
+    /// </summary>
+    internal static bool IsManualTest(string testPath)
+    {
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(testPath);
+        return nameWithoutExt.EndsWith("-manual", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Determines whether the given HTML content requires media playback
     /// (e.g. <c>&lt;video&gt;</c> with an external <c>&lt;source&gt;</c>).
     /// Broiler cannot decode video/audio streams, so these tests produce
@@ -853,6 +887,20 @@ internal sealed class WptTestRunner
         string referencePath = Path.Combine(
             referenceDir,
             Path.ChangeExtension(relativePath, ".png"));
+
+        // Skip WPT manual tests: they require human interaction and have no
+        // automated pass condition, so a pixel comparison against a Chromium
+        // screenshot is meaningless. Reported as skipped, not failed.
+        if (IsManualTest(testPath))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.ManualTest,
+                Message = "WPT manual test (filename ends in -manual); requires human interaction.",
+            };
+        }
 
         string html;
         try
