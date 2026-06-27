@@ -5,6 +5,12 @@ A browser-accessible development, test, and demo environment for the
 provides tools for testing, comparing, and exploring Broiler's rendering
 capabilities.
 
+> **Preview status:** This development tool is unstable and includes substantial
+> AI-assisted code. Its integration is **not human-approved for preview use** while the
+> root [human review](../../HUMAN_REVIEW.md) remains `PENDING`. Broiler is an
+> independent derivative project; see the root [foundation credits](../../README.md#foundations-and-independence),
+> [Apache-2.0 license](../../LICENSE), and [third-party notices](../../THIRD_PARTY_NOTICES.md).
+
 ## Features
 
 | Feature | Description |
@@ -67,3 +73,9 @@ The site expects the following directory layout relative to its project root:
 
 These paths are resolved automatically when running from the standard
 repository layout.
+
+## License and review
+
+This component is covered by Broiler's [Apache License 2.0](../../LICENSE), applicable
+third-party notices, and the root [human review record](../../HUMAN_REVIEW.md). The
+license provides the software on an “AS IS” basis without warranties or conditions.

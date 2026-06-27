@@ -1,5 +1,10 @@
 # WPT regression baselines
 
+These test artifacts are part of Broiler's unstable first-preview validation material.
+They are covered by the root [Apache License 2.0](../../LICENSE), applicable
+[third-party notices](../../THIRD_PARTY_NOTICES.md), and
+[pending human review](../../HUMAN_REVIEW.md).
+
 Committed per-segment baseline snapshots used by the scheduled WPT matrix
 (`.github/workflows/wpt-tests.yml`) and `scripts/check-wpt-regression.sh`.
 

@@ -4,7 +4,7 @@
 > **Scope**: (A) WPT CI coverage, (B) Broiler.App WPF → Broiler.Graphics migration,
 > (C) Layout-component extraction to purify HtmlBridge
 > **Owner**: TBD
-> **Last updated**: 2026-06-26
+> **Last updated**: 2026-06-27
 
 ---
 
@@ -249,8 +249,10 @@ making the typed-document render path work to drop per-frame HTML re-parsing.)*
 | 3.1 | Packaging | Self-contained Windows build (single-folder or installer); app icon, version stamp. |
 | 3.2 | Crash/error UX | Graceful page-load errors, render-exception guard (don't hard-crash on a bad page). |
 | 3.3 | Smoke suite | A small set of "must render" real-world pages run in CI against the Graphics app (the README already aspires to a heise.de capture — wire it to the new app). |
-| 3.4 | Docs refresh | Rewrite README (it still says "WPF-based browser", `net8`, and references a missing `build.yml`). Add preview install/run instructions + a link to the WPT coverage dashboard as the honesty signal. |
-| 3.5 | Release | Tag, GitHub release with the packaged artifact + known-limitations list (deferred WPT segments, Windows-only). |
+| 3.4 | Docs refresh | ✅ Root and component READMEs now disclose preview instability, AI assistance, foundation provenance, licensing, and human-review status. Add final artifact install/run instructions and the WPT coverage dashboard link when those exist. |
+| 3.5 | License and provenance audit | Preserve Apache-2.0 files for Broiler work, BSD-3-Clause conditions for inherited HTML Renderer material, Yantra JS attribution, Unicode data terms, and independent-project disclaimers in release artifacts. |
+| 3.6 | Human review sign-off | A real developer reviews each release-facing component at the exact candidate commit, records evidence/findings/scope, and signs its `HUMAN_REVIEW.md`. `PENDING` is release-blocking. |
+| 3.7 | Release | Tag, GitHub release with the packaged artifact + known-limitations list (deferred WPT segments, Windows-only). |
 
 ---
 
@@ -360,7 +362,10 @@ Track C (Layout extraction) ───────┘  runs in parallel, lands be
    path: navigate, scroll, click, hover, form input, JS, CSS animation all work.
 4. Packaged Windows artifact + refreshed README + published WPT coverage dashboard
    (the public honesty signal) + documented known-limitations list.
-5. *(Nice-to-have)* Acid1 passing; Acid2/Acid3 scores published, non-gating.
+5. Apache-2.0 and third-party license/provenance notices are present in the source and
+   packaged artifact; all component `HUMAN_REVIEW.md` files name the release-candidate
+   commit and contain an attributable human approval.
+6. *(Nice-to-have)* Acid1 passing; Acid2/Acid3 scores published, non-gating.
 
 ---
 

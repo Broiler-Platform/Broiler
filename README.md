@@ -1,379 +1,173 @@
 # Broiler
 
-A WPF-based web browser built with [HTML-Renderer](https://github.com/ArtOfSettling/HTML-Renderer) for HTML/CSS rendering and [YantraJS](https://github.com/yantrajs/yantra) for JavaScript execution.
+Broiler is an experimental managed-code browser stack for .NET, currently being prepared
+for its first preview. Its rendering lineage comes from
+[HTML Renderer](https://github.com/ArthurHub/HTML-Renderer), and its JavaScript-engine
+lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 
-## Overview
+> **Preview status:** APIs and behavior are unstable. Substantial portions of the project
+> were developed with AI assistance. No component is human-approved for preview use until
+> its linked `HUMAN_REVIEW.md` names a human reviewer, reviewed commit, evidence, and
+> approval decision. The current review records are intentionally **PENDING**.
 
-Broiler is a lightweight, extensible web browser for Windows built entirely in managed C#. It combines:
+## What Broiler contains
 
-- **HTML-Renderer** — a high-performance, 100% managed HTML/CSS rendering engine for WPF
-- **YantraJS** — a .NET Standard JavaScript engine supporting ES2020+ features
+| Component | Purpose |
+|---|---|
+| `Broiler.DOM` | Canonical DOM, HTML tokenization, parsing, mutation, traversal, and serialization |
+| `Broiler.CSS` | CSS parsing, selectors, cascade, computed values, and serialization |
+| `Broiler.Layout` | Graphics-independent CSS box-model and layout engine |
+| `Broiler.Graphics` | Managed bitmap/codecs/raster core plus a Windows Direct2D backend |
+| `Broiler.HTML` | Modular HTML/CSS renderer; derived in part from HTML Renderer |
+| `Broiler.JS` | JavaScript parser, compiler, runtime, built-ins, and host integration; derived in part from Yantra JS |
+| `Broiler.HtmlBridge` | DOM, renderer, and JavaScript integration |
+| `Broiler.App` | WPF browser application |
+| `Broiler.App.Graphics` | Win32/Direct2D preview browser application |
+| `Broiler.Cli`, `Broiler.Wpt` | Rendering and web-platform-test tooling |
+| `Broiler.DevConsole`, `Broiler.DevSite` | Development and diagnostics tools |
 
-## Architecture
+The solution also consumes the nested `Broiler.DateTime`, `Broiler.Regex`, and
+`Broiler.Unicode` components through `Broiler.JS`.
 
+## Foundations and independence
+
+Broiler would not exist without the work of the HTML Renderer and Yantra JS contributors:
+
+- [HTML Renderer](https://github.com/ArthurHub/HTML-Renderer) is the foundation of
+  `Broiler.HTML`. Inherited material remains subject to the BSD 3-Clause License and its
+  retained copyright notices.
+- [Yantra JS](https://github.com/yantrajs/yantra) is the foundation of `Broiler.JS`.
+  Yantra JS and Broiler.JS are distributed under the Apache License 2.0, with upstream
+  history and attribution retained.
+
+Broiler has diverged substantially and is maintained independently. It is not a
+continuation, official edition, or release of either upstream project. Neither upstream
+team is affiliated with, responsible for, or implied to endorse Broiler. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete provenance and license
+references.
+
+## First-preview limits
+
+This preview is intended for evaluation, testing, and contribution—not production,
+security-critical, or safety-critical use.
+
+- The public APIs, repository layout, and persisted formats may change without notice.
+- Broiler.JS is **not a security sandbox**. CLR and host capabilities must be restricted
+  by the embedding application before running untrusted scripts.
+- HTML, CSS, JavaScript, font, image, and Unicode-data inputs cross complex parser or
+  native-interop boundaries that require focused security review.
+- Passing unit, test262, WPT, or visual-comparison tests is useful evidence but does not
+  prove that a component is secure or defect-free.
+- Each license supplies the covered software on an “AS IS” basis, without warranties or
+  conditions.
+
+Current implementation and compliance work is tracked in the
+[public-preview roadmap](docs/roadmap/public-preview-roadmap.md),
+[engine standards roadmap](docs/roadmap/engines-standards-and-performance-roadmap.md),
+[DOM plan](docs/roadmap/broiler-dom-component.md),
+[CSS plan](docs/roadmap/broiler-css-component.md), and
+[layout plan](docs/roadmap/broiler-layout-component.md).
+
+## Human review status
+
+Every release-facing component has a review record. A record is valid only for the exact
+commit named by a human reviewer; **PENDING is not an approval**.
+
+| Component | Review record |
+|---|---|
+| Broiler integration and applications | [Pending human review](HUMAN_REVIEW.md) |
+| Broiler.DOM | [Pending human review](Broiler.DOM/HUMAN_REVIEW.md) |
+| Broiler.CSS | [Pending human review](Broiler.CSS/HUMAN_REVIEW.md) |
+| Broiler.Layout | [Pending human review](Broiler.Layout/HUMAN_REVIEW.md) |
+| Broiler.Graphics | [Pending human review](Broiler.Graphics/HUMAN_REVIEW.md) |
+| Broiler.HTML | [Pending human review](Broiler.HTML/HUMAN_REVIEW.md) |
+| Broiler.JS | [Pending human review](Broiler.JS/HUMAN_REVIEW.md) |
+| Broiler.DateTime | [Pending human review](Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md) |
+| Broiler.Regex | [Pending human review](Broiler.JS/Broiler.Regex/HUMAN_REVIEW.md) |
+| Broiler.Unicode | [Pending human review](Broiler.JS/Broiler.Unicode/HUMAN_REVIEW.md) |
+
+The review files deliberately require a real developer to provide an identity, exact
+commit, test and analysis evidence, findings, intended-use scope, decision, and
+attestation. AI tools must not select or sign the decision.
+
+## Get the source
+
+Broiler uses recursive Git submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/MaiRat/Broiler.git
+cd Broiler
 ```
-┌─────────────────────────────────────────────┐
-│              Broiler WPF Shell              │
-│  ┌───────────────────────────────────────┐  │
-│  │     Navigation Bar (URL, Controls)    │  │
-│  ├───────────────────────────────────────┤  │
-│  │                                       │  │
-│  │          HtmlPanel (Renderer)         │  │
-│  │      ┌─────────────────────────┐      │  │
-│  │      │    Broiler.HTML         │      │  │
-│  │      │    (HTML/CSS Engine)    │      │  │
-│  │      └──────────┬──────────────┘      │  │
-│  │                 │                     │  │
-│  │      ┌──────────▼──────────────┐      │  │
-│  │      │  Broiler.HtmlBridge    │      │  │
-│  │      │  (DOM ↔ JS Bridge)     │      │  │
-│  │      └──────────┬──────────────┘      │  │
-│  │                 │                     │  │
-│  │      ┌──────────▼──────────────┐      │  │
-│  │      │  Broiler.JavaScript    │      │  │
-│  │      │  (JavaScript Engine)   │      │  │
-│  │      └─────────────────────────┘      │  │
-│  │                                       │  │
-│  └───────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+
+For an existing checkout:
+
+```bash
+git submodule update --init --recursive
 ```
 
-### Key Components
+## Build and test
 
-| Component | Description |
-|-----------|-------------|
-| `Broiler.App` | WPF application entry point and main window |
-| `Broiler.Dom` | Dependency-free canonical DOM tree and mutation kernel |
-| `Broiler.Dom.Html` | Shared HTML tokenizer, canonical tree builder, fragment parser, and serializer |
-| `Broiler.HtmlBridge` | Bridge component connecting HTML rendering with JavaScript execution (DomBridge, ScriptEngine, shared utilities) |
-| `Broiler.HTML.Dom` | Renderer-facing CSS box construction and legacy rendering utilities |
-| `Broiler.HTML` | Cross-platform HTML/CSS parsing and rendering engine |
-| `Broiler.JavaScript` | JavaScript engine with ES2020+ support |
+Requirements:
 
-## Building
+- .NET 10 SDK
+- Git
+- Windows for WPF and Direct2D applications
+- Node.js only for the Broiler.HTML JavaScript-based WPT tooling
 
-### Prerequisites
-
-- .NET 8.0 SDK or later
-- Windows (WPF requires Windows)
-
-### Build
+Build and test the main solution:
 
 ```bash
 dotnet build Broiler.slnx
-```
-
-### Run
-
-```bash
-dotnet run --project src/Broiler.App
-```
-
-## Project Structure
-
-```
-Broiler/
-├── src/
-│   ├── Broiler.App/              # WPF browser application
-│   │   └── Rendering/            # Modular rendering pipeline
-│   └── Broiler.App.Tests/        # Unit tests
-├── docs/
-│   └── adr/                      # Architecture Decision Records
-├── HTML-Renderer-1.5.2/          # HTML/CSS rendering engine
-├── yantra-1.2.295/                # JavaScript engine
-└── Broiler.slnx                   # Solution file
-```
-
-## Roadmap
-
-See [Issue #1](https://github.com/MaiRat/Broiler/issues/1) for the full development roadmap.
-
-### HTML & JavaScript Engine
-
-A comprehensive plan covering milestones from Enhanced MVP through to a
-production-grade, standards-compliant HTML and JavaScript engine.
-See the [HTML & JS Engine Roadmap](docs/roadmap/html-js-engine.md) for details.
-For the cross-engine standards/performance baseline and PR dashboard, see the
-[Engines M0 baseline](docs/roadmap/engines-m0-baseline.md) and the
-[HtmlBridge engine boundary map](docs/architecture/htmlbridge-engine-boundaries.md).
-The canonical, engine-neutral document tree and its bridge migration are
-tracked in the [Broiler DOM Component Plan](docs/roadmap/broiler-dom-component.md).
-
-### Development Console & Development Site
-
-A roadmap for integrating an in-app developer console and a dedicated
-development site to aid rendering investigation, debugging, and testing.
-See the [Dev Console & Site Roadmap](docs/roadmap/dev-console-and-site.md)
-for details.
-
-### AvaloniaUI Support
-
-A roadmap for integrating AvaloniaUI to enable cross-platform desktop rendering
-on Windows, macOS, and Linux.
-See the [AvaloniaUI Support Roadmap](docs/roadmap/avalonia-ui-support.md) for
-details.
-
-### CLI Website Capture Tool
-
-A cross-platform command-line tool for capturing website screenshots.
-See the [CLI Roadmap](docs/roadmap/cli-website-capture.md) and
-[ADR-004](docs/adr/004-os-independent-cli-capture-tool.md) for details.
-
-### Graphics Backend Replacement
-
-A roadmap for replacing SkiaSharp with a Broiler-owned graphics
-implementation while preserving rendering, tooling, and test workflows.
-See the [Skia Replacement Roadmap](docs/roadmap/skia-replacement-roadmap.md)
-for details.
-
-PDF conversion now lives in the standalone `Broiler.Pdf` app, which can be
-developed and versioned independently from the main website-capture CLI.
-Use it directly for PDF-to-Word conversion:
-
-```bash
-dotnet run --project src/Broiler.Pdf -- --input ./input.pdf
-dotnet run --project src/Broiler.Pdf -- --input ./input.pdf --output ./converted/
-```
-
-`Broiler.Cli --convert-pdf` now acts as a compatibility wrapper around the
-external converter. Place `Broiler.Pdf` beside `Broiler.Cli`, or set
-`BROILER_PDF_APP` to the `Broiler.Pdf` executable or `.dll` path:
-
-```bash
-dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf
-BROILER_PDF_APP=./src/Broiler.Pdf/bin/Debug/net8.0/Broiler.Pdf.dll \
-  dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf --output ./converted/
-dotnet run --project src/Broiler.Cli -- --help
-```
-
-For the planned in-house parser design, see the
-[Broiler.Pdf Native PDF Parser Roadmap](docs/roadmap/broiler-pdf-native-parser.md).
-
-#### CI Website Capture
-
-The CI workflow (`.github/workflows/build.yml`) automatically captures a
-screenshot of `https://www.heise.de/` after every successful build and test run.
-The screenshot is uploaded as a build artifact named `website-capture`. This
-verifies the rendering pipeline remains functional on every change.
-
-### Log Analyzer Tool
-
-A command-line tool for analyzing Apache access log files. It supports single
-files, directories, rotated logs (`access.log.1`, `.2`, …), and
-gzip-compressed logs (`.gz`).
-
-```bash
-# Analyse a single file (default: top 10 results)
-dotnet run --project src/Broiler.LogAnalyzer.Cli -- access.log
-
-# Show the top 20 results
-dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --top 20
-
-# Show all results (no limit)
-dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --top 0
-
-# Full-text search across parsed log entries (case-insensitive)
-dotnet run --project src/Broiler.LogAnalyzer.Cli -- access.log --search people-and-earth.org
-```
-
-The report includes:
-
-| Section | Description |
-|---------|-------------|
-| Summary | Total requests, unique IPs, bytes transferred |
-| Accessed Files | Tree view of accessed paths with per-file access counts |
-| Status Code Distribution | Breakdown of HTTP status codes |
-| HTTP Methods | Request method distribution |
-| Top Endpoints | Most-requested endpoints |
-| Top IPs | Most-active IP addresses |
-| Top 404 Endpoints | Endpoints returning 404 — useful for detecting suspicious access patterns |
-
-Use `--top 0` to remove the default top-10 limit and display all entries for
-deeper investigation.
-
-Use `--search <TEXT>` to run a case-insensitive full-text search across the
-parsed log entry content (host, timestamp, request line, status, size, referer,
-and user agent). Matching entries are returned in the CLI text output, library
-filters, and the WPF quick-filter toolbar.
-
-### Current Phase: Project Initialization
-
-- [x] Define project goals and design requirements
-- [x] Establish project directory structure
-- [x] Set up solution and source control
-- [x] Document architectural decisions (ADR)
-- [x] Create initial WPF project skeleton
-- [x] Integrate html-renderer and yantra as project references
-- [x] Implement navigation history (back/forward/refresh)
-- [x] Implement rendering pipeline
-- [x] Enable DOM interaction via yantra
-- [x] Support advanced HTML/CSS features
-
-### Testing
-
-Run the full test suite:
-
-```bash
 dotnet test Broiler.slnx
 ```
 
-Run the Acid1 CSS1 conformance tests:
+Run the WPF application on Windows:
 
 ```bash
-dotnet test src/Broiler.Cli.Tests/ --filter "FullyQualifiedName~Acid1"
+dotnet run --project src/Broiler.App/Broiler.App.csproj
 ```
 
-See [docs/acid1-testing.md](docs/acid1-testing.md) for detailed Acid1 test
-documentation and [docs/testing-guide.md](docs/testing-guide.md) for the
-complete testing guide. The M0 engines dashboard baselines are published in
-[docs/roadmap/engines-m0-baseline.md](docs/roadmap/engines-m0-baseline.md).
+Run the Win32/Direct2D application on Windows:
 
-## DOM Interaction
-
-Broiler exposes a `document` object to JavaScript executed via YantraJS,
-enabling scripts embedded in HTML pages to interact with the DOM.
-
-### Available APIs
-
-#### Document methods
-
-| API | Description |
-|-----|-------------|
-| `document.title` | Read or write the page title |
-| `document.getElementById(id)` | Find an element by its `id` attribute |
-| `document.getElementsByTagName(tag)` | Find all elements with the given tag name |
-| `document.getElementsByClassName(name)` | Find all elements that carry the given class name |
-| `document.querySelector(selector)` | Return the first element matching a CSS selector |
-| `document.querySelectorAll(selector)` | Return all elements matching a CSS selector |
-| `document.createElement(tag)` | Create a new element |
-
-`querySelector` / `querySelectorAll` support tag type (`div`), `#id`, `.class`
-(multiple), `[attr]`, and `[attr=value]` tokens, including compound selectors
-such as `div.card#hero[data-active=true]`.
-
-#### Element properties and methods
-
-| API | Description |
-|-----|-------------|
-| `el.tagName` | Tag name in upper-case (read-only) |
-| `el.id` | Element `id` attribute (read-only) |
-| `el.className` | Space-separated class string (read/write) |
-| `el.innerHTML` | Inner HTML content (read/write) |
-| `el.style.setProperty(prop, value)` | Set a CSS property on the element |
-| `el.style.getPropertyValue(prop)` | Get the value of a CSS property |
-| `el.style.removeProperty(prop)` | Remove a CSS property; returns the old value |
-| `el.style.cssText` | Get or set the full inline style string (read/write) |
-| `el.classList.contains(cls)` | Returns `true` if the element has the class |
-| `el.classList.add(...cls)` | Add one or more class names |
-| `el.classList.remove(...cls)` | Remove one or more class names |
-| `el.classList.toggle(cls[, force])` | Toggle a class; returns `true` if added |
-| `el.setAttribute(name, value)` | Set an attribute value |
-| `el.getAttribute(name)` | Get an attribute value, or `null` if absent |
-
-### Example
-
-Given the following HTML page:
-
-```html
-<html>
-<head><title>Demo</title></head>
-<body>
-  <div id="greeting" class="box" style="color: blue">Hello</div>
-  <script>
-    var el = document.getElementById('greeting');
-    // el.tagName   → "DIV"
-    // el.id        → "greeting"
-    // el.className → "box"
-    // el.innerHTML → "Hello"
-    var t = document.title; // "Demo"
-
-    // Modern selector
-    var same = document.querySelector('#greeting');
-
-    // CSS style manipulation
-    el.style.setProperty('color', 'red');
-    el.style.cssText = 'font-size: 18px; font-weight: bold';
-
-    // Class manipulation
-    el.classList.add('highlight');
-    el.classList.remove('box');
-    el.classList.toggle('active');     // → true (added)
-    el.classList.contains('highlight'); // → true
-
-    // Attribute access
-    el.setAttribute('data-count', '3');
-    el.getAttribute('data-count');     // → "3"
-  </script>
-</body>
-</html>
+```bash
+dotnet run --project src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
 ```
 
-### Architecture
+Each submodule README contains its standalone build and test commands. Broiler.HTML also
+has repository-specific WPT tooling, while Broiler.JS documents its test262 workflow.
 
-The `DomBridge` class (in `Broiler.HtmlBridge`) parses the page HTML and
-registers a `document` global on the YantraJS `JSContext` before scripts
-execute.  This enables bidirectional communication: JavaScript can query the
-DOM, and property changes (e.g. setting `document.title`) are reflected back
-to the bridge.
+## Repository layout
 
-```
-PageContent (HTML + Scripts)
-       │
-       ▼
-┌────────────────────────────────────────┐
-│         Broiler.HtmlBridge             │
-│  ┌──────────┐   ┌──────────────────┐  │
-│  │DomBridge │──▶│ HtmlTreeBuilder  │  │  Parses HTML → canonical DomDocument
-│  └──────────┘   └──────────────────┘  │
-│  ┌──────────┐   ┌──────────────────┐  │
-│  │Script    │──▶│ JSContext         │  │  Executes scripts with DOM
-│  │Engine    │   │ (Broiler.JS)     │  │
-│  └──────────┘   └──────────────────┘  │
-└────────────────────────────────────────┘
+```text
+Broiler/
+├── src/                       # integration libraries, applications, and tools
+├── tests/                     # integration and WPT assets
+├── docs/                      # architecture notes and roadmaps
+├── Broiler.DOM/               # Git submodule
+├── Broiler.CSS/               # Git submodule; contains a nested DOM checkout
+├── Broiler.Layout/            # in-tree layout component
+├── Broiler.Graphics/          # Git submodule
+├── Broiler.HTML/              # Git submodule; contains a nested graphics checkout
+├── Broiler.JS/                # Git submodule; contains DateTime, Regex, and Unicode
+└── Broiler.slnx
 ```
 
-### Shared Components (Broiler.HtmlBridge ↔ Broiler.HTML)
+## AI-assisted development
 
-The WHATWG-aligned HTML tokenizer and serialization utilities are shared between
-the HtmlBridge and the Broiler.HTML rendering engine:
+AI coding tools have produced or modified substantial portions of Broiler. Maintainers
+direct the work, run automated checks, and decide what to merge. That workflow can
+increase implementation throughput, but it does not make AI output trustworthy by
+default. Human reviewers are expected to read the relevant source and validate the exact
+release commit rather than approving an AI-generated summary.
 
-```
-Broiler.HTML.Dom (shared layer)
-├── Core/Parse/HtmlTokenizer    ← WHATWG §13.2.5 tokenizer
-├── Core/Parse/HtmlParser       ← CSS box-tree parser (uses HtmlTokenizer)
-└── Core/Utils/HtmlSerializer   ← HtmlEncode, VoidTags, shorthand helpers
-       │
-       ├──▶ Broiler.HTML rendering pipeline
-       │    (HtmlParser → CssBox tree → layout → paint)
-       │
-       └──▶ Broiler.HtmlBridge
-            (HtmlTreeBuilder → Broiler.Dom tree → JS bridge)
-```
-
-| Shared Component | Location | Used By |
-|------------------|----------|---------|
-| `HtmlTokenizer` | `Broiler.HTML.Dom/Core/Parse/` | `HtmlParser` (CSS rendering), `HtmlTreeBuilder` (HtmlBridge) |
-| `HtmlSerializer` | `Broiler.HTML.Dom/Core/Utils/` | `DomBridge.Serialization` (DOM → HTML) |
-
-### Broiler.HtmlBridge Contents
-
-The `Broiler.HtmlBridge` project is a standalone class library (net8.0) that
-bridges `Broiler.HTML` and `Broiler.JavaScript`.  It contains:
-
-| Component | Description |
-|-----------|-------------|
-| `DomBridge` (10 partial files) | DOM ↔ JavaScript bridge: element conversion, event dispatch, CSS, selectors, traversal, serialization |
-| `ScriptEngine` / `IScriptEngine` | Orchestrates JS execution with DOM interaction |
-| `HtmlTreeBuilder` | WHATWG-aligned tree builder: `HtmlToken` → `DomElement` tree |
-| `ScriptExtractor` / `IScriptExtractor` | Extracts `<script>` tags from HTML |
-| `InteractiveSession` | Step-through timer/animation REPL |
-| `MicroTaskQueue` | Promise/microtask queue per HTML Living Standard |
-| `ContentSecurityPolicy` | CSP Level 3 script-src enforcement |
-| `RenderLogger` | Diagnostic logging (console.log bridge) |
-| Rendering utilities | `HtmlPostProcessor`, `CssBoxModel`, `RenderingStages`, `ImagePipeline`, `CssTextProperties` |
+Component READMEs disclose AI assistance and link to commit-scoped human review records.
 
 ## License
 
-See individual component licenses:
-- HTML-Renderer: BSD License
-- YantraJS: Apache-2.0 License
+Except where a file or third-party notice says otherwise, Broiler's current project work
+is licensed under the [Apache License 2.0](LICENSE).
+
+Inherited HTML Renderer material remains subject to its BSD 3-Clause License. Yantra JS
+material remains subject to Apache-2.0, and Unicode-provided data retains its own terms.
+Redistributions must preserve the applicable notices; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
