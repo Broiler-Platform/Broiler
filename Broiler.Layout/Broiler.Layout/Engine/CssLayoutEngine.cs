@@ -1025,6 +1025,12 @@ internal static class CssLayoutEngine
         {
             null or "" or "start" => lineRtl ? CssConstants.Right : CssConstants.Left,
             "end" => lineRtl ? CssConstants.Left : CssConstants.Right,
+            // Legacy -webkit-{left,right,center} align inline content like their
+            // standard counterparts (they additionally drive block alignment,
+            // handled in CssBox justify-self resolution).
+            "-webkit-left" => CssConstants.Left,
+            "-webkit-right" => CssConstants.Right,
+            "-webkit-center" => CssConstants.Center,
             _ => box.TextAlign
         };
 
