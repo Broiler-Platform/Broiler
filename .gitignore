@@ -90,3 +90,4 @@ docs/google-compliance/google-js-errors.log
 node_modules/
 package.json
 package-lock.json
+__pycache__
