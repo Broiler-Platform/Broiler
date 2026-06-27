@@ -23,6 +23,17 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 5 | `justify-self` yields to auto margins | ✅ merged | Broiler.Layout |
 | 6 | `justify-self`/`justify-items`/`-webkit-*` tandem | ✅ merged | Broiler.CSS + Broiler.Layout |
 | 7 | Prefixed-attribute DOM crash (`xlink:href`) | ✅ merged | Broiler.DOM |
+| 8 | `display:inline-table` dropped by value validator (300 drops → MissingContent) | ✅ fixed | Broiler.CSS |
+
+Cluster 8 was the **first win surfaced by diagnostic #1** (dropped-declaration logging):
+issue [#1103](https://github.com/MaiRat/Broiler/issues/1103)'s "Top dropped CSS declarations"
+section flagged `display: inline-table` **300×** alongside the #1 failure category
+(`PixelMismatch / MissingContent`, 344, concentrated in `css-anchor-position` + `css-align`).
+The `display` allowlist in `CssStyleEngine.Values.cs` (`IsAcceptableDeclarationValue`) omitted
+`inline-table` even though the layout engine + paint walker fully render it, so the renderer
+cascade (Phase 5 routes through this engine) silently dropped it and the boxes collapsed. Same
+shape as cluster 6's `-webkit-right`. Fix added `inline-table` (the real win) plus the other
+valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
@@ -50,6 +61,15 @@ gates on substantial features:
   + overflow + `vertical-align`→`align-self` mapping).
 - **Shadow DOM `::part`** — `animation-name-in-shadow-part*`.
 - **Scroll-driven anchor positioning** — the large `anchor-scroll-*` family.
+
+> **`css-anchor-position` LayoutShift cluster (58, issue #1103) — triaged, no single fix.**
+> These are the residual hard tail, *not* one systematic bug: 550 tests pass including the
+> simple anchor cases, so the anchor-resolution core (the mature 8-step heuristic pipeline in
+> `src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/`) is correct. The representative
+> failures are advanced/dynamic gaps — `last-successful-*` (the CSS "last successful position
+> option" is stateful across layout passes / fallback mutation → not reproducible in a static
+> one-shot renderer) and `anchor-position-multicol-fixed` (multicol + `anchor-size()` + fixed).
+> Enumerating the exact 58 from the merged artifact is currently impossible — see diagnostic #10.
 
 ---
 
@@ -130,6 +150,29 @@ classification is visible, not hidden in the failure total.
 ### #9 — Extract `<link rel=help>` / `<meta name=assert>` into the report
 See what a test *claims* to verify — the fastest way to spot that a `css-align`
 failure is actually a paint/parse bug.
+
+### #10 — Preserve per-test `subCategory` in the merged `results` (small, do next)
+
+*Motivated by the `css-anchor-position` LayoutShift triage above.* The per-shard
+report already carries the pixel-mismatch sub-category per test
+(`mismatchDiagnostics.subCategory`, e.g. `LayoutShift` / `MissingContent` /
+`ColorShift`), and `merge-wpt-shards.py` uses it for the **aggregate** "Top
+problems" section. But the merged **`results`** array — the persisted per-test
+record attached to the issue/artifact and consumed by `--rerun-json` — keeps only
+`relativeTestPath` / `passed` / `skipped` / `category`. The sub-category is
+**dropped**, so a cluster like "the 58 LayoutShift tests" cannot be enumerated
+from the artifact after the fact (only the 3 example paths in `topProblems`
+survive), which is exactly what blocked the triage above.
+
+**Change** (one line, no new computation): in `merge-wpt-shards.py::merge`, the
+loop already computes `sub_category` via `_problem_identity(result)` right after
+building the `failure` dict — add `failure["subCategory"] = sub_category` (or move
+the `_problem_identity` call above the dict literal and include the field). This
+makes every failing-test record self-describing: filtering the merged artifact by
+`subCategory == "LayoutShift"` then yields the full list directly. Backward-
+compatible (additive field; `--rerun-json` ignores unknown keys). Add a merge
+unit test asserting the field round-trips (mirrors
+`test_merge_aggregates_dropped_declarations`).
 
 ---
 
