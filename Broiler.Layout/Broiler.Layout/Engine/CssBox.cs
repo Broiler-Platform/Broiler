@@ -406,6 +406,26 @@ internal class CssBox : CssBoxProperties, IDisposable
         cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
         cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
         cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+
+        // Block-axis self-alignment of an absolutely positioned descendant can
+        // run before the containing block has resolved its own block size:
+        // heights resolve bottom-up, yet abspos children are positioned during
+        // the CB's layout, so cb.ActualBottom may still equal cb.Location.Y and
+        // cbPadHeight collapses to ~0 — leaving align-self with no IMCB to work
+        // within (the box stays at its static position).  Widths resolve
+        // top-down, so cbPadWidth is already correct; this only patches the
+        // height.  When the CB carries a definite (non-percentage) specified
+        // height, derive the padding-box height from it directly.
+        if (cbPadHeight <= 0
+            && cb.Height != CssConstants.Auto && !string.IsNullOrEmpty(cb.Height)
+            && !cb.Height.Contains('%'))
+        {
+            double cssHeight = CssValueParser.ParseLength(cb.Height, 0, cb.GetEmHeight());
+            double borderBoxHeight = cb.ResolveSpecifiedHeightToBorderBox(cssHeight);
+            double candidate = borderBoxHeight - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+            if (candidate > cbPadHeight)
+                cbPadHeight = candidate;
+        }
     }
 
     /// <summary>
@@ -1934,6 +1954,13 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 float newX = Location.X, newY = Location.Y;
 
+                // When align-self resolves the block axis to a non-stretch value,
+                // the box uses its content (shrink-to-fit) block size rather than
+                // the stretched inset size; record the resolved border-box height
+                // so the apply step can shrink it (mirrors how the inline branch
+                // sets Size.Width).  Null = leave the block size untouched.
+                double? alignBlockBorderBoxHeight = null;
+
                 // justify-self controls the inline axis:
                 //   horizontal-tb → horizontal (L/R insets)
                 //   vertical-rl/lr → vertical (T/B insets)
@@ -1989,6 +2016,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
                         double boxHeight = GetShrinkToFitHeight();
+                        // Non-stretch align-self → the box is its content height,
+                        // not the stretched top-to-bottom inset height.
+                        alignBlockBorderBoxHeight = boxHeight;
 
                         // Block-axis start is the top edge for horizontal-tb.
                         double dy = ResolveAbsposSelfAlignment(
@@ -2029,6 +2059,13 @@ internal class CssBox : CssBoxProperties, IDisposable
                         ActualBottom += deltaY;
                     }
                 }
+
+                // Un-stretch the block axis to the content height for non-stretch
+                // align-self.  Runs even when the offset was zero (align-self:start
+                // keeps the box at the start edge but still shrinks it), so it is
+                // outside the offset guard above.
+                if (alignBlockBorderBoxHeight is double abh)
+                    ActualBottom = Location.Y + abh;
             }
         }
 
