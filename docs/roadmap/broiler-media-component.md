@@ -17,8 +17,8 @@ The required runtime assembly set is:
 | Shared abstraction | `Broiler.Media` | Abstract `MediaCodec`, probing, codec selection, common input, limits, diagnostics, and the base output contract |
 | Audio abstraction | `Broiler.Media.Audio` | Abstract `AudioCodec`, decoded audio models, audio decode options, and typed audio output |
 | Audio implementation | `Broiler.Media.Audio.Managed` | Initial managed audio decoders, beginning with RIFF/WAVE PCM |
-| Video abstraction | `Broiler.Media.Video` | Abstract `VideoCodec`, decoded video models, video decode options, and typed video output |
-| Video implementation | `Broiler.Media.Video.FFmpeg` (provisional name) | Optional native-backed browser video decoders after a licensing and deployment decision |
+| Video abstraction | `Broiler.Media.Video` | Abstract `VideoCodec`, video metadata/session contracts, decode options, and a typed video presentation target |
+| Video implementation | `Broiler.Media.Video.MediaFoundation` | First real video implementation, built exclusively around Windows `IMFMediaEngine` and an externally owned HWND |
 | Image abstraction | `Broiler.Media.Image` | Abstract `ImageCodec`, pixel/frame/animation models, image decode options, and typed image output |
 | Image implementation | `Broiler.Media.Image.Managed` | Existing managed PNG/APNG, JPEG, and BMP codecs moved from `Broiler.Graphics` |
 
@@ -27,11 +27,18 @@ into the media kinds and implementations they need. An optional convenience
 package may be considered later, but it must not become a dependency of the
 abstraction assemblies.
 
-The component is decode-first. Decoding, probing, decoded frame/sample transfer,
-and codec selection are its core responsibilities. Existing image encoders must
-remain functional during the move, but new encoding work is secondary. Platform
-playback, speakers, windows, GPU presentation, networking, HTML element behavior,
-and rendering remain outside the component.
+The first real video implementation is fixed: `IMFMediaEngine` through
+`Broiler.Media.Video.MediaFoundation`. FFmpeg and other software/native codec
+stacks are staged future providers and are not part of the first implementation
+milestone.
+
+The component is decode-first. Decoding, probing, media-session control, decoded
+audio/image transfer, and codec selection are its core responsibilities. Existing
+image encoders must remain functional during the move, but new encoding work is
+secondary. `Broiler.Media` must not gain a graphics surface backend. For the first
+video path, `IMFMediaEngine` presents video to an HWND declared and owned by
+`Broiler.Graphics.Windows`; networking policy, HTML element behavior, window
+creation, and rendering remain outside Media.
 
 ## 2. Current-state findings
 
@@ -137,8 +144,8 @@ are explicitly skipped because stream decoding is unsupported. This means:
 - image extraction is a behavior-preserving migration of working code;
 - audio is a new capability with a small managed baseline available through
   RIFF/WAVE PCM; and
-- video is a new, high-risk capability requiring a container/demux and decoder
-  backend decision before implementation.
+- video is a new, Windows-first capability whose first real implementation is
+  `IMFMediaEngine`; alternate decoder stacks are deliberately deferred.
 
 No roadmap phase may claim browser audio/video support merely because the codec
 assemblies exist. HTML media elements also need source selection, loading,
@@ -165,14 +172,15 @@ canonical checkout and package/project-reference policy before files move.
 2. Put every abstraction and every concrete implementation category in its own
    assembly as listed in section 1.
 3. Make codec discovery and selection explicit, deterministic, and testable.
-4. Make decoding stream-oriented and cancellable, with bounded allocation and
-   backpressure for long-running audio/video content.
+4. Make buffer-producing decoding stream-oriented and cancellable, with bounded
+   allocation and backpressure; define deterministic session cancellation and
+   lifetime rules for `IMFMediaEngine` video presentation.
 5. Move neutral image codec/data responsibilities out of `Broiler.Graphics`
    without moving graphics surfaces, canvases, or backend resource handles.
 6. Preserve all currently working PNG/APNG, JPEG, and BMP behavior, including
    image encoding, during migration.
-7. Give audio, video, and image outputs a consistent lifecycle while retaining
-   strongly typed samples and frames.
+7. Give audio, video, and image outputs a consistent lifecycle while allowing the
+   first video implementation to present directly to an externally owned HWND.
 8. Keep the abstraction assemblies platform-neutral, safe-code compatible,
    trimming-friendly, and AOT-friendly where their dependencies permit.
 9. Define security limits for untrusted media before browser integration.
@@ -185,6 +193,10 @@ canonical checkout and package/project-reference policy before files move.
 - Put network loading, caches, cookies, CSP, CORS, or URL policy in Media.
 - Move `BCanvas`, render lists, Direct2D, GPU resources, windows, or controls out
   of Graphics.
+- Add a surface, swap-chain, HWND, or graphics-presentation backend to
+  `Broiler.Media`.
+- Use FFmpeg or another alternate video provider as the first real video
+  implementation.
 - Treat SVG as a raster codec during the initial extraction.
 - Build audio-device or window-system output into the abstraction assemblies.
 - Implement HTML media-element state machines in Media.
@@ -203,10 +215,11 @@ The implementation must distinguish these concepts:
 | Probe | Bounded inspection used to identify a format and confidence | Media codec/catalog |
 | Container/demuxer | Extracts timed encoded tracks from formats such as MP4, WebM, Ogg, or WAV | Implementation detail initially; separable future component |
 | Codec | Converts encoded data to/from decoded samples or frames | Media type plus implementation assemblies |
-| Decoded buffer/frame | Typed audio samples, video frame, or image pixels | Audio/Video/Image abstraction assembly |
-| Output sink | Receives decoded typed data with backpressure | Media type abstraction; concrete output elsewhere |
+| Decoded buffer/frame | Typed audio samples or image pixels; optional future video frames | Audio/Image abstractions; Video only when a later frame-output provider needs it |
+| Output sink | Receives decoded typed data or identifies a presentation target | Media type abstraction; concrete output/target elsewhere |
 | Graphics upload | Converts decoded pixels into a renderer-owned resource | Graphics backend |
-| Playback | Clocking, pause/seek, device selection, controls, and presentation | Application/HTML integration |
+| HWND video target | Non-owning Windows presentation endpoint for `IMFMediaEngine` | Declared and owned by `Broiler.Graphics.Windows` |
+| Playback | Source selection and HTML controls/events are integration concerns; engine playback is delegated to `IMFMediaEngine` | MediaFoundation implementation plus application/HTML integration |
 
 Two rules are especially important:
 
@@ -214,6 +227,9 @@ Two rules are especially important:
    bounded content probing.
 2. A decoder does not fetch its own input and does not choose its own output
    device.
+3. Media never creates or owns the HWND used for video. The Media Foundation
+   implementation receives a live target from `Broiler.Graphics.Windows` and
+   treats its lifetime and thread affinity as external constraints.
 
 ## 6. Target component and assembly structure
 
@@ -228,8 +244,8 @@ Broiler.Media/
     Broiler.Media.Audio.Managed.csproj
   Broiler.Media.Video/
     Broiler.Media.Video.csproj
-  Broiler.Media.Video.FFmpeg/
-    Broiler.Media.Video.FFmpeg.csproj
+  Broiler.Media.Video.MediaFoundation/
+    Broiler.Media.Video.MediaFoundation.csproj
   Broiler.Media.Image/
     Broiler.Media.Image.csproj
   Broiler.Media.Image.Managed/
@@ -238,24 +254,26 @@ Broiler.Media/
   Broiler.Media.Audio.Tests/
   Broiler.Media.Audio.Managed.Tests/
   Broiler.Media.Video.Tests/
-  Broiler.Media.Video.FFmpeg.Tests/
+  Broiler.Media.Video.MediaFoundation.Tests/
   Broiler.Media.Image.Tests/
   Broiler.Media.Image.Managed.Tests/
 ```
 
 Test projects are separate assemblies but are not shipped runtime components.
-The provisional FFmpeg name is deliberately explicit: a native dependency must
-not be hidden behind a package called `Managed` or `Core`.
+`Broiler.Media.Video.MediaFoundation` is Windows-only and targets the Windows
+framework needed by `IMFMediaEngine`. FFmpeg is not included in this initial
+runtime set; it may be introduced later as a separately named provider.
 
 ### 6.1 Dependency direction
 
 ```text
 Broiler.Media.Audio.Managed  -> Broiler.Media.Audio  -> Broiler.Media
-Broiler.Media.Video.FFmpeg   -> Broiler.Media.Video  -> Broiler.Media
+Broiler.Media.Video.MediaFoundation -> Broiler.Media.Video -> Broiler.Media
+Broiler.Media.Video.MediaFoundation -> Broiler.Graphics.Windows
 Broiler.Media.Image.Managed  -> Broiler.Media.Image  -> Broiler.Media
 
 Broiler.Graphics             -> Broiler.Media.Image -> Broiler.Media
-Broiler.Graphics.Windows     -> Broiler.Graphics
+Broiler.Graphics.Windows     -> Broiler.Graphics + Broiler.Media.Video
 
 Application composition root -> chosen implementation assemblies
 HTML resource/playback layer -> media abstractions and application catalog
@@ -266,9 +284,15 @@ Forbidden references:
 - `Broiler.Media` must not reference Audio, Video, Image, Graphics, HTML, or a
   concrete implementation.
 - A typed abstraction must not reference a sibling typed abstraction.
-- An implementation assembly must not reference Graphics or HTML.
-- Graphics must not reference Audio or Video.
-- No abstraction assembly may reference FFmpeg or another native package.
+- Implementations must not reference HTML. The only approved Graphics dependency
+  is `Broiler.Media.Video.MediaFoundation -> Broiler.Graphics.Windows`, and only
+  for the HWND presentation-target contract.
+- The platform-neutral `Broiler.Graphics` core must not reference Audio or Video.
+- `Broiler.Graphics.Windows` may reference `Broiler.Media.Video` solely to declare
+  the Windows video target that exposes its externally owned HWND.
+- No abstraction assembly may reference Media Foundation, FFmpeg, or another
+  native/platform package.
+- No Media assembly may implement a graphics surface, swap chain, or window.
 - No cycle may be resolved through service locators, reflection-only loading, or
   module-initializer side effects.
 
@@ -330,34 +354,48 @@ This assembly owns:
 - abstract `VideoCodec : MediaCodec`;
 - video stream information: coded/display dimensions, pixel aspect ratio,
   duration, time base, frame-rate hint, rotation, and color metadata;
-- decoded `VideoFrame` with timestamp, duration, pixel format, planes/strides,
-  and key-frame/discontinuity information;
-- `VideoDecodeOptions`, including requested pixel formats and decode limits; and
-  typed `IVideoOutput`.
+- `VideoDecodeOptions` and session/open options;
+- video session state, events, cancellation, seek, and lifetime contracts; and
+- typed `IVideoOutput`/presentation-target lifecycle without any surface API.
 
-The model must support planar YUV without forcing every decoder to allocate an
-RGBA copy. Graphics adapters may request or convert to an uploadable format.
+The first contract must support `IMFMediaEngine` direct presentation without
+forcing decoded frames through managed memory. A later frame-output provider may
+add `VideoFrame` with planes/strides and timestamps, but that is staged work and
+is not a prerequisite for the Media Foundation baseline.
 
-### 6.6 `Broiler.Media.Video.FFmpeg`
+### 6.6 `Broiler.Media.Video.MediaFoundation`
 
-This is the recommended first practical implementation direction, subject to an
-ADR covering:
+This is the first and only real video implementation in the initial roadmap. It
+is a Windows-only adapter built around `IMFMediaEngine`.
 
-- dynamically linked versus bundled native binaries;
-- platform/runtime identifiers and deployment size;
-- the exact FFmpeg build configuration and licenses;
-- patent-sensitive codec distribution;
-- native lifetime and thread-safety rules;
-- trimming/AOT behavior and failure diagnostics; and
-- CI availability on every supported platform.
+The baseline presentation pipeline is:
 
-The first milestone should decode one bounded video stream to timestamped frames
-and support cancellation. Browser claims should wait for MP4/WebM container
-coverage, audio/video synchronization, seeking, and output integration.
+```text
+media source -> IMFMediaEngine -> video presentation -> externally owned HWND
+                                                     (`Broiler.Graphics.Windows`)
+```
 
-If FFmpeg is rejected, use a differently named implementation assembly (for
-example a platform Media Foundation backend). Do not keep the `FFmpeg` name for
-an implementation that does not use it.
+Boundary rules:
+
+- `Broiler.Graphics.Windows` creates, declares, owns, and destroys the HWND. It
+  may expose a small `HwndVideoOutput`/Windows video-target contract implementing
+  the typed `Broiler.Media.Video` output lifecycle.
+- `Broiler.Media.Video.MediaFoundation` borrows that target and drives
+  `IMFMediaEngine`; it never creates a window and never assumes ownership of the
+  handle.
+- Media contains no `IBroilerSurface` equivalent, swap chain, Direct2D surface,
+  GPU image store, or generic presentation backend.
+- HWND validity, UI-thread affinity, resize notification, teardown ordering, and
+  engine callbacks must be explicit and tested.
+- Media Foundation/COM startup and shutdown, callbacks, event translation,
+  diagnostics, and engine-session disposal stay inside the implementation.
+- Source selection and HTML events remain in the browser/application integration
+  layer.
+
+FFmpeg and other alternative frame-decoding backends are staged until this
+pipeline is stable. They require their own later roadmap/ADR and separately named
+implementation assembly; they must not reshape the initial API around a surface
+backend that `IMFMediaEngine` does not need.
 
 ### 6.7 `Broiler.Media.Image`
 
@@ -403,7 +441,7 @@ abstract MediaCodec
   abstract AudioCodec
     concrete codecs in Broiler.Media.Audio.Managed or another Audio implementation
   abstract VideoCodec
-    concrete codecs in Broiler.Media.Video.FFmpeg or another Video implementation
+    IMFMediaEngineVideoCodec in Broiler.Media.Video.MediaFoundation
   abstract ImageCodec
     PngImageCodec / JpegImageCodec / BmpImageCodec in Broiler.Media.Image.Managed
 ```
@@ -425,9 +463,11 @@ The base must not know `AudioBuffer`, `VideoFrame`, or `ImageFrame`.
 
 ### 7.2 Typed derived codec responsibilities
 
-Each typed codec defines its own decode contract and typed options/output. Decode
-is required. Encode may be a capability-gated virtual operation so existing image
-encoders survive without making encoding mandatory for every codec.
+Each typed codec defines its own decode/session contract and typed options/output.
+Decode or media-session opening is required. `VideoCodec` must permit direct
+presentation through `IMFMediaEngine` without requiring a decoded-frame callback.
+Encode may be a capability-gated virtual operation so existing image encoders
+survive without making encoding mandatory for every codec.
 
 Unsupported operations must fail through one documented media exception/result,
 not arbitrary `NotImplementedException` or silent empty output.
@@ -469,15 +509,21 @@ adapter is acceptable, but it must use the same limits and probe path.
 The base `IMediaOutput` is a small lifecycle contract. Typed outputs extend it:
 
 - `IAudioOutput` receives stream information and `AudioBuffer` chunks;
-- `IVideoOutput` receives stream information and timestamped `VideoFrame`s; and
+- `IVideoOutput` identifies the presentation lifecycle/target; the initial Windows
+  implementation is backed by an HWND supplied by `Broiler.Graphics.Windows`;
+  and
 - `IImageOutput` receives image information and one or more `ImageFrame`s.
 
-Writes return an awaitable result so a slow speaker, renderer, encoder, or test
-sink applies backpressure. Completion, cancellation, and failure have one defined
-lifecycle; the decoder must not continue writing after termination.
+Buffer writes return an awaitable result so a slow speaker, encoder, or test sink
+applies backpressure. Completion, cancellation, and failure have one defined
+lifecycle. For `IMFMediaEngine`, the implementation maps this lifecycle to engine
+events and the externally owned HWND instead of manufacturing a Media surface or
+managed video-frame stream.
 
 This output is a decode-pipeline sink, not necessarily a physical playback
-device. Platform output packages can be added later without changing codecs.
+device. The HWND target is declared by `Broiler.Graphics.Windows`; it is not a
+surface backend owned by Media. Raw video-frame output and alternate providers
+are staged extensions.
 
 ### 7.6 Buffer ownership
 
@@ -584,7 +630,7 @@ Tasks:
 - Add malformed/truncated and allocation-limit baselines before moving parsers.
 - Record image encode golden files and decode pixel hashes.
 - Write ADRs for buffer ownership, pixel/alpha format, compatibility window, and
-  the video backend.
+  the `IMFMediaEngine`/borrowed-HWND lifetime and threading contract.
 
 Exit gate:
 
@@ -613,9 +659,9 @@ Tasks:
 Exit gate:
 
 - all abstraction projects build independently;
-- implementation assemblies depend only on their typed abstraction;
+- implementation assemblies follow the reference allowlist in section 6.1;
 - catalog behavior is deterministic; and
-- no Graphics/HTML references exist in Media.
+- no HTML reference or graphics surface implementation exists in Media.
 
 ### Phase 2 - Move image data contracts and managed codecs
 
@@ -718,42 +764,53 @@ Exit gate:
 
 ### Phase 6 - Deliver the video abstraction and first backend
 
-**Objective:** Decode a real timed video stream through an optional implementation.
+**Objective:** Deliver the first real video path through `IMFMediaEngine` and an
+HWND owned by `Broiler.Graphics.Windows`.
 
-Prerequisite: the video backend/container ADR is approved.
+Prerequisite: the borrowed-HWND lifetime/threading ADR is approved.
 
 Tasks:
 
-- Finalize planar frame, stride, color, timestamp, and ownership contracts.
-- Implement native library loading and diagnostics in the optional video assembly.
-- Add a narrow, licensed fixture set covering the selected first container and
-  codec.
-- Decode to `IVideoOutput` with cancellation and backpressure.
-- Add first-frame extraction for poster/fallback integration.
-- Add a Graphics adapter that uploads supported video frame formats or performs
-  an explicit conversion outside the codec.
-- Keep playback clocks, controls, source fallback, and A/V synchronization in a
-  higher integration layer.
+- Finalize `VideoCodec`, video metadata, engine-session, event, cancellation,
+  seek, and presentation-target contracts around `IMFMediaEngine` behavior.
+- Add the Windows-only `Broiler.Media.Video.MediaFoundation` implementation and
+  its explicit COM/Media Foundation startup, callback, and disposal handling.
+- Declare the HWND-bearing video target in `Broiler.Graphics.Windows`; Graphics
+  owns the HWND and Media Foundation borrows it for the session lifetime.
+- Establish the direct `video -> IMFMediaEngine -> HWND` presentation path.
+- Handle resize, visibility, UI-thread affinity, window destruction, source
+  replacement, cancellation, end/error state, and teardown ordering.
+- Add representative Windows video fixtures for every format that the first
+  release explicitly claims through Media Foundation.
+- Keep HTML source selection, element controls/events, and application policy in
+  the higher integration layer.
+- Do not add a Media surface, decoded-frame upload adapter, FFmpeg dependency, or
+  generic GPU backend in this phase.
 
 Exit gate:
 
-- decoded frames have correct dimensions, timestamps, ordering, and bounded
-  ownership;
-- missing native binaries produce a clear capability error;
-- the abstraction projects remain native-dependency-free; and
+- a real video is presented by `IMFMediaEngine` into an HWND owned by
+  `Broiler.Graphics.Windows`;
+- cancellation, resize, HWND destruction, and engine disposal are deterministic
+  and leak-free;
+- no graphics surface or swap chain is implemented by a Media assembly;
+- the abstraction projects remain Media-Foundation- and Windows-handle-free; and
 - browser support remains feature-gated until Phase 7.
 
 ### Phase 7 - Add output and browser playback integration
 
-**Objective:** Connect typed decode outputs to platform/application services.
+**Objective:** Connect typed outputs and the Media Foundation HWND session to
+application/browser behavior.
 
 Tasks:
 
-- Add optional platform output components only where needed, for example an audio
-  device sink and a graphics video-frame presenter.
+- Add optional audio output components only where needed.
+- Reuse the HWND target declared by `Broiler.Graphics.Windows` for video; do not
+  introduce a second Media-owned surface or video presenter.
 - Implement playback clock, pause/resume, seek, buffering, end/error state, and
   cancellation in the application/HTML layer.
-- Synchronize audio and video using decoded timestamps rather than frame counts.
+- Use `IMFMediaEngine` timing/events as the baseline for video playback and map
+  them to the HTML/application state machine.
 - Wire HTML source selection and events to real capability results.
 - Replace WPT media skips incrementally, one supported behavior/format at a time.
 - Add telemetry for selected codec, fallback, dropped frames, decode latency, and
@@ -802,7 +859,7 @@ Exit gate:
 9. Direct2D and HTML image cutover.
 10. Remove codec implementations from Graphics and update documentation.
 11. WAVE PCM audio implementation.
-12. Video backend infrastructure and one narrow decoder path.
+12. `IMFMediaEngine` plus `Broiler.Graphics.Windows` HWND presentation path.
 13. Output/playback integration in independently reviewable slices.
 14. Compatibility cleanup and package release.
 
@@ -847,19 +904,23 @@ pointer updates.
 
 ### 12.4 Video tests
 
-- independent reference hashes for selected fixtures;
-- display/coded dimensions, stride, color metadata, rotation, and timestamps;
-- B-frame reordering where supported;
-- seek/key-frame behavior where advertised;
-- missing/corrupt native dependency diagnostics;
-- cancellation and disposal under decode; and
-- bounded frame queues under a slow output.
+- `IMFMediaEngine` creation, source load, play, pause, seek, end, and error events;
+- real presentation into a test HWND created and owned by
+  `Broiler.Graphics.Windows`;
+- HWND resize, visibility change, UI-thread affinity, destruction, and recreation;
+- session cancellation and teardown in every loading/playback state;
+- unsupported-source and Media Foundation initialization diagnostics;
+- no HWND ownership transfer to Media and no use after window destruction; and
+- feature detection/skipping on non-Windows test hosts.
 
 ### 12.5 Architecture tests
 
 - exact project-reference allowlists;
 - no implementation reference from any abstraction assembly;
-- no Graphics/HTML/native namespaces in abstraction public APIs;
+- no Graphics/HTML/Media Foundation namespaces or HWND types in abstraction
+  public APIs;
+- the single approved implementation edge to `Broiler.Graphics.Windows` contains
+  only the Windows presentation-target integration;
 - no process-wide mutable codec singleton;
 - no public mutable collections;
 - no synchronous network/file access in codec assemblies; and
@@ -870,11 +931,11 @@ pointer updates.
 Capture baselines before the image move and compare:
 
 - decode time and allocations for representative small/large images;
-- time to first audio buffer/video frame;
+- time to first audio buffer/first `IMFMediaEngine` video presentation;
 - peak working set and maximum queued decoded data;
-- pixel-format conversion/upload cost;
+- image pixel-format conversion/upload cost;
 - steady-state audio/video throughput; and
-- startup cost when optional native video support is absent.
+- Media Foundation startup/session creation cost on Windows.
 
 The extraction phase should not regress image decode throughput or allocations by
 more than an agreed threshold without a documented reason.
@@ -898,9 +959,10 @@ Malformed data must produce a media-specific error with codec and offset/context
 where safe. It must not cause unbounded allocation, hangs, silent partial success,
 or arbitrary exception leakage.
 
-Native implementations additionally require safe-handle lifetime management,
-version checks, deterministic unload/disposal behavior, and CI scanning of shipped
-binaries and licenses.
+The Media Foundation implementation additionally requires COM/Media Foundation
+lifetime management, callback disconnection, deterministic session disposal, and
+strict borrowed-HWND validation. Media must never destroy the HWND or use it after
+`Broiler.Graphics.Windows` reports that the target has closed.
 
 ## 14. Risks and mitigations
 
@@ -913,11 +975,13 @@ binaries and licenses.
 | Pixel alpha/stride semantics change | Color halos or corrupted uploads | Freeze RGBA8 straight-alpha compatibility, test Direct2D premultiplication |
 | Large decoded media exhausts memory | Browser instability/security issue | Streaming outputs, backpressure, pooled ownership, hard limits |
 | Codec/container responsibilities are conflated | MP4/WebM design dead-end | Treat demux as a distinct concept and extract it when more than one implementation needs it |
-| FFmpeg deployment/licensing is unresolved | Video implementation cannot ship | ADR and packaging proof before committing public support |
+| Borrowed HWND outlives its Graphics window | Native callbacks target an invalid handle | Explicit target lifetime notifications, UI-thread rules, cancellation, and teardown tests |
+| A Media surface backend is added for symmetry | Duplicate presentation stack and confused ownership | Keep the baseline `IMFMediaEngine -> HWND`; all HWND/surface ownership stays in Graphics.Windows |
+| Windows-first video is mistaken for a cross-platform promise | Unsupported platform behavior | Name the implementation `MediaFoundation`, target Windows explicitly, and stage other providers |
 | Audio/video assemblies exist but browser still uses placeholders | Misleading support claims | Separate codec milestones from playback/WPT milestones |
 | SVG is pulled into raster codecs | Rendering/DOM dependencies leak into Media | Keep SVG outside initial raster extraction |
 | Existing encoders disappear in a decode-first rewrite | Regression in CLI/tests | Capability-gated encode path and migration gate |
-| Native frames force RGBA copies | Poor video performance | Planar formats/strides in Video model and explicit graphics conversion |
+| FFmpeg shapes the first API prematurely | Unnecessary raw-frame/surface abstractions | Stage FFmpeg until the IMFMediaEngine session and HWND contract are stable |
 
 ## 15. Definition of done
 
@@ -926,16 +990,20 @@ The Broiler.Media component is complete for this roadmap when:
 - `MediaCodec`, `AudioCodec`, `VideoCodec`, and `ImageCodec` are abstract classes
   in their prescribed separate assemblies;
 - each media kind has at least one separately shipped concrete implementation
-  assembly, with the video backend name matching its actual technology;
+  assembly, with `Broiler.Media.Video.MediaFoundation` as the first real Video
+  implementation;
 - the shared catalog explicitly selects codecs without mutable global state;
 - PNG/APNG, JPEG, and BMP codec/data code no longer lives in
   `Broiler.Graphics`;
 - `Broiler.Graphics` retains rendering surfaces, canvases, handles, and backends
   and consumes already-decoded `ImageBuffer` data;
+- no Media assembly owns a graphics surface, swap chain, window, or HWND;
+- real video presentation follows `IMFMediaEngine -> HWND`, with the HWND declared
+  and owned by `Broiler.Graphics.Windows`;
 - existing image decode, animation, encode, CPU rendering, Direct2D rendering,
   HTML image, capture, and pixel-diff tests meet their baselines;
-- audio and video decoding are streaming, cancellable, bounded, and tested with
-  real fixtures;
+- audio decoding and Media Foundation video sessions are cancellable, bounded,
+  lifetime-safe, and tested with real fixtures;
 - browser/network/playback policies remain outside Media;
 - every assembly passes dependency architecture tests;
 - security limits and ownership rules are documented and enforced; and
@@ -952,12 +1020,14 @@ The Broiler.Media component is complete for this roadmap when:
 6. Approve RGBA8 straight-alpha as the initial image compatibility format, with
    explicit stride/pixel-format extensibility.
 7. Approve RIFF/WAVE PCM as the first managed Audio implementation.
-8. Commission the video backend/license ADR before creating the concrete Video
-   package; use FFmpeg only if that ADR approves it.
+8. Approve `IMFMediaEngine` as the only first real Video implementation and stage
+   FFmpeg/other providers until the Windows baseline is stable.
 9. Choose the source/binary compatibility window for the current public Graphics
    image API.
 10. Choose package versus pinned-checkout consumption so the nested submodule
     pattern does not create multiple editable Media copies.
+11. Approve the presentation boundary: `Broiler.Graphics.Windows` declares and
+    owns the HWND; Media Foundation borrows it; Media provides no surface backend.
 
 These decisions keep the first implementation phase mechanical: establish the
 contracts, move working image codecs unchanged, cut consumers over, and only then
