@@ -94,6 +94,44 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertNotIn("`RenderingError` — 1 failure(s)", markdown)
             self.assertIn("Incomplete shards: 1", markdown)
 
+    def test_merge_aggregates_dropped_declarations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            for name, idx, drops in (
+                (
+                    "shard-0.json",
+                    0,
+                    [
+                        {"declaration": "text-align: -webkit-right", "count": 5},
+                        {"declaration": "position: wobble", "count": 1},
+                    ],
+                ),
+                ("shard-1.json", 1, [{"declaration": "text-align: -webkit-right", "count": 3}]),
+            ):
+                (shard_dir / name).write_text(
+                    json.dumps(
+                        {
+                            "summary": {"passed": 1, "failed": 0, "skipped": 0, "total": 1},
+                            "shard": {"index": idx, "count": 8},
+                            "triage": {"droppedDeclarations": drops},
+                            "results": [],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+
+            # Counts summed across shards, most frequent first.
+            self.assertEqual(
+                [("text-align: -webkit-right", 8), ("position: wobble", 1)],
+                merged["droppedDeclarations"],
+            )
+
+            markdown = MODULE.render_issue_markdown(merged, None)
+            self.assertIn("dropped CSS declarations", markdown)
+            self.assertIn("`text-align: -webkit-right` — 8 occurrence(s)", markdown)
+
     def test_cli_requests_issue_for_incomplete_shard_without_test_results(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             shard_dir = Path(temp)

@@ -191,6 +191,20 @@ public class Program
         Console.WriteLine();
 
         var runner = new WptTestRunner();
+
+        // Surface CSS declarations the style engine drops because their value
+        // failed validation. A single high-count entry (e.g. an unsupported
+        // text-align:-webkit-*) often masks many failing tests with no other
+        // signal (WPT issue #1100). Off in production; enabled only for this run.
+        //
+        // Scope: this captures declarations from author/UA STYLESHEETS (the
+        // cascade), which is where cross-cutting "missing feature" drops live and
+        // where a single value gates many tests. Inline `style=""` drops follow a
+        // separate render path and are not captured here (the engine hook still
+        // reports them for any consumer that calls GetComputedStyle).
+        var droppedDeclarations = new DroppedDeclarationCollector();
+        Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected = droppedDeclarations.Record;
+
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
         var discoveredTests = WptTestRunner
             .DiscoverTests(wptPath, subsetPatterns, nonJavaScriptOnly)
@@ -352,18 +366,23 @@ public class Program
             }
         }
 
+        // The aggregate is complete; stop collecting and snapshot the top entries.
+        Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected = null;
+        var topDropped = droppedDeclarations.Top(TopBucketLimit);
+
         PrintBucketSummary(wptPath, failures, skippedResults);
+        PrintDroppedDeclarations(topDropped, droppedDeclarations.TotalDropped);
 
         if (jsonOutputPath is not null)
         {
-            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath, shardCount, shardIndex);
+            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath, shardCount, shardIndex, topDropped);
             Console.WriteLine();
             Console.WriteLine($"JSON report written to: {jsonOutputPath}");
         }
 
         if (markdownOutputPath is not null)
         {
-            WriteMarkdownSummary(allResults, markdownOutputPath, passed, failed, skipped, wptPath, subset);
+            WriteMarkdownSummary(allResults, markdownOutputPath, passed, failed, skipped, wptPath, subset, topDropped);
             Console.WriteLine();
             Console.WriteLine($"Markdown summary written to: {markdownOutputPath}");
         }
@@ -590,7 +609,8 @@ public class Program
         int skipped,
         string wptPath,
         int shardCount = 1,
-        int shardIndex = WptTestRunner.AllShards)
+        int shardIndex = WptTestRunner.AllShards,
+        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -653,6 +673,17 @@ public class Program
                         ["subCategory"] = r.MismatchDiagnostics?.Category.ToString(),
                     })
                     .ToList(),
+                // CSS declarations the engine dropped as invalid/unsupported.
+                // A high-count entry usually points at a missing feature gating
+                // many tests (WPT issue #1100). Aggregated across shards by
+                // scripts/merge-wpt-shards.py.
+                ["droppedDeclarations"] = (droppedDeclarations ?? [])
+                    .Select(d => new Dictionary<string, object?>
+                    {
+                        ["declaration"] = d.Declaration,
+                        ["count"] = d.Count,
+                    })
+                    .ToList(),
                 ["skipReasons"] = skippedResults
                     .GroupBy(r => r.SkipReason.ToString())
                     .OrderByDescending(g => g.Count())
@@ -698,7 +729,8 @@ public class Program
         int failed,
         int skipped,
         string wptPath,
-        string? subset)
+        string? subset,
+        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -742,6 +774,7 @@ public class Program
         WriteReferenceCoverageSection(writer, referenceCoverageStatus);
         WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
         WriteTimeoutSection(writer, timeoutSummary.Failures, timeoutSummary.SubsetCommands);
+        WriteDroppedDeclarationsSection(writer, droppedDeclarations);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
         writer.WriteLine();
@@ -772,6 +805,35 @@ public class Program
             foreach (var bucket in suggestedBuckets)
                 writer.WriteLine($"- `./scripts/run-wpt-tests.sh --subset \"{bucket}\"`");
         }
+    }
+
+    private static void PrintDroppedDeclarations(
+        IReadOnlyList<(string Declaration, int Count)> topDropped, int totalDropped)
+    {
+        if (topDropped.Count == 0)
+            return;
+
+        Console.WriteLine();
+        Console.WriteLine($"=== Dropped CSS declarations ({totalDropped} total, top {topDropped.Count}) ===");
+        Console.WriteLine("(values the style engine rejected as invalid/unsupported — a high count often gates many tests)");
+        foreach (var (declaration, count) in topDropped)
+            Console.WriteLine($"  {count,6}  {declaration}");
+    }
+
+    private static void WriteDroppedDeclarationsSection(
+        TextWriter writer, IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations)
+    {
+        if (droppedDeclarations is null || droppedDeclarations.Count == 0)
+            return;
+
+        writer.WriteLine();
+        writer.WriteLine("## Dropped CSS declarations");
+        writer.WriteLine();
+        writer.WriteLine("Values the style engine rejected as invalid/unsupported. A high count");
+        writer.WriteLine("usually points at a missing feature that silently gates many tests.");
+        writer.WriteLine();
+        foreach (var (declaration, count) in droppedDeclarations)
+            writer.WriteLine($"- `{declaration}` — {count} occurrence(s)");
     }
 
     private static void PrintBucketSummary(
