@@ -2,19 +2,16 @@ name: WPT Tests
 
 # Full-suite Web Platform Tests runner, sharded for parallelism.
 #
-# Modeled on Broiler.JS's test262.yml. The whole WPT checkout (~60K+ tests) is
-# split into SHARD_COUNT deterministic shards; each shard is an independent job
-# that generates its own Chromium references and runs only its slice. Shard
+# Modeled on Broiler.JS's test262.yml. The eligible documents in the WPT
+# checkout are split into SHARD_COUNT deterministic shards; each shard is an
+# independent job that generates Chromium references and runs its slice. Shard
 # assignment (FNV-1a of the relative path) is identical in
 # scripts/generate-wpt-references.js and the C# runner, so a shard's references
 # always cover the tests it executes.
 #
-# Entry points:
-#   * Scheduled (weekly): runs every shard of the full suite, merges the
-#     results, and — when failures exist — files a summarizing GitHub issue and
-#     persists the failing-test manifest for incremental reruns.
-#   * Manual (workflow_dispatch): target a subset, a single shard, or rerun only
-#     the previously-failed tests for fast feedback.
+# The manually dispatched workflow can target the full suite, a subset, a
+# single shard, or only the previously-failed tests. Every run merges the shard
+# results and files a focused GitHub issue when failures exist.
 #
 # Reference generation (Chromium via Playwright) is expensive, so each shard
 # caches its reference slice. Bump CACHE_EPOCH to refresh WPT master + refs.
@@ -43,6 +40,10 @@ on:
         description: Per-test timeout in seconds.
         required: false
         default: '30'
+      most_common_problems_limit:
+        description: Maximum number of common failure groups to include in the GitHub issue.
+        required: false
+        default: '10'
 
 permissions:
   contents: write   # persist-failed commits the failing-test manifest
@@ -50,12 +51,13 @@ permissions:
 
 env:
   # Bump to invalidate the cached WPT checkout + references.
-  CACHE_EPOCH: '1'
+  CACHE_EPOCH: '3' # JavaScript-enabled Chromium references
   SHARD_COUNT: '8'
   WPT_CHECKOUT_DIR: tests/wpt/checkout
   REFERENCE_DIR: tests/wpt/references
   RESULTS_DIR: tests/wpt-results
   FAILED_TESTS_FILE: tests/wpt-baseline/failed-tests.json
+  MOST_COMMON_PROBLEMS_LIMIT: ${{ github.event.inputs.most_common_problems_limit || '10' }}
 
 jobs:
   # ── Resolve the shard matrix and whether to run incrementally ────────────
@@ -169,6 +171,8 @@ jobs:
           SUBSET: ${{ github.event.inputs.subset || '' }}
           RERUN_FAILED: ${{ needs.plan.outputs.rerun-failed }}
         run: |
+          # The regular WPT suite executes JavaScript in both Chromium and
+          # Broiler. --non-js remains available only for explicit local runs.
           ARGS=(--shard-index "${{ matrix.shard-index }}" --shard-count "$SHARD_COUNT")
           if [ -n "$SUBSET" ]; then
             ARGS+=(--subset "$SUBSET")
@@ -181,6 +185,7 @@ jobs:
           bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
           echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
           echo "Shard ${{ matrix.shard-index }} finished (exit $EXIT)."
+          exit "$EXIT"
 
       - name: Collect shard result
         if: always()
@@ -188,6 +193,13 @@ jobs:
           mkdir -p shard-out
           cp "$RESULTS_DIR/wpt-results.json" "shard-out/wpt-shard-${{ matrix.shard-index }}.json" 2>/dev/null || true
           cp "$RESULTS_DIR/wpt-results.log"  "shard-out/wpt-shard-${{ matrix.shard-index }}.log"  2>/dev/null || true
+          EXIT="${{ steps.wpt.outputs.exit_code }}"
+          if ! [[ "$EXIT" =~ ^[0-9]+$ ]]; then
+            EXIT=1
+          fi
+          printf '{"shardIndex":%s,"exitCode":%s}\n' \
+            "${{ matrix.shard-index }}" "$EXIT" \
+            > "shard-out/wpt-shard-${{ matrix.shard-index }}-status.json"
 
       - name: Shard step summary
         if: always()
@@ -230,18 +242,13 @@ jobs:
         shell: bash
         env:
           WPT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          ISSUE_TOKEN: ${{ secrets.ISSUE_TOKEN }}
         run: |
           python scripts/merge-wpt-shards.py \
             --shard-dir shard-results \
             --merged-json wpt-merged/wpt-results.json \
             --issue-md wpt-merged/issue.md \
+            --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
             --github-output "$GITHUB_OUTPUT"
-          if [ -n "${ISSUE_TOKEN:-}" ]; then
-            echo "issue_token_available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "issue_token_available=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Publish merged summary
         if: always()
@@ -256,26 +263,24 @@ jobs:
           name: wpt-merged
           path: wpt-merged
 
-      - name: Report missing ISSUE_TOKEN
-        if: github.event_name == 'schedule' && steps.merge.outputs.create_issue == 'true' && steps.merge.outputs.issue_token_available != 'true'
-        run: |
-          {
-            echo "### WPT issue creation"
-            echo "- Failures were found, but \`ISSUE_TOKEN\` is not configured, so no issue was filed."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Create GitHub issue for failures
-        if: github.event_name == 'schedule' && steps.merge.outputs.create_issue == 'true' && steps.merge.outputs.issue_token_available == 'true'
+      - name: Create GitHub issue for the most common failures
+        if: steps.merge.outputs.create_issue == 'true'
         uses: actions/github-script@v7
         env:
           FAILED_COUNT: ${{ steps.merge.outputs.failed_count }}
+          INCOMPLETE_SHARD_COUNT: ${{ steps.merge.outputs.incomplete_shard_count }}
         with:
-          github-token: ${{ secrets.ISSUE_TOKEN }}
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
           script: |
             const fs = require('fs');
             const body = fs.readFileSync('wpt-merged/issue.md', 'utf8').trim();
             const today = new Date().toISOString().slice(0, 10);
-            const title = `WPT scheduled run: ${process.env.FAILED_COUNT} failing test(s) (${today})`;
+            const incomplete = Number(process.env.INCOMPLETE_SHARD_COUNT || 0);
+            const failureSummary = incomplete > 0
+              ? `${process.env.FAILED_COUNT} failing test(s), ${incomplete} incomplete shard(s)`
+              : `${process.env.FAILED_COUNT} failing test(s)`;
+            const title = `WPT run: ${failureSummary} (${today})`;
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,

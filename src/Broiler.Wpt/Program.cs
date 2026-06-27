@@ -55,6 +55,7 @@ public class Program
         double? timeoutSeconds = null;
         int shardCount = 1;
         int shardIndex = WptTestRunner.AllShards;
+        bool nonJavaScriptOnly = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -110,6 +111,9 @@ public class Program
                         return 1;
                     }
 
+                    break;
+                case "--non-js":
+                    nonJavaScriptOnly = true;
                     break;
                 case "--wpt-dir":
                 case "--reference-dir":
@@ -174,6 +178,7 @@ public class Program
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
         Console.WriteLine($"Timeout       : {runTestTimeout.TotalSeconds:0.###} second(s)");
+        Console.WriteLine($"Mode          : {(nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests")}");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
         if (shardIndex != WptTestRunner.AllShards)
@@ -187,7 +192,9 @@ public class Program
 
         var runner = new WptTestRunner();
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
-        var discoveredTests = WptTestRunner.DiscoverTests(wptPath, subsetPatterns).ToList();
+        var discoveredTests = WptTestRunner
+            .DiscoverTests(wptPath, subsetPatterns, nonJavaScriptOnly)
+            .ToList();
         if (!string.IsNullOrWhiteSpace(rerunJsonPath))
         {
             if (!TryLoadRerunSelection(rerunJsonPath, wptPath, rerunSelectionKind, out var rerunTests, out var rerunError))
@@ -1248,6 +1255,7 @@ public class Program
         Console.WriteLine("  --rerun-kind <KIND>        Filter reruns to 'failures' (default) or 'timeouts'");
         Console.WriteLine("  --shard-count <N>          Split discovered tests into N deterministic shards (default: 1)");
         Console.WriteLine("  --shard-index <I>          Run only shard I (0-based), or -1 for all shards (default: -1)");
+        Console.WriteLine("  --non-js                   Exclude JavaScript-dependent documents (Broiler.HTML WPT policy)");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");

@@ -9,11 +9,12 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
   directly (top-level ``results`` array with ``relativeTestPath`` / ``passed`` /
   ``skipped`` / ``category``). This doubles as the persisted "failed tests"
   manifest that drives incremental reruns.
-* ``--issue-md``     — a Markdown body summarising totals and the top failing
-  directories / categories, suitable for posting as a GitHub issue.
+* ``--issue-md``     — a Markdown body summarising totals and a bounded list
+  of the most common failure groups, suitable for posting as a GitHub issue.
 
 When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
-writes ``failed_count``, ``total_count`` and ``create_issue`` step outputs.
+writes ``failed_count``, ``total_count``, ``incomplete_shard_count`` and
+``create_issue`` step outputs.
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ import os
 from collections import Counter
 from pathlib import Path
 
-TOP_BUCKET_LIMIT = 15
+DEFAULT_PROBLEM_LIMIT = 10
+PROBLEM_EXAMPLE_LIMIT = 3
 
 
 def _bucket_directory(relative_path: str) -> str:
@@ -48,17 +50,50 @@ def _iter_shard_reports(shard_dir: Path):
             yield path, data
 
 
-def merge(shard_dir: Path) -> dict:
+def _iter_shard_statuses(shard_dir: Path):
+    for path in sorted(shard_dir.rglob("*-status.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if isinstance(data, dict) and "shardIndex" in data and "exitCode" in data:
+            yield path, data
+
+
+def _problem_identity(result: dict) -> tuple[str, str, str | None]:
+    """Return a stable key and label for a failure root-cause group."""
+    category = str(result.get("category") or "Unknown")
+    diagnostics = result.get("mismatchDiagnostics")
+    sub_category = None
+    if isinstance(diagnostics, dict):
+        sub_category = diagnostics.get("subCategory")
+        if sub_category is not None:
+            sub_category = str(sub_category)
+
+    if category == "PixelMismatch" and sub_category:
+        return f"{category}:{sub_category}", f"{category} / {sub_category}", sub_category
+    return category, category, None
+
+
+def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
     passed = failed = skipped = total = 0
     shard_count = 0
     failures: list[dict] = []
     seen_failures: set[str] = set()
     directory_counter: Counter[str] = Counter()
     category_counter: Counter[str] = Counter()
+    problem_groups: dict[str, dict] = {}
+    reported_shard_indexes: set[int] = set()
 
     for _path, report in _iter_shard_reports(shard_dir):
         shard_count += 1
         summary = report.get("summary", {})
+        shard = report.get("shard")
+        if isinstance(shard, dict):
+            try:
+                reported_shard_indexes.add(int(shard.get("index")))
+            except (TypeError, ValueError):
+                pass
         passed += int(summary.get("passed", 0) or 0)
         failed += int(summary.get("failed", 0) or 0)
         skipped += int(summary.get("skipped", 0) or 0)
@@ -75,19 +110,64 @@ def merge(shard_dir: Path) -> dict:
                 continue
             seen_failures.add(relative_path)
 
-            category = result.get("category") or "Unknown"
-            failures.append(
-                {
-                    "relativeTestPath": relative_path,
-                    "passed": False,
-                    "skipped": False,
-                    "category": category,
-                }
-            )
+            category = str(result.get("category") or "Unknown")
+            failure = {
+                "relativeTestPath": relative_path,
+                "passed": False,
+                "skipped": False,
+                "category": category,
+            }
+            failures.append(failure)
             directory_counter[_bucket_directory(relative_path)] += 1
             category_counter[category] += 1
 
+            problem_key, problem_label, sub_category = _problem_identity(result)
+            group = problem_groups.setdefault(
+                problem_key,
+                {
+                    "key": problem_key,
+                    "label": problem_label,
+                    "category": category,
+                    "subCategory": sub_category,
+                    "count": 0,
+                    "examples": [],
+                },
+            )
+            group["count"] += 1
+            if len(group["examples"]) < PROBLEM_EXAMPLE_LIMIT:
+                group["examples"].append(relative_path)
+
+    incomplete_shards = []
+    for _path, status in _iter_shard_statuses(shard_dir):
+        try:
+            shard_index = int(status["shardIndex"])
+            exit_code = int(status["exitCode"])
+        except (TypeError, ValueError):
+            continue
+        if exit_code == 0 or shard_index in reported_shard_indexes:
+            continue
+        incomplete_shards.append({"shardIndex": shard_index, "exitCode": exit_code})
+
+    if incomplete_shards:
+        incomplete_shards.sort(key=lambda status: status["shardIndex"])
+        problem_groups["ShardProcessError"] = {
+            "key": "ShardProcessError",
+            "label": "Shard process failure",
+            "category": "ShardProcessError",
+            "subCategory": None,
+            "count": len(incomplete_shards),
+            "examples": [
+                f"shard {status['shardIndex']} (exit {status['exitCode']})"
+                for status in incomplete_shards[:PROBLEM_EXAMPLE_LIMIT]
+            ],
+        }
+
     failures.sort(key=lambda item: item["relativeTestPath"])
+
+    top_problems = sorted(
+        problem_groups.values(),
+        key=lambda group: (-group["count"], group["label"]),
+    )[:problem_limit]
 
     return {
         "summary": {
@@ -97,7 +177,10 @@ def merge(shard_dir: Path) -> dict:
             "total": total,
         },
         "shardCount": shard_count,
-        "topFailingDirectories": directory_counter.most_common(TOP_BUCKET_LIMIT),
+        "problemLimit": problem_limit,
+        "incompleteShards": incomplete_shards,
+        "topProblems": top_problems,
+        "topFailingDirectories": directory_counter.most_common(problem_limit),
         "failuresByCategory": category_counter.most_common(),
         "results": failures,
     }
@@ -106,23 +189,28 @@ def merge(shard_dir: Path) -> dict:
 def render_issue_markdown(merged: dict, run_url: str | None) -> str:
     summary = merged["summary"]
     lines = [
-        "## WPT scheduled run — failing tests",
+        "## WPT run — failing tests",
         "",
         f"- Shards merged: {merged['shardCount']}",
         f"- Total: {summary['total']}",
         f"- Passed: {summary['passed']}",
         f"- Failed: {summary['failed']}",
         f"- Skipped: {summary['skipped']}",
+        f"- Incomplete shards: {len(merged['incompleteShards'])}",
         "",
-        "### Failures by category",
+        f"### Top {merged['problemLimit']} problems",
         "",
     ]
-    if merged["failuresByCategory"]:
-        lines += [f"- `{category}` — {count}" for category, count in merged["failuresByCategory"]]
+    if merged["topProblems"]:
+        for index, problem in enumerate(merged["topProblems"], start=1):
+            lines.append(f"{index}. `{problem['label']}` — {problem['count']} failure(s)")
+            if problem["examples"]:
+                examples = ", ".join(f"`{path}`" for path in problem["examples"])
+                lines.append(f"   - Examples: {examples}")
     else:
         lines.append("- None")
 
-    lines += ["", "### Top failing directories", ""]
+    lines += ["", f"### Top {merged['problemLimit']} failing directories", ""]
     if merged["topFailingDirectories"]:
         lines += [f"- `{directory}` — {count} failure(s)" for directory, count in merged["topFailingDirectories"]]
     else:
@@ -145,11 +233,20 @@ def main() -> int:
     parser.add_argument("--shard-dir", required=True, type=Path, help="Directory containing per-shard JSON reports")
     parser.add_argument("--merged-json", type=Path, help="Where to write the merged report / rerun manifest")
     parser.add_argument("--issue-md", type=Path, help="Where to write the Markdown issue body")
+    parser.add_argument(
+        "--problem-limit",
+        type=int,
+        default=DEFAULT_PROBLEM_LIMIT,
+        help=f"Maximum common failure groups/directories to report (default: {DEFAULT_PROBLEM_LIMIT})",
+    )
     parser.add_argument("--run-url", default=os.environ.get("WPT_RUN_URL"), help="Workflow run URL for the issue footer")
     parser.add_argument("--github-output", type=Path, help="Path to $GITHUB_OUTPUT for step outputs")
     args = parser.parse_args()
 
-    merged = merge(args.shard_dir)
+    if args.problem_limit < 1:
+        parser.error("--problem-limit must be a positive integer")
+
+    merged = merge(args.shard_dir, args.problem_limit)
 
     if args.merged_json:
         args.merged_json.parent.mkdir(parents=True, exist_ok=True)
@@ -161,6 +258,7 @@ def main() -> int:
 
     failed = merged["summary"]["failed"]
     total = merged["summary"]["total"]
+    incomplete_shard_count = len(merged["incompleteShards"])
     print(f"Merged {merged['shardCount']} shard(s): {merged['summary']['passed']} passed, "
           f"{failed} failed, {merged['summary']['skipped']} skipped, {total} total.")
 
@@ -168,7 +266,8 @@ def main() -> int:
         with args.github_output.open("a", encoding="utf-8") as handle:
             handle.write(f"failed_count={failed}\n")
             handle.write(f"total_count={total}\n")
-            handle.write(f"create_issue={'true' if failed > 0 else 'false'}\n")
+            handle.write(f"incomplete_shard_count={incomplete_shard_count}\n")
+            handle.write(f"create_issue={'true' if failed > 0 or incomplete_shard_count > 0 else 'false'}\n")
 
     return 0
 

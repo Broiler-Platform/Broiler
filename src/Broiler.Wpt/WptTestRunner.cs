@@ -163,8 +163,17 @@ internal sealed class WptTestRunner
     {
         ".html",
         ".htm",
+        ".xht",
         ".xhtml",
     };
+
+    /// <summary>
+    /// Conservative JavaScript dependency check shared in behaviour with the
+    /// Broiler.HTML non-JS WPT runner.
+    /// </summary>
+    private static readonly Regex JavaScriptDependencyPattern = new(
+        @"<script\b|\bon[a-z]+\s*=\s*[""']|javascript:|testharness\.js|testdriver\.js|reftest-wait",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Regex that detects <c>&lt;video&gt;</c> elements with a <c>&lt;source&gt;</c>
@@ -514,6 +523,7 @@ internal sealed class WptTestRunner
         "/reference/", "\\reference\\",
         "/references/", "\\references\\",
         "/reftest/", "\\reftest\\",
+        "/resources/", "\\resources\\",
         "/support/", "\\support\\",
         "/test-plan/", "\\test-plan\\",
     };
@@ -531,6 +541,19 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Discovers tests and, when requested, excludes documents that depend on
+    /// JavaScript using the same conservative policy as Broiler.HTML's
+    /// <c>wpt-non-js</c> runner.
+    /// </summary>
+    internal static IEnumerable<string> DiscoverTests(string wptRoot, bool nonJavaScriptOnly)
+    {
+        var tests = DiscoverTests(wptRoot);
+        return nonJavaScriptOnly
+            ? tests.Where(testPath => !RequiresJavaScript(File.ReadAllText(testPath)))
+            : tests;
+    }
+
+    /// <summary>
     /// Discovers test files under <paramref name="wptRoot"/> that match
     /// the given <paramref name="subsetPatterns"/>.  Patterns may contain
     /// <c>*</c> and <c>?</c> wildcards (glob-style) and are matched
@@ -539,17 +562,33 @@ internal sealed class WptTestRunner
     /// a file is included when it matches <em>any</em> of the patterns.
     /// </summary>
     internal static IEnumerable<string> DiscoverTests(string wptRoot, IReadOnlyList<string> subsetPatterns)
+        => DiscoverTests(wptRoot, subsetPatterns, nonJavaScriptOnly: false);
+
+    /// <summary>
+    /// Discovers tests matching the supplied subset and optional non-JS policy.
+    /// </summary>
+    internal static IEnumerable<string> DiscoverTests(
+        string wptRoot,
+        IReadOnlyList<string> subsetPatterns,
+        bool nonJavaScriptOnly)
     {
         if (subsetPatterns.Count == 0)
-            return DiscoverTests(wptRoot);
+            return DiscoverTests(wptRoot, nonJavaScriptOnly);
 
-        return DiscoverTests(wptRoot)
+        return DiscoverTests(wptRoot, nonJavaScriptOnly)
             .Where(f =>
             {
                 var rel = Path.GetRelativePath(wptRoot, f).Replace('\\', '/');
                 return MatchesAnyPattern(rel, subsetPatterns);
             });
     }
+
+    /// <summary>
+    /// Returns whether markup depends on JavaScript or the WPT JavaScript
+    /// harness and therefore must not be included in a non-JS visual run.
+    /// </summary>
+    internal static bool RequiresJavaScript(string htmlContent)
+        => JavaScriptDependencyPattern.IsMatch(htmlContent);
 
     /// <summary>
     /// Sentinel <c>--shard-index</c> value meaning "run every shard" (no
@@ -716,7 +755,7 @@ internal sealed class WptTestRunner
     /// <list type="bullet">
     ///   <item>Files in <c>reference/</c>, <c>reftest/</c>, or <c>support/</c> directories.</item>
     ///   <item>Files in <c>test-plan/</c> directories (spec documentation).</item>
-    ///   <item>Files ending in <c>-ref.html/.htm/.xhtml</c> or <c>-notref.html/.htm/.xhtml</c>
+    ///   <item>Files ending in <c>-ref.html/.htm/.xht/.xhtml</c> or <c>-notref.html/.htm/.xht/.xhtml</c>
     ///         (WPT reference/mismatch reference files).</item>
     ///   <item>Files with a <c>.src.html</c> extension (ReSpec source files).</item>
     /// </list>
@@ -734,6 +773,7 @@ internal sealed class WptTestRunner
         var fileName = Path.GetFileName(filePath);
         if (fileName.EndsWith(".src.html", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".src.htm", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".src.xht", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".src.xhtml", StringComparison.OrdinalIgnoreCase))
             return true;
 

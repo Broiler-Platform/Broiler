@@ -83,6 +83,7 @@ public class WptTestRunnerTests : IDisposable
 
         File.WriteAllText(Path.Combine(_tempDir, "test1.html"), "<html></html>");
         File.WriteAllText(Path.Combine(subDir, "test2.htm"), "<html></html>");
+        File.WriteAllText(Path.Combine(subDir, "test3.xht"), "<html></html>");
         File.WriteAllText(Path.Combine(subDir, "test3.xhtml"), "<html></html>");
         File.WriteAllText(Path.Combine(subDir, "readme.txt"), "not a test");
         File.WriteAllText(Path.Combine(subDir, "style.css"), "body{}");
@@ -90,11 +91,12 @@ public class WptTestRunnerTests : IDisposable
         // Act
         var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
 
-        // Assert — only .html, .htm, .xhtml files should be discovered.
-        Assert.Equal(3, tests.Count);
+        // Assert — all WPT HTML/XHTML extensions should be discovered.
+        Assert.Equal(4, tests.Count);
         Assert.All(tests, t => Assert.True(
             t.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
             t.EndsWith(".htm", StringComparison.OrdinalIgnoreCase) ||
+            t.EndsWith(".xht", StringComparison.OrdinalIgnoreCase) ||
             t.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -104,10 +106,12 @@ public class WptTestRunnerTests : IDisposable
         // Arrange — create actual test files mixed with non-test WPT artefacts.
         var testDir = Path.Combine(_tempDir, "css", "compositing");
         var refDir = Path.Combine(testDir, "reference");
+        var resourcesDir = Path.Combine(testDir, "resources");
         var supportDir = Path.Combine(testDir, "support");
         var testPlanDir = Path.Combine(testDir, "test-plan");
         Directory.CreateDirectory(testDir);
         Directory.CreateDirectory(refDir);
+        Directory.CreateDirectory(resourcesDir);
         Directory.CreateDirectory(supportDir);
         Directory.CreateDirectory(testPlanDir);
 
@@ -117,6 +121,7 @@ public class WptTestRunnerTests : IDisposable
 
         // Non-test files (should be excluded).
         File.WriteAllText(Path.Combine(refDir, "mix-blend-mode-video-notref.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(resourcesDir, "fixture.html"), "<html></html>");
         File.WriteAllText(Path.Combine(supportDir, "helper.html"), "<html></html>");
         File.WriteAllText(Path.Combine(testPlanDir, "test-plan.html"), "<html></html>");
         File.WriteAllText(Path.Combine(testPlanDir, "test-plan.src.html"), "<html></html>");
@@ -137,6 +142,32 @@ public class WptTestRunnerTests : IDisposable
     {
         var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
         Assert.Empty(tests);
+    }
+
+    [Fact]
+    public void DiscoverTests_NonJs_Mode_Excludes_JavaScript_Dependent_Documents()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "visual.html"), "<html><p>visual</p></html>");
+        File.WriteAllText(Path.Combine(_tempDir, "script.html"), "<script src=\"/resources/testharness.js\"></script>");
+        File.WriteAllText(Path.Combine(_tempDir, "handler.xhtml"), "<button onclick=\"run()\">Run</button>");
+        File.WriteAllText(Path.Combine(_tempDir, "wait.xht"), "<html class=\"reftest-wait\"></html>");
+
+        var tests = WptTestRunner.DiscoverTests(_tempDir, nonJavaScriptOnly: true).ToList();
+
+        Assert.Single(tests);
+        Assert.EndsWith("visual.html", tests[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("<script></script>")]
+    [InlineData("<body onload='ready()'>")]
+    [InlineData("<a href='javascript:ready()'>")]
+    [InlineData("<link href='/resources/testdriver.js'>")]
+    [InlineData("<html class='reftest-wait'>")]
+    public void RequiresJavaScript_Matches_BroilerHtml_NonJs_Policy(string markup)
+    {
+        Assert.True(WptTestRunner.RequiresJavaScript(markup));
+        Assert.False(WptTestRunner.RequiresJavaScript("<html><body>static</body></html>"));
     }
 
     [Fact]
@@ -4852,6 +4883,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/support/helper.html"));
         Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\support\\utils.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/resources/fixture.html"));
     }
 
     [Fact]
@@ -4866,6 +4898,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/test-plan.src.html"));
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/spec.src.htm"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/spec.src.xht"));
     }
 
     [Fact]

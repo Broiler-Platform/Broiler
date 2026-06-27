@@ -18,14 +18,23 @@
 
 'use strict';
 
-const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const TEST_EXTENSIONS = new Set(['.html', '.htm', '.xhtml']);
+const TEST_EXTENSIONS = new Set(['.html', '.htm', '.xht', '.xhtml']);
+const NON_TEST_DIRECTORIES = new Set([
+    '.git',
+    'node_modules',
+    'reference',
+    'references',
+    'reftest',
+    'resources',
+    'support',
+    'test-plan',
+]);
 const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const DEFAULT_CONCURRENCY = 8;
@@ -52,7 +61,7 @@ function shardIndexForPath(relativePath, shardCount) {
 }
 
 /**
- * WPT crashtests (filename ending in `-crash.{html,htm,xhtml}`) are security
+ * WPT crashtests (filename ending in `-crash.{html,htm,xht,xhtml}`) are security
  * regression tests that deliberately try to crash the browser engine.  They
  * are not reftests, never have a reference screenshot, and — by design — kill
  * the Chromium renderer when loaded.  Skip them so they neither waste a render
@@ -62,7 +71,29 @@ function isCrashTest(name) {
     // Matches `foo-crash.html` as well as flagged variants like
     // `foo-crash.https.html` (WPT appends `.flag` segments before the
     // extension).
-    return /-crash(?:\.[^.]+)*\.(?:html|htm|xhtml)$/i.test(name);
+    return /-crash(?:\.[^.]+)*\.(?:html|htm|xht|xhtml)$/i.test(name);
+}
+
+/** Match Broiler.HTML's conservative definition of a JavaScript-dependent WPT. */
+function requiresJavaScript(markup) {
+    return /<script\b/i.test(markup) ||
+        /\bon[a-z]+\s*=\s*["']/i.test(markup) ||
+        /javascript:/i.test(markup) ||
+        /testharness\.js|testdriver\.js|reftest-wait/i.test(markup);
+}
+
+/** Exclude WPT references, resources, and specification source documents. */
+function isNonTestFile(name) {
+    const lowerName = name.toLowerCase();
+    return /\.src\.(?:html|htm|xht|xhtml)$/.test(lowerName) ||
+        /-(?:not)?ref\.(?:html|htm|xht|xhtml)$/.test(lowerName);
+}
+
+function createBrowserContextOptions(nonJsOnly) {
+    return {
+        viewport: VIEWPORT,
+        javaScriptEnabled: !nonJsOnly,
+    };
 }
 
 /** Recursively discover test files (excluding WPT crashtests). */
@@ -71,9 +102,13 @@ function discoverTests(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
+            if (NON_TEST_DIRECTORIES.has(entry.name.toLowerCase())) {
+                continue;
+            }
             results.push(...discoverTests(full));
         } else if (
             TEST_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) &&
+            !isNonTestFile(entry.name) &&
             !isCrashTest(entry.name)
         ) {
             results.push(full);
@@ -91,14 +126,14 @@ function ensureDir(filePath) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-(async () => {
-    const args = process.argv.slice(2);
+async function main(args = process.argv.slice(2)) {
     let testDir = null;
     let outputDir = null;
     let baseDir = null;
     let concurrency = DEFAULT_CONCURRENCY;
     let shardCount = 1;
     let shardIndex = ALL_SHARDS;
+    let nonJsOnly = false;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--concurrency' && i + 1 < args.length) {
@@ -109,6 +144,8 @@ function ensureDir(filePath) {
             shardCount = parseInt(args[++i], 10);
         } else if (args[i] === '--shard-index' && i + 1 < args.length) {
             shardIndex = parseInt(args[++i], 10);
+        } else if (args[i] === '--non-js') {
+            nonJsOnly = true;
         } else if (!testDir) {
             testDir = args[i];
         } else if (!outputDir) {
@@ -117,7 +154,7 @@ function ensureDir(filePath) {
     }
 
     if (!testDir || !outputDir) {
-        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>] [--shard-count N --shard-index I]');
+        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>] [--shard-count N --shard-index I] [--non-js]');
         process.exit(1);
     }
 
@@ -147,6 +184,13 @@ function ensureDir(filePath) {
     let testFiles = discoverTests(testDir);
     console.log(`Found ${testFiles.length} test files`);
 
+    if (nonJsOnly) {
+        const beforeFilter = testFiles.length;
+        testFiles = testFiles.filter((testFile) =>
+            !requiresJavaScript(fs.readFileSync(testFile, 'utf8')));
+        console.log(`Non-JS mode: selected ${testFiles.length} files; skipped ${beforeFilter - testFiles.length} JavaScript-dependent files`);
+    }
+
     // When sharding, keep only the files assigned to this shard by the same
     // FNV-1a(relative-path) % shardCount rule the C# runner uses, so this shard
     // generates references for exactly the tests it will later execute.
@@ -166,6 +210,7 @@ function ensureDir(filePath) {
     fs.mkdirSync(outputDir, { recursive: true });
 
     console.log(`Launching Chromium (concurrency=${concurrency}) …`);
+    const { chromium } = require('playwright');
     const browser = await chromium.launch({
         headless: true,
         // Allow file:// pages to load other file:// resources (e.g. SVG images
@@ -218,7 +263,7 @@ function ensureDir(filePath) {
     // Create a fresh context + page, registering the font route.  Used both
     // for a worker's initial page and to recover after a renderer crash.
     async function newRenderTarget() {
-        const context = await browser.newContext({ viewport: VIEWPORT });
+        const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
         if (hasFontsDir) {
             await context.route(/file:\/\/\/fonts\//i, fontRouteHandler);
         }
@@ -299,4 +344,20 @@ function ensureDir(filePath) {
     console.log();
     console.log(`Reference generation complete: ${completed} files, ${errors} errors`);
     console.log(`Output: ${outputDir}`);
-})();
+}
+
+module.exports = {
+    createBrowserContextOptions,
+    discoverTests,
+    isNonTestFile,
+    main,
+    requiresJavaScript,
+    shardIndexForPath,
+};
+
+if (require.main === module) {
+    main().catch((error) => {
+        console.error(error && error.stack ? error.stack : error);
+        process.exitCode = 1;
+    });
+}

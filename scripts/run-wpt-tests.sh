@@ -12,6 +12,8 @@
 #     --subset <patterns>   Semicolon-separated list of sub-path patterns with
 #                           optional wildcards (e.g. "css/CSS2;css/css-*").
 #                           A single pattern like "css/css-flexbox" also works.
+#     --non-js              Run only documents that do not depend on JavaScript,
+#                           matching Broiler.HTML's non-JS WPT policy.
 #     -h, --help           Show this help message
 #
 # Prerequisites:
@@ -32,6 +34,7 @@ SHARD_COUNT=1
 RERUN_JSON=""
 RERUN_KIND=""
 SKIP_REFERENCE_GENERATION=false
+NON_JS=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -72,6 +75,10 @@ while [[ $# -gt 0 ]]; do
             SKIP_REFERENCE_GENERATION=true
             shift
             ;;
+        --non-js)
+            NON_JS=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -86,6 +93,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --rerun-json <path>           Rerun only tests from a prior JSON report (incremental)"
             echo "  --rerun-kind <failures|timeouts>  Which prior results to rerun (default: failures)"
             echo "  --skip-reference-generation   Reuse already-generated/cached reference images"
+            echo "  --non-js                      Run only non-JavaScript WPT documents"
             echo "  -h, --help                    Show this help message"
             exit 0
             ;;
@@ -109,6 +117,11 @@ RERUN_ARGS=()
 if [[ -n "$RERUN_JSON" ]]; then
     RERUN_ARGS=(--rerun-json "$RERUN_JSON")
     [[ -n "$RERUN_KIND" ]] && RERUN_ARGS+=(--rerun-kind "$RERUN_KIND")
+fi
+
+NON_JS_ARGS=()
+if [[ "$NON_JS" == "true" ]]; then
+    NON_JS_ARGS=(--non-js)
 fi
 
 mkdir -p "$OUTPUT_DIR"
@@ -200,7 +213,7 @@ elif command -v npx &>/dev/null; then
                     if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
                         node "$SCRIPT_DIR/generate-wpt-references.js" \
                         "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 --base-dir "$WPT_DIR" \
-                        "${SHARD_ARGS[@]}" 2>&1; then
+                        "${SHARD_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
                         echo "  ✗ Reference generation failed for $MATCH_DIR" >&2
                         REF_GEN_OK=false
                     fi
@@ -214,7 +227,8 @@ elif command -v npx &>/dev/null; then
     else
         if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
             node "$SCRIPT_DIR/generate-wpt-references.js" \
-            "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 "${SHARD_ARGS[@]}" 2>&1; then
+            "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 \
+            "${SHARD_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
             REF_GEN_OK=false
         fi
     fi
@@ -264,7 +278,7 @@ set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
     --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" "${SUBSET_ARGS[@]}" \
-    "${SHARD_ARGS[@]}" "${RERUN_ARGS[@]}" 2>&1 | tee "$LOGFILE"
+    "${SHARD_ARGS[@]}" "${RERUN_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1 | tee "$LOGFILE"
 WPT_EXIT=$?
 set -e
 
