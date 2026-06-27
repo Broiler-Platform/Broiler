@@ -1,6 +1,9 @@
 # Broiler.CSS extraction — status, findings & next steps
 
 **Date:** 2026-06-26
+
+**Current closeout status:** Phases 0-6 are implemented; Phase 7 and final gates
+remain open in [`refactor-gap.md`](refactor-gap.md).
 **Scope of this note:** what landed in the Phase 4 / Phase 6 work, the findings that
 shape the rest, and a concrete, prioritized plan for the remaining phases. Read
 alongside the per-phase records in [`broiler-css-component.md`](broiler-css-component.md).
@@ -13,7 +16,7 @@ alongside the per-phase records in [`broiler-css-component.md`](broiler-css-comp
 | 4 — cascade & computed style | **Done** (`getComputedStyle()` cutover + anchor Pattern B scans migrated to a document-scoped enumeration, §4b). |
 | 5 — renderer cutover | **Done — flag flipped ON (2026-06-26, §4d).** Both render paths cascade through the shared engine; verified against Acid3 + WPT pixel gates (no pass/fail regressions; fixes several important/border cascade tests). |
 | 6 — CSSOM on shared model | **Done** (slices 6a + 6b: model storage, store unification, model-driven nested wrappers; §4a). |
-| 7 — compatibility cleanup | **Not started.** Depends on 5 + 6. |
+| 7 — compatibility cleanup | **Not started.** Prerequisites 5 + 6 are complete; see `refactor-gap.md`. |
 
 ## 2. Build prerequisites that were broken (now fixed)
 
@@ -251,7 +254,7 @@ the parallel gate noisy by ±2-3 independent of this work.
      cascade-ordering "known limitation" tests fail in this headless tree independent of
      these changes (e.g. `Acid3CascadeDebugTests.Without_Important_Higher_Specificity_Red_Wins`).
 
-## 6. Verification done — and the gap
+## 6. Phase 4/6 checkpoint verification (historical)
 
 - `Broiler.CSS.Dom.Tests`: **31 pass** (1 pre-existing standalone path-resolution quirk).
 - Focused CSS guard suite (`CssExtraction*`, `SelectorsAndCssom`, `CssRendering`,
@@ -278,57 +281,53 @@ the parallel gate noisy by ±2-3 independent of this work.
    `EnumerateScopedStyleRules` seam and migrated the four Pattern B scans; behaviour-
    preserving for the main document. **Still to verify** under the anchor-positioning WPT
    subset when those suites are re-enabled.
-4. **Phase 5 — renderer cutover** (own effort): build a style context from the canonical
-   `DomDocument` in `Broiler.HTML.Orchestration`, replace `DomParser`'s selector/cascade
-   assignment with shared computed styles, add a `CssComputedStyle → CssBoxProperties`
-   map, keep layout-owned used-value resolution. Dual-run + pixel-diff before switching
-   the observable result (roadmap decision #10). Then retire `GetComputedProps`' internal
-   `CssRules` use.
-   **Slice 1 done (§4c):** project wiring, `CssBox.SourceElement`, the
-   `CssComputedStyle → CssBoxProperties` map, and the dual-run hook (flag default off) —
-   runtime-verified by `Phase5SharedCascadeTests`. Slice 2+ is the parity work listed in §4c.
-5. **Phase 7 — cleanup.** ⛔ **Blocked on Phase 5 (see §9).** Migrate image/WPF/CLI public
+4. **Phase 5 — renderer cutover.** ✅ **Done (§4d).** The shared renderer cascade
+   defaults on. Retiring the retained rollback path belongs to Phase 7.
+5. **Phase 7 — cleanup.** **Ready but not implemented (see §9).** Migrate image/WPF/CLI public
    APIs off `CssData`, remove `Broiler.HTML.CSS` and the obsolete `Broiler.HTML.Core` CSS
-   models, trim broad `InternalsVisibleTo`, update architecture/API docs. The only
-   unblocked deliverable today (docs) is captured in §9; everything else needs the Phase 5
-   flag flipped and the legacy renderer/bridge cascade retired first.
+   models, retire the legacy renderer/bridge cascade, trim broad `InternalsVisibleTo`,
+   and update architecture/API docs.
 
-## 8. Dual-run rollback switches
+## 8. Dual-run rollback switches — RETIRED (2026-06-27)
 
-- `UseSharedComputedStyleEngine` (`DomBridge/Css.cs`) — flip to `false` to revert
-  `getComputedStyle()` to the legacy cascade if a regression surfaces under the pixel
-  suite. `BuildComputedStyleMapLegacy` is retained for exactly this.
-- `SharedRendererCascade.UseSharedRendererCascade` (`Broiler.HTML.Orchestration/Parse/`)
-  — Phase 5 renderer cascade; default **on** as of the 2026-06-26 cutover (§4d). Flip to
-  `false` to revert to the legacy `CascadeApplyStyles` selector matching if a regression
-  surfaces; the legacy `else` branch is retained for exactly this.
+Both dual-run switches and their legacy branches were removed in the RF-CSS-1
+internal-fallback retirement (see `refactor-gap.md` → RF-CSS-1 progress note). No
+rollback path remains; the shared engine is the sole authority for both
+`getComputedStyle()` and the renderer cascade.
 
-## 9. Phase 7 readiness — what's blocked, and why (audit 2026-06-26)
+- ~~`UseSharedComputedStyleEngine` (`DomBridge/Css.cs`)~~ — gate const and
+  `BuildComputedStyleMapLegacy` deleted; `getComputedStyle()` resolves solely through
+  `BuildComputedStyleMapViaEngine`.
+- ~~`SharedRendererCascade.UseSharedRendererCascade`~~ — flag and the legacy
+  `CascadeApplyStyles` `else` branch (`AssignCssBlocks` selector matching) deleted; the
+  shared engine projection is the sole renderer cascade.
 
-Phase 7 removes the legacy CSS machinery. Its exit criteria — *no production project
-references `Broiler.HTML.CSS`* and *no parser/selector implementation remains in `DomBridge`*
-— cannot be met until Phase 5's dual-run flag is flipped and the legacy paths retired. The
-audit below is the work-list; **do not delete any of it while the flags default to legacy.**
+## 9. Phase 7 readiness — current audit
+
+Phase 5 and Phase 6 are complete and their shared paths default on. Phase 7 is no
+longer blocked by those phases, but it has not been implemented. The authoritative
+remaining work and acceptance criteria are in
+[`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
 
 **Still load-bearing (removal would break the build):**
 
 - `Broiler.HTML.CSS` is referenced by **4 production projects**: `Broiler.HTML`,
-  `Broiler.HTML.Dom`, `Broiler.HTML.Orchestration`, `Broiler.HTML.WPF`. The renderer's
-  `DomParser` parses + cascades through `Broiler.HTML.CSS.CssParser` (the observable path).
+  `Broiler.HTML.Dom`, `Broiler.HTML.Orchestration`, `Broiler.HTML.WPF`. The shared
+  renderer cascade defaults on, but the legacy project and model remain load-bearing.
 - `CssData` is woven through **public** facade APIs: `HtmlContainer.CssData` /
   `SetHtml` / `SetDocument` (Image + Graphics), `IAdapter.DefaultCssData`,
   `IHtmlContainerInt.{CssData,DefaultCssData}`, `HtmlStylesheetLoadEventArgs.SetStyleSheetData`,
   `HtmlRender.ParseStyleSheet`, `CssDataJsonDumper`. These need a compatibility adapter or
   signature migration (roadmap Phase 7 deliverable #1–2) before `CssData` can move/retire.
-- `DomBridge` retains its legacy parser/selector (`_cssRules`, `MatchesSelector`,
-  `BuildComputedStyleMapLegacy`) as the dual-run fallback behind `UseSharedComputedStyleEngine`
-  and as the renderer/layout cascade (`GetComputedProps`). These retire only after Phase 5.
+- `DomBridge` `BuildComputedStyleMapLegacy` is **retired** (2026-06-27). It still owns
+  `_cssRules` + `MatchesSelector` as its live primary cascade (`InvalidateElementStyles`
+  on mutation) and the anchor rule-scans — these are not fallbacks and their migration
+  to the shared engine is a pixel-gated pass, not part of this internal cleanup.
 
-**Safe Phase 7 deliverable done now:** architecture/API documentation (this section +
-§4c) recording the compatibility surface and the blocking order. No code removed — full
-`Broiler.slnx` build green (0 errors) after this session's cross-submodule wiring.
+Architecture/API documentation records the compatibility surface, but documentation
+alone does not satisfy Phase 7.
 
-**Order once Phase 5 flips:** (1) migrate the public `CssData` facade signatures to
+**Closeout order:** (1) migrate the public `CssData` facade signatures to
 `CssStyleSheet`/a style-set API, keeping a one-release `CssData` adapter; (2) drop the
 renderer's `Broiler.HTML.CSS` parse/cascade; (3) remove `Broiler.HTML.CSS` +
 obsolete `Broiler.HTML.Core` CSS models; (4) retire `DomBridge` legacy parser/selector +
