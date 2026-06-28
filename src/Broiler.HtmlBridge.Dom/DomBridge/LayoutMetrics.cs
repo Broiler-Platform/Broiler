@@ -16,6 +16,57 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // Box-geometry memoization for a single read pass over a static layout
+    // snapshot (e.g. check-layout assertion evaluation). The estimators below
+    // recurse up (containing block), down (auto content extent), and across
+    // (preceding siblings), so a single offset query re-derives the same
+    // sub-rects combinatorially — exponential in DOM nesting depth, which times
+    // out on deep css-align / css-anchor-position trees (WPT #1113). The caches
+    // are consulted only while installed (non-null) and are always torn down at
+    // the end of the owning pass via WithLayoutGeometryCache, so live JS
+    // geometry queries (where the DOM may mutate between calls) are unaffected.
+    private Dictionary<DomElement, (double Left, double Top, double Width, double Height)>? _layoutRectCache;
+    private Dictionary<(DomElement Element, bool Vertical), double>? _contentExtentCache;
+    private Dictionary<(DomElement Element, bool Vertical), double>? _borderBoxExtentCache;
+
+    // Test seam: lets equivalence tests run the same pass with memoization off to
+    // prove the cached geometry values are identical to the un-memoized path.
+    internal static bool LayoutGeometryCacheEnabled = true;
+
+    /// <summary>
+    /// Runs <paramref name="evaluate"/> with the box-geometry memoization caches
+    /// installed, then tears them down. Only sound for a read pass over a static
+    /// layout snapshot (no DOM or computed-style mutation mid-pass); nested calls
+    /// share the outermost pass's caches.
+    /// </summary>
+    private T WithLayoutGeometryCache<T>(Func<T> evaluate)
+    {
+        if (!LayoutGeometryCacheEnabled)
+            return evaluate();
+
+        var owner = _layoutRectCache is null;
+        if (owner)
+        {
+            _layoutRectCache = [];
+            _contentExtentCache = [];
+            _borderBoxExtentCache = [];
+        }
+
+        try
+        {
+            return evaluate();
+        }
+        finally
+        {
+            if (owner)
+            {
+                _layoutRectCache = null;
+                _contentExtentCache = null;
+                _borderBoxExtentCache = null;
+            }
+        }
+    }
+
     private double GetClientWidthForDomElement(DomElement element, bool isRoot)
     {
         if (isRoot)
@@ -101,34 +152,47 @@ public sealed partial class DomBridge
 
     private double ResolveContentBoxExtent(DomElement element, bool vertical)
     {
+        if (_contentExtentCache != null && _contentExtentCache.TryGetValue((element, vertical), out var cached))
+            return cached;
+
+        // A re-entrant request for an extent still being computed returns 0 (the
+        // legacy transient); it is element/axis-specific and must never be cached.
         if (!_contentExtentInProgress.Add((element, vertical)))
             return 0;
 
         try
         {
-            var props = GetComputedProps(element);
-            var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
-            var specified = ParseCssLengthToPixelsWithViewport(
-                props.GetValueOrDefault(vertical ? "height" : "width"),
-                element,
-                percentageBasis: percentageBasis);
-            if (specified > 0)
-                return specified;
-
-            var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
-            if (svgLength > 0)
-                return svgLength;
-
-            var replacedElementLength = ResolveReplacedElementAttributeExtent(element, vertical);
-            if (replacedElementLength > 0)
-                return replacedElementLength;
-
-            return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+            var extent = ResolveContentBoxExtentCore(element, vertical);
+            if (_contentExtentCache != null)
+                _contentExtentCache[(element, vertical)] = extent;
+            return extent;
         }
         finally
         {
             _contentExtentInProgress.Remove((element, vertical));
         }
+    }
+
+    private double ResolveContentBoxExtentCore(DomElement element, bool vertical)
+    {
+        var props = GetComputedProps(element);
+        var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
+        var specified = ParseCssLengthToPixelsWithViewport(
+            props.GetValueOrDefault(vertical ? "height" : "width"),
+            element,
+            percentageBasis: percentageBasis);
+        if (specified > 0)
+            return specified;
+
+        var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
+        if (svgLength > 0)
+            return svgLength;
+
+        var replacedElementLength = ResolveReplacedElementAttributeExtent(element, vertical);
+        if (replacedElementLength > 0)
+            return replacedElementLength;
+
+        return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
     }
 
     private static double ResolveReplacedElementAttributeExtent(DomElement element, bool vertical)
@@ -141,6 +205,9 @@ public sealed partial class DomBridge
 
     private double ResolveBorderBoxExtent(DomElement element, bool vertical)
     {
+        if (_borderBoxExtentCache != null && _borderBoxExtentCache.TryGetValue((element, vertical), out var cached))
+            return cached;
+
         var props = GetComputedProps(element);
         var contentExtent = ResolveContentBoxExtent(element, vertical);
         var startPadding = ParseCssLengthToPixelsWithViewport(
@@ -155,7 +222,10 @@ public sealed partial class DomBridge
         var endBorder = ParseCssLengthToPixelsWithViewport(
             props.GetValueOrDefault(vertical ? "border-bottom-width" : "border-right-width"),
             element);
-        return contentExtent + startPadding + endPadding + startBorder + endBorder;
+        var borderBoxExtent = contentExtent + startPadding + endPadding + startBorder + endBorder;
+        if (_borderBoxExtentCache != null)
+            _borderBoxExtentCache[(element, vertical)] = borderBoxExtent;
+        return borderBoxExtent;
     }
 
     private double EstimateAutoContentExtent(DomElement element, bool vertical, HashSet<DomElement> visited)
@@ -591,6 +661,22 @@ public sealed partial class DomBridge
     }
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
+    {
+        if (_layoutRectCache != null && _layoutRectCache.TryGetValue(element, out var cached))
+            return cached;
+
+        // Cache unconditionally: re-entrant computations (an auto content-extent
+        // pass asking for the rect of an element whose own extent is mid-flight)
+        // run to completion before the owning call returns, so the owner's final
+        // rect overwrites any transient entry — the values consumers observe are
+        // identical to the un-memoized path, only computed once. See WPT #1113.
+        var rect = ComputeUnzoomedLayoutRectCore(element);
+        if (_layoutRectCache != null)
+            _layoutRectCache[element] = rect;
+        return rect;
+    }
+
+    private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRectCore(DomElement element)
     {
         var props = GetComputedProps(element);
         var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
