@@ -47,10 +47,16 @@ public sealed partial class DomBridge
     /// </summary>
     public IReadOnlyList<CheckLayoutAssertion> EvaluateCheckLayoutAssertions()
     {
-        var results = new List<CheckLayoutAssertion>();
-        if (DocumentElement is { } root)
-            CollectCheckLayoutAssertions(root, results);
-        return results;
+        // The whole pass reads one static post-script layout snapshot, so the
+        // box-geometry estimators can be memoized for its duration — without this
+        // a deep tree's offset queries are exponential and time out (WPT #1113).
+        return WithLayoutGeometryCache(() =>
+        {
+            var results = new List<CheckLayoutAssertion>();
+            if (DocumentElement is { } root)
+                CollectCheckLayoutAssertions(root, results);
+            return results;
+        });
     }
 
     private void CollectCheckLayoutAssertions(DomElement element, List<CheckLayoutAssertion> results)

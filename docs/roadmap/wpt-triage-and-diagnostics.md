@@ -273,6 +273,21 @@ pixel-guessing.
 - **Not yet covered**: `data-expected-scroll-*` and `data-expected-bounding-client-rect-*`
   (out of the current metric subset). Tests: `CheckLayoutAssertionTests` (×3, `Broiler.Cli.Tests`)
   and `LayoutAssertionFailureTests` (×2, `Broiler.Wpt.Tests`).
+- **⚠️ Perf fix (WPT #1113)**: as first shipped this evaluator made the **Timeout** count
+  jump 2 → 54 between runs #1105 and #1113. The `LayoutMetrics` geometry estimators recurse
+  up (containing block), down (auto content extent) and across (preceding siblings) with **no
+  memoization**, so a single `offsetTop` query re-derives the same sub-rects combinatorially —
+  exponential in DOM nesting depth. On deep `css-align` / `css-anchor-position` `checkLayout`
+  trees (e.g. `align-content-block-002` with `columns:3`, or `position-try-grid-001`) this
+  blew past the runner's 30 s per-test timeout (1 wrapper ≈ 2.8 s, 2 wrappers hung). Fixed by
+  memoizing `ComputeUnzoomedLayoutRect` / `ResolveContentBoxExtent` / `ResolveBorderBoxExtent`
+  for the duration of the (static) assertion pass via `DomBridge.WithLayoutGeometryCache`; the
+  caches are installed only inside that pass and torn down after, so live JS geometry queries
+  (where the DOM can mutate between calls) are untouched. Behaviour-preserving: the re-entrant
+  cycle-guard transient (`0`) is never cached, and the cached values are proven byte-identical to
+  the un-memoized path (`LayoutGeometryCacheEquivalenceTests`, `Broiler.Cli.Tests`). Post-fix the
+  same files render in ≈ 0.4–1.2 s. Regression guard: `MulticolCheckLayoutTimeoutTests`
+  (`Broiler.Wpt.Tests`).
 
 ### ✅ #5 — Richer mismatch metadata (DONE)
 
