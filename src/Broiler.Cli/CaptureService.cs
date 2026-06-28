@@ -9,7 +9,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.HTML.Core.Entities;
+using Broiler.CSS;
 
 namespace Broiler.Cli;
 
@@ -258,7 +258,7 @@ public class CaptureService
     }
 
     /// <summary>
-    /// Parses CSS blocks from the HTML using HTML-Renderer's core library.
+    /// Parses CSS declarations from the HTML using the shared CSS kernel.
     /// This exercises the HTML-Renderer engine as part of the rendering pipeline;
     /// parsed CSS data can be extended in future to influence output formatting.
     /// </summary>
@@ -269,24 +269,7 @@ public class CaptureService
             var cssContent = match.Groups["content"].Value.Trim();
             if (!string.IsNullOrEmpty(cssContent))
             {
-                // Parse CSS properties using HTML-Renderer's CssBlock
-                var properties = new Dictionary<string, string>();
-                foreach (var declaration in cssContent.Split(';'))
-                {
-                    var colonIdx = declaration.IndexOf(':');
-                    if (colonIdx > 0)
-                    {
-                        var prop = declaration[..colonIdx].Trim();
-                        var val = declaration[(colonIdx + 1)..].Trim();
-                        if (!string.IsNullOrEmpty(prop))
-                            properties[prop] = val;
-                    }
-                }
-
-                if (properties.Count > 0)
-                {
-                    _ = new CssBlock("style", properties);
-                }
+                _ = new CssParser().ParseDeclarations(cssContent);
             }
         }
     }
@@ -358,13 +341,14 @@ public class CaptureService
         }
         else if (options.FullPage)
         {
-            HtmlRender.RenderToFileAutoSized(html, options.OutputPath,
+            HtmlRender.RenderToFileAutoSizedWithStyleSet(html, options.OutputPath,
                 maxWidth: options.Width, maxHeight: options.Height,
                 format: format, quality: 90);
         }
         else
         {
-            HtmlRender.RenderToFile(html, options.Width, options.Height, options.OutputPath, format, baseUrl:uri.ToString());
+            HtmlRender.RenderToFileWithStyleSet(
+                html, options.Width, options.Height, options.OutputPath, format, baseUrl: uri.ToString());
         }
     }
 
@@ -379,7 +363,7 @@ public class CaptureService
     private static void RenderAtAnchor(string html, string elementId, ImageCaptureOptions options,
         BImageFormat format)
     {
-        using var bitmap = HtmlRender.RenderToImageAtAnchor(
+        using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet(
             html,
             elementId,
             options.Width,
@@ -388,7 +372,7 @@ public class CaptureService
 
         if (bitmap is null)
         {
-            HtmlRender.RenderToFile(
+            HtmlRender.RenderToFileWithStyleSet(
                 html,
                 options.Width,
                 options.Height,

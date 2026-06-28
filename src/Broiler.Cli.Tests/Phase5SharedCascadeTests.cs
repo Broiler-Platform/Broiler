@@ -3,6 +3,7 @@ using Broiler.Dom.Html;
 using Broiler.HTML.Dom;
 using Broiler.Layout;
 using Broiler.HTML.Dom.Parse;
+using Broiler.HTML.Core;
 using Broiler.HTML.Orchestration.Parse;
 using Xunit;
 
@@ -12,9 +13,7 @@ namespace Broiler.Cli.Tests;
 /// Phase 5 renderer cutover. Verifies that the shared Broiler.CSS.Dom engine resolves an
 /// element's cascade from the canonical DomDocument and that the renderer projection sets
 /// the result on the CssBox — without the initial-value backfill that would clobber the
-/// renderer's own defaults and adjustments. The full pipeline keeps the path off by
-/// default (<see cref="SharedRendererCascade.UseSharedRendererCascade"/>) until pixel
-/// parity is verified.
+/// renderer's own defaults and adjustments. This is the renderer's sole cascade path.
 /// </summary>
 public sealed class Phase5SharedCascadeTests
 {
@@ -81,7 +80,12 @@ public sealed class Phase5SharedCascadeTests
     {
         var document = new HtmlDocumentParser().ParseDocument(html).Document;
         var root = HtmlParser.ParseDocument(document, new Uri("file:///t.html"));
-        var engine = SharedRendererCascade.BuildEngine(document, 800, 600)!;
+        var styleStart = html.IndexOf("<style>", StringComparison.OrdinalIgnoreCase);
+        var styleEnd = html.IndexOf("</style>", StringComparison.OrdinalIgnoreCase);
+        var styleSet = styleStart >= 0 && styleEnd > styleStart
+            ? HtmlStyleSet.Parse(html.Substring(styleStart + 7, styleEnd - styleStart - 7))
+            : HtmlStyleSet.Default;
+        var engine = SharedRendererCascade.BuildEngine(document, styleSet, 800, 600)!;
         return (engine, root);
     }
 

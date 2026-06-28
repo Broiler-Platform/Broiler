@@ -14,22 +14,14 @@
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
   </ItemGroup>
 
-  <!-- The relocated layout types (CssBox, CssBoxProperties, …) are internal; expose them to
-       the renderer assembly that still owns them (Broiler.HTML.Dom) and to the consumers that
-       reach them via InternalsVisibleTo, mirroring the old Broiler.HTML.Dom IVT set. -->
+  <!-- CssBox and the concrete layout engine remain internal. Keep only assemblies that
+       directly construct, render, inspect, or test that internal box tree. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler.HTML.Dom" />
     <InternalsVisibleTo Include="Broiler.HTML" />
-    <InternalsVisibleTo Include="Broiler.HTML.Core" />
     <InternalsVisibleTo Include="Broiler.HTML.Orchestration" />
     <InternalsVisibleTo Include="Broiler.HTML.Image" />
-    <InternalsVisibleTo Include="Broiler.HTML.Image.Compat" />
-    <InternalsVisibleTo Include="Broiler.HTML.Image.Tests" />
-    <InternalsVisibleTo Include="Broiler.HTML.WPF" />
     <InternalsVisibleTo Include="Broiler" />
-    <InternalsVisibleTo Include="Broiler.HtmlBridge" />
-    <InternalsVisibleTo Include="Broiler.HtmlBridge.Dom" />
-    <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />

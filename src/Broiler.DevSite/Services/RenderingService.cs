@@ -13,7 +13,7 @@ public sealed class RenderingService
     /// </summary>
     public byte[] RenderHtmlToPng(string html, int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToPng(html, width, height, BColor.White);
+        return HtmlRender.RenderToPngWithStyleSet(html, width, height, BColor.White);
     }
 
     /// <summary>
@@ -21,7 +21,7 @@ public sealed class RenderingService
     /// </summary>
     public BBitmap RenderHtmlToBitmap(string html, int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToImage(html, width, height, BColor.White);
+        return HtmlRender.RenderToImageWithStyleSet(html, width, height, backgroundColor: BColor.White);
     }
 
     /// <summary>
@@ -31,7 +31,8 @@ public sealed class RenderingService
     /// </summary>
     public byte[]? RenderAtAnchor(string html, string elementId, int width = 1024, int height = 768)
     {
-        using var bitmap = HtmlRender.RenderToImageAtAnchor(html, elementId, width, height, BColor.White);
+        using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet(
+            html, elementId, width, height, backgroundColor: BColor.White);
         return bitmap?.Encode(BImageFormat.Png, 100);
     }
 }

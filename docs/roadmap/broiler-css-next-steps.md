@@ -1,10 +1,9 @@
 # Broiler.CSS extraction — status, findings & next steps
 
-**Date:** 2026-06-27
+**Date:** 2026-06-28
 
-**Current closeout status:** Phases 0-6 are implemented. Phase 7 has retired the
-legacy bridge/renderer runtime paths and removed the `Broiler.HTML.CSS` assembly;
-the public/renderer `CssData` adapter tail and final post-tail gate remain open in
+**Current closeout status:** Phases 0-7 are implemented. The public/renderer adapter
+tail is closed; only RF-CSS-2's raster-performance confirmation remains open in
 [`refactor-gap.md`](refactor-gap.md).
 **Scope of this note:** what landed in the Phase 4 / Phase 6 work, the findings that
 shape the rest, and a concrete, prioritized plan for the remaining phases. Read
@@ -21,7 +20,7 @@ current-state authorities.
 | 4 — cascade & computed style | **Done** (`getComputedStyle()` cutover + anchor Pattern B scans migrated to a document-scoped enumeration, §4b). |
 | 5 — renderer cutover | **Done — flag flipped ON (2026-06-26, §4d).** Both render paths cascade through the shared engine; verified against Acid3 + WPT pixel gates (no pass/fail regressions; fixes several important/border cascade tests). |
 | 6 — CSSOM on shared model | **Done** (slices 6a + 6b: model storage, store unification, model-driven nested wrappers; §4a). |
-| 7 — compatibility cleanup | **In progress.** Runtime fallbacks, bridge tuple cascade, and the old project are gone; public `CssData` signatures and renderer-only compatibility indexes remain. |
+| 7 — compatibility cleanup | **Done (2026-06-28).** `HtmlStyleSet` is public, old signatures are obsolete wrappers, legacy parser/models/indexes are removed, and friend grants are trimmed. |
 
 ## 2. Build prerequisites that were broken (now fixed)
 
@@ -286,12 +285,11 @@ the parallel gate noisy by ±2-3 independent of this work.
    `EnumerateScopedStyleRules` seam and migrated the four Pattern B scans; behaviour-
    preserving for the main document. **Still to verify** under the anchor-positioning WPT
    subset when those suites are re-enabled.
-4. **Phase 5 — renderer cutover.** ✅ **Done (§4d).** The shared renderer cascade
-   defaults on. Retiring the retained rollback path belongs to Phase 7.
-5. **Phase 7 — cleanup.** **Ready but not implemented (see §9).** Migrate image/WPF/CLI public
-   APIs off `CssData`, remove `Broiler.HTML.CSS` and the obsolete `Broiler.HTML.Core` CSS
-   models, retire the legacy renderer/bridge cascade, trim broad `InternalsVisibleTo`,
-   and update architecture/API docs.
+4. **Phase 5 — renderer cutover.** ✅ **Done (§4d).** The shared renderer cascade is
+   the sole path; its rollback branch was retired in Phase 7.
+5. **Phase 7 — cleanup.** ✅ **Done (2026-06-28, §9).** Public style-set APIs,
+   obsolete compatibility wrappers, renderer consumer migration, model/parser
+   deletion, friend trimming, architecture guards, and documentation are complete.
 
 ## 8. Dual-run rollback switches — RETIRED (2026-06-27)
 
@@ -307,33 +305,29 @@ rollback path remains; the shared engine is the sole authority for both
   `CascadeApplyStyles` `else` branch (`AssignCssBlocks` selector matching) deleted; the
   shared engine projection is the sole renderer cascade.
 
-## 9. Phase 7 readiness — current audit
+## 9. Phase 7 completion audit
 
-Phase 5 and Phase 6 are complete, and Phase 7 is materially underway. The current
-tree has one bridge CSS authority and no `Broiler.HTML.CSS` production assembly:
+Phases 5-7 are complete. The current tree has one bridge/renderer CSS authority and
+no `Broiler.HTML.CSS` production assembly:
 
 - renderer and bridge dual-run flags and their legacy branches are deleted;
 - bridge `_cssRules`, manual parse/apply/selector helpers, and scoped tuple scans are
   deleted; anchors, visibility, mutation reads, specified style, and `::backdrop`
   resolve through `CssStyleEngine`;
-- the old CSS project is removed from both solution graphs and every project
-  reference. Compatibility parser sources now compile into Orchestration while their
-  namespace remains temporarily source-compatible;
-- `CssData` carries the shared `CssStyleSheet`, and Image/Graphics/WPF expose
-  `ParseStyleSheetModel`; and
+- the old CSS project and its temporary Orchestration compatibility parser sources
+  are removed;
+- Image/Graphics/WPF and production callers expose/use `HtmlStyleSet`, while
+  `CssData` is an obsolete four-member wrapper for one release; and
 - architecture guards prevent the retired bridge state and project from returning.
 
-**Still load-bearing:** `CssData` remains in public facade/container/event APIs and
-its block indexes still serve renderer-only pseudo-element, animation, selection,
-serialization, and font-face paths. Those consumers need shared-model projections
-before the old Core CSS types can be removed. Broad renderer/layout friend grants
-also still need a consumer-by-consumer trim.
+Pseudo-elements, animation, selection, serialization, font metadata, values, and
+inline cascade now use the shared model. The obsolete Core models are deleted, and
+`Broiler.Layout` retains only nine justified direct box-tree friends (down from 16).
 
 The authoritative remaining work, accepted visual baselines, and repeatable
 validation command are in [`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and
 RF-CSS-2.
 
-**Closeout order:** (1) add shared-model/style-set facade signatures and obsolete the
-old `CssData` signatures for one release; (2) migrate renderer-only compatibility
-indexes; (3) remove obsolete Core CSS models and compatibility parser sources; (4)
-trim `InternalsVisibleTo`; (5) rerun the visual and performance closeout gate.
+**Remaining closeout:** RF-CSS-1 is closed. RF-CSS-2 records green architecture,
+CSS, Acid, and improved WPT visual results; profile or clear the remaining
+`html.raster` performance delta before marking the overall CSS roadmap complete.

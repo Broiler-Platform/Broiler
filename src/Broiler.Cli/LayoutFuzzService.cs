@@ -86,7 +86,7 @@ internal sealed class LayoutFuzzService
             using var container = new HtmlContainer();
             container.AvoidAsyncImagesLoading = true;
             container.AvoidImagesLateLoading = true;
-            container.SetHtml(html);
+            container.SetHtmlWithStyleSet(html);
 
             var clip = new RectangleF(0, 0, 500, 500);
             container.PerformLayout(clip);

@@ -21,7 +21,7 @@ public static class LinkNavigator
         ArgumentNullException.ThrowIfNull(html);
 
         using var container = new HtmlContainer();
-        container.SetHtml(html);
+        container.SetHtmlWithStyleSet(html);
         return container.GetLinks();
     }
 

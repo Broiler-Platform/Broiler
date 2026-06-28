@@ -994,7 +994,8 @@ internal sealed class WptTestRunner
         BBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImage(html, _width, _height, BColor.White,
+            rendered = HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+                backgroundColor: BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
@@ -1210,7 +1211,8 @@ internal sealed class WptTestRunner
             };
         }
 
-        return HtmlRender.RenderToImage(html, _width, _height, BColor.White,
+        return HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+            backgroundColor: BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
     }
 

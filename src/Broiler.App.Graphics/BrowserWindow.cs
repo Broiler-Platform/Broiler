@@ -169,7 +169,7 @@ internal sealed class BrowserWindow : Direct2DWindow
         if (string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
         {
             _baseUrl = string.Empty;
-            _container.SetHtml(WelcomePage);
+            _container.SetHtmlWithStyleSet(WelcomePage);
             _hasContent = true;
             MarkLayoutDirty();
             Invalidate();
@@ -183,7 +183,7 @@ internal sealed class BrowserWindow : Direct2DWindow
             SetUrlText(normalisedUrl);
 
             _container.BaseUrl = normalisedUrl;
-            _container.SetHtml(HtmlPostProcessor.Process(content.Html), baseUrl: normalisedUrl);
+            _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(content.Html), baseUrl: normalisedUrl);
             _hasContent = true;
 
             // Interactive session lets timer / rAF callbacks be stepped one batch at a
@@ -194,7 +194,7 @@ internal sealed class BrowserWindow : Direct2DWindow
             {
                 string initial = _session.CurrentHtml();
                 if (!string.IsNullOrWhiteSpace(initial))
-                    _container.SetHtml(HtmlPostProcessor.Process(initial), baseUrl: normalisedUrl);
+                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(initial), baseUrl: normalisedUrl);
 
                 if (_session.HasPendingWork)
                     StartAnimationTimer(AnimationIntervalMs);
@@ -214,7 +214,7 @@ internal sealed class BrowserWindow : Direct2DWindow
         catch (Exception ex)
         {
             _baseUrl = string.Empty;
-            _container.SetHtml($"<html><body><h1>Error</h1><p>{System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>");
+            _container.SetHtmlWithStyleSet($"<html><body><h1>Error</h1><p>{System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>");
             _hasContent = true;
             MarkLayoutDirty();
             Invalidate();
@@ -392,7 +392,7 @@ internal sealed class BrowserWindow : Direct2DWindow
             _suppressNavigation = true;
             try
             {
-                _container.SetHtml(HtmlPostProcessor.Process(html), baseUrl: _baseUrl);
+                _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(html), baseUrl: _baseUrl);
             }
             finally
             {

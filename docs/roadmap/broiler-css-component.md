@@ -1,10 +1,10 @@
 # Broiler CSS Component Plan
 
-**Status:** Core Phases 0-6 implemented; roadmap closeout incomplete. Phase 7,
-legacy-path retirement, and final validation are tracked in
+**Status:** Phases 0-7 implemented. RF-CSS-1 compatibility cleanup is closed;
+RF-CSS-2's final raster-performance confirmation remains in
 [`refactor-gap.md`](refactor-gap.md).
 
-**Date:** 2026-06-24
+**Date:** 2026-06-28
 **Scope:** Extract reusable CSS parsing, selector, cascade, and computed-style
 support into a separate `Broiler.CSS` component without moving renderer layout,
 JavaScript bindings, resource loading, or painting into that component.
@@ -990,10 +990,9 @@ mutable `CssStyleSheet` and invalidating the style engine on CSSOM mutation.
 
 ### Phase 7 - Compatibility cleanup
 
-**Status:** In progress as of 2026-06-27. Runtime fallbacks, the bridge tuple
-cascade/parser, and the `Broiler.HTML.CSS` project are retired. Public `CssData`
-signatures, renderer-only compatibility indexes, and broad friend grants remain;
-see [`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and RF-CSS-2.
+**Status:** Completed on 2026-06-28. `HtmlStyleSet` is the supported origin-aware
+renderer API; the old `CssData` signatures remain only as obsolete one-release
+wrappers. RF-CSS-2 separately tracks the final performance confirmation.
 
 Deliverables:
 
@@ -1013,16 +1012,22 @@ Exit criteria:
 - the CSS component has explicit, narrow dependencies and tests;
 - all supported public compatibility decisions are documented.
 
-#### Phase 7 implementation record (2026-06-27)
+#### Phase 7 implementation record (2026-06-27–28)
 
 - Removed both dual-run flags and legacy branches; the shared engine is the sole
   bridge and renderer cascade authority.
 - Removed bridge `_cssRules`, manual stylesheet parse/apply and selector paths, and
   migrated anchor/visibility/backdrop/specified-style reads to `CssStyleEngine`.
-- Removed `Broiler.HTML.CSS.csproj` and all production references. Compatibility
-  parser sources compile temporarily into `Broiler.HTML.Orchestration`.
-- Made `CssData` carry the canonical `CssStyleSheet` and added shared-model parse
-  facades for Image, Graphics, and WPF.
+- Removed `Broiler.HTML.CSS.csproj`, every production reference, and the temporary
+  compatibility parser sources from `Broiler.HTML.Orchestration`.
+- Added origin-aware `HtmlStyleSet` APIs for Image, Graphics, WPF, containers,
+  stylesheet events, CLI/tools/apps/WPT, and file rendering. Marked `CssData` APIs
+  obsolete and reduced the adapter to four shared-model members.
+- Migrated pseudo-elements, selection, animations, serialization, lengths/colors,
+  font faces, and feature values to the shared model; removed the obsolete Core CSS
+  block/font/keyframe models and the renderer's manual selector matcher.
+- Reduced `Broiler.Layout` friend grants from 16 to nine direct box-tree consumers
+  and added architecture guards for the retired sources and reduced boundary.
 - Added `scripts/run-rf-css-validation.ps1` with architecture, mutation, broad CSS,
   Acid3, WPT pixel, and performance gates plus explicit accepted baselines.
 

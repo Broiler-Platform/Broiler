@@ -1,4 +1,4 @@
-using Broiler.HTML.Core.Entities;
+using Broiler.CSS;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Engine;
@@ -35,35 +35,18 @@ public sealed class EngineTestService
         ];
 
     /// <summary>
-    /// Tests the HTML-Renderer core by performing a basic CSS block
-    /// parse/merge cycle using the cross-platform core library.
+    /// Tests the renderer CSS dependency through the canonical shared model.
     /// </summary>
     public EngineTestResult TestHtmlRenderer()
     {
         try
         {
-            // Create a CSS block with properties — exercises the core data model
-            var properties = new Dictionary<string, string>
-            {
-                { "color", "red" },
-                { "font-size", "14px" },
-            };
-            var block = new CssBlock("p", properties);
-
-            // Verify properties are accessible
-            if (block.Class != "p")
-                throw new InvalidOperationException("CssBlock class mismatch.");
-            if (block.Properties["color"] != "red")
-                throw new InvalidOperationException("CssBlock property mismatch.");
-
-            // Test clone and merge operations
-            var clone = block.Clone();
-            var overrideProps = new Dictionary<string, string> { { "color", "blue" } };
-            var overrideBlock = new CssBlock("p", overrideProps);
-            clone.Merge(overrideBlock);
-
-            if (clone.Properties["color"] != "blue")
-                throw new InvalidOperationException("CssBlock merge did not override property.");
+            var sheet = new CssParser().ParseStyleSheet(
+                "p { color: red; font-size: 14px; color: blue; }");
+            if (sheet.Rules.Count != 1 || sheet.Rules[0] is not CssStyleRule rule)
+                throw new InvalidOperationException("Shared CSS rule parsing failed.");
+            if (rule.Declarations.GetPropertyValue("color") != "blue")
+                throw new InvalidOperationException("Shared CSS declaration precedence failed.");
 
             return new EngineTestResult { EngineName = "HTML-Renderer", Passed = true };
         }

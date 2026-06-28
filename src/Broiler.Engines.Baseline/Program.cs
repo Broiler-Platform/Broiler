@@ -259,12 +259,12 @@ internal static partial class Program
             MeasureMilliseconds("html.parse", "HtmlContainer.SetHtml on the baseline sample document", 15, () =>
             {
                 using var container = CreateHtmlContainer();
-                container.SetHtml(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
+                container.SetHtmlWithStyleSet(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
             }),
             MeasureMilliseconds("html.layout", "HtmlContainer.SetHtml + PerformLayout on the baseline sample document", 15, () =>
             {
                 using var container = CreateHtmlContainer();
-                container.SetHtml(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
+                container.SetHtmlWithStyleSet(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
                 container.PerformLayout(new RectangleF(0, 0, 1024, 768));
             }),
             MeasureMilliseconds("html.paint", "HtmlContainer.PerformPaint after layout on the baseline sample document", 15, () =>
@@ -272,19 +272,20 @@ internal static partial class Program
                 using var container = CreateHtmlContainer();
                 using var bitmap = new BBitmap(1024, 768);
                 var clip = new RectangleF(0, 0, 1024, 768);
-                container.SetHtml(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
+                container.SetHtmlWithStyleSet(BenchmarkSamples.HtmlDocument, baseUrl: "https://example.test/");
                 container.PerformLayout(bitmap, clip);
                 container.PerformPaint(bitmap, clip);
             }),
             MeasureMilliseconds("html.raster", "Render and PNG-encode the baseline sample document", 10, () =>
             {
-                using var bitmap = HtmlRender.RenderToImage(BenchmarkSamples.HtmlDocument, 1024, 768, default, null, null, null, "https://example.test/");
+                using var bitmap = HtmlRender.RenderToImageWithStyleSet(
+                    BenchmarkSamples.HtmlDocument, 1024, 768, baseUrl: "https://example.test/");
                 _ = bitmap.Encode(BImageFormat.Png, 100);
             }),
             MeasureNanosecondsPerOperation("css.parse", "Parse the CSS Phase 0 stylesheet with the renderer parser", 12, 100, () =>
             {
                 for (var i = 0; i < 100; i++)
-                    _ = HtmlRender.ParseStyleSheet(BenchmarkSamples.CssStyleSheet, combineWithDefault: false);
+                    _ = HtmlRender.ParseStyleSet(BenchmarkSamples.CssStyleSheet, combineWithDefault: false);
             }),
             MeasureNanosecondsPerOperation("css.selector-match", "Run repeated Selectors Level 4 matches through querySelectorAll", 12, 1000, () =>
             {
@@ -310,7 +311,7 @@ internal static partial class Program
             MeasureMilliseconds("css.renderer-style-apply", "Parse HTML and apply the renderer cascade for a style-heavy document", 15, () =>
             {
                 using var container = CreateHtmlContainer();
-                container.SetHtml(BenchmarkSamples.CssBridgeDocument, baseUrl: "https://example.test/");
+                container.SetHtmlWithStyleSet(BenchmarkSamples.CssBridgeDocument, baseUrl: "https://example.test/");
             }),
             MeasureNanosecondsPerOperation("bridge.dom-call", "Repeated document.getElementById().getAttribute() calls", 12, 2000, () =>
             {
@@ -339,7 +340,8 @@ internal static partial class Program
                 var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
                 var serialized = bridge.SerializeToHtml();
-                using var bitmap = HtmlRender.RenderToImage(serialized, 1024, 768, default, null, null, null, "https://example.test/");
+                using var bitmap = HtmlRender.RenderToImageWithStyleSet(
+                    serialized, 1024, 768, baseUrl: "https://example.test/");
             }),
             MeasureMilliseconds("bridge.typed-render-handoff", "Hand the canonical DOM directly to layout without serialization or reparsing", 10, () =>
             {
@@ -348,7 +350,7 @@ internal static partial class Program
                 bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
                 using var container = CreateHtmlContainer();
                 container.MaxSize = new SizeF(1024, 768);
-                container.SetDocument(bridge.GetRenderDocument(), baseUrl: "https://example.test/");
+                container.SetDocumentWithStyleSet(bridge.GetRenderDocument(), baseUrl: "https://example.test/");
                 container.PerformLayout(new RectangleF(0, 0, 1024, 768));
             }),
         };
