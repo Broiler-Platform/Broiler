@@ -289,6 +289,22 @@ pixel-guessing.
   same files render in ≈ 0.4–1.2 s. Regression guard: `MulticolCheckLayoutTimeoutTests`
   (`Broiler.Wpt.Tests`).
 
+- **⚠️ Perf fix follow-up (WPT #1115)**: the #1113 fix scoped the geometry caches to the
+  static check-layout assertion pass **only**, so tests that drive the *same* exponential
+  recursion through **live JS geometry getters** never benefited. `align-content-table-cell.html`
+  is `testharness`-based (not `checkLayout`): its 8 `test()` blocks evaluate `offsetTop`
+  ~30 times (the no-op `assert_equals` stub still evaluates its arguments), each an un-memoized
+  query → it stayed a hard hang and was one of the 2 Timeout survivors in run #1115. Fixed by
+  wrapping every live geometry getter (`offsetTop`/`offsetLeft`/`offset{Width,Height}`/
+  `client{Width,Height}`/`scroll{Width,Height}`/`getBoundingClientRect`) in
+  `WithLayoutGeometryCache` — the cache lives for the duration of that **one synchronous getter
+  call** (no JS runs mid-getter → static snapshot → sound), and the `owner` flag means a getter
+  invoked inside the check-layout pass simply shares that pass's cache. Behaviour-preserving (same
+  recursion, same `LayoutGeometryCacheEquivalenceTests` guarantee). `align-content-table-cell.html`
+  went from > 15 s hang → ≈ 2 s. Regression guard: `LiveGeometryQueryTimeoutTests`
+  (`Broiler.Wpt.Tests`). The other #1115 survivor `anchor-scroll-004.html` (scroll-linked, not in
+  the local checkout) leans on `getBoundingClientRect` and may also benefit, but is unverified here.
+
 ### ✅ #5 — Richer mismatch metadata (DONE)
 
 `MismatchClassifier` now emits, alongside the sub-category, the **bounding box of the
