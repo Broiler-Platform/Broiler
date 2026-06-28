@@ -53,6 +53,42 @@ internal enum SkipReason
 }
 
 /// <summary>
+/// First-class classification of a WPT test file by its kind, independent of the
+/// pass/fail outcome (diagnostic #8). Surfacing these as their own buckets keeps a
+/// regression in the classification visible — e.g. if manual-test detection breaks,
+/// 59 tests would silently flip into the failure total — rather than hidden.
+/// </summary>
+internal enum TestKind
+{
+    /// <summary>An ordinary automated test compared against a reference image.</summary>
+    Regular,
+
+    /// <summary>Filename ends in <c>-manual</c>; requires human interaction (skipped).</summary>
+    Manual,
+
+    /// <summary>Tests a not-yet-standardised feature (<c>.tentative</c> in the name or a <c>tentative/</c> dir).</summary>
+    Tentative,
+
+    /// <summary>Passes if rendering does not crash (<c>-crash</c> suffix or <c>crashtests/</c> dir).</summary>
+    CrashTest,
+}
+
+/// <summary>
+/// A single failed <c>check-layout-th.js</c> geometry assertion: the element, the
+/// checked property, and the expected vs. computed value.
+/// </summary>
+internal readonly record struct LayoutAssertionFailure(
+    string Element, string Property, double Expected, double Actual)
+{
+    /// <summary>One-line, directly-actionable description (e.g. <c>span.abspos[title=start] expected offset-y=0, got 13</c>).</summary>
+    public string Describe() =>
+        $"{Element} expected {Property}={Format(Expected)}, got {Format(Actual)}";
+
+    private static string Format(double value) =>
+        value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+/// <summary>
 /// Result of rendering and comparing a single WPT test case.
 /// </summary>
 internal sealed class WptTestResult
@@ -111,6 +147,44 @@ internal sealed class WptTestResult
     public MismatchDiagnostics? MismatchDiagnostics { get; init; }
 
     /// <summary>
+    /// <c>check-layout-th.js</c> geometry assertions whose computed value diverged
+    /// from the test's <c>data-offset-*</c> / <c>data-expected-*</c> attribute, with
+    /// the expected and actual values. Null/empty when the test carries no such
+    /// assertions or all of them matched. Turns an opaque pixel mismatch into a
+    /// precise, font-independent layout diagnostic (diagnostic #4).
+    /// </summary>
+    public IReadOnlyList<LayoutAssertionFailure>? LayoutAssertionFailures { get; init; }
+
+    /// <summary>
+    /// Path to the saved rendered-output PNG for a failing comparison, when failure
+    /// image capture is enabled (diagnostic #6). Null otherwise.
+    /// </summary>
+    public string? RenderedImagePath { get; init; }
+
+    /// <summary>Path to the saved reference PNG for a failing comparison. Null when not captured.</summary>
+    public string? ReferenceImagePath { get; init; }
+
+    /// <summary>
+    /// Path to the saved diff PNG (changed pixels highlighted in magenta) for a
+    /// failing comparison. Null when not captured or when no diff bitmap exists
+    /// (e.g. a size mismatch).
+    /// </summary>
+    public string? DiffImagePath { get; init; }
+
+    /// <summary>
+    /// <c>&lt;link rel="help"&gt;</c> targets declared by the test — the spec
+    /// section(s) it exercises. Null/empty when none (diagnostic #9).
+    /// </summary>
+    public IReadOnlyList<string>? HelpLinks { get; init; }
+
+    /// <summary>
+    /// The test's <c>&lt;meta name="assert"&gt;</c> text — what it claims to verify.
+    /// Reading it is the fastest way to tell whether, say, a <c>css-align</c> failure
+    /// is actually a paint/parse bug. Null when the test declares no assertion.
+    /// </summary>
+    public string? Assertion { get; init; }
+
+    /// <summary>
     /// Serialises this result to a JSON-friendly dictionary.
     /// </summary>
     internal Dictionary<string, object?> ToJsonObject(string? wptPath = null)
@@ -131,6 +205,10 @@ internal sealed class WptTestResult
         if (SkipReason != SkipReason.None)
             obj["skipReason"] = SkipReason.ToString();
 
+        var testKind = WptTestRunner.ClassifyTestKind(TestPath);
+        if (testKind != TestKind.Regular)
+            obj["testKind"] = testKind.ToString();
+
         if (!string.IsNullOrWhiteSpace(wptPath))
         {
             var relativeTestPath = Path.GetRelativePath(wptPath, TestPath).Replace('\\', '/');
@@ -150,7 +228,47 @@ internal sealed class WptTestResult
                 ["maxChannelDelta"] = diag.MaxChannelDelta,
                 ["affectedRows"] = diag.AffectedRows,
                 ["affectedColumns"] = diag.AffectedColumns,
+                ["boundingBox"] = new Dictionary<string, object?>
+                {
+                    ["left"] = diag.BoundingLeft,
+                    ["top"] = diag.BoundingTop,
+                    ["width"] = diag.BoundingWidth,
+                    ["height"] = diag.BoundingHeight,
+                },
+                ["displacement"] = diag.Displacement,
                 ["summary"] = diag.Summary,
+            };
+        }
+
+        if (LayoutAssertionFailures is { Count: > 0 } layoutFailures)
+        {
+            obj["layoutAssertionFailures"] = layoutFailures
+                .Select(f => new Dictionary<string, object?>
+                {
+                    ["element"] = f.Element,
+                    ["property"] = f.Property,
+                    ["expected"] = f.Expected,
+                    ["actual"] = f.Actual,
+                })
+                .ToList();
+        }
+
+        if (RenderedImagePath is not null || ReferenceImagePath is not null || DiffImagePath is not null)
+        {
+            obj["failureImages"] = new Dictionary<string, object?>
+            {
+                ["rendered"] = RenderedImagePath,
+                ["reference"] = ReferenceImagePath,
+                ["diff"] = DiffImagePath,
+            };
+        }
+
+        if (HelpLinks is { Count: > 0 } || Assertion is not null)
+        {
+            obj["testMetadata"] = new Dictionary<string, object?>
+            {
+                ["helpLinks"] = HelpLinks,
+                ["assert"] = Assertion,
             };
         }
 
@@ -514,11 +632,60 @@ internal sealed class WptTestRunner
 
     private readonly int _width;
     private readonly int _height;
+    private readonly string? _failureImageDir;
 
-    public WptTestRunner(int width = 1024, int height = 768)
+    public WptTestRunner(int width = 1024, int height = 768, string? failureImageDir = null)
     {
         _width = width;
         _height = height;
+        _failureImageDir = failureImageDir;
+    }
+
+    /// <summary>
+    /// Saves the rendered, reference, and diff bitmaps for a failing comparison
+    /// under <see cref="_failureImageDir"/> (diagnostic #6), mirroring the test's
+    /// path as a sub-directory. Returns the written paths (any may be null when not
+    /// captured). Best-effort: an I/O error is logged and does not fail the test.
+    /// </summary>
+    private (string? Rendered, string? Reference, string? Diff) SaveFailureImages(
+        string testPath, string? wptRoot, BBitmap rendered, BBitmap reference, BBitmap? diff)
+    {
+        if (string.IsNullOrEmpty(_failureImageDir))
+            return (null, null, null);
+
+        try
+        {
+            // Mirror the test's relative path (without extension) as a folder so the
+            // three images for one test sit together and don't collide across the tree.
+            var relative = wptRoot is not null
+                ? Path.GetRelativePath(wptRoot, testPath)
+                : Path.GetFileName(testPath);
+            var withoutExtension = Path.Combine(
+                Path.GetDirectoryName(relative) ?? string.Empty,
+                Path.GetFileNameWithoutExtension(relative));
+            var caseDir = Path.Combine(_failureImageDir, withoutExtension);
+            Directory.CreateDirectory(caseDir);
+
+            var renderedPath = Path.Combine(caseDir, "rendered.png");
+            var referencePath = Path.Combine(caseDir, "reference.png");
+            rendered.Save(renderedPath);
+            reference.Save(referencePath);
+
+            string? diffPath = null;
+            if (diff is not null)
+            {
+                diffPath = Path.Combine(caseDir, "diff.png");
+                diff.Save(diffPath);
+            }
+
+            return (renderedPath, referencePath, diffPath);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.HtmlRenderer, "WptTestRunner.SaveFailureImages",
+                $"Failed to save failure images for {testPath}: {ex.Message}", ex);
+            return (null, null, null);
+        }
     }
 
     /// <summary>
@@ -853,6 +1020,104 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Determines whether the given test path is a WPT <em>tentative</em> test —
+    /// one that exercises a feature whose specification is not yet stable. Per WPT
+    /// convention this is signalled by <c>.tentative</c> in the file name (e.g.
+    /// <c>foo.tentative.html</c>) or by a <c>tentative/</c> directory segment.
+    /// </summary>
+    internal static bool IsTentativeTest(string testPath)
+    {
+        if (testPath.Contains("/tentative/", StringComparison.OrdinalIgnoreCase) ||
+            testPath.Contains("\\tentative\\", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(testPath);
+        return nameWithoutExt.EndsWith(".tentative", StringComparison.OrdinalIgnoreCase) ||
+               nameWithoutExt.Contains(".tentative.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly Regex LinkTagPattern = new(@"<link\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MetaTagPattern = new(@"<meta\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RelHelpPattern = new(@"\brel\s*=\s*[""']?\s*help\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex NameAssertPattern = new(@"\bname\s*=\s*[""']?\s*assert\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex HrefValuePattern = new(@"\bhref\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ContentValuePattern = new(@"\bcontent\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// What a test declares about itself: its <c>&lt;link rel="help"&gt;</c> spec
+    /// targets and its <c>&lt;meta name="assert"&gt;</c> claim (diagnostic #9).
+    /// </summary>
+    internal readonly record struct TestMetadata(IReadOnlyList<string>? HelpLinks, string? Assertion);
+
+    /// <summary>
+    /// Extracts the <c>&lt;link rel="help"&gt;</c> hrefs and the joined
+    /// <c>&lt;meta name="assert"&gt;</c> content from a test's HTML. Surfacing these
+    /// in the report shows what a failing test <em>claims</em> to verify — the
+    /// fastest way to spot that a nominal layout failure is really a paint/parse bug.
+    /// </summary>
+    internal static TestMetadata ExtractTestMetadata(string html)
+    {
+        var helpLinks = new List<string>();
+        foreach (Match link in LinkTagPattern.Matches(html))
+        {
+            if (!RelHelpPattern.IsMatch(link.Value))
+                continue;
+            if (TryExtractAttributeValue(HrefValuePattern, link.Value, out var href))
+                helpLinks.Add(href);
+        }
+
+        var assertions = new List<string>();
+        foreach (Match meta in MetaTagPattern.Matches(html))
+        {
+            if (!NameAssertPattern.IsMatch(meta.Value))
+                continue;
+            if (TryExtractAttributeValue(ContentValuePattern, meta.Value, out var content))
+                assertions.Add(System.Net.WebUtility.HtmlDecode(content));
+        }
+
+        return new TestMetadata(
+            helpLinks.Count > 0 ? helpLinks : null,
+            assertions.Count > 0 ? string.Join(" / ", assertions) : null);
+    }
+
+    private static bool TryExtractAttributeValue(Regex pattern, string tag, out string value)
+    {
+        var match = pattern.Match(tag);
+        if (match.Success)
+        {
+            // Groups 1-3 are the double-quoted / single-quoted / unquoted alternatives.
+            for (var i = 1; i < match.Groups.Count; i++)
+            {
+                if (match.Groups[i].Success && match.Groups[i].Value.Trim().Length > 0)
+                {
+                    value = match.Groups[i].Value.Trim();
+                    return true;
+                }
+            }
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Classifies a test file into its <see cref="TestKind"/>. Crash and manual are
+    /// checked first because they drive distinct handling (auto-pass / skip); a test
+    /// is otherwise tentative or regular. Outcome-independent — it keys purely off
+    /// the path so the report can bucket every result by kind.
+    /// </summary>
+    internal static TestKind ClassifyTestKind(string testPath)
+    {
+        if (IsCrashTest(testPath))
+            return TestKind.CrashTest;
+        if (IsManualTest(testPath))
+            return TestKind.Manual;
+        if (IsTentativeTest(testPath))
+            return TestKind.Tentative;
+        return TestKind.Regular;
+    }
+
+    /// <summary>
     /// Runs a single test: renders the HTML with the Broiler stack and
     /// compares the result against a Chromium/Playwright reference image.
     /// </summary>
@@ -919,6 +1184,10 @@ internal sealed class WptTestRunner
             };
         }
 
+        // What the test claims to verify (spec links + assertion); attached to
+        // failures so triage can read intent without opening the file (#9).
+        var metadata = ExtractTestMetadata(html);
+
         // Skip tests that require media playback (video/audio streams)
         // which Broiler cannot decode.
         if (IsMediaPlaybackTest(html))
@@ -933,13 +1202,16 @@ internal sealed class WptTestRunner
         }
 
         // Execute inline scripts via DomBridge.
+        IReadOnlyList<LayoutAssertionFailure>? layoutAssertionFailures = null;
         try
         {
-            html = ExecuteScriptsWithDom(
+            var executed = ExecuteScriptsWithDom(
                 html,
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
                 wptRoot,
                 batchStyleInvalidations: IsCrashTest(testPath));
+            html = executed.Html;
+            layoutAssertionFailures = ComputeLayoutAssertionFailures(executed.LayoutAssertions);
         }
         catch (Exception ex)
         {
@@ -950,6 +1222,8 @@ internal sealed class WptTestRunner
                 Message = $"Script execution failed: {ex.Message}",
                 Category = FailureCategory.ScriptError,
                 StackTrace = ex.StackTrace,
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
             };
         }
 
@@ -1007,6 +1281,8 @@ internal sealed class WptTestRunner
                 Message = $"Rendering failed: {ex.Message}",
                 Category = FailureCategory.RenderingError,
                 StackTrace = ex.StackTrace,
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
             };
         }
 
@@ -1051,6 +1327,8 @@ internal sealed class WptTestRunner
                     Message = $"Failed to decode reference image: {referencePath} ({ex.Message})",
                     Category = FailureCategory.ReferenceDecodeError,
                     StackTrace = ex.StackTrace,
+                    HelpLinks = metadata.HelpLinks,
+                    Assertion = metadata.Assertion,
                 };
             }
 
@@ -1069,6 +1347,7 @@ internal sealed class WptTestRunner
                         TestPath = testPath,
                         Passed = true,
                         MatchPercent = matchPct,
+                        LayoutAssertionFailures = layoutAssertionFailures,
                     };
                 }
 
@@ -1078,6 +1357,9 @@ internal sealed class WptTestRunner
                     rendered.Width, rendered.Height,
                     reference.Width, reference.Height);
 
+                // Capture rendered / reference / diff PNGs for visual triage (#6).
+                var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
+
                 return new WptTestResult
                 {
                     TestPath = testPath,
@@ -1086,6 +1368,12 @@ internal sealed class WptTestRunner
                     Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
                     Category = FailureCategory.PixelMismatch,
                     MismatchDiagnostics = diagnostics,
+                    LayoutAssertionFailures = layoutAssertionFailures,
+                    RenderedImagePath = images.Rendered,
+                    ReferenceImagePath = images.Reference,
+                    DiffImagePath = images.Diff,
+                    HelpLinks = metadata.HelpLinks,
+                    Assertion = metadata.Assertion,
                 };
             }
         }
@@ -1189,7 +1477,7 @@ internal sealed class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
-        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
+        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
         html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
@@ -1267,7 +1555,36 @@ internal sealed class WptTestRunner
     /// Extracts and executes inline/external scripts via the DomBridge,
     /// returning the post-execution HTML with DOM mutations applied.
     /// </summary>
-    private static string ExecuteScriptsWithDom(
+    /// <summary>
+    /// Per-axis pixel tolerance below which a computed geometry value is treated as
+    /// matching its <c>data-*</c> expectation. The bridge metrics are CSS-based
+    /// estimates, so a sub-pixel difference is not a real layout discrepancy.
+    /// </summary>
+    private const double LayoutAssertionTolerancePx = 1.0;
+
+    /// <summary>
+    /// Filters the evaluated <c>check-layout-th.js</c> assertions down to the ones
+    /// whose computed value diverges from the expected value beyond
+    /// <see cref="LayoutAssertionTolerancePx"/>. Returns <c>null</c> when everything
+    /// matched (or there were no assertions) so the result carries no empty list.
+    /// </summary>
+    private static IReadOnlyList<LayoutAssertionFailure>? ComputeLayoutAssertionFailures(
+        IReadOnlyList<DomBridge.CheckLayoutAssertion> assertions)
+    {
+        if (assertions.Count == 0)
+            return null;
+
+        var failures = new List<LayoutAssertionFailure>();
+        foreach (var a in assertions)
+        {
+            if (double.IsNaN(a.Actual) || Math.Abs(a.Expected - a.Actual) > LayoutAssertionTolerancePx)
+                failures.Add(new LayoutAssertionFailure(a.Element, a.Property, a.Expected, a.Actual));
+        }
+
+        return failures.Count > 0 ? failures : null;
+    }
+
+    private static (string Html, IReadOnlyList<DomBridge.CheckLayoutAssertion> LayoutAssertions) ExecuteScriptsWithDom(
         string html,
         string url,
         string? wptRoot = null,
@@ -1370,7 +1687,8 @@ internal sealed class WptTestRunner
             bridge2.FlushTimers();
             bridge2.ResolveAnimationSnapshots();
             bridge2.ResolveAnchorPositions();
-            return bridge2.SerializeToHtml();
+            var assertions2 = bridge2.EvaluateCheckLayoutAssertions();
+            return (bridge2.SerializeToHtml(), assertions2);
         }
 
         using var context = new JSContext();
@@ -1479,7 +1797,8 @@ internal sealed class WptTestRunner
         // backdrop elements for modal <dialog> elements.
         bridge.ResolveAnchorPositions();
 
-        return bridge.SerializeToHtml();
+        var layoutAssertions = bridge.EvaluateCheckLayoutAssertions();
+        return (bridge.SerializeToHtml(), layoutAssertions);
     }
 
     private static void PromoteWindowGlobalsToContext(JSContext context)

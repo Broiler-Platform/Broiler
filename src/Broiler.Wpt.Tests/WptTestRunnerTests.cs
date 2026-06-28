@@ -4894,6 +4894,69 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.IsManualTest(path));
     }
 
+    // ──────────── Tentative + test-kind classification (#8) ───────────
+
+    [Theory]
+    [InlineData("/wpt/css/css-anchor-position/anchor-scope.tentative.html")]
+    [InlineData("/wpt/css/css-flexbox/foo.tentative.https.html")]
+    [InlineData("C:\\wpt\\css\\tentative\\bar.html")]
+    public void IsTentativeTest_Detects_Tentative(string path)
+    {
+        Assert.True(WptTestRunner.IsTentativeTest(path));
+    }
+
+    [Theory]
+    [InlineData("/wpt/css/css-flexbox/flex-001.html")]
+    [InlineData("/wpt/css/tentatively-named.html")]
+    public void IsTentativeTest_Returns_False_For_Regular_Tests(string path)
+    {
+        Assert.False(WptTestRunner.IsTentativeTest(path));
+    }
+
+    [Theory]
+    [InlineData("/wpt/css/compositing/crashtests/bgblend.html", "CrashTest")]
+    [InlineData("/wpt/css/foo-crash.html", "CrashTest")]
+    [InlineData("/wpt/css/css-animations/anim-001-manual.html", "Manual")]
+    [InlineData("/wpt/css/css-anchor-position/anchor.tentative.html", "Tentative")]
+    [InlineData("/wpt/css/css-flexbox/flex-001.html", "Regular")]
+    public void ClassifyTestKind_Returns_Expected_Kind(string path, string expected)
+    {
+        Assert.Equal(expected, WptTestRunner.ClassifyTestKind(path).ToString());
+    }
+
+    // ──────────── Help/assert metadata extraction (#9) ────────────────
+
+    [Fact]
+    public void ExtractTestMetadata_Reads_Help_Links_And_Decoded_Assert()
+    {
+        const string html =
+            "<!DOCTYPE html>\n" +
+            "<link rel=\"help\" href=\"https://drafts.csswg.org/css-align/#align-block\">\n" +
+            "<link rel=\"author\" href=\"mailto:someone@example.test\">\n" +
+            "<link rel='help' href='https://example.test/spec#two'>\n" +
+            "<meta name=\"assert\" content=\"Box aligned to start &amp; clamped.\">\n" +
+            "<body>content</body>";
+
+        var metadata = WptTestRunner.ExtractTestMetadata(html);
+
+        Assert.Equal(
+            new[] { "https://drafts.csswg.org/css-align/#align-block", "https://example.test/spec#two" },
+            metadata.HelpLinks);
+        // rel="author" is not a help link.
+        Assert.DoesNotContain(metadata.HelpLinks!, link => link.StartsWith("mailto:"));
+        // &amp; is decoded.
+        Assert.Equal("Box aligned to start & clamped.", metadata.Assertion);
+    }
+
+    [Fact]
+    public void ExtractTestMetadata_Returns_Null_When_Absent()
+    {
+        var metadata = WptTestRunner.ExtractTestMetadata("<!DOCTYPE html><body>plain</body>");
+
+        Assert.Null(metadata.HelpLinks);
+        Assert.Null(metadata.Assertion);
+    }
+
     // ──────────── Non-test file detection ────────────────────────────
 
     [Fact]
@@ -5028,6 +5091,57 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         // Assert — crash test auto-passes when rendering doesn't throw.
         Assert.True(result.Passed);
+    }
+
+    [Fact]
+    public void RunTest_Saves_Failure_Images_When_FailureImageDir_Set()
+    {
+        // Arrange — a test that renders a red box vs a solid-blue reference of the
+        // same dimensions → a pixel mismatch with a diff bitmap.
+        var testFile = Path.Combine(_tempDir, "mismatch.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+        CreateSolidReferencePng(Path.Combine(refDir, "mismatch.png"), new BColor(0, 0, 255, 255));
+
+        var imagesDir = Path.Combine(_tempDir, "failure-images");
+        var runner = new WptTestRunner(failureImageDir: imagesDir);
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — rendered/reference/diff PNGs written and recorded on the result.
+        Assert.Equal(FailureCategory.PixelMismatch, result.Category);
+        Assert.NotNull(result.RenderedImagePath);
+        Assert.NotNull(result.ReferenceImagePath);
+        Assert.NotNull(result.DiffImagePath);
+        Assert.True(File.Exists(result.RenderedImagePath!));
+        Assert.True(File.Exists(result.ReferenceImagePath!));
+        Assert.True(File.Exists(result.DiffImagePath!));
+        Assert.StartsWith(imagesDir, result.RenderedImagePath!);
+    }
+
+    [Fact]
+    public void RunTest_Does_Not_Save_Failure_Images_By_Default()
+    {
+        var testFile = Path.Combine(_tempDir, "mismatch-default.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references-default");
+        Directory.CreateDirectory(refDir);
+        CreateSolidReferencePng(Path.Combine(refDir, "mismatch-default.png"), new BColor(0, 0, 255, 255));
+
+        var runner = new WptTestRunner();
+
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.Equal(FailureCategory.PixelMismatch, result.Category);
+        Assert.Null(result.RenderedImagePath);
+        Assert.Null(result.ReferenceImagePath);
+        Assert.Null(result.DiffImagePath);
     }
 
     [Fact]
@@ -5318,13 +5432,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     [Fact]
     public void MismatchClassifier_LayoutShift_When_Large_Deltas()
     {
-        // High per-channel delta → LayoutShift
+        // High per-channel delta → LayoutShift. Uses a blue↔green pair (no red)
+        // so the more-specific ReferenceOverlayExposed heuristic does not apply.
         var mismatches = new List<PixelMismatch>();
         for (int i = 0; i < 100; i++)
         {
-            // ~255 delta → high
+            // ~127 avg delta → high
             mismatches.Add(new PixelMismatch(i, i,
-                255, 0, 0, 255,
+                0, 0, 255, 255,
                 0, 255, 0, 255));
         }
         var diff = new PixelDiffResult
@@ -5340,6 +5455,60 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         Assert.Equal(MismatchCategory.LayoutShift, diag.Category);
         Assert.Contains("layout", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchClassifier_ReferenceOverlayExposed_When_Red_Shows_Through()
+    {
+        // Output paints pure red where the reference is green (the WPT
+        // "passes if green, no red" overlay convention) → ReferenceOverlayExposed,
+        // even though the raw per-channel delta would otherwise read as LayoutShift.
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            mismatches.Add(new PixelMismatch(i, i,
+                255, 0, 0, 255,   // actual: pure red (overlay showing through)
+                0, 128, 0, 255)); // reference: green (pass state)
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.10,
+            DiffPixelCount = 200,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.ReferenceOverlayExposed, diag.Category);
+        Assert.Contains("red", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchClassifier_Does_Not_Flag_Overlay_When_Reference_Is_Also_Red()
+    {
+        // Both output and reference are red (just different shades): red is
+        // legitimately present, so this is NOT an exposed overlay.
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            mismatches.Add(new PixelMismatch(i, i,
+                255, 0, 0, 255,    // actual: bright red
+                120, 0, 0, 255));  // reference: darker red (red content present)
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.10,
+            DiffPixelCount = 200,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.NotEqual(MismatchCategory.ReferenceOverlayExposed, diag.Category);
     }
 
     [Fact]
@@ -5393,6 +5562,82 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(2, diag.AffectedRows);  // rows 0, 10
         Assert.Equal(2, diag.AffectedColumns); // cols 0, 5
         Assert.NotNull(diag.Summary);
+    }
+
+    [Fact]
+    public void MismatchClassifier_Reports_BoundingBox_Of_Mismatched_Region()
+    {
+        // Mismatches span x∈[10,50], y∈[5,80] → box (10,5) 41×76.
+        var mismatches = new List<PixelMismatch>
+        {
+            new(10, 20, 200, 100, 50, 255, 150, 50, 0, 255),
+            new(50, 80, 200, 100, 50, 255, 150, 50, 0, 255),
+            new(30, 5, 200, 100, 50, 255, 150, 50, 0, 255),
+        };
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 3,
+            TotalPixelCount = 1000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(10, diag.BoundingLeft);
+        Assert.Equal(5, diag.BoundingTop);
+        Assert.Equal(41, diag.BoundingWidth);   // 50 - 10 + 1
+        Assert.Equal(76, diag.BoundingHeight);  // 80 - 5 + 1
+    }
+
+    [Fact]
+    public void MismatchClassifier_Estimates_Content_Shift_Direction()
+    {
+        // Output paints content at x≈110 where the reference is blank, and the
+        // reference has content at x≈10 where the output is blank → shifted right ~100px.
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 50; i++)
+            mismatches.Add(new PixelMismatch(110, 50, 0, 0, 0, 255, 255, 255, 255, 255));
+        for (int i = 0; i < 50; i++)
+            mismatches.Add(new PixelMismatch(10, 50, 255, 255, 255, 255, 0, 0, 0, 255));
+
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 100,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 200, 100, 200, 100);
+
+        Assert.Equal("content shifted right ~100px", diag.Displacement);
+        Assert.Contains("shifted right ~100px", diag.Summary);
+    }
+
+    [Fact]
+    public void MismatchClassifier_Reports_Content_Absent_When_Output_Is_Blank()
+    {
+        // Reference has content; output is white everywhere it differs → content absent.
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+            mismatches.Add(new PixelMismatch(i, 0, 255, 255, 255, 255, 0, 0, 0, 255));
+
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 100,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.NotNull(diag.Displacement);
+        Assert.Contains("content absent", diag.Displacement!);
     }
 
     // ──────────── JSON output ────────────────────────────────────────

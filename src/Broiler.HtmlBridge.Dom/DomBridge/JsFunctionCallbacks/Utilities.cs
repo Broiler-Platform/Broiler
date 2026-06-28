@@ -42,7 +42,7 @@ public sealed partial class DomBridge
         element.JsSetStyleProps.Clear();
         if (a.Length > 0)
         {
-            foreach (var kv in ParseStyle(a[0].ToString()))
+            foreach (var kv in ParseStyle(a[0].ToString(), reportDrops: true))
             {
                 element.Style[kv.Key] = kv.Value;
                 element.JsSetStyleProps.Add(kv.Key);
