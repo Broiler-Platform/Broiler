@@ -67,33 +67,35 @@ public sealed partial class DomBridge
         }
     }
 
-    private double GetClientWidthForDomElement(DomElement element, bool isRoot)
-    {
-        if (isRoot)
-            return GetViewportReferenceLength(element, vertical: false);
+    private double GetClientWidthForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
+            if (isRoot)
+                return GetViewportReferenceLength(element, vertical: false);
 
-        var props = GetComputedProps(element);
-        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-        var width = ResolveContentBoxExtent(element, vertical: false);
+            var props = GetComputedProps(element);
+            var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+            var width = ResolveContentBoxExtent(element, vertical: false);
 
-        return width
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
-    }
+            return width
+                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
+                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
+        });
 
-    private double GetClientHeightForDomElement(DomElement element, bool isRoot)
-    {
-        if (isRoot)
-            return GetViewportReferenceLength(element, vertical: true);
+    private double GetClientHeightForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
+            if (isRoot)
+                return GetViewportReferenceLength(element, vertical: true);
 
-        var props = GetComputedProps(element);
-        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-        var height = ResolveContentBoxExtent(element, vertical: true);
+            var props = GetComputedProps(element);
+            var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+            var height = ResolveContentBoxExtent(element, vertical: true);
 
-        return height
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
-    }
+            return height
+                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
+                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
+        });
 
     private double GetClientTopForDomElement(DomElement element)
     {
@@ -107,45 +109,47 @@ public sealed partial class DomBridge
         return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
     }
 
-    private double GetOffsetWidthForDomElement(DomElement element, bool isRoot)
-    {
-        if (isRoot)
-            return GetViewportReferenceLength(element, vertical: false);
+    private double GetOffsetWidthForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
+            if (isRoot)
+                return GetViewportReferenceLength(element, vertical: false);
 
-        if (ShouldReportZeroOffsetMetrics(element))
-            return 0;
+            if (ShouldReportZeroOffsetMetrics(element))
+                return 0;
 
-        var resolved = ResolvePositionAreaForElement(element);
-        if (resolved != null)
-            return resolved.Value.width;
+            var resolved = ResolvePositionAreaForElement(element);
+            if (resolved != null)
+                return resolved.Value.width;
 
-        var props = GetComputedProps(element);
-        var width = GetBorderBoxWidth(props, element);
-        if (width > 0)
-            return width;
+            var props = GetComputedProps(element);
+            var width = GetBorderBoxWidth(props, element);
+            if (width > 0)
+                return width;
 
-        return ResolveBorderBoxExtent(element, vertical: false);
-    }
+            return ResolveBorderBoxExtent(element, vertical: false);
+        });
 
-    private double GetOffsetHeightForDomElement(DomElement element, bool isRoot)
-    {
-        if (isRoot)
-            return GetViewportReferenceLength(element, vertical: true);
+    private double GetOffsetHeightForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
+            if (isRoot)
+                return GetViewportReferenceLength(element, vertical: true);
 
-        if (ShouldReportZeroOffsetMetrics(element))
-            return 0;
+            if (ShouldReportZeroOffsetMetrics(element))
+                return 0;
 
-        var resolved = ResolvePositionAreaForElement(element);
-        if (resolved != null)
-            return resolved.Value.height;
+            var resolved = ResolvePositionAreaForElement(element);
+            if (resolved != null)
+                return resolved.Value.height;
 
-        var props = GetComputedProps(element);
-        var height = GetBorderBoxHeight(props, element);
-        if (height > 0)
-            return height;
+            var props = GetComputedProps(element);
+            var height = GetBorderBoxHeight(props, element);
+            if (height > 0)
+                return height;
 
-        return ResolveBorderBoxExtent(element, vertical: true);
-    }
+            return ResolveBorderBoxExtent(element, vertical: true);
+        });
 
     private static bool ShouldReportZeroOffsetMetrics(DomElement element) =>
         string.Equals(element.TagName, "map", StringComparison.OrdinalIgnoreCase);
@@ -306,33 +310,35 @@ public sealed partial class DomBridge
         return longestLine * fontSize * 0.5;
     }
 
-    private double GetOffsetTopForDomElement(DomElement element)
-    {
-        var resolved = ResolvePositionAreaForElement(element);
-        if (resolved != null)
-            return resolved.Value.top;
+    private double GetOffsetTopForDomElement(DomElement element) =>
+        WithLayoutGeometryCache(() =>
+        {
+            var resolved = ResolvePositionAreaForElement(element);
+            if (resolved != null)
+                return resolved.Value.top;
 
-        var offsetParent = GetOffsetParentForDomElement(element);
-        if (offsetParent != null)
-            return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: true);
+            var offsetParent = GetOffsetParentForDomElement(element);
+            if (offsetParent != null)
+                return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: true);
 
-        var layoutRect = ComputeUnzoomedLayoutRect(element);
-        return layoutRect.Top;
-    }
+            var layoutRect = ComputeUnzoomedLayoutRect(element);
+            return layoutRect.Top;
+        });
 
-    private double GetOffsetLeftForDomElement(DomElement element)
-    {
-        var resolved = ResolvePositionAreaForElement(element);
-        if (resolved != null)
-            return resolved.Value.left;
+    private double GetOffsetLeftForDomElement(DomElement element) =>
+        WithLayoutGeometryCache(() =>
+        {
+            var resolved = ResolvePositionAreaForElement(element);
+            if (resolved != null)
+                return resolved.Value.left;
 
-        var offsetParent = GetOffsetParentForDomElement(element);
-        if (offsetParent != null)
-            return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: false);
+            var offsetParent = GetOffsetParentForDomElement(element);
+            if (offsetParent != null)
+                return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: false);
 
-        var layoutRect = ComputeUnzoomedLayoutRect(element);
-        return layoutRect.Left;
-    }
+            var layoutRect = ComputeUnzoomedLayoutRect(element);
+            return layoutRect.Left;
+        });
 
     private DomElement? GetOffsetParentForDomElement(DomElement element)
     {
@@ -472,8 +478,9 @@ public sealed partial class DomBridge
                !string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase);
     }
 
-    private double GetScrollWidthForDomElement(DomElement element, bool isRoot)
-    {
+    private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
             return selectScrollWidth;
 
@@ -497,10 +504,11 @@ public sealed partial class DomBridge
         }
 
         return maxWidth;
-    }
+        });
 
-    private double GetScrollHeightForDomElement(DomElement element, bool isRoot)
-    {
+    private double GetScrollHeightForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
             return selectScrollHeight;
 
@@ -524,7 +532,7 @@ public sealed partial class DomBridge
         }
 
         return maxHeight;
-    }
+        });
 
     private double ComputeOffsetRelativeToAncestor(DomElement element, DomElement ancestor, bool vertical)
     {
@@ -644,13 +652,14 @@ public sealed partial class DomBridge
                ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent) == 0;
     }
 
-    private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot)
-    {
-        if (isRoot)
-            return (0, 0, GetViewportReferenceLength(element, vertical: false), GetViewportReferenceLength(element, vertical: true));
+    private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot) =>
+        WithLayoutGeometryCache(() =>
+        {
+            if (isRoot)
+                return (0, 0, GetViewportReferenceLength(element, vertical: false), GetViewportReferenceLength(element, vertical: true));
 
-        return ComputeRenderedRect(element);
-    }
+            return ComputeRenderedRect(element);
+        });
 
     private (double Left, double Top, double Width, double Height) ComputeRenderedRect(DomElement element)
     {
