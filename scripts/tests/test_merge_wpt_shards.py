@@ -81,11 +81,13 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertEqual([3, 2], [problem["count"] for problem in merged["topProblems"]])
             self.assertEqual(6, len(merged["results"]))
             self.assertEqual([{"shardIndex": 7, "exitCode": 134}], merged["incompleteShards"])
+            # results[0] is a PixelMismatch/MissingContent case → carries subCategory (#10).
             self.assertNotIn("testPath", merged["results"][0])
             self.assertEqual(
-                {"relativeTestPath", "passed", "skipped", "category"},
+                {"relativeTestPath", "passed", "skipped", "category", "subCategory"},
                 set(merged["results"][0]),
             )
+            self.assertEqual("MissingContent", merged["results"][0]["subCategory"])
 
             markdown = MODULE.render_issue_markdown(merged, "https://example.test/run/1")
             self.assertIn("### Top 2 problems", markdown)
@@ -131,6 +133,116 @@ class MergeWptShardsTests(unittest.TestCase):
             markdown = MODULE.render_issue_markdown(merged, None)
             self.assertIn("dropped CSS declarations", markdown)
             self.assertIn("`text-align: -webkit-right` — 8 occurrence(s)", markdown)
+
+    def test_merge_aggregates_exception_signatures(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            for name, idx, signatures in (
+                (
+                    "shard-0.json",
+                    0,
+                    [
+                        {"signature": "DomName..ctor — A prefixed name requires a namespace URI", "count": 4},
+                        {"signature": "CssBox.Measure — overflow", "count": 1},
+                    ],
+                ),
+                (
+                    "shard-1.json",
+                    1,
+                    [{"signature": "DomName..ctor — A prefixed name requires a namespace URI", "count": 2}],
+                ),
+            ):
+                (shard_dir / name).write_text(
+                    json.dumps(
+                        {
+                            "summary": {"passed": 1, "failed": 0, "skipped": 0, "total": 1},
+                            "shard": {"index": idx, "count": 8},
+                            "triage": {"exceptionSignatures": signatures},
+                            "results": [],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+
+            # Counts summed across shards, most frequent first.
+            self.assertEqual(
+                [
+                    ("DomName..ctor — A prefixed name requires a namespace URI", 6),
+                    ("CssBox.Measure — overflow", 1),
+                ],
+                merged["exceptionSignatures"],
+            )
+
+            markdown = MODULE.render_issue_markdown(merged, None)
+            self.assertIn("exception signatures", markdown)
+            self.assertIn(
+                "`DomName..ctor — A prefixed name requires a namespace URI` — 6 failure(s)",
+                markdown,
+            )
+
+    def test_merge_preserves_subcategory_in_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    self._failure("css/a/layout.html", "PixelMismatch", "LayoutShift"),
+                    self._failure("css/b/render.html", "RenderingError"),
+                ],
+            )
+
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+
+            by_path = {r["relativeTestPath"]: r for r in merged["results"]}
+            # Pixel-mismatch record is self-describing: its sub-category round-trips.
+            self.assertEqual("LayoutShift", by_path["css/a/layout.html"]["subCategory"])
+            # A failure without a sub-category does not gain a null field.
+            self.assertNotIn("subCategory", by_path["css/b/render.html"])
+
+    def test_merge_clusters_numbered_families(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    self._failure("css/css-align/abspos/static-position-1.html", "PixelMismatch", "LayoutShift"),
+                    self._failure("css/css-align/abspos/static-position-2.html", "PixelMismatch", "LayoutShift"),
+                    self._failure("css/css-align/abspos/static-position-3.html", "ScriptError"),
+                ],
+            )
+            self._write_report(
+                shard_dir,
+                "shard-1.json",
+                1,
+                [
+                    self._failure("css/css-align/abspos/static-position-4.html", "PixelMismatch", "LayoutShift"),
+                    # Non-numbered sibling: a singleton family, must not be reported.
+                    self._failure("css/css-align/abspos/align-self.html", "PixelMismatch", "LayoutShift"),
+                ],
+            )
+
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+
+            families = merged["failureFamilies"]
+            self.assertEqual(1, len(families))
+            family = families[0]
+            self.assertEqual("css/css-align/abspos/static-position-{N}.html", family["family"])
+            self.assertEqual(4, family["count"])
+            self.assertEqual({"PixelMismatch": 3, "ScriptError": 1}, family["categories"])
+
+            markdown = MODULE.render_issue_markdown(merged, None)
+            self.assertIn("failure families", markdown)
+            self.assertIn(
+                "`css/css-align/abspos/static-position-{N}.html` — 4 failure(s)",
+                markdown,
+            )
+            self.assertIn("PixelMismatch 3", markdown)
 
     def test_cli_requests_issue_for_incomplete_shard_without_test_results(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

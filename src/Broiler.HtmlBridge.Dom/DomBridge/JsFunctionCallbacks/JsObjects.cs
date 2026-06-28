@@ -143,7 +143,7 @@ public sealed partial class DomBridge
             // Setting element.style = "prop: val; ..." parses as cssText
             element.Style.Clear();
             element.JsSetStyleProps.Clear();
-            foreach (var kv in ParseStyle(s.ToString()))
+            foreach (var kv in ParseStyle(s.ToString(), reportDrops: true))
             {
                 element.Style[kv.Key] = kv.Value;
                 element.JsSetStyleProps.Add(kv.Key);
@@ -172,7 +172,7 @@ public sealed partial class DomBridge
             else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
             {
                 element.Style.Clear();
-                foreach (var kv in ParseStyle(attrVal))
+                foreach (var kv in ParseStyle(attrVal, reportDrops: true))
                     element.Style[kv.Key] = kv.Value;
                 bridgeForSet.InvalidateStyleScope(element);
             }

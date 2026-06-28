@@ -236,7 +236,7 @@ public sealed partial class DomBridge
         else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
         {
             element.Style.Clear();
-            foreach (var kv in ParseStyle(attrVal))
+            foreach (var kv in ParseStyle(attrVal, reportDrops: true))
                 element.Style[kv.Key] = kv.Value;
             InvalidateStyleScope(element);
         }
@@ -291,7 +291,7 @@ public sealed partial class DomBridge
         else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
         {
             element.Style.Clear();
-            foreach (var kv in ParseStyle(attrVal))
+            foreach (var kv in ParseStyle(attrVal, reportDrops: true))
                 element.Style[kv.Key] = kv.Value;
             InvalidateStyleScope(element);
         }

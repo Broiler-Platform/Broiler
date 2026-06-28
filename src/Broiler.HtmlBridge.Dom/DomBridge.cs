@@ -751,7 +751,19 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// same property is declared multiple times, invalid values are discarded so
     /// the last <em>valid</em> value wins (per CSS 2.1 §4.2 / CSS Syntax §5).
     /// </summary>
-    private static Dictionary<string, string> ParseStyle(string styleValue)
+    /// <param name="reportDrops">
+    /// When <c>true</c>, declarations rejected by <see cref="IsAcceptableCssValue"/>
+    /// are surfaced through
+    /// <see cref="Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected"/>
+    /// (diagnostic #1b). The bridge rewrites the serialized <c>style</c> attribute
+    /// from the survivors of this filter (see <c>PrepareCanonicalDocumentForRendering</c>),
+    /// so a dropped inline declaration vanishes before the renderer's own style engine
+    /// can report it — this is the only place such drops are observable. Set it only at
+    /// inline-style <em>ingestion</em> sites that write <c>element.Style</c> (so the drop
+    /// reaches the rendered output); leave it off for query/bookkeeping re-parses and for
+    /// stylesheet-rule / descriptor parsing (cascade drops the style engine already reports).
+    /// </param>
+    private static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var declarations = new Broiler.CSS.CssParser().ParseDeclarations(styleValue);
@@ -769,6 +781,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
                 var unprefixed = StripVendorPrefix(prop);
                 if (unprefixed != prop && !result.ContainsKey(unprefixed))
                     result[unprefixed] = val;
+            }
+            else if (reportDrops)
+            {
+                // Report the raw value (without the synthetic " !important" suffix) so
+                // inline drops aggregate identically to the engine's stylesheet drops.
+                Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, declaration.Value.Text);
             }
         }
         return result;

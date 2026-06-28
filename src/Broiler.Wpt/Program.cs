@@ -49,6 +49,7 @@ public class Program
         string? referenceDir = null;
         string? jsonOutputPath = null;
         string? markdownOutputPath = null;
+        string? failureImagesDir = null;
         string? subset = null;
         string? rerunJsonPath = null;
         RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
@@ -72,6 +73,9 @@ public class Program
                     break;
                 case "--markdown-output" when i + 1 < args.Length:
                     markdownOutputPath = args[++i];
+                    break;
+                case "--failure-images" when i + 1 < args.Length:
+                    failureImagesDir = args[++i];
                     break;
                 case "--subset" when i + 1 < args.Length:
                     subset = args[++i];
@@ -119,6 +123,7 @@ public class Program
                 case "--reference-dir":
                 case "--json-output":
                 case "--markdown-output":
+                case "--failure-images":
                 case "--subset":
                 case "--rerun-json":
                 case "--rerun-kind":
@@ -190,7 +195,10 @@ public class Program
         }
         Console.WriteLine();
 
-        var runner = new WptTestRunner();
+        var runner = new WptTestRunner(failureImageDir: failureImagesDir);
+
+        if (!string.IsNullOrWhiteSpace(failureImagesDir))
+            Console.WriteLine($"Failure images: {Path.GetFullPath(failureImagesDir)}");
 
         // Surface CSS declarations the style engine drops because their value
         // failed validation. A single high-count entry (e.g. an unsupported
@@ -351,6 +359,9 @@ public class Program
                             Console.WriteLine($"      • {r.TestPath}");
                             if (r.MismatchDiagnostics is { } d)
                                 Console.WriteLine($"        {d.Summary}");
+                            PrintTestMetadata(r, "        ");
+                            PrintLayoutAssertionFailures(r, "        ");
+                            PrintFailureImages(r, "        ");
                         }
                     }
                 }
@@ -361,6 +372,8 @@ public class Program
                         Console.WriteLine($"    • {r.TestPath}");
                         if (r.Message is not null)
                             Console.WriteLine($"      {r.Message}");
+                        PrintTestMetadata(r, "      ");
+                        PrintLayoutAssertionFailures(r, "      ");
                     }
                 }
             }
@@ -369,20 +382,23 @@ public class Program
         // The aggregate is complete; stop collecting and snapshot the top entries.
         Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected = null;
         var topDropped = droppedDeclarations.Top(TopBucketLimit);
+        var topExceptionSignatures = ExceptionSignature.Buckets(failures, TopBucketLimit);
 
         PrintBucketSummary(wptPath, failures, skippedResults);
         PrintDroppedDeclarations(topDropped, droppedDeclarations.TotalDropped);
+        PrintExceptionSignatures(topExceptionSignatures);
+        PrintTestKinds(allResults);
 
         if (jsonOutputPath is not null)
         {
-            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath, shardCount, shardIndex, topDropped);
+            WriteJsonReport(allResults, jsonOutputPath, passed, failed, skipped, wptPath, shardCount, shardIndex, topDropped, topExceptionSignatures);
             Console.WriteLine();
             Console.WriteLine($"JSON report written to: {jsonOutputPath}");
         }
 
         if (markdownOutputPath is not null)
         {
-            WriteMarkdownSummary(allResults, markdownOutputPath, passed, failed, skipped, wptPath, subset, topDropped);
+            WriteMarkdownSummary(allResults, markdownOutputPath, passed, failed, skipped, wptPath, subset, topDropped, topExceptionSignatures);
             Console.WriteLine();
             Console.WriteLine($"Markdown summary written to: {markdownOutputPath}");
         }
@@ -610,7 +626,8 @@ public class Program
         string wptPath,
         int shardCount = 1,
         int shardIndex = WptTestRunner.AllShards,
-        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null)
+        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null,
+        IReadOnlyList<(string Signature, int Count)>? exceptionSignatures = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -684,6 +701,31 @@ public class Program
                         ["count"] = d.Count,
                     })
                     .ToList(),
+                // Exception-bearing failures grouped by "top frame — message"
+                // signature. One high-count signature usually means a single
+                // crash gates many tests (WPT issue #1100 cluster 7). Aggregated
+                // across shards by scripts/merge-wpt-shards.py.
+                ["exceptionSignatures"] = (exceptionSignatures ?? ExceptionSignature.Buckets(failures, TopBucketLimit))
+                    .Select(s => new Dictionary<string, object?>
+                    {
+                        ["signature"] = s.Signature,
+                        ["count"] = s.Count,
+                    })
+                    .ToList(),
+                // First-class manual / tentative / crashtest buckets with their
+                // pass/fail/skip breakdown, so a regression in the classification
+                // (e.g. manual detection breaking) is visible, not hidden in the
+                // failure total (diagnostic #8).
+                ["testKinds"] = ComputeTestKindBuckets(allResults)
+                    .Select(b => new Dictionary<string, object?>
+                    {
+                        ["kind"] = b.Kind.ToString(),
+                        ["total"] = b.Total,
+                        ["passed"] = b.Passed,
+                        ["failed"] = b.Failed,
+                        ["skipped"] = b.Skipped,
+                    })
+                    .ToList(),
                 ["skipReasons"] = skippedResults
                     .GroupBy(r => r.SkipReason.ToString())
                     .OrderByDescending(g => g.Count())
@@ -730,7 +772,8 @@ public class Program
         int skipped,
         string wptPath,
         string? subset,
-        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null)
+        IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null,
+        IReadOnlyList<(string Signature, int Count)>? exceptionSignatures = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -775,6 +818,9 @@ public class Program
         WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
         WriteTimeoutSection(writer, timeoutSummary.Failures, timeoutSummary.SubsetCommands);
         WriteDroppedDeclarationsSection(writer, droppedDeclarations);
+        WriteExceptionSignaturesSection(writer, exceptionSignatures ?? ExceptionSignature.Buckets(failures, TopBucketLimit));
+        WriteTestKindSection(writer, allResults);
+        WriteLayoutAssertionSection(writer, failures, wptPath);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
         writer.WriteLine();
@@ -790,6 +836,10 @@ public class Program
                 writer.WriteLine($"- `{failure.Category}` `{relativePath}`");
                 if (!string.IsNullOrWhiteSpace(failure.Message))
                     writer.WriteLine($"  - {failure.Message}");
+                if (failure.Assertion is { } assertion)
+                    writer.WriteLine($"  - asserts: {assertion}");
+                if (failure.HelpLinks is { Count: > 0 } helpLinks)
+                    writer.WriteLine($"  - help: {string.Join(", ", helpLinks)}");
             }
         }
 
@@ -834,6 +884,135 @@ public class Program
         writer.WriteLine();
         foreach (var (declaration, count) in droppedDeclarations)
             writer.WriteLine($"- `{declaration}` — {count} occurrence(s)");
+    }
+
+    private static void PrintExceptionSignatures(
+        IReadOnlyList<(string Signature, int Count)> signatures)
+    {
+        if (signatures.Count == 0)
+            return;
+
+        Console.WriteLine();
+        Console.WriteLine($"=== Exception signatures (top {signatures.Count}) ===");
+        Console.WriteLine("(exception failures grouped by top frame + message — one signature often gates many tests)");
+        foreach (var (signature, count) in signatures)
+            Console.WriteLine($"  {count,6}  {signature}");
+    }
+
+    private static void WriteExceptionSignaturesSection(
+        TextWriter writer, IReadOnlyList<(string Signature, int Count)>? signatures)
+    {
+        if (signatures is null || signatures.Count == 0)
+            return;
+
+        writer.WriteLine();
+        writer.WriteLine("## Exception signatures");
+        writer.WriteLine();
+        writer.WriteLine("Exception failures grouped by top non-framework frame and message. A high");
+        writer.WriteLine("count usually means one crash gates many tests (one signature → one fix).");
+        writer.WriteLine();
+        foreach (var (signature, count) in signatures)
+            writer.WriteLine($"- `{signature}` — {count} failure(s)");
+    }
+
+    private static void PrintLayoutAssertionFailures(WptTestResult result, string indent)
+    {
+        if (result.LayoutAssertionFailures is not { Count: > 0 } failures)
+            return;
+
+        foreach (var failure in failures)
+            Console.WriteLine($"{indent}layout: {failure.Describe()}");
+    }
+
+    /// <summary>
+    /// Buckets every result by <see cref="TestKind"/> with its pass/fail/skip
+    /// breakdown. All four kinds are returned in a fixed order (even at zero count)
+    /// so a classification regression — e.g. manual detection dropping to 0 — is
+    /// visible rather than absent (diagnostic #8).
+    /// </summary>
+    private static IReadOnlyList<(TestKind Kind, int Total, int Passed, int Failed, int Skipped)> ComputeTestKindBuckets(
+        IReadOnlyList<WptTestResult> allResults)
+    {
+        var byKind = allResults
+            .GroupBy(r => WptTestRunner.ClassifyTestKind(r.TestPath))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var buckets = new List<(TestKind, int, int, int, int)>();
+        foreach (var kind in new[] { TestKind.Regular, TestKind.Manual, TestKind.Tentative, TestKind.CrashTest })
+        {
+            var list = byKind.TryGetValue(kind, out var l) ? l : [];
+            var passed = list.Count(r => r.Passed);
+            var skipped = list.Count(r => r.Skipped);
+            buckets.Add((kind, list.Count, passed, list.Count - passed - skipped, skipped));
+        }
+
+        return buckets;
+    }
+
+    private static void PrintTestKinds(IReadOnlyList<WptTestResult> allResults)
+    {
+        var buckets = ComputeTestKindBuckets(allResults);
+        Console.WriteLine();
+        Console.WriteLine("=== Test kinds ===");
+        Console.WriteLine("(manual/tentative/crashtest tracked as first-class buckets — a count dropping to 0 signals a classification regression)");
+        foreach (var (kind, total, passed, failed, skipped) in buckets)
+            Console.WriteLine($"  {kind,-10} {total,6}  (passed {passed}, failed {failed}, skipped {skipped})");
+    }
+
+    private static void WriteTestKindSection(TextWriter writer, IReadOnlyList<WptTestResult> allResults)
+    {
+        writer.WriteLine();
+        writer.WriteLine("## Test kinds");
+        writer.WriteLine();
+        writer.WriteLine("Manual / tentative / crashtest tests tracked as first-class buckets. A count");
+        writer.WriteLine("dropping to 0 signals a regression in the classification (e.g. manual detection).");
+        writer.WriteLine();
+        writer.WriteLine("| Kind | Total | Passed | Failed | Skipped |");
+        writer.WriteLine("|------|------:|-------:|-------:|--------:|");
+        foreach (var (kind, total, passed, failed, skipped) in ComputeTestKindBuckets(allResults))
+            writer.WriteLine($"| {kind} | {total} | {passed} | {failed} | {skipped} |");
+    }
+
+    private static void PrintFailureImages(WptTestResult result, string indent)
+    {
+        if (result.DiffImagePath is { } diff)
+            Console.WriteLine($"{indent}images: {Path.GetDirectoryName(diff)} (rendered.png, reference.png, diff.png)");
+        else if (result.RenderedImagePath is { } rendered)
+            Console.WriteLine($"{indent}images: {Path.GetDirectoryName(rendered)} (rendered.png, reference.png)");
+    }
+
+    private static void PrintTestMetadata(WptTestResult result, string indent)
+    {
+        if (result.Assertion is { } assertion)
+            Console.WriteLine($"{indent}assert: {assertion}");
+        if (result.HelpLinks is { Count: > 0 } helpLinks)
+            Console.WriteLine($"{indent}help: {string.Join(", ", helpLinks)}");
+    }
+
+    private static void WriteLayoutAssertionSection(
+        TextWriter writer, IReadOnlyList<WptTestResult> failures, string wptPath)
+    {
+        var withAssertions = failures
+            .Where(r => r.LayoutAssertionFailures is { Count: > 0 })
+            .OrderBy(r => r.TestPath, StringComparer.Ordinal)
+            .ToList();
+        if (withAssertions.Count == 0)
+            return;
+
+        writer.WriteLine();
+        writer.WriteLine("## check-layout assertion failures");
+        writer.WriteLine();
+        writer.WriteLine("`data-offset-*` / `data-expected-*` assertions whose computed box geometry");
+        writer.WriteLine("diverged from the value the test declares — a precise, font-independent");
+        writer.WriteLine("layout diagnostic, distinct from the pixel comparison.");
+        foreach (var result in withAssertions.Take(TopBucketLimit))
+        {
+            var relativePath = Path.GetRelativePath(wptPath, result.TestPath).Replace('\\', '/');
+            writer.WriteLine();
+            writer.WriteLine($"- `{relativePath}`");
+            foreach (var failure in result.LayoutAssertionFailures!)
+                writer.WriteLine($"  - {failure.Describe()}");
+        }
     }
 
     private static void PrintBucketSummary(
@@ -1322,6 +1501,7 @@ public class Program
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
+        Console.WriteLine("  --failure-images <DIR>     Save rendered/reference/diff PNGs for each failure under DIR");
         Console.WriteLine("  --help                     Show this help message");
     }
 }

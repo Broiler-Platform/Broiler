@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -35,6 +36,19 @@ def _bucket_directory(relative_path: str) -> str:
     if len(parts) <= 1:
         return parts[0] if parts else "."
     return "/".join(parts[:2])
+
+
+_DIGIT_RUN = re.compile(r"\d+")
+
+
+def _family_key(relative_path: str) -> str:
+    """Collapse the numeric token(s) in a test's file name so a numbered family
+    (e.g. ``…/static-position-1.html`` … ``-8.html``) maps to one key
+    ``…/static-position-{N}.html``. Directory segments are left intact, so only
+    same-directory siblings that differ purely by number cluster together."""
+    directory, _, filename = relative_path.rpartition("/")
+    collapsed = _DIGIT_RUN.sub("{N}", filename)
+    return f"{directory}/{collapsed}" if directory else collapsed
 
 
 def _iter_shard_reports(shard_dir: Path):
@@ -83,7 +97,9 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
     directory_counter: Counter[str] = Counter()
     category_counter: Counter[str] = Counter()
     dropped_declaration_counter: Counter[str] = Counter()
+    exception_signature_counter: Counter[str] = Counter()
     problem_groups: dict[str, dict] = {}
+    family_groups: dict[str, dict] = {}
     reported_shard_indexes: set[int] = set()
 
     for _path, report in _iter_shard_reports(shard_dir):
@@ -112,6 +128,16 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
                 if declaration:
                     dropped_declaration_counter[str(declaration)] += int(entry.get("count", 0) or 0)
 
+            # Exception failures grouped by "top frame — message" signature. A high
+            # cross-shard count means one crash gates many tests (issue #1100, cluster
+            # 7): one signature → one fix.
+            for entry in triage.get("exceptionSignatures", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                signature = entry.get("signature")
+                if signature:
+                    exception_signature_counter[str(signature)] += int(entry.get("count", 0) or 0)
+
         for result in report.get("results", []):
             if not isinstance(result, dict):
                 continue
@@ -124,17 +150,23 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
             seen_failures.add(relative_path)
 
             category = str(result.get("category") or "Unknown")
+            problem_key, problem_label, sub_category = _problem_identity(result)
             failure = {
                 "relativeTestPath": relative_path,
                 "passed": False,
                 "skipped": False,
                 "category": category,
             }
+            # Preserve the pixel-mismatch sub-category so a whole cluster (e.g. all
+            # LayoutShift tests) can be enumerated from the merged artifact, not just
+            # the 3 example paths in topProblems (#10). Additive and only present when
+            # there is one; --rerun-json ignores unknown keys.
+            if sub_category:
+                failure["subCategory"] = sub_category
             failures.append(failure)
             directory_counter[_bucket_directory(relative_path)] += 1
             category_counter[category] += 1
 
-            problem_key, problem_label, sub_category = _problem_identity(result)
             group = problem_groups.setdefault(
                 problem_key,
                 {
@@ -149,6 +181,23 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
             group["count"] += 1
             if len(group["examples"]) < PROBLEM_EXAMPLE_LIMIT:
                 group["examples"].append(relative_path)
+
+            # Cluster numbered families (…-1.html … -8.html) into one row,
+            # cross-tabbed by category, so they collapse from N scattered lines.
+            family = _family_key(relative_path)
+            family_group = family_groups.setdefault(
+                family,
+                {
+                    "family": family,
+                    "count": 0,
+                    "categories": Counter(),
+                    "examples": [],
+                },
+            )
+            family_group["count"] += 1
+            family_group["categories"][category] += 1
+            if len(family_group["examples"]) < PROBLEM_EXAMPLE_LIMIT:
+                family_group["examples"].append(relative_path)
 
     incomplete_shards = []
     for _path, status in _iter_shard_statuses(shard_dir):
@@ -182,6 +231,22 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         key=lambda group: (-group["count"], group["label"]),
     )[:problem_limit]
 
+    # Only families that actually clustered (≥2 members) are worth a row; a lone
+    # numbered test is already covered by the per-test results list.
+    top_families = sorted(
+        (
+            {
+                "family": group["family"],
+                "count": group["count"],
+                "categories": dict(group["categories"].most_common()),
+                "examples": group["examples"],
+            }
+            for group in family_groups.values()
+            if group["count"] >= 2
+        ),
+        key=lambda group: (-group["count"], group["family"]),
+    )[:problem_limit]
+
     return {
         "summary": {
             "passed": passed,
@@ -196,6 +261,8 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         "topFailingDirectories": directory_counter.most_common(problem_limit),
         "failuresByCategory": category_counter.most_common(),
         "droppedDeclarations": dropped_declaration_counter.most_common(problem_limit),
+        "exceptionSignatures": exception_signature_counter.most_common(problem_limit),
+        "failureFamilies": top_families,
         "results": failures,
     }
 
@@ -243,6 +310,38 @@ def render_issue_markdown(merged: dict, run_url: str | None) -> str:
             "",
         ]
         lines += [f"- `{declaration}` — {count} occurrence(s)" for declaration, count in dropped]
+
+    # Exception failures grouped by signature: one high-count signature usually
+    # means a single crash (e.g. a DOM constructor throw) gates many tests.
+    exceptions = merged.get("exceptionSignatures") or []
+    if exceptions:
+        lines += [
+            "",
+            f"### Top {merged['problemLimit']} exception signatures",
+            "",
+            "_Exception failures grouped by top non-framework frame and message. A high"
+            " count usually means one crash gates many tests (one signature → one fix)._",
+            "",
+        ]
+        lines += [f"- `{signature}` — {count} failure(s)" for signature, count in exceptions]
+
+    # Numbered test families collapsed into one row, cross-tabbed by category, so a
+    # ``*-static-position-{1..8}`` cluster reads as one line instead of eight.
+    families = merged.get("failureFamilies") or []
+    if families:
+        lines += [
+            "",
+            f"### Top {merged['problemLimit']} failure families",
+            "",
+            "_Numbered test families (e.g. `…-{N}.html`) collapsed into one row, with a"
+            " per-category breakdown._",
+            "",
+        ]
+        for family in families:
+            breakdown = ", ".join(
+                f"{category} {count}" for category, count in family["categories"].items()
+            )
+            lines.append(f"- `{family['family']}` — {family['count']} failure(s) ({breakdown})")
 
     lines += [
         "",

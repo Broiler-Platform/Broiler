@@ -157,84 +157,249 @@ feature gating many tests.
   markdown step-summary; `scripts/merge-wpt-shards.py` aggregates across shards
   into a **"Top N dropped CSS declarations"** section in the GitHub issue.
 - **Scope**: captures **stylesheet (cascade)** drops — verified end-to-end through
-  the render path. Inline `style=""` drops follow a separate render route and are
-  not yet captured (the engine hook still reports them for any `GetComputedStyle`
-  consumer). Closing the inline gap → see #1b.
+  the render path — **and** inline `style=""` drops (see #1b). Static inline styles
+  flow through the renderer's style engine, which already reports their drops at the
+  `IsAcceptableDeclarationValue` site; JavaScript-mutated inline styles are dropped
+  earlier by the bridge and are now reported there too.
 - **Tests**: `CssStyleEngineTests.CssEngineDiagnostics_Reports_Dropped_Declarations_Only`,
   `DroppedDeclarationCollectorTests` (×3), `test_merge_aggregates_dropped_declarations`.
 
-#### #1b — Capture inline-style drops through the render path (small follow-up)
-Find where the bridge/layout applies the inline `style` attribute and route it
-through (or report from) the same drop site. Lower priority — cross-cutting
-"missing feature" drops live in stylesheets, which #1 already covers.
+#### ✅ #1b — Capture inline-style drops through the render path (DONE)
+The render path has two routes that ingest an inline `style` attribute:
 
-### #2 — Group exceptions by signature (next)
+1. **Static inline styles** (present in the source HTML) reach the renderer's style
+   engine unchanged, so its existing `IsAcceptableDeclarationValue` drop site
+   (`CssStyleEngine.CollectCascadedDeclarations`, the `includeInlineStyle` branch wired
+   in during the Phase 5 cutover) already reports them — no gap.
+2. **JavaScript-mutated inline styles** are applied by the **bridge** during
+   `WptTestRunner.ExecuteScriptsWithDom`, *before* rendering. `DomBridge.ParseStyle`
+   validates each declaration with the bridge's own `IsAcceptableCssValue` and keeps only
+   the survivors in `element.Style`; `PrepareCanonicalDocumentForRendering` then rewrites
+   the serialized `style` attribute from `element.Style`. A dropped declaration therefore
+   **vanishes from the serialized output before the style engine sees it** — silent unless
+   reported at the bridge.
 
-*Cluster 7.* `ScriptError` failures already carry the exception + stack trace; the
-report should bucket them by **exception type + message + top non-framework
-frame** (e.g. `DomName..ctor — A prefixed name requires a namespace URI ×N`). One
-signature → many tests → one fix. Small change in `Program.cs` triage +
-`merge-wpt-shards.py`.
+Fix: `DomBridge.ParseStyle` gained an opt-in `reportDrops` flag that routes rejected
+declarations to `CssEngineDiagnostics.DeclarationRejected` (the same hook #1 uses). It is
+set `true` only at the five inline-style **ingestion** sites that write `element.Style`
+(`setAttribute("style")` on both the C# and JS paths, `element.style = "…"`, and
+`element.style.cssText = "…"`) and left off for query/bookkeeping re-parses
+(`getComputedStyle`, style invalidation) and for stylesheet-rule/descriptor parsing
+(cascade drops the engine already reports). Regression tests:
+`InlineStyleDropDiagnosticsTests` (×4, in `Broiler.Cli.Tests`), incl. an end-to-end check
+that the dropped declaration is absent from the serialized HTML while the valid one survives.
 
-### #3 — Detect the "green / no-red" reference-overlay convention
+> **Note — not all inline mutations validate.** The per-property setter
+> (`element.style.color = "…"`, `setProperty`) bypasses `ParseStyle`/`IsAcceptableCssValue`
+> entirely and stores the value verbatim, so it neither drops nor needs reporting. Only the
+> whole-attribute / `cssText` paths run the bridge's value filter.
+
+### ✅ #2 — Group exceptions by signature (DONE)
+
+*Cluster 7.* Exception-bearing failures (`ScriptError`, `RenderingError`, `FileIO`,
+`ReferenceDecodeError`) carry the exception message + stack trace; the report now buckets
+them by **top non-framework frame + normalized message**
+(e.g. `DomName..ctor — A prefixed name requires a namespace URI`). One signature → many
+tests → one fix.
+
+- **Signature** (`ExceptionSignature.cs`, `Broiler.Wpt`): `TopNonFrameworkFrame(stackTrace)`
+  takes the first stack frame outside `System.`/`Microsoft.`/`Internal.`, shortened to
+  `Type.Method` (constructors keep the canonical `Type..ctor` double-dot spelling);
+  `NormalizeMessage` strips the runner's stage prefixes (`Script execution failed: ` …),
+  collapses whitespace, and caps length at 100. `Buckets` groups all stack-trace-bearing
+  failures (pixel mismatches excluded — no trace; timeouts excluded — reported separately),
+  most frequent first.
+- **Outputs**: results JSON `triage.exceptionSignatures` (`{signature, count}`) + console
+  section (`PrintExceptionSignatures`) + markdown step-summary
+  (`WriteExceptionSignaturesSection`); `scripts/merge-wpt-shards.py` sums the per-shard
+  counts into a **"Top N exception signatures"** section in the GitHub issue.
+- **Tests**: `ExceptionSignatureTests` (×6, incl. frame-skipping, ctor spelling, message
+  fallback, and bucket grouping/limit) and `test_merge_aggregates_exception_signatures`.
+
+### ✅ #3 — Detect the "green / no-red" reference-overlay convention (DONE)
 
 *Clusters 4, 5, 6.* A huge share of WPT reftests are "passes if green, no red"
-with a `z-index:-1` red overlay. Scan the rendered bitmap for **pure-red pixels
-present in the output but not the reference** and tag `ReferenceOverlayExposed` —
-a strong "real layout/paint bug" signal, distinct from antialiasing noise. (This
-is exactly the manual red/green pixel harness used during triage.)
+with a `z-index:-1` red overlay. The mismatch classifier now scans for **pure-red
+pixels present in the output but not the reference** and tags
+`ReferenceOverlayExposed` — a strong "real layout/paint bug" signal, distinct from
+antialiasing noise. (This is exactly the manual red/green pixel harness used during triage.)
 
-### #4 — Evaluate `check-layout-th.js` `data-offset` assertions
+- **Where**: `MismatchClassifier.Classify` (`Broiler.HTML.Image`, submodule). A new
+  `MismatchCategory.ReferenceOverlayExposed` is checked **first** — ahead of `MinorDiff`
+  and the generic delta buckets — because exposed pure red is the most specific and
+  actionable signal and never arises from anti-aliasing.
+- **Heuristic**: a sampled mismatch counts as overlay-exposed when the **output** pixel is
+  overlay-red (`R≥200`, `G,B≤60` — excludes pinkish AA) and the **reference** pixel has no
+  red content (loose `IsReddish`: red dominant and `R≥64`, so a legitimately-red reference
+  — even a darker red — is not mistaken for an exposed overlay). Fires when ≥10 % of sampled
+  mismatches are overlay-exposed.
+- **Surfacing**: flows through the existing generic sub-category plumbing automatically —
+  results JSON `triage.mismatchSubCategories` / per-test `subCategory`, the console
+  PixelMismatch sub-group, and `merge-wpt-shards.py`'s `PixelMismatch:ReferenceOverlayExposed`
+  problem group; no runner/merge changes needed.
+- **Tests** (`WptTestRunnerTests`): `..._ReferenceOverlayExposed_When_Red_Shows_Through`,
+  `..._Does_Not_Flag_Overlay_When_Reference_Is_Also_Red`; the existing high-delta
+  `LayoutShift` test was switched to a blue↔green pair (its old red↔green pixels now
+  correctly classify as the more-specific overlay-exposed).
 
-*Clusters 1, 3, 6 were all `checkLayout` tests.* Those carry `data-offset-x/y` on
-elements. The runner already holds the live DOM (`ExecuteScriptsWithDom`), so it
-can read those attributes + computed box rects and report **"`.item` expected
-offset-x=100, got 0"** — directly actionable, font-independent, no pixel-guessing.
-Highest-value Tier-2 item.
+### ✅ #4 — Evaluate `check-layout-th.js` `data-offset` assertions (DONE)
 
-### #5 — Richer mismatch metadata
+*Clusters 1, 3, 6 were all `checkLayout` tests.* Those carry `data-offset-x/y`
+(and `data-expected-*` / `data-total-*`) on elements. The runner now reads those
+attributes from the live DOM during `ExecuteScriptsWithDom` and compares them
+against the bridge's computed box geometry, reporting **"`span.abspos[title=start]`
+expected offset-y=0, got 13"** — directly actionable, font-independent, no
+pixel-guessing.
 
-Extend `MismatchClassifier` to emit the **bounding box of the largest mismatched
-region** and a **displacement estimate** ("content shifted right ~100px" vs
-"content absent"). Points at alignment-vs-rendering immediately.
+- **Evaluator** (`DomBridge.EvaluateCheckLayoutAssertions`, `CheckLayoutAssertions.cs`,
+  `Broiler.HtmlBridge.Dom`): walks the post-script DOM and, for each `data-offset-x/y`,
+  `data-expected-{width,height,client-width,client-height}`, `data-total-{x,y}` attribute,
+  computes the matching metric via the bridge's existing `LayoutMetrics` getters
+  (`offsetTop`/`offsetLeft`/`offsetWidth`/`offsetHeight`/`clientWidth`/`clientHeight` — the
+  *same* geometry `check-layout-th.js` reads from `element.offsetTop` etc.). Returns one
+  `CheckLayoutAssertion(Element, Property, Expected, Actual)` per declared attribute.
+- **Why the bridge, not the renderer**: the assertions need `offsetParent`-relative offsets
+  and client/border-box sizes the bridge already models for JS; the post-render bitmap path
+  only exposes `GetElementRectangle(id)` (id-only, document-space), which can't express these.
+- **Runner**: `ExecuteScriptsWithDom` returns the assertions alongside the serialized HTML;
+  `RunTest` filters them to the ones diverging beyond a 1px tolerance (`ComputeLayoutAssertionFailures`,
+  guarding against the estimator's sub-pixel noise) and attaches them to the result as
+  `LayoutAssertionFailures`.
+- **Surfacing**: per-test in the console Root-Cause-Analysis (`layout: … expected …, got …`),
+  the markdown **"check-layout assertion failures"** section, and the results JSON
+  (`results[].layoutAssertionFailures`). *Caveat*: the values come from the bridge's CSS-based
+  geometry estimator, so a reported diff reflects that estimate (which is what the test's own JS
+  would have seen), not necessarily the final rendered pixels.
+- **Not yet covered**: `data-expected-scroll-*` and `data-expected-bounding-client-rect-*`
+  (out of the current metric subset). Tests: `CheckLayoutAssertionTests` (×3, `Broiler.Cli.Tests`)
+  and `LayoutAssertionFailureTests` (×2, `Broiler.Wpt.Tests`).
 
-### #6 — Attach rendered / reference / diff PNGs for failures
+### ✅ #5 — Richer mismatch metadata (DONE)
+
+`MismatchClassifier` now emits, alongside the sub-category, the **bounding box of the
+mismatched region** and a **displacement estimate** ("content shifted right ~100px"
+vs "content absent") — pointing at alignment-vs-rendering immediately.
+
+- **Bounding box** (`MismatchDiagnostics.Bounding{Left,Top,Width,Height}`): the dirty
+  rect enclosing all sampled mismatches, accumulated in the existing per-pixel pass.
+- **Displacement** (`MismatchDiagnostics.Displacement`, nullable): compares the centroid
+  of *content present only in the output* (non-white actual / white reference) against
+  *content present only in the reference* (white actual / non-white reference). A
+  significant centroid offset (≥5px on an axis) → `content shifted right/left/up/down ~Npx`;
+  content only on the reference side → `content absent`; only on the output side →
+  `extra content`; co-located or no transition → null. Reuses the classifier's existing
+  white-threshold logic, so it costs nothing extra and needs only the sampled mismatches
+  (no full-bitmap access).
+- **Surfacing**: the displacement phrase is appended to the human `Summary` (so the console
+  Root-Cause-Analysis and any Summary consumer show it); both the bounding box and
+  displacement are emitted as structured fields in the results JSON
+  (`results[].mismatchDiagnostics.boundingBox` / `.displacement`).
+- **Tests** (`WptTestRunnerTests`): `..._Reports_BoundingBox_Of_Mismatched_Region`,
+  `..._Estimates_Content_Shift_Direction`, `..._Reports_Content_Absent_When_Output_Is_Blank`
+  (the existing classifier tests are unaffected — `Summary` only gains a trailing clause
+  when a transition is present).
+
+### ✅ #6 — Attach rendered / reference / diff PNGs for failures (DONE)
 Visual triage in seconds (reconstructed by hand every investigation this session).
 
-### #7 — Auto-cluster failures by name-family + category
-`scripts/merge-wpt-shards.py`: collapse numbered families (`*-static-position-{1..8}`)
-into one line and cross-tab against category, instead of N scattered lines.
+- **Opt-in**: `--failure-images <DIR>` (wired to `WptTestRunner(failureImageDir:)`). Off by
+  default — no images are written and the result paths stay null, so normal/CI runs that
+  don't pass the flag are unaffected.
+- **What/where**: on a pixel-mismatch failure, `RunTest` saves `rendered.png`,
+  `reference.png`, and (when a diff bitmap exists — i.e. not a size mismatch) `diff.png`
+  (changed pixels in magenta, from `PixelDiffResult.DiffBitmap`) under
+  `<DIR>/<test-relative-path-without-ext>/`, mirroring the test tree so the three images for
+  one case sit together and never collide. Best-effort: an I/O error is logged and never
+  fails the test.
+- **Surfacing**: the paths are recorded on `WptTestResult`
+  (`RenderedImagePath`/`ReferenceImagePath`/`DiffImagePath`), emitted in the results JSON
+  (`results[].failureImages`), and printed in the console Root-Cause-Analysis
+  (`images: <dir> (rendered.png, reference.png, diff.png)`).
+- **Tests** (`WptTestRunnerTests`): `RunTest_Saves_Failure_Images_When_FailureImageDir_Set`
+  (files written + paths recorded) and `RunTest_Does_Not_Save_Failure_Images_By_Default`.
 
-### #8 — First-class `manual` / `tentative` / `crashtest` buckets
-*Cluster 2.* Report these as their own category so a regression in the
-classification is visible, not hidden in the failure total.
+### ✅ #7 — Auto-cluster failures by name-family + category (DONE)
+`scripts/merge-wpt-shards.py` now collapses numbered families
+(`*-static-position-{1..8}`) into one line and cross-tabs against category, instead
+of N scattered lines.
 
-### #9 — Extract `<link rel=help>` / `<meta name=assert>` into the report
-See what a test *claims* to verify — the fastest way to spot that a `css-align`
-failure is actually a paint/parse bug.
+- **Family key** (`_family_key`): collapses every digit run in the *file name* to `{N}`
+  (e.g. `…/static-position-1.html` … `-8.html` → `…/static-position-{N}.html`).
+  Directory segments are left intact, so only same-directory siblings that differ purely by
+  number cluster — non-numbered tests never merge.
+- **Aggregation**: per family, accumulate count + a `Counter` of categories + up to
+  `PROBLEM_EXAMPLE_LIMIT` example paths. Only families with **≥2** members are emitted (a lone
+  numbered test is already in the per-test results list), sorted by count then name and
+  bounded to `--problem-limit`.
+- **Output**: merged `failureFamilies` (`{family, count, categories, examples}`) + a
+  **"Top N failure families"** issue section with a per-category breakdown
+  (`… — 4 failure(s) (PixelMismatch 3, ScriptError 1)`).
+- **Test**: `test_merge_clusters_numbered_families` (clusters a `static-position-{N}` family
+  across shards/categories and confirms a non-numbered sibling stays out).
 
-### #10 — Preserve per-test `subCategory` in the merged `results` (small, do next)
+### ✅ #8 — First-class `manual` / `tentative` / `crashtest` buckets (DONE)
+*Cluster 2.* These are now reported as their own buckets so a regression in the
+classification is visible, not hidden in the failure (or pass) total.
 
-*Motivated by the `css-anchor-position` LayoutShift triage above.* The per-shard
-report already carries the pixel-mismatch sub-category per test
-(`mismatchDiagnostics.subCategory`, e.g. `LayoutShift` / `MissingContent` /
-`ColorShift`), and `merge-wpt-shards.py` uses it for the **aggregate** "Top
-problems" section. But the merged **`results`** array — the persisted per-test
-record attached to the issue/artifact and consumed by `--rerun-json` — keeps only
-`relativeTestPath` / `passed` / `skipped` / `category`. The sub-category is
-**dropped**, so a cluster like "the 58 LayoutShift tests" cannot be enumerated
-from the artifact after the fact (only the 3 example paths in `topProblems`
-survive), which is exactly what blocked the triage above.
+- **Classification** (`WptTestRunner`): new `TestKind` enum (`Regular`/`Manual`/`Tentative`/`CrashTest`)
+  and `ClassifyTestKind(path)`, keyed purely off the path so it is outcome-independent.
+  Added `IsTentativeTest` (`.tentative` in the file name or a `tentative/` dir) to sit
+  alongside the existing `IsManualTest` / `IsCrashTest`. Per-test `testKind` is emitted in the
+  results JSON when not `Regular` (mirrors `skipReason`).
+- **Buckets**: `ComputeTestKindBuckets` tallies every result by kind with its pass/fail/skip
+  breakdown. **All four kinds are always emitted in a fixed order, even at zero count**, so a
+  detection regression — e.g. manual dropping from 59 to 0 — shows as `Manual 0` rather than a
+  vanished line. Surfaced in results JSON (`triage.testKinds`), the console (`=== Test kinds ===`),
+  and a markdown **"Test kinds"** table.
+- **Why it matters**: manual tests (Cluster 2) are *skipped* and crashtests *auto-pass* — both
+  invisible in the failure total today; a broken detector would silently re-inflate failures
+  (manual) or hide them (crashtest). The per-kind tally makes the population explicit.
+- **Tests** (`WptTestRunnerTests`): `IsTentativeTest_Detects_Tentative` (+ negative),
+  `ClassifyTestKind_Returns_Expected_Kind` (crash/manual/tentative/regular precedence).
 
-**Change** (one line, no new computation): in `merge-wpt-shards.py::merge`, the
-loop already computes `sub_category` via `_problem_identity(result)` right after
-building the `failure` dict — add `failure["subCategory"] = sub_category` (or move
-the `_problem_identity` call above the dict literal and include the field). This
-makes every failing-test record self-describing: filtering the merged artifact by
-`subCategory == "LayoutShift"` then yields the full list directly. Backward-
-compatible (additive field; `--rerun-json` ignores unknown keys). Add a merge
-unit test asserting the field round-trips (mirrors
-`test_merge_aggregates_dropped_declarations`).
+### ✅ #9 — Extract `<link rel=help>` / `<meta name=assert>` into the report (DONE)
+The report now shows what a failing test *claims* to verify — the fastest way to spot
+that a `css-align` failure is actually a paint/parse bug.
+
+- **Extraction** (`WptTestRunner.ExtractTestMetadata`): scans the raw test HTML for
+  `<link rel="help" href="…">` targets (the spec section[s] it exercises) and joins the
+  `<meta name="assert" content="…">` text (HTML-decoded). Tolerant of attribute order and
+  quoting; `rel="author"` etc. are ignored. Returns a `TestMetadata(HelpLinks, Assertion)`.
+- **Attachment**: extracted once per `RunTest` (right after the HTML is read) and attached to
+  every failing result — `ScriptError`, `RenderingError`, `ReferenceDecodeError`, and
+  `PixelMismatch` — via `HelpLinks` / `Assertion` on `WptTestResult`.
+- **Surfacing**: results JSON `results[].testMetadata` (`{helpLinks, assert}`), the console
+  Root-Cause-Analysis (`assert: …` / `help: …` per failure), and the markdown non-pixel
+  failures list (`asserts:` / `help:` sub-bullets).
+- **Tests** (`WptTestRunnerTests`): `ExtractTestMetadata_Reads_Help_Links_And_Decoded_Assert`
+  (multiple help links, `rel="author"` excluded, `&amp;` decoded) and
+  `ExtractTestMetadata_Returns_Null_When_Absent`.
+
+> **Note on the local test suite**: three pre-existing `Program_*` tests
+> (`…_Records_Timeouts_…`, `…_Writes_Timeout_StackTrace_…`,
+> `…_Outputs_Triage_Report_…`) fail on a **de-DE** machine because they assert
+> dot-decimal strings (`0.05`, `100.0`) that the runner formats with the OS locale
+> (`0,05`, `100,0`). Verified failing on clean `HEAD` too — unrelated to these
+> diagnostics; they pass under invariant/en-US culture (CI).
+
+### ✅ #10 — Preserve per-test `subCategory` in the merged `results` (DONE)
+
+*Motivated by the `css-anchor-position` LayoutShift triage above.* The merged
+**`results`** array previously kept only `relativeTestPath` / `passed` / `skipped` /
+`category`, dropping the pixel-mismatch sub-category — so a cluster like "the 58
+LayoutShift tests" could not be enumerated from the artifact (only the 3 example paths
+in `topProblems` survived).
+
+**Change**: in `merge-wpt-shards.py::merge`, the `_problem_identity(result)` call was
+moved above the `failure` dict and `failure["subCategory"] = sub_category` added — but only
+when a sub-category exists, so non-pixel records don't gain a null field. Every
+pixel-mismatch failure record is now self-describing: filtering the merged artifact by
+`subCategory == "LayoutShift"` yields the full list directly. Backward-compatible (additive;
+`--rerun-json` ignores unknown keys).
+
+- **Tests**: `test_merge_preserves_subcategory_in_results` (sub-category round-trips for a
+  PixelMismatch record; absent for a RenderingError record), and
+  `test_merge_reports_bounded_common_problem_groups` updated to expect the new key.
 
 ---
 
@@ -258,11 +423,11 @@ consume it), not a temporary shim.
 
 ## 4. Suggested next actions
 
-1. **#1b** (inline-style drops) — quickly closes the one gap in the shipped #1.
-2. **#2 + #3** — small, high-signal report additions; together they'd have
-   classified most of this session's "misleading category" failures correctly.
-3. **#4** — convert the most common `css-align` test shape into exact numeric
-   diffs; biggest diagnostic payoff.
+1. ~~**#1b** (inline-style drops)~~ — ✅ done; the inline gap in #1 is closed.
+2. ~~**#2** (exception signatures) + **#3** (reference-overlay detection)~~ — ✅ both
+   done; together they classify most of the "misleading category" failures.
+3. ~~**#4**~~ — ✅ done; the most common `css-align` `checkLayout` shape now reports
+   exact numeric offset/size diffs.
 4. **Abspos *static-position* alignment (cluster 3)** — now unblocked by the
    block-axis `align-self` fix (cluster 9); re-add the static (auto-inset) model.
 5. **Position-try fallback (cluster 10)** — the comment-parse win is shipped; the
