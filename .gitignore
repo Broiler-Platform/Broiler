@@ -98,3 +98,6 @@ __pycache__
 # Octane harness manifest files (re-included after the broad package*.json ignores above).
 !tests/octane/package.json
 !tests/octane/package-lock.json
+
+# Claude Code session-local settings (per-session permission state)
+.claude/settings.local.json
