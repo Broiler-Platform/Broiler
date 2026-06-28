@@ -7,6 +7,8 @@ namespace Broiler.DevConsole.Tests;
 
 public class ConsoleServiceTests : IDisposable
 {
+    private static readonly Uri TestBaseUri = new("file:///");
+
     public ConsoleServiceTests()
     {
         RenderLogger.Clear();
@@ -82,9 +84,9 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void BuildBoxTree_Creates_Correct_Structure()
     {
-        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
-        var child = new CssBox(root, new HtmlTag("p", false), new Uri("/"));
-        _ = new CssBox(child, new HtmlTag("span", false), new Uri("/"));
+        var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
+        var child = new CssBox(root, new HtmlTag("p", false), TestBaseUri);
+        _ = new CssBox(child, new HtmlTag("span", false), TestBaseUri);
 
         var tree = ConsoleService.BuildBoxTree(root);
 
@@ -96,6 +98,8 @@ public class ConsoleServiceTests : IDisposable
         Assert.Single(tree.Children[0].Children);
         Assert.Equal("span", tree.Children[0].Children[0].Tag);
         Assert.Equal(2, tree.Children[0].Children[0].Depth);
+        Assert.NotEmpty(tree.ComputedStyles);
+        Assert.NotNull(tree.BoxModel);
     }
 
     [Fact]
@@ -106,7 +110,7 @@ public class ConsoleServiceTests : IDisposable
             ["id"] = "main",
             ["class"] = "container wide",
         });
-        var root = new CssBox(null, tag, new Uri("/"));
+        var root = new CssBox(null, tag, TestBaseUri);
 
         var tree = ConsoleService.BuildBoxTree(root);
 
@@ -117,7 +121,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void BuildBoxTree_Handles_Anonymous_Box()
     {
-        var root = new CssBox(null, null!, new Uri("/"));
+        var root = new CssBox(null, null!, TestBaseUri);
         var tree = ConsoleService.BuildBoxTree(root);
 
         Assert.Equal("anon", tree.Tag);
@@ -127,7 +131,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void GetComputedStyles_Returns_Grouped_Properties()
     {
-        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
 
         var styles = ConsoleService.GetComputedStyles(root);
 
@@ -147,7 +151,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void GetBoxModel_Returns_Zero_For_Uncomputed_Box()
     {
-        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
 
         var model = ConsoleService.GetBoxModel(root);
 

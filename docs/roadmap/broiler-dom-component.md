@@ -1,8 +1,8 @@
 # Broiler DOM Component Plan
 
-**Status:** Core Phases 0-6 implemented; roadmap closeout incomplete. Compatibility
-surface retirement and deferred validation are tracked in
-[`refactor-gap.md`](refactor-gap.md), RF-DOM-1 and RF-DOM-2.
+**Status:** Complete as of 2026-06-28. RF-DOM-1 and RF-DOM-2 are closed in
+[`refactor-gap.md`](refactor-gap.md) with a versioned compatibility boundary and
+recorded conformance, visual, and performance evidence.
 
 **Date:** 2026-06-24
 **Scope:** Extract a canonical, engine-neutral DOM component from the current
@@ -666,12 +666,12 @@ attributes at the boundary. Interactive WPF rendering now calls
 existing serialized `IScriptEngine.Execute` and `HtmlContainer.SetHtml`
 surfaces remain available.
 
-`RenderingPipeline.HandoffMode` defaults to `TypedDocument` and retains
-`SerializedHtml` as the explicit compatibility mode. Dual-path tests compare
-deterministic fragment trees, verify lazy invalidation after canonical
-mutation, and exercise script mutation through direct rendering. The benchmark
-harness now records `bridge.typed-render-handoff` beside the serialized
-`bridge.render-handoff` metric.
+The application pipeline now uses the typed document exclusively. RF-DOM-1
+removed the unused serialized hand-off switch, payload, and execution branch.
+The public-v1 serialized `IScriptEngine.Execute` and `HtmlContainer.SetHtml`
+methods remain available to direct callers, while dual-path tests and the
+benchmark harness continue to compare `bridge.typed-render-handoff` with
+`bridge.render-handoff`.
 
 Validation completed on 2026-06-24:
 
@@ -691,9 +691,10 @@ Deliverables:
 - move engine-neutral selector traversal, Range, TreeWalker, NodeIterator,
   event dispatch, and Shadow DOM algorithms into `Broiler.Dom` where practical;
 - leave JavaScript object construction and callback invocation in the bridge;
-- remove the legacy bridge-owned `DomElement`;
-- remove compatibility adapters and obsolete type forwards after consumers
-  migrate;
+- remove any duplicate bridge-owned DOM tree; retain a facade only as a
+  versioned adapter over the canonical node;
+- remove compatibility adapters and obsolete type forwards only at their
+  documented breaking boundary after consumers migrate;
 - rename `Broiler.HtmlBridge.Dom` to a clearer binding-oriented name only as a
   separately reviewed compatibility change;
 - evaluate renaming `Broiler.HTML.Dom` to `Broiler.HTML.Layout` once its parser
@@ -721,14 +722,17 @@ Exit criteria:
 The bridge's TreeWalker and NodeIterator JavaScript objects now wrap the
 canonical implementations. JavaScript filter invocation and object conversion
 remain in the bridge, while traversal state and mutation handling live in the
-DOM kernel. Range geometry, content extraction, JavaScript events, and
-bridge-specific Shadow DOM distribution remain bridge-owned until their
-renderer/runtime dependencies can be separated without weakening behavior.
+DOM kernel. Range boundaries and mutation semantics are canonical. Client-rect
+geometry remains deliberately bridge-owned because it consumes computed style
+and renderer layout; content operations, JavaScript events, and bridge-specific
+Shadow DOM distribution likewise retain their runtime-dependent ownership.
 
-The legacy `Broiler.HtmlBridge.DomElement` remains as the frozen public
-compatibility facade, but it is not a second tree model: it derives from the
-canonical node and delegates tree/attribute mutation to `Broiler.Dom`.
-Project renaming remains a separately reviewed compatibility change.
+`Broiler.HtmlBridge.DomElement` and `HtmlTreeBuilder` form the explicit
+`htmlbridge-dom-adapter/v1` boundary. They are not a second tree model or parser:
+the facade delegates tree/attribute mutation to `Broiler.Dom`, and the builder
+delegates parsing to `Broiler.Dom.Html`. Architecture tests lock that version and
+its `htmlbridge-public-surface/v2` removal boundary. Project renaming remains a
+separately reviewed compatibility change.
 
 Validation completed on 2026-06-24:
 
@@ -739,12 +743,20 @@ Validation completed on 2026-06-24:
   passed;
 - full solution build succeeds with no errors.
 
-The broader `DomTraversalAndRangeTests` class still contains a slow,
-bridge-owned range-geometry failure:
-`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants` completes
-after roughly 105 seconds but does not produce the expected
-`expected=60|actual=60|clientRects=2` marker. That path does not instantiate
-the canonical `DomRange`; range geometry remains explicitly deferred above.
+RF-DOM closeout on 2026-06-28 fixed the deferred
+`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants` case by
+including the descendants of boxless `display: contents` siblings in normal-flow
+geometry. The regression now reports
+`expected=60|actual=60|clientRects=2`. The closeout also removed the unused
+application serialized hand-off branch and seven dead bridge helper copies.
+
+The repeatable `scripts/run-rf-dom-validation.ps1` closeout passed 19 kernel,
+4 HTML, 20 boundary, 190 bridge-DOM, 1 focused range, 27 Acid DOM/range, and
+5 focused WPT tests. Three named Acid invalidation cases remain exact accepted
+baselines. The RF-LAYOUT visual gate had zero unexpected outcomes. Owned
+performance gates passed: bridge mutation was 962,353.100 ns/op versus the
+1,099,027.367 ns/op baseline, serialization median was 1.517 ms versus 1.942 ms,
+and typed hand-off was 149.026 ms versus serialized hand-off at 153.977 ms.
 
 ## 8. Suggested pull-request sequence
 
@@ -767,11 +779,13 @@ unless they are required to preserve existing behavior.
 ## 9. Compatibility policy
 
 The existing `Broiler.HtmlBridge` facade and
-`htmlbridge-public-surface/v1` remain the compatibility boundary during the
-transition.
+`htmlbridge-public-surface/v1` are the supported compatibility boundary.
 
-- Preserve public namespaces initially where type forwarding is viable.
-- Mark compatibility members obsolete only after all in-repo consumers move.
+- `DomElement` and `HtmlTreeBuilder` are the tested
+  `htmlbridge-dom-adapter/v1` adapter, not independent owners of a tree or parser.
+- Remove that adapter only in `htmlbridge-public-surface/v2` or later.
+- Mark compatibility members obsolete when a v2 replacement is ready and
+  in-repo consumers have moved.
 - Do not expose the new node model through the frozen bridge surface until its
   ownership and lifecycle contracts are stable.
 - Replace `Elements` with script/document snapshots before removing it.
@@ -887,6 +901,8 @@ The separate DOM component is complete when:
 - scripts and rendering operate on the same `DomDocument`;
 - the default pipeline does not serialize and reparse between script execution
   and layout;
-- the legacy bridge-owned tree has been removed;
+- the duplicate bridge-owned mutable tree has been removed; versioned v1 facades
+  may remain when they delegate to the canonical model and have a tested v2
+  removal boundary;
 - architecture, unit, bridge, WPT, Acid, pixel, and performance gates pass;
 - the boundary and roadmap documentation reflects the final ownership model.

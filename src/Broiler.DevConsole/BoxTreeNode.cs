@@ -1,12 +1,9 @@
-using Broiler.HTML.Dom;
-using Broiler.Layout;
-
 namespace Broiler.DevConsole;
 
 /// <summary>
-/// A read-only snapshot of a <see cref="CssBox"/> node for display in
+/// A read-only snapshot of a renderer layout-box node for display in
 /// the DOM Inspector tree view.  Each node captures the tag name, id,
-/// display value, and a reference to the underlying box for style lookup.
+/// display value, computed styles, and box-model dimensions.
 /// </summary>
 public sealed class BoxTreeNode
 {
@@ -25,11 +22,11 @@ public sealed class BoxTreeNode
     /// <summary>Zero-based depth in the tree.</summary>
     public int Depth { get; init; }
 
-    /// <summary>
-    /// Reference to the underlying <see cref="CssBox"/> so that callers
-    /// can extract computed styles and box-model dimensions on demand.
-    /// </summary>
-    internal CssBox? Box { get; init; }
+    /// <summary>Resolved CSS properties captured with this snapshot.</summary>
+    public IReadOnlyList<ComputedStyleInfo> ComputedStyles { get; init; } = [];
+
+    /// <summary>Resolved box-model dimensions captured with this snapshot.</summary>
+    public BoxModelInfo BoxModel { get; init; } = new();
 
     /// <summary>Child nodes.</summary>
     public List<BoxTreeNode> Children { get; } = [];

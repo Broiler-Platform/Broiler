@@ -27,6 +27,29 @@ public sealed class LayoutArchitectureTests
     }
 
     [Fact]
+    public void Internal_Consumers_Are_Explicit_And_Minimal()
+    {
+        var project = XDocument.Load(FindProjectPath());
+        var friends = project
+            .Descendants("InternalsVisibleTo")
+            .Select(static element => (string?)element.Attribute("Include"))
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "Broiler.Cli.Tests",
+                "Broiler.DevConsole",
+                "Broiler.DevConsole.Tests",
+                "Broiler.HTML",
+                "Broiler.HTML.Dom",
+                "Broiler.HTML.Orchestration",
+                "Broiler.Layout.Tests",
+            ],
+            friends);
+    }
+
+    [Fact]
     public void Public_Surface_Does_Not_Leak_Consumer_Types()
     {
         var assembly = typeof(ILayoutEnvironment).Assembly;

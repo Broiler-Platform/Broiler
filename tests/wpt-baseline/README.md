@@ -14,6 +14,13 @@ named after the matrix `segment.id` (e.g. `css-css2.json`, `css-flexbox.json`,
 against the baseline and fails only on **regression** — so the large backlog of
 skipped/failing tests does not keep CI red.
 
+`rf-layout-curated.json` is the narrower RF-LAYOUT-2 closeout baseline used by
+`scripts/run-rf-layout-validation.ps1`. Unlike the scheduled segment snapshots, it
+stores the exact accepted failure and missing-reference skip paths for the committed
+in-tree `tests/wpt` corpus. The layout gate permits those paths to improve to passes,
+but rejects new failures, new skips, disappearance of an accepted path, or a drop in
+the discovery total.
+
 ## Establishing or refreshing a baseline
 
 When a segment has no baseline file, the gate emits a warning and passes. To

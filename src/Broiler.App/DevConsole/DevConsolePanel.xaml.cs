@@ -8,8 +8,6 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using Broiler.HtmlBridge;
 using Broiler.DevConsole;
-using Broiler.HTML.Dom;
-using Broiler.Layout;
 
 namespace Broiler.App.DevConsole;
 
@@ -141,16 +139,14 @@ public partial class DevConsolePanel : UserControl, IDisposable
     // ─── DOM Inspector ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Populates the DOM tree from the given root CssBox.
+    /// Populates the DOM tree from a renderer-independent box-tree snapshot.
     /// Called by the host when a page finishes rendering.
     /// </summary>
-    internal void LoadBoxTree(CssBox root)
+    internal void LoadBoxTree(BoxTreeNode root)
     {
         DomTree.Items.Clear();
         StylesList.Items.Clear();
-
-        var treeRoot = ConsoleService.BuildBoxTree(root);
-        DomTree.Items.Add(BuildTreeViewItem(treeRoot));
+        DomTree.Items.Add(BuildTreeViewItem(root));
     }
 
     private static TreeViewItem BuildTreeViewItem(BoxTreeNode node)
@@ -180,17 +176,16 @@ public partial class DevConsolePanel : UserControl, IDisposable
 
     private void DomTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        if (e.NewValue is TreeViewItem { Tag: BoxTreeNode node } && node.Box != null)
+        if (e.NewValue is TreeViewItem { Tag: BoxTreeNode node })
         {
-            ShowComputedStyles(node.Box);
-            ShowBoxModel(node.Box);
+            ShowComputedStyles(node.ComputedStyles);
+            ShowBoxModel(node.BoxModel);
         }
     }
 
-    private void ShowComputedStyles(CssBox box)
+    private void ShowComputedStyles(IReadOnlyList<ComputedStyleInfo> styles)
     {
         StylesList.Items.Clear();
-        var styles = ConsoleService.GetComputedStyles(box);
 
         string? currentCategory = null;
         foreach (var style in styles)
@@ -215,10 +210,9 @@ public partial class DevConsolePanel : UserControl, IDisposable
         }
     }
 
-    private void ShowBoxModel(CssBox box)
+    private void ShowBoxModel(BoxModelInfo model)
     {
         BoxModelCanvas.Children.Clear();
-        var model = ConsoleService.GetBoxModel(box);
 
         var canvasWidth = BoxModelCanvas.ActualWidth > 0 ? BoxModelCanvas.ActualWidth : DefaultCanvasWidth;
         var canvasHeight = BoxModelCanvas.ActualHeight > 0 ? BoxModelCanvas.ActualHeight : DefaultCanvasHeight;

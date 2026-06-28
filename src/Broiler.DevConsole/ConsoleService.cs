@@ -84,7 +84,8 @@ public sealed class ConsoleService : IDisposable
             CssClass = box.HtmlTag?.TryGetAttribute("class"),
             Display = box.Display,
             Depth = depth,
-            Box = box,
+            ComputedStyles = GetComputedStyles(box),
+            BoxModel = GetBoxModel(box),
         };
 
         foreach (var child in box.Boxes)

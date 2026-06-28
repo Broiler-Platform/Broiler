@@ -119,25 +119,6 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        JSValue GetNodeTextValue()
-        {
-            // For text nodes, return the direct text content
-            if (element.IsTextNode)
-                return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
-            // For element nodes with direct TextContent set (e.g., via JS setter)
-            if (element.TextContent != null && element.Children.Count == 0)
-                return new JSString(element.TextContent);
-            // For element nodes, recursively collect text from descendants
-            if (element.Children.Count > 0)
-            {
-                var sb = new StringBuilder();
-                CollectTextContent(element, sb);
-                return new JSString(sb.ToString());
-            }
-            // Fallback to InnerHtml if no children and no TextContent
-            return new JSString(element.InnerHtml);
-        }
-
         // textContent (read/write)
         obj.FastAddProperty(
             (KeyString)"textContent",
@@ -813,15 +794,6 @@ public sealed partial class DomBridge
         // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
         if (string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
         {
-            bool IsCurrentIframeCrossOrigin()
-            {
-                if (element.Attributes.ContainsKey("srcdoc"))
-                    return false;
-
-                var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
-                return IsCrossOrigin(iframeSrcValue, _pageUrl);
-            }
-
             obj.FastAddProperty(
                 (KeyString)"contentDocument",
                 new JSFunction((in Arguments _) => JsJsObjectsGetContentDocument135Core(element, in _), "get contentDocument"),

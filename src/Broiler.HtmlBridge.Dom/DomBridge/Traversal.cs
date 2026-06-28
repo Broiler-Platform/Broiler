@@ -296,56 +296,6 @@ public sealed partial class DomBridge
         // Register this range for mutation tracking
         _activeRanges.Add(new WeakReference<RangeState>(state));
 
-        // Helper: returns true if position (containerA,offsetA) is after (containerB,offsetB) in document order
-        bool IsPositionAfter(DomElement containerA, int offsetA, DomElement containerB, int offsetB)
-        {
-            if (ReferenceEquals(containerA, containerB))
-                return offsetA > offsetB;
-
-            // Check if B is a descendant of A
-            // Position (A, offsetA) is after (B, offsetB) if the child of A that
-            // contains B (or is B) has index < offsetA.
-            if (IsDescendant(containerA, containerB))
-            {
-                // Find which child index of A contains B
-                var node = containerB;
-                while (node.Parent != null && !ReferenceEquals(node.Parent, containerA))
-                    node = node.Parent;
-                if (node.Parent != null)
-                {
-                    var childIdx = containerA.Children.IndexOf(node);
-                    return offsetA > childIdx;
-                }
-                return false;
-            }
-
-            // Check if A is a descendant of B
-            // Position (A, offsetA) is after (B, offsetB) if the child of B that
-            // contains A (or is A) has index >= offsetB.
-            if (IsDescendant(containerB, containerA))
-            {
-                var node = containerA;
-                while (node.Parent != null && !ReferenceEquals(node.Parent, containerB))
-                    node = node.Parent;
-                if (node.Parent != null)
-                {
-                    var childIdx = containerB.Children.IndexOf(node);
-                    return childIdx >= offsetB;
-                }
-                return true;
-            }
-
-            // Compare positions in document order using their common ancestor
-            var commonRoot = FindCommonAncestor(containerA, containerB);
-            if (commonRoot == null)
-                commonRoot = docRoot;
-            var allNodes = GetDocumentOrderNodes(commonRoot);
-            var idxA = allNodes.IndexOf(containerA);
-            var idxB = allNodes.IndexOf(containerB);
-            if (idxA < 0 || idxB < 0) return false;
-            return idxA > idxB || (idxA == idxB && offsetA > offsetB);
-        }
-
         // startContainer
         range.FastAddProperty(
             (KeyString)"startContainer",
@@ -489,20 +439,6 @@ public sealed partial class DomBridge
             (KeyString)"cloneRange",
             new JSFunction((in Arguments a) => JsTraversalCloneRange037Core(bridge, state, in a), "cloneRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-
-        int CompareBoundaryPosition(DomElement containerA, int offsetA, DomElement containerB, int offsetB)
-        {
-            if (ReferenceEquals(containerA, containerB) && offsetA == offsetB)
-                return 0;
-
-            if (IsPositionAfter(containerA, offsetA, containerB, offsetB))
-                return 1;
-
-            if (IsPositionAfter(containerB, offsetB, containerA, offsetA))
-                return -1;
-
-            return 0;
-        }
 
         // compareBoundaryPoints(how, sourceRange)
         range.FastAddValue(

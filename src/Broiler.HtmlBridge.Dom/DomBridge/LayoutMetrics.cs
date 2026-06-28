@@ -643,11 +643,16 @@ public sealed partial class DomBridge
                     break;
                 if (sibling.IsTextNode)
                     continue;
-                if (!HasAssociatedLayoutBox(sibling))
+
+                var siblingProps = GetComputedProps(sibling);
+                var siblingDisplay = siblingProps.GetValueOrDefault("display");
+                if (!string.Equals(siblingDisplay, "contents", StringComparison.OrdinalIgnoreCase) &&
+                    !HasAssociatedLayoutBox(sibling))
+                {
                     continue;
+                }
 
                 var siblingRect = ComputeRenderedRect(sibling);
-                var siblingProps = GetComputedProps(sibling);
                 var siblingPosition = siblingProps.GetValueOrDefault("position");
                 if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))

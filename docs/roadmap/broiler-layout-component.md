@@ -1,17 +1,18 @@
 # Broiler.Layout Component Plan
 
-**Status:** **Core extraction complete; roadmap closeout incomplete (2026-06-27).** Phases 1–4 done — the ~9.7k-line layout engine now
-physically lives in `Broiler.Layout` (project references only `Broiler.CSS`/`Broiler.CSS.Dom`/`Broiler.Dom`).
-Full `Broiler.slnx` builds green; behavior preserved (only known flaky/pre-existing test failures); Layout
-arch tests 3/3. Polish done 2026-06-27: **namespace flip** (the 16 moved files are now `namespace Broiler.Layout`;
-~25 renderer/consumer files got `using Broiler.Layout;` + a handful of `Broiler.HTML.Utils` disambiguation aliases;
-full slnx green, arch 3/3, behavior preserved) and **identical-copy dedup** (`CssConstants` + `RegexParserUtils`
-removed from the renderer → it now uses the `Broiler.CSS` versions; `Broiler.HTML.Utils` gained a `Broiler.CSS` ref for
-its `CommonUtils`). Remaining = the **inherent** duplication that can't be deduped (`Broiler.Layout` can't reference the
-renderer, and the renderer's `CssLength`/`CssValueParser` carry colour the layout copies don't; `HtmlConstants`/
-`CommonUtils`/`HtmlUtils` are layout subsets vs renderer full). Phase 5 cleanup and the
-final WPT/pixel closeout are tracked in [`refactor-gap.md`](refactor-gap.md),
-RF-LAYOUT-1 and RF-LAYOUT-2.
+**Status:** **Complete (2026-06-28).** Phases 1–5 are done: the ~9.7k-line layout
+engine lives in `Broiler.Layout`, whose only project dependencies are `Broiler.CSS`,
+`Broiler.CSS.Dom`, and `Broiler.Dom`. The namespace flip and identical-copy cleanup
+are complete. Phase 5 reduced the internal friend surface from 16 assemblies to seven,
+documented each remaining direct box-tree consumer, locked that set in architecture
+tests, and removed facade/application box-tree traversal.
+
+The repeatable closeout runner is `scripts/run-rf-layout-validation.ps1`. Its final
+2026-06-28 run built the solution without errors or warnings and recorded layout 13/13,
+diagnostic seam 5/5, Acid2 25/25, Acid3 65 passes with two established exceptions, and
+the curated WPT pixel baseline at 69 passes, 71 accepted failures, five missing-reference
+skips, and zero unexpected outcomes. RF-LAYOUT-1 and RF-LAYOUT-2 are closed in
+[`refactor-gap.md`](refactor-gap.md).
 **Date:** 2026-06-26
 
 **Progress (Phase 1):** `Broiler.Layout/Broiler.Layout/` created in the parent repo

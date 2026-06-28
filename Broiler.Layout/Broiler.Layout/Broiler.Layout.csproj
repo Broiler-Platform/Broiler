@@ -20,8 +20,6 @@
     <InternalsVisibleTo Include="Broiler.HTML.Dom" />
     <InternalsVisibleTo Include="Broiler.HTML" />
     <InternalsVisibleTo Include="Broiler.HTML.Orchestration" />
-    <InternalsVisibleTo Include="Broiler.HTML.Image" />
-    <InternalsVisibleTo Include="Broiler" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />

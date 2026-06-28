@@ -71,25 +71,42 @@ attribute mutations route through canonical mutation APIs. JavaScript listeners,
 observer options, and IDL runtime state remain bridge-owned. The legacy public
 type remains only as a source-compatibility facade.
 
+### Versioned DOM adapter policy
+
+`Broiler.HtmlBridge.DomElement` and `HtmlTreeBuilder` are the explicit
+`htmlbridge-dom-adapter/v1` compatibility boundary. Their version and removal
+boundary are published as constants and locked by architecture tests. They remain
+supported for `htmlbridge-public-surface/v1` consumers and may be removed only in
+`htmlbridge-public-surface/v2` or later.
+
+This adapter is not parallel ownership. `DomElement` delegates tree and attribute
+state to the canonical node model, and `HtmlTreeBuilder` delegates parsing to
+`Broiler.Dom.Html`. The adapter must not acquire independent runtime state,
+standards algorithms, parsing, or serialization. New in-repo code should consume
+canonical nodes and parser contracts directly.
+
 HTML tokenization, document/fragment tree construction, and deterministic
 serialization are owned by `Broiler.Dom.Html`. The bridge keeps only a
-compatibility materializer for its temporary `DomElement` facade, while the
+versioned compatibility materializer for its `DomElement` facade, while the
 renderer consumes the same shared parser contract. `innerHTML`,
 `document.write`, and subdocument parsing therefore no longer carry separate
 tree-builder implementations.
 
 The optional `ITypedScriptEngine` extension and renderer
 `SetDocument(DomDocument, ...)` entry points form the Phase 5 typed hand-off.
-The WPF interactive path uses this route by default. The frozen
+The WPF interactive path uses this route exclusively; RF-DOM-1 removed its unused
+serialized-mode switch and alternate payload. The frozen
 `IScriptEngine.Execute(...)` string methods and `SetHtml(...)` renderer methods
-remain compatibility surfaces, selectable through
-`RenderingPipeline.HandoffMode.SerializedHtml`.
+remain direct public-v1 compatibility APIs, but no longer form an alternate
+application pipeline.
 
 TreeWalker and NodeIterator state and traversal are now canonical
 `Broiler.Dom` algorithms. The bridge only converts JavaScript filters and node
 wrappers. Canonical `DomRange` provides engine-neutral boundary and mutation
-semantics; bridge-only range geometry and content operations remain outside the
-kernel.
+semantics. Client-rectangle calculation deliberately remains bridge-owned because
+it consumes computed style and renderer geometry; its `display: contents`
+descendant behavior is covered by a dedicated regression gate. Content operations
+and JavaScript wrappers likewise remain outside the dependency-free kernel.
 
 ## PR dashboard surfaces tied to this boundary
 

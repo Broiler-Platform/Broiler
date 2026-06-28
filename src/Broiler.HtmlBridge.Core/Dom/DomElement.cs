@@ -8,12 +8,16 @@ using CanonicalNamespaces = Broiler.Dom.DomNamespaces;
 namespace Broiler.HtmlBridge;
 
 /// <summary>
-/// Temporary bridge compatibility facade over the canonical <see cref="CanonicalElement"/>.
+/// Versioned v1 bridge adapter over the canonical <see cref="CanonicalElement"/>.
 /// Existing bridge algorithms retain their legacy surface while every tree and attribute
-/// mutation is performed by <c>Broiler.Dom</c>.
+/// mutation is performed by <c>Broiler.Dom</c>. New engine code should use the canonical
+/// node types; this facade may be removed only with the v2 public boundary.
 /// </summary>
 public sealed class DomElement : CanonicalElement
 {
+    public const string CompatibilitySurfaceVersion = "htmlbridge-dom-adapter/v1";
+    public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
+
     private readonly LegacyChildList _children;
     private readonly LegacyAttributeDictionary _attributes;
     private string? _textContent;

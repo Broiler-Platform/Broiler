@@ -14,8 +14,6 @@ public sealed class RenderingPipeline(
     IScriptExtractor scriptExtractor,
     IScriptEngine scriptEngine) : IDisposable
 {
-    public RendererHandoffMode HandoffMode { get; set; } = RendererHandoffMode.TypedDocument;
-
     /// <summary>
     /// Load a page from <paramref name="url"/>, extract inline scripts,
     /// and return a <see cref="PageContent"/> ready for rendering.
@@ -31,50 +29,6 @@ public sealed class RenderingPipeline(
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();
         return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, result.DeferredScripts));
-    }
-
-    /// <summary>
-    /// Execute the scripts contained in <paramref name="content"/> with DOM
-    /// interaction support.  A <c>document</c> object derived from the page
-    /// HTML is made available to the scripts via the <see cref="DomBridge"/>.
-    /// The page URL (when available) is set on <c>window.location</c>.
-    /// After scripts execute, the body <c>onload</c> event fires and
-    /// pending timers are flushed.
-    /// The serialised post-execution HTML is then sanitised (script tags,
-    /// data-URI backgrounds, iframe/object fallback content, and hidden
-    /// test artifacts are stripped) so that HtmlRenderer displays the same
-    /// result as the CLI image-capture path.
-    /// Returns the sanitised HTML, or <c>null</c> when there are no scripts.
-    /// </summary>
-    public string? ExecuteScripts(PageContent content)
-    {
-        var html = scriptEngine.Execute(content.Scripts, content.DeferredScripts, content.Html, content.Url);
-        if (html != null)
-            html = HtmlPostProcessor.Process(html);
-        return html;
-    }
-
-    /// <summary>
-    /// Executes scripts and returns either the canonical document or the
-    /// serialized compatibility payload according to <see cref="HandoffMode"/>.
-    /// </summary>
-    public RenderHandoff ExecuteScriptsForRendering(PageContent content)
-    {
-        if (HandoffMode == RendererHandoffMode.TypedDocument &&
-            scriptEngine is ITypedScriptEngine typedScriptEngine)
-        {
-            var document = typedScriptEngine.ExecuteToDocument(
-                content.Scripts,
-                content.DeferredScripts,
-                content.Html,
-                content.Url);
-            return new RenderHandoff(document, null, RendererHandoffMode.TypedDocument);
-        }
-
-        return new RenderHandoff(
-            null,
-            ExecuteScripts(content),
-            RendererHandoffMode.SerializedHtml);
     }
 
     /// <summary>
@@ -95,14 +49,3 @@ public sealed class RenderingPipeline(
 
     public void Dispose() => pageLoader.Dispose();
 }
-
-public enum RendererHandoffMode
-{
-    TypedDocument,
-    SerializedHtml
-}
-
-public sealed record RenderHandoff(
-    Broiler.Dom.DomDocument? Document,
-    string? Html,
-    RendererHandoffMode Mode);

@@ -5,9 +5,9 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Characterization tests for the legacy bridge-owned tree. These tests freeze
-/// the Phase 0 starting point so the canonical DOM extraction can proceed in
-/// small, behavior-preserving steps.
+/// Characterization tests for the Phase 0 surface and its final versioned
+/// adapter boundary. Historical checks freeze the extraction starting point;
+/// ownership checks ensure the adapter remains over the canonical DOM.
 /// </summary>
 public sealed class DomExtractionPhaseZeroTests
 {
@@ -63,6 +63,15 @@ public sealed class DomExtractionPhaseZeroTests
 
         Assert.IsAssignableFrom<Broiler.Dom.DomNode>(element);
         Assert.IsAssignableFrom<Broiler.Dom.DomElement>(element);
+    }
+
+    [Fact]
+    public void Compatibility_Materializers_Are_Versioned_For_The_V1_Boundary()
+    {
+        Assert.Equal("htmlbridge-dom-adapter/v1", DomElement.CompatibilitySurfaceVersion);
+        Assert.Equal("htmlbridge-public-surface/v2", DomElement.RemovalBoundaryVersion);
+        Assert.Equal("htmlbridge-dom-adapter/v1", HtmlTreeBuilder.CompatibilitySurfaceVersion);
+        Assert.Equal("htmlbridge-public-surface/v2", HtmlTreeBuilder.RemovalBoundaryVersion);
     }
 
     [Fact]

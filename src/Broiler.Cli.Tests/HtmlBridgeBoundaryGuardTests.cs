@@ -178,6 +178,15 @@ public class HtmlBridgeBoundaryGuardTests
                 field.FieldType.ToString().Contains("IteratorState", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Range_Ownership_Splits_Canonical_Boundaries_From_Renderer_Geometry()
+    {
+        Assert.Equal("Broiler.Dom", typeof(Broiler.Dom.DomRange).Assembly.GetName().Name);
+        Assert.NotNull(typeof(DomBridge).GetMethod(
+            "GetClientRectsForRange",
+            BindingFlags.NonPublic | BindingFlags.Instance));
+    }
+
     private static bool ExposesEngineInternalType(MemberInfo member) => member switch
     {
         MethodInfo method when !method.IsSpecialName =>

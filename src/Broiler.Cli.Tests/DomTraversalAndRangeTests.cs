@@ -1783,6 +1783,15 @@ document.getElementById('result').textContent =
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains("expected=60|actual=60|clientRects=2", result);
+        const string expectedMarker = "expected=60|actual=60|clientRects=2";
+        var markerStart = result.IndexOf("expected=", StringComparison.Ordinal);
+        var markerEnd = markerStart < 0 ? -1 : result.IndexOf('<', markerStart);
+        var actualMarker = markerStart < 0
+            ? "<missing>"
+            : result[markerStart..(markerEnd < 0 ? result.Length : markerEnd)];
+
+        Assert.True(
+            result.Contains(expectedMarker, StringComparison.Ordinal),
+            $"Expected '{expectedMarker}', actual marker was '{actualMarker}'.");
     }
 }

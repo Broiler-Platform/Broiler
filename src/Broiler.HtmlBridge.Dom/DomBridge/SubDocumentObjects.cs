@@ -25,10 +25,6 @@ public sealed partial class DomBridge
         _jsObjectCache[docRoot] = doc;
         var bridge = this;
 
-        DomElement GetDocumentElement() =>
-            docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"))
-            ?? docRoot;
-
         doc.FastAddProperty(
             (KeyString)"documentElement",
             new JSFunction((in Arguments _) => ToJSObject(DomBridge.GetDocumentElement(docRoot)), "get documentElement"),

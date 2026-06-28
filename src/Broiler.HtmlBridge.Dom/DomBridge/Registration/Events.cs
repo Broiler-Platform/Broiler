@@ -150,40 +150,6 @@ public sealed partial class DomBridge
                     return evt;
                 }
             ");
-        static bool GetMutationObserverOption(JSObject optionsObject, string propertyName)
-        {
-            var optionValue = optionsObject[(KeyString)propertyName];
-            return optionValue != null &&
-                   !optionValue.IsUndefined &&
-                   !optionValue.IsNull &&
-                   optionValue.BooleanValue;
-        }
-        MutationObserverOptions CreateMutationObserverOptions(JSValue? value)
-        {
-            if (value is not JSObject optionsObject)
-                return new MutationObserverOptions();
-
-            return new MutationObserverOptions
-            {
-                ChildList = GetMutationObserverOption(optionsObject, "childList"),
-                Attributes = GetMutationObserverOption(optionsObject, "attributes"),
-                AttributeOldValue = GetMutationObserverOption(optionsObject, "attributeOldValue"),
-                CharacterData = GetMutationObserverOption(optionsObject, "characterData"),
-                CharacterDataOldValue = GetMutationObserverOption(optionsObject, "characterDataOldValue"),
-                Subtree = GetMutationObserverOption(optionsObject, "subtree")
-            };
-        }
-        void RegisterMutationObserver(JSObject observerObject, DomElement target, MutationObserverOptions options)
-        {
-            _mutationObservers.RemoveAll(entry =>
-                ReferenceEquals(entry.Observer, observerObject) &&
-                ReferenceEquals(entry.Target, target));
-            _mutationObservers.Add((observerObject, target, options));
-        }
-        void UnregisterMutationObserver(JSObject observerObject)
-        {
-            _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
-        }
         var registerMutationObserverFn = new JSFunction(JsRegistrationBroilerRegisterMutationObserver034Core, "__broilerRegisterMutationObserver", 3);
         var unregisterMutationObserverFn = new JSFunction(JsRegistrationBroilerUnregisterMutationObserver035Core, "__broilerUnregisterMutationObserver", 1);
         context["__broilerRegisterMutationObserver"] = registerMutationObserverFn;

@@ -5,10 +5,15 @@ namespace Broiler.HtmlBridge;
 /// <summary>
 /// Compatibility adapter over the shared <see cref="HtmlDocumentParser"/>.
 /// The parsing algorithm and token contract live in <c>Broiler.Dom.Html</c>;
-/// this type only materializes the temporary bridge facade nodes.
+/// this type only materializes v1 bridge facade nodes. New parser consumers
+/// should use <see cref="HtmlDocumentParser"/> directly; this adapter may be
+/// removed only with the v2 public boundary.
 /// </summary>
 public sealed class HtmlTreeBuilder
 {
+    public const string CompatibilitySurfaceVersion = "htmlbridge-dom-adapter/v1";
+    public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
+
     public (DomElement DocumentElement, List<DomElement> AllElements, string Title) Build(
         string html,
         Broiler.Dom.DomDocument? document = null)
