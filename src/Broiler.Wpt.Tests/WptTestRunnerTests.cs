@@ -4446,6 +4446,32 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Program_Render_Mode_Writes_Png_For_A_Single_File()
+    {
+        // --render produces a PNG for one HTML file with no reference/compare —
+        // the quick "reproduce against the live renderer" path.
+        var dir = Path.Combine(_tempDir, "render");
+        Directory.CreateDirectory(dir);
+        var htmlPath = Path.Combine(dir, "snippet.html");
+        File.WriteAllText(htmlPath,
+            "<!DOCTYPE html><body style=\"margin:0\"><div style=\"width:50px;height:50px;background:green\"></div></body>");
+        var outPath = Path.Combine(dir, "out.png");
+
+        var exit = Program.Main(["--render", htmlPath, "--render-out", outPath]);
+
+        Assert.Equal(0, exit);
+        Assert.True(File.Exists(outPath), "render mode should write the output PNG");
+        Assert.True(new FileInfo(outPath).Length > 0, "rendered PNG should be non-empty");
+    }
+
+    [Fact]
+    public void Program_Render_Mode_Reports_Missing_File()
+    {
+        var exit = Program.Main(["--render", Path.Combine(_tempDir, "does-not-exist.html")]);
+        Assert.Equal(1, exit);
+    }
+
+    [Fact]
     public void Program_Output_Includes_Progress_Updates_During_Run()
     {
         var testDir = Path.Combine(_tempDir, "progress");
@@ -5427,6 +5453,116 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         Assert.Equal(MismatchCategory.ColorShift, diag.Category);
         Assert.Contains("color", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DisplacementBands_Report_NonUniform_Band_Shift()
+    {
+        // Two vertical bands: an upper band whose content is aligned (output-only
+        // and reference-only content co-located) and a lower band shifted down
+        // ~9px (output-only content sits 9px below the reference-only content).
+        // The GLOBAL centroid blurs this to < the 5px threshold, but the per-band
+        // analysis must surface the lower band's shift — the <br>/line-spacing
+        // signature that misled issue #1121.
+        var mismatches = new List<PixelMismatch>();
+        for (int x = 40; x < 50; x++)
+        {
+            // Upper band (y≈20): alternate output-only / reference-only at the
+            // same row → band shift ≈ 0 (aligned).
+            bool outputOnly = (x % 2) == 0;
+            if (outputOnly)
+                mismatches.Add(new PixelMismatch(x, 20, 0, 128, 0, 255, 255, 255, 255, 255)); // green vs white
+            else
+                mismatches.Add(new PixelMismatch(x, 20, 255, 255, 255, 255, 0, 128, 0, 255)); // white vs green
+
+            // Lower band: output-only content at y=70, reference-only at y=61 →
+            // content shifted DOWN ~9px.
+            mismatches.Add(new PixelMismatch(x, 70, 0, 128, 0, 255, 255, 255, 255, 255)); // output-only (lower)
+            mismatches.Add(new PixelMismatch(x, 61, 255, 255, 255, 255, 0, 128, 0, 255)); // reference-only (higher)
+        }
+
+        var bands = DisplacementBandAnalyzer.Analyze(mismatches);
+        var note = DisplacementBandAnalyzer.DescribeNonUniform(bands);
+
+        Assert.Equal(2, bands.Count);
+        Assert.NotNull(note);
+        Assert.Contains("non-uniform", note, StringComparison.OrdinalIgnoreCase);
+
+        // The lower band must report the ~9px downward shift; the upper band ~0.
+        var lower = bands.OrderByDescending(b => b.Top).First();
+        var upper = bands.OrderBy(b => b.Top).First();
+        Assert.True(lower.ShiftY >= 7, $"lower band should be shifted down ~9px, got {lower.ShiftY}");
+        Assert.True(System.Math.Abs(upper.ShiftY) <= 2, $"upper band should be ~aligned, got {upper.ShiftY}");
+    }
+
+    [Fact]
+    public void DisplacementBands_Uniform_Shift_Not_Flagged_NonUniform()
+    {
+        // A single contiguous band shifted uniformly right ~10px must NOT be
+        // reported as non-uniform (one band → no per-band variance).
+        var mismatches = new List<PixelMismatch>();
+        for (int y = 20; y < 35; y++)
+        {
+            mismatches.Add(new PixelMismatch(60, y, 0, 128, 0, 255, 255, 255, 255, 255)); // output-only (right)
+            mismatches.Add(new PixelMismatch(50, y, 255, 255, 255, 255, 0, 128, 0, 255)); // reference-only (left)
+        }
+
+        var bands = DisplacementBandAnalyzer.Analyze(mismatches);
+
+        Assert.Single(bands);
+        Assert.Null(DisplacementBandAnalyzer.DescribeNonUniform(bands));
+    }
+
+    [Fact]
+    public void CheckLayoutPixelDivergence_Flagged_When_Axes_Disagree()
+    {
+        // The bridge check-layout estimate flags a horizontal (offset-x)
+        // divergence, but the rendered pixels moved vertically — the exact
+        // misdirection from issue #1121. The note must fire and name both axes.
+        var result = new WptTestResult
+        {
+            TestPath = "css/css-align/abspos/x.html",
+            Passed = false,
+            LayoutAssertionFailures = new[]
+            {
+                new LayoutAssertionFailure("div.item", "offset-x", 35, 10),
+            },
+            MismatchDiagnostics = new MismatchDiagnostics
+            {
+                Category = MismatchCategory.MissingContent,
+                Summary = "…",
+                Displacement = "content shifted down ~9px",
+            },
+        };
+
+        var note = Program.CheckLayoutPixelDivergenceNote(result);
+
+        Assert.NotNull(note);
+        Assert.Contains("horizontal", note, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vertical", note, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CheckLayoutPixelDivergence_Null_When_Axes_Agree()
+    {
+        // Both signals point at the vertical axis → corroborated, no warning.
+        var result = new WptTestResult
+        {
+            TestPath = "css/css-align/abspos/y.html",
+            Passed = false,
+            LayoutAssertionFailures = new[]
+            {
+                new LayoutAssertionFailure("div.item", "offset-y", 35, 10),
+            },
+            MismatchDiagnostics = new MismatchDiagnostics
+            {
+                Category = MismatchCategory.MissingContent,
+                Summary = "…",
+                Displacement = "content shifted down ~9px",
+            },
+        };
+
+        Assert.Null(Program.CheckLayoutPixelDivergenceNote(result));
     }
 
     [Fact]

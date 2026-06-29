@@ -519,6 +519,58 @@ pixel-mismatch failure record is now self-describing: filtering the merged artif
   PixelMismatch record; absent for a RenderingError record), and
   `test_merge_reports_bounded_common_problem_groups` updated to expect the new key.
 
+### ✅ #11 — Per-band displacement profile (DONE)
+
+*Would have found cluster 12 (issue #1121) immediately.* Diagnostic #5's displacement
+estimate computes **one global centroid** shift for the whole dirty region. When a shift
+affects only *part* of the image — everything below some point translated, the line-height /
+inter-line-spacing / `<br>`-flow signature — that average blurs it away. In #1121 the global
+phrase read "content shifted right ~29px and down ~59px" (a misleading blend) when the truth
+was "the upper region is aligned; the region below y≈300 is shifted down ~9px", which points
+straight at a flow/spacing bug rather than a mis-placed element.
+
+- **Where**: `DisplacementBandAnalyzer` (`Broiler.Wpt`, main repo — it only needs the public
+  `PixelDiffResult.Mismatches`, so the diagnostic stays in the triage layer, not the
+  `MismatchClassifier` submodule). `Analyze` segments the sampled mismatches into contiguous
+  vertical **bands** (merging sampling holes up to 24px) and estimates each band's shift
+  independently (output-only centroid − reference-only centroid, the same comparison #5 does
+  globally). `DescribeNonUniform` emits a phrase only when the bands disagree by ≥6px on an axis.
+- **Surfacing**: `WptTestResult.DisplacementProfile`; appended to the failure `Message` as
+  `[non-uniform shift across N bands (y[a-b] aligned; y[c-d] down ~9px; …)]`, so it flows to the
+  console, the Markdown failures list, and the merged issue automatically.
+- **Tests** (`WptTestRunnerTests`): `DisplacementBands_Report_NonUniform_Band_Shift` (a band
+  shifted while another is aligned, where the global centroid is *below* the 5px threshold) and
+  `DisplacementBands_Uniform_Shift_Not_Flagged_NonUniform`.
+
+### ✅ #12 — Flag check-layout / pixel axis disagreement (DONE)
+
+*Would have prevented the #1121 misdirection.* The check-layout `data-offset` evaluator (#4)
+reads the **bridge's** CSS geometry estimator — a different code path from the renderer — so its
+"expected X, got Y" can disagree with the actual pixels. In #1121 it reported an `offset-x`
+divergence (→ "abspos placement is wrong") while the rendered pixels were displaced purely
+*vertically*. The report now cross-checks the two signals: when the check-layout failures name
+one axis but the pixel displacement moved only on the other, it prints
+`⚠ check-layout (bridge estimate) flags a horizontal divergence but the pixels moved vertical …
+the bug is likely in rendering, not where check-layout points. Reproduce with --render.`
+
+- **Where**: `Program.CheckLayoutPixelDivergenceNote` (`Broiler.Wpt`), printed under the
+  check-layout failures in the console Root-Cause-Analysis. Axis from the failing `Property`
+  (`offset-x`/`width`/… → horizontal; `*-y`/`height` → vertical) vs. the displacement phrase
+  (`left`/`right` vs `up`/`down`). Null when the signals agree, are absent, or have no direction.
+- **Tests** (`WptTestRunnerTests`): `CheckLayoutPixelDivergence_Flagged_When_Axes_Disagree`,
+  `CheckLayoutPixelDivergence_Null_When_Axes_Agree`.
+
+### ✅ #13 — Single-file render command (DONE)
+
+*The doc's core methodology ("reproduce against the live renderer") had no one-line tool — the
+CLI `--capture-image` is broken by the `Broiler.Dom` ALC load failure, so triage meant writing a
+throwaway xUnit test against `RenderHtmlFileBitmapPublic`.* `Broiler.Wpt` now takes
+`--render <FILE> [--render-out <PATH>]`: it renders one HTML file to a PNG with the live
+renderer and exits (no reference, no comparison, bypasses discovery). `--wpt-dir` is optional —
+when given it supplies WPT fonts and wpt-root-relative resource resolution, otherwise the file
+renders standalone. Makes minimal-repro a one-liner. Tests: `Program_Render_Mode_Writes_Png_For_A_Single_File`,
+`Program_Render_Mode_Reports_Missing_File`.
+
 ---
 
 ## 3. Performance & permanence of the diagnostics hook
