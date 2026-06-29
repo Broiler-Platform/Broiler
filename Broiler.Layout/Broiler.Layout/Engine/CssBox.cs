@@ -2147,8 +2147,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                 - ActualPaddingTop - ActualPaddingBottom
                 - ActualBorderTopWidth - ActualBorderBottomWidth;
 
-            // Compute height of in-flow children (excluding overflow:0 boxes,
-            // absolutely positioned elements, and fixed elements).
+            // Compute the extent of the in-flow content (excluding absolutely
+            // positioned and fixed elements).  Per CSS Box Alignment §5.4 the
+            // alignment subject is the content's *margin* box, so the leading
+            // child's top margin and the trailing child's bottom margin count
+            // toward the consumed space — measuring only border boxes would
+            // overstate the free space and shift the content too far.
             double contentTop = double.MaxValue;
             double contentBottom = double.MinValue;
             foreach (var child in Boxes)
@@ -2157,8 +2161,8 @@ internal class CssBox : CssBoxProperties, IDisposable
                     continue;
                 if (child.Display == CssConstants.None)
                     continue;
-                double childTop = child.Location.Y;
-                double childBottom = child.ActualBottom;
+                double childTop = child.Location.Y - child.ActualMarginTop;
+                double childBottom = child.ActualBottom + child.ActualMarginBottom;
                 if (childTop < contentTop)
                     contentTop = childTop;
                 if (childBottom > contentBottom)
@@ -2195,9 +2199,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                             break;
                         case "end":
                         case "flex-end":
-                        case "last baseline":
                             shift = freeSpace;
                             break;
+                        // baseline / last baseline: with no baseline-sharing group
+                        // (each container is independent), both fall back to the
+                        // start edge — matching the reference rendering.
                         case "space-between":
                             // Single content group → same as start (no shift).
                             break;
