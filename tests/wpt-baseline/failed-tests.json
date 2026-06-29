@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 319,
+      "count": 317,
       "examples": [
         "css/css-align/abspos/align-self-static-position-003.html",
         "css/css-align/abspos/align-self-vlr-ltr-vlr.html",
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 21,
+      "count": 22,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
@@ -66,6 +66,16 @@
       "examples": [
         "css/css-animations/animate-with-color-mix-2.html"
       ]
+    },
+    {
+      "key": "ScriptError",
+      "label": "ScriptError",
+      "category": "ScriptError",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "css/css-anchor-position/popover-implicit-anchor.html"
+      ]
     }
   ],
   "topFailingDirectories": [
@@ -85,11 +95,20 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      412
+      411
+    ],
+    [
+      "ScriptError",
+      1
     ]
   ],
   "droppedDeclarations": [],
-  "exceptionSignatures": [],
+  "exceptionSignatures": [
+    [
+      "DomBridge.BuildAnchorRegistry \u2014 Collection was modified; enumeration operation may not execute.",
+      1
+    ]
+  ],
   "failureFamilies": [
     {
       "family": "css/css-anchor-position/anchor-scroll-position-try-{N}.html",
@@ -2202,6 +2221,12 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/popover-implicit-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "ScriptError"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/position-anchor-001.html",
       "passed": false,
       "skipped": false,
@@ -2227,7 +2252,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-005.html",
@@ -2637,13 +2662,6 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-anchor.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-css-visibility.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
