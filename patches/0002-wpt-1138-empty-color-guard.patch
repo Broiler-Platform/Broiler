@@ -1,0 +1,40 @@
+From 7820e80d1291b08dfd8a66141a3784e2fe4ec2d7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 29 Jun 2026 21:59:16 +0000
+Subject: [PATCH] Guard ParseCssColor against empty color values
+
+A color property that resolves to an empty/whitespace string (e.g. a var()
+reference that substitutes to nothing) reached RAdapter.GetColor, which
+rejects empty input with an ArgumentException and aborts rendering for the
+whole document (WPT RenderingError, signature RAdapter.GetColor). Return an
+unresolved color in that case, mirroring the static PaintWalker.ParseCssColor
+guard.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index 884fae4..0674ba5 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -266,6 +266,15 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+         if (Broiler.CSS.CssValueParser.TryParseColor(value, out var color))
+             return Color.FromArgb(color.Alpha, color.Red, color.Green, color.Blue);
+ 
++        // An empty/whitespace value reaches here when a color property resolves to
++        // nothing (e.g. a `var()` reference with no fallback that substitutes to the
++        // empty string). RAdapter.GetColor rejects empty input with an
++        // ArgumentException, which aborts rendering for the whole document
++        // (RenderingError, signature RAdapter.GetColor). Treat it as an unresolved
++        // color, mirroring the static PaintWalker.ParseCssColor guard.
++        if (string.IsNullOrWhiteSpace(value))
++            return Color.Empty;
++
+         return Adapter.GetColor(value);
+     }
+ 
+-- 
+2.43.0
+

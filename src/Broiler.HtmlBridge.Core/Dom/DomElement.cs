@@ -254,11 +254,19 @@ public sealed class DomElement : CanonicalElement
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        private Dictionary<string, string> Snapshot() =>
-            owner.baseAttributes().Values.ToDictionary(
-                static attribute => attribute.QualifiedName,
-                static attribute => attribute.Value,
-                StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, string> Snapshot()
+        {
+            // Two attributes can collapse to the same key under case-insensitive
+            // comparison (e.g. an element carrying both `xml:lang` and `XML:LANG`,
+            // common in XHTML/XML fixtures). ToDictionary throws "An item with the
+            // same key has already been added" in that case, which aborts the whole
+            // snapshot (signature LegacyAttributeDictionary.Snapshot). Build the map
+            // defensively with last-wins semantics instead.
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var attribute in owner.baseAttributes().Values)
+                result[attribute.QualifiedName] = attribute.Value;
+            return result;
+        }
 
         private Broiler.Dom.DomAttribute? Find(string qualifiedName)
         {
