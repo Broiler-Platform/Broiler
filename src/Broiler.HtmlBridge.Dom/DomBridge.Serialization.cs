@@ -108,9 +108,40 @@ public sealed partial class DomBridge
             return;
 
         _serializationTransformsApplied = true;
+        RemoveRenderCommentNodes(DocumentElement);
         ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplyZoomPseudoSerializationOverrides();
         ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+    }
+
+    /// <summary>
+    /// Drops comment nodes from the render-bound document. Comments never render,
+    /// but the shared serializer emits them as <c>&lt;!--…--&gt;</c>, which splits
+    /// an otherwise-contiguous run of text around a comment (e.g.
+    /// <c>"\n&lt;!-- c --&gt;\n"</c> between block siblings) into two separate text
+    /// nodes when the canonical HTML is re-parsed for layout. CSS white-space
+    /// processing then collapses each run independently, yielding a spurious extra
+    /// space between elements (and an uncollapsed leading space at the start of a
+    /// block) that shifts all following content — a common cause of the WPT
+    /// "MissingContent" pixel mismatches in comment-heavy tests. Removing the
+    /// comment nodes lets the surrounding text re-parse as a single node so the run
+    /// collapses as the spec requires. Runs only inside <see cref="ApplySerializationTransforms"/>,
+    /// so JS-visible <c>innerHTML</c>/<c>outerHTML</c> (which serialize without it)
+    /// still expose the comments.
+    /// </summary>
+    private static void RemoveRenderCommentNodes(DomElement element)
+    {
+        for (int i = element.Children.Count - 1; i >= 0; i--)
+        {
+            var child = element.Children[i];
+            if (string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Children.RemoveAt(i);
+                continue;
+            }
+
+            RemoveRenderCommentNodes(child);
+        }
     }
 
     private void ApplyZoomPseudoSerializationOverrides()

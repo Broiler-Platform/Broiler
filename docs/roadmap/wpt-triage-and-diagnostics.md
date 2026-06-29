@@ -26,6 +26,32 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 8 | `display:inline-table` dropped by value validator (300 drops → MissingContent) | ✅ fixed | Broiler.CSS |
 | 9 | Abspos block-axis `align-self` (unresolved CB height + no height-shrink) | ✅ fixed | Broiler.Layout |
 | 10 | `@position-try` fallback dropped by comment-in-body parse bug | 🟡 partial | Broiler.HtmlBridge.Dom |
+| 11 | HTML comments split inline white-space runs → spurious space, content shift | ✅ fixed | Broiler.HtmlBridge.Dom |
+
+Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
+`PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
+shifted content horizontally in comment-heavy tests. After scripts run, the bridge serializes
+the live DOM back to canonical HTML for the renderer (`DomBridge.SerializeToHtml`). The shared
+serializer re-emitted comment nodes as `<!--…-->`, so a comment sitting inside a run of
+white-space between siblings — ubiquitous in these WPT files, e.g.
+`</div>\n<!-- Overflows IMCB. -->\n<div>` — split the run into **two** DOM text nodes when the
+canonical HTML was re-parsed for layout. CSS white-space processing then collapsed each run
+*independently*: between elements that yields two stacked spaces instead of one, and at the
+start of a block the leading white-space no longer collapses to nothing (the first text node is
+removed but the second survives as a "between inlines" space in `DomParser.CorrectTextBoxes`).
+The error **accumulates** left-to-right, so every following box drifts right — exactly the
+"content shifted right ~Npx" / `MissingContent` signature. Found by reproducing
+`css-align/abspos/justify-self-default-overflow-htb-ltr-htb.html` against the live renderer
+(first inline-block container painted at x=24 instead of x=20, each subsequent container +5px
+further off). Fixed by dropping comment nodes from the **render-bound** document in
+`DomBridge.ApplySerializationTransforms` (`RemoveRenderCommentNodes`) so the surrounding text
+re-parses as a single node and the run collapses per spec; comments never render, and the
+transform runs only on the render path, so JS-visible `innerHTML`/`outerHTML` still expose them.
+Regression test `CommentWhitespaceCollapseTests` (`Broiler.Wpt.Tests`). The fix removes the
+comment-induced shift across the css-align/abspos family (e.g. `justify-self-…-htb-ltr-htb`
+94.1 % → 96.9 % match); the residual gap in those specific local tests is the **separate**
+RTL / vertical-writing-mode inline static-position work (cluster 3, deferred) plus sub-pixel
+border anti-aliasing, not the white-space bug.
 
 Cluster 10 (issue [#1105](https://github.com/MaiRat/Broiler/issues/1105), the
 `css-anchor-position` position-try/fallback sub-cluster, ~23 tests) was a parse bug in
