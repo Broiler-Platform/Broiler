@@ -339,10 +339,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- "$FAILED_TESTS_FILE"; then
+          # Stage first, then test the staged diff: `git diff` ignores untracked
+          # files, so checking before `git add` would never detect the manifest's
+          # first-ever creation (the file is untracked until then).
+          git add "$FAILED_TESTS_FILE"
+          if git diff --cached --quiet -- "$FAILED_TESTS_FILE"; then
             echo "No manifest changes to commit."
             exit 0
           fi
-          git add "$FAILED_TESTS_FILE"
           git commit -m "ci: update WPT failed-tests manifest [skip ci]"
           git push origin "HEAD:$BRANCH_NAME"
