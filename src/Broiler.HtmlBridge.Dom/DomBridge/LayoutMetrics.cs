@@ -1544,7 +1544,7 @@ public sealed partial class DomBridge
                     NotifyVisualViewportScrollIfNeeded(queuedPreviousVisualPageLeft, queuedPreviousVisualPageTop, trackVisualViewport);
                     DispatchScrollEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
                     DispatchScrollEndEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
-                    _smoothScrollTokens.Remove(element);
+                    _smoothScrollTokens.TryRemove(element, out _);
                 }
             });
 
@@ -1571,7 +1571,7 @@ public sealed partial class DomBridge
 
     private void CancelSmoothScroll(DomElement element)
     {
-        _smoothScrollTokens.Remove(element);
+        _smoothScrollTokens.TryRemove(element, out _);
     }
 
     private void DispatchScrollEventIfNeeded(DomElement element, double previousLeft, double previousTop)

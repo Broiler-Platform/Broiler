@@ -68,7 +68,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _rafCallbacks = new();
     private int _frameActionIdCounter;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Action> _frameActions = new();
-    private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
+    // Touched by the same scroll/frame-action callbacks that can run on
+    // ThreadPool threads (see the timer-map note above), so keep it concurrent.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, int> _smoothScrollTokens = new();
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
