@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 670,
+    "failed": 662,
     "skipped": 0,
-    "total": 670
+    "total": 662
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 317,
+      "count": 309,
       "examples": [
         "css/css-align/abspos/align-self-static-position-003.html",
         "css/css-align/abspos/align-self-vlr-ltr-vlr.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 16,
+      "count": 17,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html",
@@ -66,49 +66,30 @@
       "examples": [
         "css/css-animations/animate-with-color-mix-2.html"
       ]
-    },
-    {
-      "key": "ScriptError",
-      "label": "ScriptError",
-      "category": "ScriptError",
-      "subCategory": null,
-      "count": 1,
-      "examples": [
-        "css/css-anchor-position/popover-implicit-anchor.html"
-      ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      239
+      241
     ],
     [
       "css/css-align",
-      143
+      132
     ],
     [
       "css/css-animations",
-      28
+      29
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      409
-    ],
-    [
-      "ScriptError",
-      1
+      402
     ]
   ],
   "droppedDeclarations": [],
-  "exceptionSignatures": [
-    [
-      "DomBridge.BuildAnchorRegistry \u2014 Collection was modified; enumeration operation may not execute.",
-      1
-    ]
-  ],
+  "exceptionSignatures": [],
   "failureFamilies": [
     {
       "family": "css/css-anchor-position/anchor-scroll-position-try-{N}.html",
@@ -171,6 +152,18 @@
       ]
     },
     {
+      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
+      "count": 7,
+      "categories": {
+        "PixelMismatch": 7
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-scroll-005.html",
+        "css/css-anchor-position/anchor-scroll-002.html",
+        "css/css-anchor-position/anchor-scroll-007.html"
+      ]
+    },
+    {
       "family": "css/css-anchor-position/scroll-to-anchored-fixed-{N}.html",
       "count": 7,
       "categories": {
@@ -192,18 +185,6 @@
         "css/css-align/abspos/align-self-static-position-003.html",
         "css/css-align/abspos/align-self-static-position-004.html",
         "css/css-align/abspos/align-self-static-position-007.html"
-      ]
-    },
-    {
-      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
-      "count": 6,
-      "categories": {
-        "PixelMismatch": 6
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-005.html",
-        "css/css-anchor-position/anchor-scroll-002.html",
-        "css/css-anchor-position/anchor-scroll-004.html"
       ]
     },
     {
@@ -245,41 +226,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/align-self-default-overflow-htb-ltr-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/align-self-default-overflow-htb-rtl-htb.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/align-self-default-overflow-htb-rtl-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/align-self-default-overflow-vrl-rtl-htb.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/align-self-default-overflow-vrl-rtl-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-align/abspos/align-self-htb-ltr-vlr.html",
@@ -451,48 +397,6 @@
     },
     {
       "relativeTestPath": "css/css-align/abspos/default-overflow-with-scroll.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-htb-ltr-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-htb-rtl-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-vrl-ltr-htb.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-vrl-ltr-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-vrl-rtl-htb.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-align/abspos/justify-self-default-overflow-vrl-rtl-vrl.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -1766,6 +1670,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/anchor-scroll-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-chained-001.html",
       "passed": false,
       "skipped": false,
@@ -2214,12 +2125,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/popover-implicit-anchor.html",
-      "passed": false,
-      "skipped": false,
-      "category": "ScriptError"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-anchor-001.html",
       "passed": false,
       "skipped": false,
@@ -2584,6 +2489,13 @@
       "subCategory": "ColorShift"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/position-try-switch-to-fixed-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/position-try-tree-scoped-pseudo.html",
       "passed": false,
       "skipped": false,
@@ -2655,6 +2567,13 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-css-visibility.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -2953,6 +2872,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-animations/animation-delay-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-animations/animation-delay-011.html",
