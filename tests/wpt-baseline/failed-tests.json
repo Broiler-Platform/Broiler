@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 672,
+    "failed": 670,
     "skipped": 0,
-    "total": 672
+    "total": 670
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 22,
+      "count": 21,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 17,
+      "count": 16,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html",
@@ -81,7 +81,7 @@
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      240
+      239
     ],
     [
       "css/css-align",
@@ -89,13 +89,13 @@
     ],
     [
       "css/css-animations",
-      29
+      28
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      411
+      409
     ],
     [
       "ScriptError",
@@ -171,18 +171,6 @@
       ]
     },
     {
-      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
-      "count": 7,
-      "categories": {
-        "PixelMismatch": 7
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-005.html",
-        "css/css-anchor-position/anchor-scroll-002.html",
-        "css/css-anchor-position/anchor-scroll-007.html"
-      ]
-    },
-    {
       "family": "css/css-anchor-position/scroll-to-anchored-fixed-{N}.html",
       "count": 7,
       "categories": {
@@ -204,6 +192,18 @@
         "css/css-align/abspos/align-self-static-position-003.html",
         "css/css-align/abspos/align-self-static-position-004.html",
         "css/css-align/abspos/align-self-static-position-007.html"
+      ]
+    },
+    {
+      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
+      "count": 6,
+      "categories": {
+        "PixelMismatch": 6
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-scroll-005.html",
+        "css/css-anchor-position/anchor-scroll-002.html",
+        "css/css-anchor-position/anchor-scroll-004.html"
       ]
     },
     {
@@ -1766,13 +1766,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchor-scroll-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-chained-001.html",
       "passed": false,
       "skipped": false,
@@ -2252,7 +2245,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-005.html",
@@ -2960,13 +2953,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-animations/animation-delay-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-animations/animation-delay-011.html",
