@@ -5,6 +5,12 @@ using System.Linq;
 
 namespace Broiler.HtmlBridge;
 
+// RF-BRIDGE-1a: this file is the bridge's parallel box model. It is unused at
+// runtime (the renderer's CssLayoutEngine performs layout/paint) and is deprecated
+// for removal at the next htmlbridge-public-surface major. The cross-references
+// among the deprecated types below are intentional, so silence CS0618 here.
+#pragma warning disable CS0618
+
 /// <summary>CSS display property values.</summary>
 public enum CssDisplay { Block, Inline, InlineBlock, None, Flex, Grid }
 
@@ -121,6 +127,7 @@ public class BoxDimensions
 
 /// <summary>A box in the layout tree with computed dimensions and CSS properties.</summary>
 /// <remarks>Initializes a new <see cref="LayoutBox"/> for the given element.</remarks>
+[Obsolete("Unused at runtime; the renderer's CssLayoutEngine performs layout/paint. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class LayoutBox(DomElement element)
 {
     /// <summary>The DOM element this box represents.</summary>
@@ -170,6 +177,7 @@ public class LayoutBox(DomElement element)
 /// Implements CSS Box Model Level 3 layout with block, inline, and inline-block
 /// formatting contexts, float/clear, and positioning.
 /// </summary>
+[Obsolete("Unused at runtime; the renderer's CssLayoutEngine performs layout/paint. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class CssBoxModel
 {
     private const float DefaultFontSize = 16f;

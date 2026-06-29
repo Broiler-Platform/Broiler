@@ -1,5 +1,10 @@
 using System.Runtime.CompilerServices;
 
+// RF-BRIDGE-1a: some forwarded types (the dead bridge paint pipeline) are now
+// [Obsolete] but stay forwarded for public-surface compatibility until their v2
+// removal. The forwards themselves are not deprecated, so silence CS0618 here.
+#pragma warning disable CS0618
+
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssDisplay))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssPosition))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssVisibility))]

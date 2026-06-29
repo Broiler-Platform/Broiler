@@ -3,7 +3,8 @@
 **Date:** 2026-06-28
 
 **Current closeout status:** Phases 0-7 are implemented. The public/renderer adapter
-tail is closed; only RF-CSS-2's raster-performance confirmation remains open in
+tail is closed, and RF-CSS-2's raster-performance gate is confirmed within budget
+(2026-06-29) — the CSS roadmap is complete. See
 [`refactor-gap.md`](refactor-gap.md).
 **Scope of this note:** what landed in the Phase 4 / Phase 6 work, the findings that
 shape the rest, and a concrete, prioritized plan for the remaining phases. Read
@@ -328,6 +329,9 @@ The authoritative remaining work, accepted visual baselines, and repeatable
 validation command are in [`refactor-gap.md`](refactor-gap.md), RF-CSS-1 and
 RF-CSS-2.
 
-**Remaining closeout:** RF-CSS-1 is closed. RF-CSS-2 records green architecture,
-CSS, Acid, and improved WPT visual results; profile or clear the remaining
-`html.raster` performance delta before marking the overall CSS roadmap complete.
+**Remaining closeout:** RF-CSS-1 and RF-CSS-2 are both closed. RF-CSS-2 records green
+architecture, CSS, Acid, and improved WPT visual results, and the `html.raster` gate
+is confirmed within budget by three clean `--no-build` runs (2026-06-29, 182–186 ms
+vs the 190.515 ms baseline). The CSS roadmap is complete. Optional hygiene: regenerate
+the benchmark baseline JSON with the current `*WithStyleSet` harness so the un-gated
+companion metrics stop reading stale.
