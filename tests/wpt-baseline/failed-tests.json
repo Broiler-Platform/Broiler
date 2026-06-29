@@ -1,0 +1,2022 @@
+{
+  "summary": {
+    "passed": 0,
+    "failed": 260,
+    "skipped": 0,
+    "total": 260
+  },
+  "shardCount": 8,
+  "problemLimit": 10,
+  "incompleteShards": [],
+  "topProblems": [
+    {
+      "key": "PixelMismatch:MissingContent",
+      "label": "PixelMismatch / MissingContent",
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent",
+      "count": 245,
+      "examples": [
+        "css/css-ui/appearance-button-001.html",
+        "css/css-ui/appearance-menulist-button-001.html",
+        "css/css-ui/box-sizing-008.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ReferenceOverlayExposed",
+      "label": "PixelMismatch / ReferenceOverlayExposed",
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed",
+      "count": 14,
+      "examples": [
+        "css/css-ui/outline-001.html",
+        "css/css-ui/outline-012.html",
+        "css/css-ui/outline-015.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ColorShift",
+      "label": "PixelMismatch / ColorShift",
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift",
+      "count": 1,
+      "examples": [
+        "css/css-ui/inert-attribute-overriding.html"
+      ]
+    }
+  ],
+  "topFailingDirectories": [
+    [
+      "css/css-ui",
+      260
+    ]
+  ],
+  "failuresByCategory": [
+    [
+      "PixelMismatch",
+      260
+    ]
+  ],
+  "droppedDeclarations": [
+    [
+      "clear: up",
+      138
+    ],
+    [
+      "outline-style: auto",
+      56
+    ],
+    [
+      "cursor: light-dark(linear-gradient(red), none) 0 0, pointer",
+      11
+    ],
+    [
+      "cursor: linear-gradient(blue, green), help",
+      11
+    ]
+  ],
+  "exceptionSignatures": [],
+  "failureFamilies": [
+    {
+      "family": "css/css-ui/box-sizing-{N}.html",
+      "count": 20,
+      "categories": {
+        "PixelMismatch": 20
+      },
+      "examples": [
+        "css/css-ui/box-sizing-008.html",
+        "css/css-ui/box-sizing-013.html",
+        "css/css-ui/box-sizing-022.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/resize-{N}.html",
+      "count": 20,
+      "categories": {
+        "PixelMismatch": 20
+      },
+      "examples": [
+        "css/css-ui/resize-006.html",
+        "css/css-ui/resize-011.html",
+        "css/css-ui/resize-019.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/nav-down-{N}.html",
+      "count": 17,
+      "categories": {
+        "PixelMismatch": 17
+      },
+      "examples": [
+        "css/css-ui/nav-down-002.html",
+        "css/css-ui/nav-down-015.html",
+        "css/css-ui/nav-down-007.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/nav-left-{N}.html",
+      "count": 17,
+      "categories": {
+        "PixelMismatch": 17
+      },
+      "examples": [
+        "css/css-ui/nav-left-001.html",
+        "css/css-ui/nav-left-009.html",
+        "css/css-ui/nav-left-016.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/nav-right-{N}.html",
+      "count": 17,
+      "categories": {
+        "PixelMismatch": 17
+      },
+      "examples": [
+        "css/css-ui/nav-right-000.html",
+        "css/css-ui/nav-right-008.html",
+        "css/css-ui/nav-right-013.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/nav-up-{N}.html",
+      "count": 17,
+      "categories": {
+        "PixelMismatch": 17
+      },
+      "examples": [
+        "css/css-ui/nav-up-001.html",
+        "css/css-ui/nav-up-009.html",
+        "css/css-ui/nav-up-016.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/outline-{N}.html",
+      "count": 16,
+      "categories": {
+        "PixelMismatch": 16
+      },
+      "examples": [
+        "css/css-ui/outline-026.html",
+        "css/css-ui/outline-001.html",
+        "css/css-ui/outline-009.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/caret-color-{N}.html",
+      "count": 15,
+      "categories": {
+        "PixelMismatch": 15
+      },
+      "examples": [
+        "css/css-ui/caret-color-001.html",
+        "css/css-ui/caret-color-016.html",
+        "css/css-ui/caret-color-004.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/text-overflow-{N}.html",
+      "count": 9,
+      "categories": {
+        "PixelMismatch": 9
+      },
+      "examples": [
+        "css/css-ui/text-overflow-002.html",
+        "css/css-ui/text-overflow-018.html",
+        "css/css-ui/text-overflow-008.html"
+      ]
+    },
+    {
+      "family": "css/css-ui/cursor-image-png-{N}.html",
+      "count": 6,
+      "categories": {
+        "PixelMismatch": 6
+      },
+      "examples": [
+        "css/css-ui/cursor-image-png-032.html",
+        "css/css-ui/cursor-image-png-004.html",
+        "css/css-ui/cursor-image-png-033.html"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "relativeTestPath": "css/css-ui/appearance-auto-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-button-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-checkbox-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-listbox-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-menulist-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-menulist-button-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-menulist-button-002.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-meter-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-progress-bar-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-radio-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-revert-001.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-searchfield-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-textarea-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/appearance-textfield-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-017.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-018.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-019.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-020.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-021.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-022.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-023.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-024.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-025.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-026.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/canvas-cursor-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/canvas-cursor-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-color-017.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-eol-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-rtl-sideways-lr.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-rtl-sideways-rl.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-rtl-vlr.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-rtl-vrl.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-rtl.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-sideways-lr.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-sideways-rl.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-vlr.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-001-vrl.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-empty-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-empty-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-block-fallback-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-underscore-001-notref-1.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-underscore-001-notref-2.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-underscore-001-notref-3.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-underscore-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/caret-shape-underscore-empty-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-fallback-props-revert-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-background-attachment-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-background-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-block-start-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-block-start-style-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-block-start-width-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-image-source-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-top-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-top-left-radius-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-top-style-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-generated/grouped-kind-of-widget-fallback-border-top-width-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/compute-kind-widget-no-fallback-props-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-auto-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-auto-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-border-area.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-box-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-box-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-box-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-hover-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-018.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-022.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-031.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-032.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/cursor-image-png-033.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/inert-attribute-overriding.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "css/css-ui/native-appearance-disabled-for-value-unset.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-missing-1.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-missing-2.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-missing-3.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-missing-4.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-dir-target-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-000.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-down-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-000.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-left-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-000.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-right-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-000.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/nav-up-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/negative-outline-offset.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-019.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-022.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-025.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-026.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-027.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-028.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-auto-width-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-negative-offset-composited-scroll.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-offset-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-style-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/outline-width-rounding.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-005.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-009.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-012.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-015.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-016.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-017.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-018.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-019.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-020.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-021.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/resize-child-will-change-transform.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/subpixel-outline-width.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-013.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-014.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-017.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-018.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-026.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow-string-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/text-overflow.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/translucent-outline.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/transparent-accent-color-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/transparent-accent-color-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-auto-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-button-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-checkbox-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-listbox-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-menulist-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-menulist-button-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-menulist-button-002.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-meter-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-progress-bar-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-radio-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-searchfield-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-textarea-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/webkit-appearance-textfield-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    }
+  ]
+}
