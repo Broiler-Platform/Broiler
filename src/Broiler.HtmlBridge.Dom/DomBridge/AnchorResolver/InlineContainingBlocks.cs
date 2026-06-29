@@ -157,7 +157,11 @@ public sealed partial class DomBridge
             if (parentFs > 0) fontSize = parentFs;
         }
 
-        foreach (var child in element.Children)
+        // Snapshot before iterating: this estimation is reached from
+        // BuildAnchorRegistry's box computation, where the live ChildNodes list
+        // can be mutated mid-walk and throw "Collection was modified" (WPT issue
+        // #1131). Matches the .ToList() idiom used elsewhere in this file.
+        foreach (var child in element.Children.ToList())
         {
             if (child.IsTextNode)
             {

@@ -284,7 +284,15 @@ public sealed partial class DomBridge
         if (element.Parent == null) return 0;
 
         double totalHeight = 0;
-        foreach (var sibling in element.Parent.Children)
+        // Snapshot the sibling list before walking it: element.Parent.Children
+        // enumerates the live ChildNodes list, so any mutation of it during the
+        // walk (e.g. an anchor-driven DOM move on a node sharing this parent, or
+        // a lazy offset query that re-enters anchor resolution) throws
+        // "Collection was modified" mid-traversal and aborts the registry build
+        // for the whole document (WPT issue #1131, signature
+        // DomBridge.BuildAnchorRegistry). Same defensive idiom as the .ToList()
+        // walks in ResolveAnchorCenter and InlineContainingBlocks.
+        foreach (var sibling in element.Parent.Children.ToList())
         {
             if (sibling == element) break;
             if (sibling.IsTextNode) continue;
