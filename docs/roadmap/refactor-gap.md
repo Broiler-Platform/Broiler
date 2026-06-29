@@ -1,8 +1,9 @@
 # CSS, Layout, DOM/HTML, and HtmlBridge refactor gap register
 
-**Status:** Open
+**Status:** Open — one gap remaining (RF-BRIDGE-1). CSS, Layout, and DOM/HTML are
+closed; RF-CSS-2 closed 2026-06-29.
 
-**Audit date:** 2026-06-28
+**Audit date:** 2026-06-28 (RF-CSS-2 raster confirmation added 2026-06-29)
 
 **Audited baseline:** `ea7b7bc6` plus the RF-LAYOUT-1/RF-LAYOUT-2 and
 RF-DOM-1/RF-DOM-2 working-tree changes recorded below
@@ -24,7 +25,7 @@ gates are satisfied.
 
 | Refactor | Current state | Complete? |
 |---|---|---|
-| CSS | Phases 0-7 are implemented. `HtmlStyleSet` is the supported origin-aware API; `CssData` is only an obsolete one-release wrapper. The final performance confirmation in RF-CSS-2 remains open. | No |
+| CSS | Phases 0-7 are implemented. `HtmlStyleSet` is the supported origin-aware API; `CssData` is only an obsolete one-release wrapper. RF-CSS-2's raster confirmation is within budget (2026-06-29). | Yes |
 | Renderer layout | The extraction, cleanup, API boundary, and final Acid/WPT regression gates are complete. | Yes |
 | DOM/HTML | The canonical `Broiler.Dom`/`Broiler.Dom.Html` model is implemented, the typed hand-off is exclusive in the application pipeline, compatibility facades are a tested v1 adapter boundary, and the deferred behavior/validation gates are closed. | Yes |
 | HtmlBridge layout | The separate Track C extraction/unification has not started. | No |
@@ -95,21 +96,22 @@ ownership moves to the shared model. Landed:
 - Deleted the compatibility parser sources and the obsolete Core `CssBlock`,
   selector-item, font-face, and keyframe models. `CssData` now has only `StyleSet`,
   `StyleSheet`, `Combine`, and `Clone`.
-- Trimmed `Broiler.Layout` from 16 friend grants to nine direct box-tree consumers;
+- Trimmed `Broiler.Layout` from 16 friend grants to nine direct box-tree consumers
+  (RF-LAYOUT-1 later reduced this further to the current seven — see that section);
   removed stale grants for Core, Image.Compat, Image.Tests, WPF, both bridge facades,
   and CLI. Architecture tests lock the reduced surface and the removed legacy models.
 
 RF-CSS-1's close conditions are satisfied. The compatibility wrapper is an explicit
 API-retirement policy, not a second parser, cascade, model, or runtime path.
 
-### RF-CSS-2 — Record final CSS cutover validation
+### RF-CSS-2 — Record final CSS cutover validation — **Closed 2026-06-29**
 
 The repeatable runner is `scripts/run-rf-css-validation.ps1`. It serially rebuilds
 the solution and every standalone test assembly it executes, emits TRX files and a
 Markdown summary, rejects failures outside the explicit baseline, and optionally
 runs visual and performance gates.
 
-Current post-tail evidence (`artifacts/rf-css-validation/rf-css-closeout-20260628`,
+Post-tail correctness evidence (`artifacts/rf-css-validation/rf-css-closeout-20260628`,
 2026-06-28):
 
 - CSS kernel 22/22, CSS DOM 55/55, extraction architecture 13/13, and bridge
@@ -123,15 +125,40 @@ Current post-tail evidence (`artifacts/rf-css-validation/rf-css-closeout-2026062
 - Acid3 CSS/layout: 65 passed with the same two accepted cascade failures; WPT
   anchor/visibility/backdrop improved to 23 passed with three accepted pixel failures
   (the six top-layer anchor baselines now pass). No new visual or assembly-load failure
-  appeared; and
-- performance remains the only open gate. The latest optimized no-build confirmation
-  kept `js.startup` and `bridge.mutation` within budget, while `html.raster` measured
-  216.644 ms against the 190.515 ms baseline (+13.71%, 2% budget). Evidence is under
-  `performance-optimized` in the closeout directory.
+  appeared.
 
-RF-CSS-2 remains open only for the reproducible `html.raster` performance delta. Do
-not widen or replace the baseline until the renderer timing is profiled or a clean
-confirmation is within budget.
+#### Closure — clean raster confirmation within budget (2026-06-29)
+
+The `html.raster` gate now passes. Three consecutive `--no-build` runs of the
+benchmark harness on a stable machine (no compile near sampling) measured raster
+**below** the 190.515 ms baseline — 182.075 ms, 185.923 ms, and 182.757 ms (−4.4%,
+−2.4%, −4.1%; ceiling 194.33 ms) — all "within budget", with `bridge.mutation` and
+`js.startup` also within budget. Evidence is under
+`artifacts/rf-css-validation/rf-css-2-confirmation-20260629`.
+
+The 2026-06-28 `html.raster` reading of 216.644 ms (+13.71%) was a
+measurement-environment artifact, not a CSS-refactor regression:
+
+1. **Compile too close to sampling.** The 06-28 run sampled raster in a loaded
+   container right after building — the failure mode the runner's performance step
+   explicitly warns about. A clean `--no-build` run removes it.
+2. **Stale cross-API baseline.** The baseline JSON was captured at `12d055b3`
+   (2026-06-26) with the old `SetHtml`/`RenderToImage` API; commit `ea7b7bc6`
+   swapped every benchmark body to the new `*WithStyleSet` APIs without
+   regenerating it. The un-gated companion metrics prove the drift — baseline
+   `html.parse` 6.703 ms and `bridge.typed-render-handoff` 7.779 ms are 15–25×
+   faster than any current run, impossible as a real per-call regression because
+   the `html.paint` benchmark runs the same parse and moved only +8%.
+
+This satisfies the close condition ("a clean confirmation is within budget"). The
+baseline was not widened or replaced.
+
+**Follow-up (non-blocking hygiene, not an open gate):** the committed baseline's
+un-gated metrics (`html.parse`, `html.layout`, `bridge.typed-render-handoff`) are
+stale relative to the current `*WithStyleSet` harness. Regenerating the baseline JSON
+on a stable machine with the current harness would make those companion numbers
+reproducible. The gated metrics already pass, so do this as a deliberate re-baseline,
+separate from RF-CSS-2.
 
 ### RF-LAYOUT-1 — Finish the cleanup phase — **Closed 2026-06-28**
 
@@ -238,6 +265,80 @@ the proposed HtmlBridge layout boundary and repointing consumers, or (b) unifyin
 bridge on `Broiler.Layout` and formally superseding Track C. The selected path must
 retain computed-style, offset-geometry, and bridge-test parity.
 
+#### Code-reality findings (2026-06-29) — the choice is not what Track C framed
+
+A read of the actual bridge code reframes the decision. Track C assumes the
+duplication to relocate is `CssBoxModel` + `CssTextProperties`. It is not:
+
+- **The bridge's `CssBoxModel` (1064 LOC) + `RenderingStages` (440 LOC) paint
+  pipeline is dead except for its own unit tests.** `BuildLayoutTree`,
+  `PaintBox`, and `CreateStackingContext` have **no live (non-test) caller anywhere
+  in the repo** (`RenderingPipelineTests.cs` is the only `BuildLayoutTree` caller).
+  Runtime painting goes through the renderer's `CssLayoutEngine` (the Graphics app
+  and WPF both paint from it). `CssTextProperties` (269 LOC) has no external
+  consumer by file name. So Track C's C.2 would extract **dead code** into a new
+  assembly — entrenching and dignifying it, the worst outcome.
+- **The live duplication is `LayoutMetrics.cs` (2711 LOC)** — recursive estimators
+  that re-derive box geometry from computed style to answer `clientWidth/Height`,
+  `getBoundingClientRect`, `offset*`, hit-testing, and check-layout assertions. This
+  is the exponential-recursion path behind the #1113/#1115 timeouts and the
+  pixels-vs-`getComputedStyle` divergence risk. Track C's move list does not mention
+  it.
+- **The bridge is no longer a `Broiler.Layout` friend** (RF-LAYOUT-1 trimmed it), and
+  the engine types are `internal`. Unification therefore needs a *new public*
+  `DomElement`-keyed geometry read-model API on the renderer/`Broiler.Layout`, plus a
+  headless metrics-only `ILayoutEnvironment` the bridge can supply (the
+  `ILayoutEnvironment` text-metrics seam already exists — it was the original reason
+  two engines diverged).
+
+#### Recommendation — end-state (b) unify; supersede Track C's extraction
+
+Split RF-BRIDGE-1 into two independently-valued tracks:
+
+- **RF-BRIDGE-1a (retire the dead paint pipeline — small, but a public-surface
+  change, not a free deletion).** The pipeline (`CssBoxModel.BuildLayoutTree`,
+  `Painter`/`PaintCommand`/`PaintLayer`, `LayoutBox`, stacking contexts in
+  `RenderingStages.cs`) is dead at runtime (test-only callers), but the per-type
+  audit (2026-06-29) found two constraints:
+  1. **The types are public API** — `CssBoxModel`, `LayoutBox`, `Painter`,
+     `PaintCommand`, `RenderOutput`, the CSS/flex/grid enums, etc. are all
+     `[assembly: TypeForwardedTo]` from the `Broiler.HtmlBridge` facade
+     (`src/Broiler.HtmlBridge/TypeForwarding.cs`). Removal must go through the
+     `htmlbridge-public-surface` versioning policy: mark `[Obsolete]` now, delete at
+     the next public-surface major, mirroring the DOM v1→v2 boundary.
+  2. **Shared primitives must be preserved** — `Rect` is live
+     (`ImagePipeline.cs` `GetViewBox`/SVG); `BoxEdges`/`BoxDimensions` and the enum
+     names collide with live `Broiler.HTML.Core.IR` twins. Keep/relocate the shared
+     geometry primitives; only the box-build + paint implementation with no live
+     consumer is retired.
+  Net effect is still large dead-code removal with zero runtime behavior change, but
+  it is a deliberate API-retirement PR, not a one-shot file delete.
+- **RF-BRIDGE-1b (large, gated, later): unify the live geometry path.** Full design
+  in [`rf-bridge-1b-layout-unification.md`](rf-bridge-1b-layout-unification.md).
+  **Feasibility confirmed (2026-06-29):** the renderer already supports headless
+  layout (`HtmlContainer.PerformLayout(RectangleF)` uses an internal bitmap for text
+  metrics only — no paint surface), `CssBox.SourceElement` links boxes to the
+  canonical `DomElement`, and the geometry surface (`Actual*`/client extents) is
+  complete. Because `SourceElement` is `internal` to `Broiler.Layout` and the bridge
+  is not a friend, the `DomElement`-keyed read-model is exposed by the renderer
+  (`HtmlContainerInt`, a Layout friend) — an additive public API in the
+  `Broiler.HTML` **submodule** (patch/push workflow). The bridge drives it through a
+  versioned per-snapshot provider behind a `UseSharedLayoutGeometry` flag; cut
+  `LayoutMetrics`' ~10 `*ForDomElement` entry points over; gate with the
+  `EvaluateCheckLayoutAssertions` parity harness over the WPT check-layout corpus +
+  the six bridge geometry tests (require shared ≥ estimator) plus WPT pixel/Acid;
+  flip; delete the ~2700-line estimators and `WithLayoutGeometryCache`; move
+  `LayoutRuntimeState` (`ElementRuntimeState.cs:102`) last.
+
+#### Decision (2026-06-29) — ratified: end-state (b) unify; Track C superseded
+
+The owner ratified end-state (b): unify the bridge on `Broiler.Layout` and formally
+supersede Track C's extract-and-keep-two-engines proposal. RF-BRIDGE-1 is now tracked
+as 1a (delete the dead paint pipeline — immediate) then 1b (unify the live
+`LayoutMetrics` geometry path — large, gated). `public-preview-roadmap.md` Track C
+"Layout Component Extraction" is superseded by this decision and should not be built
+as a standalone `Broiler.HtmlBridge.Layout` assembly.
+
 ## Verification captured by this audit
 
 - serial `dotnet build Broiler.slnx`: passed, 0 errors.
@@ -263,8 +364,10 @@ submodule layout and retained the old layout as a supported fallback.
 
 ## Closeout order
 
-1. Profile or clear the remaining raster-performance gate (RF-CSS-2).
-2. Decide the bridge layout end state, then extract or unify it (RF-BRIDGE-1).
+1. ~~Profile or clear the remaining raster-performance gate (RF-CSS-2).~~ Done
+   2026-06-29 — clean raster confirmation within budget.
+2. Decide the bridge layout end state, then extract or unify it (RF-BRIDGE-1) — the
+   sole remaining open gap.
 
 Do not mark the parent roadmaps complete until every gap above is closed or explicitly
 superseded by an approved compatibility decision with equivalent acceptance criteria.

@@ -105,7 +105,10 @@ public sealed class CssExtractionPhaseZeroTests
             .Select(static line => line.Trim())
             .ToArray();
 
-        Assert.Equal(9, grants.Length);
+        // RF-LAYOUT-1 trimmed the friend surface to seven direct box-tree consumers
+        // (three production: Broiler.HTML.Dom/.HTML/.Orchestration; plus DevConsole and
+        // three focused test assemblies). Keep this count in sync with the csproj.
+        Assert.Equal(7, grants.Length);
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Core", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Image.Compat", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Image.Tests", StringComparison.Ordinal));

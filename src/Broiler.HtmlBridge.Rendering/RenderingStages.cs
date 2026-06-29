@@ -5,10 +5,18 @@ using System.Linq;
 
 namespace Broiler.HtmlBridge;
 
+// RF-BRIDGE-1a: the bridge's parallel paint/composite pipeline below is unused at
+// runtime (the renderer's CssLayoutEngine + paint walker produce the painted
+// output) and is deprecated for removal at the next htmlbridge-public-surface
+// major. Cross-references among the deprecated types are intentional, so silence
+// CS0618 here.
+#pragma warning disable CS0618
+
 /// <summary>Types of paint commands produced during the paint stage.</summary>
 public enum PaintCommandType { Background, Border, Text, Image, BoxShadow, Group, TextShadow }
 
 /// <summary>Represents a single painting instruction in the rendering pipeline.</summary>
+[Obsolete("Unused at runtime; the renderer's paint walker produces painted output. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class PaintCommand
 {
     /// <summary>The type of paint operation.</summary>
@@ -52,6 +60,7 @@ public class PaintCommand
 }
 
 /// <summary>Represents a compositing layer that groups paint commands at the same z-index.</summary>
+[Obsolete("Unused at runtime; the renderer's paint walker produces painted output. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class PaintLayer
 {
     /// <summary>Z-index of this layer in the stacking order.</summary>
@@ -71,6 +80,7 @@ public class PaintLayer
 /// Walks the tree back-to-front and generates background, border, text, and
 /// box-shadow commands for each <see cref="LayoutBox"/>.
 /// </summary>
+[Obsolete("Unused at runtime; the renderer's paint walker produces painted output. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class Painter
 {
     /// <summary>Walks the layout tree and generates paint commands in paint order (back-to-front).</summary>
@@ -324,6 +334,7 @@ public class Painter
 /// Groups paint commands into <see cref="PaintLayer"/> instances and flattens
 /// them back into a single ordered list.
 /// </summary>
+[Obsolete("Unused at runtime; the renderer's paint walker produces painted output. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class Compositor
 {
     /// <summary>
@@ -427,6 +438,7 @@ public class Compositor
 
 /// <summary>The final output of the rendering pipeline after paint and composite stages.</summary>
 /// <remarks>Initializes a new <see cref="RenderOutput"/>.</remarks>
+[Obsolete("Unused at runtime; the renderer's paint walker produces painted output. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class RenderOutput(IReadOnlyList<PaintCommand> commands, IReadOnlyList<PaintLayer> layers, float width, float height)
 {
     /// <summary>Ordered paint commands ready for rasterization.</summary>

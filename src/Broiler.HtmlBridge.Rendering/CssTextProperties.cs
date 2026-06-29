@@ -5,6 +5,12 @@ using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
 
+// RF-BRIDGE-1a: the bridge's @font-face/text-layout helpers below are unused at
+// runtime (font/text handling lives in the CSS component and the renderer) and are
+// deprecated for removal at the next htmlbridge-public-surface major. Silence CS0618
+// for the intentional cross-references among the deprecated types.
+#pragma warning disable CS0618
+
 /// <summary>CSS text-overflow property values.</summary>
 public enum CssTextOverflow { Clip, Ellipsis }
 
@@ -15,6 +21,7 @@ public enum CssWordBreak { Normal, BreakAll, KeepAll, BreakWord }
 public enum CssWhiteSpace { Normal, NoWrap, Pre, PreWrap, PreLine }
 
 /// <summary>Represents an <c>@font-face</c> rule declaration.</summary>
+[Obsolete("Unused at runtime; @font-face handling lives in the CSS component. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class CssFontFace
 {
     private static readonly Regex FamilyRegex = new(@"font-family\s*:\s*['""]?([^;'""]+?)['""]?\s*[;}\s]", RegexOptions.Compiled);
@@ -79,6 +86,7 @@ public class CssFontFace
 }
 
 /// <summary>Manages a collection of <c>@font-face</c> declarations.</summary>
+[Obsolete("Unused at runtime; @font-face handling lives in the CSS component. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public class CssFontFaceCollection
 {
     private readonly List<CssFontFace> _faces = [];
@@ -129,6 +137,7 @@ public class CssFontFaceCollection
 }
 
 /// <summary>Utility for text layout calculations with CSS text properties.</summary>
+[Obsolete("Unused at runtime; text layout lives in the renderer. Deprecated for removal at the next htmlbridge-public-surface major (RF-BRIDGE-1a).")]
 public static class TextLayout
 {
     private static readonly Regex CollapseWhitespace = new(@"\s+", RegexOptions.Compiled);
