@@ -294,7 +294,15 @@ jobs:
     needs: run
     # Only the scheduled full-suite run maintains the canonical manifest; manual
     # subset/shard runs would persist a narrower set and shrink it incorrectly.
-    if: always() && github.event_name == 'schedule' && needs.run.result == 'success'
+    #
+    # Run whenever the shards actually executed — success OR failure. The run job
+    # reports `failure` precisely when some tests failed (the runner exits 1 on
+    # any failure), which is exactly when the failed-tests manifest needs
+    # rebuilding; gating on `success` alone would skip persistence in that case
+    # and never record the failures. `skipped`/`cancelled` are still excluded.
+    if: >-
+      always() && github.event_name == 'schedule'
+      && (needs.run.result == 'success' || needs.run.result == 'failure')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -313,15 +321,26 @@ jobs:
           merge-multiple: true
 
       - name: Build failed-tests manifest
+        id: manifest
         run: |
           python scripts/merge-wpt-shards.py \
             --shard-dir shard-results \
-            --merged-json "$FAILED_TESTS_FILE"
+            --merged-json "$FAILED_TESTS_FILE" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Commit manifest
         env:
           BRANCH_NAME: ${{ github.ref_name }}
+          INCOMPLETE_SHARD_COUNT: ${{ steps.manifest.outputs.incomplete_shard_count }}
         run: |
+          # A shard that crashed before uploading its report contributes no
+          # failures to the merged manifest. Committing then would drop those
+          # tests from the canonical set and shrink it incorrectly, so skip the
+          # commit and leave the existing manifest untouched for this run.
+          if [ "${INCOMPLETE_SHARD_COUNT:-0}" -gt 0 ]; then
+            echo "::warning::$INCOMPLETE_SHARD_COUNT incomplete shard(s); skipping manifest commit to avoid shrinking it."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --quiet -- "$FAILED_TESTS_FILE"; then
