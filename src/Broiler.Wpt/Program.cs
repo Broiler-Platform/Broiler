@@ -51,6 +51,8 @@ public class Program
         string? markdownOutputPath = null;
         string? failureImagesDir = null;
         string? subset = null;
+        string? renderPath = null;
+        string? renderOutPath = null;
         string? rerunJsonPath = null;
         RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
         double? timeoutSeconds = null;
@@ -79,6 +81,12 @@ public class Program
                     break;
                 case "--subset" when i + 1 < args.Length:
                     subset = args[++i];
+                    break;
+                case "--render" when i + 1 < args.Length:
+                    renderPath = args[++i];
+                    break;
+                case "--render-out" when i + 1 < args.Length:
+                    renderOutPath = args[++i];
                     break;
                 case "--rerun-json" when i + 1 < args.Length:
                     rerunJsonPath = args[++i];
@@ -125,6 +133,8 @@ public class Program
                 case "--markdown-output":
                 case "--failure-images":
                 case "--subset":
+                case "--render":
+                case "--render-out":
                 case "--rerun-json":
                 case "--rerun-kind":
                 case "--timeout":
@@ -151,6 +161,14 @@ public class Program
                     break;
             }
         }
+
+        // Render mode: render a single HTML file to a PNG (no reference, no
+        // comparison) — the fast "reproduce against the live renderer" path.
+        // A --wpt-dir is optional; when given it supplies WPT fonts and
+        // wpt-root-relative resource resolution, otherwise the file renders
+        // standalone.  This deliberately bypasses test discovery.
+        if (renderPath != null)
+            return RunRenderMode(renderPath, renderOutPath, wptPath);
 
         if (wptPath is null)
         {
@@ -922,6 +940,69 @@ public class Program
 
         foreach (var failure in failures)
             Console.WriteLine($"{indent}layout: {failure.Describe()}");
+
+        var divergence = CheckLayoutPixelDivergenceNote(result);
+        if (divergence != null)
+            Console.WriteLine($"{indent}layout: ⚠ {divergence}");
+    }
+
+    /// <summary>
+    /// Returns a warning when the bridge's <c>check-layout</c> geometry estimate
+    /// and the actual pixel mismatch <b>disagree about which axis moved</b>
+    /// (diagnostic #2b).  The check-layout numbers come from the bridge's CSS
+    /// geometry estimator, a different code path from the renderer; when it
+    /// reports, say, an <c>offset-x</c> divergence but the rendered pixels are
+    /// displaced purely vertically (or vice-versa), the estimate is misleading —
+    /// the real bug is in the *rendering*, not where the estimator points.  This
+    /// is exactly the misdirection that sent issue #1121 toward an abspos /
+    /// alignment hypothesis when the cause was a vertical <c>&lt;br&gt;</c>
+    /// line-advance.  Returns null when the two signals are absent, agree, or
+    /// there is no usable directional signal.
+    /// </summary>
+    internal static string? CheckLayoutPixelDivergenceNote(WptTestResult result)
+    {
+        if (result.LayoutAssertionFailures is not { Count: > 0 } failures)
+            return null;
+        if (result.MismatchDiagnostics?.Displacement is not { Length: > 0 } displacement)
+            return null;
+
+        // Axis the check-layout estimate flags: x for offset-x/total-x/width/
+        // client-width, y for the *-y / height variants.
+        bool clX = false, clY = false;
+        foreach (var f in failures)
+        {
+            var p = f.Property;
+            if (p.Contains("-x") || p == "width" || p == "client-width") clX = true;
+            if (p.Contains("-y") || p == "height" || p == "client-height") clY = true;
+        }
+
+        // Axis the rendered pixels actually moved, from the displacement phrase
+        // ("content shifted right/left ~Npx and up/down ~Mpx").
+        bool pxX = displacement.Contains("left") || displacement.Contains("right");
+        bool pxY = displacement.Contains("up") || displacement.Contains("down");
+
+        if (!pxX && !pxY)
+            return null; // "content absent" / "extra content" — no direction to compare.
+        if ((clX || clY) == false)
+            return null;
+
+        // Disagreement: the estimate names one axis but the pixels moved only on
+        // the other.
+        bool estimateOnlyX = clX && !clY;
+        bool estimateOnlyY = clY && !clX;
+        bool pixelsOnlyX = pxX && !pxY;
+        bool pixelsOnlyY = pxY && !pxX;
+
+        if ((estimateOnlyX && pixelsOnlyY) || (estimateOnlyY && pixelsOnlyX))
+        {
+            string clAxis = estimateOnlyX ? "horizontal" : "vertical";
+            string pxAxis = pixelsOnlyX ? "horizontal" : "vertical";
+            return $"check-layout (bridge estimate) flags a {clAxis} divergence but the pixels moved {pxAxis} " +
+                   $"({displacement}) — the estimate may not reflect the rendered pixels; the bug is likely in " +
+                   $"rendering, not where check-layout points. Reproduce with --render.";
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1502,6 +1583,49 @@ public class Program
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
         Console.WriteLine("  --failure-images <DIR>     Save rendered/reference/diff PNGs for each failure under DIR");
+        Console.WriteLine("  --render <FILE>            Render a single HTML file to a PNG and exit (no reference/compare).");
+        Console.WriteLine("                             The fast 'reproduce against the live renderer' path; --wpt-dir is");
+        Console.WriteLine("                             optional (supplies WPT fonts/resource resolution when given).");
+        Console.WriteLine("  --render-out <PATH>        Output PNG path for --render (default: <FILE> with a .png extension)");
         Console.WriteLine("  --help                     Show this help message");
+    }
+
+    /// <summary>
+    /// Renders a single HTML file to a PNG with the live renderer and exits —
+    /// the quick "reproduce against the live renderer" path used during triage,
+    /// without needing a reference image or the full test-discovery run.  When
+    /// <paramref name="wptPath"/> is supplied it loads the WPT fonts and resolves
+    /// wpt-root-relative sub-resources; otherwise the file renders standalone.
+    /// </summary>
+    private static int RunRenderMode(string renderPath, string? renderOutPath, string? wptPath)
+    {
+        if (!File.Exists(renderPath))
+        {
+            Console.Error.WriteLine($"Error: File not found: {renderPath}");
+            return 1;
+        }
+
+        var outPath = renderOutPath ?? Path.ChangeExtension(Path.GetFullPath(renderPath), ".png");
+        var outDir = Path.GetDirectoryName(Path.GetFullPath(outPath));
+        if (!string.IsNullOrEmpty(outDir))
+            Directory.CreateDirectory(outDir);
+
+        // A --wpt-dir is optional in render mode; only use it when it exists.
+        var wptRoot = wptPath != null && Directory.Exists(wptPath) ? wptPath : null;
+
+        try
+        {
+            var runner = new WptTestRunner();
+            using var bitmap = runner.RenderHtmlFileBitmapPublic(renderPath, wptRoot);
+            bitmap.Save(outPath);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: failed to render '{renderPath}': {ex.Message}");
+            return 1;
+        }
+
+        Console.WriteLine($"Rendered {renderPath} -> {outPath}");
+        return 0;
     }
 }

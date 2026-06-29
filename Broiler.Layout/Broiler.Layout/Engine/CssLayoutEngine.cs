@@ -282,6 +282,29 @@ internal static class CssLayoutEngine
                     continue;
 
                 maxBottom = Math.Max(maxBottom, InlineRectLineBoxBottom(rect.Key, rect.Value));
+                // CSS2.1 §10.8: an atomic inline-block contributes its *margin*
+                // box plus the line's strut descent below the baseline to the
+                // line-box height.  InlineRectLineBoxBottom returns only the
+                // border box (its rectangle excludes the bottom margin), so for
+                // an *anonymous* block — which has no visual box of its own and
+                // exists purely to position the next block-level sibling (e.g.
+                // the anonymous wrappers a <br> splits inline content into) —
+                // extend its content height to the true line-box bottom.  This
+                // mirrors what the inline-block *wrap* path (FlowInlineBlock)
+                // already does in-scope, so a <br>-separated row lands where a
+                // wrapped one does.  Restricted to anonymous blocks to avoid
+                // changing the rendered height of author boxes.
+                if (blockBox.Kind == BoxKind.Anonymous
+                    && (rect.Key.Display == CssConstants.InlineBlock
+                        || rect.Key.Display is "inline-flex" or "inline-grid"))
+                {
+                    double lineStrut = blockBox.ActualLineHeight > 0
+                        ? blockBox.ActualLineHeight
+                        : blockBox.ActualFont.Height * PtToCssPx;
+                    double marginBoxBottom = rect.Value.Bottom + rect.Key.ActualMarginBottom
+                        + lineStrut * (1.0 - TypicalAscentRatio);
+                    maxBottom = Math.Max(maxBottom, marginBoxBottom);
+                }
                 minTop = Math.Min(minTop, rect.Value.Top);
             }
             foreach (var word in linebox.Words)
@@ -1256,6 +1279,39 @@ internal static class CssLayoutEngine
             return rect.Bottom;
 
         return Math.Min(rect.Bottom, rect.Top + lineHeight);
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="box"/> ends with atomic inline-level
+    /// content (an <c>inline-block</c>/<c>inline-flex</c>/<c>inline-grid</c>
+    /// box), looking through the anonymous block wrapper that the
+    /// block-inside-inline correction generates around inline content split by a
+    /// <c>&lt;br&gt;</c>.  Used to decide whether a following <c>&lt;br&gt;</c>'s
+    /// empty-line spacer is spurious (it merely ends the inline-block's line).
+    /// </summary>
+    internal static bool EndsWithAtomicInlineBlock(CssBox box)
+    {
+        if (box == null)
+            return false;
+
+        if (box.Display == CssConstants.InlineBlock
+            || box.Display is "inline-flex" or "inline-grid")
+            return true;
+
+        if (box.Kind == BoxKind.Anonymous)
+        {
+            for (int i = box.Boxes.Count - 1; i >= 0; i--)
+            {
+                var c = box.Boxes[i];
+                if (c.Display == CssConstants.None
+                    || c.Position is CssConstants.Absolute or CssConstants.Fixed
+                    || c.Float != CssConstants.None)
+                    continue;
+                return EndsWithAtomicInlineBlock(c);
+            }
+        }
+
+        return false;
     }
 
     private static void ApplyVerticalAlignment(ILayoutEnvironment g, CssLineBox lineBox)

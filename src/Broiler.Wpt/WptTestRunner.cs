@@ -147,6 +147,15 @@ internal sealed class WptTestResult
     public MismatchDiagnostics? MismatchDiagnostics { get; init; }
 
     /// <summary>
+    /// Non-uniform per-band displacement phrase (diagnostic #11) when the
+    /// mismatched region splits into vertical bands that moved by different
+    /// amounts — the line-spacing / <c>&lt;br&gt;</c>-flow signature that the
+    /// single global <see cref="MismatchDiagnostics.Displacement"/> centroid hides.
+    /// Null for a uniform or single-band shift.
+    /// </summary>
+    public string? DisplacementProfile { get; init; }
+
+    /// <summary>
     /// <c>check-layout-th.js</c> geometry assertions whose computed value diverged
     /// from the test's <c>data-offset-*</c> / <c>data-expected-*</c> attribute, with
     /// the expected and actual values. Null/empty when the test carries no such
@@ -1357,6 +1366,15 @@ internal sealed class WptTestRunner
                     rendered.Width, rendered.Height,
                     reference.Width, reference.Height);
 
+                // Per-band displacement profile (#11): resolve the shift along the
+                // vertical axis so a band-localised shift (the line-spacing / <br>
+                // signature the global centroid blurs away) is surfaced explicitly.
+                var bands = DisplacementBandAnalyzer.Analyze(diff.Mismatches);
+                var displacementProfile = DisplacementBandAnalyzer.DescribeNonUniform(bands);
+                var message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}";
+                if (displacementProfile != null)
+                    message = $"{message} [{displacementProfile}]";
+
                 // Capture rendered / reference / diff PNGs for visual triage (#6).
                 var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
 
@@ -1365,9 +1383,10 @@ internal sealed class WptTestRunner
                     TestPath = testPath,
                     Passed = false,
                     MatchPercent = matchPct,
-                    Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
+                    Message = message,
                     Category = FailureCategory.PixelMismatch,
                     MismatchDiagnostics = diagnostics,
+                    DisplacementProfile = displacementProfile,
                     LayoutAssertionFailures = layoutAssertionFailures,
                     RenderedImagePath = images.Rendered,
                     ReferenceImagePath = images.Reference,

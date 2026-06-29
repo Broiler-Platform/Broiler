@@ -879,6 +879,23 @@ internal class CssBox : CssBoxProperties, IDisposable
             MeasureWordsSize(g);
         }
 
+        // CI fallback for the Broiler.HTML submodule <br> patch
+        // (patches/0002-broiler-html-br-after-inline-block.patch): DomParser
+        // gives a <br> a ".95em" empty-line height when it "follows a block".
+        // An atomic inline-block carries no text words, so it is misclassified
+        // as block-level and a <br> after it spuriously inserts a full empty
+        // line, pushing every following block sibling ~1em down.  Such a <br>
+        // merely ends the inline-block's line, so drop its empty-line height.
+        // The previous in-flow sibling (an anonymous block wrapping the
+        // inline-block, or the inline-block itself) is already laid out by the
+        // time this block runs.  Harmless once the submodule patch lands (the
+        // <br> then carries no .95em height to drop).
+        if (IsBrElement && !string.IsNullOrEmpty(Height) && Height != CssConstants.Auto
+            && CssLayoutEngine.EndsWithAtomicInlineBlock(LayoutBoxUtils.GetPreviousSibling(this)))
+        {
+            Height = CssConstants.Auto;
+        }
+
         // CSS Box Model 4 §6.2: margin-trim zeroes the block-axis margins of
         // this container's first/last in-flow block-level children before they
         // are laid out, so the trimmed margins collapse to nothing.
