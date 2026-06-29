@@ -270,6 +270,76 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("incomplete_shard_count=1", outputs)
             self.assertIn("create_issue=true", outputs)
 
+    def test_merge_into_preserves_out_of_scope_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            # Manifest lives outside the scanned shard dir, as in production
+            # (tests/wpt-baseline vs the downloaded shard-results dir).
+            shard_dir = Path(temp) / "shards"
+            shard_dir.mkdir()
+            manifest = Path(temp) / "failed-tests.json"
+            # Existing manifest: one css/a failure (in this run's scope) and one
+            # html/z failure (NOT exercised by this run).
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 2, "skipped": 0, "total": 2},
+                        "results": [
+                            {"relativeTestPath": "css/a/old-fail.html", "passed": False,
+                             "skipped": False, "category": "RenderingError"},
+                            {"relativeTestPath": "html/z/untouched.html", "passed": False,
+                             "skipped": False, "category": "Timeout"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # This run exercises css/a: old-fail.html now passes, new-fail.html fails,
+            # skipped.html is skipped (inconclusive). It never touches html/z.
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 1, "failed": 1, "skipped": 1, "total": 3},
+                        "shard": {"index": 0, "count": 8},
+                        "results": [
+                            {"relativeTestPath": "css/a/old-fail.html", "passed": True,
+                             "skipped": False, "category": "None"},
+                            self._failure("css/a/new-fail.html", "RenderingError"),
+                            {"relativeTestPath": "css/a/skipped.html", "passed": False,
+                             "skipped": True, "category": "None"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+            executed = MODULE._collect_executed_paths(shard_dir)
+            result = MODULE.merge_into_manifest(merged, executed, manifest)
+
+            paths = {entry["relativeTestPath"] for entry in result["results"]}
+            # Out-of-scope failure preserved; now-passing failure dropped; new
+            # failure recorded; skipped test does not evict anything.
+            self.assertEqual({"html/z/untouched.html", "css/a/new-fail.html"}, paths)
+            self.assertEqual(2, result["summary"]["failed"])
+            self.assertEqual(2, result["summary"]["total"])
+            # A test that only skipped this run is inconclusive — not "executed".
+            self.assertNotIn("css/a/skipped.html", executed)
+
+    def test_merge_into_creates_manifest_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir, "shard-0.json", 0, [self._failure("css/a/one.html", "RenderingError")]
+            )
+            merged = MODULE.merge(shard_dir, problem_limit=10)
+            executed = MODULE._collect_executed_paths(shard_dir)
+            # No manifest on disk yet (first run).
+            result = MODULE.merge_into_manifest(merged, executed, shard_dir / "does-not-exist.json")
+
+            self.assertEqual(
+                ["css/a/one.html"], [entry["relativeTestPath"] for entry in result["results"]]
+            )
+
     def test_cli_rejects_non_positive_problem_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             result = subprocess.run(

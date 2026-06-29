@@ -12,6 +12,14 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
 * ``--issue-md``     — a Markdown body summarising totals and a bounded list
   of the most common failure groups, suitable for posting as a GitHub issue.
 
+When ``--merge-into`` names an existing manifest, the run's failures are folded
+into it *by scope* instead of replacing it: entries for tests this run actually
+exercised (conclusive pass/fail, skips excluded) are refreshed, while entries
+for tests the run never touched (outside its subset/shards) are preserved. This
+lets a partial subset/shard/rerun run update its own slice of the manifest
+without shrinking it, so persistence is safe on every run, not just a full-suite
+one.
+
 When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
 writes ``failed_count``, ``total_count``, ``incomplete_shard_count`` and
 ``create_issue`` step outputs.
@@ -267,6 +275,65 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
     }
 
 
+def _collect_executed_paths(shard_dir: Path) -> set[str]:
+    """Relative paths of tests that produced a conclusive pass/fail verdict in
+    this run. Skips are inconclusive (e.g. a missing reference image) and are
+    deliberately excluded, so a test that merely skipped this run does not evict
+    its existing manifest entry. Used to scope ``merge_into_manifest``."""
+    executed: set[str] = set()
+    for _path, report in _iter_shard_reports(shard_dir):
+        for result in report.get("results", []):
+            if not isinstance(result, dict) or result.get("skipped"):
+                continue
+            relative_path = result.get("relativeTestPath") or result.get("testPath") or ""
+            if relative_path:
+                executed.add(relative_path)
+    return executed
+
+
+def _load_manifest_results(path: Path) -> list[dict]:
+    """Return the ``results`` array of an existing manifest, or ``[]`` when the
+    file is absent or unreadable (e.g. the first run, before one exists)."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, list):
+        return []
+    return [entry for entry in results if isinstance(entry, dict)]
+
+
+def merge_into_manifest(merged: dict, executed: set[str], existing_path: Path) -> dict:
+    """Fold this run's failures into an existing manifest by scope.
+
+    Existing entries for tests this run exercised are dropped (superseded by the
+    fresh verdict — re-added below only if they still fail); entries for tests
+    the run never touched are kept; then this run's failures are added. The net
+    effect: a partial run refreshes its own slice and leaves the rest intact.
+    """
+    kept = [
+        entry
+        for entry in _load_manifest_results(existing_path)
+        if (entry.get("relativeTestPath") or entry.get("testPath") or "") not in executed
+    ]
+    # New failures come last so they win any (normally impossible) key collision
+    # with a kept entry.
+    by_path: dict[str, dict] = {}
+    for entry in kept + merged["results"]:
+        key = entry.get("relativeTestPath") or entry.get("testPath") or ""
+        if key:
+            by_path[key] = entry
+    results = sorted(by_path.values(), key=lambda item: item.get("relativeTestPath") or "")
+
+    merged = dict(merged)
+    merged["results"] = results
+    # The manifest is a list of known failures; its summary describes that list,
+    # not the (unknown, corpus-wide) pass/total of any single run.
+    merged["summary"] = {"passed": 0, "failed": len(results), "skipped": 0, "total": len(results)}
+    return merged
+
+
 def render_issue_markdown(merged: dict, run_url: str | None) -> str:
     summary = merged["summary"]
     lines = [
@@ -359,6 +426,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard-dir", required=True, type=Path, help="Directory containing per-shard JSON reports")
     parser.add_argument("--merged-json", type=Path, help="Where to write the merged report / rerun manifest")
+    parser.add_argument(
+        "--merge-into",
+        type=Path,
+        help="Existing manifest to fold this run's failures into by scope (preserving "
+        "entries for tests the run did not exercise) instead of replacing it",
+    )
     parser.add_argument("--issue-md", type=Path, help="Where to write the Markdown issue body")
     parser.add_argument(
         "--problem-limit",
@@ -374,6 +447,11 @@ def main() -> int:
         parser.error("--problem-limit must be a positive integer")
 
     merged = merge(args.shard_dir, args.problem_limit)
+
+    if args.merge_into:
+        # Read the existing manifest before any write below (the same path may be
+        # both --merge-into and --merged-json).
+        merged = merge_into_manifest(merged, _collect_executed_paths(args.shard_dir), args.merge_into)
 
     if args.merged_json:
         args.merged_json.parent.mkdir(parents=True, exist_ok=True)
