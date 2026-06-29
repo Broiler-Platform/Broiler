@@ -343,6 +343,8 @@ public sealed partial class DomBridge
                 return resolved.Value.top;
 
             var offsetParent = GetOffsetParentForDomElement(element);
+            if (TryGetSharedOffset(element, offsetParent, vertical: true, out var sharedTop))
+                return sharedTop;
             if (offsetParent != null)
                 return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: true);
 
@@ -358,12 +360,43 @@ public sealed partial class DomBridge
                 return resolved.Value.left;
 
             var offsetParent = GetOffsetParentForDomElement(element);
+            if (TryGetSharedOffset(element, offsetParent, vertical: false, out var sharedLeft))
+                return sharedLeft;
             if (offsetParent != null)
                 return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: false);
 
             var layoutRect = ComputeUnzoomedLayoutRect(element);
             return layoutRect.Left;
         });
+
+    /// <summary>
+    /// RF-BRIDGE-1b: derive <c>offsetTop</c>/<c>offsetLeft</c> straight from the renderer's
+    /// real box geometry when the shared snapshot is active. <c>offsetTop/Left</c> is the
+    /// element's border-box edge relative to the offset parent's padding edge (HTML
+    /// <c>offsetParent.clientLeft/Top</c> already excludes that border), or the initial
+    /// containing block when there is no offset parent. This reflects layout effects the
+    /// per-property estimator cannot model — e.g. abspos static-position alignment
+    /// (<c>align-self</c>/<c>justify-self</c>) in vertical writing modes. Returns
+    /// <c>false</c> (fall back to the estimator) when either box is missing from the snapshot.
+    /// </summary>
+    private bool TryGetSharedOffset(DomElement element, DomElement offsetParent, bool vertical, out double offset)
+    {
+        offset = 0;
+        if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var elementGeometry))
+            return false;
+
+        double elementEdge = vertical ? elementGeometry.BorderBox.Top : elementGeometry.BorderBox.Left;
+        double parentEdge = 0;
+        if (offsetParent != null)
+        {
+            if (!TryGetSharedLayoutGeometry(offsetParent, out var parentGeometry))
+                return false;
+            parentEdge = vertical ? parentGeometry.PaddingBox.Top : parentGeometry.PaddingBox.Left;
+        }
+
+        offset = elementEdge - parentEdge;
+        return true;
+    }
 
     private DomElement? GetOffsetParentForDomElement(DomElement element)
     {

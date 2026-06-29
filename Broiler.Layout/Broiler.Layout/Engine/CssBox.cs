@@ -2037,12 +2037,21 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double alignWidth = WillBeVerticalTransposed()
                             ? GetShrinkToFitHeight() : boxWidth;
 
-                        bool isRtl = Direction == "rtl";
-                        // Inline-axis start edge follows the CB's direction.
+                        // Inline-axis start edge follows the CB's direction (start/end);
+                        // self-start/self-end follow the ITEM's start in this horizontal
+                        // axis — its inline axis when horizontal-tb (right under rtl), or
+                        // its block axis when vertical (vertical-rl starts on the right).
                         bool startIsLow = cb.Direction != "rtl";
+                        bool itemStartIsHigh = WritingMode switch
+                        {
+                            "vertical-rl" => true,
+                            "vertical-lr" => false,
+                            _ => Direction == "rtl",
+                        };
                         double dx = ResolveAbsposSelfAlignment(
                             jsPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
-                            alignWidth, isRtl, startIsLow);
+                            alignWidth, isRtl: !startIsLow, startIsLow,
+                            selfStartIsHigh: itemStartIsHigh);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                     else if (cbVertical && hasT && hasB)
@@ -2064,11 +2073,20 @@ internal class CssBox : CssBoxProperties, IDisposable
                         alignBlockBorderBoxHeight = boxHeight;
 
                         // Inline axis is vertical here; its start runs top→bottom
-                        // unless the CB's direction is rtl.
+                        // unless the CB's direction is rtl. start/end follow the CB's
+                        // inline direction (so the flip is !startIsLow, mirroring the
+                        // align-self block-axis branch); self-start/self-end follow the
+                        // ITEM's inline direction — for a vertical-wm item the vertical
+                        // axis is its inline axis (start at the bottom under rtl), while
+                        // for a horizontal-tb item it is the block axis (start at top).
                         bool startIsLow = cb.Direction != "rtl";
+                        bool itemStartIsHigh =
+                            (WritingMode == "vertical-lr" || WritingMode == "vertical-rl")
+                            && Direction == "rtl";
                         double dy = ResolveAbsposSelfAlignment(
                             jsPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
-                            boxHeight, false, startIsLow);
+                            boxHeight, isRtl: !startIsLow, startIsLow,
+                            selfStartIsHigh: itemStartIsHigh);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                     else if (!cbVertical && !hasL && !hasR && ParentBox != null)
@@ -2164,10 +2182,17 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double alignHeight = WillBeVerticalTransposed()
                             ? GetShrinkToFitWidth() : boxHeight;
 
-                        // Block-axis start is the top edge for horizontal-tb.
+                        // Block-axis start is the top edge for horizontal-tb. self-start/
+                        // self-end use the ITEM's start in this vertical axis: its block
+                        // axis when horizontal-tb (top), or its inline axis when vertical
+                        // (bottom under direction:rtl).
+                        bool itemStartIsHigh =
+                            (WritingMode == "vertical-lr" || WritingMode == "vertical-rl")
+                            && Direction == "rtl";
                         double dy = ResolveAbsposSelfAlignment(
                             asPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
-                            alignHeight, false, startIsLow: true);
+                            alignHeight, isRtl: false, startIsLow: true,
+                            selfStartIsHigh: itemStartIsHigh);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                     else if (cbVertical && hasL && hasR)
@@ -2180,13 +2205,32 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double boxWidth = GetShrinkToFitWidth();
                         Size = new SizeF((float)boxWidth, Size.Height);
 
-                        bool isRtl = Direction == "rtl";
                         // Block-axis start runs L→R for vertical-lr, R→L for
-                        // vertical-rl (so the low edge is the start only for lr).
+                        // vertical-rl (so the low/left edge is the start only for lr).
+                        // align-self acts on the containing block's BLOCK axis, whose
+                        // flow is fixed by writing-mode; `direction` (rtl/ltr) is an
+                        // inline-axis property and must NOT flip block-axis start/end
+                        // (WPT css-align/abspos/align-self-{vlr,vrl}-*). So the start↔end
+                        // flip is driven purely by the writing mode: start sits on the
+                        // high edge exactly when the block start is not the low edge.
                         bool startIsLow = cb.WritingMode == "vertical-lr";
+
+                        // self-start/self-end use the ITEM's start edge in this
+                        // (horizontal) alignment axis: for a vertical-wm item the
+                        // horizontal axis is its block axis (vertical-rl starts on the
+                        // right/high edge, vertical-lr on the left/low edge); for a
+                        // horizontal-tb item it is the inline axis, whose start is the
+                        // right/high edge under direction:rtl.
+                        bool itemStartIsHigh = WritingMode switch
+                        {
+                            "vertical-rl" => true,
+                            "vertical-lr" => false,
+                            _ => Direction == "rtl",
+                        };
                         double dx = ResolveAbsposSelfAlignment(
                             asPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
-                            boxWidth, isRtl, startIsLow);
+                            boxWidth, isRtl: !startIsLow, startIsLow,
+                            selfStartIsHigh: itemStartIsHigh);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                     else if (!cbVertical && !hasT && !hasB)
@@ -4046,9 +4090,19 @@ internal class CssBox : CssBoxProperties, IDisposable
         string alignment,
         double imcbStart, double imcbSize,
         double cbStart, double cbSize,
-        double boxSize, bool isRtl, bool startIsLow)
+        double boxSize, bool isRtl, bool startIsLow,
+        bool? selfStartIsHigh = null)
     {
         double freeSpace = imcbSize - boxSize;
+
+        // `start`/`end` resolve against the alignment CONTAINER's start edge
+        // (whether that is the high/far edge of the axis is `isRtl`).
+        // `self-start`/`self-end` resolve against the BOX's OWN start edge, which
+        // differs when the box's writing-mode/direction differ from the container's
+        // (WPT css-align/abspos/align-self-* mixed-writing-mode tests). When the
+        // caller does not supply the box-relative flip we fall back to the
+        // container's (correct whenever the two share a writing mode).
+        bool selfHigh = selfStartIsHigh ?? isRtl;
 
         // Strip an explicit safe/unsafe prefix. Track whether one was present:
         // the abspos DEFAULT mode is neither plain "safe" nor "unsafe" — it
@@ -4077,16 +4131,28 @@ internal class CssBox : CssBoxProperties, IDisposable
                 break;
             case "end":
             case "flex-end":
-            case "self-end":
+            // No baseline-sharing group for a lone abspos box → last-baseline
+            // aligns to the end edge (CSS Align §9, baseline self-alignment).
+            case "last baseline":
+            case "last-baseline":
                 dx = isRtl ? 0 : freeSpace;
+                break;
+            case "self-end":
+                dx = selfHigh ? 0 : freeSpace;
                 break;
             case "right":
                 dx = freeSpace;
                 break;
             case "start":
             case "flex-start":
-            case "self-start":
+            // first-baseline → start edge (no baseline group).
+            case "baseline":
+            case "first baseline":
+            case "first-baseline":
                 dx = isRtl ? freeSpace : 0;
+                break;
+            case "self-start":
+                dx = selfHigh ? freeSpace : 0;
                 break;
             case "left":
                 dx = 0;
