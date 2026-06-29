@@ -18,7 +18,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 |---|---------|--------|-------|
 | 1 | Abspos self-alignment overflow clamp (IMCB∪CB union) | ✅ merged | Broiler.Layout |
 | 2 | Skip WPT manual tests (`*-manual`, 59 false failures) | ✅ merged | Broiler.Wpt |
-| 3 | Abspos **static-position** alignment | ⏸ reverted | see "Known blockers" |
+| 3 | Abspos **static-position** alignment | 🟡 partial | Broiler.Layout |
 | 4 | Negative `z-index` paint order (CSS2.1 App. E Step 2) | ✅ merged | Broiler.HTML |
 | 5 | `justify-self` yields to auto margins | ✅ merged | Broiler.Layout |
 | 6 | `justify-self`/`justify-items`/`-webkit-*` tandem | ✅ merged | Broiler.CSS + Broiler.Layout |
@@ -68,10 +68,33 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
   renderer showed the box was stuck at its static position (offset `dy=0`) because
   the containing block's height was unresolved, plus a missing content-height
   shrink. Both were in `Broiler.Layout`, not the render path.
-- **Abspos *static-position* alignment (cluster 3)** — still deferred. It needs the
-  static (auto-inset) block-axis model re-added on top of the now-correct block-axis
-  apply; the `align-self`/`justify-self` *inset* path (cluster 9) is the prerequisite
-  that is now in place.
+- **Abspos *static-position* alignment (cluster 3)** — 🟡 **partial (WPT #1117)**. When an
+  abspos box has **auto insets** on an axis, `align-self`/`justify-self` aligns it within its
+  *static-position rectangle*, not the inset-modified containing block. This was previously a
+  silent no-op (the box stayed at its static position, so only `start` looked right). Now
+  implemented for **horizontal-`tb`** containing blocks in `CssBox` (the abspos self-alignment
+  apply step), reverse-engineered from the `align-self-static-position-001` reference:
+  - **Static inline axis** (`left`/`right` auto): the rectangle spans the **in-flow parent's
+    content box** (`ParentBox.ClientLeft..ClientRight`); free space = `parentContentWidth −
+    marginBoxWidth`, aligned per `justify-self` (start/center/end). E.g. a 50px box in a 75px
+    parent → start 0 / center +12.5 / end +25.
+  - **Static block axis** (`top`/`bottom` auto): the rectangle has **zero block size** at the
+    static position, so free space = `−marginBoxHeight` → `start` keeps the box put, `center`
+    pulls it up by half its height, `end` by all of it (box bottom lands on the static edge).
+    The box's own block size is preserved (recorded via `alignBlockBorderBoxHeight` so the
+    shared apply step's `ActualBottom += deltaY` bookkeeping — which otherwise shrinks a box
+    moved upward by the offset — is undone).
+
+  Both branches are **additive**: they fire only for an abspos box with auto insets *and* an
+  explicit non-default `align-self`/`justify-self`, so the inset path (cluster 9) and ordinary
+  content are untouched (verified: the 28 local `css-align` align/justify reftests have an
+  identical pass/fail set before and after). Regression guard: `AbsposStaticPositionAlignTests`
+  (`Broiler.Wpt.Tests`, 9 render cases covering the static×positioned axis matrix for
+  start/center/end). The real WPT files (`{align,justify}-self-static-position-00{1,2,3}.html`)
+  are not in the local checkout, so they are validated by the full CI WPT run.
+  - ⛔ **Still deferred**: vertical writing-mode containers (`vrl`/`lr`) and the **inline-parent**
+    variant (`-003`, where the static position is mid-line and font-dependent — needs the inline
+    static position, not just `ParentBox.ClientLeft`).
 
 ### Position-try fallback — sub-task checklist (cluster 10)
 
