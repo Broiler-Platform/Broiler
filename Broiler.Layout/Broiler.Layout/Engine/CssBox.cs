@@ -231,6 +231,34 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    /// <summary>
+    /// PROTOTYPE (BROILER_VERTICAL_FLOW): see
+    /// <see cref="CssBoxProperties.WillBeVerticalTransposed"/>.  Walk up the box
+    /// tree: the first vertical-writing-mode ancestor (or this box) whose own
+    /// parent is NOT vertical is a rotation root and transposes this box.  An
+    /// out-of-flow ancestor establishes its own rotation context, so if one is
+    /// reached before any vertical root, the rotation of a further vertical
+    /// ancestor does not reach this box — matching the runtime, where an abspos
+    /// item in a vertical container is left untransposed (its container's
+    /// rotation skips it and it is not a root itself).
+    /// </summary>
+    protected override bool WillBeVerticalTransposed()
+    {
+        if (!VerticalFlowPrototype.Enabled)
+            return false;
+        for (CssBox ctx = this; ctx != null; ctx = ctx.ParentBox)
+        {
+            bool ctxVertical = IsVerticalWritingMode(ctx.WritingMode);
+            bool parentVertical = ctx.ParentBox != null
+                && IsVerticalWritingMode(ctx.ParentBox.WritingMode);
+            if (ctxVertical && !parentVertical)
+                return true;
+            if (ctx.Position == CssConstants.Absolute || ctx.Position == CssConstants.Fixed)
+                return false;
+        }
+        return false;
+    }
+
     public List<CssBox> Boxes { get; } = [];
 
     public override bool AvoidGeometryAntialias => LayoutEnvironment?.AvoidGeometryAntialias ?? false;
@@ -602,8 +630,15 @@ internal class CssBox : CssBoxProperties, IDisposable
         // whole rotated subtree right so the root's block-start edge sits at the
         // containing block's content-right minus the block-start (right) margin.
         // (vertical-lr keeps blockOffset 0: left-aligned is already correct.)
+        // In-flow vertical-rl roots are block-start (right) aligned within their
+        // containing block, so the left-aligned logical frame is shifted right.
+        // An out-of-flow (absolute/fixed) root is already placed at its resolved
+        // physical position by the abspos self-alignment (which aligns using the
+        // post-rotation physical extents), so this shift would override it — keep
+        // blockOffset 0 and rotate the content in place.
         double blockOffset = 0;
-        if (mirror && ContainingBlock is { } cb)
+        if (mirror && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && ContainingBlock is { } cb)
         {
             double cbContentRight = cb.Location.X + cb.Size.Width
                 - cb.ActualPaddingRight - cb.ActualBorderRightWidth;
@@ -1993,12 +2028,21 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double boxWidth = GetShrinkToFitWidth();
                         Size = new SizeF((float)boxWidth, Size.Height);
 
+                        // For a box the vertical-flow rotation will transpose, the
+                        // alignment runs on the CB's inline (horizontal) axis but
+                        // the item's PHYSICAL width is its logical HEIGHT (the
+                        // rotation swaps them). Align with the physical extent so
+                        // an overflowing vrl item (laid out with a small logical
+                        // width) is centered/clamped by its true width.
+                        double alignWidth = WillBeVerticalTransposed()
+                            ? GetShrinkToFitHeight() : boxWidth;
+
                         bool isRtl = Direction == "rtl";
                         // Inline-axis start edge follows the CB's direction.
                         bool startIsLow = cb.Direction != "rtl";
                         double dx = ResolveAbsposSelfAlignment(
                             jsPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
-                            boxWidth, isRtl, startIsLow);
+                            alignWidth, isRtl, startIsLow);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                     else if (cbVertical && hasT && hasB)
@@ -2009,6 +2053,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
                         double boxHeight = GetShrinkToFitHeight();
+                        // Non-stretch justify-self on the vertical inline axis →
+                        // the box uses its content (shrink-to-fit) height, not the
+                        // top-to-bottom inset-stretched height. Record it so the
+                        // shared apply step restores the height after the offset
+                        // (mirrors the width un-stretch in the !cbVertical inline
+                        // branch and the height un-stretch in the align-self
+                        // block-axis branch). Without this the box stays stretched
+                        // to the IMCB height and renders as a tall bar.
+                        alignBlockBorderBoxHeight = boxHeight;
 
                         // Inline axis is vertical here; its start runs top→bottom
                         // unless the CB's direction is rtl.
@@ -2037,6 +2090,55 @@ internal class CssBox : CssBoxProperties, IDisposable
                         newX = (float)(rectStart + dx + ActualMarginLeft);
                     }
                 }
+                else if (!cbVertical && !hasL && !hasR && ParentBox != null
+                         && cb.Direction == "rtl")
+                {
+                    // justify-self:auto (default) + auto inline insets → the box
+                    // rests at its static position: the inline-START edge of the
+                    // static-position rectangle (the in-flow parent's content
+                    // box). That start edge follows the containing block's
+                    // direction — for ltr it is the left edge (already set by
+                    // base layout), for rtl it is the RIGHT edge. Without this,
+                    // abspos items in rtl containers render flush-left, shifted
+                    // left by the free inline width
+                    // (WPT css-align/abspos/*-rtl-*, issue #1131).
+                    double rectStart = ParentBox.ClientLeft;
+                    double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
+                    // Use the physical width for a box the rotation will transpose
+                    // (its physical width is the logical height).
+                    double boxW = WillBeVerticalTransposed() ? GetShrinkToFitHeight() : Size.Width;
+                    double marginBoxWidth = boxW + ActualMarginLeft + ActualMarginRight;
+                    double dx = ResolveAbsposSelfAlignment(
+                        "unsafe start", rectStart, rectWidth, rectStart, rectWidth,
+                        marginBoxWidth, isRtl: true, startIsLow: false);
+                    newX = (float)(rectStart + dx + ActualMarginLeft);
+                }
+                else if (cbVertical && !hasT && !hasB
+                         && cb.Direction == "rtl")
+                {
+                    // vertical-rl/lr container: the inline axis is VERTICAL.
+                    // justify-self:auto + auto block insets (top/bottom) → the box
+                    // rests at its static position: the inline-START edge of the
+                    // static-position rectangle. That start follows the inline
+                    // direction — for ltr the top (Broiler's default), for rtl the
+                    // inline axis is reversed so the start is the BOTTOM. Use the
+                    // CB padding box (cbPadTop/cbPadHeight) for the vertical
+                    // extent: block-axis sizes resolve bottom-up, so ParentBox's
+                    // ActualBottom is not final here, whereas cbPad* carries the
+                    // definite-height patch. Without this, abspos items in
+                    // vertical-rl+rtl containers render flush-top
+                    // (WPT css-align/abspos/*-vrl-rtl-*, issue #1131).
+                    double marginBoxHeight = Size.Height + ActualMarginTop + ActualMarginBottom;
+                    double dy = ResolveAbsposSelfAlignment(
+                        "unsafe start", cbPadTop, cbPadHeight, cbPadTop, cbPadHeight,
+                        marginBoxHeight, isRtl: true, startIsLow: false);
+                    newY = (float)(cbPadTop + dy + ActualMarginTop);
+                    // Preserve the box's own (shrink-to-fit) block size: the apply
+                    // step shifts ActualBottom by the same delta as Location, so
+                    // record the height to restore it (mirrors the align-self
+                    // block-axis un-stretch).
+                    alignBlockBorderBoxHeight = Size.Height;
+                }
 
                 // align-self controls the block axis:
                 //   horizontal-tb → vertical (T/B insets)
@@ -2055,10 +2157,17 @@ internal class CssBox : CssBoxProperties, IDisposable
                         // not the stretched top-to-bottom inset height.
                         alignBlockBorderBoxHeight = boxHeight;
 
+                        // For a box the vertical-flow rotation will transpose, the
+                        // alignment runs on the CB's block (vertical) axis but the
+                        // item's PHYSICAL height is its logical WIDTH (the rotation
+                        // swaps them); align with the physical extent.
+                        double alignHeight = WillBeVerticalTransposed()
+                            ? GetShrinkToFitWidth() : boxHeight;
+
                         // Block-axis start is the top edge for horizontal-tb.
                         double dy = ResolveAbsposSelfAlignment(
                             asPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
-                            boxHeight, false, startIsLow: true);
+                            alignHeight, false, startIsLow: true);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                     else if (cbVertical && hasL && hasR)
@@ -2101,6 +2210,29 @@ internal class CssBox : CssBoxProperties, IDisposable
                             marginBoxHeight, false, startIsLow: true);
                         newY = (float)(marginBoxStart + dy + ActualMarginTop);
                     }
+                }
+                else if (cbVertical && !hasL && !hasR && ParentBox != null
+                         && cb.WritingMode == "vertical-rl")
+                {
+                    // align-self:auto (default) + auto block insets (left/right):
+                    // for a vertical-rl container the BLOCK axis is horizontal and
+                    // flows right-to-left, so the block-START edge is the RIGHT.
+                    // The box rests at that block static position, but Broiler's
+                    // base layout placed it flush-left, so flush it right within
+                    // the parent content box. (vertical-lr keeps the left edge —
+                    // its block start — which is Broiler's default, so no branch
+                    // is needed there.) The inline (vertical) axis is handled by
+                    // the justify-self branch above. Mirrors the rtl inline-axis
+                    // static-position fix (WPT css-align/abspos/justify-self-*-vrl-*,
+                    // issue #1131). Widths resolve top-down, so ParentBox's
+                    // horizontal extent is reliable here (unlike its vertical one).
+                    double rectStart = ParentBox.ClientLeft;
+                    double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
+                    double marginBoxWidth = Size.Width + ActualMarginLeft + ActualMarginRight;
+                    double dx = ResolveAbsposSelfAlignment(
+                        "unsafe start", rectStart, rectWidth, rectStart, rectWidth,
+                        marginBoxWidth, isRtl: true, startIsLow: false);
+                    newX = (float)(rectStart + dx + ActualMarginLeft);
                 }
 
                 if (newX != Location.X || newY != Location.Y)
