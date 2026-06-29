@@ -50,15 +50,24 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
-    // Timer & async execution queues
+    // Timer & async execution queues.
+    //
+    // These are read and cleared by the main-thread timer drain (FlushTimerStep)
+    // but written by setTimeout/setInterval/requestAnimationFrame and scroll
+    // callbacks that can run on ThreadPool threads — the JS engine dispatches
+    // Promise/async/generator continuations via ThreadPool.QueueUserWorkItem, so
+    // a continuation may register a timer concurrently with a flush. Plain
+    // Dictionary/HashSet are not safe under that race (it surfaced as
+    // "Collection was modified" / "Destination array is not long enough" aborting
+    // FlushTimerStep), so use concurrent collections and atomic id counters.
     private int _timerIdCounter;
-    private readonly Dictionary<int, JSFunction> _timeoutCallbacks = new();
-    private readonly Dictionary<int, JSFunction> _intervalCallbacks = new();
-    private readonly HashSet<int> _clearedTimerIds = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _timeoutCallbacks = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _intervalCallbacks = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, byte> _clearedTimerIds = new();
     private int _rafIdCounter;
-    private readonly Dictionary<int, JSFunction> _rafCallbacks = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _rafCallbacks = new();
     private int _frameActionIdCounter;
-    private readonly Dictionary<int, Action> _frameActions = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Action> _frameActions = new();
     private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
@@ -354,30 +363,41 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
         var pending = new List<(int Id, JSFunction Fn)>();
 
-        // Collect timeout callbacks
-        foreach (var kv in _timeoutCallbacks)
+        // ConcurrentDictionary.ToArray() takes a consistent snapshot even while
+        // other threads register callbacks, and TryRemove drains only the entries
+        // we actually collected — so a timer registered concurrently (or by a
+        // callback that runs during this flush) is carried to the next step
+        // instead of being wiped by a blanket Clear().
+
+        // Collect timeout callbacks (one-shot: remove as collected)
+        foreach (var kv in _timeoutCallbacks.ToArray())
         {
-            if (!_clearedTimerIds.Contains(kv.Key))
-                pending.Add((kv.Key, kv.Value));
+            if (_timeoutCallbacks.TryRemove(kv.Key, out var fn) && !_clearedTimerIds.ContainsKey(kv.Key))
+                pending.Add((kv.Key, fn));
         }
-        _timeoutCallbacks.Clear();
 
         // Collect interval callbacks (execute once per step, keep registered)
         var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _intervalCallbacks)
+        foreach (var kv in _intervalCallbacks.ToArray())
         {
-            if (!_clearedTimerIds.Contains(kv.Key))
+            if (!_clearedTimerIds.ContainsKey(kv.Key))
                 intervalSnapshot.Add((kv.Key, kv.Value));
         }
 
-        // Collect rAF callbacks
+        // Collect rAF callbacks (one-shot: remove as collected)
         var rafSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _rafCallbacks)
-            rafSnapshot.Add((kv.Key, kv.Value));
-        _rafCallbacks.Clear();
+        foreach (var kv in _rafCallbacks.ToArray())
+        {
+            if (_rafCallbacks.TryRemove(kv.Key, out var fn))
+                rafSnapshot.Add((kv.Key, fn));
+        }
 
-        var frameActionSnapshot = _frameActions.Values.ToList();
-        _frameActions.Clear();
+        var frameActionSnapshot = new List<Action>();
+        foreach (var kv in _frameActions.ToArray())
+        {
+            if (_frameActions.TryRemove(kv.Key, out var action))
+                frameActionSnapshot.Add(action);
+        }
 
         if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
             return false;
@@ -385,7 +405,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // Execute timeout callbacks
         foreach (var (id, fn) in pending)
         {
-            if (_clearedTimerIds.Contains(id)) continue;
+            if (_clearedTimerIds.ContainsKey(id)) continue;
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setTimeout callback error: {ex.Message}", ex); }
             finally { RunTaskCheckpoint(); }
@@ -394,7 +414,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // Execute interval callbacks (one tick per step)
         foreach (var (id, fn) in intervalSnapshot)
         {
-            if (_clearedTimerIds.Contains(id)) continue;
+            if (_clearedTimerIds.ContainsKey(id)) continue;
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setInterval callback error: {ex.Message}", ex); }
             finally { RunTaskCheckpoint(); }

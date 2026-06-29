@@ -1529,7 +1529,7 @@ public sealed partial class DomBridge
 
         if (string.Equals(effectiveBehavior, "smooth", StringComparison.OrdinalIgnoreCase))
         {
-            var token = ++_frameActionIdCounter;
+            var token = System.Threading.Interlocked.Increment(ref _frameActionIdCounter);
             _smoothScrollTokens[element] = token;
             QueueFrameAction(() =>
             {
@@ -1566,7 +1566,7 @@ public sealed partial class DomBridge
 
     private void QueueFrameAction(Action callback)
     {
-        _frameActions[++_frameActionIdCounter] = callback;
+        _frameActions[System.Threading.Interlocked.Increment(ref _frameActionIdCounter)] = callback;
     }
 
     private void CancelSmoothScroll(DomElement element)
