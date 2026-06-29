@@ -1,77 +1,24 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 12809,
+    "failed": 12806,
     "skipped": 0,
-    "total": 12809
+    "total": 12806
   },
-  "shardCount": 6,
+  "shardCount": 8,
   "problemLimit": 10,
-  "incompleteShards": [
-    {
-      "shardIndex": 7,
-      "exitCode": 134
-    }
-  ],
+  "incompleteShards": [],
   "topProblems": [
     {
       "key": "PixelMismatch:MissingContent",
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 9682,
+      "count": 54,
       "examples": [
-        "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
-        "css/compositing/root-element-background-image-transparency-003.html",
-        "css/css-align/abspos/align-self-static-position-003.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ReferenceOverlayExposed",
-      "label": "PixelMismatch / ReferenceOverlayExposed",
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed",
-      "count": 1982,
-      "examples": [
-        "css/compositing/Blending_in_a_group_with_filter.html",
-        "css/compositing/mix-blend-mode/mix-blend-mode-blended-element-with-transparent-pixels.html",
-        "css/css-anchor-position/anchor-position-multicol-fixed-001.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 568,
-      "examples": [
-        "css/compositing/mix-blend-mode/mix-blend-mode-overflowing-child.html",
-        "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
-        "css/css-anchor-position/position-anchor-002.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ColorShift",
-      "label": "PixelMismatch / ColorShift",
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift",
-      "count": 362,
-      "examples": [
-        "css/compositing/mix-blend-mode/mix-blend-mode-image.html",
-        "css/css-anchor-position/anchor-inherited.html",
-        "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 24,
-      "examples": [
-        "css/css-animations/animate-with-color-mix-2.html",
-        "css/css-contain/contain-layout-ignored-cases-no-principal-box-001.html",
-        "css/css-images/gradient-button.html"
+        "css/css-align/blocks/align-content-table-cell-005.html",
+        "css/css-anchor-position/position-area-anchor-partially-outside.html",
+        "css/css-anchor-position/position-area-percents-001.html"
       ]
     },
     {
@@ -79,7 +26,7 @@
       "label": "RenderingError",
       "category": "RenderingError",
       "subCategory": null,
-      "count": 12,
+      "count": 11,
       "examples": [
         "css/css-properties-values-api/var-reference-registered-properties-cycles.html",
         "css/css-variables/variable-declaration-33.html",
@@ -91,11 +38,23 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 10,
+      "count": 8,
       "examples": [
         "css/css-inline/empty-span-size-001.html",
         "css/CSS2/cascade-import/cascade-import-005.xht",
         "css/CSS2/cascade-import/cascade-import-003.xht"
+      ]
+    },
+    {
+      "key": "PixelMismatch:LayoutShift",
+      "label": "PixelMismatch / LayoutShift",
+      "category": "PixelMismatch",
+      "subCategory": "LayoutShift",
+      "count": 7,
+      "examples": [
+        "css/css-backgrounds/background-clip/clip-border-area-border-on-top.html",
+        "css/css-backgrounds/background-clip/clip-border-area-multiple-backgrounds.html",
+        "css/css-align/blocks/align-content-block-008.html"
       ]
     },
     {
@@ -105,76 +64,89 @@
       "subCategory": null,
       "count": 7,
       "examples": [
+        "css/css-contain/content-visibility/content-visibility-anchor-positioning-004.html",
         "css/selectors/invalidation/lang-pseudo-class-in-has-xhtml.xhtml",
-        "css/css-anchor-position/last-successful-pseudo-element-basic.html",
-        "css/css-scroll-snap/snap-after-relayout/multiple-aligned-targets/common-to-both-axes-supercedes-first-in-tree-order.html"
+        "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html"
       ]
     },
     {
-      "key": "ShardProcessError",
-      "label": "Shard process failure",
-      "category": "ShardProcessError",
-      "subCategory": null,
-      "count": 1,
+      "key": "PixelMismatch:ReferenceOverlayExposed",
+      "label": "PixelMismatch / ReferenceOverlayExposed",
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed",
+      "count": 3,
       "examples": [
-        "shard 7 (exit 134)"
+        "css/css-backgrounds/background-clip-root.html",
+        "css/css-anchor-position/anchor-position-borders-002.html",
+        "css/css-align/self-alignment/block-justify-self.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ColorShift",
+      "label": "PixelMismatch / ColorShift",
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift",
+      "count": 2,
+      "examples": [
+        "css/css-align/blocks/align-content-block-002.html",
+        "css/css-align/blocks/align-content-block-004.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
+      "css/css-backgrounds",
+      32
+    ],
+    [
+      "css/css-anchor-position",
+      17
+    ],
+    [
+      "css/css-align",
+      12
+    ],
+    [
       "css/CSS2",
-      3068
+      11
     ],
     [
-      "css/css-grid",
-      1038
+      "css/css-variables",
+      6
     ],
     [
-      "css/css-text",
-      753
+      "css/css-contain",
+      2
     ],
     [
-      "css/css-flexbox",
-      647
+      "css/css-scroll-snap",
+      2
     ],
     [
-      "css/css-break",
-      642
+      "css/css-inline",
+      1
     ],
     [
-      "css/css-writing-modes",
-      641
+      "css/css-properties-values-api",
+      1
     ],
     [
-      "css/css-transforms",
-      459
-    ],
-    [
-      "css/css-sizing",
-      369
-    ],
-    [
-      "css/css-overflow",
-      315
-    ],
-    [
-      "css/css-multicol",
-      270
+      "css/cssom",
+      1
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      12618
+      66
     ],
     [
       "RenderingError",
-      12
+      11
     ],
     [
       "Timeout",
-      10
+      8
     ],
     [
       "ScriptError",
@@ -184,43 +156,43 @@
   "droppedDeclarations": [
     [
       "display: inline grid-lanes",
-      46042
+      29908
     ],
     [
       "display: grid-lanes",
-      41027
+      29480
     ],
     [
       "display: inline-grid-lanes",
-      5007
+      4069
     ],
     [
       "display: -webkit-box",
-      4270
+      3986
     ],
     [
       "display: -webkit-flex",
-      2882
-    ],
-    [
-      "display: layout(test)",
-      1728
+      2594
     ],
     [
       "text-transform: full-size-kana",
-      814
+      1650
+    ],
+    [
+      "display: layout(test)",
+      554
     ],
     [
       "list-style-type: japanese-informal",
       456
     ],
     [
-      "display: inline flow-root list-item",
-      330
+      "list-style-type: simp-chinese-informal",
+      456
     ],
     [
-      "list-style-type: ethiopic-numeric",
-      297
+      "display: inline flow-root list-item",
+      330
     ]
   ],
   "exceptionSignatures": [
@@ -233,7 +205,7 @@
       3
     ],
     [
-      "DomBridge.FlushTimerStep \u2014 Collection was modified; enumeration operation may not execute.",
+      "DomBridge.BuildAnchorRegistry \u2014 Collection was modified; enumeration operation may not execute.",
       2
     ],
     [
@@ -245,133 +217,102 @@
       1
     ],
     [
-      "DomBridge.BuildAnchorRegistry \u2014 Collection was modified; enumeration operation may not execute.",
-      1
-    ],
-    [
-      "CssStyleEngine.ResolveKnownCustomProperties \u2014 Insufficient memory to continue the execution of the program.",
+      "DomBridge.FlushTimerStep \u2014 Collection was modified; enumeration operation may not execute.",
       1
     ]
   ],
   "failureFamilies": [
     {
-      "family": "css/CSS2/backgrounds/background-{N}.xht",
-      "count": 175,
+      "family": "css/CSS2/cascade-import/cascade-import-{N}.xht",
+      "count": 5,
       "categories": {
-        "PixelMismatch": 175
+        "Timeout": 5
       },
       "examples": [
-        "css/CSS2/backgrounds/background-011.xht",
-        "css/CSS2/backgrounds/background-019.xht",
-        "css/CSS2/backgrounds/background-046.xht"
+        "css/CSS2/cascade-import/cascade-import-005.xht",
+        "css/CSS2/cascade-import/cascade-import-003.xht",
+        "css/CSS2/cascade-import/cascade-import-010.xht"
       ]
     },
     {
-      "family": "css/CSS2/tables/table-anonymous-objects-{N}.xht",
-      "count": 93,
+      "family": "css/css-align/blocks/align-content-block-{N}.html",
+      "count": 5,
       "categories": {
-        "PixelMismatch": 93
+        "PixelMismatch": 5
       },
       "examples": [
-        "css/CSS2/tables/table-anonymous-objects-023.xht",
-        "css/CSS2/tables/table-anonymous-objects-034.xht",
-        "css/CSS2/tables/table-anonymous-objects-056.xht"
+        "css/css-align/blocks/align-content-block-002.html",
+        "css/css-align/blocks/align-content-block-008.html",
+        "css/css-align/blocks/align-content-block-010.html"
       ]
     },
     {
-      "family": "css/css-text/i18n/css{N}-text-line-break-baspglwj-{N}.html",
-      "count": 86,
+      "family": "css/css-align/blocks/align-content-table-cell-{N}.html",
+      "count": 4,
       "categories": {
-        "PixelMismatch": 86
+        "PixelMismatch": 4
       },
       "examples": [
-        "css/css-text/i18n/css3-text-line-break-baspglwj-008.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-022.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-035.html"
+        "css/css-align/blocks/align-content-table-cell-005.html",
+        "css/css-align/blocks/align-content-table-cell-002.html",
+        "css/css-align/blocks/align-content-table-cell-004.html"
       ]
     },
     {
-      "family": "css/css-break/out-of-flow-in-multicolumn-{N}.html",
-      "count": 85,
+      "family": "css/css-anchor-position/position-area-scrolling-{N}.tentative.html",
+      "count": 3,
       "categories": {
-        "PixelMismatch": 85
+        "PixelMismatch": 3
       },
       "examples": [
-        "css/css-break/out-of-flow-in-multicolumn-002.html",
-        "css/css-break/out-of-flow-in-multicolumn-015.html",
-        "css/css-break/out-of-flow-in-multicolumn-020.html"
+        "css/css-anchor-position/position-area-scrolling-001.tentative.html",
+        "css/css-anchor-position/position-area-scrolling-002.tentative.html",
+        "css/css-anchor-position/position-area-scrolling-003.tentative.html"
       ]
     },
     {
-      "family": "css/CSS2/tables/border-conflict-w-{N}.xht",
-      "count": 74,
+      "family": "css/css-variables/variable-declaration-{N}.html",
+      "count": 3,
       "categories": {
-        "PixelMismatch": 74
+        "RenderingError": 3
       },
       "examples": [
-        "css/CSS2/tables/border-conflict-w-003.xht",
-        "css/CSS2/tables/border-conflict-w-014.xht",
-        "css/CSS2/tables/border-conflict-w-021.xht"
+        "css/css-variables/variable-declaration-33.html",
+        "css/css-variables/variable-declaration-47.html",
+        "css/css-variables/variable-declaration-58.html"
       ]
     },
     {
-      "family": "css/CSS2/tables/border-conflict-style-{N}.xht",
-      "count": 73,
+      "family": "css/CSS2/visudet/replaced-elements-min-width-{N}.html",
+      "count": 2,
       "categories": {
-        "PixelMismatch": 73
+        "PixelMismatch": 2
       },
       "examples": [
-        "css/CSS2/tables/border-conflict-style-003.xht",
-        "css/CSS2/tables/border-conflict-style-014.xht",
-        "css/CSS2/tables/border-conflict-style-021.xht"
+        "css/CSS2/visudet/replaced-elements-min-width-80.html",
+        "css/CSS2/visudet/replaced-elements-min-width-40.html"
       ]
     },
     {
-      "family": "css/CSS2/tables/border-conflict-width-{N}.xht",
-      "count": 72,
+      "family": "css/css-backgrounds/background-attachment-margin-root-{N}.html",
+      "count": 2,
       "categories": {
-        "PixelMismatch": 72
+        "PixelMismatch": 2
       },
       "examples": [
-        "css/CSS2/tables/border-conflict-width-004.xht",
-        "css/CSS2/tables/border-conflict-width-013.xht",
-        "css/CSS2/tables/border-conflict-width-022.xht"
+        "css/css-backgrounds/background-attachment-margin-root-002.html",
+        "css/css-backgrounds/background-attachment-margin-root-001.html"
       ]
     },
     {
-      "family": "css/CSS2/generated-content/content-{N}.xht",
-      "count": 66,
+      "family": "css/css-contain/content-visibility/content-visibility-anchor-positioning-{N}.html",
+      "count": 2,
       "categories": {
-        "PixelMismatch": 66
+        "ScriptError": 2
       },
       "examples": [
-        "css/CSS2/generated-content/content-003.xht",
-        "css/CSS2/generated-content/content-014.xht",
-        "css/CSS2/generated-content/content-021.xht"
-      ]
-    },
-    {
-      "family": "css/css-gaps/grid/grid-gap-decorations-{N}.html",
-      "count": 57,
-      "categories": {
-        "PixelMismatch": 57
-      },
-      "examples": [
-        "css/css-gaps/grid/grid-gap-decorations-001.html",
-        "css/css-gaps/grid/grid-gap-decorations-009.html",
-        "css/css-gaps/grid/grid-gap-decorations-016.html"
-      ]
-    },
-    {
-      "family": "css/css-transforms/matrix/svg-matrix-{N}.html",
-      "count": 51,
-      "categories": {
-        "PixelMismatch": 51
-      },
-      "examples": [
-        "css/css-transforms/matrix/svg-matrix-001.html",
-        "css/css-transforms/matrix/svg-matrix-009.html",
-        "css/css-transforms/matrix/svg-matrix-016.html"
+        "css/css-contain/content-visibility/content-visibility-anchor-positioning-004.html",
+        "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html"
       ]
     }
   ],
@@ -12482,13 +12423,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/CSS2/pagination/float-page-break-inside-avoid-5-print.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/CSS2/pagination/forced-page-breaks-000.xht",
       "passed": false,
       "skipped": false,
@@ -21495,7 +21429,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/CSS2/visufx/overflow-applies-to-001.xht",
@@ -24958,8 +24892,7 @@
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-003.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "ScriptError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-004.html",
@@ -25670,7 +25603,8 @@
       "relativeTestPath": "css/css-anchor-position/position-area-scrolling-002.tentative.html",
       "passed": false,
       "skipped": false,
-      "category": "ScriptError"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-area-scrolling-003.tentative.html",
@@ -25848,21 +25782,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -36392,15 +36312,13 @@
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "ScriptError"
     },
     {
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-anchor-positioning-004.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "ScriptError"
     },
     {
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-anchor-positioning-005.html",
