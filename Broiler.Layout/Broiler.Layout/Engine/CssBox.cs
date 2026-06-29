@@ -2009,6 +2009,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
                         double boxHeight = GetShrinkToFitHeight();
+                        // Non-stretch justify-self on the vertical inline axis →
+                        // the box uses its content (shrink-to-fit) height, not the
+                        // top-to-bottom inset-stretched height. Record it so the
+                        // shared apply step restores the height after the offset
+                        // (mirrors the width un-stretch in the !cbVertical inline
+                        // branch and the height un-stretch in the align-self
+                        // block-axis branch). Without this the box stays stretched
+                        // to the IMCB height and renders as a tall bar.
+                        alignBlockBorderBoxHeight = boxHeight;
 
                         // Inline axis is vertical here; its start runs top→bottom
                         // unless the CB's direction is rtl.
@@ -2147,6 +2156,29 @@ internal class CssBox : CssBoxProperties, IDisposable
                             marginBoxHeight, false, startIsLow: true);
                         newY = (float)(marginBoxStart + dy + ActualMarginTop);
                     }
+                }
+                else if (cbVertical && !hasL && !hasR && ParentBox != null
+                         && cb.WritingMode == "vertical-rl")
+                {
+                    // align-self:auto (default) + auto block insets (left/right):
+                    // for a vertical-rl container the BLOCK axis is horizontal and
+                    // flows right-to-left, so the block-START edge is the RIGHT.
+                    // The box rests at that block static position, but Broiler's
+                    // base layout placed it flush-left, so flush it right within
+                    // the parent content box. (vertical-lr keeps the left edge —
+                    // its block start — which is Broiler's default, so no branch
+                    // is needed there.) The inline (vertical) axis is handled by
+                    // the justify-self branch above. Mirrors the rtl inline-axis
+                    // static-position fix (WPT css-align/abspos/justify-self-*-vrl-*,
+                    // issue #1131). Widths resolve top-down, so ParentBox's
+                    // horizontal extent is reliable here (unlike its vertical one).
+                    double rectStart = ParentBox.ClientLeft;
+                    double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
+                    double marginBoxWidth = Size.Width + ActualMarginLeft + ActualMarginRight;
+                    double dx = ResolveAbsposSelfAlignment(
+                        "unsafe start", rectStart, rectWidth, rectStart, rectWidth,
+                        marginBoxWidth, isRtl: true, startIsLow: false);
+                    newX = (float)(rectStart + dx + ActualMarginLeft);
                 }
 
                 if (newX != Location.X || newY != Location.Y)
