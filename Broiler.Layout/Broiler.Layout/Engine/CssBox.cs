@@ -2037,6 +2037,26 @@ internal class CssBox : CssBoxProperties, IDisposable
                         newX = (float)(rectStart + dx + ActualMarginLeft);
                     }
                 }
+                else if (!cbVertical && !hasL && !hasR && ParentBox != null
+                         && cb.Direction == "rtl")
+                {
+                    // justify-self:auto (default) + auto inline insets → the box
+                    // rests at its static position: the inline-START edge of the
+                    // static-position rectangle (the in-flow parent's content
+                    // box). That start edge follows the containing block's
+                    // direction — for ltr it is the left edge (already set by
+                    // base layout), for rtl it is the RIGHT edge. Without this,
+                    // abspos items in rtl containers render flush-left, shifted
+                    // left by the free inline width
+                    // (WPT css-align/abspos/*-rtl-*, issue #1131).
+                    double rectStart = ParentBox.ClientLeft;
+                    double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
+                    double marginBoxWidth = Size.Width + ActualMarginLeft + ActualMarginRight;
+                    double dx = ResolveAbsposSelfAlignment(
+                        "unsafe start", rectStart, rectWidth, rectStart, rectWidth,
+                        marginBoxWidth, isRtl: true, startIsLow: false);
+                    newX = (float)(rectStart + dx + ActualMarginLeft);
+                }
 
                 // align-self controls the block axis:
                 //   horizontal-tb → vertical (T/B insets)
