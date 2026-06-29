@@ -66,6 +66,7 @@ jobs:
     outputs:
       shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
       rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
+      full-suite: ${{ steps.resolve.outputs.full-suite }}
     steps:
       - uses: actions/checkout@v4
 
@@ -75,6 +76,7 @@ jobs:
         env:
           SELECTED_SHARD_INDEX: ${{ github.event.inputs.shard_index || '-1' }}
           RERUN_FAILED_ONLY: ${{ github.event.inputs.rerun_failed_only || 'false' }}
+          SUBSET: ${{ github.event.inputs.subset || '' }}
         run: |
           python <<'PY'
           import json
@@ -98,9 +100,21 @@ jobs:
           rerun_requested = os.environ["RERUN_FAILED_ONLY"].strip().lower() == "true"
           rerun_failed = rerun_requested and Path(os.environ["FAILED_TESTS_FILE"]).exists()
 
+          # A run is "full suite" when it covers every eligible test: no subset
+          # filter, all shards, and not an incremental rerun. Only such a run may
+          # rewrite the canonical failed-tests manifest — a partial run would
+          # drop the tests it didn't execute and shrink the manifest incorrectly.
+          # (A scheduled run uses default inputs, so this is true for it too.)
+          full_suite = (
+              os.environ["SUBSET"].strip() == ""
+              and selected == -1
+              and not rerun_requested
+          )
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               fh.write(f"shard-matrix={json.dumps(matrix)}\n")
               fh.write(f"rerun-failed={'true' if rerun_failed else 'false'}\n")
+              fh.write(f"full-suite={'true' if full_suite else 'false'}\n")
           PY
 
   # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
@@ -291,9 +305,13 @@ jobs:
 
   # ── Persist the failing-test manifest for incremental reruns ─────────────
   persist-failed:
-    needs: run
-    # Only the scheduled full-suite run maintains the canonical manifest; manual
-    # subset/shard runs would persist a narrower set and shrink it incorrectly.
+    needs: [plan, run]
+    # Only a full-suite run maintains the canonical manifest; a subset/single-shard
+    # /rerun run would persist a narrower set and shrink it incorrectly. The plan
+    # job derives `full-suite` from the inputs (empty subset, all shards, not a
+    # rerun), which is true for scheduled runs and for manual full-suite dispatches
+    # alike — so this no longer hinges on a `schedule` event the workflow never
+    # actually fires.
     #
     # Run whenever the shards actually executed — success OR failure. The run job
     # reports `failure` precisely when some tests failed (the runner exits 1 on
@@ -301,7 +319,7 @@ jobs:
     # rebuilding; gating on `success` alone would skip persistence in that case
     # and never record the failures. `skipped`/`cancelled` are still excluded.
     if: >-
-      always() && github.event_name == 'schedule'
+      always() && needs.plan.outputs.full-suite == 'true'
       && (needs.run.result == 'success' || needs.run.result == 'failure')
     runs-on: ubuntu-latest
     steps:
