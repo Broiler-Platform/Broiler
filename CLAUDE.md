@@ -3,51 +3,58 @@
 These notes persist across sessions. Keep them accurate; update when the
 workflow changes.
 
-## Submodules: you may (and should) modify them
+## Submodules: modify them, but deliver the change as a PATCH — never push
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS`, and
 `Broiler.Graphics` are git submodules (see `.gitmodules`), each with its own
 remote under the `MaiRat/` org. The renderer, CSS engine, DOM, JS engine, and
 graphics core live there — **a fix often belongs in a submodule, not the main
 repo.** Do not contort a change into the main repo just to avoid touching a
-submodule; put the fix at its correct layer.
+submodule; write the fix at its correct layer.
 
-Prefer the correct layer over a main-repo workaround. Example: the inline
-white-space / comment-collapse fix (issue #1119) belongs in
-`Broiler.HTML/Source/Broiler.HTML.Dom/Parse/HtmlParser.cs`
-(`AppendCanonicalNode`, coalesce consecutive text nodes); the equivalent
-main-repo serialization patch in
-`src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs`
-(`RemoveRenderCommentNodes`) is only a fallback for when the submodule remote
-cannot be pushed.
+**Hard rule: do NOT push submodule remotes, and do NOT bump submodule pointers
+(gitlinks) in the parent.** Instead, capture each submodule change as a patch
+file committed under `patches/` and attach it to the parent PR. A maintainer
+applies the patch inside the submodule, pushes it there, and bumps the pointer
+in a follow-up. (Pushing a submodule pointer the session can't also push the
+commit for would break CI's submodule clone; and submodule remotes are outside
+the session's GitHub scope anyway — see the caveat below.)
 
 ### Submodule change workflow
 
-1. Edit files inside the submodule directory.
-2. In the submodule: create/checkout the working branch, commit, and
-   `git push -u origin <branch>` to the submodule's own remote.
-3. In the main repo: stage the updated submodule pointer (gitlink) plus any
-   main-repo changes, commit, and push.
-4. Open/refresh the parent PR; if the submodule change is on a branch (not the
-   submodule's default branch), note in the PR that the submodule branch must
-   be merged too, so the pinned SHA stays reachable.
+1. Edit files inside the submodule directory and verify the fix by building the
+   parent (the build compiles submodule source in place).
+2. Generate a patch from the submodule:
+   ```sh
+   cd <Submodule>
+   git checkout -b _tmp_patch
+   git add -A && git commit -m "<message>"
+   git format-patch -1 --stdout > ../patches/NNNN-<slug>.patch
+   git checkout <pinned-sha> && git branch -D _tmp_patch   # leave submodule clean
+   ```
+3. Revert the submodule working tree so its pointer stays unchanged
+   (`git submodule status` should show the original SHA, no `+`).
+4. Add the patch (and an entry in `patches/README.md`) plus any main-repo
+   changes, commit, and push the **parent** branch only.
+5. In the PR, note which submodule the patch targets so it can be applied and
+   the pointer bumped separately.
 
-### Egress-scope caveat (read before relying on a submodule push)
+If the same bug also needs to work on CI *now* (before the patch is applied),
+add an equivalent fallback fix at a main-repo layer and say so in the patch
+index — e.g. issue #1119's `Broiler.HTML` `HtmlParser.AppendCanonicalNode`
+text-node coalescing is shipped as `patches/0001-…`, with the active fallback
+`DomBridge.RemoveRenderCommentNodes` in the main repo until the patch lands.
+
+### Why not push (egress-scope caveat)
 
 Pushes go through the session's git proxy, which only authorizes repos in the
-session's GitHub scope. If the session is scoped to `mairat/broiler` only,
-pushing to a submodule remote (e.g. `MaiRat/Broiler.HTML`) returns **403** and
-must not be retried or routed around (per `/root/.ccr/README.md`). When that
-happens:
-
-- Do **not** point the parent at an unpushable submodule SHA — CI cannot clone
-  it and the build breaks.
-- Land the fix via the main-repo fallback layer instead, and report that the
-  submodule remote needs to be added to the session scope to land the change at
-  its proper layer.
-
-To make submodule pushes work permanently, add the relevant `MaiRat/Broiler.*`
-repositories to the environment's GitHub access scope.
+session's GitHub scope. Pushing a submodule remote (e.g. `MaiRat/Broiler.HTML`)
+returns **403** and must not be retried or routed around (per
+`/root/.ccr/README.md`). The patch-file workflow above sidesteps this entirely
+and keeps the parent buildable. (If a future session genuinely needs to push
+submodules, that requires adding `MaiRat/Broiler.*` to the environment's GitHub
+access scope — an environment-config change, not something to attempt from
+inside the container.)
 
 ## Build & test
 
