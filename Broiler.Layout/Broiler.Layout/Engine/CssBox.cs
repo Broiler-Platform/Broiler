@@ -630,8 +630,15 @@ internal class CssBox : CssBoxProperties, IDisposable
         // whole rotated subtree right so the root's block-start edge sits at the
         // containing block's content-right minus the block-start (right) margin.
         // (vertical-lr keeps blockOffset 0: left-aligned is already correct.)
+        // In-flow vertical-rl roots are block-start (right) aligned within their
+        // containing block, so the left-aligned logical frame is shifted right.
+        // An out-of-flow (absolute/fixed) root is already placed at its resolved
+        // physical position by the abspos self-alignment (which aligns using the
+        // post-rotation physical extents), so this shift would override it — keep
+        // blockOffset 0 and rotate the content in place.
         double blockOffset = 0;
-        if (mirror && ContainingBlock is { } cb)
+        if (mirror && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && ContainingBlock is { } cb)
         {
             double cbContentRight = cb.Location.X + cb.Size.Width
                 - cb.ActualPaddingRight - cb.ActualBorderRightWidth;
@@ -2021,12 +2028,21 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double boxWidth = GetShrinkToFitWidth();
                         Size = new SizeF((float)boxWidth, Size.Height);
 
+                        // For a box the vertical-flow rotation will transpose, the
+                        // alignment runs on the CB's inline (horizontal) axis but
+                        // the item's PHYSICAL width is its logical HEIGHT (the
+                        // rotation swaps them). Align with the physical extent so
+                        // an overflowing vrl item (laid out with a small logical
+                        // width) is centered/clamped by its true width.
+                        double alignWidth = WillBeVerticalTransposed()
+                            ? GetShrinkToFitHeight() : boxWidth;
+
                         bool isRtl = Direction == "rtl";
                         // Inline-axis start edge follows the CB's direction.
                         bool startIsLow = cb.Direction != "rtl";
                         double dx = ResolveAbsposSelfAlignment(
                             jsPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
-                            boxWidth, isRtl, startIsLow);
+                            alignWidth, isRtl, startIsLow);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
                     }
                     else if (cbVertical && hasT && hasB)
@@ -2088,7 +2104,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // (WPT css-align/abspos/*-rtl-*, issue #1131).
                     double rectStart = ParentBox.ClientLeft;
                     double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
-                    double marginBoxWidth = Size.Width + ActualMarginLeft + ActualMarginRight;
+                    // Use the physical width for a box the rotation will transpose
+                    // (its physical width is the logical height).
+                    double boxW = WillBeVerticalTransposed() ? GetShrinkToFitHeight() : Size.Width;
+                    double marginBoxWidth = boxW + ActualMarginLeft + ActualMarginRight;
                     double dx = ResolveAbsposSelfAlignment(
                         "unsafe start", rectStart, rectWidth, rectStart, rectWidth,
                         marginBoxWidth, isRtl: true, startIsLow: false);
@@ -2138,10 +2157,17 @@ internal class CssBox : CssBoxProperties, IDisposable
                         // not the stretched top-to-bottom inset height.
                         alignBlockBorderBoxHeight = boxHeight;
 
+                        // For a box the vertical-flow rotation will transpose, the
+                        // alignment runs on the CB's block (vertical) axis but the
+                        // item's PHYSICAL height is its logical WIDTH (the rotation
+                        // swaps them); align with the physical extent.
+                        double alignHeight = WillBeVerticalTransposed()
+                            ? GetShrinkToFitWidth() : boxHeight;
+
                         // Block-axis start is the top edge for horizontal-tb.
                         double dy = ResolveAbsposSelfAlignment(
                             asPost, imcbTop, imcbHeight, cbPadTop, cbPadHeight,
-                            boxHeight, false, startIsLow: true);
+                            alignHeight, false, startIsLow: true);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
                     else if (cbVertical && hasL && hasR)
