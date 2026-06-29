@@ -27,6 +27,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 9 | Abspos block-axis `align-self` (unresolved CB height + no height-shrink) | ✅ fixed | Broiler.Layout |
 | 10 | `@position-try` fallback dropped by comment-in-body parse bug | 🟡 partial | Broiler.HtmlBridge.Dom |
 | 11 | HTML comments split inline white-space runs → spurious space, content shift | ✅ fixed | Broiler.HtmlBridge.Dom |
+| 12 | `<br>` after an inline-block adds a spurious empty line + anon-block drops inline-block margin | ✅ fixed | Broiler.Layout (+ Broiler.HTML patch) |
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
@@ -52,6 +53,43 @@ comment-induced shift across the css-align/abspos family (e.g. `justify-self-…
 94.1 % → 96.9 % match); the residual gap in those specific local tests is the **separate**
 RTL / vertical-writing-mode inline static-position work (cluster 3, deferred) plus sub-pixel
 border anti-aliasing, not the white-space bug.
+
+Cluster 12 (issue [#1121](https://github.com/MaiRat/Broiler/issues/1121)) **corrects a prior
+assumption**: the dominant `css-align/abspos` residual (`default-overflow` family, the bulk of
+the `PixelMismatch / MissingContent` failures) was attributed under cluster 11 to "RTL / vertical
+inline static-position work plus sub-pixel border AA". Reproducing
+`justify-self-default-overflow-htb-rtl-htb.html` against the live renderer showed the **abspos
+self-alignment is already correct** (horizontal placement matches Chromium to ≤1px). The real cause
+is a `<br>` line-advance bug: every test in this family has a `…inline-blocks… <br> …inline-blocks…`
+structure, and Broiler advanced **~9px too little** across the `<br>`, so the entire second half of
+each test rendered ~9–10px too high — ~92 % of the mismatched pixels in the representative file
+(22 386 of 24 230), with sub-pixel border AA the negligible remainder. Two coupled defects, both
+about how a `<br>` (modelled as a block with a `.95em` empty-line height) interacts with
+inline-block content:
+1. **Anonymous-block line-box height dropped the inline-block's margin.** A `<br>` splits inline
+   content into sibling anonymous blocks; the wrapper's height came from
+   `InlineRectLineBoxBottom` = the inline-block's **border** box (its line rectangle excludes the
+   bottom margin) and omitted the strut descent, so the next block sibling started ~24px too high.
+   Fixed in `CssLayoutEngine.CreateLineBoxes` by extending an **anonymous** block's content height
+   to the inline-block's margin-box bottom + strut descent (mirrors the already-correct
+   `FlowInlineBlock` *wrap* path; restricted to anonymous blocks so author-box heights are
+   unchanged). Main-repo, permanent.
+2. **`<br>` after an inline-block got a spurious `.95em` empty line.** `DomParser.CorrectLineBreaksBlocks`
+   (Broiler.HTML) gives a `<br>` a `.95em` height only when it "follows a block"; an atomic
+   inline-block has no text words and was misclassified as block-level. The proper fix treats
+   atomic inline-level boxes as inline content (patch `0002-broiler-html-br-after-inline-block.patch`).
+   Because CI builds the submodule at its pinned SHA (the patch is not applied there), an
+   **equivalent main-repo fallback** drops the `<br>`'s `.95em` height when its previous in-flow
+   sibling ends with inline-block content (`CssBox.PerformLayoutImp`, using
+   `CssLayoutEngine.EndsWithAtomicInlineBlock`) so CI is correct now; it is a no-op once the patch
+   lands. (Same proper-layer-patch-plus-CI-fallback shape as cluster 11.)
+
+After the fix the `<br>`-separated row advances the same distance as a naturally wrapped one. Full
+local `css` WPT sweep **68 → 73 passed** (+5, **zero regressions**); the curated `Broiler.Wpt.Tests`
+suite (485) likewise had zero regressions. Regression guards: `BrAfterInlineBlockTests`
+(`Broiler.Wpt.Tests`). The 10 still-failing local `css-align/abspos` files are the **vrl / vertical
+writing-mode** variants — the separate, still-deferred cluster-3 work (their "content shifted
+left/up" signatures), not this bug.
 
 Cluster 10 (issue [#1105](https://github.com/MaiRat/Broiler/issues/1105), the
 `css-anchor-position` position-try/fallback sub-cluster, ~23 tests) was a parse bug in
