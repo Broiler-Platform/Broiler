@@ -2057,6 +2057,32 @@ internal class CssBox : CssBoxProperties, IDisposable
                         marginBoxWidth, isRtl: true, startIsLow: false);
                     newX = (float)(rectStart + dx + ActualMarginLeft);
                 }
+                else if (cbVertical && !hasT && !hasB
+                         && cb.Direction == "rtl")
+                {
+                    // vertical-rl/lr container: the inline axis is VERTICAL.
+                    // justify-self:auto + auto block insets (top/bottom) → the box
+                    // rests at its static position: the inline-START edge of the
+                    // static-position rectangle. That start follows the inline
+                    // direction — for ltr the top (Broiler's default), for rtl the
+                    // inline axis is reversed so the start is the BOTTOM. Use the
+                    // CB padding box (cbPadTop/cbPadHeight) for the vertical
+                    // extent: block-axis sizes resolve bottom-up, so ParentBox's
+                    // ActualBottom is not final here, whereas cbPad* carries the
+                    // definite-height patch. Without this, abspos items in
+                    // vertical-rl+rtl containers render flush-top
+                    // (WPT css-align/abspos/*-vrl-rtl-*, issue #1131).
+                    double marginBoxHeight = Size.Height + ActualMarginTop + ActualMarginBottom;
+                    double dy = ResolveAbsposSelfAlignment(
+                        "unsafe start", cbPadTop, cbPadHeight, cbPadTop, cbPadHeight,
+                        marginBoxHeight, isRtl: true, startIsLow: false);
+                    newY = (float)(cbPadTop + dy + ActualMarginTop);
+                    // Preserve the box's own (shrink-to-fit) block size: the apply
+                    // step shifts ActualBottom by the same delta as Location, so
+                    // record the height to restore it (mirrors the align-self
+                    // block-axis un-stretch).
+                    alignBlockBorderBoxHeight = Size.Height;
+                }
 
                 // align-self controls the block axis:
                 //   horizontal-tb → vertical (T/B insets)
