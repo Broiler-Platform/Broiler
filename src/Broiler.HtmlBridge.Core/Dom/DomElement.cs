@@ -115,6 +115,15 @@ public sealed class DomElement : CanonicalElement
         }
     }
 
+    /// <summary>
+    /// Exposes a text node's content through the canonical <see cref="CanonicalElement.NodeValue"/>
+    /// so engine-neutral consumers (notably the renderer's typed DOM-to-box builder) can read
+    /// bridge text without depending on this facade type. The bridge models text nodes as a
+    /// <see cref="DomElement"/> with <see cref="IsTextNode"/> set rather than a canonical
+    /// <c>DomText</c>, so <c>NodeValue</c> is the only canonical bridge for that text.
+    /// </summary>
+    public override string? NodeValue => IsTextNode ? _textContent : base.NodeValue;
+
     public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public string? NamespaceURI

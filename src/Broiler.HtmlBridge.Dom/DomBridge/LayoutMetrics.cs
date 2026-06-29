@@ -50,6 +50,15 @@ public sealed partial class DomBridge
             _layoutRectCache = [];
             _contentExtentCache = [];
             _borderBoxExtentCache = [];
+            // RF-BRIDGE-1b: build the shared-geometry snapshot up front, before the
+            // read pass enumerates the element tree. BuildSharedGeometrySnapshot calls
+            // GetRenderDocument, which mutates the document (reflects style into
+            // attributes); doing that lazily mid-traversal modified a Children
+            // collection that an enclosing foreach was still enumerating
+            // (InvalidOperationException). Building once here also bounds it to one
+            // layout per pass.
+            if (UseSharedLayoutGeometry)
+                _sharedGeometrySnapshot = BuildSharedGeometrySnapshot();
         }
 
         try
@@ -63,6 +72,8 @@ public sealed partial class DomBridge
                 _layoutRectCache = null;
                 _contentExtentCache = null;
                 _borderBoxExtentCache = null;
+                // RF-BRIDGE-1b: the shared-geometry snapshot is scoped to the same pass.
+                ClearSharedGeometrySnapshot();
             }
         }
     }
@@ -72,6 +83,10 @@ public sealed partial class DomBridge
         {
             if (isRoot)
                 return GetViewportReferenceLength(element, vertical: false);
+
+            // RF-BRIDGE-1b: clientWidth is the padding-box width (content + padding).
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return shared.PaddingBox.Width;
 
             var props = GetComputedProps(element);
             var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
@@ -87,6 +102,10 @@ public sealed partial class DomBridge
         {
             if (isRoot)
                 return GetViewportReferenceLength(element, vertical: true);
+
+            // RF-BRIDGE-1b: clientHeight is the padding-box height (content + padding).
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return shared.PaddingBox.Height;
 
             var props = GetComputedProps(element);
             var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
@@ -118,6 +137,9 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return shared.BorderBox.Width;
+
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.width;
@@ -138,6 +160,9 @@ public sealed partial class DomBridge
 
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
+
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return shared.BorderBox.Height;
 
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
@@ -673,6 +698,21 @@ public sealed partial class DomBridge
     {
         if (_layoutRectCache != null && _layoutRectCache.TryGetValue(element, out var cached))
             return cached;
+
+        // RF-BRIDGE-1b: prefer the renderer's real layout (border box, document coords)
+        // for the element's rect, which powers getBoundingClientRect and offset top/left.
+        // Falls back to the estimator when the element has no box (detached/display:none).
+        if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var sharedGeometry))
+        {
+            var sharedRect = (
+                (double)sharedGeometry.BorderBox.Left,
+                (double)sharedGeometry.BorderBox.Top,
+                (double)sharedGeometry.BorderBox.Width,
+                (double)sharedGeometry.BorderBox.Height);
+            if (_layoutRectCache != null)
+                _layoutRectCache[element] = sharedRect;
+            return sharedRect;
+        }
 
         // Cache unconditionally: re-entrant computations (an auto content-extent
         // pass asking for the rect of an element whose own extent is mid-flight)
