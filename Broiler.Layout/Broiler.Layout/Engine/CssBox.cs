@@ -2001,6 +2001,24 @@ internal class CssBox : CssBoxProperties, IDisposable
                             boxHeight, false, startIsLow);
                         newY = (float)(imcbTop + dy + ActualMarginTop);
                     }
+                    else if (!cbVertical && !hasL && !hasR && ParentBox != null)
+                    {
+                        // Inline insets are auto → the box is at its static
+                        // position; justify-self aligns it within the
+                        // static-position rectangle, whose inline extent is the
+                        // in-flow parent's content box (CSS Position 3
+                        // §abspos-alignment). The box keeps its own inline size.
+                        double rectStart = ParentBox.ClientLeft;
+                        double rectWidth = ParentBox.ClientRight - ParentBox.ClientLeft;
+                        double marginBoxWidth = Size.Width + ActualMarginLeft + ActualMarginRight;
+                        bool isRtl = Direction == "rtl";
+                        bool startIsLow = cb.Direction != "rtl";
+                        double dx = ResolveAbsposSelfAlignment(
+                            "unsafe " + StripSafeUnsafe(jsPost),
+                            rectStart, rectWidth, rectStart, rectWidth,
+                            marginBoxWidth, isRtl, startIsLow);
+                        newX = (float)(rectStart + dx + ActualMarginLeft);
+                    }
                 }
 
                 // align-self controls the block axis:
@@ -2044,6 +2062,27 @@ internal class CssBox : CssBoxProperties, IDisposable
                             asPost, imcbLeft, imcbWidth, cbPadLeft, cbPadWidth,
                             boxWidth, isRtl, startIsLow);
                         newX = (float)(imcbLeft + dx + ActualMarginLeft);
+                    }
+                    else if (!cbVertical && !hasT && !hasB)
+                    {
+                        // Block insets are auto → the box is at its static
+                        // position; align-self aligns it within the
+                        // static-position rectangle, which has ZERO block size
+                        // at the static position (free space = −margin-box
+                        // height), so start keeps the box put while center/end
+                        // pull it up by half / all of its height (CSS Position 3
+                        // §abspos-alignment). The box keeps its own block size:
+                        // record it so the shared apply step's ActualBottom
+                        // bookkeeping restores the height after the offset
+                        // (otherwise moving up shrinks the box by the delta).
+                        alignBlockBorderBoxHeight = Size.Height;
+                        double marginBoxStart = Location.Y - ActualMarginTop;
+                        double marginBoxHeight = Size.Height + ActualMarginTop + ActualMarginBottom;
+                        double dy = ResolveAbsposSelfAlignment(
+                            "unsafe " + StripSafeUnsafe(asPost),
+                            marginBoxStart, 0, marginBoxStart, 0,
+                            marginBoxHeight, false, startIsLow: true);
+                        newY = (float)(marginBoxStart + dy + ActualMarginTop);
                     }
                 }
 
@@ -3834,6 +3873,20 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// Drives the overflow tie-break.</param>
     /// <returns>Offset to add to <paramref name="imcbStart"/>; the caller
     /// computes <c>pos = imcbStart + returnValue + leading margin</c>.</returns>
+    /// <summary>
+    /// Drops a leading <c>safe</c>/<c>unsafe</c> overflow keyword from an
+    /// alignment value so the static-position path can force its own
+    /// (always-unsafe) overflow handling by re-prefixing <c>unsafe</c>.
+    /// </summary>
+    private static string StripSafeUnsafe(string value)
+    {
+        if (value.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
+            return value.Substring(5).Trim();
+        if (value.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
+            return value.Substring(7).Trim();
+        return value;
+    }
+
     internal static double ResolveAbsposSelfAlignment(
         string alignment,
         double imcbStart, double imcbSize,
