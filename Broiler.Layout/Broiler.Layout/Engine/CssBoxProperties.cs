@@ -1130,14 +1130,37 @@ internal abstract class CssBoxProperties
 
     private string ResolvePhysicalSize(string explicitPhysicalValue, bool isWidth)
     {
+        // PROTOTYPE (BROILER_VERTICAL_FLOW): a vertical-writing-mode box that
+        // WILL be transposed by the post-layout rotation is laid out in a logical
+        // (horizontal) frame whose frame-width is the box's INLINE size and
+        // frame-height its BLOCK size; the rotation then swaps them into physical
+        // space.  For a vertical writing mode physical 'width' is the block-size
+        // and physical 'height' the inline-size, so the frame dimensions come
+        // from the *swapped* physical properties (frame-width ← CSS height,
+        // frame-height ← CSS width).  Without this an explicitly-sized box lays
+        // out un-swapped and the rotation transposes it (a 20×80 inner → 80×20).
+        // Gated on WillBeVerticalTransposed so a vertical box that is NOT actually
+        // rotated (e.g. an abspos item nested in a vertical container, which the
+        // runtime excludes from its container's rotation) is left untouched.
+        // The cheap IsVerticalWritingMode check short-circuits the common
+        // horizontal-tb case before the parent-chain walk.
+        if (IsVerticalWritingMode(WritingMode)
+            && VerticalFlowPrototype.Enabled
+            && WillBeVerticalTransposed())
+        {
+            string logical = isWidth ? InlineSize : BlockSize;
+            if (HasExplicitSize(logical))
+                return logical;
+            string swappedPhysical = isWidth ? _height : _width;
+            return HasExplicitSize(swappedPhysical) ? swappedPhysical : explicitPhysicalValue;
+        }
+
         if (HasExplicitSize(explicitPhysicalValue))
             return explicitPhysicalValue;
 
-        // PROTOTYPE (BROILER_VERTICAL_FLOW): when the experimental vertical
-        // flow path is enabled, vertical-writing-mode boxes are laid out in a
-        // logical (horizontal) coordinate frame — inline-size maps to width,
-        // block-size to height — and a post-layout transform rotates the
-        // result into physical space.  So the dimension swap is suppressed.
+        // Legacy path (prototype disabled): vertical-writing-mode boxes swap
+        // inline/block onto physical width/height directly (no post-layout
+        // rotation).
         bool vertical = IsVerticalWritingMode(WritingMode) && !VerticalFlowPrototype.Enabled;
         var logicalValue = isWidth
             ? (vertical ? BlockSize : InlineSize)
@@ -1145,6 +1168,17 @@ internal abstract class CssBoxProperties
 
         return HasExplicitSize(logicalValue) ? logicalValue : explicitPhysicalValue;
     }
+
+    /// <summary>
+    /// PROTOTYPE (BROILER_VERTICAL_FLOW): whether this box will be transposed by
+    /// the post-layout vertical-flow rotation — i.e. it lies inside a vertical
+    /// rotation root (a vertical-writing-mode box whose parent is not vertical),
+    /// reached without first crossing an out-of-flow box that establishes its own
+    /// (non-transposed) rotation context.  Overridden in <see cref="CssBox"/>,
+    /// which has the parent chain; the property base has no parent so it cannot
+    /// be transposed.
+    /// </summary>
+    protected virtual bool WillBeVerticalTransposed() => false;
 
     private static bool HasExplicitSize(string? value) =>
         !string.IsNullOrWhiteSpace(value) &&

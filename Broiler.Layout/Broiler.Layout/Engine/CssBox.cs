@@ -231,6 +231,34 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    /// <summary>
+    /// PROTOTYPE (BROILER_VERTICAL_FLOW): see
+    /// <see cref="CssBoxProperties.WillBeVerticalTransposed"/>.  Walk up the box
+    /// tree: the first vertical-writing-mode ancestor (or this box) whose own
+    /// parent is NOT vertical is a rotation root and transposes this box.  An
+    /// out-of-flow ancestor establishes its own rotation context, so if one is
+    /// reached before any vertical root, the rotation of a further vertical
+    /// ancestor does not reach this box — matching the runtime, where an abspos
+    /// item in a vertical container is left untransposed (its container's
+    /// rotation skips it and it is not a root itself).
+    /// </summary>
+    protected override bool WillBeVerticalTransposed()
+    {
+        if (!VerticalFlowPrototype.Enabled)
+            return false;
+        for (CssBox ctx = this; ctx != null; ctx = ctx.ParentBox)
+        {
+            bool ctxVertical = IsVerticalWritingMode(ctx.WritingMode);
+            bool parentVertical = ctx.ParentBox != null
+                && IsVerticalWritingMode(ctx.ParentBox.WritingMode);
+            if (ctxVertical && !parentVertical)
+                return true;
+            if (ctx.Position == CssConstants.Absolute || ctx.Position == CssConstants.Fixed)
+                return false;
+        }
+        return false;
+    }
+
     public List<CssBox> Boxes { get; } = [];
 
     public override bool AvoidGeometryAntialias => LayoutEnvironment?.AvoidGeometryAntialias ?? false;
