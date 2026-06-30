@@ -33,6 +33,10 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
 | 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
 | 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
+| 18 | Inline-box (`display:inline`) background/border painted **over** the line text → coloured spans hid their own text | ✅ fixed | Broiler.HTML |
+| 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
+| 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
+| 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -145,6 +149,119 @@ unaffected. All 6 tests pass (CSS2 **7 → 13**); curated `Broiler.Wpt.Tests` **
 `Wpt_ReplacedElements*_MatchesReference` are the regression guards); css-backgrounds (image-heavy),
 css-anchor-position, and css-align all unchanged — zero regressions.
 
+Cluster 18 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) was found by
+reproducing the `CSS2/linebox/vertical-align-negative-leading-001` failure against the live
+renderer: its `<span>`s (Ahem text, `color:orange`, `background:purple`) rendered as solid
+**purple** boxes with no orange glyphs. A minimal repro isolated it — a `display:inline` span
+with a contrasting `color` + `background` paints as a solid background rectangle with its text
+**completely hidden**, while a block (`<div>`) with the same colours paints correctly. Root
+cause is paint order in `Broiler.HTML`'s `PaintWalker`: the glyphs of every inline box on a line
+are emitted in one pass from the **containing block's** line boxes (`EmitText`), but each
+`display:inline` child fragment carries only its own background/border (its glyphs live in the
+block's lines). Painted in the normal child phase (Appendix E Step 5) those backgrounds landed
+**on top of** the already-emitted text. Per CSS2.1 Appendix E an inline box's background/border
+paints behind the line's text. Fixed by emitting `display:inline` descendants' backgrounds and
+borders **before** the block's text (`EmitInlineLevelBoxDecorations`, called from both
+`PaintFragment` and `PaintFragmentForegroundPhase`) and suppressing re-emission when the box is
+later painted as inline content in Step 5 (the new `asInlineContent` flag). Atomic inline-level
+boxes (`inline-block`/`inline-table`) own their own text and are untouched; positioned /
+stacking-context inline boxes keep their own later phase. Verified against minimal repros and the
+curated `Broiler.Wpt.Tests` suite (496): **zero regressions, net +1** — `PositionTry002`
+(cluster 10's `position-try-002`, an orange target over a background) now clears the pixel gate.
+On the full CI suite this lifts any test that places a coloured inline span over a background — a
+ubiquitous WPT idiom — so the win is broad even though the local curated subset moves by one.
+Pushed to `MaiRat/Broiler.HTML`; pointer bumped. Regression guard:
+`InlineBackgroundPaintOrderTests` (main repo, renders a blue-on-red inline span and asserts the
+blue text pixels survive). *Note:* `vertical-align-negative-leading-001` itself still fails — its
+residual gap is the **`text-top`/`text-bottom` line-box height** (those values must grow the line
+box; Broiler keeps it at the `line-height`) plus Ahem glyph metrics — separate line-box work.
+
+Cluster 19 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) came from pursuing the
+non-local `CSS2/tables` families (`border-conflict-*`, 258 failures — the biggest table cluster).
+Fetching `border-conflict-w-001.xht` from WPT (via `gh api`) and rendering it surfaced **two
+systematic bugs**, both in `Broiler.HTML`, neither table-conflict-specific:
+- **CDATA-wrapped `<style>` dropped.** XHTML wraps inline CSS in a CDATA section
+  (`<![CDATA[ … ]]>`) so the document validates as XML. The HTML tree builder leaves the markers
+  as literal text in the style element; the CSS parser cannot tokenize `<![CDATA[` / `]]>` and
+  dropped the rules, so **the entire stylesheet was silently lost** — the cells rendered with no
+  border/padding/height. This hits *every* CDATA-wrapped CSS2 `.xht` reftest, and `css/CSS2` is
+  the **#1 failing directory (3549)**, so the blast radius is large. Fixed by stripping the
+  markers before parsing (`DomParser.StripCdataSection`); a minimal `cdata.xht` went 0 → fully
+  styled.
+- **Author `border` shorthand colour lost on table cells.** A non-standard UA rule
+  `td, th { border-color:#dfdfdf }` set a *longhand* that the post-cascade `border`-shorthand
+  expansion (`CssStyleEngine.ExpandBorderShorthand`'s `!ContainsKey` guards) could not override,
+  so `td { border: 5px solid green }` kept the UA grey and rendered grey (a `<div>` with the same
+  border was always green). Real UA stylesheets set a default border-color on `table` only, not on
+  cells — removed the cell rule; legacy `<table border>` cells get their grey from
+  `DomParser.ApplyTableBorder` instead, so that path is unaffected. Verified green for separate
+  *and* collapsed, solid *and* double borders.
+
+Both verified against minimal repros and the curated `Broiler.Wpt.Tests` suite (zero regressions;
+the one flaky `CssomView_ZoomScroll…` failure passes 3/3 in isolation and is unrelated). Pushed to
+`MaiRat/Broiler.HTML`; pointer bumped. Regression guards: `XhtmlStyleAndTableBorderTests` (main
+repo). **Remaining for the `border-conflict-*` family:** with these fixes the tests now apply
+their styles and paint the lime borders, but the red borders still show because **collapsed-border
+conflict resolution** (CSS2.1 §17.6.2.1 — `hidden` wins, then width, then style priority, then
+origin; shared-edge dedup) is **unimplemented** (the layout only approximates collapse with a -1px
+spacing hack). That is the next, larger increment for this family — it needs the table grid
+(neighbour lookup lives in `CssLayoutEngineTable`) and is well-specified; no local pixel reference,
+so verify with the "no red / lime present" heuristic + the curated suite.
+
+Cluster 20 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) implements the
+collapsed-border conflict resolution that cluster 19 identified as the remaining gap for the
+`CSS2/tables/border-conflict-*` family (258 failures). In the `border-collapse:collapse` model
+adjacent cells **share** one border, but Broiler painted each cell's own borders independently, so
+a border that should *lose* a shared edge (e.g. a red edge yielding to an adjacent `hidden`, wider,
+or higher-priority border) still painted — every `border-conflict-*` reftest showed the red it
+asserts must be absent. `CssLayoutEngineTable.ResolveCollapsedBorders` (a pre-sizing pass gated to
+collapse tables) builds the column-indexed cell grid and resolves each **internal** shared edge per
+CSS2.1 §17.6.2.1: `hidden` suppresses the edge; otherwise the **wider** border wins, then the
+higher-priority **style** (`double > solid > dashed > dotted > ridge > outset > groove > inset`),
+then the earlier (left/top) cell on an exact tie; `none`/zero always loses. The winner is assigned
+to the left/top cell and the right/bottom cell's matching edge is suppressed, so the edge paints
+once with the winning style/width/colour (or not at all when `hidden` wins). Verified:
+`border-conflict-{w,width,style}-00x.xht` now render **no red** with the winning borders painted
+(e.g. `border-conflict-w-001` red 260 → 0, lime 996 → 753 after dedup); the curated
+`Broiler.Wpt.Tests` suite has **zero regressions**. Regression guards:
+`CollapsedBorderConflictTests`. **Validated broadly** by fetching the `border-conflict-element-*`
+family: `-001` and `-003`…`-008` (cell-vs-cell tie-break *and* the row/column-origin cases) all
+render **no red**; the tie-break (first/left-top operand wins) is correct for LTR *and* — by the
+logical-column ordering — RTL. **Follow-ups:** outer **table-vs-cell** edge resolution — ✅ **now done** (each perimeter cell edge
+collapses with the table element's own border; cell wins ties per origin priority; no-op for the
+common borderless table; companion `Broiler.HTML` removal of the UA `table{border-color}` longhand
+so an author table border keeps its colour — a wider author-green table border now wins the
+perimeter as green, hidden suppresses the cell perimeter; guards `OuterEdge_*`). Still open: **row/
+col-group** origin edges, exact collapsed-border **geometry** (half-border centring + cell/table
+shrink) — the current pass fixes which border *wins* and its colour, not sub-pixel placement;
+**spanned cells**
+(rowspan/colspan placeholders) are skipped (conservative no-op); and the **RTL** tie-break (`direction:rtl`) — ✅ **now fixed**: a tie favours the top-RIGHT cell in
+an rtl table, so the horizontal-edge resolver passes the right cell first to `ResolveCollapsedEdge`
+when the table is rtl (verified ltr↔rtl flip on a minimal table; `border-conflict-element-002` red
+40→24, the residual being the deferred outer table-vs-cell corner — that cell's own border legitimately
+wins against the table's absent border, so the corner needs the outer-edge model *and* the
+`height:2in`-on-empty-collapse-cells sizing, both still open). Zero curated regressions; guard
+`CollapsedBorderConflictTests.TieBreak_IsDirectionAware_*`. No local pixel reference
+for these `.xht` tests, so verification used the "no red / winning colour present" heuristic + the
+curated suite.
+
+Cluster 21 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) — found while checking
+why the `border-conflict-*` tables (all `height:2in; width:2in`) rendered as thin strips: Broiler
+sized tables **purely from content** and never consulted the specified table `height`, so every
+CSS2 `tables` reftest collapsed to content height — the committed references expect the box
+sized to `2in`, so the geometry never matched even with correct borders. CSS2.1 §17.5.3: a
+specified table height greater than the rows' natural sum is **distributed over the rows**.
+`CssLayoutEngineTable.DistributeExtraTableHeight` (post-row-layout) records each row's natural
+top/bottom and, when the resolved (definite) table height exceeds the content extent, spreads the
+surplus equally across the in-flow rows — shifting each row down by the surplus added above it and
+growing its non-row-spanning cells (vertical-alignment re-applied). **Gated** to an explicit
+definite height that *exceeds* content, so auto-height tables and content-taller tables are
+untouched. Verified: a `height:200px` two-row table renders ~200px (was ~40px);
+`border-conflict-w-001` / `border-conflict-element-001` now render at the 2in reference height
+with no red. Zero curated regressions; guard `TableHeightTests`. (Side effect: full-height tables
+make any *unresolved* border full-length — `border-conflict-element-002`'s deferred outer-corner
+red grew 24→182px, underscoring that the outer table-vs-cell edge model is the next table item.)
+
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
 shifted content horizontally in comment-heavy tests. After scripts run, the bridge serializes
@@ -242,6 +359,60 @@ shape as cluster 6's `-webkit-right`. Fix added `inline-table` (the real win) pl
 valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
+
+- **`CSS2/generated-content/content-*` (≈82) — triaged, NOT a bug (font/reference tail).**
+  Probed `content-00{1..8}` against WPT: `content:none`, `content:normal`, string content,
+  `content:url(…)`, and `content:counter(…)` all render correctly (e.g. `content-005`'s undefined
+  counter renders "0", matching its reference glyph-for-glyph modulo anti-aliasing). The family's
+  failures are the committed-reference pixel/font tail, not a `content` feature gap — **don't chase
+  this family** as a systematic fix.
+
+- **`<br>`-after-inline-block spurious line inside a block-in-inline split** —
+  🔬 **triaged, deferred (issue #1143).** `CSS2/abspos/abspos-in-block-in-inline-in-relpos-inline`
+  (94.8%) renders the abspos `#target` correctly sized/placed **except ~17px too low**.
+  Reproducing against the live renderer pinned it precisely: the abspos's static-position Y is
+  pushed down by a spurious ~19px empty line from the first `<br>` (deleting that one `<br>`
+  moves the band from y=108 to y=89, matching the reference y=91). This is the **cluster 12**
+  `<br>`-after-inline-block bug — but in a structure cluster 12 did *not* cover: the inline-block
+  and the `<br>` are children of an **inline** span (`#notContainingBlockOfTarget`) that also
+  contains a block descendant, so the **block-in-inline anonymization** restructures the box tree
+  and the `<br>` no longer sees the inline-block as its `GetPreviousSibling`, so the
+  `EndsWithAtomicInlineBlock` suppression (`CssBox.PerformLayoutImp`) never fires. The removed
+  height (~19px ≈ one normal line) also exceeds the `.95em` (~15px) spacer cluster 12 targets, so
+  the spurious line may be generated by the line-box pass in the split, not only the `<br>`'s
+  `.95em` height. A fix must extend the suppression to see through the block-in-inline
+  anonymization (and/or stop the split from emitting the empty `<br>` line) — same high
+  regression surface that regressed 8 `css-align/abspos` reftests in cluster 16, so it needs the
+  curated 496-suite as the net and careful gating. **Note:** this test also proves the abspos
+  **inline containing-block *width* resolution already works** (`width:100%` → the 100px inline
+  CB, not the viewport), so the "inline containing blocks for abspos" deferred item below is
+  partly stale — the residual there is static-position/geometry, not CB-width.
+
+- **`vertical-align` line-box height under negative leading (`text-top`/`text-bottom`)** —
+  🔬 **triaged, deferred (issue #1143).** `CSS2/linebox/vertical-align-negative-leading-001`
+  uses `line-height:10px; font-size:30px` (negative leading) and tests that `top`/`bottom` do
+  **not** grow the line box while `text-top`/`text-bottom` (and baseline content) **do** — the
+  reference grows containers 2/5/6 to 30/20/20px line boxes; Broiler renders them all 10px.
+  After cluster 18 (the spans now show their orange glyphs) the dominant residual is the
+  line-box height. Root cause is in `Broiler.Layout` `CssLayoutEngine.ApplyVerticalAlignment` +
+  the `InlineWordLineBoxBottom`/`InlineRectLineBoxBottom` line-height clamp:
+  1. `text-bottom` subtracts the box's **content-area (font) height** instead of its
+     **line-height box** height, so `text-bottom` collapses onto the same top as `text-top`
+     instead of sitting a content-area-height lower; both end at the content-area top and the
+     line never spans the 30px content area.
+  2. Even once `text-bottom` is repositioned, `InlineWordLineBoxBottom` clamps every inline
+     word's line-box contribution to `word.Top + line-height` (10px), so a `text-top`/`text-bottom`
+     box — which per §10.8.1 aligns to the parent **content area**, not the line-height box —
+     cannot extend the line box to the content area.
+  A correct fix is a coordinated change (line-height-box vs content-area extents under negative
+  half-leading, plus the clamp exception for `text-top`/`text-bottom`) whose glyph-position
+  effects ripple through all baseline math — high-risk in the most complex engine. A narrow
+  one-line attempt (use `box.ActualLineHeight` for the `text-bottom` subtraction) was a **no-op**
+  (the inline span's `ActualLineHeight` reads 0, so it fell back to the content height) and was
+  reverted. Needs the half-leading-aware line-box-height model done deliberately, with the
+  curated 496-suite as the regression net. Separately, the same reftest also needs Ahem glyph
+  metrics and the container-1 negative-half-leading baseline offset (Broiler renders its boxes
+  ~10px low) to fully pass.
 
 - **Abspos block-axis `align-self`** — ✅ fixed (cluster 9 above). The earlier
   "paint double-apply" diagnosis was superseded: re-reproducing against the live

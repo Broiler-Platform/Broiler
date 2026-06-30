@@ -1,0 +1,142 @@
+using System.IO;
+
+namespace Broiler.Wpt.Tests;
+
+/// <summary>
+/// Regression tests for CSS2.1 §17.6.2.1 collapsed-border conflict resolution
+/// (WPT issue #1143, css/CSS2/tables/border-conflict-*). In the
+/// <c>border-collapse:collapse</c> model adjacent cells share one border;
+/// Broiler resolves each internal edge to a single winner — <c>hidden</c>
+/// suppresses the edge, otherwise the wider border wins, then the
+/// higher-priority style. Before this, every cell painted its own borders, so
+/// a losing red border still showed.
+/// </summary>
+public class CollapsedBorderConflictTests : IDisposable
+{
+    private readonly string _tempDir;
+
+    public CollapsedBorderConflictTests()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), "broiler-collapse-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    public void Dispose()
+    {
+        Program.ResetTestHooks();
+        if (Directory.Exists(_tempDir))
+            Directory.Delete(_tempDir, recursive: true);
+    }
+
+    private (int red, int green) RenderCounts(string html)
+    {
+        var file = Path.Combine(_tempDir, "t-" + Guid.NewGuid().ToString("N")[..6] + ".html");
+        File.WriteAllText(file, html);
+        var runner = new WptTestRunner(300, 200);
+        using var bmp = runner.RenderHtmlFileBitmapPublic(file, _tempDir);
+        int red = 0, green = 0;
+        for (int y = 0; y < 200; y++)
+            for (int x = 0; x < 300; x++)
+            {
+                var p = bmp.GetPixel(x, y);
+                // `green` is (0,128,0) and `lime` is (0,255,0) — detect a
+                // green-dominant pixel, not a fixed channel threshold.
+                if (p.R > 150 && p.G < 100 && p.B < 100) red++;
+                else if (p.G > p.R + 40 && p.G > p.B + 40 && p.G > 80) green++;
+            }
+        return (red, green);
+    }
+
+    [Fact]
+    public void HiddenBorder_SuppressesAdjacentConflictingBorders()
+    {
+        // Mirrors border-conflict-w-001: a centre cell with a `hidden` border;
+        // its neighbours carry red borders only on the edges they share with it.
+        // `hidden` wins every shared edge, so no red must survive; the outer
+        // green borders remain.
+        var html = @"<!DOCTYPE html><html><head><style>
+table { border-collapse: collapse; }
+td { border: 5px solid green; height: 2em; width: 40px; }
+.c5 { border: 10px hidden red; }
+.c2 { border-bottom-color: red; }
+.c6 { border-left-color: red; }
+.c8 { border-top-color: red; }
+.c4 { border-right-color: red; }
+</style></head><body>
+<table>
+ <tr><td>a</td><td class='c2'>b</td><td>c</td></tr>
+ <tr><td class='c4'>d</td><td class='c5'>e</td><td class='c6'>f</td></tr>
+ <tr><td>g</td><td class='c8'>h</td><td>i</td></tr>
+</table></body></html>";
+        var (red, green) = RenderCounts(html);
+        Assert.True(green > 0, "winning green collapsed borders should paint");
+        Assert.Equal(0, red);
+    }
+
+    [Fact]
+    public void TieBreak_IsDirectionAware_RtlFavoursRightCell()
+    {
+        // CSS2.1 §17.6.2.1: with equal width and style, the shared edge is won
+        // by the top-LEFT cell in an ltr table but the top-RIGHT cell in an rtl
+        // table. The first cell's red right border therefore wins (shows) in
+        // ltr but loses (is suppressed) in rtl.
+        const string markup = @"<!DOCTYPE html><html><head><style>
+table{{border-collapse:collapse;direction:{0};}}
+td{{border:5px solid black;width:40px;height:30px;}}
+#a{{border-right-color:red;}}
+</style></head><body><table><tr><td id='a'>A</td><td>B</td></tr></table></body></html>";
+
+        var (rtlRed, _) = RenderCounts(string.Format(markup, "rtl"));
+        var (ltrRed, _) = RenderCounts(string.Format(markup, "ltr"));
+
+        Assert.Equal(0, rtlRed); // rtl: the right cell wins → red suppressed.
+        Assert.True(ltrRed > 0, "ltr: the left cell wins the tie, so its red border shows");
+    }
+
+    [Fact]
+    public void OuterEdge_HiddenTableBorder_SuppressesCellPerimeter()
+    {
+        // §17.6.2.1: a cell's perimeter edge collapses with the table's own
+        // border. A `hidden` table border wins (suppresses), so the single
+        // cell's red border must not show.
+        var html = @"<!DOCTYPE html><html><head><style>
+table{border-collapse:collapse;border:10px hidden green;width:100px;height:60px;}
+td{border:4px solid red;}
+</style></head><body><table><tr><td>a</td></tr></table></body></html>";
+        var (red, _) = RenderCounts(html);
+        Assert.Equal(0, red);
+    }
+
+    [Fact]
+    public void OuterEdge_WiderTableBorder_WinsOverCellPerimeter()
+    {
+        // A wider table border wins the perimeter over the cell's thin red one,
+        // so green shows and no red survives.
+        var html = @"<!DOCTYPE html><html><head><style>
+table{border-collapse:collapse;border:12px solid green;width:100px;height:60px;}
+td{border:2px solid red;}
+</style></head><body><table><tr><td>a</td></tr></table></body></html>";
+        var (red, green) = RenderCounts(html);
+        Assert.Equal(0, red);
+        Assert.True(green > 0, "the wider green table border should win the perimeter");
+    }
+
+    [Fact]
+    public void WiderBorder_WinsAtSharedEdge()
+    {
+        // Two cells sharing one edge: the right cell's wider green border must
+        // win over the left cell's thin red one at that edge. The left cell's
+        // red is confined to its outer edges, so green must dominate.
+        var html = @"<!DOCTYPE html><html><head><style>
+table { border-collapse: collapse; }
+td { height: 2em; width: 40px; }
+#a { border: 2px solid red; }
+#b { border: 12px solid green; }
+</style></head><body>
+<table><tr><td id='a'>a</td><td id='b'>b</td></tr></table></body></html>";
+        var (red, green) = RenderCounts(html);
+        // The shared edge (the thickest band between the cells) is green, and
+        // cell b's thick green frame dominates over cell a's thin red outline.
+        Assert.True(green > red, $"wider green border should dominate (green={green}, red={red})");
+    }
+}

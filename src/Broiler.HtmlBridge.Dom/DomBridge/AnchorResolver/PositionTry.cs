@@ -64,7 +64,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in el.Children)
+        foreach (var child in el.Children.ToList())
             CollectPositionTryRulesFromTree(child, result);
     }
     /// <summary>
@@ -101,7 +101,10 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in element.Children)
+        // Snapshot: TryApplyFallback resolves anchor geometry, which can lazily
+        // reflect style into the DOM and mutate a Children collection an enclosing
+        // recursion frame is still walking ("Collection was modified", issue #1143).
+        foreach (var child in element.Children.ToList())
             ResolvePositionTryFallbacksTree(child, anchorRegistry, positionTryRules);
     }
     private void TryApplyFallback(

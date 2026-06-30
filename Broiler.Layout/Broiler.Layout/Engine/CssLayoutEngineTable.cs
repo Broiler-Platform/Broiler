@@ -88,8 +88,12 @@ internal sealed class CssLayoutEngineTable
         // get the table boxes into the proper fields
         AssignBoxKinds(baseUrl);
 
-        // Insert EmptyBoxes for vertical cell spanning. 
+        // Insert EmptyBoxes for vertical cell spanning.
         InsertEmptyBoxes(baseUrl);
+
+        // CSS2.1 §17.6.2.1: resolve conflicting borders at each shared cell edge
+        // before sizing, so the used (winning) border widths drive cell layout.
+        ResolveCollapsedBorders();
 
         // Determine Row and Column Count, and ColumnWidths
         var availCellSpace = CalculateCountAndWidth();
@@ -667,9 +671,15 @@ internal sealed class CssLayoutEngineTable
         double maxBottom = 0f;
         int currentrow = 0;
 
+        // CSS2.1 §17.5.3: record each laid-out row's natural top/bottom so a
+        // specified table height greater than the content height can be
+        // distributed across the rows afterwards.
+        var rowBounds = new List<(CssBox Row, double Top, double Bottom)>();
+
         for (int i = 0; i < _allRows.Count; i++)
         {
             var row = _allRows[i];
+            double rowTop = cury;
 
             // CSS2.1 §17.5.5: Rows with visibility:collapse are hidden and do
             // not contribute height.  Column widths are still affected (handled
@@ -757,10 +767,15 @@ internal sealed class CssLayoutEngineTable
                 continue;
             }
 
+            rowBounds.Add((row, rowTop, maxBottom));
             cury = maxBottom + GetVerticalSpacing();
 
             currentrow++;
         }
+
+        // CSS2.1 §17.5.3: when the table's specified height exceeds the height
+        // the rows naturally occupy, distribute the surplus over the rows.
+        maxBottom = DistributeExtraTableHeight(g, rowBounds, starty, maxBottom);
 
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
@@ -775,6 +790,67 @@ internal sealed class CssLayoutEngineTable
             (float)(_tableBox.ActualBottom - _tableBox.Location.Y));
     }
 
+    /// <summary>
+    /// CSS2.1 §17.5.3: "If the 'table' or 'inline-table' element's height is
+    /// specified [and greater than the sum of the row heights], the row heights
+    /// are increased so they sum to the specified height." Broiler sizes the
+    /// table purely from content, so an explicit table height was ignored
+    /// (every CSS2 tables reftest sets <c>height:2in</c>). Distribute the
+    /// surplus equally over the in-flow rows: shift each row down by the surplus
+    /// already added above it and grow its (non-row-spanning) cells. Returns the
+    /// updated <paramref name="naturalBottom"/>. No-op when the height is auto
+    /// or the rows already exceed it, so auto-height tables are unchanged.
+    /// </summary>
+    private double DistributeExtraTableHeight(
+        ILayoutEnvironment g, List<(CssBox Row, double Top, double Bottom)> rowBounds,
+        double starty, double naturalBottom)
+    {
+        if (rowBounds.Count == 0)
+            return naturalBottom;
+        if (string.IsNullOrEmpty(_tableBox.Height) || _tableBox.Height == CssConstants.Auto)
+            return naturalBottom;
+
+        // Resolve the specified height against the containing block (percentages
+        // need a definite basis; fall back to no-op when unavailable).
+        double cbHeight = _tableBox.ContainingBlock?.ActualHeight ?? 0;
+        double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, _tableBox.GetEmHeight());
+        if (double.IsNaN(specHeight) || specHeight <= 0)
+            return naturalBottom;
+
+        // Target bottom for the row area = table top + specified content height.
+        // ClientTop already includes the table's top border/padding; the bottom
+        // border/spacing is added by the caller, so target the row content box.
+        double specBottom = _tableBox.Location.Y + specHeight
+            - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
+        double surplus = specBottom - naturalBottom;
+        if (surplus <= 0.5)
+            return naturalBottom;
+
+        double perRow = surplus / rowBounds.Count;
+        double shift = 0;
+        foreach (var (row, top, bottom) in rowBounds)
+        {
+            foreach (var cell in row.Boxes)
+            {
+                if (cell is CssSpacingBox || GetRowSpan(cell) != 1)
+                {
+                    // Spanned cells: just shift; their height is governed by the
+                    // last spanned row. Conservative for this increment.
+                    cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
+                    continue;
+                }
+                cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
+                double newBottom = bottom + shift + perRow;
+                cell.ActualBottom = newBottom;
+                cell.Size = new SizeF(cell.Size.Width, (float)(newBottom - cell.Location.Y));
+                CssLayoutEngine.ApplyCellVerticalAlignment(g, cell);
+            }
+            shift += perRow;
+        }
+
+        return naturalBottom + surplus;
+    }
+
     private double GetSpannedMinWidth(CssBox row, CssBox cell, int realcolindex, int colspan)
     {
         double w = 0f;
@@ -786,6 +862,205 @@ internal sealed class CssLayoutEngineTable
         }
 
         return w;
+    }
+
+    // CSS2.1 §17.6.2.1 border-conflict-resolution priority of border styles
+    // (most → least): hidden (handled separately) > double > solid > dashed >
+    // dotted > ridge > outset > groove > inset > none.
+    private static readonly Dictionary<string, int> BorderStyleRank = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["double"] = 8, ["solid"] = 7, ["dashed"] = 6, ["dotted"] = 5,
+        ["ridge"] = 4, ["outset"] = 3, ["groove"] = 2, ["inset"] = 1, ["none"] = 0,
+    };
+
+    private readonly record struct EdgeBorder(string Style, double Width, string Color);
+
+    /// <summary>
+    /// CSS2.1 §17.6.2.1: resolves the single border that the
+    /// <c>border-collapse:collapse</c> model paints at a shared edge between two
+    /// cells. <c>hidden</c> suppresses the edge entirely; otherwise the wider
+    /// border wins, then the higher-priority style, then (for an exact tie) the
+    /// first operand — the spec's earlier-in-tree-order cell. <c>none</c> / zero
+    /// width always loses.
+    /// </summary>
+    private static EdgeBorder ResolveCollapsedEdge(EdgeBorder a, EdgeBorder b)
+    {
+        bool aHidden = string.Equals(a.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase);
+        bool bHidden = string.Equals(b.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase);
+        if (aHidden || bHidden)
+            return new EdgeBorder(CssConstants.Hidden, 0, string.Empty);
+
+        bool aNone = a.Width <= 0.01 || string.IsNullOrEmpty(a.Style) || string.Equals(a.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        bool bNone = b.Width <= 0.01 || string.IsNullOrEmpty(b.Style) || string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        if (aNone && bNone)
+            return new EdgeBorder(CssConstants.None, 0, string.Empty);
+        if (aNone) return b;
+        if (bNone) return a;
+
+        if (Math.Abs(a.Width - b.Width) > 0.01)
+            return a.Width > b.Width ? a : b;
+
+        int ra = BorderStyleRank.GetValueOrDefault(a.Style, 0);
+        int rb = BorderStyleRank.GetValueOrDefault(b.Style, 0);
+        if (ra != rb)
+            return ra > rb ? a : b;
+
+        return a; // exact tie → the earlier (left/top) cell, per tree order.
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.6.2.1: in the collapsing-borders model adjacent cells share a
+    /// single border. Broiler paints each cell's own borders, so resolve every
+    /// internal shared edge to one winner: assign it to the left/top cell and
+    /// suppress the right/bottom cell's matching edge, so the edge is painted
+    /// once with the winning style/width/colour (and not at all when a
+    /// <c>hidden</c> border wins). Perimeter cell edges additionally collapse
+    /// with the table element's own border (cell wins ties, per origin
+    /// priority). Cells spanning rows/columns (EmptyBox placeholders) are
+    /// skipped — a conservative no-op for now.
+    /// </summary>
+    private void ResolveCollapsedBorders()
+    {
+        if (!string.Equals(_tableBox.BorderCollapse, CssConstants.Collapse, StringComparison.OrdinalIgnoreCase))
+            return;
+        if (_allRows.Count == 0)
+            return;
+
+        // CSS2.1 §17.6.2.1: an exact tie (same width and style) favours the cell
+        // furthest to the top-left in a left-to-right table, but the top-RIGHT
+        // cell in a right-to-left table. ResolveCollapsedEdge breaks ties toward
+        // its first operand, so for a horizontal edge in an RTL table the right
+        // cell must be passed first.
+        bool rtl = string.Equals(_tableBox.Direction, "rtl", StringComparison.OrdinalIgnoreCase);
+
+        // Build a column-indexed grid of real cells (a colspan cell occupies
+        // every column it spans; row-span placeholders are left null).
+        var grid = new List<Dictionary<int, CssBox>>(_allRows.Count);
+        foreach (var row in _allRows)
+        {
+            var cols = new Dictionary<int, CssBox>();
+            foreach (var cell in row.Boxes)
+            {
+                if (cell.Display != CssConstants.TableCell)
+                    continue;
+                int col = GetCellRealColumnIndex(row, cell);
+                int span = GetColSpan(cell);
+                for (int k = 0; k < span; k++)
+                    cols[col + k] = cell;
+            }
+            grid.Add(cols);
+        }
+
+        // Horizontal internal edges: left cell's right border vs right cell's left.
+        foreach (var cols in grid)
+        {
+            if (cols.Count == 0) continue;
+            int maxCol = 0;
+            foreach (var c in cols.Keys) if (c > maxCol) maxCol = c;
+            for (int c = 0; c < maxCol; c++)
+            {
+                if (!cols.TryGetValue(c, out var left) || !cols.TryGetValue(c + 1, out var right) || ReferenceEquals(left, right))
+                    continue;
+                var leftEdge = new EdgeBorder(left.BorderRightStyle, left.ActualBorderRightWidth, left.BorderRightColor);
+                var rightEdge = new EdgeBorder(right.BorderLeftStyle, right.ActualBorderLeftWidth, right.BorderLeftColor);
+                var winner = rtl
+                    ? ResolveCollapsedEdge(rightEdge, leftEdge)
+                    : ResolveCollapsedEdge(leftEdge, rightEdge);
+                ApplyEdge(left, "right", winner);
+                SuppressEdge(right, "left");
+            }
+        }
+
+        // Vertical internal edges: top cell's bottom border vs bottom cell's top.
+        for (int r = 0; r + 1 < grid.Count; r++)
+        {
+            foreach (var (col, top) in grid[r])
+            {
+                if (!grid[r + 1].TryGetValue(col, out var bottom) || ReferenceEquals(top, bottom))
+                    continue;
+                var winner = ResolveCollapsedEdge(
+                    new EdgeBorder(top.BorderBottomStyle, top.ActualBorderBottomWidth, top.BorderBottomColor),
+                    new EdgeBorder(bottom.BorderTopStyle, bottom.ActualBorderTopWidth, bottom.BorderTopColor));
+                ApplyEdge(top, "bottom", winner);
+                SuppressEdge(bottom, "top");
+            }
+        }
+
+        // Outer (perimeter) edges: each border-box cell edge on the table
+        // perimeter collapses with the table element's own border. §17.6.2.1
+        // origin priority puts the cell above the table, so on an exact tie the
+        // cell wins — pass the cell edge first. A no-op for the common
+        // borderless table (the table edge is `none`, which always loses).
+        var tableTop = new EdgeBorder(_tableBox.BorderTopStyle, _tableBox.ActualBorderTopWidth, _tableBox.BorderTopColor);
+        var tableBottom = new EdgeBorder(_tableBox.BorderBottomStyle, _tableBox.ActualBorderBottomWidth, _tableBox.BorderBottomColor);
+        var tableLeft = new EdgeBorder(_tableBox.BorderLeftStyle, _tableBox.ActualBorderLeftWidth, _tableBox.BorderLeftColor);
+        var tableRight = new EdgeBorder(_tableBox.BorderRightStyle, _tableBox.ActualBorderRightWidth, _tableBox.BorderRightColor);
+
+        int lastRow = grid.Count - 1;
+        int globalMaxCol = 0;
+        foreach (var cols in grid)
+            foreach (var c in cols.Keys)
+                if (c > globalMaxCol) globalMaxCol = c;
+
+        var resolvedOuter = new HashSet<(CssBox, string)>();
+        for (int r = 0; r < grid.Count; r++)
+        {
+            foreach (var (col, cell) in grid[r])
+            {
+                if (r == 0) ResolveOuterEdge(cell, "top", tableTop, resolvedOuter);
+                if (r == lastRow) ResolveOuterEdge(cell, "bottom", tableBottom, resolvedOuter);
+                if (col == 0) ResolveOuterEdge(cell, "left", tableLeft, resolvedOuter);
+                if (col == globalMaxCol) ResolveOuterEdge(cell, "right", tableRight, resolvedOuter);
+            }
+        }
+    }
+
+    private void ResolveOuterEdge(CssBox cell, string side, EdgeBorder tableEdge, HashSet<(CssBox, string)> done)
+    {
+        if (!done.Add((cell, side)))
+            return;
+        EdgeBorder cellEdge = side switch
+        {
+            "top" => new EdgeBorder(cell.BorderTopStyle, cell.ActualBorderTopWidth, cell.BorderTopColor),
+            "bottom" => new EdgeBorder(cell.BorderBottomStyle, cell.ActualBorderBottomWidth, cell.BorderBottomColor),
+            "left" => new EdgeBorder(cell.BorderLeftStyle, cell.ActualBorderLeftWidth, cell.BorderLeftColor),
+            _ => new EdgeBorder(cell.BorderRightStyle, cell.ActualBorderRightWidth, cell.BorderRightColor),
+        };
+        // Cell first: §17.6.2.1 origin priority favours the cell over the table
+        // on an exact width/style tie.
+        ApplyEdge(cell, side, ResolveCollapsedEdge(cellEdge, tableEdge));
+    }
+
+    private static void ApplyEdge(CssBox cell, string side, EdgeBorder b)
+    {
+        // A hidden/none winner paints nothing at this edge.
+        bool paints = b.Width > 0.01
+            && !string.Equals(b.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        if (!paints)
+        {
+            SuppressEdge(cell, side);
+            return;
+        }
+        string w = b.Width.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        switch (side)
+        {
+            case "right": cell.BorderRightStyle = b.Style; cell.BorderRightWidth = w; cell.BorderRightColor = b.Color; break;
+            case "left": cell.BorderLeftStyle = b.Style; cell.BorderLeftWidth = w; cell.BorderLeftColor = b.Color; break;
+            case "bottom": cell.BorderBottomStyle = b.Style; cell.BorderBottomWidth = w; cell.BorderBottomColor = b.Color; break;
+            case "top": cell.BorderTopStyle = b.Style; cell.BorderTopWidth = w; cell.BorderTopColor = b.Color; break;
+        }
+    }
+
+    private static void SuppressEdge(CssBox cell, string side)
+    {
+        switch (side)
+        {
+            case "right": cell.BorderRightStyle = CssConstants.None; cell.BorderRightWidth = "0"; break;
+            case "left": cell.BorderLeftStyle = CssConstants.None; cell.BorderLeftWidth = "0"; break;
+            case "bottom": cell.BorderBottomStyle = CssConstants.None; cell.BorderBottomWidth = "0"; break;
+            case "top": cell.BorderTopStyle = CssConstants.None; cell.BorderTopWidth = "0"; break;
+        }
     }
 
     private static int GetCellRealColumnIndex(CssBox row, CssBox cell)

@@ -186,7 +186,7 @@ public sealed partial class DomBridge
 
         // A re-entrant request for an extent still being computed returns 0 (the
         // legacy transient); it is element/axis-specific and must never be cached.
-        if (!_contentExtentInProgress.Add((element, vertical)))
+        if (!_contentExtentInProgress.TryAdd((element, vertical), 0))
             return 0;
 
         try
@@ -198,7 +198,7 @@ public sealed partial class DomBridge
         }
         finally
         {
-            _contentExtentInProgress.Remove((element, vertical));
+            _contentExtentInProgress.TryRemove((element, vertical), out _);
         }
     }
 
