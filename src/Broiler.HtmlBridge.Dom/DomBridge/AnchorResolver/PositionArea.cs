@@ -392,7 +392,16 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in element.Children)
+        // Snapshot before the recursive descent: element.Children enumerates the
+        // live ChildNodes list, and resolving a child can re-enter anchor
+        // resolution through a lazy offset/box query (ComputeElementBox →
+        // ResolvePositionAreaForElement) or surface a DOM move on a node sharing
+        // this parent, mutating the list mid-walk and throwing "Collection was
+        // modified" — which aborts position-area resolution for the whole
+        // document (WPT issue #1147, signature
+        // DomBridge.ResolvePositionAreaValues). Same defensive .ToList() idiom as
+        // BuildAnchorRegistry / ResolveAnchorCenter / InlineContainingBlocks.
+        foreach (var child in element.Children.ToList())
             ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative,
                 deferredDomMoves);
     }
