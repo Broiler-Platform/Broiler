@@ -191,6 +191,18 @@ internal static class CssUtils
             case "border-spacing":
                 cssBox.BorderSpacing = value;
                 break;
+            case "outline-width":
+                cssBox.OutlineWidth = value;
+                break;
+            case "outline-style":
+                cssBox.OutlineStyle = value;
+                break;
+            case "outline-color":
+                cssBox.OutlineColor = value;
+                break;
+            case "outline-offset":
+                cssBox.OutlineOffset = value;
+                break;
             case "border-collapse":
                 cssBox.BorderCollapse = value;
                 break;

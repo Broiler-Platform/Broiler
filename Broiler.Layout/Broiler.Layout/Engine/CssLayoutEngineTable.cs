@@ -676,6 +676,12 @@ internal sealed class CssLayoutEngineTable
         // distributed across the rows afterwards.
         var rowBounds = new List<(CssBox Row, double Top, double Bottom)>();
 
+        // Rowspan cells are normally sized/aligned at their last spanned row via a
+        // CssSpacingBox. When the trailing spanned rows are collapsed or empty no
+        // spacer runs, so we track which spanned cells were finalised and fix up the
+        // rest in a post-pass below.
+        var finalizedSpanCells = new HashSet<CssBox>();
+
         for (int i = 0; i < _allRows.Count; i++)
         {
             var row = _allRows[i];
@@ -724,6 +730,15 @@ internal sealed class CssLayoutEngineTable
                 curx = cell.ActualRight + GetHorizontalSpacing();
             }
 
+            // CSS2.1 §17.5.3: a row's specified `height` is a minimum. The loop
+            // above only grows `maxBottom` from non-row-spanning cell bottoms, so
+            // a row whose only cells span into later rows (e.g. rowspan cells with
+            // a collapsed/empty following row) would leave the row — and the whole
+            // table — at zero height, which `overflow:hidden` then clips away.
+            // Floor the row bottom by its explicit height so such rows still take
+            // space and overflowing cell content is clipped to the row box.
+            maxBottom = Math.Max(maxBottom, rowTop + GetSpecifiedRowHeight(row));
+
             foreach (CssBox cell in row.Boxes)
             {
                 CssSpacingBox spacer = cell as CssSpacingBox;
@@ -742,6 +757,7 @@ internal sealed class CssLayoutEngineTable
                     spacer.ExtendedBox.ActualBottom = maxBottom;
                     spacer.ExtendedBox.Size = new SizeF(spacer.ExtendedBox.Size.Width, (float)(maxBottom - spacer.ExtendedBox.Location.Y));
                     CssLayoutEngine.ApplyCellVerticalAlignment(g, spacer.ExtendedBox);
+                    finalizedSpanCells.Add(spacer.ExtendedBox);
                 }
 
                 // If one cell crosses page borders then don't need to check other cells in the row
@@ -772,6 +788,13 @@ internal sealed class CssLayoutEngineTable
 
             currentrow++;
         }
+
+        // CSS2.1 §17.5: finalise rowspan cells that no spacer sized (their trailing
+        // spanned rows were collapsed/empty). Clamp each to the bottom of its last
+        // laid-out spanned row and align its content — so e.g. `align-content:
+        // unsafe end` shifts the overflowing content to the cell's end edge instead
+        // of leaving it at the start.
+        FinalizeUnspacedRowSpanCells(g, rowBounds, finalizedSpanCells);
 
         // CSS2.1 §17.5.3: when the table's specified height exceeds the height
         // the rows naturally occupy, distribute the surplus over the rows.
@@ -1117,6 +1140,68 @@ internal sealed class CssLayoutEngineTable
             return 1;
 
         return rowspan;
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.5.3: the explicit <c>height</c> of a table row is a minimum.
+    /// Returns the resolved length for a definite (px/em) row height, or 0 when
+    /// the height is <c>auto</c> or a percentage (percentages resolve against the
+    /// table height, which is not yet known during the row-height pass).
+    /// </summary>
+    private static double GetSpecifiedRowHeight(CssBox row)
+    {
+        string h = row.Height;
+        if (string.IsNullOrEmpty(h)
+            || h == CssConstants.Auto
+            || h.EndsWith("%", StringComparison.Ordinal))
+            return 0;
+
+        double v = CssValueParser.ParseLength(h, 0, row.GetEmHeight());
+        return double.IsNaN(v) || v < 0 ? 0 : v;
+    }
+
+    /// <summary>
+    /// Sizes and aligns rowspan cells that no <see cref="CssSpacingBox"/> finalised
+    /// because their trailing spanned rows were collapsed (<c>visibility:collapse</c>)
+    /// or empty. Each such cell is clamped to the bottom of its last laid-out spanned
+    /// row, then its content is aligned via
+    /// <see cref="CssLayoutEngine.ApplyCellContentAlignment"/> (so <c>align-content</c>
+    /// center/end positions overflowing content instead of leaving it at the start).
+    /// </summary>
+    private void FinalizeUnspacedRowSpanCells(
+        ILayoutEnvironment g,
+        List<(CssBox Row, double Top, double Bottom)> rowBounds,
+        HashSet<CssBox> finalizedSpanCells)
+    {
+        if (rowBounds.Count == 0)
+            return;
+
+        var rowBottom = new Dictionary<CssBox, double>();
+        foreach (var (row, _, bottom) in rowBounds)
+            rowBottom[row] = bottom;
+
+        for (int r = 0; r < _allRows.Count; r++)
+        {
+            foreach (var cell in _allRows[r].Boxes)
+            {
+                if (cell is CssSpacingBox || GetRowSpan(cell) <= 1 || finalizedSpanCells.Contains(cell))
+                    continue;
+
+                // Bottom of the last laid-out (non-collapsed) row this cell spans.
+                double bottom = double.NaN;
+                for (int k = r; k < r + GetRowSpan(cell) && k < _allRows.Count; k++)
+                    if (rowBottom.TryGetValue(_allRows[k], out var b))
+                        bottom = double.IsNaN(bottom) ? b : Math.Max(bottom, b);
+
+                if (double.IsNaN(bottom) || bottom <= cell.Location.Y)
+                    continue;
+
+                cell.ActualBottom = bottom;
+                cell.Size = new SizeF(cell.Size.Width, (float)(bottom - cell.Location.Y));
+                CssLayoutEngine.ApplyCellContentAlignment(g, cell);
+                finalizedSpanCells.Add(cell);
+            }
+        }
     }
 
     private static void MeasureWords(CssBox box, ILayoutEnvironment g)

@@ -498,6 +498,59 @@ internal static class CssLayoutEngine
         }
     }
 
+    /// <summary>
+    /// CSS Box Alignment §6.2: aligns a table cell's in-flow content along the
+    /// block axis from the cell's explicit <c>align-content</c> (overriding the
+    /// vertical-align mapping), falling back to <see cref="ApplyCellVerticalAlignment"/>
+    /// when align-content is absent/<c>normal</c>. Used for cells whose final height
+    /// is only known after the row-height pass — notably rowspan cells whose trailing
+    /// rows are collapsed/empty, where the per-box align-content pass in
+    /// <c>CssBox.PerformLayout</c> ran while the cell was still content-sized
+    /// (zero free space) and therefore did nothing.
+    /// </summary>
+    public static void ApplyCellContentAlignment(ILayoutEnvironment g, CssBox cell)
+    {
+        ArgumentNullException.ThrowIfNull(g);
+        ArgumentNullException.ThrowIfNull(cell);
+
+        string ac = cell.AlignContent?.Trim() ?? string.Empty;
+        if (ac.Length == 0 || ac.Equals(CssConstants.Normal, StringComparison.OrdinalIgnoreCase))
+        {
+            ApplyCellVerticalAlignment(g, cell);
+            return;
+        }
+
+        bool isUnsafe = ac.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase);
+        bool isSafe = ac.StartsWith("safe ", StringComparison.OrdinalIgnoreCase);
+        string kw = (isUnsafe ? ac[7..] : isSafe ? ac[5..] : ac).Trim().ToLowerInvariant();
+
+        double free = cell.ClientBottom - CssBoxHelper.GetMaximumBottom(cell, 0f);
+        double shift = kw switch
+        {
+            "center" or "space-around" or "space-evenly" => free / 2,
+            "end" or "flex-end" => free,
+            // start / flex-start / baseline / space-between / unknown → start edge.
+            _ => 0,
+        };
+
+        // CSS Box Alignment §5.3: overflow alignment defaults to 'safe' (clamp to
+        // the start edge) unless 'unsafe' is requested.
+        if (!isUnsafe && shift < 0)
+            shift = 0;
+
+        if (Math.Abs(shift) <= 0.5)
+            return;
+
+        foreach (CssBox b in cell.Boxes)
+        {
+            if (b.Position == CssConstants.Absolute || b.Position == CssConstants.Fixed)
+                continue;
+            if (b.Display == CssConstants.None)
+                continue;
+            b.OffsetTop(shift);
+        }
+    }
+
     private static void FlowBox(ILayoutEnvironment g, CssBox blockbox, CssBox box, double limitRight, double linespacing, double startx, ref CssLineBox line, ref double curx, ref double cury, ref double maxRight, ref double maxbottom)
     {
         var startX = curx;
