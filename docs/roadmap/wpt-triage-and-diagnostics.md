@@ -360,6 +360,39 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
+- **`CSS2/backgrounds/background-{N}` (≈202, the single largest CSS2 family) — triaged, NOT a
+  systematic bug (image/scroll/color fidelity tail).** Probed `background-{001,004,050,150}` against
+  the live renderer: the `background` **shorthand parser is solid** — `background:green` (001) →
+  green rect; `background:fixed` (004, image/color reset to initial) → nothing; `background:repeat-x
+  scroll bottom green` (150, keyword soup, no image) → plain green square; `background:repeat-x green
+  url(blue15x15.png)` (050) → blue `repeat-x` stripe over green. All four render **correctly**. The
+  202 failures are the family's genuinely-hard tail: `cat.png` **tiling + scrolling + centered
+  bottom-position** fidelity (`background-{100,200,…}`), the `*_color.png` **sub-pixel colour-swatch**
+  comparisons, and committed-reference/asset issues — the same texture/font fidelity tail flagged for
+  `css-backgrounds/background-clip` under cluster 13. **Don't chase this family** as a systematic fix;
+  individual image-fidelity work is the only lever and it is low-yield per test.
+
+- **`css-writing-modes/abs-pos-non-replaced-{vrl,vlr}-*` (≈159) — real bug found, fix deferred
+  (regresses other vertical-WM tests).** Two coupled gaps. (1) **In-flow vertical-rl block
+  mis-positioned to the right.** A `writing-mode:vertical-rl` block that is an *in-flow* child of a
+  *horizontal* parent is placed at the **right edge** of the page instead of the left:
+  `ApplyVerticalWritingModeFlow` (`CssBox.cs`) right-aligns the box keyed off the **box's own**
+  writing mode, but a block's position follows its **containing block's** writing mode (CSS Writing
+  Modes 3 §7.1) — a vertical-rl box in a horizontal CB should keep its normal-flow (left) position
+  and rotate only its *content*. A minimal repro (`writing-mode:vertical-rl` div in a horizontal
+  body) renders the div flush-right; gating the right-shift on the **CB** being vertical-rl fixes the
+  repro (the box left-aligns, content rotates correctly) — but **regresses ~14 already-passing
+  vertical-WM tests** in the curated suite (`Wpt_WritingModes_{NativeCheckableControls,
+  SelectMultiple_Fallback,ButtonNativeComputedStyle}…` for vertical-rl/lr), which rely on the current
+  right-shift. The prototype's in-flow positioning is interdependent enough that the spec-correct
+  change is net-negative without coordinated rework; the right-shift already excludes abspos
+  (`Position != Absolute/Fixed`), so the abspos vertical-flow work (clusters 3/#1131/#1134) is
+  untouched either way. (2) **Vertical Ahem glyph fill not painting** — even with the CB
+  re-positioned, `abs-pos-non-replaced-vrl-002`'s abspos `<span>` (Ahem `X`, `color:green` over
+  `background-color:red`) shows red, not the green filled square the reftest needs: the green glyph
+  does not fill its 80×80 box in the rotated vertical frame (prototype Stage 2 glyph rendering). Both
+  must land together for this family to flip; neither is a small isolated fix.
+
 - **`CSS2/generated-content/content-*` (≈82) — triaged, NOT a bug (font/reference tail).**
   Probed `content-00{1..8}` against WPT: `content:none`, `content:normal`, string content,
   `content:url(…)`, and `content:counter(…)` all render correctly (e.g. `content-005`'s undefined
