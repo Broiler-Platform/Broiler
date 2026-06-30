@@ -34,6 +34,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
 | 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
 | 18 | Inline-box (`display:inline`) background/border painted **over** the line text → coloured spans hid their own text | ✅ fixed | Broiler.HTML |
+| 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -172,6 +173,38 @@ Pushed to `MaiRat/Broiler.HTML`; pointer bumped. Regression guard:
 blue text pixels survive). *Note:* `vertical-align-negative-leading-001` itself still fails — its
 residual gap is the **`text-top`/`text-bottom` line-box height** (those values must grow the line
 box; Broiler keeps it at the `line-height`) plus Ahem glyph metrics — separate line-box work.
+
+Cluster 19 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) came from pursuing the
+non-local `CSS2/tables` families (`border-conflict-*`, 258 failures — the biggest table cluster).
+Fetching `border-conflict-w-001.xht` from WPT (via `gh api`) and rendering it surfaced **two
+systematic bugs**, both in `Broiler.HTML`, neither table-conflict-specific:
+- **CDATA-wrapped `<style>` dropped.** XHTML wraps inline CSS in a CDATA section
+  (`<![CDATA[ … ]]>`) so the document validates as XML. The HTML tree builder leaves the markers
+  as literal text in the style element; the CSS parser cannot tokenize `<![CDATA[` / `]]>` and
+  dropped the rules, so **the entire stylesheet was silently lost** — the cells rendered with no
+  border/padding/height. This hits *every* CDATA-wrapped CSS2 `.xht` reftest, and `css/CSS2` is
+  the **#1 failing directory (3549)**, so the blast radius is large. Fixed by stripping the
+  markers before parsing (`DomParser.StripCdataSection`); a minimal `cdata.xht` went 0 → fully
+  styled.
+- **Author `border` shorthand colour lost on table cells.** A non-standard UA rule
+  `td, th { border-color:#dfdfdf }` set a *longhand* that the post-cascade `border`-shorthand
+  expansion (`CssStyleEngine.ExpandBorderShorthand`'s `!ContainsKey` guards) could not override,
+  so `td { border: 5px solid green }` kept the UA grey and rendered grey (a `<div>` with the same
+  border was always green). Real UA stylesheets set a default border-color on `table` only, not on
+  cells — removed the cell rule; legacy `<table border>` cells get their grey from
+  `DomParser.ApplyTableBorder` instead, so that path is unaffected. Verified green for separate
+  *and* collapsed, solid *and* double borders.
+
+Both verified against minimal repros and the curated `Broiler.Wpt.Tests` suite (zero regressions;
+the one flaky `CssomView_ZoomScroll…` failure passes 3/3 in isolation and is unrelated). Pushed to
+`MaiRat/Broiler.HTML`; pointer bumped. Regression guards: `XhtmlStyleAndTableBorderTests` (main
+repo). **Remaining for the `border-conflict-*` family:** with these fixes the tests now apply
+their styles and paint the lime borders, but the red borders still show because **collapsed-border
+conflict resolution** (CSS2.1 §17.6.2.1 — `hidden` wins, then width, then style priority, then
+origin; shared-edge dedup) is **unimplemented** (the layout only approximates collapse with a -1px
+spacing hack). That is the next, larger increment for this family — it needs the table grid
+(neighbour lookup lives in `CssLayoutEngineTable`) and is well-specified; no local pixel reference,
+so verify with the "no red / lime present" heuristic + the curated suite.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
