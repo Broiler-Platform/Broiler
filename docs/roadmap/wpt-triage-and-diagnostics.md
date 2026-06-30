@@ -36,6 +36,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 18 | Inline-box (`display:inline`) background/border painted **over** the line text → coloured spans hid their own text | ✅ fixed | Broiler.HTML |
 | 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
 | 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
+| 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -238,6 +239,23 @@ wins against the table's absent border, so the corner needs the outer-edge model
 `CollapsedBorderConflictTests.TieBreak_IsDirectionAware_*`. No local pixel reference
 for these `.xht` tests, so verification used the "no red / winning colour present" heuristic + the
 curated suite.
+
+Cluster 21 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) — found while checking
+why the `border-conflict-*` tables (all `height:2in; width:2in`) rendered as thin strips: Broiler
+sized tables **purely from content** and never consulted the specified table `height`, so every
+CSS2 `tables` reftest collapsed to content height — the committed references expect the box
+sized to `2in`, so the geometry never matched even with correct borders. CSS2.1 §17.5.3: a
+specified table height greater than the rows' natural sum is **distributed over the rows**.
+`CssLayoutEngineTable.DistributeExtraTableHeight` (post-row-layout) records each row's natural
+top/bottom and, when the resolved (definite) table height exceeds the content extent, spreads the
+surplus equally across the in-flow rows — shifting each row down by the surplus added above it and
+growing its non-row-spanning cells (vertical-alignment re-applied). **Gated** to an explicit
+definite height that *exceeds* content, so auto-height tables and content-taller tables are
+untouched. Verified: a `height:200px` two-row table renders ~200px (was ~40px);
+`border-conflict-w-001` / `border-conflict-element-001` now render at the 2in reference height
+with no red. Zero curated regressions; guard `TableHeightTests`. (Side effect: full-height tables
+make any *unresolved* border full-length — `border-conflict-element-002`'s deferred outer-corner
+red grew 24→182px, underscoring that the outer table-vs-cell edge model is the next table item.)
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
