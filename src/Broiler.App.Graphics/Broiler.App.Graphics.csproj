@@ -8,11 +8,12 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>Broiler.App.Graphics</RootNamespace>
     <AssemblyName>Broiler.Graphics.Browser</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Preview UI is built entirely on Broiler.Graphics (Win32 + Direct2D); no WPF. -->
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Broiler.HTML\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Graphics\Broiler.HTML.Graphics.csproj" />
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
     <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->

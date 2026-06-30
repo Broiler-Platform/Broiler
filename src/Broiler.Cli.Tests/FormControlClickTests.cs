@@ -34,6 +34,22 @@ public class FormControlClickTests
         return container.HtmlContainerInt.Root;
     }
 
+    private static HtmlContainer CreateLaidOutContainer(string html, int width = 600, int height = 100)
+    {
+        var container = new HtmlContainer();
+        container.Location = new PointF(0, 0);
+        container.MaxSize = new SizeF(width, height);
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.SetHtml(html, null);
+
+        using var bmp = new BBitmap(width, height);
+        var clip = new RectangleF(0, 0, width, height);
+        container.PerformLayout(bmp, clip);
+
+        return container;
+    }
+
     /// <summary>
     /// Finds the first CssBox whose HtmlTag matches the given tag name.
     /// </summary>
@@ -131,6 +147,36 @@ public class FormControlClickTests
         var inputBox = FindBoxByTagAndAttr(root, "input", "type", "text");
         Assert.NotNull(inputBox);
         Assert.False(inputBox.IsClickable, "input[type=text] should NOT be clickable");
+    }
+
+    [Fact]
+    public void EditableInputHitTest_FindsTextInput()
+    {
+        using var container = CreateLaidOutContainer("<html><body style='margin:0'><input id='q' name='query' type='text' value='Hello'></body></html>", 400, 40);
+        var inputBox = FindBoxByTagAndAttr(container.HtmlContainerInt.Root, "input", "id", "q");
+        Assert.NotNull(inputBox);
+
+        var input = container.GetEditableInputAt(new PointF(inputBox.Location.X + 2, inputBox.Location.Y + 2));
+
+        Assert.NotNull(input);
+        Assert.Equal("q", input.Id);
+        Assert.Equal("query", input.Name);
+        Assert.Equal("text", input.Type);
+        Assert.Equal("Hello", input.Value);
+    }
+
+    [Fact]
+    public void EditableInputValueUpdate_UpdatesAttributeAndRenderedText()
+    {
+        using var container = CreateLaidOutContainer("<html><body style='margin:0'><input id='q' type='text'></body></html>", 400, 40);
+        var inputBox = FindBoxByTagAndAttr(container.HtmlContainerInt.Root, "input", "id", "q");
+        Assert.NotNull(inputBox);
+
+        var editPoint = new PointF(inputBox.Location.X + 2, inputBox.Location.Y + 2);
+        Assert.True(container.SetEditableInputValueAtDocumentPoint(editPoint, "Broiler"));
+
+        Assert.Contains("value=\"Broiler\"", container.GetHtml());
+        Assert.Contains("Broiler", CollectRenderedText(container.HtmlContainerInt.Root));
     }
 
     [Fact]

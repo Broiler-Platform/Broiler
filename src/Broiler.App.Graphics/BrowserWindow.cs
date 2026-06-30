@@ -4,6 +4,8 @@ using System.Drawing;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.Versioning;
+using System.Threading;
+using System.Threading.Tasks;
 using Broiler.App.Rendering;
 using Broiler.Graphics;
 using Broiler.Graphics.Windows;
@@ -26,19 +28,20 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private const double ToolbarHeight = 40;
     private const double FavoritesBarHeight = 30;
-    private const double Margin = 6;
-    private const double ControlHeight = 26;
-    private const double NavButtonWidth = 34;
-    private const double GoButtonWidth = 56;
-    private const double StarWidth = 34;
+    private const double StatusBarHeight = 24;
+    private const double Margin = 8;
+    private const double ControlHeight = 28;
+    private const double NavButtonWidth = 36;
+    private const double StopButtonWidth = 58;
+    private const double GoButtonWidth = 54;
+    private const double StarWidth = 36;
 
     private const double WheelScrollStep = 60;
     private const double KeyScrollStep = 48;
     private const double AnimationIntervalMs = 16;
 
     private readonly string? _initialUrl;
-    private readonly HtmlContainer _container = new();
-    private readonly RenderingPipeline _pipeline;
+    private HtmlContainer _container = CreateHtmlContainer();
     private readonly FavoritesManager _favorites = new();
 
     private readonly List<string> _history = [];
@@ -47,9 +50,12 @@ internal sealed class BrowserWindow : Direct2DWindow
     private BButtonControl? _backButton;
     private BButtonControl? _forwardButton;
     private BButtonControl? _refreshButton;
+    private BButtonControl? _stopButton;
     private BButtonControl? _goButton;
     private BButtonControl? _starButton;
     private BEditControl? _urlEdit;
+    private BEditControl? _formEdit;
+    private BLabelControl? _statusBar;
     private readonly List<(BButtonControl Button, string Url)> _favoriteButtons = [];
 
     private InteractiveSession? _session;
@@ -63,6 +69,14 @@ internal sealed class BrowserWindow : Direct2DWindow
     private string _baseUrl = string.Empty;
     private string? _pendingAnchor;
     private bool _suppressNavigation;
+    private bool _isShuttingDown;
+    private bool _isPageBusy;
+    private long _navigationGeneration;
+    private CancellationTokenSource? _navigationCancellation;
+    private bool _updatingFormEdit;
+    private bool _skipNextFormPointerUp;
+    private FormInputElementData<RectangleF>? _activeFormInput;
+    private PointF _activeFormInputDocumentPoint;
 
     public BrowserWindow(string? initialUrl)
         : base(new BWindowOptions
@@ -75,21 +89,14 @@ internal sealed class BrowserWindow : Direct2DWindow
         })
     {
         _initialUrl = initialUrl;
-        _container.AvoidAsyncImagesLoading = true;
-        _container.AvoidImagesLateLoading = true;
         _container.LinkClicked += OnLinkClicked;
-
-        _pipeline = new RenderingPipeline(
-            new PageLoader(new HttpClient()),
-            new ScriptExtractor(),
-            new ScriptEngine());
     }
 
     // The render content area sits below the toolbar and favorites bar.
     protected override BRect GetRenderBounds(BSize clientSize)
     {
         double top = ToolbarHeight + FavoritesBarHeight;
-        return new BRect(0, top, clientSize.Width, Math.Max(0, clientSize.Height - top));
+        return new BRect(0, top, clientSize.Width, Math.Max(0, clientSize.Height - top - StatusBarHeight));
     }
 
     protected override BFrameContext CreateFrameContext(long frameIndex) =>
@@ -102,10 +109,13 @@ internal sealed class BrowserWindow : Direct2DWindow
         _backButton = MakeButton("←", () => GoHistory(-1));
         _forwardButton = MakeButton("→", () => GoHistory(1));
         _refreshButton = MakeButton("↻", Reload);
+        _stopButton = MakeButton("Stop", StopLoading);
+        _stopButton.Enabled = false;
         _urlEdit = CreateEditControl(new BControlOptions { Text = string.Empty });
         _urlEdit.Submitted += (_, _) => NavigateTo(_urlEdit!.Text);
         _starButton = MakeButton("☆", ToggleFavorite);
         _goButton = MakeButton("Go", () => NavigateTo(_urlEdit!.Text));
+        _statusBar = CreateLabelControl(new BControlOptions { Text = "Ready" });
 
         _favorites.Load();
         RefreshFavoritesBar();
@@ -118,15 +128,25 @@ internal sealed class BrowserWindow : Direct2DWindow
     protected override void OnResized(BSize clientSize, double dpiScale)
     {
         LayoutControls(clientSize);
+        LayoutFormEdit();
         MarkLayoutDirty();
     }
 
-    protected override void OnGraphicsResourcesReleasing() => MarkLayoutDirty();
+    protected override void OnGraphicsResourcesReleasing()
+    {
+        DisposeRenderList();
+        MarkLayoutDirty();
+    }
+
+    protected override void OnClosing() => Diagnostics.Guard(nameof(OnClosing), BeginShutdown);
 
     // ---- Navigation -------------------------------------------------------
 
     private void NavigateTo(string url)
     {
+        if (_isShuttingDown)
+            return;
+
         if (string.IsNullOrWhiteSpace(url))
             return;
 
@@ -143,6 +163,9 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private void GoHistory(int delta)
     {
+        if (_isShuttingDown)
+            return;
+
         int target = _historyIndex + delta;
         if (target < 0 || target >= _history.Count)
             return;
@@ -153,15 +176,36 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private void Reload()
     {
+        if (_isShuttingDown)
+            return;
+
         if (_historyIndex >= 0 && _historyIndex < _history.Count)
             LoadUrl(_history[_historyIndex]);
     }
 
+    private void StopLoading()
+    {
+        if (_isShuttingDown || !_isPageBusy)
+            return;
+
+        CancelPendingNavigation();
+        StopSession();
+        _navigationGeneration++;
+        SetBusy(false);
+        SetStatus("Stopped");
+        RequestInvalidate();
+    }
+
     private void LoadUrl(string url)
     {
+        if (_isShuttingDown)
+            return;
+
+        long navigationGeneration = BeginNavigation();
         SetUrlText(url);
         UpdateNavigationButtons();
         UpdateStarButton();
+        HideFormEdit();
         StopSession();
         _scrollY = 0;
         _pendingAnchor = null;
@@ -169,62 +213,191 @@ internal sealed class BrowserWindow : Direct2DWindow
         if (string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
         {
             _baseUrl = string.Empty;
-            _container.SetHtmlWithStyleSet(WelcomePage);
+            ReplaceContainer(CreateContentContainer(WelcomePage, string.Empty));
             _hasContent = true;
+            SetBusy(false);
+            SetStatus("Ready");
             MarkLayoutDirty();
-            Invalidate();
+            RequestInvalidate();
             return;
         }
 
+        ShowLoadingPage(url);
+
+        var cancellation = new CancellationTokenSource();
+        _navigationCancellation = cancellation;
+        _ = LoadUrlInBackgroundAsync(navigationGeneration, url, cancellation);
+    }
+
+    private long BeginNavigation()
+    {
+        CancelPendingNavigation();
+        return ++_navigationGeneration;
+    }
+
+    private async Task LoadUrlInBackgroundAsync(
+        long navigationGeneration,
+        string url,
+        CancellationTokenSource cancellation)
+    {
+        NavigationLoadResult? result = null;
+
         try
         {
-            var (normalisedUrl, content) = _pipeline.LoadPageAsync(url).GetAwaiter().GetResult();
-            _baseUrl = normalisedUrl;
-            SetUrlText(normalisedUrl);
-
-            _container.BaseUrl = normalisedUrl;
-            _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(content.Html), baseUrl: normalisedUrl);
-            _hasContent = true;
-
-            // Interactive session lets timer / rAF callbacks be stepped one batch at a
-            // time so animations play out, mirroring the WPF shell. The Graphics host
-            // renders from serialized HTML (the typed-document path lays out empty here).
-            _session = _pipeline.ExecuteScriptsInteractive(content);
-            if (_session != null)
-            {
-                string initial = _session.CurrentHtml();
-                if (!string.IsNullOrWhiteSpace(initial))
-                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(initial), baseUrl: normalisedUrl);
-
-                if (_session.HasPendingWork)
-                    StartAnimationTimer(AnimationIntervalMs);
-                else
-                    StopSession();
-            }
-
-            if (Uri.TryCreate(normalisedUrl, UriKind.Absolute, out Uri? uri)
-                && !string.IsNullOrEmpty(uri.Fragment) && uri.Fragment.Length > 1)
-            {
-                _pendingAnchor = uri.Fragment[1..];
-            }
-
-            MarkLayoutDirty();
-            Invalidate();
+            result = await LoadUrlOnWorkerAsync(url, cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
-            _baseUrl = string.Empty;
-            _container.SetHtmlWithStyleSet($"<html><body><h1>Error</h1><p>{System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>");
-            _hasContent = true;
-            MarkLayoutDirty();
-            Invalidate();
+            result = NavigationLoadResult.FromError(ex);
         }
+
+        if (!PostToUiThread(() => CompleteBackgroundLoad(navigationGeneration, cancellation, result)))
+        {
+            result?.Dispose();
+            cancellation.Dispose();
+        }
+    }
+
+    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(string url, CancellationToken cancellationToken)
+    {
+        using var pipeline = new RenderingPipeline(
+            new PageLoader(new HttpClient()),
+            new ScriptExtractor(),
+            new ScriptEngine());
+
+        var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string html = HtmlPostProcessor.Process(content.Html);
+        InteractiveSession? session = null;
+        try
+        {
+            session = pipeline.ExecuteScriptsInteractive(content);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (session != null)
+            {
+                string initial = session.CurrentHtml();
+                if (!string.IsNullOrWhiteSpace(initial))
+                    html = HtmlPostProcessor.Process(initial);
+
+                if (!session.HasPendingWork)
+                {
+                    session.Dispose();
+                    session = null;
+                }
+            }
+
+            HtmlContainer container = CreateContentContainer(html, normalisedUrl);
+            return NavigationLoadResult.FromSuccess(normalisedUrl, container, session);
+        }
+        catch
+        {
+            session?.Dispose();
+            throw;
+        }
+    }
+
+    private void CompleteBackgroundLoad(
+        long navigationGeneration,
+        CancellationTokenSource cancellation,
+        NavigationLoadResult? result)
+    {
+        try
+        {
+            if (ReferenceEquals(_navigationCancellation, cancellation))
+                _navigationCancellation = null;
+
+            if (_isShuttingDown
+                || cancellation.IsCancellationRequested
+                || navigationGeneration != _navigationGeneration)
+            {
+                result?.Dispose();
+                return;
+            }
+
+            if (result is null)
+                return;
+
+            if (result.Error is { } error)
+            {
+                ShowErrorPage(error);
+                return;
+            }
+
+            ApplyLoadedPage(result);
+        }
+        finally
+        {
+            cancellation.Dispose();
+        }
+    }
+
+    private void ApplyLoadedPage(NavigationLoadResult result)
+    {
+        _baseUrl = result.NormalisedUrl;
+        SetUrlText(result.NormalisedUrl);
+        ReplaceContainer(result.TakeContainer());
+        _hasContent = true;
+
+        _session = result.TakeSession();
+        if (_session != null && _session.HasPendingWork)
+        {
+            SetBusy(true);
+            SetStatus("Rendering...");
+            StartAnimationTimer(AnimationIntervalMs);
+        }
+        else
+        {
+            SetBusy(false);
+            SetStatus("Done");
+        }
+
+        if (Uri.TryCreate(result.NormalisedUrl, UriKind.Absolute, out Uri? uri)
+            && !string.IsNullOrEmpty(uri.Fragment) && uri.Fragment.Length > 1)
+        {
+            _pendingAnchor = uri.Fragment[1..];
+        }
+
+        MarkLayoutDirty();
+        RequestInvalidate();
+    }
+
+    private void ShowLoadingPage(string url)
+    {
+        _baseUrl = string.Empty;
+        SetBusy(true);
+        SetStatus($"Loading {url}...");
+        ReplaceContainer(CreateContentContainer($"""
+<html>
+<body style='font-family: Segoe UI, Arial, sans-serif; margin: 40px; color: #333;'>
+    <p>Loading {System.Net.WebUtility.HtmlEncode(url)}...</p>
+</body>
+</html>
+""", string.Empty));
+        _hasContent = true;
+        MarkLayoutDirty();
+        RequestInvalidate();
+    }
+
+    private void ShowErrorPage(Exception ex)
+    {
+        _baseUrl = string.Empty;
+        SetBusy(false);
+        SetStatus("Error loading page");
+        ReplaceContainer(CreateContentContainer($"<html><body><h1>Error</h1><p>{System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>", string.Empty));
+        _hasContent = true;
+        MarkLayoutDirty();
+        RequestInvalidate();
     }
 
     private void OnLinkClicked(object? sender, HtmlLinkClickedEventArgs e)
     {
         e.Handled = true;
-        if (_suppressNavigation)
+        if (_isShuttingDown || _suppressNavigation)
             return;
 
         string link = e.Link;
@@ -259,7 +432,7 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private BRenderList? BuildRenderListCore(BSize clientSize)
     {
-        if (!_hasContent || clientSize.IsEmpty || Renderer is null)
+        if (_isShuttingDown || !_hasContent || clientSize.IsEmpty || Renderer is null)
             return null;
 
         float vpW = (float)clientSize.Width;
@@ -278,11 +451,12 @@ internal sealed class BrowserWindow : Direct2DWindow
         }
 
         ClampScroll(vpH);
+        RefreshActiveFormEditLayout();
 
         if (_renderDirty || _renderList is null)
         {
             _container.ScrollOffset = new PointF(0, -_scrollY);
-            _renderList?.Dispose();
+            DisposeRenderList();
             _renderList = _container.CreateRenderList(Renderer, new RectangleF(0, 0, vpW, vpH));
             _renderDirty = false;
         }
@@ -319,36 +493,79 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     protected override void OnPointerDown(BPointerEventArgs e) => Diagnostics.Guard(nameof(OnPointerDown), () =>
     {
-        if (_hasContent)
-            _container.HandleMouseDown(ToPoint(e.Position), e.LeftButton, e.RightButton);
+        if (_hasContent && !_isShuttingDown)
+        {
+            PointF location = ToPoint(e.Position);
+            if (IsChangedOrCurrentButton(e, BMouseButtons.Left) && TryActivateFormEdit(location))
+            {
+                _skipNextFormPointerUp = true;
+                return;
+            }
+
+            _container.HandleMouseDown(
+                location,
+                IsChangedOrCurrentButton(e, BMouseButtons.Left),
+                IsChangedOrCurrentButton(e, BMouseButtons.Right));
+            InvalidateRenderedContent();
+        }
     });
 
     protected override void OnPointerMove(BPointerEventArgs e) => Diagnostics.Guard(nameof(OnPointerMove), () =>
     {
-        if (_hasContent)
+        if (_hasContent && !_isShuttingDown)
+        {
             _container.HandleMouseMove(ToPoint(e.Position), e.LeftButton, e.RightButton);
+            InvalidateRenderedContent();
+        }
     });
 
     protected override void OnPointerUp(BPointerEventArgs e) => Diagnostics.Guard(nameof(OnPointerUp), () =>
     {
         // HandleMouseUp raises LinkClicked for links, which drives navigation.
-        if (_hasContent)
-            _container.HandleMouseUp(ToPoint(e.Position), e.LeftButton, e.RightButton);
+        if (_hasContent && !_isShuttingDown)
+        {
+            if (_skipNextFormPointerUp && IsChangedOrCurrentButton(e, BMouseButtons.Left))
+            {
+                _skipNextFormPointerUp = false;
+                return;
+            }
+
+            _container.HandleMouseUp(
+                ToPoint(e.Position),
+                IsChangedOrCurrentButton(e, BMouseButtons.Left),
+                IsChangedOrCurrentButton(e, BMouseButtons.Right));
+            InvalidateRenderedContent();
+        }
     });
 
     protected override void OnPointerLeave() => Diagnostics.Guard(nameof(OnPointerLeave), () =>
     {
-        if (_hasContent)
+        if (_hasContent && !_isShuttingDown)
+        {
             _container.HandleMouseLeave();
+            InvalidateRenderedContent();
+        }
     });
 
     protected override void OnMouseWheel(BMouseWheelEventArgs e)
     {
+        if (_isShuttingDown)
+            return;
+
         ScrollBy(-(float)(e.Delta * WheelScrollStep));
     }
 
     protected override void OnKeyDown(BKeyEventArgs e) => Diagnostics.Guard(nameof(OnKeyDown), () =>
     {
+        if (_hasContent && !_isShuttingDown)
+        {
+            _container.HandleKeyDown(
+                e.Control,
+                e.VirtualKey == BVirtualKey.A,
+                e.VirtualKey == BVirtualKey.C);
+            InvalidateRenderedContent();
+        }
+
         switch (e.VirtualKey)
         {
             case BVirtualKey.Down: ScrollBy((float)KeyScrollStep); break;
@@ -367,10 +584,192 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private void SetScroll(float value)
     {
+        if (_isShuttingDown)
+            return;
+
         _scrollY = value;
         _renderDirty = true;
-        Invalidate();
+        LayoutFormEdit();
+        RequestInvalidate();
     }
+
+    private void InvalidateRenderedContent()
+    {
+        if (_isShuttingDown)
+            return;
+
+        _renderDirty = true;
+        RequestInvalidate();
+    }
+
+    private bool TryActivateFormEdit(PointF location)
+    {
+        if (_isShuttingDown)
+            return false;
+
+        FormInputElementData<RectangleF>? input = _container.GetEditableInputAt(location);
+        if (input is null)
+        {
+            HideFormEdit();
+            return false;
+        }
+
+        if (!EnsureFormEdit())
+            return false;
+
+        _activeFormInput = input;
+        _activeFormInputDocumentPoint = Center(input.Rectangle);
+
+        _updatingFormEdit = true;
+        try
+        {
+            if (!string.Equals(_formEdit!.Text, input.Value, StringComparison.Ordinal))
+                _formEdit.Text = input.Value;
+        }
+        finally
+        {
+            _updatingFormEdit = false;
+        }
+
+        LayoutFormEdit();
+        _formEdit!.Focus();
+        return true;
+    }
+
+    private bool EnsureFormEdit()
+    {
+        if (_formEdit != null)
+            return true;
+
+        if (_isShuttingDown || IsDisposed)
+            return false;
+
+        _formEdit = CreateEditControl(new BControlOptions
+        {
+            Bounds = BRect.Empty,
+            Text = string.Empty,
+            Visible = false,
+        });
+        _formEdit.TextChanged += OnFormEditTextChanged;
+        return true;
+    }
+
+    private void OnFormEditTextChanged(object? sender, EventArgs e)
+    {
+        if (_updatingFormEdit || _formEdit is null || _activeFormInput is null || _isShuttingDown)
+            return;
+
+        if (_container.SetEditableInputValueAtDocumentPoint(_activeFormInputDocumentPoint, _formEdit.Text))
+        {
+            MarkLayoutDirty();
+            RequestInvalidate();
+        }
+    }
+
+    private void RefreshActiveFormEditLayout()
+    {
+        if (_formEdit is null || _activeFormInput is null || _isShuttingDown)
+            return;
+
+        FormInputElementData<RectangleF>? refreshed =
+            _container.GetEditableInputAtDocumentPoint(_activeFormInputDocumentPoint);
+        if (refreshed is null)
+        {
+            HideFormEdit();
+            return;
+        }
+
+        _activeFormInput = refreshed;
+        LayoutFormEdit();
+    }
+
+    private void LayoutFormEdit()
+    {
+        if (_formEdit is null || _activeFormInput is null || _isShuttingDown)
+            return;
+
+        if (!TryGetFormEditBounds(_activeFormInput.Rectangle, out BRect bounds))
+        {
+            SafeSetFormEditVisible(false);
+            return;
+        }
+
+        try
+        {
+            _formEdit.Bounds = bounds;
+            _formEdit.Visible = true;
+        }
+        catch (ObjectDisposedException) when (_isShuttingDown)
+        {
+        }
+    }
+
+    private bool TryGetFormEditBounds(RectangleF documentRect, out BRect bounds)
+    {
+        double contentTop = ToolbarHeight + FavoritesBarHeight;
+        double x = documentRect.X;
+        double y = contentTop + documentRect.Y - _scrollY;
+        double width = Math.Max(24, documentRect.Width);
+        double height = Math.Max(18, documentRect.Height);
+
+        BSize clientSize = ClientSize;
+        BRect viewport = new(0, contentTop, clientSize.Width, Math.Max(0, clientSize.Height - contentTop - StatusBarHeight));
+        BRect editBounds = new(x, y, width, height);
+        BRect visibleBounds = editBounds.Intersect(viewport);
+
+        if (visibleBounds.IsEmpty || visibleBounds.Height < height || visibleBounds.Width < 8)
+        {
+            bounds = BRect.Empty;
+            return false;
+        }
+
+        bounds = new BRect(visibleBounds.X, visibleBounds.Y, visibleBounds.Width, height);
+        return true;
+    }
+
+    private void HideFormEdit()
+    {
+        _activeFormInput = null;
+        _skipNextFormPointerUp = false;
+        SafeSetFormEditVisible(false);
+    }
+
+    private void SafeSetFormEditVisible(bool visible)
+    {
+        if (_formEdit is null)
+            return;
+
+        try
+        {
+            _formEdit.Visible = visible;
+        }
+        catch (ObjectDisposedException) when (_isShuttingDown)
+        {
+        }
+    }
+
+    private void DisposeFormEdit()
+    {
+        BEditControl? edit = _formEdit;
+        _formEdit = null;
+        _activeFormInput = null;
+        _skipNextFormPointerUp = false;
+
+        if (edit is null)
+            return;
+
+        edit.TextChanged -= OnFormEditTextChanged;
+        try
+        {
+            edit.Dispose();
+        }
+        catch (ObjectDisposedException) when (_isShuttingDown)
+        {
+        }
+    }
+
+    private static PointF Center(RectangleF rectangle) =>
+        new(rectangle.X + (rectangle.Width / 2), rectangle.Y + (rectangle.Height / 2));
 
     // ---- Animation --------------------------------------------------------
 
@@ -378,9 +777,17 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private void OnAnimationTickCore()
     {
+        if (_isShuttingDown)
+        {
+            StopSession();
+            return;
+        }
+
         if (_session is null || !_session.HasPendingWork)
         {
             StopSession();
+            SetBusy(false);
+            SetStatus("Done");
             return;
         }
 
@@ -392,6 +799,7 @@ internal sealed class BrowserWindow : Direct2DWindow
             _suppressNavigation = true;
             try
             {
+                HideFormEdit();
                 _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(html), baseUrl: _baseUrl);
             }
             finally
@@ -399,18 +807,96 @@ internal sealed class BrowserWindow : Direct2DWindow
                 _suppressNavigation = false;
             }
             MarkLayoutDirty();
-            Invalidate();
+            RequestInvalidate();
         }
 
         if (!_session.HasPendingWork)
+        {
             StopSession();
+            SetBusy(false);
+            SetStatus("Done");
+        }
     }
 
     private void StopSession()
     {
-        StopAnimationTimer();
+        try
+        {
+            if (!IsDisposed)
+                StopAnimationTimer();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
         _session?.Dispose();
         _session = null;
+    }
+
+    private void CancelPendingNavigation()
+    {
+        CancellationTokenSource? cancellation = _navigationCancellation;
+        _navigationCancellation = null;
+        cancellation?.Cancel();
+    }
+
+    private void ReplaceContainer(HtmlContainer container)
+    {
+        ArgumentNullException.ThrowIfNull(container);
+
+        DisposeRenderList();
+        _container.LinkClicked -= OnLinkClicked;
+        _container.Dispose();
+
+        _container = container;
+        _container.LinkClicked += OnLinkClicked;
+    }
+
+    private void BeginShutdown()
+    {
+        if (_isShuttingDown)
+            return;
+
+        _isShuttingDown = true;
+        SetBusy(false);
+        CancelPendingNavigation();
+        _container.LinkClicked -= OnLinkClicked;
+        DisposeFormEdit();
+        StopSession();
+        DisposeRenderList();
+    }
+
+    private void DisposeRenderList()
+    {
+        HtmlGraphicsRenderList? renderList = _renderList;
+        _renderList = null;
+        _renderDirty = true;
+
+        if (renderList is null)
+            return;
+
+        try
+        {
+            renderList.Dispose();
+        }
+        catch (ObjectDisposedException) when (_isShuttingDown)
+        {
+            // The native renderer may already be gone if disposal follows WM_DESTROY.
+        }
+    }
+
+    private void RequestInvalidate()
+    {
+        if (_isShuttingDown || IsDisposed)
+            return;
+
+        try
+        {
+            Invalidate();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     // ---- Favorites & chrome ----------------------------------------------
@@ -464,7 +950,7 @@ internal sealed class BrowserWindow : Direct2DWindow
     private void LayoutControls(BSize clientSize)
     {
         if (_backButton is null || _forwardButton is null || _refreshButton is null
-            || _urlEdit is null || _starButton is null || _goButton is null)
+            || _stopButton is null || _urlEdit is null || _starButton is null || _goButton is null)
             return;
 
         double x = Margin;
@@ -473,6 +959,7 @@ internal sealed class BrowserWindow : Direct2DWindow
         _backButton.Bounds = new BRect(x, y, NavButtonWidth, ControlHeight); x += NavButtonWidth + Margin;
         _forwardButton.Bounds = new BRect(x, y, NavButtonWidth, ControlHeight); x += NavButtonWidth + Margin;
         _refreshButton.Bounds = new BRect(x, y, NavButtonWidth, ControlHeight); x += NavButtonWidth + Margin;
+        _stopButton.Bounds = new BRect(x, y, StopButtonWidth, ControlHeight); x += StopButtonWidth + Margin;
 
         double rightControls = GoButtonWidth + StarWidth + (Margin * 3);
         double editWidth = Math.Max(40, clientSize.Width - x - rightControls);
@@ -495,12 +982,35 @@ internal sealed class BrowserWindow : Direct2DWindow
             button.Bounds = new BRect(fx, fy, width, ControlHeight);
             fx += width + Margin;
         }
+
+        if (_statusBar != null)
+        {
+            _statusBar.Visible = true;
+            _statusBar.Bounds = new BRect(
+                Margin,
+                Math.Max(ToolbarHeight + FavoritesBarHeight, clientSize.Height - StatusBarHeight),
+                Math.Max(0, clientSize.Width - (Margin * 2)),
+                StatusBarHeight);
+        }
     }
 
     private void SetUrlText(string url)
     {
         if (_urlEdit != null && !string.Equals(_urlEdit.Text, url, StringComparison.Ordinal))
             _urlEdit.Text = url;
+    }
+
+    private void SetStatus(string status)
+    {
+        if (_statusBar != null && !string.Equals(_statusBar.Text, status, StringComparison.Ordinal))
+            _statusBar.Text = status;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _isPageBusy = busy;
+        if (_stopButton != null)
+            _stopButton.Enabled = busy;
     }
 
     private BButtonControl MakeButton(string text, Action onClick)
@@ -518,6 +1028,23 @@ internal sealed class BrowserWindow : Direct2DWindow
             : BColor.White;
     }
 
+    private static HtmlContainer CreateContentContainer(string html, string baseUrl)
+    {
+        HtmlContainer container = CreateHtmlContainer();
+        container.BaseUrl = baseUrl;
+        container.SetHtmlWithStyleSet(html, baseUrl: baseUrl);
+        return container;
+    }
+
+    private static HtmlContainer CreateHtmlContainer()
+    {
+        return new HtmlContainer
+        {
+            AvoidAsyncImagesLoading = true,
+            AvoidImagesLateLoading = true,
+        };
+    }
+
     private void MarkLayoutDirty()
     {
         _layoutDirty = true;
@@ -525,6 +1052,11 @@ internal sealed class BrowserWindow : Direct2DWindow
     }
 
     private static PointF ToPoint(BPoint p) => new((float)p.X, (float)p.Y);
+
+    private static bool IsChangedOrCurrentButton(BPointerEventArgs e, BMouseButtons button) =>
+        e.ChangedButton == BMouseButtons.None
+            ? (e.Buttons & button) != 0
+            : (e.ChangedButton & button) != 0;
 
     // Accept a local filesystem path (e.g. "C:\page.html") as a convenience and turn it into a
     // file:// URI the page loader understands; otherwise pass the input through unchanged.
@@ -557,22 +1089,76 @@ internal sealed class BrowserWindow : Direct2DWindow
     {
         if (disposing)
         {
-            StopSession();
+            BeginShutdown();
             foreach (var (button, _) in _favoriteButtons)
                 button.Dispose();
             _favoriteButtons.Clear();
             _backButton?.Dispose();
             _forwardButton?.Dispose();
             _refreshButton?.Dispose();
+            _stopButton?.Dispose();
             _goButton?.Dispose();
             _starButton?.Dispose();
             _urlEdit?.Dispose();
-            _renderList?.Dispose();
-            _pipeline.Dispose();
+            _statusBar?.Dispose();
+            DisposeRenderList();
             _container.Dispose();
         }
 
         base.Dispose(disposing);
+    }
+
+    private sealed class NavigationLoadResult : IDisposable
+    {
+        private HtmlContainer? _container;
+        private InteractiveSession? _session;
+
+        private NavigationLoadResult(
+            string normalisedUrl,
+            HtmlContainer? container,
+            InteractiveSession? session,
+            Exception? error)
+        {
+            NormalisedUrl = normalisedUrl;
+            _container = container;
+            _session = session;
+            Error = error;
+        }
+
+        public string NormalisedUrl { get; }
+
+        public Exception? Error { get; }
+
+        public static NavigationLoadResult FromSuccess(
+            string normalisedUrl,
+            HtmlContainer container,
+            InteractiveSession? session) =>
+            new(normalisedUrl, container, session, null);
+
+        public static NavigationLoadResult FromError(Exception error) =>
+            new(string.Empty, null, null, error);
+
+        public HtmlContainer TakeContainer()
+        {
+            HtmlContainer container = _container ?? throw new InvalidOperationException("Navigation result has no container.");
+            _container = null;
+            return container;
+        }
+
+        public InteractiveSession? TakeSession()
+        {
+            InteractiveSession? session = _session;
+            _session = null;
+            return session;
+        }
+
+        public void Dispose()
+        {
+            _session?.Dispose();
+            _session = null;
+            _container?.Dispose();
+            _container = null;
+        }
     }
 
     private const string WelcomePage = """

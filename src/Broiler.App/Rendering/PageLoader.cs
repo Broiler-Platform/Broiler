@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Broiler.App.Rendering;
@@ -18,7 +19,7 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
 {
 
     /// <inheritdoc />
-    public async Task<(string NormalisedUrl, string Html)> FetchAsync(string url)
+    public async Task<(string NormalisedUrl, string Html)> FetchAsync(string url, CancellationToken cancellationToken = default)
     {
         if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
@@ -26,7 +27,7 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             var localPath = uri.LocalPath;
             if (!File.Exists(localPath))
                 throw new FileNotFoundException($"Local file not found: {localPath}", localPath);
-            var html = await File.ReadAllTextAsync(localPath);
+            var html = await File.ReadAllTextAsync(localPath, cancellationToken);
             return (url, html);
         }
 
@@ -36,7 +37,7 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             url = "https://" + url;
         }
 
-        var content = await httpClient.GetStringAsync(new Uri(url));
+        var content = await httpClient.GetStringAsync(new Uri(url), cancellationToken);
         return (url, content);
     }
 

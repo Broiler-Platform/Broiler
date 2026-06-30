@@ -570,6 +570,27 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    public void SetGeneratedTextContent(string text)
+    {
+        CssBox textBox = null;
+        foreach (CssBox child in Boxes)
+        {
+            if (child.HtmlTag == null)
+            {
+                textBox = child;
+                break;
+            }
+        }
+
+        if (textBox == null)
+        {
+            textBox = new CssBox(this, null, BaseUrl);
+            textBox.InheritStyle();
+        }
+
+        textBox.Text = (text ?? string.Empty).AsMemory();
+    }
+
     internal List<CssLineBox> LineBoxes { get; } = [];
     internal Dictionary<CssLineBox, RectangleF> Rectangles { get; } = [];
     internal List<CssRect> Words { get; } = [];
