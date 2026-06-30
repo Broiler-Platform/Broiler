@@ -33,6 +33,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
 | 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
 | 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
+| 18 | Inline-box (`display:inline`) background/border painted **over** the line text → coloured spans hid their own text | ✅ fixed | Broiler.HTML |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -144,6 +145,33 @@ images are untouched; `Math.Max` means small images (where the strut already dom
 unaffected. All 6 tests pass (CSS2 **7 → 13**); curated `Broiler.Wpt.Tests` **67 → 61** (the six
 `Wpt_ReplacedElements*_MatchesReference` are the regression guards); css-backgrounds (image-heavy),
 css-anchor-position, and css-align all unchanged — zero regressions.
+
+Cluster 18 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) was found by
+reproducing the `CSS2/linebox/vertical-align-negative-leading-001` failure against the live
+renderer: its `<span>`s (Ahem text, `color:orange`, `background:purple`) rendered as solid
+**purple** boxes with no orange glyphs. A minimal repro isolated it — a `display:inline` span
+with a contrasting `color` + `background` paints as a solid background rectangle with its text
+**completely hidden**, while a block (`<div>`) with the same colours paints correctly. Root
+cause is paint order in `Broiler.HTML`'s `PaintWalker`: the glyphs of every inline box on a line
+are emitted in one pass from the **containing block's** line boxes (`EmitText`), but each
+`display:inline` child fragment carries only its own background/border (its glyphs live in the
+block's lines). Painted in the normal child phase (Appendix E Step 5) those backgrounds landed
+**on top of** the already-emitted text. Per CSS2.1 Appendix E an inline box's background/border
+paints behind the line's text. Fixed by emitting `display:inline` descendants' backgrounds and
+borders **before** the block's text (`EmitInlineLevelBoxDecorations`, called from both
+`PaintFragment` and `PaintFragmentForegroundPhase`) and suppressing re-emission when the box is
+later painted as inline content in Step 5 (the new `asInlineContent` flag). Atomic inline-level
+boxes (`inline-block`/`inline-table`) own their own text and are untouched; positioned /
+stacking-context inline boxes keep their own later phase. Verified against minimal repros and the
+curated `Broiler.Wpt.Tests` suite (496): **zero regressions, net +1** — `PositionTry002`
+(cluster 10's `position-try-002`, an orange target over a background) now clears the pixel gate.
+On the full CI suite this lifts any test that places a coloured inline span over a background — a
+ubiquitous WPT idiom — so the win is broad even though the local curated subset moves by one.
+Pushed to `MaiRat/Broiler.HTML`; pointer bumped. Regression guard:
+`InlineBackgroundPaintOrderTests` (main repo, renders a blue-on-red inline span and asserts the
+blue text pixels survive). *Note:* `vertical-align-negative-leading-001` itself still fails — its
+residual gap is the **`text-top`/`text-bottom` line-box height** (those values must grow the line
+box; Broiler keeps it at the `line-height`) plus Ahem glyph metrics — separate line-box work.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
