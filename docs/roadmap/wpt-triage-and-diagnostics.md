@@ -227,9 +227,14 @@ once with the winning style/width/colour (or not at all when `hidden` wins). Ver
 `CollapsedBorderConflictTests`. **Validated broadly** by fetching the `border-conflict-element-*`
 family: `-001` and `-003`…`-008` (cell-vs-cell tie-break *and* the row/column-origin cases) all
 render **no red**; the tie-break (first/left-top operand wins) is correct for LTR *and* — by the
-logical-column ordering — RTL. **Follow-ups:** outer **table-vs-cell** and **row/col-group** edge
-resolution, exact collapsed-border **geometry** (half-border centring + cell/table shrink) — the
-current pass fixes which border *wins* and its colour, not sub-pixel placement; **spanned cells**
+logical-column ordering — RTL. **Follow-ups:** outer **table-vs-cell** edge resolution — ✅ **now done** (each perimeter cell edge
+collapses with the table element's own border; cell wins ties per origin priority; no-op for the
+common borderless table; companion `Broiler.HTML` removal of the UA `table{border-color}` longhand
+so an author table border keeps its colour — a wider author-green table border now wins the
+perimeter as green, hidden suppresses the cell perimeter; guards `OuterEdge_*`). Still open: **row/
+col-group** origin edges, exact collapsed-border **geometry** (half-border centring + cell/table
+shrink) — the current pass fixes which border *wins* and its colour, not sub-pixel placement;
+**spanned cells**
 (rowspan/colspan placeholders) are skipped (conservative no-op); and the **RTL** tie-break (`direction:rtl`) — ✅ **now fixed**: a tie favours the top-RIGHT cell in
 an rtl table, so the horizontal-edge resolver passes the right cell first to `ResolveCollapsedEdge`
 when the table is rtl (verified ltr↔rtl flip on a minimal table; `border-conflict-element-002` red
