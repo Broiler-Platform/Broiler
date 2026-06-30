@@ -25,6 +25,7 @@ internal abstract class CssBoxProperties
     private string _borderRightColor = "black";
     private string _borderBottomColor = "black";
     private string _borderLeftColor = "black";
+    private string _outlineColor = string.Empty;
     private string _bottom = "auto";
     private string _color = "black";
     private string _cornerRadius = "0";
@@ -215,6 +216,48 @@ internal abstract class CssBoxProperties
 
     public string BorderSpacing { get; set; } = "0";
     public string BorderCollapse { get; set; } = "separate";
+
+    // CSS UI §2: outline is painted just outside the border edge and does not
+    // affect layout. Stored uniformly (outline cannot be set per-side).
+    public string OutlineWidth { get; set; } = "medium";
+    public string OutlineStyle { get; set; } = "none";
+    public string OutlineColor { get => ResolveCssVariables(_outlineColor); set => _outlineColor = value ?? string.Empty; }
+    public string OutlineOffset { get; set; } = "0";
+
+    /// <summary>Used outline width in px; 0 when the outline style is none/hidden.</summary>
+    public double ActualOutlineWidth
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(OutlineStyle) || OutlineStyle == CssConstants.None
+                || OutlineStyle.Equals("hidden", StringComparison.OrdinalIgnoreCase))
+                return 0;
+            return CssValueParser.GetActualBorderWidth(OutlineWidth, GetEmHeight());
+        }
+    }
+
+    /// <summary>Used outline-offset in px (the gap between border edge and outline).</summary>
+    public double ActualOutlineOffset =>
+        string.IsNullOrEmpty(OutlineOffset) ? 0 : CssValueParser.ParseLength(OutlineOffset, 0, GetEmHeight());
+
+    /// <summary>
+    /// Used outline colour. The initial value (<c>auto</c>/<c>invert</c>) and an
+    /// unset colour resolve to <c>currentColor</c> (the element's text colour),
+    /// matching modern browsers.
+    /// </summary>
+    public Color ActualOutlineColor
+    {
+        get
+        {
+            string c = OutlineColor;
+            if (string.IsNullOrEmpty(c)
+                || c.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                || c.Equals("invert", StringComparison.OrdinalIgnoreCase)
+                || c.Equals("currentcolor", StringComparison.OrdinalIgnoreCase))
+                return GetActualColor(Color);
+            return GetActualColor(c);
+        }
+    }
 
     public string CornerRadius
     {
@@ -1719,6 +1762,10 @@ internal abstract class CssBoxProperties
         _borderRightColor = p._borderRightColor;
         _borderBottomColor = p._borderBottomColor;
         _borderLeftColor = p._borderLeftColor;
+        OutlineWidth = p.OutlineWidth;
+        OutlineStyle = p.OutlineStyle;
+        _outlineColor = p._outlineColor;
+        OutlineOffset = p.OutlineOffset;
         BorderTopStyle = p.BorderTopStyle;
         BorderRightStyle = p.BorderRightStyle;
         BorderBottomStyle = p.BorderBottomStyle;
