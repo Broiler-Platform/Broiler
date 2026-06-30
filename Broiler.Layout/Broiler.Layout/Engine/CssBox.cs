@@ -570,6 +570,27 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    public void SetGeneratedTextContent(string text)
+    {
+        CssBox textBox = null;
+        foreach (CssBox child in Boxes)
+        {
+            if (child.HtmlTag == null)
+            {
+                textBox = child;
+                break;
+            }
+        }
+
+        if (textBox == null)
+        {
+            textBox = new CssBox(this, null, BaseUrl);
+            textBox.InheritStyle();
+        }
+
+        textBox.Text = (text ?? string.Empty).AsMemory();
+    }
+
     internal List<CssLineBox> LineBoxes { get; } = [];
     internal Dictionary<CssLineBox, RectangleF> Rectangles { get; } = [];
     internal List<CssRect> Words { get; } = [];
@@ -3668,6 +3689,25 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         maxWidth = paddingSum + maxSum;
         minWidth = paddingSum + (min < 90999 ? min : 0);
+
+        // CSS Text 3 §4.1.1 (phase II): a collapsible space sequence at the
+        // start of the first line / end of the last line of a formatting
+        // context is removed and contributes no width.  Broiler models a
+        // collapsed space as word-spacing carried on the neighbouring word
+        // (HasSpaceBefore / HasSpaceAfter); GetMinMaxSumWords counts that
+        // spacing for every word, so the leading space-before of the box's
+        // first content word and the trailing space-after of its last word
+        // inflate the preferred width by one space each.  This is the box's
+        // own formatting-context edge (GetMinMaxWidth is only queried for
+        // shrink-to-fit roots — table cells, floats, inline-blocks,
+        // abspos), and the paint path already drops those edge spaces, so
+        // the width must match.  Subtracting them makes a whitespace-padded
+        // table cell (e.g. <td> Cell </td>) shrink to the same width as the
+        // tight cell, so adjacent cells abut as in a real <table>
+        // (CSS2 tables/table-anonymous-objects-*).
+        maxWidth -= CssBoxHelper.EdgeWhitespaceSpacing(this);
+        if (maxWidth < minWidth)
+            maxWidth = minWidth;
     }
 
     /// <summary>

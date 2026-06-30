@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Broiler.HtmlBridge;
 
@@ -21,10 +22,16 @@ public sealed class RenderingPipeline(
     /// Uses <see cref="IScriptExtractor.ExtractAll"/> so that deferred and
     /// external scripts are also captured, matching the CLI's behaviour.
     /// </summary>
-    public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(string url)
+    public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(
+        string url,
+        CancellationToken cancellationToken = default)
     {
-        var (normalisedUrl, html) = await pageLoader.FetchAsync(url);
+        var (normalisedUrl, html) = await pageLoader.FetchAsync(url, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var result = scriptExtractor.ExtractAll(html, normalisedUrl);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var executableScripts = result.AsyncScripts.Count == 0
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();

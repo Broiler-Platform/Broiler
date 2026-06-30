@@ -37,6 +37,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
 | 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
 | 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
+| 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -262,6 +263,35 @@ with no red. Zero curated regressions; guard `TableHeightTests`. (Side effect: f
 make any *unresolved* border full-length — `border-conflict-element-002`'s deferred outer-corner
 red grew 24→182px, underscoring that the outer table-vs-cell edge model is the next table item.)
 
+Cluster 22 (issue [#1147](https://github.com/MaiRat/Broiler/issues/1147)) is the
+`CSS2/tables/table-anonymous-objects-*` family — **107 failures**, the 2nd-largest `CSS2/tables`
+cluster. These reftests overlay a `display:table` construct (whose cell content is wrapped in
+newlines + indentation) on a real `<table>` with tight `<td>Cell</td>` cells, asserting "no red"
+(the construct must cover an identical red layer beneath a green one). Reproducing
+`table-anonymous-objects-{001,003}` against the live renderer showed the red layer fully exposed —
+but **anonymous table-box generation was already correct**: a `display:table` with cells-only (no
+rows) or full structure both laid out *identically to the real table*. The divergence was purely
+**leading/trailing collapsible white space inside each cell inflating its shrink-to-fit width**.
+CSS Text 3 §4.1.1 removes a collapsible space at the start of a formatting context's first line /
+end of its last line; Broiler carries a collapsed space as word-spacing on the neighbouring word
+(`HasSpaceBefore`/`HasSpaceAfter`), and `CssBoxHelper.GetMinMaxSumWords` counts that spacing for
+every word, so the first content word's leading space and the last word's trailing space each
+added a space to the preferred width. The **paint path already drops** those edge spaces, so a
+`<td> Cell </td>` painted flush-left yet measured wider than the tight cell — adjacent cells
+stopped abutting (the real-`<table>` reference uses tight cells, exposing the gap). Fixed in
+`CssBox.GetMinMaxWidth` by subtracting the formatting context's leading+trailing edge word-spacing
+(`CssBoxHelper.EdgeWhitespaceSpacing`, walking the box's first/last in-flow content word), clamped
+to the min width. `GetMinMaxWidth` is queried only for shrink-to-fit roots (table cells, floats,
+inline-blocks, abspos) — exactly the boxes whose own line edges are where the spec strips the white
+space — so it is behaviour-preserving for content that begins/ends on a real word. Verified:
+`table-anonymous-objects-{001,002,003}` red 370 → ≤26px (glyph-edge anti-aliasing the test allows);
+whitespace-padded cells now render the same width as tight cells. Zero curated regressions (the one
+flagged `CommentWhitespaceCollapse` failure is a pre-existing parallel-render flake — passes 3/3 in
+isolation, and uses an empty explicit-width inline-block the fix cannot touch). Main-repo
+`Broiler.Layout`; guard `TableCellWhitespaceTests` (fails without the fix at +11px). **Follow-up:**
+the same edge-whitespace model now applies to inline-blocks/floats with padded content, which were
+similarly over-wide; not separately surveyed here.
+
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
 shifted content horizontally in comment-heavy tests. After scripts run, the bridge serializes
@@ -359,6 +389,39 @@ shape as cluster 6's `-webkit-right`. Fix added `inline-table` (the real win) pl
 valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
+
+- **`CSS2/backgrounds/background-{N}` (≈202, the single largest CSS2 family) — triaged, NOT a
+  systematic bug (image/scroll/color fidelity tail).** Probed `background-{001,004,050,150}` against
+  the live renderer: the `background` **shorthand parser is solid** — `background:green` (001) →
+  green rect; `background:fixed` (004, image/color reset to initial) → nothing; `background:repeat-x
+  scroll bottom green` (150, keyword soup, no image) → plain green square; `background:repeat-x green
+  url(blue15x15.png)` (050) → blue `repeat-x` stripe over green. All four render **correctly**. The
+  202 failures are the family's genuinely-hard tail: `cat.png` **tiling + scrolling + centered
+  bottom-position** fidelity (`background-{100,200,…}`), the `*_color.png` **sub-pixel colour-swatch**
+  comparisons, and committed-reference/asset issues — the same texture/font fidelity tail flagged for
+  `css-backgrounds/background-clip` under cluster 13. **Don't chase this family** as a systematic fix;
+  individual image-fidelity work is the only lever and it is low-yield per test.
+
+- **`css-writing-modes/abs-pos-non-replaced-{vrl,vlr}-*` (≈159) — real bug found, fix deferred
+  (regresses other vertical-WM tests).** Two coupled gaps. (1) **In-flow vertical-rl block
+  mis-positioned to the right.** A `writing-mode:vertical-rl` block that is an *in-flow* child of a
+  *horizontal* parent is placed at the **right edge** of the page instead of the left:
+  `ApplyVerticalWritingModeFlow` (`CssBox.cs`) right-aligns the box keyed off the **box's own**
+  writing mode, but a block's position follows its **containing block's** writing mode (CSS Writing
+  Modes 3 §7.1) — a vertical-rl box in a horizontal CB should keep its normal-flow (left) position
+  and rotate only its *content*. A minimal repro (`writing-mode:vertical-rl` div in a horizontal
+  body) renders the div flush-right; gating the right-shift on the **CB** being vertical-rl fixes the
+  repro (the box left-aligns, content rotates correctly) — but **regresses ~14 already-passing
+  vertical-WM tests** in the curated suite (`Wpt_WritingModes_{NativeCheckableControls,
+  SelectMultiple_Fallback,ButtonNativeComputedStyle}…` for vertical-rl/lr), which rely on the current
+  right-shift. The prototype's in-flow positioning is interdependent enough that the spec-correct
+  change is net-negative without coordinated rework; the right-shift already excludes abspos
+  (`Position != Absolute/Fixed`), so the abspos vertical-flow work (clusters 3/#1131/#1134) is
+  untouched either way. (2) **Vertical Ahem glyph fill not painting** — even with the CB
+  re-positioned, `abs-pos-non-replaced-vrl-002`'s abspos `<span>` (Ahem `X`, `color:green` over
+  `background-color:red`) shows red, not the green filled square the reftest needs: the green glyph
+  does not fill its 80×80 box in the rotated vertical frame (prototype Stage 2 glyph rendering). Both
+  must land together for this family to flip; neither is a small isolated fix.
 
 - **`CSS2/generated-content/content-*` (≈82) — triaged, NOT a bug (font/reference tail).**
   Probed `content-00{1..8}` against WPT: `content:none`, `content:normal`, string content,

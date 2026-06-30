@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Broiler.App.Rendering;
@@ -13,5 +14,5 @@ public interface IPageLoader : IDisposable
     /// If the URL lacks a scheme, <c>https://</c> is prepended.
     /// Returns a tuple of (normalisedUrl, html).
     /// </summary>
-    Task<(string NormalisedUrl, string Html)> FetchAsync(string url);
+    Task<(string NormalisedUrl, string Html)> FetchAsync(string url, CancellationToken cancellationToken = default);
 }
