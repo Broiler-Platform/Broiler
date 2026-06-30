@@ -31,7 +31,17 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public const int AsyncDrainIterationLimit = 1000;
 
-    private const int FetchTimeoutSeconds = 30;
+    // External resource fetches (stylesheets, iframe documents, JS fetch) block
+    // the synchronous render/script pipeline.  In the sandboxed WPT/headless
+    // environment external http(s) hosts are unreachable, so the only question is
+    // how long each blocked fetch waits before failing — and the per-test budget
+    // (Broiler.Wpt's default 30 s) equals this client's old 30 s timeout, so a
+    // single unreachable stylesheet consumed the entire budget and timed the test
+    // out (WPT #1147 Timeout cluster, e.g. CSS2/cascade-import-* which @link three
+    // delayed-file CGI URLs).  A short timeout fails fast: even several sequential
+    // external fetches stay well under the test budget, converting a 30 s hang
+    // (which also risks aborting the whole shard) into a quick, deterministic miss.
+    private const int FetchTimeoutSeconds = 5;
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
