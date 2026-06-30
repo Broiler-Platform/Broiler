@@ -914,9 +914,10 @@ internal sealed class CssLayoutEngineTable
     /// internal shared edge to one winner: assign it to the left/top cell and
     /// suppress the right/bottom cell's matching edge, so the edge is painted
     /// once with the winning style/width/colour (and not at all when a
-    /// <c>hidden</c> border wins). Outer edges keep the cell's own border (the
-    /// table-vs-cell resolution is a follow-up). Cells spanning rows/columns
-    /// (EmptyBox placeholders) are skipped — a conservative no-op for now.
+    /// <c>hidden</c> border wins). Perimeter cell edges additionally collapse
+    /// with the table element's own border (cell wins ties, per origin
+    /// priority). Cells spanning rows/columns (EmptyBox placeholders) are
+    /// skipped — a conservative no-op for now.
     /// </summary>
     private void ResolveCollapsedBorders()
     {
@@ -984,6 +985,50 @@ internal sealed class CssLayoutEngineTable
                 SuppressEdge(bottom, "top");
             }
         }
+
+        // Outer (perimeter) edges: each border-box cell edge on the table
+        // perimeter collapses with the table element's own border. §17.6.2.1
+        // origin priority puts the cell above the table, so on an exact tie the
+        // cell wins — pass the cell edge first. A no-op for the common
+        // borderless table (the table edge is `none`, which always loses).
+        var tableTop = new EdgeBorder(_tableBox.BorderTopStyle, _tableBox.ActualBorderTopWidth, _tableBox.BorderTopColor);
+        var tableBottom = new EdgeBorder(_tableBox.BorderBottomStyle, _tableBox.ActualBorderBottomWidth, _tableBox.BorderBottomColor);
+        var tableLeft = new EdgeBorder(_tableBox.BorderLeftStyle, _tableBox.ActualBorderLeftWidth, _tableBox.BorderLeftColor);
+        var tableRight = new EdgeBorder(_tableBox.BorderRightStyle, _tableBox.ActualBorderRightWidth, _tableBox.BorderRightColor);
+
+        int lastRow = grid.Count - 1;
+        int globalMaxCol = 0;
+        foreach (var cols in grid)
+            foreach (var c in cols.Keys)
+                if (c > globalMaxCol) globalMaxCol = c;
+
+        var resolvedOuter = new HashSet<(CssBox, string)>();
+        for (int r = 0; r < grid.Count; r++)
+        {
+            foreach (var (col, cell) in grid[r])
+            {
+                if (r == 0) ResolveOuterEdge(cell, "top", tableTop, resolvedOuter);
+                if (r == lastRow) ResolveOuterEdge(cell, "bottom", tableBottom, resolvedOuter);
+                if (col == 0) ResolveOuterEdge(cell, "left", tableLeft, resolvedOuter);
+                if (col == globalMaxCol) ResolveOuterEdge(cell, "right", tableRight, resolvedOuter);
+            }
+        }
+    }
+
+    private void ResolveOuterEdge(CssBox cell, string side, EdgeBorder tableEdge, HashSet<(CssBox, string)> done)
+    {
+        if (!done.Add((cell, side)))
+            return;
+        EdgeBorder cellEdge = side switch
+        {
+            "top" => new EdgeBorder(cell.BorderTopStyle, cell.ActualBorderTopWidth, cell.BorderTopColor),
+            "bottom" => new EdgeBorder(cell.BorderBottomStyle, cell.ActualBorderBottomWidth, cell.BorderBottomColor),
+            "left" => new EdgeBorder(cell.BorderLeftStyle, cell.ActualBorderLeftWidth, cell.BorderLeftColor),
+            _ => new EdgeBorder(cell.BorderRightStyle, cell.ActualBorderRightWidth, cell.BorderRightColor),
+        };
+        // Cell first: §17.6.2.1 origin priority favours the cell over the table
+        // on an exact width/style tie.
+        ApplyEdge(cell, side, ResolveCollapsedEdge(cellEdge, tableEdge));
     }
 
     private static void ApplyEdge(CssBox cell, string side, EdgeBorder b)

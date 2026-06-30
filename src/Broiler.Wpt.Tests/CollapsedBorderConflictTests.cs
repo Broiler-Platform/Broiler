@@ -94,6 +94,34 @@ td{{border:5px solid black;width:40px;height:30px;}}
     }
 
     [Fact]
+    public void OuterEdge_HiddenTableBorder_SuppressesCellPerimeter()
+    {
+        // §17.6.2.1: a cell's perimeter edge collapses with the table's own
+        // border. A `hidden` table border wins (suppresses), so the single
+        // cell's red border must not show.
+        var html = @"<!DOCTYPE html><html><head><style>
+table{border-collapse:collapse;border:10px hidden green;width:100px;height:60px;}
+td{border:4px solid red;}
+</style></head><body><table><tr><td>a</td></tr></table></body></html>";
+        var (red, _) = RenderCounts(html);
+        Assert.Equal(0, red);
+    }
+
+    [Fact]
+    public void OuterEdge_WiderTableBorder_WinsOverCellPerimeter()
+    {
+        // A wider table border wins the perimeter over the cell's thin red one,
+        // so green shows and no red survives.
+        var html = @"<!DOCTYPE html><html><head><style>
+table{border-collapse:collapse;border:12px solid green;width:100px;height:60px;}
+td{border:2px solid red;}
+</style></head><body><table><tr><td>a</td></tr></table></body></html>";
+        var (red, green) = RenderCounts(html);
+        Assert.Equal(0, red);
+        Assert.True(green > 0, "the wider green table border should win the perimeter");
+    }
+
+    [Fact]
     public void WiderBorder_WinsAtSharedEdge()
     {
         // Two cells sharing one edge: the right cell's wider green border must
