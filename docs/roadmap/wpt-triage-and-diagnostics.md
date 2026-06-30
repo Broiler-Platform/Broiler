@@ -31,6 +31,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 13 | Multi-layer root background image dropped on the canvas (`background: url(), color`) | ✅ fixed | Broiler.HTML |
 | 14 | `var()` exponential-blowup OOM + reentrant-cascade / anchor-walk "Collection was modified" crashes | ✅ fixed | Broiler.CSS + Broiler.HtmlBridge.Dom |
 | 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
+| 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -97,6 +98,32 @@ Regression guard: `HtmlDocumentParserTests.Leading_Text_Without_Body_Tag_Opens_T
 > dynamic `position-visibility` (`position-area-scrolling-*`, `position-visibility-*`), and
 > percentage inset/margin/padding in position-area cells. None is a single clean fix; each is
 > feature-depth work to be taken on individually.
+
+Cluster 16 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) came from the
+`PixelMismatch / ReferenceOverlayExposed` cluster — the runner's strongest "real paint/layout bug"
+signal (pure red showing through where the reference has none). After `background-clip-root`
+(cluster 13), two remained: `css-align/self-alignment/block-justify-self` (a large `justify-self`
+matrix, many sub-cases — left as hard-tail) and `css-anchor-position/anchor-position-borders-002`.
+Reproducing the latter showed the anchor block rendered on the **left** of its `dir="rtl"`
+scroller; it should hug the **right**, with the `anchor()`-covered target on top. Root cause was a
+**CSS2.1 §10.3.3 gap** in `Broiler.Layout`: for a block-level box with an explicit width, the
+margin resolver handled the auto-margin cases (centering, single auto margin) but **not the
+over-constrained case** (width + both margins specified). In a left-to-right CB that is harmless
+(margin-right is the ignored one and the X computation already positions by margin-left), but in a
+right-to-left CB **margin-left** is the ignored one, so the box must be re-solved against the
+right edge. Added that branch (`CssBox.PerformLayoutImp`), positioning the box from the right.
+`anchor-position-borders-002` 98.8 % → pass (`css-anchor-position` 26 → 27).
+
+The branch is deliberately **narrowly gated** to the case that is unambiguously correct and
+regression-free, after the first attempt regressed 8 `css-align/abspos` reftests: it fires only
+for a block-level box that (a) fits its CB (`remainingSpace ≥ 0`), (b) whose CB is **not** an
+abspos/fixed box (avoids feeding back into shrink-to-fit width resolution of `position:absolute`
+items, the `…-default-overflow-*` family), (c) in a **horizontal** writing-mode CB (the inline
+axis is horizontal), (d) with CB `direction:rtl`, and (e) with no concrete `justify-self`
+(which is resolved later and would otherwise be double-applied). Excluded cases (overflowing
+boxes, vertical writing modes, abspos CBs) keep Broiler's existing behaviour and are follow-up
+work. Verified: `css-align` unchanged at 15 passing, curated `Broiler.Wpt.Tests` unchanged at 67,
+zero regressions. Regression guard: `Fixed_Width_Block_In_Rtl_Container_Is_Right_Aligned`.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that

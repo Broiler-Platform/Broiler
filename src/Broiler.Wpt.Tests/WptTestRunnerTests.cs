@@ -6184,6 +6184,36 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Fixed_Width_Block_In_Rtl_Container_Is_Right_Aligned()
+    {
+        // CSS2.1 §10.3.3: a block-level box with an explicit width and
+        // non-auto margins is over-constrained; in a right-to-left containing
+        // block the used margin-left (not margin-right) is ignored, so the box
+        // hugs the right edge of its containing block rather than the left.
+        // Regression guard for WPT css-anchor-position/anchor-position-borders,
+        // where a fixed-width anchor in a dir=rtl scroller must sit on the right.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<div style=""width:400px; height:40px; direction:rtl; background:white"">
+    <div style=""width:40px; height:40px; background:green""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 500, 100);
+
+        // Green box must be at the right edge (x in 360..400), not the left.
+        var right = bitmap.GetPixel(380, 20);
+        Assert.True(right.Green > 100 && right.Red < 100 && right.Blue < 100,
+            $"Expected green at right edge (380,20), got R={right.Red} G={right.Green} B={right.Blue}. " +
+            "A fixed-width block in a dir=rtl container must be right-aligned.");
+        // Left side must stay the white container background.
+        var left = bitmap.GetPixel(20, 20);
+        Assert.True(left.Green > 200 && left.Red > 200 && left.Blue > 200,
+            $"Expected white at left (20,20), got R={left.Red} G={left.Green} B={left.Blue}. " +
+            "The block must not be left-aligned in rtl.");
+    }
+
+    [Fact]
     public void Overflow_Scroll_Clamps_Layout_Height()
     {
         // overflow:scroll should also clamp layout height, same as hidden.
