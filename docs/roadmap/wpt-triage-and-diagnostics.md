@@ -37,6 +37,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
 | 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
 | 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
+| 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -261,6 +262,35 @@ untouched. Verified: a `height:200px` two-row table renders ~200px (was ~40px);
 with no red. Zero curated regressions; guard `TableHeightTests`. (Side effect: full-height tables
 make any *unresolved* border full-length — `border-conflict-element-002`'s deferred outer-corner
 red grew 24→182px, underscoring that the outer table-vs-cell edge model is the next table item.)
+
+Cluster 22 (issue [#1147](https://github.com/MaiRat/Broiler/issues/1147)) is the
+`CSS2/tables/table-anonymous-objects-*` family — **107 failures**, the 2nd-largest `CSS2/tables`
+cluster. These reftests overlay a `display:table` construct (whose cell content is wrapped in
+newlines + indentation) on a real `<table>` with tight `<td>Cell</td>` cells, asserting "no red"
+(the construct must cover an identical red layer beneath a green one). Reproducing
+`table-anonymous-objects-{001,003}` against the live renderer showed the red layer fully exposed —
+but **anonymous table-box generation was already correct**: a `display:table` with cells-only (no
+rows) or full structure both laid out *identically to the real table*. The divergence was purely
+**leading/trailing collapsible white space inside each cell inflating its shrink-to-fit width**.
+CSS Text 3 §4.1.1 removes a collapsible space at the start of a formatting context's first line /
+end of its last line; Broiler carries a collapsed space as word-spacing on the neighbouring word
+(`HasSpaceBefore`/`HasSpaceAfter`), and `CssBoxHelper.GetMinMaxSumWords` counts that spacing for
+every word, so the first content word's leading space and the last word's trailing space each
+added a space to the preferred width. The **paint path already drops** those edge spaces, so a
+`<td> Cell </td>` painted flush-left yet measured wider than the tight cell — adjacent cells
+stopped abutting (the real-`<table>` reference uses tight cells, exposing the gap). Fixed in
+`CssBox.GetMinMaxWidth` by subtracting the formatting context's leading+trailing edge word-spacing
+(`CssBoxHelper.EdgeWhitespaceSpacing`, walking the box's first/last in-flow content word), clamped
+to the min width. `GetMinMaxWidth` is queried only for shrink-to-fit roots (table cells, floats,
+inline-blocks, abspos) — exactly the boxes whose own line edges are where the spec strips the white
+space — so it is behaviour-preserving for content that begins/ends on a real word. Verified:
+`table-anonymous-objects-{001,002,003}` red 370 → ≤26px (glyph-edge anti-aliasing the test allows);
+whitespace-padded cells now render the same width as tight cells. Zero curated regressions (the one
+flagged `CommentWhitespaceCollapse` failure is a pre-existing parallel-render flake — passes 3/3 in
+isolation, and uses an empty explicit-width inline-block the fix cannot touch). Main-repo
+`Broiler.Layout`; guard `TableCellWhitespaceTests` (fails without the fix at +11px). **Follow-up:**
+the same edge-whitespace model now applies to inline-blocks/floats with padded content, which were
+similarly over-wide; not separately surveyed here.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
