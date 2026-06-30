@@ -35,6 +35,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
 | 18 | Inline-box (`display:inline`) background/border painted **over** the line text → coloured spans hid their own text | ✅ fixed | Broiler.HTML |
 | 19 | CDATA-wrapped `<style>` CSS dropped (every XHTML `.xht` reftest unstyled) + author `border` shorthand colour lost on table cells | ✅ fixed | Broiler.HTML |
+| 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -205,6 +206,29 @@ origin; shared-edge dedup) is **unimplemented** (the layout only approximates co
 spacing hack). That is the next, larger increment for this family — it needs the table grid
 (neighbour lookup lives in `CssLayoutEngineTable`) and is well-specified; no local pixel reference,
 so verify with the "no red / lime present" heuristic + the curated suite.
+
+Cluster 20 (issue [#1143](https://github.com/MaiRat/Broiler/issues/1143)) implements the
+collapsed-border conflict resolution that cluster 19 identified as the remaining gap for the
+`CSS2/tables/border-conflict-*` family (258 failures). In the `border-collapse:collapse` model
+adjacent cells **share** one border, but Broiler painted each cell's own borders independently, so
+a border that should *lose* a shared edge (e.g. a red edge yielding to an adjacent `hidden`, wider,
+or higher-priority border) still painted — every `border-conflict-*` reftest showed the red it
+asserts must be absent. `CssLayoutEngineTable.ResolveCollapsedBorders` (a pre-sizing pass gated to
+collapse tables) builds the column-indexed cell grid and resolves each **internal** shared edge per
+CSS2.1 §17.6.2.1: `hidden` suppresses the edge; otherwise the **wider** border wins, then the
+higher-priority **style** (`double > solid > dashed > dotted > ridge > outset > groove > inset`),
+then the earlier (left/top) cell on an exact tie; `none`/zero always loses. The winner is assigned
+to the left/top cell and the right/bottom cell's matching edge is suppressed, so the edge paints
+once with the winning style/width/colour (or not at all when `hidden` wins). Verified:
+`border-conflict-{w,width,style}-00x.xht` now render **no red** with the winning borders painted
+(e.g. `border-conflict-w-001` red 260 → 0, lime 996 → 753 after dedup); the curated
+`Broiler.Wpt.Tests` suite has **zero regressions**. Regression guards:
+`CollapsedBorderConflictTests`. **Follow-ups:** outer **table-vs-cell** and **row/col-group** edge
+resolution, and exact collapsed-border **geometry** (half-border centring + cell/table shrink) —
+the current pass fixes which border *wins* and its colour, not sub-pixel placement; and **spanned
+cells** (rowspan/colspan placeholders) are skipped (conservative no-op). No local pixel reference
+for these `.xht` tests, so verification used the "no red / winning colour present" heuristic + the
+curated suite.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
