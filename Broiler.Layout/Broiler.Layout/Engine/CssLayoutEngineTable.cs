@@ -724,6 +724,15 @@ internal sealed class CssLayoutEngineTable
                 curx = cell.ActualRight + GetHorizontalSpacing();
             }
 
+            // CSS2.1 §17.5.3: a row's specified `height` is a minimum. The loop
+            // above only grows `maxBottom` from non-row-spanning cell bottoms, so
+            // a row whose only cells span into later rows (e.g. rowspan cells with
+            // a collapsed/empty following row) would leave the row — and the whole
+            // table — at zero height, which `overflow:hidden` then clips away.
+            // Floor the row bottom by its explicit height so such rows still take
+            // space and overflowing cell content is clipped to the row box.
+            maxBottom = Math.Max(maxBottom, rowTop + GetSpecifiedRowHeight(row));
+
             foreach (CssBox cell in row.Boxes)
             {
                 CssSpacingBox spacer = cell as CssSpacingBox;
@@ -1117,6 +1126,24 @@ internal sealed class CssLayoutEngineTable
             return 1;
 
         return rowspan;
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.5.3: the explicit <c>height</c> of a table row is a minimum.
+    /// Returns the resolved length for a definite (px/em) row height, or 0 when
+    /// the height is <c>auto</c> or a percentage (percentages resolve against the
+    /// table height, which is not yet known during the row-height pass).
+    /// </summary>
+    private static double GetSpecifiedRowHeight(CssBox row)
+    {
+        string h = row.Height;
+        if (string.IsNullOrEmpty(h)
+            || h == CssConstants.Auto
+            || h.EndsWith("%", StringComparison.Ordinal))
+            return 0;
+
+        double v = CssValueParser.ParseLength(h, 0, row.GetEmHeight());
+        return double.IsNaN(v) || v < 0 ? 0 : v;
     }
 
     private static void MeasureWords(CssBox box, ILayoutEnvironment g)
