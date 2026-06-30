@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 12806,
+    "failed": 12802,
     "skipped": 0,
-    "total": 12806
+    "total": 12802
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 54,
+      "count": 50,
       "examples": [
         "css/css-align/blocks/align-content-table-cell-005.html",
         "css/css-anchor-position/position-area-anchor-partially-outside.html",
@@ -22,23 +22,11 @@
       ]
     },
     {
-      "key": "RenderingError",
-      "label": "RenderingError",
-      "category": "RenderingError",
-      "subCategory": null,
-      "count": 11,
-      "examples": [
-        "css/css-properties-values-api/var-reference-registered-properties-cycles.html",
-        "css/css-variables/variable-declaration-33.html",
-        "css/css-variables/vars-border-shorthand-serialize.html"
-      ]
-    },
-    {
       "key": "Timeout",
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 8,
+      "count": 9,
       "examples": [
         "css/css-inline/empty-span-size-001.html",
         "css/CSS2/cascade-import/cascade-import-005.xht",
@@ -55,18 +43,6 @@
         "css/css-backgrounds/background-clip/clip-border-area-border-on-top.html",
         "css/css-backgrounds/background-clip/clip-border-area-multiple-backgrounds.html",
         "css/css-align/blocks/align-content-block-008.html"
-      ]
-    },
-    {
-      "key": "ScriptError",
-      "label": "ScriptError",
-      "category": "ScriptError",
-      "subCategory": null,
-      "count": 7,
-      "examples": [
-        "css/css-contain/content-visibility/content-visibility-anchor-positioning-004.html",
-        "css/selectors/invalidation/lang-pseudo-class-in-has-xhtml.xhtml",
-        "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html"
       ]
     },
     {
@@ -91,16 +67,37 @@
         "css/css-align/blocks/align-content-block-002.html",
         "css/css-align/blocks/align-content-block-004.html"
       ]
+    },
+    {
+      "key": "ScriptError",
+      "label": "ScriptError",
+      "category": "ScriptError",
+      "subCategory": null,
+      "count": 2,
+      "examples": [
+        "css/css-contain/content-visibility/content-visibility-anchor-positioning-001.html",
+        "css/css-scroll-snap/snap-after-relayout/multiple-aligned-targets/common-to-both-axes-supercedes-first-in-tree-order.html"
+      ]
+    },
+    {
+      "key": "RenderingError",
+      "label": "RenderingError",
+      "category": "RenderingError",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "css/css-variables/variable-exponential-blowup.html"
+      ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-backgrounds",
-      32
+      30
     ],
     [
       "css/css-anchor-position",
-      17
+      14
     ],
     [
       "css/css-align",
@@ -111,46 +108,46 @@
       11
     ],
     [
-      "css/css-variables",
-      6
+      "css/css-scroll-snap",
+      2
     ],
     [
       "css/css-contain",
-      2
-    ],
-    [
-      "css/css-scroll-snap",
-      2
+      1
     ],
     [
       "css/css-inline",
       1
     ],
     [
-      "css/css-properties-values-api",
+      "css/css-variables",
       1
     ],
     [
-      "css/cssom",
+      "css/WOFF2",
+      1
+    ],
+    [
+      "css/filter-effects",
       1
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      66
-    ],
-    [
-      "RenderingError",
-      11
+      62
     ],
     [
       "Timeout",
-      8
+      9
     ],
     [
       "ScriptError",
-      7
+      2
+    ],
+    [
+      "RenderingError",
+      1
     ]
   ],
   "droppedDeclarations": [
@@ -197,27 +194,15 @@
   ],
   "exceptionSignatures": [
     [
-      "RAdapter.GetColor \u2014 The value cannot be an empty string. (Parameter 'colorName')",
-      10
-    ],
-    [
-      "LegacyAttributeDictionary.Snapshot \u2014 An item with the same key has already been added. Key: xml:lang",
-      3
-    ],
-    [
-      "DomBridge.BuildAnchorRegistry \u2014 Collection was modified; enumeration operation may not execute.",
-      2
+      "DomBridge.CollectMatchedRuleProperties \u2014 Collection was modified; enumeration operation may not execute.",
+      1
     ],
     [
       "CssStyleEngine.BuildResolvedCustomPropertyMap \u2014 Insufficient memory to continue the execution of the program.",
       1
     ],
     [
-      "DomBridge.CollectStyleElementsInTree \u2014 Collection was modified; enumeration operation may not execute.",
-      1
-    ],
-    [
-      "DomBridge.FlushTimerStep \u2014 Collection was modified; enumeration operation may not execute.",
+      "DomBridge.ResolveAnchorFunctions \u2014 Collection was modified; enumeration operation may not execute.",
       1
     ]
   ],
@@ -271,18 +256,6 @@
       ]
     },
     {
-      "family": "css/css-variables/variable-declaration-{N}.html",
-      "count": 3,
-      "categories": {
-        "RenderingError": 3
-      },
-      "examples": [
-        "css/css-variables/variable-declaration-33.html",
-        "css/css-variables/variable-declaration-47.html",
-        "css/css-variables/variable-declaration-58.html"
-      ]
-    },
-    {
       "family": "css/CSS2/visudet/replaced-elements-min-width-{N}.html",
       "count": 2,
       "categories": {
@@ -291,28 +264,6 @@
       "examples": [
         "css/CSS2/visudet/replaced-elements-min-width-80.html",
         "css/CSS2/visudet/replaced-elements-min-width-40.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/background-attachment-margin-root-{N}.html",
-      "count": 2,
-      "categories": {
-        "PixelMismatch": 2
-      },
-      "examples": [
-        "css/css-backgrounds/background-attachment-margin-root-002.html",
-        "css/css-backgrounds/background-attachment-margin-root-001.html"
-      ]
-    },
-    {
-      "family": "css/css-contain/content-visibility/content-visibility-anchor-positioning-{N}.html",
-      "count": 2,
-      "categories": {
-        "ScriptError": 2
-      },
-      "examples": [
-        "css/css-contain/content-visibility/content-visibility-anchor-positioning-004.html",
-        "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html"
       ]
     }
   ],
@@ -25782,13 +25733,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-004.html",
       "passed": false,
       "skipped": false,
@@ -25808,13 +25752,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-with-position.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-no-overflow-nested.html",
@@ -26459,20 +26396,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-backgrounds/background-attachment-margin-root-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-backgrounds/background-attachment-margin-root-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-backgrounds/background-clip-border-area-and-blend-mode.html",
@@ -36305,8 +36228,7 @@
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-anchor-positioning-001.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "ScriptError"
     },
     {
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-anchor-positioning-003.html",
