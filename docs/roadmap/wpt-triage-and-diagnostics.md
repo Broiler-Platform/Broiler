@@ -30,6 +30,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 12 | `<br>` after an inline-block adds a spurious empty line + anon-block drops inline-block margin | ✅ fixed | Broiler.Layout (+ Broiler.HTML patch) |
 | 13 | Multi-layer root background image dropped on the canvas (`background: url(), color`) | ✅ fixed | Broiler.HTML |
 | 14 | `var()` exponential-blowup OOM + reentrant-cascade / anchor-walk "Collection was modified" crashes | ✅ fixed | Broiler.CSS + Broiler.HtmlBridge.Dom |
+| 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -70,6 +71,32 @@ Cluster 14 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) collec
 The two `Broiler.CSS` fixes and the `Broiler.HTML` fix were pushed to their `MaiRat/` remotes and
 the submodule pointers bumped; the anchor-walk snapshot is a main-repo change (active on CI
 immediately).
+
+Cluster 15 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) came out of triaging the
+`css-anchor-position` MissingContent sub-cluster. Reproducing
+`anchor-size-css-zoom` against the live renderer showed the instruction text
+("Test passes if no red is visible.") missing and every box one line-height too high — but the
+position-area / anchor-size math was correct. The cause was the **HTML tree builder**
+(`Broiler.DOM`'s `HtmlDocumentParser`): it redirected *every* character token seen before the
+body was opened into the `<head>`. Documents with an explicit `<body>` were unaffected, but the
+many WPT reftests that omit `<body>` and open with text had that leading text parked in the head,
+where it never renders — a direct `MissingContent` / content-shift signature. Fixed to match HTML
+tree construction: leading whitespace before the body stays in the head, but the first
+non-whitespace character opens the body and is inserted there. Locally flips `anchor-size-css-zoom`
+(`css-anchor-position` 25 → 26) with zero regressions on the curated suite and the CSS2 /
+css-align / css-backgrounds subsets; on CI it removes the dropped-text contributor from any
+bodyless reftest that opens with instruction text. Pushed to `MaiRat/Broiler.DOM`; pointer bumped.
+Regression guard: `HtmlDocumentParserTests.Leading_Text_Without_Body_Tag_Opens_The_Body`.
+
+> **Note on the position-area cluster.** The bulk of the remaining `css-anchor-position`
+> MissingContent failures are the genuine hard tail: the position-area **grid math is already
+> correct** (the anchor-outside `Min/Max` grid extension in `PositionArea.cs` matches the spec's
+> expected offsets), and the failures come from *compounding* advanced features — vertical
+> writing-mode position-area geometry (`position-area-percents-001` cases 2–4), inline
+> containing blocks for abspos (`position-area-inline-container`, Ahem), scroll-linked position +
+> dynamic `position-visibility` (`position-area-scrolling-*`, `position-visibility-*`), and
+> percentage inset/margin/padding in position-area cells. None is a single clean fix; each is
+> feature-depth work to be taken on individually.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
