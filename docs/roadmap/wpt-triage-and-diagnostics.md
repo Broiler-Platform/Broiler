@@ -360,6 +360,13 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
+- **`CSS2/generated-content/content-*` (≈82) — triaged, NOT a bug (font/reference tail).**
+  Probed `content-00{1..8}` against WPT: `content:none`, `content:normal`, string content,
+  `content:url(…)`, and `content:counter(…)` all render correctly (e.g. `content-005`'s undefined
+  counter renders "0", matching its reference glyph-for-glyph modulo anti-aliasing). The family's
+  failures are the committed-reference pixel/font tail, not a `content` feature gap — **don't chase
+  this family** as a systematic fix.
+
 - **`<br>`-after-inline-block spurious line inside a block-in-inline split** —
   🔬 **triaged, deferred (issue #1143).** `CSS2/abspos/abspos-in-block-in-inline-in-relpos-inline`
   (94.8%) renders the abspos `#target` correctly sized/placed **except ~17px too low**.
