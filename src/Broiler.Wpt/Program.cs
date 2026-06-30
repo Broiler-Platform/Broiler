@@ -345,8 +345,33 @@ public class Program
             }
         }
 
+        int comparedCount = passed + failed;
+        int missingReferenceSkipCount =
+            skippedResults.Count(r => r.SkipReason == SkipReason.MissingReferenceImage);
+        double comparedPassRate = comparedCount > 0 ? 100.0 * passed / comparedCount : 0;
+
         Console.WriteLine();
-        Console.WriteLine($"Results: {passed} passed, {failed} failed, {skipped} skipped");
+        Console.WriteLine("=== Results ===");
+        // The three buckets are mutually exclusive and sum to the discovered
+        // total; a skipped test is NOT a pass. Spell that out so a run dominated
+        // by skips (e.g. missing references) is not misread as "almost passing".
+        Console.WriteLine(
+            $"Total discovered : {allResults.Count}  " +
+            $"(= {passed} passed + {failed} failed + {skipped} skipped)");
+        Console.WriteLine(
+            $"Compared         : {comparedCount}  ({comparedPassRate:F1}% of compared passed) " +
+            "— only these were pixel-compared against a reference");
+        Console.WriteLine(
+            $"Skipped          : {skipped}  — not compared and not counted as passed " +
+            "(no reference image / manual / unsupported media)");
+        if (missingReferenceSkipCount > 0)
+            Console.WriteLine(
+                $"                   of which {missingReferenceSkipCount} had no reference image " +
+                "(SkipReason.MissingReferenceImage)");
+        if (skipped > 0 && skipped >= comparedCount)
+            Console.WriteLine(
+                "WARNING: more tests were skipped than compared — reference coverage is low, so " +
+                "most tests are unscored. Generate/fetch references before reading the pass rate.");
 
         if (failures.Count > 0)
         {
@@ -828,12 +853,26 @@ public class Program
         writer.WriteLine($"- Render backend: {BGraphicsBackend.CurrentLabel}");
         writer.WriteLine($"- Subset: {(string.IsNullOrWhiteSpace(subset) ? "(all)" : subset)}");
         writer.WriteLine();
+        int compared = passed + failed;
+        int missingReferenceSkipCount = missingReferenceSkips.Count;
+        double comparedPassRate = compared > 0 ? 100.0 * passed / compared : 0;
+
         writer.WriteLine("## Totals");
         writer.WriteLine();
-        writer.WriteLine($"- Total: {allResults.Count}");
+        writer.WriteLine(
+            $"- Total discovered: {allResults.Count} " +
+            $"(= {passed} passed + {failed} failed + {skipped} skipped — mutually exclusive)");
+        writer.WriteLine(
+            $"- Compared (pixel-tested): {compared} — {comparedPassRate:F1}% of compared passed");
         writer.WriteLine($"- Passed: {passed}");
         writer.WriteLine($"- Failed: {failed}");
-        writer.WriteLine($"- Skipped: {skipped}");
+        writer.WriteLine(
+            $"- Skipped: {skipped} (not compared, **not** counted as passed; " +
+            $"{missingReferenceSkipCount} missing reference image)");
+        if (skipped > 0 && skipped >= compared)
+            writer.WriteLine(
+                "- ⚠️ **Reference coverage low** — more tests were skipped than compared, so most " +
+                "tests are unscored. Generate/fetch references before reading the pass rate.");
         WriteBucketSection(writer, "Top failing buckets", topFailingDirectories);
         WriteBucketSection(writer, "Top skipped buckets", topSkippedDirectories);
         WriteReferenceCoverageSection(writer, referenceCoverageStatus);
