@@ -422,9 +422,18 @@ public sealed partial class DomBridge
 
             // For the position-area grid, use the scroll content dimensions
             // (the actual scrollable area) rather than the scroll port dimensions.
-            // The grid extends to cover the full scrollable content.
+            // The grid extends to cover the full scrollable content — but only
+            // when the scroll container actually establishes the containing block
+            // for the positioned element. When it does not (e.g. a static
+            // overflow:scroll box), the element's containing block is an ancestor,
+            // so the grid is keyed off the scroll port, not the scrollable extent;
+            // using the extent there would oversize the cell and surface content
+            // that should be clipped out of the scrollport.
+            bool containerIsCB = EstablishesContainingBlock(scProps);
             double scrollContentWidth = FindScrollContentWidth(scrollContainer, cbWidth);
-            double scrollContentHeight = FindScrollContentHeight(scrollContainer, cbHeight);
+            double scrollContentHeight = containerIsCB
+                ? FindScrollContentHeight(scrollContainer, cbHeight)
+                : cbHeight;
 
             // Compute anchor position relative to the scroll container.
             var anchorRelPos = ComputeAnchorRelativeToContainer(anchor, scrollContainer);
@@ -562,27 +571,29 @@ public sealed partial class DomBridge
     }
     /// <summary>
     /// Computes the total height of the scrollable content inside a scroll
-    /// container by examining its children's heights and margins.
-    /// Falls back to the container's own height if no explicit child heights
-    /// are found.
+    /// container.  In-flow block children stack vertically, so the scrollable
+    /// extent is the <em>sum</em> of their heights and margins (not the tallest
+    /// single child, which is what the inline/horizontal axis uses).  Absolutely
+    /// and fixed positioned children are out of flow and do not contribute to
+    /// the block-axis scroll extent.  The result is clamped to at least the
+    /// container's own height (scrollHeight ≥ clientHeight).
     /// </summary>
     private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
     {
-        double maxHeight = containerHeight;
+        double stackedHeight = 0;
         foreach (var child in scrollContainer.Children)
         {
             if (child.IsTextNode) continue;
             var childProps = GetComputedProps(child);
-            double? childH = TryParsePx(childProps.GetValueOrDefault("height"));
-            if (childH.HasValue)
-            {
-                double mt = TryParsePx(childProps.GetValueOrDefault("margin-top")) ?? 0;
-                double mb = TryParsePx(childProps.GetValueOrDefault("margin-bottom")) ?? 0;
-                double totalH = childH.Value + mt + mb;
-                if (totalH > maxHeight) maxHeight = totalH;
-            }
+            var pos = childProps.GetValueOrDefault("position");
+            if (pos == "absolute" || pos == "fixed")
+                continue;
+            double childH = TryParsePx(childProps.GetValueOrDefault("height")) ?? 0;
+            double mt = TryParsePx(childProps.GetValueOrDefault("margin-top")) ?? 0;
+            double mb = TryParsePx(childProps.GetValueOrDefault("margin-bottom")) ?? 0;
+            stackedHeight += childH + mt + mb;
         }
-        return maxHeight;
+        return Math.Max(containerHeight, stackedHeight);
     }
     /// <summary>
     /// Computes the anchor's position relative to the specified container.

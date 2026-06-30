@@ -1,0 +1,68 @@
+From 4e16344f79a4b8fc32b5dc37e279b7673af17093 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 30 Jun 2026 06:43:36 +0000
+Subject: [PATCH] Propagate root gradient background across the whole canvas
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When the root element's background is a gradient (CSS2.1 §14.2 canvas
+propagation), the gradient must paint over the entire canvas (viewport),
+not just the root element's box. EmitGradientLayers was given the source
+element's clip rect as the fill area, so a root gradient with a margin
+(or any box smaller than the viewport) left the rest of the canvas blank.
+
+Decouple the paint area from the scroll-layer positioning area: the canvas
+call now fills the viewport while passing the source box as the optional
+scrollPositioningArea so scroll-attached layers stay anchored to the root's
+background positioning area and fixed layers anchor to the viewport. Element
+backgrounds are unaffected (the new parameter defaults to the fill rect).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ .../Broiler.HTML.Orchestration/IR/PaintWalker.cs  | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.cs
+index b9a6805..1f2249d 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.cs
+@@ -105,7 +105,13 @@ internal static class PaintWalker
+                 gradientSource.Bounds,
+                 gradientSource,
+                 gradientSource.Style.BackgroundClip);
+-            EmitGradientLayers(gradientSource, gradientClipRect, viewport, items);
++            // CSS2.1 §14.2: the root element's background is propagated to the
++            // canvas and paints over the entire viewport, not just the source
++            // element's box. Scroll-attached layers stay anchored to the
++            // source's background positioning area (gradientClipRect); fixed
++            // layers anchor to the viewport (handled inside EmitGradientLayers).
++            EmitGradientLayers(gradientSource, viewport, viewport, items,
++                scrollPositioningArea: gradientClipRect);
+ 
+             if (needsOpacity)
+                 items.Add(new RestoreOpacityItem { Bounds = viewport });
+@@ -2444,7 +2450,7 @@ internal static class PaintWalker
+     /// layer in the fragment's <c>background-image</c>.  Layers are painted
+     /// bottom-most first (last in the comma list) to top-most (first in the list).
+     /// </summary>
+-    private static void EmitGradientLayers(Fragment fragment, RectangleF fillRect, RectangleF viewport, List<DisplayItem> items)
++    private static void EmitGradientLayers(Fragment fragment, RectangleF fillRect, RectangleF viewport, List<DisplayItem> items, RectangleF? scrollPositioningArea = null)
+     {
+         var style = fragment.Style;
+         var gradientFunctions = SplitGradientLayers(style.BackgroundImage);
+@@ -2487,7 +2493,10 @@ internal static class PaintWalker
+                 && !fragment.HasTransformAncestor
+                 && viewport.Width > 0
+                 && viewport.Height > 0;
+-            var positioningArea = isFixed ? viewport : fillRect;
++            // Scroll-attached layers anchor to the supplied positioning area when
++            // one is given (canvas propagation: the source element's box), else to
++            // the fill rect (ordinary element backgrounds — unchanged behaviour).
++            var positioningArea = isFixed ? viewport : (scrollPositioningArea ?? fillRect);
+             var tileOrigin = new PointF(positioningArea.X, positioningArea.Y);
+ 
+             // Apply background-position offset.
+-- 
+2.43.0
+

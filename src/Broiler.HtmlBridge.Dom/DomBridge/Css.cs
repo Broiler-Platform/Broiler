@@ -437,7 +437,14 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
-        foreach (var child in root.Children)
+        // Snapshot the child list before walking it: root.Children enumerates the
+        // live ChildNodes collection, so any mutation during the walk (e.g. a lazy
+        // sub-document root materialising, or a style query re-entering DOM
+        // construction) throws "Collection was modified" and aborts style
+        // collection for the whole tree (signature
+        // DomBridge.CollectStyleElementsInTree). Same defensive idiom as the other
+        // .ToList() DOM walks in DomBridge.
+        foreach (var child in root.Children.ToList())
         {
             if (!child.IsTextNode)
             {

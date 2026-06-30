@@ -1030,7 +1030,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationSetTimeout070Core(in Arguments a)
     {
-        var id = ++_timerIdCounter;
+        var id = System.Threading.Interlocked.Increment(ref _timerIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _timeoutCallbacks[id] = fn;
@@ -1045,8 +1045,8 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var id = (int)a[0].DoubleValue;
-            _timeoutCallbacks.Remove(id);
-            _clearedTimerIds.Add(id);
+            _timeoutCallbacks.TryRemove(id, out _);
+            _clearedTimerIds[id] = 0;
         }
 
         return JSUndefined.Value;
@@ -1055,7 +1055,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationSetInterval072Core(in Arguments a)
     {
-        var id = ++_timerIdCounter;
+        var id = System.Threading.Interlocked.Increment(ref _timerIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _intervalCallbacks[id] = fn;
@@ -1070,8 +1070,8 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var id = (int)a[0].DoubleValue;
-            _intervalCallbacks.Remove(id);
-            _clearedTimerIds.Add(id);
+            _intervalCallbacks.TryRemove(id, out _);
+            _clearedTimerIds[id] = 0;
         }
 
         return JSUndefined.Value;
@@ -1080,7 +1080,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a)
     {
-        var id = ++_rafIdCounter;
+        var id = System.Threading.Interlocked.Increment(ref _rafIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _rafCallbacks[id] = fn;
@@ -1095,7 +1095,7 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var id = (int)a[0].DoubleValue;
-            _rafCallbacks.Remove(id);
+            _rafCallbacks.TryRemove(id, out _);
         }
 
         return JSUndefined.Value;
