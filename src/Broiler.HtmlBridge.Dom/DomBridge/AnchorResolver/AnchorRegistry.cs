@@ -248,7 +248,7 @@ public sealed partial class DomBridge
         }
         finally
         {
-            _computedPropsInProgress.Remove(element);
+            _computedPropsInProgress.TryRemove(element, out _);
         }
     }
     private void ResolveExplicitInheritedValues(Dictionary<string, string> props, DomElement element)

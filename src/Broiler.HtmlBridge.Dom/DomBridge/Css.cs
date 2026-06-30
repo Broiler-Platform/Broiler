@@ -22,9 +22,20 @@ public sealed partial class DomBridge
 {
     private int _styleInvalidationBatchDepth;
     private HashSet<DomElement>? _pendingStyleInvalidationRoots;
-    private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsCache = [];
-    private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = [];
-    private readonly HashSet<(DomElement Element, bool Vertical)> _contentExtentInProgress = [];
+    // These caches/reentrancy guards are read and written while computing
+    // getComputedStyle / element geometry. That work is re-entered from JS
+    // Promise/async/generator and scroll/timer continuations that the JS engine
+    // dispatches on ThreadPool threads (see the timer-map note in DomBridge.cs),
+    // so a continuation can mutate them concurrently with the main-thread layout
+    // pass. A plain Dictionary/HashSet corrupts under that race and throws
+    // "Operations that change non-concurrent collections must have exclusive
+    // access" from GetComputedProps — unhandled on a ThreadPool thread it aborts
+    // the whole process (SIGABRT/exit 134), taking out an entire WPT shard
+    // (issue #1143). Use concurrent collections, the same defensive idiom as the
+    // timer/raf maps.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsCache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(DomElement Element, bool Vertical), byte> _contentExtentInProgress = new();
 
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading

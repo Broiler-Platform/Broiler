@@ -22,14 +22,17 @@ public sealed partial class DomBridge
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var child in root.Children)
+            // Snapshot: assigning child.TextContent re-parses the <style> element's
+            // text node, mutating root.Children mid-enumeration ("Collection was
+            // modified", WPT issue #1143). Same .ToList() idiom as AnchorRegistry.
+            foreach (var child in root.Children.ToList())
             {
                 if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
                     child.TextContent = RemoveUnsupportedCssRules(child.TextContent);
             }
         }
 
-        foreach (var child in root.Children)
+        foreach (var child in root.Children.ToList())
             NeutralizeStyleElementsForAnchorRules(child);
     }
     private static readonly System.Text.RegularExpressions.Regex CssRuleBlockPattern = new(
