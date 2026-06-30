@@ -906,6 +906,33 @@ internal class CssBox : CssBoxProperties, IDisposable
             childBox.Dispose();
     }
 
+    /// <summary>
+    /// Whether a concrete <c>justify-self</c> alignment (one that actually shifts
+    /// the box) is in effect, after resolving <c>auto</c> to the parent's
+    /// <c>justify-items</c> and the legacy <c>text-align:-webkit-*</c> fallback.
+    /// Mirrors the resolution in <see cref="PerformLayoutImp"/>'s block
+    /// justify-self step; used to avoid double-applying alignment with the
+    /// CSS2.1 §10.3.3 over-constrained-margin positioning.
+    /// </summary>
+    private bool HasConcreteJustifySelf()
+    {
+        string js = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
+        if (js == "auto")
+            js = ParentBox?.JustifyItems?.Trim().ToLowerInvariant() ?? "normal";
+        if (js is "normal" or "stretch" or "auto" or "legacy")
+        {
+            js = (ParentBox?.TextAlign?.Trim().ToLowerInvariant()) switch
+            {
+                "-webkit-right" => "right",
+                "-webkit-center" => "center",
+                "-webkit-left" => "left",
+                _ => js,
+            };
+        }
+        return js is "center" or "end" or "flex-end" or "self-end" or "right"
+            or "start" or "flex-start" or "self-start" or "left";
+    }
+
     protected virtual void PerformLayoutImp(ILayoutEnvironment g)
     {
         if (Display != CssConstants.None)
@@ -1074,6 +1101,32 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double leftMargin = ActualMarginLeft;
                         double rightMargin = Math.Max(0, remainingSpace - leftMargin);
                         MarginRight = rightMargin.ToString("F4",
+                            CultureInfo.InvariantCulture) + "px";
+                    }
+                    else if ((IsBlock || Display == CssConstants.ListItem)
+                             && remainingSpace >= 0
+                             && ContainingBlock?.Position != CssConstants.Absolute
+                             && ContainingBlock?.Position != CssConstants.Fixed
+                             && !IsVerticalWritingMode(ContainingBlock?.WritingMode ?? WritingMode)
+                             && (ContainingBlock?.Direction ?? Direction) == "rtl"
+                             && !HasConcreteJustifySelf())
+                    {
+                        // CSS2.1 §10.3.3: when width and both margins are
+                        // specified the box is over-constrained, so one used
+                        // margin is ignored and solved for. In a left-to-right
+                        // containing block that is margin-right (and the box
+                        // stays at its margin-left, which the X computation
+                        // already honours, so no adjustment is needed). In a
+                        // right-to-left containing block margin-LEFT is the one
+                        // ignored, so recompute it from the remaining space —
+                        // this positions the box against the right edge instead
+                        // of the left (e.g. a fixed-width block in a dir=rtl
+                        // container; WPT css-anchor-position/anchor-position-borders).
+                        // Skipped when a concrete justify-self alignment applies,
+                        // because that is resolved later (see ApplyBlockJustifySelf)
+                        // and would otherwise be double-applied.
+                        double leftMargin = remainingSpace - ActualMarginRight;
+                        MarginLeft = leftMargin.ToString("F4",
                             CultureInfo.InvariantCulture) + "px";
                     }
                 }

@@ -28,6 +28,122 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 10 | `@position-try` fallback dropped by comment-in-body parse bug | 🟡 partial | Broiler.HtmlBridge.Dom |
 | 11 | HTML comments split inline white-space runs → spurious space, content shift | ✅ fixed | Broiler.HtmlBridge.Dom |
 | 12 | `<br>` after an inline-block adds a spurious empty line + anon-block drops inline-block margin | ✅ fixed | Broiler.Layout (+ Broiler.HTML patch) |
+| 13 | Multi-layer root background image dropped on the canvas (`background: url(), color`) | ✅ fixed | Broiler.HTML |
+| 14 | `var()` exponential-blowup OOM + reentrant-cascade / anchor-walk "Collection was modified" crashes | ✅ fixed | Broiler.CSS + Broiler.HtmlBridge.Dom |
+| 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
+| 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
+| 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
+
+Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
+`css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
+match, all red**). Root cause was **not** `background-clip`: a root element whose background has
+multiple layers (`html { background: url(green.png), red; }`) stores its per-layer image handles
+as an `object?[]`, but `PaintWalker.EmitCanvasBackground` passed that whole array straight to
+`DrawTiledImageItem.ImageHandle` — which the rasterizer cannot draw, so the green image layer
+silently vanished and only the canvas colour (red) showed through (the test's failure overlay).
+Fixed by normalizing the handles (`NormalizeBackgroundImageHandles`) and emitting one
+`DrawTiledImageItem` per image layer, bottom-most first, each with its own
+`background-repeat`/`-position` — mirroring the normal element paint path. Verified locally:
+`background-clip-root` 0 % → 99.7 %, `css-backgrounds` 38 → 39 passing, zero regressions. (The
+remaining ~17 local `css-backgrounds/background-clip` failures are the font-metric / texture
+sub-pixel fidelity tail — the rendered boxes and clip regions match Chromium; the glyph widths
+differ — not a paint bug.)
+
+Cluster 14 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) collects the three
+**exception-signature** crashes, each gating one test:
+- **`var()` exponential blowup → OOM** (`css-variables/variable-exponential-blowup`,
+  `CssStyleEngine.BuildResolvedCustomPropertyMap` *Insufficient memory*). A non-cyclic chain where
+  each custom property references the one below it twice expands exponentially (billion-laughs);
+  cycle detection (the #1136 fix) does not catch it. Bounded the substituted length (100k chars):
+  on overflow the property computes to the CSS **guaranteed-invalid value**, carried by a distinct
+  marker (not the empty string) so a referencing `var()` with a fallback uses the fallback — the
+  reference renders green — while a legitimately empty custom property keeps its empty value.
+  Regression test `Acyclic_Exponential_Custom_Property_Chain_Falls_Back_Without_Exhausting_Memory`.
+- **Reentrant-cascade "Collection was modified"** (`DomBridge.CollectMatchedRuleProperties`,
+  `content-visibility-anchor-positioning`). `CollectCascadedDeclarations` iterates `_sheets` while
+  matching selectors; selector matching can call back into the bridge, which re-syncs the engine's
+  stylesheets mid-cascade (`ClearStyleSheets` + `AddStyleSheet`) when the document mutated — e.g.
+  while anchor positioning rewrites styles. Iterating a snapshot keeps the in-progress cascade
+  crash-free regardless of reentrancy.
+- **Anchor-walk "Collection was modified"** (`DomBridge.ResolveAnchorFunctions`). The recursive
+  `foreach (var child in element.Children)` over the **live** child list throws when resolution
+  mutates the DOM underneath it; snapshot the children (`.ToList()`) before recursing — same shape
+  as the prior `BuildAnchorRegistry`/`ResolveAnchorCenter` snapshot fixes.
+
+The two `Broiler.CSS` fixes and the `Broiler.HTML` fix were pushed to their `MaiRat/` remotes and
+the submodule pointers bumped; the anchor-walk snapshot is a main-repo change (active on CI
+immediately).
+
+Cluster 15 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) came out of triaging the
+`css-anchor-position` MissingContent sub-cluster. Reproducing
+`anchor-size-css-zoom` against the live renderer showed the instruction text
+("Test passes if no red is visible.") missing and every box one line-height too high — but the
+position-area / anchor-size math was correct. The cause was the **HTML tree builder**
+(`Broiler.DOM`'s `HtmlDocumentParser`): it redirected *every* character token seen before the
+body was opened into the `<head>`. Documents with an explicit `<body>` were unaffected, but the
+many WPT reftests that omit `<body>` and open with text had that leading text parked in the head,
+where it never renders — a direct `MissingContent` / content-shift signature. Fixed to match HTML
+tree construction: leading whitespace before the body stays in the head, but the first
+non-whitespace character opens the body and is inserted there. Locally flips `anchor-size-css-zoom`
+(`css-anchor-position` 25 → 26) with zero regressions on the curated suite and the CSS2 /
+css-align / css-backgrounds subsets; on CI it removes the dropped-text contributor from any
+bodyless reftest that opens with instruction text. Pushed to `MaiRat/Broiler.DOM`; pointer bumped.
+Regression guard: `HtmlDocumentParserTests.Leading_Text_Without_Body_Tag_Opens_The_Body`.
+
+> **Note on the position-area cluster.** The bulk of the remaining `css-anchor-position`
+> MissingContent failures are the genuine hard tail: the position-area **grid math is already
+> correct** (the anchor-outside `Min/Max` grid extension in `PositionArea.cs` matches the spec's
+> expected offsets), and the failures come from *compounding* advanced features — vertical
+> writing-mode position-area geometry (`position-area-percents-001` cases 2–4), inline
+> containing blocks for abspos (`position-area-inline-container`, Ahem), scroll-linked position +
+> dynamic `position-visibility` (`position-area-scrolling-*`, `position-visibility-*`), and
+> percentage inset/margin/padding in position-area cells. None is a single clean fix; each is
+> feature-depth work to be taken on individually.
+
+Cluster 16 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) came from the
+`PixelMismatch / ReferenceOverlayExposed` cluster — the runner's strongest "real paint/layout bug"
+signal (pure red showing through where the reference has none). After `background-clip-root`
+(cluster 13), two remained: `css-align/self-alignment/block-justify-self` (a large `justify-self`
+matrix, many sub-cases — left as hard-tail) and `css-anchor-position/anchor-position-borders-002`.
+Reproducing the latter showed the anchor block rendered on the **left** of its `dir="rtl"`
+scroller; it should hug the **right**, with the `anchor()`-covered target on top. Root cause was a
+**CSS2.1 §10.3.3 gap** in `Broiler.Layout`: for a block-level box with an explicit width, the
+margin resolver handled the auto-margin cases (centering, single auto margin) but **not the
+over-constrained case** (width + both margins specified). In a left-to-right CB that is harmless
+(margin-right is the ignored one and the X computation already positions by margin-left), but in a
+right-to-left CB **margin-left** is the ignored one, so the box must be re-solved against the
+right edge. Added that branch (`CssBox.PerformLayoutImp`), positioning the box from the right.
+`anchor-position-borders-002` 98.8 % → pass (`css-anchor-position` 26 → 27).
+
+The branch is deliberately **narrowly gated** to the case that is unambiguously correct and
+regression-free, after the first attempt regressed 8 `css-align/abspos` reftests: it fires only
+for a block-level box that (a) fits its CB (`remainingSpace ≥ 0`), (b) whose CB is **not** an
+abspos/fixed box (avoids feeding back into shrink-to-fit width resolution of `position:absolute`
+items, the `…-default-overflow-*` family), (c) in a **horizontal** writing-mode CB (the inline
+axis is horizontal), (d) with CB `direction:rtl`, and (e) with no concrete `justify-self`
+(which is resolved later and would otherwise be double-applied). Excluded cases (overflowing
+boxes, vertical writing modes, abspos CBs) keep Broiler's existing behaviour and are follow-up
+work. Verified: `css-align` unchanged at 15 passing, curated `Broiler.Wpt.Tests` unchanged at 67,
+zero regressions. Regression guard: `Fixed_Width_Block_In_Rtl_Container_Is_Right_Aligned`.
+
+Cluster 17 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) was the entire
+`CSS2/visudet/replaced-elements-*` family — 6 reftests of CSS 2.1 §10.4 replaced-element sizing
+(intrinsic width/height/ratio combinations under min/max constraints), all failing at the same
+~96.8 % `MissingContent`. Measuring the rendered vs reference box positions showed the colour
+boxes were the right size and x-position but each was **too high by a growing amount**
+(+~3px per line, accumulating: 4, 7, 10, 13, 16…). Each large SVG is an inline image on its own
+line; a baseline-aligned inline replaced element sits with its **bottom on the baseline**, so the
+line box must still extend below it by the strut's below-baseline descent. The inline-flow
+wrap-advance (`CssLayoutEngine.FlowBox`, `cury = maxbottom + linespacing`) took `maxbottom` from
+`InlineWordLineBoxBottom`, which for an image returns only the image bottom (the baseline) — so the
+text descent (`lineStrut · (1 − TypicalAscentRatio)`, ≈3px for a 16px font) was dropped and every
+following line started too high, the error compounding down the block. Added that descent for
+baseline-aligned image words (mirroring the inline-block path and the same fix in `CreateLineBoxes`
+for the block's own content height). Gated to baseline vertical-align so `top`/`bottom`/`middle`
+images are untouched; `Math.Max` means small images (where the strut already dominates) are
+unaffected. All 6 tests pass (CSS2 **7 → 13**); curated `Broiler.Wpt.Tests` **67 → 61** (the six
+`Wpt_ReplacedElements*_MatchesReference` are the regression guards); css-backgrounds (image-heavy),
+css-anchor-position, and css-align all unchanged — zero regressions.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
@@ -570,6 +686,42 @@ renderer and exits (no reference, no comparison, bypasses discovery). `--wpt-dir
 when given it supplies WPT fonts and wpt-root-relative resource resolution, otherwise the file
 renders standalone. Makes minimal-repro a one-liner. Tests: `Program_Render_Mode_Writes_Png_For_A_Single_File`,
 `Program_Render_Mode_Reports_Missing_File`.
+
+### ✅ #14 — Reference sanity check (committed PNG vs `rel="match"` reference HTML) (DONE)
+
+*Motivated by `css-backgrounds/background-clip/clip-border-area{,-corner-shape}`.* The subset/CI
+path (`RunTest`) compares Broiler's render against a **committed Chromium reference PNG**. When that
+PNG is itself wrong, the test fails forever no matter how correct Broiler is — and nothing
+distinguishes "Broiler bug" from "bad reference data." `clip-border-area` is exactly this: the
+committed PNG shows a **solid** blue box, but the test's own `clip-border-area-ref.html`
+(`border: 50px solid blue`, no background) renders a blue **ring with a transparent centre** (the
+`fuzzy` tolerance is ~1100px, far below the centre area), and Broiler renders the test identically
+to that ref — so Broiler is correct and the committed PNG is the outlier.
+
+- **Where**: `WptTestRunner.VerifyAgainstReferenceHtml` (opt-in via `--verify-reference` /
+  `WptTestRunner(verifyReferenceHtml:)`). On a pixel-mismatch failure it extracts the test's
+  `<link rel="match" href>` (`ExtractMatchHref`), renders that reference HTML with the same live
+  renderer, and compares it to the **already-computed test render**. If Broiler matches its own
+  reference HTML (`PixelDiffRunner.IsMatch`) it sets `WptTestResult.SuspectReference` with the
+  match % — the reftest actually passes (test ≈ ref) and the committed PNG is stale/incorrect.
+- **Specificity**: fires only when Broiler matches the reference HTML, so a genuine Broiler bug —
+  where the render matches *neither* the PNG nor the ref HTML — is not flagged (verified:
+  `position-area-inline-container`, `control-characters-001`, `abspos-in-block-…` are all left
+  unflagged; only the two `clip-border-area` tests are flagged, at 99–100 % vs their ref HTML).
+- **Cost**: off by default (one extra render per failure when enabled, failures only); best-effort
+  (any error → no flag, never throws).
+- **Surfacing**: appended to the failure `Message` (`[⚠ suspect reference: …]`, so it flows to the
+  console, Markdown, and merged issue) and emitted as `results[].suspectReference` in the JSON.
+- **Tests** (`WptTestRunnerTests`): `ExtractMatchHref_Reads_Rel_Match_Reference`,
+  `RunTest_Flags_Suspect_Reference_When_Broiler_Matches_Ref_Html_But_Not_Committed_Png`,
+  `RunTest_Does_Not_Flag_Suspect_Reference_For_A_Genuine_Mismatch`.
+
+> **Finding (issue #1140).** Run `--verify-reference` flags **2** false-negatives in the local
+> `css-backgrounds/background-clip` set — `clip-border-area` and `clip-border-area-corner-shape` —
+> where Broiler's `background-clip: border-area` rendering is **correct** (matches the reftest's
+> own reference HTML) but the committed Chromium PNGs are wrong (solid fill instead of the
+> ring/centre the ref HTML produces). These stay red until the committed references are
+> regenerated; they are **not** Broiler rendering bugs.
 
 ---
 

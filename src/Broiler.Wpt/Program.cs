@@ -59,6 +59,7 @@ public class Program
         int shardCount = 1;
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
+        bool verifyReference = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -126,6 +127,9 @@ public class Program
                     break;
                 case "--non-js":
                     nonJavaScriptOnly = true;
+                    break;
+                case "--verify-reference":
+                    verifyReference = true;
                     break;
                 case "--wpt-dir":
                 case "--reference-dir":
@@ -213,7 +217,7 @@ public class Program
         }
         Console.WriteLine();
 
-        var runner = new WptTestRunner(failureImageDir: failureImagesDir);
+        var runner = new WptTestRunner(failureImageDir: failureImagesDir, verifyReferenceHtml: verifyReference);
 
         if (!string.IsNullOrWhiteSpace(failureImagesDir))
             Console.WriteLine($"Failure images: {Path.GetFullPath(failureImagesDir)}");
@@ -1583,6 +1587,9 @@ public class Program
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
         Console.WriteLine("  --failure-images <DIR>     Save rendered/reference/diff PNGs for each failure under DIR");
+        Console.WriteLine("  --verify-reference         On each pixel-mismatch failure, also render the test's rel=match");
+        Console.WriteLine("                             reference HTML; flag failures where Broiler matches its reference");
+        Console.WriteLine("                             HTML but not the committed PNG (stale/incorrect reference, not a bug)");
         Console.WriteLine("  --render <FILE>            Render a single HTML file to a PNG and exit (no reference/compare).");
         Console.WriteLine("                             The fast 'reproduce against the live renderer' path; --wpt-dir is");
         Console.WriteLine("                             optional (supplies WPT fonts/resource resolution when given).");
