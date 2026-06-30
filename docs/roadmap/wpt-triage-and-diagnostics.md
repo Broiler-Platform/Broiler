@@ -271,6 +271,32 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
+- **`vertical-align` line-box height under negative leading (`text-top`/`text-bottom`)** —
+  🔬 **triaged, deferred (issue #1143).** `CSS2/linebox/vertical-align-negative-leading-001`
+  uses `line-height:10px; font-size:30px` (negative leading) and tests that `top`/`bottom` do
+  **not** grow the line box while `text-top`/`text-bottom` (and baseline content) **do** — the
+  reference grows containers 2/5/6 to 30/20/20px line boxes; Broiler renders them all 10px.
+  After cluster 18 (the spans now show their orange glyphs) the dominant residual is the
+  line-box height. Root cause is in `Broiler.Layout` `CssLayoutEngine.ApplyVerticalAlignment` +
+  the `InlineWordLineBoxBottom`/`InlineRectLineBoxBottom` line-height clamp:
+  1. `text-bottom` subtracts the box's **content-area (font) height** instead of its
+     **line-height box** height, so `text-bottom` collapses onto the same top as `text-top`
+     instead of sitting a content-area-height lower; both end at the content-area top and the
+     line never spans the 30px content area.
+  2. Even once `text-bottom` is repositioned, `InlineWordLineBoxBottom` clamps every inline
+     word's line-box contribution to `word.Top + line-height` (10px), so a `text-top`/`text-bottom`
+     box — which per §10.8.1 aligns to the parent **content area**, not the line-height box —
+     cannot extend the line box to the content area.
+  A correct fix is a coordinated change (line-height-box vs content-area extents under negative
+  half-leading, plus the clamp exception for `text-top`/`text-bottom`) whose glyph-position
+  effects ripple through all baseline math — high-risk in the most complex engine. A narrow
+  one-line attempt (use `box.ActualLineHeight` for the `text-bottom` subtraction) was a **no-op**
+  (the inline span's `ActualLineHeight` reads 0, so it fell back to the content height) and was
+  reverted. Needs the half-leading-aware line-box-height model done deliberately, with the
+  curated 496-suite as the regression net. Separately, the same reftest also needs Ahem glyph
+  metrics and the container-1 negative-half-leading baseline offset (Broiler renders its boxes
+  ~10px low) to fully pass.
+
 - **Abspos block-axis `align-self`** — ✅ fixed (cluster 9 above). The earlier
   "paint double-apply" diagnosis was superseded: re-reproducing against the live
   renderer showed the box was stuck at its static position (offset `dy=0`) because
