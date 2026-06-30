@@ -853,6 +853,13 @@ internal sealed class CssLayoutEngineTable
         if (_allRows.Count == 0)
             return;
 
+        // CSS2.1 §17.6.2.1: an exact tie (same width and style) favours the cell
+        // furthest to the top-left in a left-to-right table, but the top-RIGHT
+        // cell in a right-to-left table. ResolveCollapsedEdge breaks ties toward
+        // its first operand, so for a horizontal edge in an RTL table the right
+        // cell must be passed first.
+        bool rtl = string.Equals(_tableBox.Direction, "rtl", StringComparison.OrdinalIgnoreCase);
+
         // Build a column-indexed grid of real cells (a colspan cell occupies
         // every column it spans; row-span placeholders are left null).
         var grid = new List<Dictionary<int, CssBox>>(_allRows.Count);
@@ -881,9 +888,11 @@ internal sealed class CssLayoutEngineTable
             {
                 if (!cols.TryGetValue(c, out var left) || !cols.TryGetValue(c + 1, out var right) || ReferenceEquals(left, right))
                     continue;
-                var winner = ResolveCollapsedEdge(
-                    new EdgeBorder(left.BorderRightStyle, left.ActualBorderRightWidth, left.BorderRightColor),
-                    new EdgeBorder(right.BorderLeftStyle, right.ActualBorderLeftWidth, right.BorderLeftColor));
+                var leftEdge = new EdgeBorder(left.BorderRightStyle, left.ActualBorderRightWidth, left.BorderRightColor);
+                var rightEdge = new EdgeBorder(right.BorderLeftStyle, right.ActualBorderLeftWidth, right.BorderLeftColor);
+                var winner = rtl
+                    ? ResolveCollapsedEdge(rightEdge, leftEdge)
+                    : ResolveCollapsedEdge(leftEdge, rightEdge);
                 ApplyEdge(left, "right", winner);
                 SuppressEdge(right, "left");
             }

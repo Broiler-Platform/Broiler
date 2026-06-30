@@ -74,6 +74,26 @@ td { border: 5px solid green; height: 2em; width: 40px; }
     }
 
     [Fact]
+    public void TieBreak_IsDirectionAware_RtlFavoursRightCell()
+    {
+        // CSS2.1 §17.6.2.1: with equal width and style, the shared edge is won
+        // by the top-LEFT cell in an ltr table but the top-RIGHT cell in an rtl
+        // table. The first cell's red right border therefore wins (shows) in
+        // ltr but loses (is suppressed) in rtl.
+        const string markup = @"<!DOCTYPE html><html><head><style>
+table{{border-collapse:collapse;direction:{0};}}
+td{{border:5px solid black;width:40px;height:30px;}}
+#a{{border-right-color:red;}}
+</style></head><body><table><tr><td id='a'>A</td><td>B</td></tr></table></body></html>";
+
+        var (rtlRed, _) = RenderCounts(string.Format(markup, "rtl"));
+        var (ltrRed, _) = RenderCounts(string.Format(markup, "ltr"));
+
+        Assert.Equal(0, rtlRed); // rtl: the right cell wins → red suppressed.
+        Assert.True(ltrRed > 0, "ltr: the left cell wins the tie, so its red border shows");
+    }
+
+    [Fact]
     public void WiderBorder_WinsAtSharedEdge()
     {
         // Two cells sharing one edge: the right cell's wider green border must
