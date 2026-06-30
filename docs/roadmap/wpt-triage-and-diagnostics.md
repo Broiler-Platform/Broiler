@@ -687,6 +687,42 @@ when given it supplies WPT fonts and wpt-root-relative resource resolution, othe
 renders standalone. Makes minimal-repro a one-liner. Tests: `Program_Render_Mode_Writes_Png_For_A_Single_File`,
 `Program_Render_Mode_Reports_Missing_File`.
 
+### ✅ #14 — Reference sanity check (committed PNG vs `rel="match"` reference HTML) (DONE)
+
+*Motivated by `css-backgrounds/background-clip/clip-border-area{,-corner-shape}`.* The subset/CI
+path (`RunTest`) compares Broiler's render against a **committed Chromium reference PNG**. When that
+PNG is itself wrong, the test fails forever no matter how correct Broiler is — and nothing
+distinguishes "Broiler bug" from "bad reference data." `clip-border-area` is exactly this: the
+committed PNG shows a **solid** blue box, but the test's own `clip-border-area-ref.html`
+(`border: 50px solid blue`, no background) renders a blue **ring with a transparent centre** (the
+`fuzzy` tolerance is ~1100px, far below the centre area), and Broiler renders the test identically
+to that ref — so Broiler is correct and the committed PNG is the outlier.
+
+- **Where**: `WptTestRunner.VerifyAgainstReferenceHtml` (opt-in via `--verify-reference` /
+  `WptTestRunner(verifyReferenceHtml:)`). On a pixel-mismatch failure it extracts the test's
+  `<link rel="match" href>` (`ExtractMatchHref`), renders that reference HTML with the same live
+  renderer, and compares it to the **already-computed test render**. If Broiler matches its own
+  reference HTML (`PixelDiffRunner.IsMatch`) it sets `WptTestResult.SuspectReference` with the
+  match % — the reftest actually passes (test ≈ ref) and the committed PNG is stale/incorrect.
+- **Specificity**: fires only when Broiler matches the reference HTML, so a genuine Broiler bug —
+  where the render matches *neither* the PNG nor the ref HTML — is not flagged (verified:
+  `position-area-inline-container`, `control-characters-001`, `abspos-in-block-…` are all left
+  unflagged; only the two `clip-border-area` tests are flagged, at 99–100 % vs their ref HTML).
+- **Cost**: off by default (one extra render per failure when enabled, failures only); best-effort
+  (any error → no flag, never throws).
+- **Surfacing**: appended to the failure `Message` (`[⚠ suspect reference: …]`, so it flows to the
+  console, Markdown, and merged issue) and emitted as `results[].suspectReference` in the JSON.
+- **Tests** (`WptTestRunnerTests`): `ExtractMatchHref_Reads_Rel_Match_Reference`,
+  `RunTest_Flags_Suspect_Reference_When_Broiler_Matches_Ref_Html_But_Not_Committed_Png`,
+  `RunTest_Does_Not_Flag_Suspect_Reference_For_A_Genuine_Mismatch`.
+
+> **Finding (issue #1140).** Run `--verify-reference` flags **2** false-negatives in the local
+> `css-backgrounds/background-clip` set — `clip-border-area` and `clip-border-area-corner-shape` —
+> where Broiler's `background-clip: border-area` rendering is **correct** (matches the reftest's
+> own reference HTML) but the committed Chromium PNGs are wrong (solid fill instead of the
+> ring/centre the ref HTML produces). These stay red until the committed references are
+> regenerated; they are **not** Broiler rendering bugs.
+
 ---
 
 ## 3. Performance & permanence of the diagnostics hook

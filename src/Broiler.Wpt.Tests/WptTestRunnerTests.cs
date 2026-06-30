@@ -5150,6 +5150,63 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void ExtractMatchHref_Reads_Rel_Match_Reference()
+    {
+        Assert.Equal("foo-ref.html", WptTestRunner.ExtractMatchHref(
+            "<link rel=\"help\" href=\"spec\"><link rel=\"match\" href=\"foo-ref.html\">"));
+        Assert.Null(WptTestRunner.ExtractMatchHref("<link rel=\"help\" href=\"spec\">"));
+    }
+
+    [Fact]
+    public void RunTest_Flags_Suspect_Reference_When_Broiler_Matches_Ref_Html_But_Not_Committed_Png()
+    {
+        // Reference sanity check (#14): a reftest whose committed reference PNG is
+        // wrong (solid blue) but whose rel=match reference HTML renders the same as
+        // the test (a red box). With verifyReferenceHtml the runner must detect that
+        // Broiler matches its reference HTML and flag the committed PNG as the stale
+        // outlier rather than reporting a Broiler bug.
+        File.WriteAllText(Path.Combine(_tempDir, "box-ref.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+        var testFile = Path.Combine(_tempDir, "box.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><head><link rel=""match"" href=""box-ref.html""></head><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "refs-suspect");
+        Directory.CreateDirectory(refDir);
+        CreateSolidReferencePng(Path.Combine(refDir, "box.png"), new BColor(0, 0, 255, 255));
+
+        var runner = new WptTestRunner(verifyReferenceHtml: true);
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.Equal(FailureCategory.PixelMismatch, result.Category);
+        Assert.NotNull(result.SuspectReference);
+        Assert.Contains("suspect reference", result.SuspectReference!);
+    }
+
+    [Fact]
+    public void RunTest_Does_Not_Flag_Suspect_Reference_For_A_Genuine_Mismatch()
+    {
+        // Broiler's render (red) differs from BOTH the committed PNG (blue) and the
+        // rel=match reference HTML (green) → a genuine mismatch, not a stale
+        // reference, so the suspect-reference note must NOT fire.
+        File.WriteAllText(Path.Combine(_tempDir, "green-ref.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:green""></div></body></html>");
+        var testFile = Path.Combine(_tempDir, "redbox.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><head><link rel=""match"" href=""green-ref.html""></head><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "refs-genuine");
+        Directory.CreateDirectory(refDir);
+        CreateSolidReferencePng(Path.Combine(refDir, "redbox.png"), new BColor(0, 0, 255, 255));
+
+        var runner = new WptTestRunner(verifyReferenceHtml: true);
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.Equal(FailureCategory.PixelMismatch, result.Category);
+        Assert.Null(result.SuspectReference);
+    }
+
+    [Fact]
     public void RunTest_Does_Not_Save_Failure_Images_By_Default()
     {
         var testFile = Path.Combine(_tempDir, "mismatch-default.html");

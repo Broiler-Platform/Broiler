@@ -156,6 +156,17 @@ internal sealed class WptTestResult
     public string? DisplacementProfile { get; init; }
 
     /// <summary>
+    /// Reference sanity check (diagnostic #14): set when a pixel-mismatch failure
+    /// against the committed reference PNG is accompanied by Broiler's own render
+    /// matching the test's <c>rel="match"</c> reference <em>HTML</em>. That pairing
+    /// means Broiler renders the reftest correctly (test ≈ ref) and the committed
+    /// PNG is the outlier — the failure is a stale/incorrect reference, not a
+    /// Broiler bug. Null when the check was not run, no <c>rel="match"</c>
+    /// reference exists, or Broiler does not match the reference HTML.
+    /// </summary>
+    public string? SuspectReference { get; init; }
+
+    /// <summary>
     /// <c>check-layout-th.js</c> geometry assertions whose computed value diverged
     /// from the test's <c>data-offset-*</c> / <c>data-expected-*</c> attribute, with
     /// the expected and actual values. Null/empty when the test carries no such
@@ -280,6 +291,9 @@ internal sealed class WptTestResult
                 ["assert"] = Assertion,
             };
         }
+
+        if (SuspectReference is not null)
+            obj["suspectReference"] = SuspectReference;
 
         return obj;
     }
@@ -642,12 +656,15 @@ internal sealed class WptTestRunner
     private readonly int _width;
     private readonly int _height;
     private readonly string? _failureImageDir;
+    private readonly bool _verifyReferenceHtml;
 
-    public WptTestRunner(int width = 1024, int height = 768, string? failureImageDir = null)
+    public WptTestRunner(int width = 1024, int height = 768, string? failureImageDir = null,
+        bool verifyReferenceHtml = false)
     {
         _width = width;
         _height = height;
         _failureImageDir = failureImageDir;
+        _verifyReferenceHtml = verifyReferenceHtml;
     }
 
     /// <summary>
@@ -1048,6 +1065,7 @@ internal sealed class WptTestRunner
     private static readonly Regex LinkTagPattern = new(@"<link\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MetaTagPattern = new(@"<meta\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelHelpPattern = new(@"\brel\s*=\s*[""']?\s*help\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RelMatchPattern = new(@"\brel\s*=\s*[""']?\s*match\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameAssertPattern = new(@"\bname\s*=\s*[""']?\s*assert\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex HrefValuePattern = new(@"\bhref\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex ContentValuePattern = new(@"\bcontent\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1087,6 +1105,67 @@ internal sealed class WptTestRunner
         return new TestMetadata(
             helpLinks.Count > 0 ? helpLinks : null,
             assertions.Count > 0 ? string.Join(" / ", assertions) : null);
+    }
+
+    /// <summary>
+    /// Extracts the first <c>&lt;link rel="match" href="…"&gt;</c> target — the
+    /// reftest's reference HTML — or null when the test is not a rel=match reftest.
+    /// </summary>
+    internal static string? ExtractMatchHref(string html)
+    {
+        foreach (Match link in LinkTagPattern.Matches(html))
+        {
+            if (!RelMatchPattern.IsMatch(link.Value))
+                continue;
+            if (TryExtractAttributeValue(HrefValuePattern, link.Value, out var href))
+                return href;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Reference sanity check (diagnostic #14). When a test fails its committed
+    /// reference-PNG comparison, render the test's own <c>rel="match"</c> reference
+    /// HTML and compare it to the already-computed test render. If Broiler matches
+    /// its reference HTML, the reftest actually passes (test ≈ ref) and the
+    /// committed PNG is the stale/incorrect outlier — return a note saying so.
+    /// Returns null when there is no rel=match reference, it cannot be resolved or
+    /// rendered, or Broiler does not match it. Best-effort: never throws.
+    /// </summary>
+    private string? VerifyAgainstReferenceHtml(string testPath, string html, string? wptRoot, BBitmap testRender)
+    {
+        try
+        {
+            var href = ExtractMatchHref(html);
+            if (string.IsNullOrWhiteSpace(href))
+                return null;
+
+            // Strip any fragment/query and resolve relative to the test file
+            // (a root-relative "/foo" maps under the WPT root).
+            href = href.Split('#', '?')[0].Trim();
+            if (href.Length == 0)
+                return null;
+
+            string refPath = href.StartsWith("/", StringComparison.Ordinal) && wptRoot != null
+                ? Path.GetFullPath(Path.Combine(wptRoot, href.TrimStart('/')))
+                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testPath)!, href));
+            if (!File.Exists(refPath))
+                return null;
+
+            using var refRender = RenderHtmlFileBitmap(refPath, wptRoot);
+            using var diff = PixelDiffRunner.Compare(testRender, refRender);
+            if (!diff.IsMatch)
+                return null;
+
+            double pct = (1.0 - diff.DiffRatio) * 100;
+            return $"⚠ suspect reference: Broiler matches its rel=match reference HTML " +
+                   $"({pct:F1}%) but not the committed reference PNG — the committed reference " +
+                   "is likely stale/incorrect, not a Broiler bug";
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool TryExtractAttributeValue(Regex pattern, string tag, out string value)
@@ -1375,6 +1454,17 @@ internal sealed class WptTestRunner
                 if (displacementProfile != null)
                     message = $"{message} [{displacementProfile}]";
 
+                // Reference sanity check (#14): when the committed PNG comparison
+                // fails, optionally render the test's own rel=match reference HTML
+                // and see whether Broiler's render actually matches it. If it does,
+                // the committed PNG — not Broiler — is the outlier (stale/incorrect
+                // reference), which we surface so triage doesn't chase a non-bug.
+                string? suspectReference = _verifyReferenceHtml
+                    ? VerifyAgainstReferenceHtml(testPath, html, wptRoot, rendered)
+                    : null;
+                if (suspectReference != null)
+                    message = $"{message} [{suspectReference}]";
+
                 // Capture rendered / reference / diff PNGs for visual triage (#6).
                 var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
 
@@ -1387,6 +1477,7 @@ internal sealed class WptTestRunner
                     Category = FailureCategory.PixelMismatch,
                     MismatchDiagnostics = diagnostics,
                     DisplacementProfile = displacementProfile,
+                    SuspectReference = suspectReference,
                     LayoutAssertionFailures = layoutAssertionFailures,
                     RenderedImagePath = images.Rendered,
                     ReferenceImagePath = images.Reference,
