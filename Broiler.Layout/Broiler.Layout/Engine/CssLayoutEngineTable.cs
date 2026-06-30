@@ -671,9 +671,15 @@ internal sealed class CssLayoutEngineTable
         double maxBottom = 0f;
         int currentrow = 0;
 
+        // CSS2.1 §17.5.3: record each laid-out row's natural top/bottom so a
+        // specified table height greater than the content height can be
+        // distributed across the rows afterwards.
+        var rowBounds = new List<(CssBox Row, double Top, double Bottom)>();
+
         for (int i = 0; i < _allRows.Count; i++)
         {
             var row = _allRows[i];
+            double rowTop = cury;
 
             // CSS2.1 §17.5.5: Rows with visibility:collapse are hidden and do
             // not contribute height.  Column widths are still affected (handled
@@ -761,10 +767,15 @@ internal sealed class CssLayoutEngineTable
                 continue;
             }
 
+            rowBounds.Add((row, rowTop, maxBottom));
             cury = maxBottom + GetVerticalSpacing();
 
             currentrow++;
         }
+
+        // CSS2.1 §17.5.3: when the table's specified height exceeds the height
+        // the rows naturally occupy, distribute the surplus over the rows.
+        maxBottom = DistributeExtraTableHeight(g, rowBounds, starty, maxBottom);
 
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
@@ -777,6 +788,67 @@ internal sealed class CssLayoutEngineTable
         _tableBox.Size = new SizeF(
             (float)(_tableBox.ActualRight - _tableBox.Location.X),
             (float)(_tableBox.ActualBottom - _tableBox.Location.Y));
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.5.3: "If the 'table' or 'inline-table' element's height is
+    /// specified [and greater than the sum of the row heights], the row heights
+    /// are increased so they sum to the specified height." Broiler sizes the
+    /// table purely from content, so an explicit table height was ignored
+    /// (every CSS2 tables reftest sets <c>height:2in</c>). Distribute the
+    /// surplus equally over the in-flow rows: shift each row down by the surplus
+    /// already added above it and grow its (non-row-spanning) cells. Returns the
+    /// updated <paramref name="naturalBottom"/>. No-op when the height is auto
+    /// or the rows already exceed it, so auto-height tables are unchanged.
+    /// </summary>
+    private double DistributeExtraTableHeight(
+        ILayoutEnvironment g, List<(CssBox Row, double Top, double Bottom)> rowBounds,
+        double starty, double naturalBottom)
+    {
+        if (rowBounds.Count == 0)
+            return naturalBottom;
+        if (string.IsNullOrEmpty(_tableBox.Height) || _tableBox.Height == CssConstants.Auto)
+            return naturalBottom;
+
+        // Resolve the specified height against the containing block (percentages
+        // need a definite basis; fall back to no-op when unavailable).
+        double cbHeight = _tableBox.ContainingBlock?.ActualHeight ?? 0;
+        double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, _tableBox.GetEmHeight());
+        if (double.IsNaN(specHeight) || specHeight <= 0)
+            return naturalBottom;
+
+        // Target bottom for the row area = table top + specified content height.
+        // ClientTop already includes the table's top border/padding; the bottom
+        // border/spacing is added by the caller, so target the row content box.
+        double specBottom = _tableBox.Location.Y + specHeight
+            - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
+        double surplus = specBottom - naturalBottom;
+        if (surplus <= 0.5)
+            return naturalBottom;
+
+        double perRow = surplus / rowBounds.Count;
+        double shift = 0;
+        foreach (var (row, top, bottom) in rowBounds)
+        {
+            foreach (var cell in row.Boxes)
+            {
+                if (cell is CssSpacingBox || GetRowSpan(cell) != 1)
+                {
+                    // Spanned cells: just shift; their height is governed by the
+                    // last spanned row. Conservative for this increment.
+                    cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
+                    continue;
+                }
+                cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
+                double newBottom = bottom + shift + perRow;
+                cell.ActualBottom = newBottom;
+                cell.Size = new SizeF(cell.Size.Width, (float)(newBottom - cell.Location.Y));
+                CssLayoutEngine.ApplyCellVerticalAlignment(g, cell);
+            }
+            shift += perRow;
+        }
+
+        return naturalBottom + surplus;
     }
 
     private double GetSpannedMinWidth(CssBox row, CssBox cell, int realcolindex, int colspan)
