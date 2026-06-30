@@ -251,6 +251,76 @@ internal static class CssBoxHelper
     }
 
     /// <summary>
+    /// CSS Text 3 §4.1.1: collapsible white space at the very start of a
+    /// formatting context's first line and the very end of its last line is
+    /// removed.  Broiler carries a collapsed space as word-spacing on the
+    /// neighbouring word (<c>HasSpaceBefore</c>/<c>HasSpaceAfter</c>), so the
+    /// preferred-width sum in <see cref="GetMinMaxSumWords"/> double-counts the
+    /// leading space-before of <paramref name="box"/>'s first content word and
+    /// the trailing space-after of its last word.  Returns the total of those
+    /// two edge spacings (in CSS px) so the caller can subtract them from the
+    /// shrink-to-fit width; a box that begins/ends on a real word (no edge
+    /// space) contributes nothing.
+    /// </summary>
+    internal static double EdgeWhitespaceSpacing(CssBox box)
+    {
+        double sum = 0;
+
+        var first = FirstContentWord(box);
+        if (first != null && first.HasSpaceBefore && !first.IsImage && first.OwnerBox != null)
+            sum += first.OwnerBox.ActualWordSpacing;
+
+        var last = LastContentWord(box);
+        if (last != null && last.HasSpaceAfter && !last.IsImage && last.OwnerBox != null)
+            sum += last.OwnerBox.ActualWordSpacing;
+
+        return sum > 0 ? sum : 0;
+    }
+
+    /// <summary>
+    /// Returns the first word in document order within <paramref name="box"/>'s
+    /// in-flow inline content, or <c>null</c> if it has none.  Out-of-flow
+    /// children (<c>display:none</c>) do not form the inline edge.
+    /// </summary>
+    private static CssRect FirstContentWord(CssBox box)
+    {
+        if (box.Words.Count > 0)
+            return box.Words[0];
+
+        foreach (CssBox child in box.Boxes)
+        {
+            if (child.Display == CssConstants.None)
+                continue;
+            var w = FirstContentWord(child);
+            if (w != null)
+                return w;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the last word in document order within <paramref name="box"/>'s
+    /// in-flow inline content, or <c>null</c> if it has none.
+    /// </summary>
+    private static CssRect LastContentWord(CssBox box)
+    {
+        if (box.Words.Count > 0)
+            return box.Words[box.Words.Count - 1];
+
+        for (int i = box.Boxes.Count - 1; i >= 0; i--)
+        {
+            if (box.Boxes[i].Display == CssConstants.None)
+                continue;
+            var w = LastContentWord(box.Boxes[i]);
+            if (w != null)
+                return w;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// CSS2.1 §9.5.2: Returns the maximum bottom outer edge of preceding
     /// floats that the given box needs to clear, considering the box's
     /// <c>clear</c> direction (<c>left</c>, <c>right</c>, or <c>both</c>).
