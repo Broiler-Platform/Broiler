@@ -88,8 +88,12 @@ internal sealed class CssLayoutEngineTable
         // get the table boxes into the proper fields
         AssignBoxKinds(baseUrl);
 
-        // Insert EmptyBoxes for vertical cell spanning. 
+        // Insert EmptyBoxes for vertical cell spanning.
         InsertEmptyBoxes(baseUrl);
+
+        // CSS2.1 §17.6.2.1: resolve conflicting borders at each shared cell edge
+        // before sizing, so the used (winning) border widths drive cell layout.
+        ResolveCollapsedBorders();
 
         // Determine Row and Column Count, and ColumnWidths
         var availCellSpace = CalculateCountAndWidth();
@@ -786,6 +790,151 @@ internal sealed class CssLayoutEngineTable
         }
 
         return w;
+    }
+
+    // CSS2.1 §17.6.2.1 border-conflict-resolution priority of border styles
+    // (most → least): hidden (handled separately) > double > solid > dashed >
+    // dotted > ridge > outset > groove > inset > none.
+    private static readonly Dictionary<string, int> BorderStyleRank = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["double"] = 8, ["solid"] = 7, ["dashed"] = 6, ["dotted"] = 5,
+        ["ridge"] = 4, ["outset"] = 3, ["groove"] = 2, ["inset"] = 1, ["none"] = 0,
+    };
+
+    private readonly record struct EdgeBorder(string Style, double Width, string Color);
+
+    /// <summary>
+    /// CSS2.1 §17.6.2.1: resolves the single border that the
+    /// <c>border-collapse:collapse</c> model paints at a shared edge between two
+    /// cells. <c>hidden</c> suppresses the edge entirely; otherwise the wider
+    /// border wins, then the higher-priority style, then (for an exact tie) the
+    /// first operand — the spec's earlier-in-tree-order cell. <c>none</c> / zero
+    /// width always loses.
+    /// </summary>
+    private static EdgeBorder ResolveCollapsedEdge(EdgeBorder a, EdgeBorder b)
+    {
+        bool aHidden = string.Equals(a.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase);
+        bool bHidden = string.Equals(b.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase);
+        if (aHidden || bHidden)
+            return new EdgeBorder(CssConstants.Hidden, 0, string.Empty);
+
+        bool aNone = a.Width <= 0.01 || string.IsNullOrEmpty(a.Style) || string.Equals(a.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        bool bNone = b.Width <= 0.01 || string.IsNullOrEmpty(b.Style) || string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        if (aNone && bNone)
+            return new EdgeBorder(CssConstants.None, 0, string.Empty);
+        if (aNone) return b;
+        if (bNone) return a;
+
+        if (Math.Abs(a.Width - b.Width) > 0.01)
+            return a.Width > b.Width ? a : b;
+
+        int ra = BorderStyleRank.GetValueOrDefault(a.Style, 0);
+        int rb = BorderStyleRank.GetValueOrDefault(b.Style, 0);
+        if (ra != rb)
+            return ra > rb ? a : b;
+
+        return a; // exact tie → the earlier (left/top) cell, per tree order.
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.6.2.1: in the collapsing-borders model adjacent cells share a
+    /// single border. Broiler paints each cell's own borders, so resolve every
+    /// internal shared edge to one winner: assign it to the left/top cell and
+    /// suppress the right/bottom cell's matching edge, so the edge is painted
+    /// once with the winning style/width/colour (and not at all when a
+    /// <c>hidden</c> border wins). Outer edges keep the cell's own border (the
+    /// table-vs-cell resolution is a follow-up). Cells spanning rows/columns
+    /// (EmptyBox placeholders) are skipped — a conservative no-op for now.
+    /// </summary>
+    private void ResolveCollapsedBorders()
+    {
+        if (!string.Equals(_tableBox.BorderCollapse, CssConstants.Collapse, StringComparison.OrdinalIgnoreCase))
+            return;
+        if (_allRows.Count == 0)
+            return;
+
+        // Build a column-indexed grid of real cells (a colspan cell occupies
+        // every column it spans; row-span placeholders are left null).
+        var grid = new List<Dictionary<int, CssBox>>(_allRows.Count);
+        foreach (var row in _allRows)
+        {
+            var cols = new Dictionary<int, CssBox>();
+            foreach (var cell in row.Boxes)
+            {
+                if (cell.Display != CssConstants.TableCell)
+                    continue;
+                int col = GetCellRealColumnIndex(row, cell);
+                int span = GetColSpan(cell);
+                for (int k = 0; k < span; k++)
+                    cols[col + k] = cell;
+            }
+            grid.Add(cols);
+        }
+
+        // Horizontal internal edges: left cell's right border vs right cell's left.
+        foreach (var cols in grid)
+        {
+            if (cols.Count == 0) continue;
+            int maxCol = 0;
+            foreach (var c in cols.Keys) if (c > maxCol) maxCol = c;
+            for (int c = 0; c < maxCol; c++)
+            {
+                if (!cols.TryGetValue(c, out var left) || !cols.TryGetValue(c + 1, out var right) || ReferenceEquals(left, right))
+                    continue;
+                var winner = ResolveCollapsedEdge(
+                    new EdgeBorder(left.BorderRightStyle, left.ActualBorderRightWidth, left.BorderRightColor),
+                    new EdgeBorder(right.BorderLeftStyle, right.ActualBorderLeftWidth, right.BorderLeftColor));
+                ApplyEdge(left, "right", winner);
+                SuppressEdge(right, "left");
+            }
+        }
+
+        // Vertical internal edges: top cell's bottom border vs bottom cell's top.
+        for (int r = 0; r + 1 < grid.Count; r++)
+        {
+            foreach (var (col, top) in grid[r])
+            {
+                if (!grid[r + 1].TryGetValue(col, out var bottom) || ReferenceEquals(top, bottom))
+                    continue;
+                var winner = ResolveCollapsedEdge(
+                    new EdgeBorder(top.BorderBottomStyle, top.ActualBorderBottomWidth, top.BorderBottomColor),
+                    new EdgeBorder(bottom.BorderTopStyle, bottom.ActualBorderTopWidth, bottom.BorderTopColor));
+                ApplyEdge(top, "bottom", winner);
+                SuppressEdge(bottom, "top");
+            }
+        }
+    }
+
+    private static void ApplyEdge(CssBox cell, string side, EdgeBorder b)
+    {
+        // A hidden/none winner paints nothing at this edge.
+        bool paints = b.Width > 0.01
+            && !string.Equals(b.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+        if (!paints)
+        {
+            SuppressEdge(cell, side);
+            return;
+        }
+        string w = b.Width.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        switch (side)
+        {
+            case "right": cell.BorderRightStyle = b.Style; cell.BorderRightWidth = w; cell.BorderRightColor = b.Color; break;
+            case "left": cell.BorderLeftStyle = b.Style; cell.BorderLeftWidth = w; cell.BorderLeftColor = b.Color; break;
+            case "bottom": cell.BorderBottomStyle = b.Style; cell.BorderBottomWidth = w; cell.BorderBottomColor = b.Color; break;
+            case "top": cell.BorderTopStyle = b.Style; cell.BorderTopWidth = w; cell.BorderTopColor = b.Color; break;
+        }
+    }
+
+    private static void SuppressEdge(CssBox cell, string side)
+    {
+        switch (side)
+        {
+            case "right": cell.BorderRightStyle = CssConstants.None; cell.BorderRightWidth = "0"; break;
+            case "left": cell.BorderLeftStyle = CssConstants.None; cell.BorderLeftWidth = "0"; break;
+            case "bottom": cell.BorderBottomStyle = CssConstants.None; cell.BorderBottomWidth = "0"; break;
+            case "top": cell.BorderTopStyle = CssConstants.None; cell.BorderTopWidth = "0"; break;
+        }
     }
 
     private static int GetCellRealColumnIndex(CssBox row, CssBox cell)
