@@ -229,10 +229,13 @@ render **no red**; the tie-break (first/left-top operand wins) is correct for LT
 logical-column ordering — RTL. **Follow-ups:** outer **table-vs-cell** and **row/col-group** edge
 resolution, exact collapsed-border **geometry** (half-border centring + cell/table shrink) — the
 current pass fixes which border *wins* and its colour, not sub-pixel placement; **spanned cells**
-(rowspan/colspan placeholders) are skipped (conservative no-op); and the **RTL** tie-break
-(`border-conflict-element-002`, `direction:rtl`) still leaves ~40px of red — the `rtl` table's
-cell grid / vertical-edge neighbour lookup needs the direction-aware ordering, an isolated edge
-case deferred to avoid RTL-specific regression risk. No local pixel reference
+(rowspan/colspan placeholders) are skipped (conservative no-op); and the **RTL** tie-break (`direction:rtl`) — ✅ **now fixed**: a tie favours the top-RIGHT cell in
+an rtl table, so the horizontal-edge resolver passes the right cell first to `ResolveCollapsedEdge`
+when the table is rtl (verified ltr↔rtl flip on a minimal table; `border-conflict-element-002` red
+40→24, the residual being the deferred outer table-vs-cell corner — that cell's own border legitimately
+wins against the table's absent border, so the corner needs the outer-edge model *and* the
+`height:2in`-on-empty-collapse-cells sizing, both still open). Zero curated regressions; guard
+`CollapsedBorderConflictTests.TieBreak_IsDirectionAware_*`. No local pixel reference
 for these `.xht` tests, so verification used the "no red / winning colour present" heuristic + the
 curated suite.
 
