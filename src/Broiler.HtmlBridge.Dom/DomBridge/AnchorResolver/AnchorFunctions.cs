@@ -146,7 +146,11 @@ public sealed partial class DomBridge
             ResolveAnchorSizeFunctions(element, cssProps, anchorRegistry);
         }
 
-        foreach (var child in element.Children)
+        // Snapshot the child list: resolving anchor functions on a descendant can
+        // mutate the live DOM (e.g. anchor-driven style/structure changes under
+        // content-visibility), and iterating the live collection while it changes
+        // throws "Collection was modified" (WPT content-visibility-anchor-positioning).
+        foreach (var child in element.Children.ToList())
             ResolveAnchorFunctions(child, anchorRegistry);
     }
     private static bool IsLayoutProperty(string prop) => prop switch

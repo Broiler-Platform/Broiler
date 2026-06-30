@@ -28,6 +28,48 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 10 | `@position-try` fallback dropped by comment-in-body parse bug | 🟡 partial | Broiler.HtmlBridge.Dom |
 | 11 | HTML comments split inline white-space runs → spurious space, content shift | ✅ fixed | Broiler.HtmlBridge.Dom |
 | 12 | `<br>` after an inline-block adds a spurious empty line + anon-block drops inline-block margin | ✅ fixed | Broiler.Layout (+ Broiler.HTML patch) |
+| 13 | Multi-layer root background image dropped on the canvas (`background: url(), color`) | ✅ fixed | Broiler.HTML |
+| 14 | `var()` exponential-blowup OOM + reentrant-cascade / anchor-walk "Collection was modified" crashes | ✅ fixed | Broiler.CSS + Broiler.HtmlBridge.Dom |
+
+Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
+`css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
+match, all red**). Root cause was **not** `background-clip`: a root element whose background has
+multiple layers (`html { background: url(green.png), red; }`) stores its per-layer image handles
+as an `object?[]`, but `PaintWalker.EmitCanvasBackground` passed that whole array straight to
+`DrawTiledImageItem.ImageHandle` — which the rasterizer cannot draw, so the green image layer
+silently vanished and only the canvas colour (red) showed through (the test's failure overlay).
+Fixed by normalizing the handles (`NormalizeBackgroundImageHandles`) and emitting one
+`DrawTiledImageItem` per image layer, bottom-most first, each with its own
+`background-repeat`/`-position` — mirroring the normal element paint path. Verified locally:
+`background-clip-root` 0 % → 99.7 %, `css-backgrounds` 38 → 39 passing, zero regressions. (The
+remaining ~17 local `css-backgrounds/background-clip` failures are the font-metric / texture
+sub-pixel fidelity tail — the rendered boxes and clip regions match Chromium; the glyph widths
+differ — not a paint bug.)
+
+Cluster 14 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) collects the three
+**exception-signature** crashes, each gating one test:
+- **`var()` exponential blowup → OOM** (`css-variables/variable-exponential-blowup`,
+  `CssStyleEngine.BuildResolvedCustomPropertyMap` *Insufficient memory*). A non-cyclic chain where
+  each custom property references the one below it twice expands exponentially (billion-laughs);
+  cycle detection (the #1136 fix) does not catch it. Bounded the substituted length (100k chars):
+  on overflow the property computes to the CSS **guaranteed-invalid value**, carried by a distinct
+  marker (not the empty string) so a referencing `var()` with a fallback uses the fallback — the
+  reference renders green — while a legitimately empty custom property keeps its empty value.
+  Regression test `Acyclic_Exponential_Custom_Property_Chain_Falls_Back_Without_Exhausting_Memory`.
+- **Reentrant-cascade "Collection was modified"** (`DomBridge.CollectMatchedRuleProperties`,
+  `content-visibility-anchor-positioning`). `CollectCascadedDeclarations` iterates `_sheets` while
+  matching selectors; selector matching can call back into the bridge, which re-syncs the engine's
+  stylesheets mid-cascade (`ClearStyleSheets` + `AddStyleSheet`) when the document mutated — e.g.
+  while anchor positioning rewrites styles. Iterating a snapshot keeps the in-progress cascade
+  crash-free regardless of reentrancy.
+- **Anchor-walk "Collection was modified"** (`DomBridge.ResolveAnchorFunctions`). The recursive
+  `foreach (var child in element.Children)` over the **live** child list throws when resolution
+  mutates the DOM underneath it; snapshot the children (`.ToList()`) before recursing — same shape
+  as the prior `BuildAnchorRegistry`/`ResolveAnchorCenter` snapshot fixes.
+
+The two `Broiler.CSS` fixes and the `Broiler.HTML` fix were pushed to their `MaiRat/` remotes and
+the submodule pointers bumped; the anchor-walk snapshot is a main-repo change (active on CI
+immediately).
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
