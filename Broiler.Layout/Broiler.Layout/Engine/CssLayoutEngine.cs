@@ -313,6 +313,27 @@ internal static class CssLayoutEngine
                     continue;
 
                 maxBottom = Math.Max(maxBottom, InlineWordLineBoxBottom(word));
+
+                // CSS2.1 §10.8: a baseline-aligned inline replaced element (image)
+                // sits with its bottom on the baseline, so the line box still
+                // extends below it by the strut's below-baseline descent.
+                // InlineWordLineBoxBottom returns only the image bottom (the
+                // baseline), so add that descent here — mirroring the inline-block
+                // path above. Without it, a line whose height is set by a tall
+                // image drops the text descent and every following line creeps up
+                // (CSS2 visudet/replaced-elements-*).
+                if (word.IsImage
+                    && (word.OwnerBox == null
+                        || string.IsNullOrEmpty(word.OwnerBox.VerticalAlign)
+                        || word.OwnerBox.VerticalAlign == CssConstants.Baseline))
+                {
+                    double lineStrut = blockBox.ActualLineHeight > 0
+                        ? blockBox.ActualLineHeight
+                        : blockBox.ActualFont.Height * PtToCssPx;
+                    maxBottom = Math.Max(maxBottom,
+                        word.Bottom + lineStrut * (1.0 - TypicalAscentRatio));
+                }
+
                 minTop = Math.Min(minTop, word.Top);
             }
 
@@ -613,6 +634,25 @@ internal static class CssLayoutEngine
 
                     maxRight = Math.Max(maxRight, word.Right);
                     maxbottom = Math.Max(maxbottom, InlineWordLineBoxBottom(word));
+
+                    // CSS2.1 §10.8: a baseline-aligned inline replaced element
+                    // (image) sits with its bottom on the baseline, so the line
+                    // box still extends below it by the strut's below-baseline
+                    // descent. InlineWordLineBoxBottom returns only the image
+                    // bottom (the baseline); without adding that descent the next
+                    // wrapped line starts too high and the error accumulates down
+                    // the block (CSS2 visudet/replaced-elements-*).
+                    if (word.IsImage
+                        && (word.OwnerBox == null
+                            || string.IsNullOrEmpty(word.OwnerBox.VerticalAlign)
+                            || word.OwnerBox.VerticalAlign == CssConstants.Baseline))
+                    {
+                        double lineStrut = blockbox.ActualLineHeight > 0
+                            ? blockbox.ActualLineHeight
+                            : blockbox.ActualFont.Height * PtToCssPx;
+                        maxbottom = Math.Max(maxbottom,
+                            word.Bottom + lineStrut * (1.0 - TypicalAscentRatio));
+                    }
 
                     if (b.Position == CssConstants.Absolute)
                     {

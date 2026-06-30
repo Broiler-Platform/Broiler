@@ -32,6 +32,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 14 | `var()` exponential-blowup OOM + reentrant-cascade / anchor-walk "Collection was modified" crashes | ✅ fixed | Broiler.CSS + Broiler.HtmlBridge.Dom |
 | 15 | Leading text dropped in documents without a `<body>` tag (`MissingContent` contributor) | ✅ fixed | Broiler.DOM |
 | 16 | Fixed-width block not right-aligned in an RTL containing block (CSS2.1 §10.3.3 over-constrained margins) | ✅ fixed | Broiler.Layout |
+| 17 | Line box drops the strut descent below a baseline-aligned inline image → following lines creep up | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -124,6 +125,25 @@ axis is horizontal), (d) with CB `direction:rtl`, and (e) with no concrete `just
 boxes, vertical writing modes, abspos CBs) keep Broiler's existing behaviour and are follow-up
 work. Verified: `css-align` unchanged at 15 passing, curated `Broiler.Wpt.Tests` unchanged at 67,
 zero regressions. Regression guard: `Fixed_Width_Block_In_Rtl_Container_Is_Right_Aligned`.
+
+Cluster 17 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140)) was the entire
+`CSS2/visudet/replaced-elements-*` family — 6 reftests of CSS 2.1 §10.4 replaced-element sizing
+(intrinsic width/height/ratio combinations under min/max constraints), all failing at the same
+~96.8 % `MissingContent`. Measuring the rendered vs reference box positions showed the colour
+boxes were the right size and x-position but each was **too high by a growing amount**
+(+~3px per line, accumulating: 4, 7, 10, 13, 16…). Each large SVG is an inline image on its own
+line; a baseline-aligned inline replaced element sits with its **bottom on the baseline**, so the
+line box must still extend below it by the strut's below-baseline descent. The inline-flow
+wrap-advance (`CssLayoutEngine.FlowBox`, `cury = maxbottom + linespacing`) took `maxbottom` from
+`InlineWordLineBoxBottom`, which for an image returns only the image bottom (the baseline) — so the
+text descent (`lineStrut · (1 − TypicalAscentRatio)`, ≈3px for a 16px font) was dropped and every
+following line started too high, the error compounding down the block. Added that descent for
+baseline-aligned image words (mirroring the inline-block path and the same fix in `CreateLineBoxes`
+for the block's own content height). Gated to baseline vertical-align so `top`/`bottom`/`middle`
+images are untouched; `Math.Max` means small images (where the strut already dominates) are
+unaffected. All 6 tests pass (CSS2 **7 → 13**); curated `Broiler.Wpt.Tests` **67 → 61** (the six
+`Wpt_ReplacedElements*_MatchesReference` are the regression guards); css-backgrounds (image-heavy),
+css-anchor-position, and css-align all unchanged — zero regressions.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
