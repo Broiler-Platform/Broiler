@@ -223,10 +223,16 @@ once with the winning style/width/colour (or not at all when `hidden` wins). Ver
 `border-conflict-{w,width,style}-00x.xht` now render **no red** with the winning borders painted
 (e.g. `border-conflict-w-001` red 260 → 0, lime 996 → 753 after dedup); the curated
 `Broiler.Wpt.Tests` suite has **zero regressions**. Regression guards:
-`CollapsedBorderConflictTests`. **Follow-ups:** outer **table-vs-cell** and **row/col-group** edge
-resolution, and exact collapsed-border **geometry** (half-border centring + cell/table shrink) —
-the current pass fixes which border *wins* and its colour, not sub-pixel placement; and **spanned
-cells** (rowspan/colspan placeholders) are skipped (conservative no-op). No local pixel reference
+`CollapsedBorderConflictTests`. **Validated broadly** by fetching the `border-conflict-element-*`
+family: `-001` and `-003`…`-008` (cell-vs-cell tie-break *and* the row/column-origin cases) all
+render **no red**; the tie-break (first/left-top operand wins) is correct for LTR *and* — by the
+logical-column ordering — RTL. **Follow-ups:** outer **table-vs-cell** and **row/col-group** edge
+resolution, exact collapsed-border **geometry** (half-border centring + cell/table shrink) — the
+current pass fixes which border *wins* and its colour, not sub-pixel placement; **spanned cells**
+(rowspan/colspan placeholders) are skipped (conservative no-op); and the **RTL** tie-break
+(`border-conflict-element-002`, `direction:rtl`) still leaves ~40px of red — the `rtl` table's
+cell grid / vertical-edge neighbour lookup needs the direction-aware ordering, an isolated edge
+case deferred to avoid RTL-specific regression risk. No local pixel reference
 for these `.xht` tests, so verification used the "no red / winning colour present" heuristic + the
 curated suite.
 
