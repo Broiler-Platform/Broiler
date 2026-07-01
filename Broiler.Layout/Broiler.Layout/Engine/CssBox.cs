@@ -635,7 +635,7 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// their horizontal size (no glyph rotation yet — Stage 2), so this is
     /// positionally correct for square fonts and an approximation otherwise.
     /// </summary>
-    private void ApplyVerticalWritingModeFlow()
+    internal void ApplyVerticalWritingModeFlow()
     {
         // Capture the root's logical origin and block extent (its logical
         // height) before any coordinate is rewritten.  For vertical-rl the
@@ -657,8 +657,15 @@ internal class CssBox : CssBoxProperties, IDisposable
         // physical position by the abspos self-alignment (which aligns using the
         // post-rotation physical extents), so this shift would override it — keep
         // blockOffset 0 and rotate the content in place.
+        //
+        // An inline-block (or other inline-level) vertical root is positioned by
+        // the inline formatting context (FlowInlineBlock places it on the line),
+        // not block-aligned within its containing block, so it is likewise
+        // rotated in place — shifting it right would tear it off the line.
         double blockOffset = 0;
         if (mirror && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && Display != CssConstants.InlineBlock
+            && Display != "inline-flex" && Display != "inline-grid"
             && ContainingBlock is { } cb)
         {
             double cbContentRight = cb.Location.X + cb.Size.Width
@@ -760,6 +767,16 @@ internal class CssBox : CssBoxProperties, IDisposable
         foreach (var child in box.Boxes)
         {
             if (child.Display == CssConstants.None)
+                continue;
+            // Out-of-flow descendants are excluded from the rotation: an
+            // absolutely/fixed-positioned box is placed in *physical* space by
+            // the abspos self-alignment (which is already writing-mode aware and,
+            // per WillBeVerticalTransposed, treats abspos boxes as not
+            // transposed). Rotating it here would apply the transform twice and
+            // tear it away from its resolved position (WPT css-align/abspos
+            // *-default-overflow-vrl-* regressed when an inline-block vertical
+            // container began rotating its abspos children).
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
             TransformVerticalSubtree(child, rootX, rootY, blockExtent, mirror, blockOffset, isRoot: false);
         }
@@ -2525,7 +2542,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (alignKw is "center" or "end" or "flex-end" or "self-end" or "right"
                     or "start" or "flex-start" or "self-start" or "left")
                 {
-                    bool containerVertical = IsVerticalWritingMode(ParentBox.WritingMode);
+                    // When the box will be rotated by the vertical-flow transform
+                    // (WillBeVerticalTransposed), layout is happening in the logical
+                    // (horizontal) frame, so justify-self is applied along the
+                    // logical inline axis (X) here and the transform rotates it onto
+                    // the physical vertical axis. Only when the transform is NOT in
+                    // play (prototype disabled) does a vertical container require a
+                    // direct physical-Y shift.
+                    bool containerVertical = IsVerticalWritingMode(ParentBox.WritingMode)
+                        && !WillBeVerticalTransposed();
                     double boxSize = containerVertical
                         ? ActualBottom - Location.Y
                         : ActualRight - Location.X;
