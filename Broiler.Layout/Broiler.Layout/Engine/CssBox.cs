@@ -635,7 +635,7 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// their horizontal size (no glyph rotation yet — Stage 2), so this is
     /// positionally correct for square fonts and an approximation otherwise.
     /// </summary>
-    private void ApplyVerticalWritingModeFlow()
+    internal void ApplyVerticalWritingModeFlow()
     {
         // Capture the root's logical origin and block extent (its logical
         // height) before any coordinate is rewritten.  For vertical-rl the
@@ -657,8 +657,15 @@ internal class CssBox : CssBoxProperties, IDisposable
         // physical position by the abspos self-alignment (which aligns using the
         // post-rotation physical extents), so this shift would override it — keep
         // blockOffset 0 and rotate the content in place.
+        //
+        // An inline-block (or other inline-level) vertical root is positioned by
+        // the inline formatting context (FlowInlineBlock places it on the line),
+        // not block-aligned within its containing block, so it is likewise
+        // rotated in place — shifting it right would tear it off the line.
         double blockOffset = 0;
         if (mirror && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && Display != CssConstants.InlineBlock
+            && Display != "inline-flex" && Display != "inline-grid"
             && ContainingBlock is { } cb)
         {
             double cbContentRight = cb.Location.X + cb.Size.Width
@@ -760,6 +767,16 @@ internal class CssBox : CssBoxProperties, IDisposable
         foreach (var child in box.Boxes)
         {
             if (child.Display == CssConstants.None)
+                continue;
+            // Out-of-flow descendants are excluded from the rotation: an
+            // absolutely/fixed-positioned box is placed in *physical* space by
+            // the abspos self-alignment (which is already writing-mode aware and,
+            // per WillBeVerticalTransposed, treats abspos boxes as not
+            // transposed). Rotating it here would apply the transform twice and
+            // tear it away from its resolved position (WPT css-align/abspos
+            // *-default-overflow-vrl-* regressed when an inline-block vertical
+            // container began rotating its abspos children).
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
             TransformVerticalSubtree(child, rootX, rootY, blockExtent, mirror, blockOffset, isRoot: false);
         }
@@ -2507,6 +2524,79 @@ internal class CssBox : CssBoxProperties, IDisposable
             && (IsBlock || Display == CssConstants.ListItem)
             && ParentBox != null)
         {
+            // CSS Box Alignment §5.3 + §6.1: an explicit overflow-alignment
+            // keyword (safe/unsafe) on a block-level box. Unlike the legacy
+            // path below, this handles the containing block's inline axis when
+            // it is VERTICAL (writing-mode: vertical-*) — where justify-self
+            // shifts the box along Y — and it honours overflow: `safe` clamps
+            // to start when the box is larger than the alignment container,
+            // while `unsafe` keeps the requested edge (allowing a negative
+            // shift past the start edge). The keyword-less path is left
+            // untouched below to avoid perturbing existing block layout.
+            string rawJs = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
+            if (rawJs.StartsWith("safe ", StringComparison.Ordinal)
+                || rawJs.StartsWith("unsafe ", StringComparison.Ordinal))
+            {
+                bool explicitSafe = rawJs.StartsWith("safe ", StringComparison.Ordinal);
+                string alignKw = StripSafeUnsafe(rawJs);
+                if (alignKw is "center" or "end" or "flex-end" or "self-end" or "right"
+                    or "start" or "flex-start" or "self-start" or "left")
+                {
+                    // When the box will be rotated by the vertical-flow transform
+                    // (WillBeVerticalTransposed), layout is happening in the logical
+                    // (horizontal) frame, so justify-self is applied along the
+                    // logical inline axis (X) here and the transform rotates it onto
+                    // the physical vertical axis. Only when the transform is NOT in
+                    // play (prototype disabled) does a vertical container require a
+                    // direct physical-Y shift.
+                    bool containerVertical = IsVerticalWritingMode(ParentBox.WritingMode)
+                        && !WillBeVerticalTransposed();
+                    double boxSize = containerVertical
+                        ? ActualBottom - Location.Y
+                        : ActualRight - Location.X;
+                    double marginStart = containerVertical ? ActualMarginTop : ActualMarginLeft;
+                    double marginEnd = containerVertical ? ActualMarginBottom : ActualMarginRight;
+                    // The vertical inline-axis extent must come from ActualHeight
+                    // (the resolved content height), not ClientRectangle.Height:
+                    // block-axis geometry resolves bottom-up, so the container's
+                    // ActualBottom — and thus ClientRectangle.Height — is still 0
+                    // when its in-flow child is being aligned.
+                    double containerSize = containerVertical
+                        ? ParentBox.ActualHeight
+                        : ParentBox.ClientRectangle.Width;
+                    double axisFree = containerSize - boxSize - marginStart - marginEnd;
+
+                    // 'safe' falls back to 'start' when the box overflows.
+                    if (explicitSafe && axisFree < 0)
+                        alignKw = "start";
+
+                    bool selfRtl = Direction == "rtl";
+                    bool cbRtl = ParentBox?.Direction == "rtl";
+                    double d = alignKw switch
+                    {
+                        "center" => axisFree / 2,
+                        "end" or "flex-end" => cbRtl ? 0 : axisFree,
+                        "self-end" => selfRtl ? 0 : axisFree,
+                        "right" => axisFree,
+                        "start" or "flex-start" => cbRtl ? axisFree : 0,
+                        "self-start" => selfRtl ? axisFree : 0,
+                        _ => 0, // left
+                    };
+
+                    if (Math.Abs(d) > 0.5)
+                    {
+                        if (containerVertical)
+                            OffsetTop(d);
+                        else
+                            OffsetLeft(d);
+                    }
+                }
+                // The keyword-less legacy path below is a no-op for an explicit
+                // safe/unsafe value ("safe end" etc. is not a concrete keyword,
+                // so it resolves to null there); fall through so any
+                // position:relative offset later in this method still applies.
+            }
+
             string js = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
             if (js == "auto")
                 js = ParentBox.JustifyItems?.Trim().ToLowerInvariant() ?? "normal";

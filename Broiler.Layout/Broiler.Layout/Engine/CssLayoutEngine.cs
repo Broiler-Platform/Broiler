@@ -1014,19 +1014,39 @@ internal static class CssLayoutEngine
         b.ActualBottom = b.Location.Y + ibHeight;
         b.Size = new SizeF(b.Size.Width, (float)ibHeight);
 
+        // --- Rotate a vertical writing-mode inline-block into physical space ---
+        // An inline-block that is a vertical writing-mode root lays its content
+        // out in the logical (horizontal) frame here (its Width/Height already
+        // report the swapped logical extents via WillBeVerticalTransposed).
+        // Unlike a block-level root, it never passes through CssBox.PerformLayout,
+        // so the post-layout rotation was skipped and its content stayed in the
+        // logical frame (e.g. a vertical-rl block child left-aligned instead of
+        // block-start/right aligned). Rotate it in place now — its inline
+        // position on the line is already correct — then advance the line by the
+        // box's *physical* border-box width (Size.Width after the swap), which
+        // differs from the logical ibBoxWidth for non-square boxes.
+        double physicalBoxWidth = ibBoxWidth;
+        if (VerticalFlowPrototype.Enabled
+            && CssBox.IsVerticalWritingMode(b.WritingMode)
+            && (b.ParentBox == null || !CssBox.IsVerticalWritingMode(b.ParentBox.WritingMode)))
+        {
+            b.ApplyVerticalWritingModeFlow();
+            physicalBoxWidth = b.Size.Width;
+        }
+
         // --- Register the inline-block as a rectangle in the line box ---
         line.Rectangles[b] = new RectangleF(b.Location.X, b.Location.Y,
-            (float)ibBoxWidth, (float)ibHeight);
+            (float)physicalBoxWidth, (float)(b.ActualBottom - b.Location.Y));
 
         // --- Advance flow position ---
         // curx has leftspacing (margin+border+padding) already added.
         // After the inline-block, set curx so that after rightspacing
         // (margin+border+padding right) is added, we end up at the
         // right margin edge of the box.
-        curx = ibBorderLeft + ibBoxWidth
+        curx = ibBorderLeft + physicalBoxWidth
             - b.ActualBorderRightWidth - b.ActualPaddingRight;
 
-        maxRight = Math.Max(maxRight, ibBorderLeft + ibBoxWidth);
+        maxRight = Math.Max(maxRight, ibBorderLeft + physicalBoxWidth);
         maxbottom = Math.Max(maxbottom, b.ActualBottom + b.ActualMarginBottom);
     }
 
