@@ -170,6 +170,13 @@ jobs:
         env:
           SUBSET: ${{ github.event.inputs.subset || '' }}
           RERUN_FAILED: ${{ needs.plan.outputs.rerun-failed }}
+          # Match Chromium's reference generator, which screenshots at `load` before
+          # any promise_test body runs: skip executing stub promise_test bodies in
+          # Broiler's runner so post-load layout mutations (scrollTo, display toggling)
+          # in the css-anchor-position scroll cluster do not advance the captured DOM
+          # past the reference point. Affects only the C# runner, not the (Chromium)
+          # reference generation. Revert by removing this line if it regresses tests.
+          BROILER_WPT_DEFER_PROMISE_TESTS: '1'
         run: |
           # The regular WPT suite executes JavaScript in both Chromium and
           # Broiler. --non-js remains available only for explicit local runs.

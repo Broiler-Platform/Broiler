@@ -125,6 +125,9 @@ public class Program
                     }
 
                     break;
+                case "--defer-promise-tests":
+                    WptTestRunner.DeferPromiseTests = true;
+                    break;
                 case "--non-js":
                     nonJavaScriptOnly = true;
                     break;
@@ -1621,6 +1624,9 @@ public class Program
         Console.WriteLine("  --shard-count <N>          Split discovered tests into N deterministic shards (default: 1)");
         Console.WriteLine("  --shard-index <I>          Run only shard I (0-based), or -1 for all shards (default: -1)");
         Console.WriteLine("  --non-js                   Exclude JavaScript-dependent documents (Broiler.HTML WPT policy)");
+        Console.WriteLine("  --defer-promise-tests      Do not run stub promise_test bodies before the snapshot, matching");
+        Console.WriteLine("                             Chromium's reference generator (captures at load). Fixes the");
+        Console.WriteLine("                             css-anchor-position scroll cluster. Env: BROILER_WPT_DEFER_PROMISE_TESTS=1");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
