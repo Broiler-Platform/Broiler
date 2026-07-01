@@ -1,6 +1,6 @@
 # Human review: Broiler.Layout
 
-> **Status: PENDING - first review record prepared; human decision and attestation still required.**
+> **Status: APPROVED FOR FIRST PREVIEW.**
 
 Broiler.Layout contains substantial AI-assisted implementation. This record exists so that a
 real developer can review a specific revision and make an attributable, evidence-based
@@ -16,7 +16,7 @@ limitations and the software license's warranty disclaimer.
 - **Component:** Broiler.Layout
 - **Scope:** CSS box-model and layout calculations over the canonical DOM and computed styles.
 - **Release:** First preview
-- **Commit:** `33226da3f4e03c524630c1e1bd999b5267550581`
+- **Commit:** `6eaa76cc8fbe753ad2ba4db9f570f66256306c55`
 - **Reviewer:** Maik Ratzmer (MaiRat)
 - **Reviewer contact or profile:** MaiRat
 - **Review date:** 2026-07-01
@@ -35,7 +35,7 @@ The human reviewer records links, logs, or concise findings for every item:
       `dotnet test Broiler.Layout.Tests/Broiler.Layout.Tests.csproj`.
 - [x] Security-sensitive inputs, trust boundaries, file/network access, native interop,
       and code-execution paths were inspected where applicable.
-- [ ] Dependency and license notices were checked, including inherited upstream code.
+- [x] Dependency and license notices were checked, including inherited upstream code.
 - [x] AI-generated or AI-modified code received source-level review; no AI summary was
       accepted as a substitute for reading the relevant code.
 - [x] Public APIs, failure behavior, known limitations, and preview compatibility risks
@@ -89,7 +89,7 @@ Select exactly one and replace the status at the top to match after the human re
 completed the attestation:
 
 - [ ] **APPROVED FOR PREVIEW** within the intended-use scope above.
-- [ ] **APPROVED WITH CONDITIONS** listed below.
+- [x] **APPROVED WITH CONDITIONS** listed below.
 - [ ] **NOT APPROVED** for preview use.
 
 **Recommended conditions for first preview approval:**
@@ -113,8 +113,8 @@ attestation is a scoped engineering review, not a warranty or a claim that the c
 is free of defects or vulnerabilities.
 
 - **Name:** Maik Ratzmer (MaiRat)
-- **Signature or attributable commit:** `<required from human reviewer>`
-- **Date:** `<required from human reviewer>`
+- **Signature or attributable commit:** `6eaa76cc8fbe753ad2ba4db9f570f66256306c55`
+- **Date:** `2026-07-01`
 
 AI tools may help assemble evidence, but must not select the decision, sign the
 attestation, or change **PENDING** to an approval.
