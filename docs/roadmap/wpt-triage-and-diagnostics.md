@@ -38,6 +38,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 20 | Collapsed-border conflict resolution (`border-collapse`) unimplemented — losing borders (red) still painted at shared edges | ✅ fixed | Broiler.Layout |
 | 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
 | 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
+| 23 | `css-anchor-position` full-suite run (#1163, 227 fails) — triaged tail; scroll-offset tracking for `anchor()` across scrollers implemented | 🟡 partial | Broiler.HtmlBridge.Dom |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -291,6 +292,187 @@ isolation, and uses an empty explicit-width inline-block the fix cannot touch). 
 `Broiler.Layout`; guard `TableCellWhitespaceTests` (fails without the fix at +11px). **Follow-up:**
 the same edge-whitespace model now applies to inline-blocks/floats with padded content, which were
 similarly over-wide; not separately surveyed here.
+
+Cluster 23 (issue [#1163](https://github.com/Broiler-Platform/Broiler/issues/1163)) is the first CI
+run of the **full `css-anchor-position` suite** (497 tests, 270 pass, **227 fail — every failure in
+this one directory**). The report headline (`PixelMismatch / MissingContent` 160, plus
+`ReferenceOverlayExposed` 39, `ColorShift` 18, `LayoutShift` 10) reads like one systematic bug;
+triage shows the opposite — the 227 spread across **125 test families** (largest single family 15),
+a heterogeneous long tail of *advanced anchor-positioning features* and sub-pixel/font fidelity,
+**not a regression and not one fix.** The mature 8-step resolver
+(`src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/`) is correct for the base cases (270 pass);
+the failures are feature depth Broiler has not built yet. Reproduce any test locally with the
+runner's single-file mode — `dotnet run --project src/Broiler.Wpt -c Release -- --render <FILE>
+--render-out <PNG>` — and set `BROILER_WPT_DEFER_PROMISE_TESTS=1` (or `--defer-promise-tests`) to
+match CI. Findings by bucket:
+
+- **Scroll-driven positioning — ~54 tests, the single largest lever.** `anchor-scroll-position-try`
+  (15), `anchor-scroll-update` (7), `scroll-to-anchored-fixed` (7), `position-area-scrolling` (6),
+  `anchor-scroll` (4), `anchor-scroll-chained` (4), `anchor-scroll-to-sticky` (4),
+  `anchor-scroll-fixedpos` (3), `position-visibility-anchors-visible-chained` (4). These need the
+  anchored element to track its anchor's *live scroll offset* and re-evaluate `position-visibility`
+  as the anchor scrolls in/out of the scrollport — a scroll-linked recompute Broiler does
+  statically. **Note the `promise_test` interaction:** these tests set the scroll/redisplay state in
+  post-load `promise_test` bodies; Chromium's reference generator screenshots at `load`, *before*
+  they run, so CI already runs with `BROILER_WPT_DEFER_PROMISE_TESTS=1` (cluster/PR #1159) to match.
+  Confirmed the mechanism: `position-area-scrolling-001` renders **nothing** for the 9 anchored
+  cells when the bodies run (the `scrollTo`+`display:none/block` toggle drops them), but jumps
+  **84 % → 98.5 %** with the bodies deferred — so on CI it is already a *sub-pixel grid-cell gap*
+  (~2 px on the inter-cell borders), **not** MissingContent. The `-003` variant stays failing because
+  it wraps the whole test in `<iframe srcdoc>` (see below), not because of scroll.
+
+  **✅ First increment landed — `anchor()` scroll-offset tracking across scrollers.** Reproducing the
+  canonical `anchor-scroll-001` (anchor inside a scroller, `#outer-anchored` a sibling *of* the
+  scroller anchored into it) exposed **two** independent defects, isolated with `--render` +
+  debug instrumentation:
+  1. **Missing intervening scroll offset (fixed).** `ResolveAnchorFunctions` resolved `anchor()`
+     against the anchor's *unscrolled* layout position and only compensated for the document scroll
+     of **fixed** targets — a nested scroll container between the anchor and the target was ignored,
+     so the target stayed pinned to the anchor's unscrolled position. Added
+     `ComputeInterveningScrollOffset(anchorEl, targetEl)` (`AnchorFunctions.cs`): it accumulates the
+     scroll offset of every scroll container that is an ancestor of the anchor but **not** of the
+     target (stopping at the first scroller that contains the target — that one scrolls both, or is
+     the target's CB), scaled to match `ApplyScrollSimulation` under an active visual viewport, and
+     folds it into the existing `scrollAdj`. The target-*inside*-scroller case is unchanged (it is
+     shifted by `ApplyScrollSimulation` with its subtree). **Additive and narrowly scoped:** the
+     offset is 0 whenever no scroller separates anchor and target, so it can only move boxes that
+     currently render at the wrong (unscrolled) position — no currently-passing config changes.
+     Verified on a controlled block-anchor repro (target tracks anchor from unscrolled (200,300) to
+     scrolled (50,200)); **zero regressions** on the 39-test local `css-anchor-position` subset
+     (28 pass, unchanged) and the curated anchor/position/scroll unit tests (the 13 pre-existing
+     `CssomView`/font-tail failures are identical with the change stashed). Guard:
+     `AnchorScrollTrackingTests.OuterAnchored_TracksAnchorScrolledPositionAcrossScroller`
+     (fails at `left=200` without the fix, passes at `left≈50` with it). Main-repo, active on CI.
+  2. **Inline-anchor box geometry (investigated — needs real layout, deferred).** The whole
+     `anchor-scroll-{001-007}` / `anchor-scroll-update-*` family uses an **inline** `<span>` anchor
+     that follows a 500 px inline-block on the same line, with Ahem metrics. `ComputeElementBox`
+     (`AnchorRegistry.cs`) mis-estimates it: it treats the span as block (width = CB width = 1000
+     instead of the ~120 px text run), gets height 0 (no line-box height), and — critically —
+     computes `Left = 0` because `ComputePrecedingSiblingHeights` accumulates only *vertical* stacking,
+     never the width of preceding **inline** siblings + collapsed whitespace. So the anchor's rect is
+     `L=0 W=1000 H=0` (should be `L=520 W=120 H=20`: 500 px inline-block + one Ahem space + "anchor"
+     = 6×20). Even with (1) correct the anchored boxes land wrong (the inner one off-screen at
+     x≈−450). **Probed three geometry sources for the anchor's rect, none works at registry time:**
+     the coarse `ComputeElementBox` and the richer `GetBoundingClientRectForDomElement` estimator both
+     return `L=0` (neither models inline horizontal flow past an inline-block) with a crude ~10 px/char
+     width (`W=60`, not Ahem's 120); the real-layout `SharedLayoutGeometryProvider`
+     (`UseSharedLayoutGeometry`) returns `0,0,0,0` because its snapshot is keyed by the *render tree's*
+     `DomElement` instances, which differ from the bridge elements the resolver holds. And there is no
+     reusable C# text-measurement in the bridge (only the JS canvas `measureText`), so a registry-level
+     estimate would be font-inaccurate (the 10 px/char fallback) and whitespace-fragile — it would miss
+     the 99 % pixel gate *and* add regression surface to the mature registry (28 local anchor passes).
+     **Correct fix is architectural:** source the anchor rect from real layout. **✅ Now built (see
+     increment 3 below).**
+
+  3. **Render-tree↔bridge element bridging (built — behind the `UseSharedLayoutGeometry` flag).**
+     Investigating the mapping showed the *element* bridging already works: `GetRenderDocument()`
+     returns the **live** `_document`, so `SharedLayoutGeometryProvider.GetGeometry` lays that document
+     out and keys the result by the very `DomElement` instances the resolver holds (probe:
+     `map.Count=19, contains-anchor=True`). The real gap was two-fold, now fixed:
+     - **Inline boxes recorded zero geometry.** `HtmlContainerInt.CollectLayoutGeometry` (Broiler.HTML)
+       recorded `box.Bounds` per element, but an inline box lays out as one rect per line box, so its
+       `Bounds`/`Location` are unset → an inline anchor came back `0,0,0,0`. Fixed to reconstruct the
+       border box from the union of the per-line `Rectangles`. Delivered as
+       `patches/0001-broiler-html-inline-layout-geometry.patch` (the `MaiRat/Broiler.HTML` remote is
+       outside session scope → push 403 → patch, pointer unchanged). After it the anchor reports its
+       real rect `L=520 T=500 W=120 H=23` (500 px inline-block + one Ahem space + 6×20 "anchor").
+       *Ahem note:* the runner only loads `/fonts/ahem.css` when `--wpt-dir` is passed — omit it and
+       inline text falls back to a proportional font, throwing off any Ahem geometry check.
+     - **The resolver did not consult real layout.** `AnchorRegistry.ComputeElementBox` now calls
+       `TryGetAnchorLayoutBox` first: it pulls the anchor's border box from the shared snapshot and
+       converts document coords to the estimator's containing-block-relative frame (subtracting the
+       CB's border-box origin), falling back to the estimator when the geometry is absent. Gated behind
+       `DomBridge.UseSharedLayoutGeometry` (default **off**), so CI is a no-op until the flag + patch
+       land — zero regression (local 28 anchor passes, shared-geometry parity 7/7 unchanged). Guard:
+       `AnchorScrollTrackingTests.OuterAnchored_TracksAnchorScrolledPosition_WithSharedLayoutGeometry`
+       (block anchor, flag on — CI-safe against the un-patched submodule).
+
+     With the flag on + patch applied, `anchor()` now resolves to the **spec-correct** insets for the
+     canonical `anchor-scroll-001` (inner `left=520, bottom=500`; outer `left=70, top=223` — exactly
+     the reference's intent, `520−450 scroll = 70`), and the controlled block-anchor scroll repro
+     renders pixel-correct.
+
+  4. **Downstream render defect — abspos content double-applied its inset (fixed, main-repo).** Even
+     with (1)–(3) correct, `outer-anchored` painted at ~(140,455) though its resolved style was
+     `left:70; top:223` — exactly **2×**. Bisected with explicit-inset repros to a **pre-existing**
+     core-layout bug independent of anchor positioning: `<div style="position:absolute;left:100px;
+     top:150px">HELLO</div>` paints its text at (200,300). The box *origin* (border/background) is
+     correct; only its **inline content** doubles, and only on **auto-sized** axes (explicit width/
+     height are fine — which is why most abspos tests never hit it, but auto-sized anchored labels do).
+     Root cause: `CssLayoutEngine.FlowBox` ends every abspos box with `AdjustAbsolutePosition(box,0,0)`,
+     which adds the box's `left`/`top` to each word — correct for an abspos child positioned at its
+     parent's inline cursor (static position), but a **double** when the box flows its own content and
+     `PerformLayoutImp` already advanced its `Location` to the final `left`/`top` (words flow from
+     `startx = Location.X`). Fixed with an `AbsposLocationFinalized` flag set when `PerformLayoutImp`
+     repositions the box, gating out the redundant `AdjustAbsolutePosition` only then — so native form
+     controls (which keep their static `Location` and rely on the adjustment) are unaffected. The
+     narrow `box != blockbox` first cut regressed one native-button multiline-sizing test; the flag
+     approach fixes that. Main-repo (`Broiler.Layout`), **active on CI**. Verified: the anchor-scroll
+     structure repro now paints `outer` at (70,223); the full curated `Broiler.Wpt.Tests` suite has
+     **zero new failures** (457 pass; the `AdjustAbsolutePosition` change is net-negative-one after the
+     guard). Guard: `AbsposAutoSizeContentTests.AbsposAutoSizedInlineContent_RendersAtInset_NotDoubled`
+     (fails at `left≈200` without the fix).
+
+     With all four increments the `anchor-scroll-*` family's auto-sized anchored labels resolve to the
+     correct insets **and** paint at the correct position. **Validated end-to-end:** with the patch
+     applied and the flag on locally, `anchor-scroll-001` rendered against its reference matches at
+     **99.72 %** (2 240 / 786 432 px differ — text-edge anti-aliasing), clearing the 99 % gate. On CI,
+     (1) and (4) are live now; (2)/(3) activate once the Broiler.HTML patch is applied and
+     `UseSharedLayoutGeometry` is enabled.
+- **Multicol containing blocks — 16 tests.** `anchor-position-multicol` (13) +
+  `anchor-position-multicol-colspan` (3). Blocked on the same real multicol fragmentation engine as
+  the deferred `css-align/align-content-block` cluster — an abspos anchor/target inside a multicol
+  column needs true track/column geometry Broiler approximates. Deferred behind multicol.
+- **Transforms — 11 tests (`transform-{N}`).** Anchor whose ancestor chain carries 2D/3D transforms
+  (`transform-005` uses `rotate3d` + `preserve-3d`); the anchor rect must be resolved in the
+  transformed coordinate space. Needs transform-aware anchor geometry.
+- **Shadow DOM — `position-anchor-002` et al.** Broiler renders the declarative `<#shadow-root>`
+  markers as **literal text** and does no cross-boundary anchor resolution — Shadow DOM is
+  unimplemented on this path. Feature-sized.
+- **`<iframe srcdoc>` nested browsing context — `position-area-scrolling-003`.** The grid lives in an
+  `srcdoc` iframe; Broiler paints only the empty iframe border. Nested-context rendering gap.
+- **Grid-area containing block — `position-try-grid-001`.** Same block noted in the position-try
+  checklist: an abspos grid item's CB is its grid area, worthwhile only once grid tracks actually lay
+  out. Deferred behind flex/grid.
+- **Inline containing block for abspos / inline anchor — `position-area-inline-container`,
+  `position-area-abs-inline-container`, `position-area-percents-001` (3).** These anchor a
+  `position-area` grid to an **inline** (Ahem `XXX`) anchor inside an inline containing block. The
+  render-tree bridging (increment 3 above) helps materially — with the patch + flag the inline anchor
+  now reports its real rect, lifting all three from ~93–94 % to **~96 %** (the anchor text and the
+  cyan cell land correctly). The residual ~4 % is the **position-area grid geometry for an inline
+  anchor / inline CB**: the blue cells are still placed on the wrong grid lines (the cell rects are
+  computed against an approximate CB, not the inline anchor's line box). That is the deferred
+  "inline containing blocks for abspos" position-area work (`PositionArea.cs`) — a separate increment
+  from the geometry bridging, now unblocked by it.
+- **`anchor-center` safe / RTL — `anchor-center-safe-rtl`, `anchor-center-overflow` (5).** The
+  anchored elements collapse to the origin (overlapping text) — `anchor-center` with `safe`/overflow
+  clamping and RTL is not resolving. Advanced position-area centering.
+- **Inline anchors + Ahem + `check-layout` — `anchor-position-inline` (4).** `anchor()` against an
+  inline (`<span>`) anchor, asserted by `check-layout-th.js` with Ahem metrics — the inline
+  static-position + font-metric tail (same shape as the deferred cluster-3 inline-parent variant).
+- **`last-successful-*` / `position-try` cascade / `try-tactic` — `position-try-fallbacks` (4),
+  `position-try` (3), `position-anchor` (5).** The stateful "last successful position option" and
+  cascade-origin interactions already tracked as open in the position-try sub-task checklist.
+- **Sub-pixel / font tail (near-pass).** `position-visibility-anchors-valid` (98.6 %),
+  `position-visibility-remove-anchors-visible` (98.4 %), `position-area-percents-001` /
+  `position-area-inline-container` / `position-area-abs-inline-container` /
+  `position-area-anchor-partially-outside` (93–94 %). Broiler's geometry matches Chromium to a few
+  px; the residual is border anti-aliasing, Ahem glyph metrics, and 50 %-of-cell box placement — the
+  same low-yield fidelity tail flagged for other directions. No local pixel win without touching the
+  mature position-area path (regression-risky, and only 39 anchor tests are in the local checkout to
+  net against).
+
+**Recommendation / status.** The scroll-driven lever is being worked: increment (1) above
+(cross-scroller `anchor()` scroll-offset tracking) is **landed and guarded**. Increment (3), the
+**render-tree↔bridge bridging** that gives the resolver real-layout anchor geometry (inline flow +
+font metrics), is **built** — the Broiler.HTML inline-geometry patch plus the flag-gated
+`TryGetAnchorLayoutBox` wiring — and verified to make `anchor()` resolve to the spec-correct insets
+for the `anchor-scroll-*` family. The **next** increment is the *downstream rendering* defect that
+now blocks those tests: an abspos sibling of a scroll-simulated container is painted at ~2× its
+resolved inset (scroll-simulation / abspos-layout path, not anchor geometry). After that, enable
+`UseSharedLayoutGeometry` once the parity gate confirms it. The remaining buckets (multicol,
+transforms, Shadow DOM, iframe srcdoc, grid tracks, sub-pixel tail) stay filed against the existing
+deferred items rather than chased as a cluster.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that

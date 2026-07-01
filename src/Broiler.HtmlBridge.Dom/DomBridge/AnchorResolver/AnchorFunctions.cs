@@ -95,8 +95,24 @@ public sealed partial class DomBridge
                     // are still shifted by scroll simulation and need adjustment.
                     bool anchorIsFixed = anchor.SourceElement != null &&
                         GetComputedProps(anchor.SourceElement).GetValueOrDefault("position") == "fixed";
-                    double adjY = anchorIsFixed ? 0 : scrollAdjY;
-                    double adjX = anchorIsFixed ? 0 : scrollAdjX;
+
+                    // Scroll-driven positioning (CSS Anchor Positioning § scroll):
+                    // an anchored element must track its anchor's *scrolled* position.
+                    // When a scroll container is an ancestor of the anchor but NOT of
+                    // the target (the target lives outside that scroller, e.g. a fixed
+                    // or sibling-of-scroller abspos box), the anchor's edges shift by
+                    // that scroller's scroll offset while the target does not — so the
+                    // resolved inset must subtract it. Scrollers that contain the target
+                    // too move both together and are skipped. (The target-inside-scroller
+                    // case is handled separately by ApplyScrollSimulation, which shifts
+                    // the target's own subtree.)
+                    double nestedX = 0, nestedY = 0;
+                    if (!anchorIsFixed && anchor.SourceElement != null)
+                        ComputeInterveningScrollOffset(
+                            anchor.SourceElement, element, out nestedX, out nestedY);
+
+                    double adjY = anchorIsFixed ? 0 : scrollAdjY + nestedY;
+                    double adjX = anchorIsFixed ? 0 : scrollAdjX + nestedX;
 
                     double rawValue = edge switch
                     {
@@ -152,6 +168,50 @@ public sealed partial class DomBridge
         // throws "Collection was modified" (WPT content-visibility-anchor-positioning).
         foreach (var child in element.Children.ToList())
             ResolveAnchorFunctions(child, anchorRegistry);
+    }
+    /// <summary>
+    /// Accumulates the scroll offset of scroll containers that lie between the
+    /// anchor and the target — i.e. that are ancestors of <paramref name="anchorEl"/>
+    /// but do not also contain <paramref name="targetEl"/>. Such a scroller moves the
+    /// anchor (and its edges) but not the target, so an anchored element positioned
+    /// against it must subtract this offset to stay pinned to the anchor's scrolled
+    /// position. The walk stops at the first scroller that also contains the target
+    /// (that scroller scrolls both, or is the target's containing block). The offset
+    /// is scaled to match <c>ApplyScrollSimulation</c> under an active visual viewport.
+    /// </summary>
+    private void ComputeInterveningScrollOffset(
+        DomElement anchorEl, DomElement targetEl, out double offX, out double offY)
+    {
+        offX = 0;
+        offY = 0;
+        var scale = GetScrollSimulationScaleFactor();
+        for (var el = anchorEl.Parent; el != null; el = el.Parent)
+        {
+            var props = GetComputedProps(el);
+            if (!HasOverflowClipping(props))
+                continue;
+
+            // The target lives inside this scroller too → they scroll together
+            // (or this scroller is the target's containing block); no separation.
+            if (IsDescendantOrSelf(targetEl, el))
+                break;
+
+            if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
+                offX += slv * scale;
+            if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
+                offY += stv * scale;
+        }
+    }
+    /// <summary>
+    /// True when <paramref name="node"/> is <paramref name="ancestor"/> or a
+    /// descendant of it.
+    /// </summary>
+    private static bool IsDescendantOrSelf(DomElement node, DomElement ancestor)
+    {
+        for (var cur = node; cur != null; cur = cur.Parent)
+            if (cur == ancestor)
+                return true;
+        return false;
     }
     private static bool IsLayoutProperty(string prop) => prop switch
     {

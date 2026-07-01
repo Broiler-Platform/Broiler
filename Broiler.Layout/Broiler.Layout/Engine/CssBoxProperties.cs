@@ -409,6 +409,16 @@ internal abstract class CssBoxProperties
     public string MaxWidth { get; set; } = "none";
     public string MinWidth { get; set; } = "0";
     internal bool IsMinWidthSpecified { get; set; }
+    /// <summary>
+    /// True when this absolutely/fixed-positioned box has already had its
+    /// <see cref="CssBoxProperties.Location"/> advanced to its final CSS
+    /// <c>left</c>/<c>top</c> offset by the positioning pass, so its inline
+    /// content flows at that final origin. <c>AdjustAbsolutePosition</c> must then
+    /// NOT re-add the offset (it would double it). Boxes whose Location stays at
+    /// the static position (e.g. native form controls) keep this false and still
+    /// rely on <c>AdjustAbsolutePosition</c>.
+    /// </summary>
+    internal bool AbsposLocationFinalized { get; set; }
     public string Height
     {
         get => ResolvePhysicalSize(_height, isWidth: false);

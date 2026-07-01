@@ -39,6 +39,19 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
 
+        // Prefer the renderer's real layout for the anchor rect when the shared
+        // geometry path is active (RF-BRIDGE-1b). The CSS-property estimator below
+        // cannot model inline flow — an inline anchor after an inline-block, or with
+        // real font metrics, is mis-sized/mis-placed (see AnchorScroll* / the
+        // css-anchor-position anchor-scroll cluster). Real layout gets the inline
+        // border box exactly; convert its document coords to the anchor's
+        // containing-block-relative frame (the estimator's convention) so downstream
+        // anchor() resolution is unchanged. Falls through to the estimator whenever
+        // the geometry is unavailable (flag off, detached, no box) — so this is a
+        // no-op unless UseSharedLayoutGeometry is enabled.
+        if (TryGetAnchorLayoutBox(element, out var layoutBox))
+            return layoutBox;
+
         double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
         double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
 
@@ -166,6 +179,55 @@ public sealed partial class DomBridge
         }
 
         return new AnchorInfo(accTop, accLeft, width, height);
+    }
+    /// <summary>
+    /// Tries to source the anchor's box from the renderer's real layout
+    /// (RF-BRIDGE-1b), returning it in the same containing-block-relative frame the
+    /// CSS-property estimator uses. This is the accurate path for inline anchors
+    /// (inline flow + font metrics), which the estimator cannot model. Returns
+    /// <c>false</c> — so the caller falls back to the estimator — whenever the shared
+    /// geometry path is disabled (<see cref="UseSharedLayoutGeometry"/>, the default)
+    /// or the element produced no usable box, keeping this a no-op until the parity
+    /// gate enables real-layout geometry.
+    /// </summary>
+    private bool TryGetAnchorLayoutBox(DomElement element, out AnchorInfo box)
+    {
+        box = default!;
+        if (!UseSharedLayoutGeometry)
+            return false;
+        if (!TryGetSharedLayoutGeometry(element, out var geometry))
+            return false;
+
+        var border = geometry.BorderBox;
+        if (border.Width <= 0 && border.Height <= 0)
+            return false;
+
+        // The estimator expresses the box relative to the anchor's nearest
+        // containing-block-establishing ancestor's border-box origin (its ancestor
+        // walk stops there and folds in that ancestor's border+padding). Match that
+        // frame by subtracting the CB's document-space border-box origin.
+        double originX = 0, originY = 0;
+        var cb = FindGeometryContainingBlockAncestor(element);
+        if (cb != null && TryGetSharedLayoutGeometry(cb, out var cbGeometry))
+        {
+            originX = cbGeometry.BorderBox.Left;
+            originY = cbGeometry.BorderBox.Top;
+        }
+
+        box = new AnchorInfo(
+            border.Top - originY, border.Left - originX, border.Width, border.Height);
+        return true;
+    }
+    /// <summary>
+    /// Walks up from <paramref name="element"/> to the nearest ancestor that
+    /// establishes a containing block (the frame the estimator measures against).
+    /// </summary>
+    private DomElement? FindGeometryContainingBlockAncestor(DomElement element)
+    {
+        for (var ancestor = element.Parent; ancestor != null; ancestor = ancestor.Parent)
+            if (EstablishesContainingBlock(GetComputedProps(ancestor)))
+                return ancestor;
+        return null;
     }
     /// <summary>
     /// Parses the 'margin' shorthand into individual margin values,
