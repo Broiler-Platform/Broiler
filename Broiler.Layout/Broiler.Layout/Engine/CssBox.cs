@@ -1544,6 +1544,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     Location = new PointF((float)left, (float)top);
                     ActualBottom = top;
+                    AbsposLocationFinalized = false;
 
                     // CSS2.1 §10.3.7 / §10.6.4: For absolutely positioned
                     // elements with explicit 'top'/'left', override the static
@@ -1590,6 +1591,12 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                         Location = new PointF(newX, newY);
                         ActualBottom = newY;
+                        // Location now holds the final left/top offset; the content
+                        // flow below starts here, so AdjustAbsolutePosition must not
+                        // add the offset again (WPT css-anchor-position anchor-scroll).
+                        if (Left != null && Left != CssConstants.Auto
+                            || Top != null && Top != CssConstants.Auto)
+                            AbsposLocationFinalized = true;
                     }
 
                     // CSS2.1 §10.6.4 / §9.6.1: For fixed-position elements,
@@ -1635,6 +1642,8 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                             Location = new PointF(newX, newY);
                             ActualBottom = newY;
+                            if (hasLeft || hasTop)
+                                AbsposLocationFinalized = true;
                         }
                         // When all offsets are auto, keep the static position
                         // (Location is already set from normal-flow

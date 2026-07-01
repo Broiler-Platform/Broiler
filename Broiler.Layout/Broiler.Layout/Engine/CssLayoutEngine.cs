@@ -828,7 +828,20 @@ internal static class CssLayoutEngine
             curx = localCurx;
             maxRight = localMaxRight;
             maxbottom = localmaxbottom;
-            AdjustAbsolutePosition(box, 0, 0);
+
+            // AdjustAbsolutePosition shifts the box's words by its own left/top so
+            // an abspos child laid out at the *parent's* inline cursor (its static
+            // position) lands at its CSS offset. But when the box flows its OWN
+            // content (box == blockbox) AND PerformLayoutImp already advanced its
+            // Location to the final left/top offset (AbsposLocationFinalized), the
+            // words were flowed from startx = box.Location.X = the final origin, so
+            // re-adding left/top would double the inset — painting content at ~2× the
+            // offset while the border/background paint at the correct origin (auto-
+            // sized abspos with inline content, e.g. css-anchor-position anchored
+            // labels, issue #1163). Boxes that keep their static Location (e.g.
+            // native form controls) still rely on the adjustment.
+            if (!(box == blockbox && box.AbsposLocationFinalized))
+                AdjustAbsolutePosition(box, 0, 0);
         }
 
         box.LastHostingLineBox = line;

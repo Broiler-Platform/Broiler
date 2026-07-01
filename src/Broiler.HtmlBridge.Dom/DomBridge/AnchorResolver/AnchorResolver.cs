@@ -118,6 +118,11 @@ public sealed partial class DomBridge
         // 8. Apply scroll simulation: shift content in scroll containers
         //    where JavaScript set scrollTop/scrollLeft to match Chromium output.
         ApplyScrollSimulation(DocumentElement);
+
+        // Drop any shared-layout-geometry snapshot built for anchor-box geometry
+        // (TryGetAnchorLayoutBox) so later live geometry queries lay out fresh —
+        // the resolution above mutated the DOM. No-op when the shared path is off.
+        ClearSharedGeometrySnapshot();
     }
     private void ApplyVisualViewportSerializationState()
     {
