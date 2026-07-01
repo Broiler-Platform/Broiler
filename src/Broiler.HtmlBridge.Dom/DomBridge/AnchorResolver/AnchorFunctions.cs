@@ -185,23 +185,53 @@ public sealed partial class DomBridge
         offX = 0;
         offY = 0;
         var scale = GetScrollSimulationScaleFactor();
+
+        // A position:sticky element stays pinned to its nearest scroll
+        // container's edge instead of translating with that scroller's scroll.
+        // When the anchor (or a box between it and its scroller) is sticky, the
+        // anchor's scrolled position does NOT shift by the full scroll offset,
+        // so a target outside the scroller must not subtract it — doing so drives
+        // the anchored box off-screen (css-anchor-position anchor-scroll-to-sticky-004).
+        bool stickyToNextScroller = IsSticky(GetComputedProps(anchorEl));
+
         for (var el = anchorEl.Parent; el != null; el = el.Parent)
         {
             var props = GetComputedProps(el);
             if (!HasOverflowClipping(props))
+            {
+                // A sticky box below the next scroller pins the anchor to it;
+                // remember that until we reach the scroller itself.
+                if (IsSticky(props))
+                    stickyToNextScroller = true;
                 continue;
+            }
 
             // The target lives inside this scroller too → they scroll together
             // (or this scroller is the target's containing block); no separation.
             if (IsDescendantOrSelf(targetEl, el))
                 break;
 
-            if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
-                offX += slv * scale;
-            if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
-                offY += stv * scale;
+            // Skip scrollers the anchor is sticky-pinned to: the anchor resists
+            // this scroller's scroll, so its edges don't move by that offset.
+            if (!stickyToNextScroller)
+            {
+                if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
+                    offX += slv * scale;
+                if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
+                    offY += stv * scale;
+            }
+
+            // Past this scroller, sticky pinning resets: a sticky box higher up
+            // pins to the next scroll container, not this one.
+            stickyToNextScroller = false;
         }
     }
+    /// <summary>
+    /// True when the computed <c>position</c> in <paramref name="props"/> is
+    /// <c>sticky</c>.
+    /// </summary>
+    private static bool IsSticky(Dictionary<string, string> props) =>
+        string.Equals(props.GetValueOrDefault("position"), "sticky", StringComparison.OrdinalIgnoreCase);
     /// <summary>
     /// True when <paramref name="node"/> is <paramref name="ancestor"/> or a
     /// descendant of it.
