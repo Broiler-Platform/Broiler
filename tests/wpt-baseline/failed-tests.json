@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14623,
+    "failed": 14624,
     "skipped": 0,
-    "total": 14623
+    "total": 14624
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 160,
+      "count": 161,
       "examples": [
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "css/css-anchor-position/anchor-position-multicol-017.html",
@@ -61,13 +61,13 @@
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      227
+      228
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      227
+      228
     ]
   ],
   "droppedDeclarations": [],
@@ -146,6 +146,18 @@
       ]
     },
     {
+      "family": "css/css-anchor-position/anchor-scroll-to-sticky-{N}.html",
+      "count": 5,
+      "categories": {
+        "PixelMismatch": 5
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-scroll-to-sticky-002.html",
+        "css/css-anchor-position/anchor-scroll-to-sticky-005.html",
+        "css/css-anchor-position/anchor-scroll-to-sticky-003.html"
+      ]
+    },
+    {
       "family": "css/css-anchor-position/position-anchor-{N}.html",
       "count": 5,
       "categories": {
@@ -179,18 +191,6 @@
         "css/css-anchor-position/anchor-scroll-chained-002.html",
         "css/css-anchor-position/anchor-scroll-chained-003.html",
         "css/css-anchor-position/anchor-scroll-chained-001.html"
-      ]
-    },
-    {
-      "family": "css/css-anchor-position/anchor-scroll-to-sticky-{N}.html",
-      "count": 4,
-      "categories": {
-        "PixelMismatch": 4
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-to-sticky-002.html",
-        "css/css-anchor-position/anchor-scroll-to-sticky-005.html",
-        "css/css-anchor-position/anchor-scroll-to-sticky-003.html"
       ]
     }
   ],
@@ -27578,6 +27578,13 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-to-sticky-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/anchor-scroll-to-sticky-004.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
