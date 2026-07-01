@@ -474,6 +474,17 @@ resolved inset (scroll-simulation / abspos-layout path, not anchor geometry). Af
 transforms, Shadow DOM, iframe srcdoc, grid tracks, sub-pixel tail) stay filed against the existing
 deferred items rather than chased as a cluster.
 
+**Regression follow-up (issue [#1165](https://github.com/Broiler-Platform/Broiler/issues/1165),
+227→228).** Increment (1)'s `ComputeInterveningScrollOffset` over-corrected for a `position: sticky`
+anchor: it subtracts the intervening scroller's *full* `scrollTop`, but a sticky anchor stays pinned
+to that scroller's edge and does not translate 1:1 with scroll, so the subtraction drove
+`anchor-scroll-to-sticky-004`'s anchored box off-screen (`MissingContent`). Fixed by skipping a
+scroller's offset contribution when the anchor (or a box between it and the scroller) is sticky —
+i.e. the anchor is pinned to that scroller. Guard: `AnchorScrollTrackingTests.
+OuterAnchored_StickyAnchor_NotShiftedByScroll`. Broiler still doesn't *paint* sticky pinning
+(`ScrollSimulation` shifts sticky children like normal flow), so the remaining
+`anchor-scroll-to-sticky-{002,003,005}` fails are a distinct, still-open gap.
+
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
 shifted content horizontally in comment-heavy tests. After scripts run, the bridge serializes

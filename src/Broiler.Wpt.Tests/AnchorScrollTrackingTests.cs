@@ -128,4 +128,57 @@ public class AnchorScrollTrackingTests : IDisposable
             try { Directory.Delete(dir, true); } catch { }
         }
     }
+
+    // A position:sticky anchor stays pinned to its scroll container's edge instead
+    // of translating with the scroll, so ComputeInterveningScrollOffset must NOT
+    // subtract that scroller's offset for it. The anchor sits 50px down inside a
+    // scroller scrolled by 100; the target outside the scroller pins to
+    // anchor(top)/anchor(left). Because the anchor is sticky, the target stays at
+    // the anchor's (unshifted) position (0,50) — subtracting the full scroll offset
+    // would drive it to y=-50 and off-screen, which is the css-anchor-position
+    // anchor-scroll-to-sticky-004 regression this guards.
+    private const string StickyHtml = @"<!DOCTYPE html><meta charset=""utf-8"">
+<style>
+  body { margin: 0; }
+  #anchor { position: sticky; top: 0; width: 100px; height: 40px;
+            anchor-name: --a; background: gray; }
+  #outer  { position: absolute; position-anchor: --a; left: anchor(left);
+            top: anchor(top); width: 60px; height: 20px; background: red; }
+</style>
+<div style=""position:relative"">
+  <div id=""sc"" style=""width:400px;height:400px;overflow:scroll"">
+    <div style=""height:50px""></div>
+    <div id=""anchor""></div>
+    <div style=""height:1000px""></div>
+  </div>
+  <div id=""outer""></div>
+</div>
+<script>document.getElementById('sc').scrollTo(0, 100);</script>";
+
+    [Fact]
+    public void OuterAnchored_StickyAnchor_NotShiftedByScroll()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-sticky-" + System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string file = Path.Combine(dir, "sticky-track.html");
+            File.WriteAllText(file, StickyHtml);
+
+            var runner = new WptTestRunner(800, 600);
+            using var bmp = runner.RenderHtmlFileBitmapPublic(file, dir);
+
+            var box = ColorBox(bmp, 800, 600, (r, g, b) => r > 200 && g < 80 && b < 80);
+
+            Assert.True(box.count > 0, "red target not painted — sticky anchor's target driven off-screen.");
+            // With the fix the target stays at the anchor's pinned position (0,50);
+            // subtracting the full scroll offset would push it to (0,-50), off-screen.
+            Assert.True(System.Math.Abs(box.x0 - 0) <= 2, $"target left={box.x0}, expected ~0.");
+            Assert.True(System.Math.Abs(box.y0 - 50) <= 2, $"target top={box.y0}, expected ~50 (was ~-50 / off-screen unfixed).");
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
 }
