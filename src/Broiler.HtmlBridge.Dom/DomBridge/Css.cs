@@ -448,14 +448,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
-        // Snapshot the child list before walking it: root.Children enumerates the
-        // live ChildNodes collection, so any mutation during the walk (e.g. a lazy
-        // sub-document root materialising, or a style query re-entering DOM
-        // construction) throws "Collection was modified" and aborts style
-        // collection for the whole tree (signature
-        // DomBridge.CollectStyleElementsInTree). Same defensive idiom as the other
-        // .ToList() DOM walks in DomBridge.
-        foreach (var child in root.Children.ToList())
+        foreach (var child in SnapshotChildren(root))
         {
             if (!child.IsTextNode)
             {
@@ -469,6 +462,66 @@ public sealed partial class DomBridge
                     CollectStyleElementsInTree(child, styleElements);
             }
         }
+    }
+
+    /// <summary>
+    /// Snapshots an element's children in a way that tolerates concurrent DOM
+    /// mutation (parallel WPT rendering, JS-driven tree edits, or a lazy
+    /// sub-document root materialising during the walk).
+    /// </summary>
+    /// <remarks>
+    /// A plain <c>root.Children.ToList()</c> is NOT thread-safe here.
+    /// <see cref="DomElement.LegacyChildList"/> projects the live
+    /// <c>ChildNodes</c> collection: <see cref="Enumerable.ToList{T}"/> reads
+    /// <c>Count</c>, allocates a destination array of that size, then calls
+    /// <c>CopyTo</c>, which materialises the <em>current</em> (possibly larger)
+    /// child array. If another thread appends between those two steps the copy
+    /// overflows and throws <see cref="ArgumentException"/> ("Destination array
+    /// was not long enough" — signature
+    /// <c>DomBridge.CollectStyleElementsInTree</c>); a mutation during plain
+    /// enumeration instead throws <see cref="InvalidOperationException"/>
+    /// ("Collection was modified"). Either previously aborted style collection
+    /// for the whole tree, leaving the document unstyled. Retry a bounded number
+    /// of times, then fall back to a tolerant index walk.
+    /// </remarks>
+    private static List<DomElement> SnapshotChildren(DomElement root)
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            try
+            {
+                return root.Children.ToList();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                // Concurrent structural mutation raced the snapshot; retry with a
+                // fresh copy. Transient contention almost always clears in a
+                // couple of attempts.
+            }
+        }
+
+        // Sustained contention: copy element-by-element, re-checking bounds each
+        // step so a shrinking list can only truncate the snapshot, never throw.
+        var snapshot = new List<DomElement>();
+        for (var i = 0; ; i++)
+        {
+            DomElement child;
+            try
+            {
+                if (i >= root.Children.Count)
+                    break;
+                child = root.Children[i];
+            }
+            catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
+            {
+                break;
+            }
+
+            if (child is not null)
+                snapshot.Add(child);
+        }
+
+        return snapshot;
     }
 
     private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
