@@ -390,6 +390,35 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
+- **`css-align/blocks/align-content-block-{002,004,006,008,010}` (5, `columns:3`) — triaged
+  (issue #1152), NOT an align-content bug; deferred to the multicol engine.** The report signature
+  is misleading: four of the five fail with an *identical* `PixelMismatch / ColorShift` "Content
+  absent" pattern (91.0 %, 70411 px, 62 rows) and the check-layout `data-offset-y` values come back
+  **constant across all 17 alignment variants** (in-flow always 35, float#2 always 45), which reads
+  as "align-content is applied to nothing." It is not. **`align-content` on block containers is
+  correctly implemented** in `Broiler.Layout` (`CssBox.PerformLayoutImp`, the free-space/margin-box
+  shift near `CssBox.cs:2388`): reproduced correct start/center/end/space-* placement in isolation
+  across simple content, the test's full complex content (float + empty in-flow + relpos + abspos +
+  `overflow{height:0}`), single-box-per-column multicol, and 15-box forced column fragmentation —
+  all render per Chromium. The failure only appears when **complex boxes are stacked within a
+  multicol column *and* the box contains the `.overflow { height: 0 }` element with overflowing
+  text**: bisecting the exact test content, a 12-box `columns:3` repro is clean without the overflow
+  div and corrupts each box's internal layout (orange fills, "OVERFLOW" text surfaces, float
+  positions scatter) with it. Root cause is in the multicol fragmentation pass
+  (`CssBox.ApplyMultiColumnLayout` + `GetVisualBottom`, which recursively counts a `height:0` box's
+  *overflowing* descendants as real visual height when sizing/packing/deep-fragmenting columns —
+  `CssBox.cs:3379`, and the deep-fragment flatten at `CssBox.cs:3173`). The check-layout constancy
+  is a *separate* diagnostic-only gap — the bridge's `LayoutMetrics` estimator does not model
+  `align-content`, so `data-offset-y` assertions are wrong even though scoring is pixel-vs-reference.
+  **Deferred, not fixed**, for one concrete reason: the fix belongs in the shared multicol engine
+  whose regression surface is the `css-break` / `css-position` multicol families (e.g. the verified
+  `vlr-in-multicol`, `out-of-flow-in-multicolumn`) — **none of which are in the local WPT checkout**
+  (only CSS2/css-align/css-anchor-position/css-animations/css-backgrounds are), so a change here
+  cannot be locally regression-tested and must be driven by a full CI WPT run. Next step: make
+  `GetVisualBottom` (and the column-height / deep-fragment logic) use the *border-box* extent of a
+  definite- or zero-height box rather than its ink-overflow when the box's own `overflow` would not
+  extend the fragmentation flow, then validate against the CI multicol suites.
+
 - **`CSS2/backgrounds/background-{N}` (≈202, the single largest CSS2 family) — triaged, NOT a
   systematic bug (image/scroll/color fidelity tail).** Probed `background-{001,004,050,150}` against
   the live renderer: the `background` **shorthand parser is solid** — `background:green` (001) →
