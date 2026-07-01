@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Broiler.App.Rendering;
@@ -39,6 +41,34 @@ internal sealed class BrowserWindow : Direct2DWindow
     private const double WheelScrollStep = 60;
     private const double KeyScrollStep = 48;
     private const double AnimationIntervalMs = 16;
+    private const int MaxSavePath = 32768;
+
+    private const int OfnOverwritePrompt = 0x00000002;
+    private const int OfnHideReadOnly = 0x00000004;
+    private const int OfnNoChangeDir = 0x00000008;
+    private const int OfnPathMustExist = 0x00000800;
+    private const int OfnExplorer = 0x00080000;
+
+    private const uint MfString = 0x00000000;
+    private const uint MfGrayed = 0x00000001;
+    private const uint MfSeparator = 0x00000800;
+    private const uint TpmRightButton = 0x0002;
+    private const uint TpmReturnCmd = 0x0100;
+
+    private const int ContextOpenLink = 1001;
+    private const int ContextSaveLink = 1002;
+    private const int ContextBack = 1003;
+    private const int ContextForward = 1004;
+    private const int ContextReload = 1005;
+    private const int ContextStop = 1006;
+
+    private static readonly HashSet<string> DownloadFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".7z", ".avi", ".bin", ".bmp", ".csv", ".dll", ".dmg", ".doc", ".docx", ".exe",
+        ".gif", ".gz", ".iso", ".jar", ".jpeg", ".jpg", ".json", ".mov", ".mp3", ".mp4",
+        ".msi", ".pdf", ".png", ".ppt", ".pptx", ".rar", ".tar", ".tgz", ".txt", ".wasm",
+        ".webm", ".webp", ".xls", ".xlsx", ".xml", ".zip",
+    };
 
     private readonly string? _initialUrl;
     private HtmlContainer _container = CreateHtmlContainer();
@@ -73,6 +103,7 @@ internal sealed class BrowserWindow : Direct2DWindow
     private bool _isPageBusy;
     private long _navigationGeneration;
     private CancellationTokenSource? _navigationCancellation;
+    private CancellationTokenSource? _downloadCancellation;
     private bool _updatingFormEdit;
     private bool _skipNextFormPointerUp;
     private FormInputElementData<RectangleF>? _activeFormInput;
@@ -189,6 +220,7 @@ internal sealed class BrowserWindow : Direct2DWindow
             return;
 
         CancelPendingNavigation();
+        CancelPendingDownload();
         StopSession();
         _navigationGeneration++;
         SetBusy(false);
@@ -232,6 +264,7 @@ internal sealed class BrowserWindow : Direct2DWindow
     private long BeginNavigation()
     {
         CancelPendingNavigation();
+        CancelPendingDownload();
         return ++_navigationGeneration;
     }
 
@@ -400,16 +433,11 @@ internal sealed class BrowserWindow : Direct2DWindow
         if (_isShuttingDown || _suppressNavigation)
             return;
 
-        string link = e.Link;
-
-        // Resolve fragment-only hrefs (e.g. "#top") against the current page URL.
-        if (link.StartsWith('#') && _historyIndex >= 0 && _historyIndex < _history.Count)
+        string link = ResolveLinkUrl(e.Link);
+        if (ShouldDownloadLink(link, e.Attributes, out string suggestedFileName))
         {
-            string current = _history[_historyIndex];
-            int hash = current.IndexOf('#');
-            if (hash >= 0)
-                current = current[..hash];
-            link = current + link;
+            SaveLinkAs(link, suggestedFileName);
+            return;
         }
 
         NavigateTo(link);
@@ -496,6 +524,9 @@ internal sealed class BrowserWindow : Direct2DWindow
         if (_hasContent && !_isShuttingDown)
         {
             PointF location = ToPoint(e.Position);
+            if (IsChangedOrCurrentButton(e, BMouseButtons.Right))
+                return;
+
             if (IsChangedOrCurrentButton(e, BMouseButtons.Left) && TryActivateFormEdit(location))
             {
                 _skipNextFormPointerUp = true;
@@ -524,6 +555,12 @@ internal sealed class BrowserWindow : Direct2DWindow
         // HandleMouseUp raises LinkClicked for links, which drives navigation.
         if (_hasContent && !_isShuttingDown)
         {
+            if (IsChangedOrCurrentButton(e, BMouseButtons.Right))
+            {
+                ShowHtmlContextMenu(ToPoint(e.Position));
+                return;
+            }
+
             if (_skipNextFormPointerUp && IsChangedOrCurrentButton(e, BMouseButtons.Left))
             {
                 _skipNextFormPointerUp = false;
@@ -840,6 +877,13 @@ internal sealed class BrowserWindow : Direct2DWindow
         cancellation?.Cancel();
     }
 
+    private void CancelPendingDownload()
+    {
+        CancellationTokenSource? cancellation = _downloadCancellation;
+        _downloadCancellation = null;
+        cancellation?.Cancel();
+    }
+
     private void ReplaceContainer(HtmlContainer container)
     {
         ArgumentNullException.ThrowIfNull(container);
@@ -860,6 +904,7 @@ internal sealed class BrowserWindow : Direct2DWindow
         _isShuttingDown = true;
         SetBusy(false);
         CancelPendingNavigation();
+        CancelPendingDownload();
         _container.LinkClicked -= OnLinkClicked;
         DisposeFormEdit();
         StopSession();
@@ -897,6 +942,508 @@ internal sealed class BrowserWindow : Direct2DWindow
         catch (ObjectDisposedException)
         {
         }
+    }
+
+    // ---- Downloads & context menu ----------------------------------------
+
+    private void ShowHtmlContextMenu(PointF location)
+    {
+        if (_isShuttingDown || NativeHandle == IntPtr.Zero)
+            return;
+
+        string? link = _container.GetLinkAt(location);
+        string resolvedLink = string.IsNullOrWhiteSpace(link)
+            ? string.Empty
+            : ResolveLinkUrl(link);
+
+        IntPtr menu = CreatePopupMenu();
+        if (menu == IntPtr.Zero)
+            return;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(resolvedLink))
+            {
+                AppendContextMenuItem(menu, ContextOpenLink, "Open Link");
+                AppendContextMenuItem(menu, ContextSaveLink, "Save Link As...");
+                AppendMenu(menu, MfSeparator, UIntPtr.Zero, null);
+            }
+
+            AppendContextMenuItem(menu, ContextBack, "Back", _historyIndex > 0);
+            AppendContextMenuItem(menu, ContextForward, "Forward", _historyIndex < _history.Count - 1);
+            AppendContextMenuItem(menu, ContextReload, "Reload", _historyIndex >= 0 && _historyIndex < _history.Count);
+            AppendContextMenuItem(menu, ContextStop, "Stop", _isPageBusy);
+
+            NativePoint screenPoint = ContentToScreen(location);
+            SetForegroundWindow(NativeHandle);
+            int command = TrackPopupMenu(
+                menu,
+                TpmRightButton | TpmReturnCmd,
+                screenPoint.X,
+                screenPoint.Y,
+                0,
+                NativeHandle,
+                IntPtr.Zero);
+
+            switch (command)
+            {
+                case ContextOpenLink when !string.IsNullOrWhiteSpace(resolvedLink):
+                    NavigateTo(resolvedLink);
+                    break;
+
+                case ContextSaveLink when !string.IsNullOrWhiteSpace(resolvedLink):
+                    SaveLinkAs(resolvedLink, SuggestedFileNameFromDownload(
+                        _container.GetAttributeAt(location, "download"),
+                        resolvedLink));
+                    break;
+
+                case ContextBack:
+                    GoHistory(-1);
+                    break;
+
+                case ContextForward:
+                    GoHistory(1);
+                    break;
+
+                case ContextReload:
+                    Reload();
+                    break;
+
+                case ContextStop:
+                    StopLoading();
+                    break;
+            }
+        }
+        finally
+        {
+            DestroyMenu(menu);
+        }
+    }
+
+    private static void AppendContextMenuItem(IntPtr menu, int command, string text, bool enabled = true) =>
+        AppendMenu(menu, MfString | (enabled ? 0 : MfGrayed), new UIntPtr((uint)command), text);
+
+    private NativePoint ContentToScreen(PointF location)
+    {
+        double scale = DpiScale;
+        var point = new NativePoint
+        {
+            X = (int)Math.Round(location.X * scale),
+            Y = (int)Math.Round((ToolbarHeight + FavoritesBarHeight + location.Y) * scale),
+        };
+
+        ClientToScreen(NativeHandle, ref point);
+        return point;
+    }
+
+    private void SaveLinkAs(string link, string? suggestedFileName)
+    {
+        if (_isShuttingDown)
+            return;
+
+        try
+        {
+            string url = ResolveLinkUrl(link);
+            string? destination = ShowSaveFileDialog(SuggestedFileNameFromDownload(suggestedFileName, url));
+            if (string.IsNullOrWhiteSpace(destination))
+                return;
+
+            CancelPendingDownload();
+
+            var cancellation = new CancellationTokenSource();
+            _downloadCancellation = cancellation;
+            SetBusy(true);
+            SetStatus($"Downloading {Path.GetFileName(destination)}...");
+            _ = DownloadLinkInBackgroundAsync(url, destination, cancellation);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log(nameof(SaveLinkAs), ex);
+            SetBusy(false);
+            SetStatus($"Download failed: {ex.Message}");
+        }
+    }
+
+    private async Task DownloadLinkInBackgroundAsync(
+        string url,
+        string destination,
+        CancellationTokenSource cancellation)
+    {
+        Exception? error = null;
+
+        try
+        {
+            await DownloadUrlToFileAsync(url, destination, cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            TryDeletePartial(destination);
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+        }
+
+        if (!PostToUiThread(() => CompleteDownload(cancellation, destination, error)))
+            cancellation.Dispose();
+    }
+
+    private void CompleteDownload(
+        CancellationTokenSource cancellation,
+        string destination,
+        Exception? error)
+    {
+        try
+        {
+            if (ReferenceEquals(_downloadCancellation, cancellation))
+                _downloadCancellation = null;
+
+            if (_isShuttingDown || cancellation.IsCancellationRequested)
+                return;
+
+            SetBusy(false);
+            SetStatus(error is null
+                ? $"Saved {Path.GetFileName(destination)}"
+                : $"Download failed: {error.Message}");
+        }
+        finally
+        {
+            cancellation.Dispose();
+        }
+    }
+
+    private static async Task DownloadUrlToFileAsync(
+        string url,
+        string destination,
+        CancellationToken cancellationToken)
+    {
+        string? directory = Path.GetDirectoryName(destination);
+        if (!string.IsNullOrWhiteSpace(directory))
+            Directory.CreateDirectory(directory);
+
+        if (TryGetLocalFilePath(url, out string? localPath))
+        {
+            if (IsSameFilePath(localPath, destination))
+                return;
+
+            await using var source = new FileStream(
+                localPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                useAsync: true);
+            await using var target = new FileStream(
+                destination,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                useAsync: true);
+            await source.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+            uri = new Uri("https://" + url);
+
+        if (string.Equals(uri.Scheme, "data", StringComparison.OrdinalIgnoreCase))
+        {
+            byte[] payload = DecodeDataUri(uri.OriginalString);
+            await File.WriteAllBytesAsync(destination, payload, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            throw new NotSupportedException($"Cannot download '{uri.Scheme}' URLs.");
+
+        using var httpClient = new HttpClient();
+        using HttpResponseMessage response = await httpClient
+            .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using Stream sourceStream = await response.Content
+            .ReadAsStreamAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var destinationStream = new FileStream(
+            destination,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            81920,
+            useAsync: true);
+        await sourceStream.CopyToAsync(destinationStream, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static byte[] DecodeDataUri(string dataUri)
+    {
+        int comma = dataUri.IndexOf(',');
+        if (comma < 0 || !dataUri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            throw new FormatException("The data URL is not valid.");
+
+        string metadata = dataUri[5..comma];
+        string payload = dataUri[(comma + 1)..];
+        bool isBase64 = metadata
+            .Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Contains("base64", StringComparer.OrdinalIgnoreCase);
+
+        return isBase64
+            ? Convert.FromBase64String(Uri.UnescapeDataString(payload))
+            : Encoding.UTF8.GetBytes(Uri.UnescapeDataString(payload));
+    }
+
+    private static bool TryGetLocalFilePath(string url, out string? localPath)
+    {
+        localPath = null;
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+        {
+            if (!uri.IsFile)
+                return false;
+
+            localPath = uri.LocalPath;
+            return File.Exists(localPath);
+        }
+
+        if (!File.Exists(url))
+            return false;
+
+        localPath = Path.GetFullPath(url);
+        return true;
+    }
+
+    private static bool IsSameFilePath(string left, string right)
+    {
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(left),
+                Path.GetFullPath(right),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void TryDeletePartial(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
+    private string? ShowSaveFileDialog(string suggestedFileName)
+    {
+        IntPtr fileBuffer = IntPtr.Zero;
+        IntPtr filterBuffer = IntPtr.Zero;
+        IntPtr titleBuffer = IntPtr.Zero;
+        IntPtr defaultExtensionBuffer = IntPtr.Zero;
+
+        try
+        {
+            string safeFileName = SanitizeFileName(suggestedFileName);
+            fileBuffer = AllocateSaveFileBuffer(safeFileName);
+            filterBuffer = Marshal.StringToHGlobalUni("All files (*.*)\0*.*\0\0");
+            titleBuffer = Marshal.StringToHGlobalUni("Save As");
+
+            string extension = Path.GetExtension(safeFileName);
+            if (!string.IsNullOrWhiteSpace(extension))
+                defaultExtensionBuffer = Marshal.StringToHGlobalUni(extension.TrimStart('.'));
+
+            var openFileName = new OpenFileName
+            {
+                lStructSize = Marshal.SizeOf<OpenFileName>(),
+                hwndOwner = NativeHandle,
+                lpstrFilter = filterBuffer,
+                lpstrFile = fileBuffer,
+                nMaxFile = MaxSavePath,
+                lpstrTitle = titleBuffer,
+                Flags = OfnExplorer
+                    | OfnOverwritePrompt
+                    | OfnHideReadOnly
+                    | OfnNoChangeDir
+                    | OfnPathMustExist,
+                lpstrDefExt = defaultExtensionBuffer,
+            };
+
+            if (!GetSaveFileName(ref openFileName))
+                return null;
+
+            string? destination = Marshal.PtrToStringUni(fileBuffer);
+            return string.IsNullOrWhiteSpace(destination) ? null : destination;
+        }
+        finally
+        {
+            FreeHGlobal(fileBuffer);
+            FreeHGlobal(filterBuffer);
+            FreeHGlobal(titleBuffer);
+            FreeHGlobal(defaultExtensionBuffer);
+        }
+    }
+
+    private static IntPtr AllocateSaveFileBuffer(string suggestedFileName)
+    {
+        IntPtr buffer = Marshal.AllocHGlobal(MaxSavePath * sizeof(char));
+        byte[] zeroes = new byte[MaxSavePath * sizeof(char)];
+        Marshal.Copy(zeroes, 0, buffer, zeroes.Length);
+
+        if (suggestedFileName.Length == 0)
+            return buffer;
+
+        string trimmed = suggestedFileName.Length >= MaxSavePath
+            ? suggestedFileName[..(MaxSavePath - 1)]
+            : suggestedFileName;
+        byte[] bytes = Encoding.Unicode.GetBytes(trimmed);
+        Marshal.Copy(bytes, 0, buffer, bytes.Length);
+        return buffer;
+    }
+
+    private static void FreeHGlobal(IntPtr pointer)
+    {
+        if (pointer != IntPtr.Zero)
+            Marshal.FreeHGlobal(pointer);
+    }
+
+    private string ResolveLinkUrl(string link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+            return link;
+
+        link = link.Trim();
+
+        if (link.StartsWith('#'))
+        {
+            string current = CurrentHistoryUrl();
+            if (!string.IsNullOrWhiteSpace(current))
+            {
+                int hash = current.IndexOf('#');
+                if (hash >= 0)
+                    current = current[..hash];
+                return current + link;
+            }
+        }
+
+        if (Uri.TryCreate(link, UriKind.Absolute, out _))
+            return link;
+
+        string baseUrl = !string.IsNullOrWhiteSpace(_baseUrl)
+            ? _baseUrl
+            : CurrentHistoryUrl();
+
+        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? baseUri)
+            && Uri.TryCreate(baseUri, link, out Uri? resolved))
+        {
+            return resolved.AbsoluteUri;
+        }
+
+        return link;
+    }
+
+    private string CurrentHistoryUrl() =>
+        _historyIndex >= 0 && _historyIndex < _history.Count
+            ? _history[_historyIndex]
+            : string.Empty;
+
+    private static bool ShouldDownloadLink(
+        string link,
+        IReadOnlyDictionary<string, string> attributes,
+        out string suggestedFileName)
+    {
+        if (TryGetAttribute(attributes, "download", out string? downloadName))
+        {
+            suggestedFileName = SuggestedFileNameFromDownload(downloadName, link);
+            return true;
+        }
+
+        if (LooksLikeDownloadTarget(link))
+        {
+            suggestedFileName = GuessFileNameFromUrl(link);
+            return true;
+        }
+
+        suggestedFileName = string.Empty;
+        return false;
+    }
+
+    private static bool LooksLikeDownloadTarget(string link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+            return false;
+
+        string path = link;
+        if (Uri.TryCreate(link, UriKind.Absolute, out Uri? uri))
+            path = uri.AbsolutePath;
+
+        int queryStart = path.IndexOfAny(['?', '#']);
+        if (queryStart >= 0)
+            path = path[..queryStart];
+
+        string extension = Path.GetExtension(Uri.UnescapeDataString(path));
+        return !string.IsNullOrWhiteSpace(extension) && DownloadFileExtensions.Contains(extension);
+    }
+
+    private static bool TryGetAttribute(
+        IReadOnlyDictionary<string, string> attributes,
+        string name,
+        out string? value)
+    {
+        if (attributes.TryGetValue(name, out value))
+            return true;
+
+        foreach (var pair in attributes)
+        {
+            if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = pair.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static string SuggestedFileNameFromDownload(string? downloadValue, string link)
+    {
+        if (!string.IsNullOrWhiteSpace(downloadValue))
+            return SanitizeFileName(downloadValue);
+
+        return GuessFileNameFromUrl(link);
+    }
+
+    private static string GuessFileNameFromUrl(string link)
+    {
+        string candidate = string.Empty;
+
+        if (Uri.TryCreate(link, UriKind.Absolute, out Uri? uri))
+            candidate = Path.GetFileName(Uri.UnescapeDataString(uri.LocalPath));
+        else
+            candidate = Path.GetFileName(link.Split('?', '#')[0]);
+
+        return SanitizeFileName(string.IsNullOrWhiteSpace(candidate) ? "download" : candidate);
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            return "download";
+
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+            fileName = fileName.Replace(invalid, '_');
+
+        fileName = fileName.Trim();
+        if (fileName is "." or "..")
+            return "download";
+
+        return fileName.Length <= 240 ? fileName : fileName[..240];
     }
 
     // ---- Favorites & chrome ----------------------------------------------
@@ -1107,6 +1654,74 @@ internal sealed class BrowserWindow : Direct2DWindow
 
         base.Dispose(disposing);
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct OpenFileName
+    {
+        public int lStructSize;
+        public IntPtr hwndOwner;
+        public IntPtr hInstance;
+        public IntPtr lpstrFilter;
+        public IntPtr lpstrCustomFilter;
+        public int nMaxCustFilter;
+        public int nFilterIndex;
+        public IntPtr lpstrFile;
+        public int nMaxFile;
+        public IntPtr lpstrFileTitle;
+        public int nMaxFileTitle;
+        public IntPtr lpstrInitialDir;
+        public IntPtr lpstrTitle;
+        public int Flags;
+        public short nFileOffset;
+        public short nFileExtension;
+        public IntPtr lpstrDefExt;
+        public IntPtr lCustData;
+        public IntPtr lpfnHook;
+        public IntPtr lpTemplateName;
+        public IntPtr pvReserved;
+        public int dwReserved;
+        public int FlagsEx;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetSaveFileName(ref OpenFileName openFileName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CreatePopupMenu();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyMenu(IntPtr menu);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr newItemId, string? itemText);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int TrackPopupMenu(
+        IntPtr menu,
+        uint flags,
+        int x,
+        int y,
+        int reserved,
+        IntPtr owner,
+        IntPtr rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ClientToScreen(IntPtr hwnd, ref NativePoint point);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
 
     private sealed class NavigationLoadResult : IDisposable
     {

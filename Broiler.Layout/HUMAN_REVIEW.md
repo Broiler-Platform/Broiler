@@ -103,7 +103,7 @@ completed the attestation:
 - Track compiler cleanup separately, including unused `using` directives and eligible
   `static` functions.
 - Re-review any source changes after commit
-  `33226da3f4e03c524630c1e1bd999b5267550581`.
+  `6eaa76cc8fbe753ad2ba4db9f570f66256306c55`.
 
 ## Human attestation
 

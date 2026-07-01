@@ -1,75 +1,97 @@
-# Human review: Broiler integration and applications
+# Human review summary: Broiler preview
 
-> **Status: PENDING — not approved for preview use.**
+> **Status: SUMMARY ONLY - not a root-level human approval.**
 
-Broiler integration and applications contains substantial AI-assisted implementation. This record exists so that a
-real developer can review a specific revision and make an attributable, evidence-based
-decision. Until the decision and attestation below are completed by a human, this file is
-not a safety approval.
+This file aggregates the human-review records found in subdirectories for the first
+Broiler preview. It is intentionally a summary and does not replace the individual
+component review files, reviewer attestations, conditions, or pending-review warnings.
 
-“Safe” is not an absolute guarantee. Approval means only that the named reviewer found the
-specified revision reasonably suitable for the stated preview use, subject to the recorded
-limitations and the software license's warranty disclaimer.
+Source files included:
 
-## Review target
+- `Broiler.CSS/HUMAN_REVIEW.md`
+- `Broiler.CSS/Broiler.DOM/HUMAN_REVIEW.md`
+- `Broiler.DOM/HUMAN_REVIEW.md`
+- `Broiler.Graphics/HUMAN_REVIEW.md`
+- `Broiler.HTML/HUMAN_REVIEW.md`
+- `Broiler.HTML/Broiler.Graphics/HUMAN_REVIEW.md`
+- `Broiler.JS/HUMAN_REVIEW.md`
+- `Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md`
+- `Broiler.JS/Broiler.Regex/HUMAN_REVIEW.md`
+- `Broiler.JS/Broiler.Regex/Broiler.Unicode/HUMAN_REVIEW.md`
+- `Broiler.JS/Broiler.Unicode/HUMAN_REVIEW.md`
+- `Broiler.Layout/HUMAN_REVIEW.md`
 
-- **Component:** Broiler integration and applications
-- **Scope:** The root solution, application shells, command-line tools, HtmlBridge integration, development tools, and release packaging.
-- **Release:** First preview
-- **Commit:** `<full reviewed commit SHA — required>`
-- **Reviewer:** `<human name — required>`
-- **Reviewer contact or profile:** `<required>`
-- **Review date:** `<YYYY-MM-DD — required>`
-- **Intended preview use:** `<required>`
+## Overall preview position
 
-Any source change after the reviewed commit invalidates an approval until the changed
-revision is reviewed again.
+The repository is suitable only for first-preview, controlled development, testing, and
+evaluation scenarios. It must not be presented as production-ready, security-audited, or
+free of defects or vulnerabilities.
 
-## Required evidence
+Several components are approved for first-preview use, usually with conditions. Several
+nested review records remain pending or explicitly state that they are not approvals.
+Because the preview application combines these components, the safe public position is:
 
-The human reviewer records links, logs, or concise findings for every item:
+- first-preview only;
+- controlled or non-hostile inputs only unless the host provides isolation;
+- no production or security-sensitive use without further review;
+- re-review required after source changes to reviewed commits;
+- public preview notes must preserve the safety warnings from the component reviews.
 
-- [ ] Build and automated tests completed; minimum expected commands: `dotnet build Broiler.slnx` and `dotnet test Broiler.slnx`.
-- [ ] Security-sensitive inputs, trust boundaries, file/network access, native interop,
-      and code-execution paths were inspected where applicable.
-- [ ] Dependency and license notices were checked, including inherited upstream code.
-- [ ] AI-generated or AI-modified code received source-level review; no AI summary was
-      accepted as a substitute for reading the relevant code.
-- [ ] Public APIs, failure behavior, known limitations, and preview compatibility risks
-      were assessed.
-- [ ] Static analysis, dependency/vulnerability scanning, or an explicit reason for
-      omitting each was recorded.
-- [ ] Open findings and residual risks are listed below.
+## Component status summary
 
-### Evidence and commands
+| Source | Status summary |
+| --- | --- |
+| `Broiler.CSS/HUMAN_REVIEW.md` | Approved for first preview. Dead/transitional code and preview instability are accepted limitations. |
+| `Broiler.CSS/Broiler.DOM/HUMAN_REVIEW.md` | Approved with conditions for first-preview use. Parser/string-handling risks, dead code, and cleanup follow-ups remain. |
+| `Broiler.DOM/HUMAN_REVIEW.md` | Pending; not approved for preview use in that record. |
+| `Broiler.Graphics/HUMAN_REVIEW.md` | Approved with conditions for first-preview use. Image codecs, untrusted binary input, native Windows API usage, and Direct2D/DirectWrite/DXGI/D3D interop are security-sensitive. |
+| `Broiler.HTML/HUMAN_REVIEW.md` | Approved with conditions for first preview only. Renderer paths are not hardened for hostile HTML/CSS, and obsolete/transitional APIs remain. |
+| `Broiler.HTML/Broiler.Graphics/HUMAN_REVIEW.md` | Pending; not approved for preview use in that nested record. |
+| `Broiler.JS/HUMAN_REVIEW.md` | Pending final human review. Available only for first preview with safety warnings. JavaScript execution and host integration are security-sensitive and are not a sandbox. |
+| `Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md` | Approved for preview. Residual risks are normal parser/date-time semantics and caller misuse in critical domains. |
+| `Broiler.JS/Broiler.Regex/HUMAN_REVIEW.md` | Approved for preview. Resource-exhaustion risk from large or adversarial regex input remains despite a step budget. |
+| `Broiler.JS/Broiler.Regex/Broiler.Unicode/HUMAN_REVIEW.md` | Pending; not approved for preview use in that nested record. |
+| `Broiler.JS/Broiler.Unicode/HUMAN_REVIEW.md` | Approved with conditions for first-preview use. Runtime libraries use committed data, while developer-operated data tools download Unicode/CLDR data and require review for refreshes. |
+| `Broiler.Layout/HUMAN_REVIEW.md` | Status line records first-preview approval, with decision conditions recorded. Layout CPU/memory consumption, dead code, cleanup, and dependency/license follow-ups remain. |
 
-`<human reviewer: add exact commands, results, CI links, test reports, and review notes>`
+## Shared safety risks
 
-### Findings and residual risks
+- **Untrusted active content:** Broiler.JS can parse, compile, and execute JavaScript and
+  can interact with .NET host capabilities. It is not a security sandbox.
+- **Untrusted documents:** Broiler.HTML and related DOM/CSS/layout paths parse and render
+  HTML/CSS. Hostile documents may trigger parser, resource-loading, rendering,
+  performance, or compatibility problems.
+- **Untrusted images:** Broiler.Graphics includes managed image codecs for PNG/APNG,
+  JPEG, and BMP. Complex binary image parsing is security-sensitive.
+- **Native Windows interop:** The graphics backend uses Windows APIs and
+  Direct2D/DirectWrite/DXGI/D3D interop. Correct security-relevant usage is not guaranteed
+  by the first-preview reviews.
+- **Resource exhaustion:** Layout, rendering, regex matching, JavaScript execution, image
+  decoding, malformed inputs, deep nesting, large documents, or adversarial data may cause
+  high CPU use, high memory use, hangs, crashes, or denial-of-service behavior.
+- **Network, file, and host access:** Preview code paths can load pages, resources,
+  scripts, downloads, files, or host integration depending on the embedding scenario.
+- **Incomplete review:** Some component records remain pending, and several approved
+  records explicitly exclude production or security-sensitive use.
 
-`<human reviewer: list findings, severity, mitigations, accepted risks, and follow-up issues>`
+## Preview recommendations
 
-## Decision
-
-Select exactly one and replace the status at the top to match:
-
-- [ ] **APPROVED FOR PREVIEW** within the intended-use scope above.
-- [ ] **APPROVED WITH CONDITIONS** listed below.
-- [ ] **NOT APPROVED** for preview use.
-
-**Conditions:** `<required when approval is conditional; otherwise “None”>`
+- Use Broiler only as first-preview software in controlled development or test scenarios.
+- Prefer local, known, non-hostile pages and assets for evaluation.
+- Run unknown HTML/CSS/JS/images in a disposable VM, sandbox, or otherwise isolated
+  environment.
+- Do not execute untrusted JavaScript unless the embedding host enforces capability
+  restrictions, isolation, and operational limits.
+- Restrict resource loading, file access, network access, host integration, module
+  loading, storage, debugging, downloads, and CLR interop when evaluating unknown content.
+- Apply resource limits and timeouts around parsing, layout, rendering, image decoding,
+  regex matching, and script execution.
+- Keep all preview communication clear that this is not a production security audit.
+- Re-run human review, tests, dependency/license checks, static analysis, vulnerability
+  scanning, fuzzing, or threat modeling before broader release or security-sensitive use.
 
 ## Human attestation
 
-I confirm that I am a human developer, that I personally reviewed the revision and
-evidence identified above, and that the decision is my own. I understand that this
-attestation is a scoped engineering review, not a warranty or a claim that the component
-is free of defects or vulnerabilities.
-
-- **Name:** `<required>`
-- **Signature or attributable commit:** `<required>`
-- **Date:** `<required>`
-
-AI tools may help assemble evidence, but must not fill in the reviewer identity, select the
-decision, sign the attestation, or change **PENDING** to an approval.
+No root-level human approval is recorded in this summary file. The authoritative human
+review decisions and attestations remain in the source files listed above.
 

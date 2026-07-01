@@ -24,6 +24,9 @@ internal static class Program
         // Fall back to loading any such assembly directly from the application directory.
         AssemblyLoadContext.Default.Resolving += ResolveFromAppDirectory;
 
+        if (!ConfirmPreviewSafetyNotice())
+            return 0;
+
         _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
 
         string? initialUrl = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : null;
@@ -49,8 +52,22 @@ internal static class Program
         return File.Exists(candidate) ? context.LoadFromAssemblyPath(candidate) : null;
     }
 
+    private static bool ConfirmPreviewSafetyNotice()
+    {
+        const string message =
+            "Broiler is an early preview; some human review records are still pending.\n\n" +
+            "Risks: HTML/CSS/JS, images, downloads, network/file access, and Windows interop are not security-hardened. JavaScript is not a sandbox.\n\n" +
+            "Recommendation: use controlled content only. Test unknown content in a VM or sandbox, restrict host, file, and network access, and use resource limits.\n\n" +
+            "Choose OK to continue or Cancel to exit.";
+
+        return MessageBox(IntPtr.Zero, message, "Broiler Preview - Safety Notice", MbIconWarning | MbOkCancel) == IdOk;
+    }
+
     private const uint MbOk = 0x00000000;
+    private const uint MbOkCancel = 0x00000001;
     private const uint MbIconError = 0x00000010;
+    private const uint MbIconWarning = 0x00000030;
+    private const int IdOk = 1;
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
