@@ -76,16 +76,16 @@ commit named by a human reviewer; **PENDING is not an approval**.
 
 | Component | Review record |
 |---|---|
-| Broiler integration and applications | [Pending human review](HUMAN_REVIEW.md) |
-| Broiler.DOM | [Pending human review](Broiler.DOM/HUMAN_REVIEW.md) |
-| Broiler.CSS | [Pending human review](Broiler.CSS/HUMAN_REVIEW.md) |
-| Broiler.Layout | [Pending human review](Broiler.Layout/HUMAN_REVIEW.md) |
-| Broiler.Graphics | [Pending human review](Broiler.Graphics/HUMAN_REVIEW.md) |
-| Broiler.HTML | [Pending human review](Broiler.HTML/HUMAN_REVIEW.md) |
-| Broiler.JS | [Pending human review](Broiler.JS/HUMAN_REVIEW.md) |
-| Broiler.DateTime | [Pending human review](Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md) |
-| Broiler.Regex | [Pending human review](Broiler.JS/Broiler.Regex/HUMAN_REVIEW.md) |
-| Broiler.Unicode | [Pending human review](Broiler.JS/Broiler.Unicode/HUMAN_REVIEW.md) |
+| Broiler integration and applications | [Review](HUMAN_REVIEW.md) |
+| Broiler.DOM | [Review](Broiler.DOM/HUMAN_REVIEW.md) |
+| Broiler.CSS | [Review](Broiler.CSS/HUMAN_REVIEW.md) |
+| Broiler.Layout | [Review](Broiler.Layout/HUMAN_REVIEW.md) |
+| Broiler.Graphics | [Review](Broiler.Graphics/HUMAN_REVIEW.md) |
+| Broiler.HTML | [Review](Broiler.HTML/HUMAN_REVIEW.md) |
+| Broiler.JS | [Review](Broiler.JS/HUMAN_REVIEW.md) |
+| Broiler.DateTime | [Review](Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md) |
+| Broiler.Regex | [Review](Broiler.JS/Broiler.Regex/HUMAN_REVIEW.md) |
+| Broiler.Unicode | [Review](Broiler.JS/Broiler.Unicode/HUMAN_REVIEW.md) |
 
 The review files deliberately require a real developer to provide an identity, exact
 commit, test and analysis evidence, findings, intended-use scope, decision, and
