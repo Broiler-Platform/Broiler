@@ -25,6 +25,14 @@ internal static class LayoutBoxUtils
 
         foreach (CssBox b in box.Boxes)
         {
+            // CSS2.1 §9.2.4: A 'display:none' box generates no box at all, so it
+            // is transparent to the inline-only test — an invisible <style>,
+            // <script>, or display:none <span> between two inline-level siblings
+            // must not force the container onto the block path (which wraps the
+            // siblings in anonymous blocks and stacks them vertically).
+            if (b.Display == CssConstants.None)
+                continue;
+
             // CSS2.1 §9.5: Floats are out-of-flow.  Their computed display
             // is promoted to 'block' (§9.7) but they participate in the
             // inline formatting context of their parent for line-box
