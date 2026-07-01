@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14631,
+    "failed": 14630,
     "skipped": 0,
-    "total": 14631
+    "total": 14630
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 272,
+      "count": 268,
       "examples": [
         "css/css-align/abspos/align-self-static-position-003.html",
         "css/css-align/abspos/default-overflow-with-scroll.html",
@@ -26,11 +26,23 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 53,
+      "count": 54,
       "examples": [
         "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
         "css/css-anchor-position/last-successful-fallback-to-base-style.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:LayoutShift",
+      "label": "PixelMismatch / LayoutShift",
+      "category": "PixelMismatch",
+      "subCategory": "LayoutShift",
+      "count": 20,
+      "examples": [
+        "css/css-anchor-position/position-anchor-002.html",
+        "css/css-anchor-position/position-try-004.html",
+        "css/css-anchor-position/position-area-scrolling-005.html"
       ]
     },
     {
@@ -43,18 +55,6 @@
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html",
         "css/css-align/blocks/align-content-block-002.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 18,
-      "examples": [
-        "css/css-anchor-position/position-anchor-002.html",
-        "css/css-anchor-position/position-try-004.html",
-        "css/css-anchor-position/position-area-scrolling-005.html"
       ]
     },
     {
@@ -71,7 +71,7 @@
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      235
+      234
     ],
     [
       "css/css-align",
@@ -85,7 +85,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      363
+      362
     ]
   ],
   "droppedDeclarations": [],
@@ -26780,14 +26780,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-align/blocks/safe-justify-self-vrl.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-align/content-distribution/default-overflow-alignment-single-axis-scroll-container.html",
@@ -27312,7 +27312,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
@@ -28275,13 +28275,6 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-anchor.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-css-visibility.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
