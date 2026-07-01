@@ -28130,13 +28130,6 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/position-try-switch-to-fixed-anchor.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-try-tree-scoped-pseudo.html",
       "passed": false,
       "skipped": false,
@@ -28208,6 +28201,13 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-css-visibility.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
