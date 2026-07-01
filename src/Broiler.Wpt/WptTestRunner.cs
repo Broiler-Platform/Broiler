@@ -307,6 +307,20 @@ internal sealed class WptTestResult
 internal sealed class WptTestRunner
 {
     /// <summary>
+    /// When set, the stub <c>promise_test</c> does NOT run its bodies before the
+    /// render snapshot. WPT <c>promise_test</c> callbacks are assertions that
+    /// commonly mutate layout (scrollTo, display toggling) through post-load rAF
+    /// chains; Chromium's reference generator screenshots at <c>load</c>, before
+    /// they run, so executing them here advances the captured DOM past the
+    /// reference point (the css-anchor-position scroll cluster). Default
+    /// <c>false</c> preserves the historical behaviour; overridden by the
+    /// <c>BROILER_WPT_DEFER_PROMISE_TESTS</c> environment variable and the
+    /// <c>--defer-promise-tests</c> CLI flag.
+    /// </summary>
+    internal static bool DeferPromiseTests { get; set; } =
+        Environment.GetEnvironmentVariable("BROILER_WPT_DEFER_PROMISE_TESTS") is "1" or "true" or "TRUE";
+
+    /// <summary>
     /// File extensions treated as test files.
     /// </summary>
     private static readonly HashSet<string> TestExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -373,6 +387,14 @@ internal sealed class WptTestRunner
   }
   if (typeof promise_test === 'undefined') {
     function __broilerRunPromiseTest(func) {
+      // Chromium-matching mode: the reference generator screenshots at `load`,
+      // before any promise_test body runs. Those bodies are assertions that
+      // frequently mutate layout (scrollTo, display toggling) via rAF chains;
+      // running them here would advance the captured DOM past the reference point.
+      // Leave them un-run so the snapshot reflects the initial post-load layout.
+      if (window.__broilerDeferPromiseTests) {
+        return;
+      }
       try {
         var result = func();
         if (result && typeof result.then === 'function') {
@@ -1783,6 +1805,11 @@ internal sealed class WptTestRunner
         // testharness.js.  Insert at position 0 so they are available
         // before any test script code runs.
         scripts.Insert(0, BrowserApiStubs);
+
+        // Expose the promise_test deferral setting to the stubs (inserted before
+        // them so the promise_test stub can honour it). See TestharnessStubs.
+        scripts.Insert(0, FormattableString.Invariant(
+            $"window.__broilerDeferPromiseTests = {(DeferPromiseTests ? "true" : "false")};"));
 
         if (scripts.Count == 0 && deferredScripts.Count == 0)
         {
