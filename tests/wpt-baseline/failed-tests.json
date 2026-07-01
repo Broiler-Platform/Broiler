@@ -14,11 +14,11 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 268,
+      "count": 165,
       "examples": [
-        "css/css-align/abspos/align-self-static-position-003.html",
-        "css/css-align/abspos/default-overflow-with-scroll.html",
-        "css/css-align/abspos/safe-align-self-htb.html"
+        "css/css-anchor-position/anchor-center-safe-rtl.html",
+        "css/css-anchor-position/anchor-position-multicol-017.html",
+        "css/css-anchor-position/anchor-position-multicol-colspan-001.html"
       ]
     },
     {
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 54,
+      "count": 46,
       "examples": [
         "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 20,
+      "count": 14,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
@@ -50,21 +50,11 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 19,
+      "count": 9,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
-        "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html",
-        "css/css-align/blocks/align-content-block-002.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 1,
-      "examples": [
-        "css/css-animations/animate-with-color-mix-2.html"
+        "css/css-anchor-position/anchor-scroll-chained-002.html",
+        "css/css-anchor-position/position-visibility-no-overflow-without-anchor.html"
       ]
     }
   ],
@@ -72,20 +62,12 @@
     [
       "css/css-anchor-position",
       234
-    ],
-    [
-      "css/css-align",
-      100
-    ],
-    [
-      "css/css-animations",
-      28
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      362
+      234
     ]
   ],
   "droppedDeclarations": [],
@@ -116,18 +98,6 @@
       ]
     },
     {
-      "family": "css/css-align/blocks/align-content-block-{N}.html",
-      "count": 11,
-      "categories": {
-        "PixelMismatch": 11
-      },
-      "examples": [
-        "css/css-align/blocks/align-content-block-007.html",
-        "css/css-align/blocks/align-content-block-002.html",
-        "css/css-align/blocks/align-content-block-011.html"
-      ]
-    },
-    {
       "family": "css/css-anchor-position/transform-{N}.html",
       "count": 11,
       "categories": {
@@ -152,18 +122,6 @@
       ]
     },
     {
-      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
-      "count": 7,
-      "categories": {
-        "PixelMismatch": 7
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-005.html",
-        "css/css-anchor-position/anchor-scroll-002.html",
-        "css/css-anchor-position/anchor-scroll-007.html"
-      ]
-    },
-    {
       "family": "css/css-anchor-position/scroll-to-anchored-fixed-{N}.html",
       "count": 7,
       "categories": {
@@ -176,15 +134,15 @@
       ]
     },
     {
-      "family": "css/css-align/abspos/align-self-static-position-{N}.html",
+      "family": "css/css-anchor-position/anchor-scroll-{N}.html",
       "count": 6,
       "categories": {
         "PixelMismatch": 6
       },
       "examples": [
-        "css/css-align/abspos/align-self-static-position-003.html",
-        "css/css-align/abspos/align-self-static-position-004.html",
-        "css/css-align/abspos/align-self-static-position-007.html"
+        "css/css-anchor-position/anchor-scroll-005.html",
+        "css/css-anchor-position/anchor-scroll-002.html",
+        "css/css-anchor-position/anchor-scroll-004.html"
       ]
     },
     {
@@ -209,6 +167,30 @@
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-anchor-005.html",
         "css/css-anchor-position/position-anchor-003.html"
+      ]
+    },
+    {
+      "family": "css/css-anchor-position/anchor-position-inline-{N}.html",
+      "count": 4,
+      "categories": {
+        "PixelMismatch": 4
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-position-inline-005.html",
+        "css/css-anchor-position/anchor-position-inline-007.html",
+        "css/css-anchor-position/anchor-position-inline-004.html"
+      ]
+    },
+    {
+      "family": "css/css-anchor-position/anchor-scroll-chained-{N}.html",
+      "count": 4,
+      "categories": {
+        "PixelMismatch": 4
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-scroll-chained-002.html",
+        "css/css-anchor-position/anchor-scroll-chained-003.html",
+        "css/css-anchor-position/anchor-scroll-chained-001.html"
       ]
     }
   ],
@@ -27406,13 +27388,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchor-scroll-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-chained-001.html",
       "passed": false,
       "skipped": false,
@@ -28202,6 +28177,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/position-try-switch-from-fixed-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-try-tree-scoped-pseudo.html",
