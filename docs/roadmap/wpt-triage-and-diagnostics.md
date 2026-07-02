@@ -462,17 +462,20 @@ match CI. Findings by bucket:
   mature position-area path (regression-risky, and only 39 anchor tests are in the local checkout to
   net against).
 
-**Recommendation / status.** The scroll-driven lever is being worked: increment (1) above
-(cross-scroller `anchor()` scroll-offset tracking) is **landed and guarded**. Increment (3), the
-**render-tree↔bridge bridging** that gives the resolver real-layout anchor geometry (inline flow +
-font metrics), is **built** — the Broiler.HTML inline-geometry patch plus the flag-gated
-`TryGetAnchorLayoutBox` wiring — and verified to make `anchor()` resolve to the spec-correct insets
-for the `anchor-scroll-*` family. The **next** increment is the *downstream rendering* defect that
-now blocks those tests: an abspos sibling of a scroll-simulated container is painted at ~2× its
-resolved inset (scroll-simulation / abspos-layout path, not anchor geometry). After that, enable
-`UseSharedLayoutGeometry` once the parity gate confirms it. The remaining buckets (multicol,
-transforms, Shadow DOM, iframe srcdoc, grid tracks, sub-pixel tail) stay filed against the existing
-deferred items rather than chased as a cluster.
+**Recommendation / status.** The scroll-driven lever's four increments have all **landed**:
+(1) cross-scroller `anchor()` scroll-offset tracking, (2) the Broiler.HTML inline-box geometry fix
+(now upstream in the submodule as commit `e37d38a` — the `patches/0001` fallback is obsolete and was
+removed), (3) the render-tree↔bridge bridging that gives the resolver real-layout anchor geometry via
+`TryGetAnchorLayoutBox`, and (4) the downstream abspos double-inset paint fix. With (2) live on CI,
+the last gate was the `UseSharedLayoutGeometry` flag, which the increment-4 parity gate
+(`SharedLayoutGeometryParityTests`) now confirms: on the current tree the shared renderer-layout path
+matches or beats the estimator on the check-layout corpus, and enabling the flag lifts the local
+`css-anchor-position` subset from 28→29 pass (0 regressions; `transform-005` 99.0 %→99.5 %). The flag
+is therefore **enabled by default** (issue #1170), routing all `offset*`/`getBoundingClientRect`/
+`check-layout` and anchor geometry through real layout. This is a global geometry cutover whose
+full-suite delta is confirmed by a manual WPT dispatch (the workflow is `workflow_dispatch`-only). The
+remaining buckets (multicol, transforms, Shadow DOM, iframe srcdoc, grid tracks, sub-pixel tail) stay
+filed against the existing deferred items rather than chased as a cluster.
 
 **Regression follow-up (issue [#1165](https://github.com/Broiler-Platform/Broiler/issues/1165),
 227→228).** Increment (1)'s `ComputeInterveningScrollOffset` over-corrected for a `position: sticky`
