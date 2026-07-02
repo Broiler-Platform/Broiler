@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14623,
+    "failed": 14619,
     "skipped": 0,
-    "total": 14623
+    "total": 14619
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 159,
+      "count": 150,
       "examples": [
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "css/css-anchor-position/anchor-position-multicol-017.html",
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 40,
+      "count": 38,
       "examples": [
         "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
         "css/css-anchor-position/position-anchor-normal-pseudo-element-implicit-002.html",
@@ -50,24 +50,38 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 9,
+      "count": 15,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
         "css/css-anchor-position/position-try-container-query.html"
+      ]
+    },
+    {
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "css/css-anchor-position/anchor-position-writing-modes-001.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      227
+      223
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      227
+      222
+    ],
+    [
+      "Timeout",
+      1
     ]
   ],
   "droppedDeclarations": [],
@@ -99,26 +113,14 @@
     },
     {
       "family": "css/css-anchor-position/transform-{N}.html",
-      "count": 11,
+      "count": 10,
       "categories": {
-        "PixelMismatch": 11
+        "PixelMismatch": 10
       },
       "examples": [
         "css/css-anchor-position/transform-003.html",
         "css/css-anchor-position/transform-006.html",
         "css/css-anchor-position/transform-001.html"
-      ]
-    },
-    {
-      "family": "css/css-anchor-position/anchor-scroll-update-{N}.html",
-      "count": 7,
-      "categories": {
-        "PixelMismatch": 7
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-update-006.html",
-        "css/css-anchor-position/anchor-scroll-update-003.html",
-        "css/css-anchor-position/anchor-scroll-update-004.html"
       ]
     },
     {
@@ -143,6 +145,18 @@
         "css/css-anchor-position/anchor-center-overflow-002.html",
         "css/css-anchor-position/anchor-center-overflow-005.html",
         "css/css-anchor-position/anchor-center-overflow-003.html"
+      ]
+    },
+    {
+      "family": "css/css-anchor-position/anchor-scroll-update-{N}.html",
+      "count": 5,
+      "categories": {
+        "PixelMismatch": 5
+      },
+      "examples": [
+        "css/css-anchor-position/anchor-scroll-update-006.html",
+        "css/css-anchor-position/anchor-scroll-update-004.html",
+        "css/css-anchor-position/anchor-scroll-update-001.html"
       ]
     },
     {
@@ -26877,13 +26891,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchor-center-htb-vrl.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchor-center-overflow-001.html",
       "passed": false,
       "skipped": false,
@@ -27301,7 +27308,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-position-sibling-index.html",
@@ -27314,8 +27321,7 @@
       "relativeTestPath": "css/css-anchor-position/anchor-position-writing-modes-001.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-position-writing-modes-002.html",
@@ -27333,13 +27339,6 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-scope-shadow-names.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/anchor-scroll-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -27598,20 +27597,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchor-scroll-update-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/anchor-scroll-update-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-update-004.html",
       "passed": false,
       "skipped": false,
@@ -27682,13 +27667,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchored-c-v-hidden.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchored-transition-display-none-002.html",
       "passed": false,
       "skipped": false,
@@ -27707,7 +27685,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-anchor-position/grid-position-area-basic.html",
@@ -27826,7 +27804,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-005.html",
@@ -27875,7 +27853,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/position-area-abs-inline-container.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-area-alignment-inset-001.html",
@@ -27939,6 +27924,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-anchor-position/position-area-inline-container.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-area-no-default-anchor.html",
@@ -28130,6 +28122,13 @@
       "subCategory": "ColorShift"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/position-try-switch-to-fixed-anchor.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/position-try-tree-scoped-pseudo.html",
       "passed": false,
       "skipped": false,
@@ -28176,7 +28175,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-002.html",
@@ -28190,7 +28189,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-004.html",
@@ -28333,13 +28332,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/scrollable-containing-block-position-area.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/scrollable-containing-block-size.html",
       "passed": false,
       "skipped": false,
@@ -28380,13 +28372,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/transform-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-006.html",
