@@ -6216,8 +6216,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // The blue box should start at y~104 (100px box + 4px border area).
         // If overflow clipping is broken, it would be pushed to ~304px.
         var pixel = bitmap.GetPixel(100, 130);
-        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
-            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+        Assert.True(pixel.B > 200 && pixel.R < 50 && pixel.G < 50,
+            $"Expected blue at (100,130), got R={pixel.R} G={pixel.G} B={pixel.B}. " +
             "The blue box should appear immediately after the overflow:hidden container.");
     }
 
@@ -6236,8 +6236,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 400);
 
         var pixel = bitmap.GetPixel(100, 130);
-        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
-            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+        Assert.True(pixel.B > 200 && pixel.R < 50 && pixel.G < 50,
+            $"Expected blue at (100,130), got R={pixel.R} G={pixel.G} B={pixel.B}. " +
             "The blue box should appear immediately after the overflow:auto container.");
     }
 
@@ -6261,13 +6261,13 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         // Green box must be at the right edge (x in 360..400), not the left.
         var right = bitmap.GetPixel(380, 20);
-        Assert.True(right.Green > 100 && right.Red < 100 && right.Blue < 100,
-            $"Expected green at right edge (380,20), got R={right.Red} G={right.Green} B={right.Blue}. " +
+        Assert.True(right.G > 100 && right.R < 100 && right.B < 100,
+            $"Expected green at right edge (380,20), got R={right.R} G={right.G} B={right.B}. " +
             "A fixed-width block in a dir=rtl container must be right-aligned.");
         // Left side must stay the white container background.
         var left = bitmap.GetPixel(20, 20);
-        Assert.True(left.Green > 200 && left.Red > 200 && left.Blue > 200,
-            $"Expected white at left (20,20), got R={left.Red} G={left.Green} B={left.Blue}. " +
+        Assert.True(left.G > 200 && left.R > 200 && left.B > 200,
+            $"Expected white at left (20,20), got R={left.R} G={left.G} B={left.B}. " +
             "The block must not be left-aligned in rtl.");
     }
 
@@ -6286,8 +6286,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 400);
 
         var pixel = bitmap.GetPixel(100, 130);
-        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
-            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+        Assert.True(pixel.B > 200 && pixel.R < 50 && pixel.G < 50,
+            $"Expected blue at (100,130), got R={pixel.R} G={pixel.G} B={pixel.B}. " +
             "The blue box should appear immediately after the overflow:scroll container.");
     }
 
@@ -6309,8 +6309,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // The SVG should render a green rectangle.  Check center of the
         // SVG area for green pixels.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Green > 100,
-            $"Expected green content at (50,50), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+        Assert.True(pixel.G > 100,
+            $"Expected green content at (50,50), got R={pixel.R} G={pixel.G} B={pixel.B}. " +
             "Inline SVG should render as a replaced inline-block element.");
     }
 
@@ -6334,8 +6334,8 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         // Verify the blue float is present.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
-            $"Expected blue float at (50,50), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}.");
+        Assert.True(pixel.B > 200 && pixel.R < 50 && pixel.G < 50,
+            $"Expected blue float at (50,50), got R={pixel.R} G={pixel.G} B={pixel.B}.");
     }
 
     [Fact]
@@ -6357,14 +6357,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // to the 400×400 CSS element bounds.  Check that the center of the
         // element (200,200) is green, proving viewBox→bounds scaling works.
         var pixel = bitmap.GetPixel(200, 200);
-        Assert.True(pixel.Green > 100 && pixel.Red < 50 && pixel.Blue < 50,
-            $"Expected green at (200,200), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+        Assert.True(pixel.G > 100 && pixel.R < 50 && pixel.B < 50,
+            $"Expected green at (200,200), got R={pixel.R} G={pixel.G} B={pixel.B}. " +
             "SVG viewBox content should be scaled to the CSS element bounds.");
 
         // Also check near the edge — at (390, 390) should still be green.
         var edge = bitmap.GetPixel(390, 390);
-        Assert.True(edge.Green > 100 && edge.Red < 50 && edge.Blue < 50,
-            $"Expected green at (390,390), got R={edge.Red} G={edge.Green} B={edge.Blue}. " +
+        Assert.True(edge.G > 100 && edge.R < 50 && edge.B < 50,
+            $"Expected green at (390,390), got R={edge.R} G={edge.G} B={edge.B}. " +
             "SVG viewBox scaling should fill the entire element.");
     }
 
@@ -6385,20 +6385,20 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         // Top border should be visible (black at y=0).
         var topBorder = bitmap.GetPixel(100, 0);
-        Assert.True(topBorder.Red < 10 && topBorder.Green < 10 && topBorder.Blue < 10,
-            $"Expected black top border at (100,0), got R={topBorder.Red} G={topBorder.Green} B={topBorder.Blue}. " +
+        Assert.True(topBorder.R < 10 && topBorder.G < 10 && topBorder.B < 10,
+            $"Expected black top border at (100,0), got R={topBorder.R} G={topBorder.G} B={topBorder.B}. " +
             "Borders should not be clipped by overflow:hidden.");
 
         // Left border should be visible (black at x=0, y=50).
         var leftBorder = bitmap.GetPixel(0, 50);
-        Assert.True(leftBorder.Red < 10 && leftBorder.Green < 10 && leftBorder.Blue < 10,
-            $"Expected black left border at (0,50), got R={leftBorder.Red} G={leftBorder.Green} B={leftBorder.Blue}. " +
+        Assert.True(leftBorder.R < 10 && leftBorder.G < 10 && leftBorder.B < 10,
+            $"Expected black left border at (0,50), got R={leftBorder.R} G={leftBorder.G} B={leftBorder.B}. " +
             "Borders should not be clipped by overflow:hidden.");
 
         // Bottom border should be visible (black at y=102 or y=103).
         var bottomBorder = bitmap.GetPixel(100, 103);
-        Assert.True(bottomBorder.Red < 10 && bottomBorder.Green < 10 && bottomBorder.Blue < 10,
-            $"Expected black bottom border at (100,103), got R={bottomBorder.Red} G={bottomBorder.Green} B={bottomBorder.Blue}. " +
+        Assert.True(bottomBorder.R < 10 && bottomBorder.G < 10 && bottomBorder.B < 10,
+            $"Expected black bottom border at (100,103), got R={bottomBorder.R} G={bottomBorder.G} B={bottomBorder.B}. " +
             "Borders should not be clipped by overflow:hidden.");
     }
 
@@ -6422,23 +6422,23 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
         // Blue float: centered at (110, 60), should be blue.
         var blue = bitmap.GetPixel(110, 60);
-        Assert.True(blue.Blue > 200 && blue.Red < 50 && blue.Green < 50,
-            $"Expected blue float at (110,60), got R={blue.Red} G={blue.Green} B={blue.Blue}.");
+        Assert.True(blue.B > 200 && blue.R < 50 && blue.G < 50,
+            $"Expected blue float at (110,60), got R={blue.R} G={blue.G} B={blue.B}.");
 
         // Red float: at (330, 60), should be red.
         var red = bitmap.GetPixel(330, 60);
-        Assert.True(red.Red > 200 && red.Blue < 50 && red.Green < 50,
-            $"Expected red float at (330,60), got R={red.Red} G={red.Green} B={red.Blue}.");
+        Assert.True(red.R > 200 && red.B < 50 && red.G < 50,
+            $"Expected red float at (330,60), got R={red.R} G={red.G} B={red.B}.");
 
         // Green content at (100, 130): after clear, should be green.
         var green = bitmap.GetPixel(100, 130);
-        Assert.True(green.Green > 100 && green.Red < 50 && green.Blue < 50,
-            $"Expected green content at (100,130), got R={green.Red} G={green.Green} B={green.Blue}.");
+        Assert.True(green.G > 100 && green.R < 50 && green.B < 50,
+            $"Expected green content at (100,130), got R={green.R} G={green.G} B={green.B}.");
 
         // Green content should also be present far right (full width).
         var greenRight = bitmap.GetPixel(500, 130);
-        Assert.True(greenRight.Green > 100 && greenRight.Red < 50 && greenRight.Blue < 50,
-            $"Expected green content at (500,130), got R={greenRight.Red} G={greenRight.Green} B={greenRight.Blue}. " +
+        Assert.True(greenRight.G > 100 && greenRight.R < 50 && greenRight.B < 50,
+            $"Expected green content at (500,130), got R={greenRight.R} G={greenRight.G} B={greenRight.B}. " +
             "Green content div should span the full container width.");
     }
 
