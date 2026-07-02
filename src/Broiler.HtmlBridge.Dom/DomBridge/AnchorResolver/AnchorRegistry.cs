@@ -19,8 +19,17 @@ public sealed partial class DomBridge
         public double Right => Left + Width;
         public double Bottom => Top + Height;
     }
+
+    // All anchors, keyed by anchor-name, in document order. The name→single
+    // <see cref="AnchorInfo"/> registry keeps only the last element for a name;
+    // this keeps every element so a query can bind to the anchor in its own
+    // scope when several elements share an anchor-name (see
+    // <see cref="ResolveAnchorForElement"/>). Rebuilt by BuildAnchorRegistry.
+    private Dictionary<string, List<AnchorInfo>>? _anchorCandidates;
+
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
+        var candidates = new Dictionary<string, List<AnchorInfo>>(StringComparer.Ordinal);
         foreach (var el in Elements)
         {
             if (el.IsTextNode)
@@ -32,8 +41,44 @@ public sealed partial class DomBridge
 
             var box = ComputeElementBox(el);
             if (box != null)
-                registry[anchorName] = box with { SourceElement = el };
+            {
+                var info = box with { SourceElement = el };
+                registry[anchorName] = info;
+                if (!candidates.TryGetValue(anchorName, out var list))
+                    candidates[anchorName] = list = new List<AnchorInfo>();
+                list.Add(info);
+            }
         }
+        _anchorCandidates = candidates;
+    }
+    /// <summary>
+    /// Resolves the anchor a positioned element binds to for a given
+    /// <c>anchor-name</c>. When several elements share that name, CSS binds the
+    /// query element to the acceptable anchor <em>in its scope</em> rather than a
+    /// single global one; here that is approximated by the candidate inside the
+    /// query element's own containing block. Only diverges from the global
+    /// name→single registry when duplicates exist <em>and</em> an in-CB candidate
+    /// is found, so unique-name lookups (the overwhelming majority) are unchanged.
+    /// </summary>
+    private AnchorInfo? ResolveAnchorForElement(
+        string name, DomElement queryEl, Dictionary<string, AnchorInfo> registry)
+    {
+        if (_anchorCandidates != null &&
+            _anchorCandidates.TryGetValue(name, out var list) && list.Count > 1)
+        {
+            var cb = FindContainingBlockElement(queryEl);
+            if (cb != null)
+            {
+                AnchorInfo? scoped = null;
+                foreach (var cand in list) // document order
+                    if (cand.SourceElement != null &&
+                        IsDescendantOfElement(cand.SourceElement, cb))
+                        scoped = cand; // keep the last in-CB candidate
+                if (scoped != null)
+                    return scoped;
+            }
+        }
+        return registry.TryGetValue(name, out var global) ? global : (AnchorInfo?)null;
     }
     private AnchorInfo? ComputeElementBox(DomElement element)
     {

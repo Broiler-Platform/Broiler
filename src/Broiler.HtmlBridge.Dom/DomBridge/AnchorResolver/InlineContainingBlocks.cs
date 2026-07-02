@@ -21,7 +21,16 @@ public sealed partial class DomBridge
             {
                 var box = ComputeElementBoxWithContainer(el);
                 if (box != null && !registry.ContainsKey(anchorName))
-                    registry[anchorName] = box with { SourceElement = el };
+                {
+                    var info = box with { SourceElement = el };
+                    registry[anchorName] = info;
+                    if (_anchorCandidates != null)
+                    {
+                        if (!_anchorCandidates.TryGetValue(anchorName, out var list))
+                            _anchorCandidates[anchorName] = list = new List<AnchorInfo>();
+                        list.Add(info);
+                    }
+                }
             }
         }
     }

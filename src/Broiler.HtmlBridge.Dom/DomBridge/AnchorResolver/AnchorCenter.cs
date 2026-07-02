@@ -34,7 +34,7 @@ public sealed partial class DomBridge
             if (hasAnchorCenter &&
                 !string.IsNullOrWhiteSpace(positionAnchor) &&
                 (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none") &&
-                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+                ResolveAnchorForElement(positionAnchor, element, anchorRegistry) is { } anchor)
             {
                 double elWidth = TryParsePx(cssProps.GetValueOrDefault("width")) ??
                                  TryParsePx(element.Style.GetValueOrDefault("width")) ?? 0;

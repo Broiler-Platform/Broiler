@@ -44,7 +44,8 @@ public sealed partial class DomBridge
         BuildAnchorRegistry(anchorRegistry);
         BuildInlineAnchorRegistry(anchorRegistry);
 
-        if (!anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+        var anchor = ResolveAnchorForElement(positionAnchor, element, anchorRegistry);
+        if (anchor is null)
             return null;
 
         var rect = ComputePositionAreaRect(element, anchor, positionArea);

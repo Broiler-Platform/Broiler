@@ -40,6 +40,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
 | 23 | `css-anchor-position` full-suite run (#1163, 227 fails) — triaged tail; scroll-offset tracking for `anchor()` across scrollers implemented | 🟡 partial | Broiler.HtmlBridge.Dom |
 | 24 | `position-area` grid collapses when the anchor is an abspos box inside an **inline** containing block (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
+| 25 | Shared `anchor-name` not scoped — every element bound to one global (last-wins) anchor instead of the one in its own scope (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -521,6 +522,32 @@ committed `--reference-dir` PNGs for these two tests are stale **no-Ahem** captu
 at the proportional-font positions), so the pixel-vs-committed-PNG subset run still scores them ~94 %;
 the fix is validated by the reference-HTML comparison and the offset guard, and lands on CI once those
 references are regenerated with Ahem.
+
+Cluster 25 (issue [#1175](https://github.com/Broiler-Platform/Broiler/issues/1175)) is root cause #1
+from the cluster-24 / percents-001 triage, taken on its own: **a shared `anchor-name` was not
+scoped.** `BuildAnchorRegistry` keyed each `anchor-name` to a *single* `AnchorInfo` (last element in
+document order wins), so every element referencing that name bound to that one global anchor — even
+across unrelated containers. When several elements legitimately share a name (e.g.
+`position-area-percents-001`'s four `.anchor`s all named `--foo`, one per `float` container), an
+anchored element in container 1 wrongly resolved against container 4's anchor. CSS binds an anchored
+element to the acceptable anchor *in its scope*. Fixed by keeping **all** candidates per name
+(`_anchorCandidates`, name→list in document order) alongside the existing registry, and adding
+`ResolveAnchorForElement(name, queryEl)`: when a name has more than one candidate, it binds the query
+element to the candidate inside the query element's **own containing block**
+(`FindContainingBlockElement` + `IsDescendantOfElement`), falling back to the global registry
+otherwise. Wired into the three `position-anchor`-based default-anchor lookups (position-area,
+position-area JS offset queries, `anchor-center`); the `anchor()`-function path is left unchanged (it
+already filters via `IsAnchorAccessible` and carries the delicate scroll-offset logic). **Additive and
+narrowly gated:** it diverges from the old behaviour *only* when a name is shared *and* an in-CB
+candidate exists, so the ~275 unique-name anchor configs are byte-identical — the full curated
+`Broiler.Wpt.Tests` suite is **453 pass / 61 fail, zero regressions** (net +1, the new guard). Guard:
+`AnchorNameScopeTests.AnchoredElement_BindsToAnchorInItsOwnScope_NotGlobalLastWins` — two containers
+sharing `--a`; the anchored box's bottom-right cell is non-empty only when it binds to its own
+container's anchor, so it vanishes without the fix. *Note:* this alone does **not** flip
+`position-area-percents-001` — that test is still blocked by root cause #2 (the shared-layout snapshot
+mis-places its later `float:left` containers) and #3 (writing-mode-aware margin/padding %), both still
+open (see the deferred entry). But the scope fix is correct for the whole class of shared-`anchor-name`
+tests independent of those.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
