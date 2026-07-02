@@ -620,6 +620,35 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
 
+- **`css-anchor-position/position-area-percents-001` (#1175) — triaged, deferred (three
+  compounding root causes, none a clean fix).** The test lays out four `float:left` 100×100
+  `.container`s, each with a `.anchor` (`inset:20px 20px 40px 20px`, no explicit size,
+  `anchor-name:--foo`) and a `.anchored` (`position-area:bottom span-right`, `place-self:stretch`,
+  percentage `inset`/`margin`/`padding`), across horizontal and vertical writing modes. Broiler
+  renders the **reference** (explicit-inset boxes) correctly but the **test** grossly wrong — the
+  anchored boxes balloon to ~viewport width. Instrumenting `ComputePositionAreaRect` shows the CB is
+  correctly 100×100 but the anchor rect is `L=-876,R=-816,T20,B60` (width 60 is right; the horizontal
+  *position* is wildly negative). Three defects stack:
+  1. **Shared `anchor-name` not scoped.** All four `.anchor`s share `anchor-name:--foo`, but
+     `BuildAnchorRegistry` keys the registry by name into a *single* slot (last-wins), so every
+     `.anchored` resolves against one global `--foo` instead of the anchor in its own container. CSS
+     binds an anchored element to the acceptable anchor *in its scope* (here, its preceding sibling);
+     Broiler needs per-scope anchor selection (registry name→list + nearest-scope pick), which
+     touches every anchor-resolution path — regression-risky, CI-gated.
+  2. **Float-container geometry via shared layout.** The single registered `--foo` comes back at a
+     document X (~905) that doesn't match the anchor's own container — the shared-layout snapshot
+     mis-places the later `float:left` containers (3rd/4th reported at x≈910 instead of ≈242/≈360),
+     so the CB-origin subtraction yields the negative `anchorLeft`. Needs correct float placement in
+     the shared-geometry layout.
+  3. **Writing-mode-aware margin/padding %.** `ResolvePositionAreaValues` resolves margin/padding
+     percentages against `cellW` unconditionally, but per CSS they resolve against the **inline
+     dimension of the containing block** — `cellH` when the container's writing mode is vertical
+     (`vertical-rl`). The reference confirms the axis follows the *container's* writing mode, not the
+     anchored element's (case 2 anchored-vertical-in-horizontal-container still uses the horizontal
+     axis; case 4 the reverse). This is the smallest of the three but is masked by (1)/(2) until they
+     land. All three are feature-depth; taken together they are the deferred "vertical writing-mode
+     position-area geometry" item, now with concrete root causes.
+
 - **`css-align/blocks/align-content-block-{002,004,006,008,010}` (5, `columns:3`) — triaged
   (issue #1152), NOT an align-content bug; deferred to the multicol engine.** The report signature
   is misleading: four of the five fail with an *identical* `PixelMismatch / ColorShift` "Content
