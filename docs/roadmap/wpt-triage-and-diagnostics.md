@@ -39,6 +39,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
 | 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
 | 23 | `css-anchor-position` full-suite run (#1163, 227 fails) — triaged tail; scroll-offset tracking for `anchor()` across scrollers implemented | 🟡 partial | Broiler.HtmlBridge.Dom |
+| 24 | `position-area` grid collapses when the anchor is an abspos box inside an **inline** containing block (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -487,6 +488,39 @@ i.e. the anchor is pinned to that scroller. Guard: `AnchorScrollTrackingTests.
 OuterAnchored_StickyAnchor_NotShiftedByScroll`. Broiler still doesn't *paint* sticky pinning
 (`ScrollSimulation` shifts sticky children like normal flow), so the remaining
 `anchor-scroll-to-sticky-{002,003,005}` fails are a distinct, still-open gap.
+
+Cluster 24 (issue [#1175](https://github.com/Broiler-Platform/Broiler/issues/1175)) is the
+`position-area-inline-container` / `position-area-abs-inline-container` sub-cluster — a
+`position-area` grid anchored to an **abspos** box that lives inside an **inline** containing block
+(a `position:relative` `<span>`). Reproducing `position-area-inline-container` with the four
+`top|bottom × left|right` cells coloured distinctly showed **three of the four cells vanished and the
+survivor stretched to the full containing-block width** — the grid had collapsed. Instrumenting
+`ResolvePositionAreaValues` pinned it to the **anchor rect**: the anchor (`left:100; top:25; 200×50`
+inside the span) was registered at `(400, 0)` — the end of the preceding inline text — instead of
+`(100, 25)`. Root cause is in `DomBridge.ComputeElementBox`: with the shared renderer-layout geometry
+path enabled (the default since #1170), the anchor rect is sourced from real layout via
+`TryGetAnchorLayoutBox`; but Broiler's renderer **cannot place an abspos box inside an inline box**
+(that is exactly why `PromoteAbsPosFromInlineCBs` exists), so real layout drops the anchor at its
+inline-flow position, ignoring its own `left`/`top` insets. One wrong anchor rect feeds
+`ComputePositionAreaRect`, so every cell edge (derived from the anchor edges) lands wrong. Fixed by
+**bypassing the shared-geometry path for an abspos/fixed anchor whose containing block is an inline
+element** — detected with the existing `FindContainingBlockElement` + `IsInlineContainingBlock`
+helpers — falling through to the CSS-inset estimator, which resolves the explicit insets exactly. The
+condition is narrow (abspos + inline CB) and a no-op when the shared path is off, so ordinary
+block-CB and inline-text anchors (the `anchor-scroll-*` inline-anchor path) are untouched. With the
+fix the four cells land at the spec corners — verified against the authoritative reference HTML
+(`position-area-inline-container-ref.html`): the blue cells and the cyan anchor now match it
+**exactly**, the only residual being a ~1 % Ahem `XXXX` line-box baseline offset (the separate font
+tail). The two curated Broiler-vs-Broiler match tests
+(`Wpt_PositionArea{Inline,AbsInline}Container_MatchesReference`, which render both the test *and* the
+reference HTML through Broiler so both use Ahem consistently) move the anchor/geometry suite
+**14→12 failing with zero regressions**. Main-repo (`Broiler.HtmlBridge.Dom`), active on CI. Guard:
+`AnchorInlineContainingBlockTests.PositionAreaCells_AroundAbsPosAnchorInInlineContainingBlock_LandAtCorners`
+(a deterministic, Ahem-free repro that fails at the collapsed grid without the fix). *Note:* the
+committed `--reference-dir` PNGs for these two tests are stale **no-Ahem** captures (anchor and cells
+at the proportional-font positions), so the pixel-vs-committed-PNG subset run still scores them ~94 %;
+the fix is validated by the reference-HTML comparison and the offset guard, and lands on CI once those
+references are regenerated with Ahem.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that

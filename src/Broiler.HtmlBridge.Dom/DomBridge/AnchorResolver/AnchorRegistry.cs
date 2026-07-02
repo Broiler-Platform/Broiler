@@ -39,6 +39,23 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
 
+        string? position = props.GetValueOrDefault("position");
+        bool isPositioned = position == "absolute" || position == "fixed";
+
+        // An absolutely/fixed-positioned anchor whose containing block is an
+        // *inline* element (e.g. a `position:relative` <span>) cannot be placed by
+        // Broiler's renderer inside that inline box (see PromoteAbsPosFromInlineCBs)
+        // — its real layout lands at the inline-flow position, ignoring the box's own
+        // left/top insets. The shared-geometry path would therefore register the
+        // anchor at the wrong rect (css-anchor-position position-area-inline-container:
+        // an abspos anchor at left:100/top:25 in a <span> came back at the end of the
+        // preceding text, collapsing all four position-area cells). The CSS-inset
+        // estimator below resolves this case exactly from the explicit insets, so
+        // bypass the shared path for it.
+        bool absPosInInlineCB = isPositioned
+            && FindContainingBlockElement(element) is { } inlineCbAncestor
+            && IsInlineContainingBlock(inlineCbAncestor);
+
         // Prefer the renderer's real layout for the anchor rect when the shared
         // geometry path is active (RF-BRIDGE-1b). The CSS-property estimator below
         // cannot model inline flow — an inline anchor after an inline-block, or with
@@ -49,14 +66,11 @@ public sealed partial class DomBridge
         // anchor() resolution is unchanged. Falls through to the estimator whenever
         // the geometry is unavailable (flag off, detached, no box) — so this is a
         // no-op unless UseSharedLayoutGeometry is enabled.
-        if (TryGetAnchorLayoutBox(element, out var layoutBox))
+        if (!absPosInInlineCB && TryGetAnchorLayoutBox(element, out var layoutBox))
             return layoutBox;
 
         double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
         double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
-
-        string? position = props.GetValueOrDefault("position");
-        bool isPositioned = position == "absolute" || position == "fixed";
 
         // For absolutely positioned elements, use their explicit insets.
         if (isPositioned)
