@@ -1,7 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Scripting;
 
@@ -13,7 +9,6 @@ namespace Broiler.App.Rendering;
 /// </summary>
 public sealed class RenderingPipeline(
     IPageLoader pageLoader,
-    IScriptExtractor scriptExtractor,
     IScriptEngine scriptEngine) : IDisposable
 {
     /// <summary>
@@ -30,7 +25,7 @@ public sealed class RenderingPipeline(
         var (normalisedUrl, html) = await pageLoader.FetchAsync(url, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var result = scriptExtractor.ExtractAll(html, normalisedUrl);
+        var result = ScriptExtractionService.ExtractAll(html, normalisedUrl);
         cancellationToken.ThrowIfCancellationRequested();
 
         var executableScripts = result.AsyncScripts.Count == 0

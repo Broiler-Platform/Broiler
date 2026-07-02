@@ -33,12 +33,3 @@ public static class CommonUtils
     public static SizeF Max(SizeF size, SizeF other)
         => new(System.Math.Max(size.Width, other.Width), System.Math.Max(size.Height, other.Height));
 }
-
-/// <summary>
-/// HTML text helpers ported from the renderer's <c>Broiler.HTML.Utils.HtmlUtils</c>.
-/// </summary>
-public static class HtmlUtils
-{
-    /// <summary>Decodes HTML character entities in text content.</summary>
-    public static string DecodeHtml(string str) => WebUtility.HtmlDecode(str);
-}

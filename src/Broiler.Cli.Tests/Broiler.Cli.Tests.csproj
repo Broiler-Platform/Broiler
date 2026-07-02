@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Broiler.Cli\Broiler.Cli.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image.Compat\Broiler.HTML.Image.Compat.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Orchestration\Broiler.HTML.Orchestration.csproj" />
+    <ProjectReference Include="..\Broiler.HtmlBridge.Scripting\Broiler.HtmlBridge.Scripting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

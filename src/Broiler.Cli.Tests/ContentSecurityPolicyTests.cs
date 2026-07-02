@@ -312,8 +312,7 @@ public class ContentSecurityPolicyTests
             </html>
             """;
 
-        var extractor = new ScriptExtractor();
-        var result = extractor.ExtractAll(html, "file:///test.html");
+        var result = ScriptExtractionService.ExtractAll(html, "file:///test.html");
 
         Assert.Single(result.Scripts);
         Assert.Contains("var allowed = true;", result.Scripts);

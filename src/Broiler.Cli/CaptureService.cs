@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -10,6 +9,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.CSS;
+using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 

@@ -532,8 +532,7 @@ document.write('<p id=""injected"">written</p>');
 <script>var c = 3;</script>
 </body></html>";
 
-        var extractor = new ScriptExtractor();
-        var result = extractor.ExtractAll(html);
+        var result = ScriptExtractionService.ExtractAll(html);
 
         Assert.Equal(2, result.Scripts.Count);
         Assert.Contains("var a = 1;", result.Scripts);
@@ -548,8 +547,7 @@ document.write('<p id=""injected"">written</p>');
     {
         var html = @"<!DOCTYPE html><html><body><p>Hello</p></body></html>";
 
-        var extractor = new ScriptExtractor();
-        var result = extractor.ExtractAll(html);
+        var result = ScriptExtractionService.ExtractAll(html);
 
         Assert.Empty(result.Scripts);
         Assert.Empty(result.DeferredScripts);
@@ -563,8 +561,7 @@ document.write('<p id=""injected"">written</p>');
 <script src=""data:text/javascript,var%20x%20%3D%201%3B""></script>
 </body></html>";
 
-        var extractor = new ScriptExtractor();
-        var result = extractor.ExtractAll(html);
+        var result = ScriptExtractionService.ExtractAll(html);
 
         Assert.Single(result.Scripts);
         Assert.Equal("var x = 1;", result.Scripts[0]);
@@ -579,8 +576,7 @@ document.write('<p id=""injected"">written</p>');
 <script defer src=""data:text/javascript,var%20x%20%3D%201%3B""></script>
 </body></html>";
 
-        var extractor = new ScriptExtractor();
-        var result = extractor.ExtractAll(html);
+        var result = ScriptExtractionService.ExtractAll(html);
 
         Assert.Empty(result.Scripts);
         Assert.Single(result.DeferredScripts);
@@ -604,8 +600,7 @@ document.write('<p id=""injected"">written</p>');
 <script src=""{scriptUrl}""></script>
 </body></html>";
 
-            var extractor = new ScriptExtractor();
-            var result = extractor.ExtractAll(html, "file:///page.html");
+            var result = ScriptExtractionService.ExtractAll(html, "file:///page.html");
 
             Assert.Single(result.Scripts);
             Assert.Equal("var ext = 'loaded';", result.Scripts[0]);
@@ -680,7 +675,7 @@ document.getElementById('out').appendChild(p);
 </body></html>
 """;
 
-        var extraction = new ScriptExtractor().ExtractAll(html, "file:///test.html");
+        var extraction = ScriptExtractionService.ExtractAll(html, "file:///test.html");
         var executableScripts = extraction.Scripts.Concat(extraction.AsyncScripts).ToArray();
         var output = new ScriptEngine().Execute(executableScripts, extraction.DeferredScripts, html, "file:///test.html");
 
@@ -773,7 +768,7 @@ document.getElementById('out').appendChild(p);
             File.WriteAllText(scriptPath, "alert('hello');");
             var fileUrl = new Uri(scriptPath).AbsoluteUri;
 
-            var result = ScriptExtractor.FetchExternalScript(fileUrl, null);
+            var result = ScriptExtractionService.FetchExternalScript(fileUrl, null);
             Assert.Equal("alert('hello');", result);
         }
         finally
@@ -785,7 +780,7 @@ document.getElementById('out').appendChild(p);
     [Fact]
     public void ScriptExtractor_FetchExternalScript_NonExistent_Returns_Null()
     {
-        var result = ScriptExtractor.FetchExternalScript("file:///nonexistent/script.js", null);
+        var result = ScriptExtractionService.FetchExternalScript("file:///nonexistent/script.js", null);
         Assert.Null(result);
     }
 

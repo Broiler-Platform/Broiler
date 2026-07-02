@@ -1,19 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Net.Http;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Broiler.App.Rendering;
 using Broiler.Graphics;
 using Broiler.Graphics.Windows;
-using Broiler.HtmlBridge;
 using Broiler.HTML.Core.Entities;
 using Broiler.HTML.Graphics;
+using Broiler.HTML.Image;
+using Broiler.HtmlBridge;
+using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Text;
+
 
 namespace Broiler.App.Graphics;
 
@@ -298,7 +294,6 @@ internal sealed class BrowserWindow : Direct2DWindow
     {
         using var pipeline = new RenderingPipeline(
             new PageLoader(new HttpClient()),
-            new ScriptExtractor(),
             new ScriptEngine());
 
         var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
@@ -485,7 +480,7 @@ internal sealed class BrowserWindow : Direct2DWindow
         {
             _container.ScrollOffset = new PointF(0, -_scrollY);
             DisposeRenderList();
-            _renderList = _container.CreateRenderList(Renderer, new RectangleF(0, 0, vpW, vpH));
+            _renderList = HtmlGraphicsRenderListBuilder.Build(Renderer, _container.CreateDisplayList(), new RectangleF(0, 0, vpW, vpH));
             _renderDirty = false;
         }
 

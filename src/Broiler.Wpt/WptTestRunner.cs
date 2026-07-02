@@ -1,15 +1,13 @@
 using System.Text.RegularExpressions;
-using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Broiler.HTML.Core.Entities;
 using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge;
+using Broiler.Graphics;
 using Broiler.HtmlBridge.Scripting;
-using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Wpt;
 
@@ -699,7 +697,7 @@ internal sealed class WptTestRunner
     /// captured). Best-effort: an I/O error is logged and does not fail the test.
     /// </summary>
     private (string? Rendered, string? Reference, string? Diff) SaveFailureImages(
-        string testPath, string? wptRoot, BBitmap rendered, BBitmap reference, BBitmap? diff)
+        string testPath, string? wptRoot, HTML.Image.BBitmap rendered, HTML.Image.BBitmap reference, HTML.Image.BBitmap? diff)
     {
         if (string.IsNullOrEmpty(_failureImageDir))
             return (null, null, null);
@@ -1157,7 +1155,7 @@ internal sealed class WptTestRunner
     /// Returns null when there is no rel=match reference, it cannot be resolved or
     /// rendered, or Broiler does not match it. Best-effort: never throws.
     /// </summary>
-    private string? VerifyAgainstReferenceHtml(string testPath, string html, string? wptRoot, BBitmap testRender)
+    private string? VerifyAgainstReferenceHtml(string testPath, string html, string? wptRoot, HTML.Image.BBitmap testRender)
     {
         try
         {
@@ -1378,7 +1376,7 @@ internal sealed class WptTestRunner
         }
 
         // Render via Broiler HTML stack.
-        BBitmap rendered;
+        HTML.Image.BBitmap rendered;
         try
         {
             rendered = HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
@@ -1426,10 +1424,10 @@ internal sealed class WptTestRunner
                 };
             }
 
-            BBitmap reference;
+            HTML.Image.BBitmap reference;
             try
             {
-                reference = BBitmap.Decode(referencePath);
+                reference = HTML.Image.BBitmap.Decode(referencePath);
             }
             catch (Exception ex)
             {
@@ -1535,8 +1533,8 @@ internal sealed class WptTestRunner
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
 
-        BBitmap? rendered = null;
-        BBitmap? reference = null;
+        HTML.Image.BBitmap? rendered = null;
+        HTML.Image.BBitmap? reference = null;
         try
         {
             rendered = RenderHtmlFileBitmap(testPath, wptRoot);
@@ -1602,7 +1600,7 @@ internal sealed class WptTestRunner
     /// Renders an HTML file through the full Broiler pipeline (script execution,
     /// anchor resolution, rendering) and returns the resulting bitmap.
     /// </summary>
-    private BBitmap RenderHtmlFileBitmap(string htmlPath, string? wptRoot)
+    private HTML.Image.BBitmap RenderHtmlFileBitmap(string htmlPath, string? wptRoot)
     {
         var html = File.ReadAllText(htmlPath);
 
@@ -1639,7 +1637,7 @@ internal sealed class WptTestRunner
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
     }
 
-    internal BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
+    internal HTML.Image.BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
     {
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);

@@ -21,9 +21,6 @@
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image.Compat/Broiler.HTML.Image.Compat.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image/Broiler.HTML.Image.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj" />
-    <Project Path="Broiler.HTML/Source/Broiler.HTML.Rendering/Broiler.HTML.Rendering.csproj" />
-    <Project Path="Broiler.HTML/Source/Broiler.HTML.Utils/Broiler.HTML.Utils.csproj" />
-    <Project Path="Broiler.HTML/Source/Broiler.HTML/Broiler.HTML.csproj" />
   </Folder>
   <Folder Name="/Dependencies/JavaScript/">
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
@@ -65,7 +62,6 @@
     <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Rendering/Broiler.HtmlBridge.Rendering.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj" />
-    <Project Path="src/Broiler.HtmlBridge/Broiler.HtmlBridge.csproj" />
   </Folder>
   <Project Path="src/Broiler.Wpt/Broiler.Wpt.csproj" />
 </Solution>

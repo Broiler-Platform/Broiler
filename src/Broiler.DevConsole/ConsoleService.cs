@@ -1,6 +1,5 @@
-using Broiler.HTML.Dom;
-using Broiler.Layout.Engine;
 using Broiler.HtmlBridge.Logging;
+using Broiler.Layout.Engine;
 
 namespace Broiler.DevConsole;
 
@@ -12,7 +11,7 @@ public sealed class ConsoleService : IDisposable
 {
     private readonly LogSubscription _logSubscription;
     private readonly List<RenderLogEntry> _entries = [];
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     /// <summary>Raised when a new log entry is received.</summary>
     public event Action<RenderLogEntry>? EntryReceived;

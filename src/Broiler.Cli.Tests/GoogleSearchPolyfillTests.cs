@@ -3299,7 +3299,6 @@ document.getElementById('result').textContent =
     [Fact]
     public void ScriptExtractor_Separates_Async_Scripts()
     {
-        var extractor = new ScriptExtractor();
         var html = @"<html><head>
             <script>var a = 1;</script>
             <script async>var b = 2;</script>
@@ -3307,7 +3306,7 @@ document.getElementById('result').textContent =
             <script async src=""data:text/javascript,var d = 4;""></script>
         </head><body></body></html>";
 
-        var result = extractor.ExtractAll(html);
+        var result = ScriptExtractionService.ExtractAll(html);
         Assert.Single(result.Scripts);           // 'var a = 1;'
         Assert.Single(result.DeferredScripts);   // 'var c = 3;'
         Assert.Equal(2, result.AsyncScripts.Count); // 'var b = 2;' + 'var d = 4;'

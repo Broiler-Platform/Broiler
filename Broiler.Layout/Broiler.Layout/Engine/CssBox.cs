@@ -1,6 +1,7 @@
 using Broiler.Graphics;
 ﻿using System.Drawing;
 using System.Globalization;
+using System.Net;
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 
@@ -842,7 +843,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     }
                     else
                     {
-                        Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
+                        Words.Add(new CssRectWord(this, WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
                     }
                 }
             }
@@ -869,7 +870,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
                     var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
 
-                    Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), hasSpaceBefore, hasSpaceAfter));
+                    Words.Add(new CssRectWord(this, WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString()), hasSpaceBefore, hasSpaceAfter));
                 }
             }
 
