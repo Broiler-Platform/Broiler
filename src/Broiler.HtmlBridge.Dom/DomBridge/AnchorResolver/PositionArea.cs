@@ -473,6 +473,29 @@ public sealed partial class DomBridge
                 // and the grid origin must account for body margin.
                 cbOffsetX = FindBodyMarginLeft();
                 cbOffsetY = FindBodyMarginTop();
+
+                // ComputeElementBox measures the anchor relative to its nearest
+                // CB-establishing ancestor and stops there. When that ancestor is
+                // a non-body wrapper (e.g. a transformed div), the returned coords
+                // are wrapper-relative, not document-absolute as assumed above.
+                // Shift the anchor into the document frame by adding the wrapper's
+                // own position (css-anchor-position transform-005: a transformed
+                // anchor wrapper below a <p> otherwise placed block-end one text
+                // line too high, exposing the red containing block).
+                var anchorWrapper = anchor.SourceElement != null
+                    ? FindContainingBlockElement(anchor.SourceElement)
+                    : null;
+                if (anchorWrapper != null)
+                {
+                    var wrapperBox = ComputeElementBox(anchorWrapper);
+                    if (wrapperBox != null)
+                    {
+                        anchorLeft += wrapperBox.Left;
+                        anchorRight += wrapperBox.Left;
+                        anchorTop += wrapperBox.Top;
+                        anchorBottom += wrapperBox.Top;
+                    }
+                }
             }
             else
             {

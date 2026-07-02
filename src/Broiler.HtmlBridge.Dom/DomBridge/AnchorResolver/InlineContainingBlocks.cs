@@ -56,6 +56,17 @@ public sealed partial class DomBridge
                     // may not have explicit width. Estimate from content.
                     explicitW = EstimateInlineContentWidth(parent);
                 }
+                if (explicitW == null)
+                {
+                    // A no-width block-level containing block (e.g. a transformed
+                    // wrapper with no explicit width) fills ITS own containing
+                    // block; resolve its used width from the nearest sized
+                    // ancestor up the normal-flow parent chain rather than
+                    // defaulting to the viewport (css-anchor-position transform-005:
+                    // a nested no-width anchor under a sized 100px ancestor made
+                    // anchor-size(width) resolve to the viewport width).
+                    explicitW = ResolveBlockUsedWidthFromAncestors(parent);
+                }
                 double w = explicitW ?? _viewportWidth;
                 // Subtract padding from the CB width to get content width.
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-left")) ?? 0;
@@ -67,6 +78,34 @@ public sealed partial class DomBridge
         // No positioned ancestor found; use viewport width minus default body
         // margin (8px each side) as the effective content width for block layout.
         return _viewportWidth - 16;
+    }
+    /// <summary>
+    /// Resolves the used content width of a block-level element that has no
+    /// explicit <c>width</c> by walking up the normal-flow parent chain to the
+    /// nearest ancestor with a definite width and returning its content width.
+    /// A block with no explicit width fills its containing block, so a no-width
+    /// wrapper (even one that establishes a containing block, e.g. via
+    /// <c>transform</c>) inherits the width of an outer sized ancestor rather
+    /// than defaulting to the viewport. Returns <c>null</c> when no sized
+    /// ancestor is found (caller falls back to the viewport width).
+    /// </summary>
+    private double? ResolveBlockUsedWidthFromAncestors(DomElement blockEl)
+    {
+        for (var a = blockEl.Parent; a != null && !a.IsTextNode; a = a.Parent)
+        {
+            var ap = GetComputedProps(a);
+            double? w = TryParsePx(ap.GetValueOrDefault("width"));
+            if (w.HasValue)
+            {
+                double cw = w.Value;
+                cw -= TryParsePx(ap.GetValueOrDefault("padding-left")) ?? 0;
+                cw -= TryParsePx(ap.GetValueOrDefault("padding-right")) ?? 0;
+                cw -= TryParsePx(ap.GetValueOrDefault("border-left-width")) ?? 0;
+                cw -= TryParsePx(ap.GetValueOrDefault("border-right-width")) ?? 0;
+                return cw < 0 ? 0 : cw;
+            }
+        }
+        return null;
     }
     /// <summary>
     /// Finds the height of the nearest positioned ancestor (containing block)
