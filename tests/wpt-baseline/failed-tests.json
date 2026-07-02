@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14622,
+    "failed": 14623,
     "skipped": 0,
-    "total": 14622
+    "total": 14623
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -26,11 +26,11 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 39,
+      "count": 34,
       "examples": [
         "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
         "css/css-anchor-position/position-anchor-normal-pseudo-element-implicit-002.html",
-        "css/css-anchor-position/transform-003.html"
+        "css/css-anchor-position/anchor-position-multicol-009.html"
       ]
     },
     {
@@ -50,28 +50,49 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 10,
+      "count": 8,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
         "css/css-anchor-position/position-try-container-query.html"
+      ]
+    },
+    {
+      "key": "RenderingError",
+      "label": "RenderingError",
+      "category": "RenderingError",
+      "subCategory": null,
+      "count": 8,
+      "examples": [
+        "css/css-anchor-position/transform-003.html",
+        "css/css-anchor-position/transform-001.html",
+        "css/css-anchor-position/transform-009.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      226
+      227
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      226
+      219
+    ],
+    [
+      "RenderingError",
+      8
     ]
   ],
   "droppedDeclarations": [],
-  "exceptionSignatures": [],
+  "exceptionSignatures": [
+    [
+      "CompatCanvasOperations.InvokeVoid \u2014 Canvas compat object 'Broiler.HTML.Image.Compat.StubCanvas' does not expose method 'Save'.",
+      8
+    ]
+  ],
   "failureFamilies": [
     {
       "family": "css/css-anchor-position/anchor-scroll-position-try-{N}.html",
@@ -99,9 +120,10 @@
     },
     {
       "family": "css/css-anchor-position/transform-{N}.html",
-      "count": 11,
+      "count": 12,
       "categories": {
-        "PixelMismatch": 11
+        "RenderingError": 6,
+        "PixelMismatch": 6
       },
       "examples": [
         "css/css-anchor-position/transform-003.html",
@@ -185,7 +207,8 @@
       "family": "css/css-anchor-position/anchor-scroll-to-sticky-{N}.html",
       "count": 4,
       "categories": {
-        "PixelMismatch": 4
+        "PixelMismatch": 3,
+        "RenderingError": 1
       },
       "examples": [
         "css/css-anchor-position/anchor-scroll-to-sticky-002.html",
@@ -26999,8 +27022,7 @@
       "relativeTestPath": "css/css-anchor-position/anchor-getComputedStyle-001.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-getComputedStyle-002.html",
@@ -27587,8 +27609,7 @@
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-to-sticky-005.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-update-001.html",
@@ -28197,7 +28218,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-change-anchor.html",
@@ -28350,22 +28371,19 @@
       "relativeTestPath": "css/css-anchor-position/transform-001.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-002.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-003.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-004.html",
@@ -28389,18 +28407,22 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/transform-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "RenderingError"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/transform-008.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-009.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "category": "RenderingError"
     },
     {
       "relativeTestPath": "css/css-anchor-position/transform-011.html",
