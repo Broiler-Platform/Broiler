@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14619,
+    "failed": 14618,
     "skipped": 0,
-    "total": 14619
+    "total": 14618
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 19,
+      "count": 20,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -50,38 +50,24 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 15,
+      "count": 14,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
         "css/css-anchor-position/position-try-container-query.html"
-      ]
-    },
-    {
-      "key": "Timeout",
-      "label": "Timeout",
-      "category": "Timeout",
-      "subCategory": null,
-      "count": 1,
-      "examples": [
-        "css/css-anchor-position/anchor-position-writing-modes-001.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      223
+      222
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
       222
-    ],
-    [
-      "Timeout",
-      1
     ]
   ],
   "droppedDeclarations": [],
@@ -27318,12 +27304,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/anchor-position-writing-modes-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/anchor-position-writing-modes-002.html",
       "passed": false,
       "skipped": false,
@@ -27804,7 +27784,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-005.html",
@@ -28182,7 +28162,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-003.html",
