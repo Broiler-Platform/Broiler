@@ -21,16 +21,17 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+_(none currently pending)_
+
+## Applied / obsolete
+
 - **0001-broiler-html-inline-layout-geometry.patch** → `Broiler.HTML`
-  (`Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs`). Makes
-  `CollectLayoutGeometry` reconstruct an **inline** box's border box from the
-  union of its per-line rectangles instead of recording an empty box at the
-  origin. Enables the shared-layout-geometry snapshot (RF-BRIDGE-1b) — and
-  `getBoundingClientRect` for inline elements — to report real inline geometry.
-  Required for the css-anchor-position `anchor-scroll-*` cluster (issue #1163):
-  an inline `<span>` anchor must report its real rect so `anchor()` resolves
-  against the anchor's true position. See `docs/roadmap/wpt-triage-and-diagnostics.md`
-  Cluster 23. The main-repo consumer (`AnchorRegistry.TryGetAnchorLayoutBox`) is
-  gated behind `DomBridge.UseSharedLayoutGeometry` (default off), so it is a
-  no-op on CI until both this patch is applied and the flag is enabled — nothing
-  regresses in the meantime.
+  (`Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — **APPLIED upstream**,
+  no longer needed. Made `CollectLayoutGeometry` reconstruct an **inline** box's
+  border box from the union of its per-line rectangles instead of recording an
+  empty box at the origin, so the shared-layout-geometry snapshot (RF-BRIDGE-1b)
+  and `getBoundingClientRect` report real inline geometry. This landed in the
+  `Broiler.HTML` submodule as commit `e37d38a` ("Collect real geometry for inline
+  boxes in CollectLayoutGeometry") and is live at the pinned pointer CI clones, so
+  the patch file was removed. With it live, `DomBridge.UseSharedLayoutGeometry` was
+  enabled by default (see `docs/roadmap/wpt-triage-and-diagnostics.md` Cluster 23).

@@ -9,10 +9,13 @@ public sealed partial class DomBridge
     // RF-BRIDGE-1b: when true, element-geometry queries (offset*/client*/
     // getBoundingClientRect/check-layout) resolve through the renderer's real layout
     // engine via SharedLayoutGeometryProvider instead of the coarse LayoutMetrics
-    // estimators. Default false until the parity gate (increment 4) confirms the shared
-    // path matches or improves on the estimators; the LayoutMetrics entry points are
-    // routed in increment 3. Mirrors the LayoutGeometryCacheEnabled test seam.
-    internal static bool UseSharedLayoutGeometry;
+    // estimators. Enabled once increments 1-3 landed (the LayoutMetrics entry points and
+    // the anchor resolver route through the provider, and the Broiler.HTML inline-box
+    // geometry fix is live on CI) and the increment-4 parity gate confirmed the shared
+    // path matches or improves on the estimators — see
+    // SharedLayoutGeometryParityTests.Shared_Geometry_Matches_Or_Beats_Estimator_On_CheckLayout_Corpus.
+    // Mirrors the LayoutGeometryCacheEnabled test seam.
+    internal static bool UseSharedLayoutGeometry = true;
 
     private SharedLayoutGeometryProvider _sharedLayoutGeometry;
 
