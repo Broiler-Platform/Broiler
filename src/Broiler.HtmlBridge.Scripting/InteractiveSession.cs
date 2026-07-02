@@ -1,3 +1,5 @@
+using Broiler.HtmlBridge.Dom;
+using Broiler.HtmlBridge.Scripting;
 using Broiler.JavaScript.Engine;
 using System;
 

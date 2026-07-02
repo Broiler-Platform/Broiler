@@ -1,4 +1,5 @@
 using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Scripting;
 using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
@@ -29,7 +30,7 @@ public class ScriptEngineExecuteTests
         {
             MaxSize = new System.Drawing.SizeF(100, 50)
         };
-        container.SetDocument(document!);
+        container.SetDocumentWithStyleSet(document!);
         container.PerformLayout(new System.Drawing.RectangleF(0, 0, 100, 50));
 
         Assert.Equal(35, container.GetElementRectangle("target")!.Value.Width);

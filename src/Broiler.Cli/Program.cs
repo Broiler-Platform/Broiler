@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
+using Broiler.HtmlBridge.Logging;
 
 namespace Broiler.Cli;
 

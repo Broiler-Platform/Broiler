@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace Broiler.Layout;
+namespace Broiler.Layout.Engine;
 
 internal sealed class CssRectImage(CssBox owner) : CssRect(owner)
 {

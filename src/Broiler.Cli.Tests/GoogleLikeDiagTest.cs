@@ -21,7 +21,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+            if (px.R < 250 || px.G < 250 || px.B < 250)
             {
                 if (left < 0) left = x;
                 right = x;
@@ -36,7 +36,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+            if (px.R < 100 && px.G < 100 && px.B < 100)
                 count++;
         }
         return count;
@@ -54,7 +54,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
                 <input type='submit' value='Search'>
             </div>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
         
         // The flex container should have block width and the button should render
         int totalNonWhite = 0;
@@ -62,7 +62,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+            if (px.R < 250 || px.G < 250 || px.B < 250)
                 totalNonWhite++;
         }
         Assert.True(totalNonWhite > 20, $"Flex container children should render (nonWhite={totalNonWhite})");
@@ -80,7 +80,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
             </div>
             <span>World</span>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 40);
         
         // Both "Hello" and "World" should be on the same line (inline-flex is inline-level)
         int totalDark = 0;
@@ -99,7 +99,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         var html = @"<html><body style='margin:0'>
             <input type='submit' value='OK'>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
         
         var (left, right) = (bmp.Width, 0);
         for (int y = 0; y < bmp.Height; y++)
@@ -122,7 +122,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
             <input type='submit' value='Google Suche'>
         </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 40);
 
         int totalDark = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -139,7 +139,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
             <input type='submit'>
         </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 40);
 
         int totalDark = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -174,7 +174,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
 </center>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 200);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 200);
 
         // Check for dark pixels in the button area (y=40-150)
         int buttonDark = 0;
@@ -207,7 +207,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         // Check that buttons don't span full width
         bool foundWideRow = false;
@@ -237,14 +237,14 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         int totalNonWhite = 0;
         for (int y = 0; y < bmp.Height; y++)
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+            if (px.R < 250 || px.G < 250 || px.B < 250)
                 totalNonWhite++;
         }
         Assert.True(totalNonWhite > 20,

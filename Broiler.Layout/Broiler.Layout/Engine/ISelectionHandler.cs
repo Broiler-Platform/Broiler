@@ -1,4 +1,4 @@
-namespace Broiler.Layout;
+namespace Broiler.Layout.Engine;
 
 internal interface ISelectionHandler
 {

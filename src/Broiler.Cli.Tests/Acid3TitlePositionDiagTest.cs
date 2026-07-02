@@ -28,7 +28,7 @@ h1:first-child { font-size: 5em; font-weight: bolder; margin-bottom: -0.4em; }
 </style>
 <body><h1>X</h1></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 800, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 300);
         int topDark = FindTopDark(bitmap);
 
         // Without :root support, title was at y~91 (2cm border).
@@ -54,12 +54,12 @@ div { background: white; width: 50px; height: 50px; }
 </style>
 <body><div>X</div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The div at (0,0) should be white, not red
         var px = bitmap.GetPixel(25, 25);
-        Assert.True(px.Red > 200 && px.Green > 200 && px.Blue > 200,
-            $"div should be white, found ({px.Red},{px.Green},{px.Blue})");
+        Assert.True(px.R > 200 && px.G > 200 && px.B > 200,
+            $"div should be white, found ({px.R},{px.G},{px.B})");
     }
 
     private static int FindTopDark(BBitmap bitmap)
@@ -68,7 +68,7 @@ div { background: white; width: 50px; height: 50px; }
         for (int x = 50; x < 400; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < 80 && px.Green < 80 && px.Blue < 80)
+            if (px.R < 80 && px.G < 80 && px.B < 80)
                 return y;
         }
         return -1;

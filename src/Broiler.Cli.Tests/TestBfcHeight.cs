@@ -22,7 +22,7 @@ public class BfcHeightTests
                     </div>
                 </div>
             </body></html>";
-        using var bitmap = HtmlRender.RenderToImage(html, 500, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 500, 200);
 
         // Count black (border) and yellow (float content) pixels
         int black = 0, yellow = 0;
@@ -30,8 +30,8 @@ public class BfcHeightTests
         for (int x = 0; x < 120; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < 10 && px.Green < 10 && px.Blue < 10) black++;
-            if (px.Red > 240 && px.Green > 240 && px.Blue < 10) yellow++;
+            if (px.R < 10 && px.G < 10 && px.B < 10) black++;
+            if (px.R > 240 && px.G > 240 && px.B < 10) yellow++;
         }
 
         // The float content should render (yellow pixels present)
@@ -60,15 +60,15 @@ public class BfcHeightTests
                     <div class='ears'><div class='inner'></div></div>
                 </div>
             </body></html>";
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 200);
 
         int black = 0, yellow = 0;
         for (int y = 0; y < 100; y++)
         for (int x = 0; x < 200; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < 10 && px.Green < 10 && px.Blue < 10) black++;
-            if (px.Red > 240 && px.Green > 240 && px.Blue < 10) yellow++;
+            if (px.R < 10 && px.G < 10 && px.B < 10) black++;
+            if (px.R > 240 && px.G > 240 && px.B < 10) yellow++;
         }
 
         Assert.True(yellow > 50,

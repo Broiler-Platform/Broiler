@@ -43,15 +43,15 @@ body { margin: 0; }
 <div style=""background: yellow; width: 50px; height: 10px;""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 300);
 
         // The yellow div should start right after the red container's
         // flow content (30px), not after the absolute child (200px).
         // Check at x=25 (within yellow div, outside absolute child at left:100).
         var pixel = bitmap.GetPixel(25, 35);
-        _output.WriteLine($"Pixel at (25,35): R={pixel.Red} G={pixel.Green} B={pixel.Blue}");
-        Assert.True(pixel.Red > 200 && pixel.Green > 200 && pixel.Blue < 50,
-            $"Expected yellow below the 30px flow child; got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        _output.WriteLine($"Pixel at (25,35): R={pixel.R} G={pixel.G} B={pixel.B}");
+        Assert.True(pixel.R > 200 && pixel.G > 200 && pixel.B < 50,
+            $"Expected yellow below the 30px flow child; got ({pixel.R},{pixel.G},{pixel.B})");
     }
 
     /// <summary>
@@ -75,12 +75,12 @@ body { margin: 0; }
 <div style=""background: yellow; width: 50px; height: 10px;""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 300);
 
         var pixel = bitmap.GetPixel(25, 35);
-        _output.WriteLine($"Pixel at (25,35): R={pixel.Red} G={pixel.Green} B={pixel.Blue}");
-        Assert.True(pixel.Red > 200 && pixel.Green > 200 && pixel.Blue < 50,
-            $"Expected yellow below the 30px flow child; got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        _output.WriteLine($"Pixel at (25,35): R={pixel.R} G={pixel.G} B={pixel.B}");
+        Assert.True(pixel.R > 200 && pixel.G > 200 && pixel.B < 50,
+            $"Expected yellow below the 30px flow child; got ({pixel.R},{pixel.G},{pixel.B})");
     }
 
     // ------------------------------------------------------------------
@@ -104,7 +104,7 @@ div { width: 60px; height: 40px; background: lime; }
 <div></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // No blue border pixels should exist — border-style is "none".
         int bluePixels = 0;
@@ -112,7 +112,7 @@ div { width: 60px; height: 40px; background: lime; }
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Blue > 200 && p.Red < 30 && p.Green < 30)
+                if (p.B > 200 && p.R < 30 && p.G < 30)
                     bluePixels++;
             }
 
@@ -141,7 +141,7 @@ p { border: 1px solid !important; width: 60px; height: 40px; }
 <p></p>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The paragraph should have a 1px solid black border, not blue.
         int bluePixels = 0;
@@ -149,7 +149,7 @@ p { border: 1px solid !important; width: 60px; height: 40px; }
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Blue > 200 && p.Red < 30 && p.Green < 30)
+                if (p.B > 200 && p.R < 30 && p.G < 30)
                     bluePixels++;
             }
 
@@ -175,7 +175,7 @@ div.hidden-border { border-style: none; }
 <div class=""hidden-border"" style=""width:60px;height:40px;background:lime""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // No red border pixels should exist — style is "none".
         int redPixels = 0;
@@ -183,7 +183,7 @@ div.hidden-border { border-style: none; }
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Red > 200 && p.Green < 30 && p.Blue < 30)
+                if (p.R > 200 && p.G < 30 && p.B < 30)
                     redPixels++;
             }
 

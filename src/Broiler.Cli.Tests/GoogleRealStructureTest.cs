@@ -46,8 +46,8 @@ public class GoogleRealStructureTest
 </center>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 200);
-        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_buttons.png"), bmp.Encode(BImageFormat.Png, 100));
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 200);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_buttons.png"), bmp.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
         
         // Analyze button area (y=30-100)
         int btnLeft = bmp.Width, btnRight = 0;
@@ -56,8 +56,8 @@ public class GoogleRealStructureTest
             {
                 var px = bmp.GetPixel(x, y);
                 // #F3F5F6 or nearby (.lsbb background)
-                if (px.Red >= 0xF0 && px.Green >= 0xF0 && px.Blue >= 0xF0
-                    && (px.Red < 0xFF || px.Green < 0xFF || px.Blue < 0xFF))
+                if (px.R >= 0xF0 && px.G >= 0xF0 && px.B >= 0xF0
+                    && (px.R < 0xFF || px.G < 0xFF || px.B < 0xFF))
                 {
                     if (x < btnLeft) btnLeft = x;
                     if (x > btnRight) btnRight = x;
@@ -125,8 +125,8 @@ a{color:#4b11a8;text-decoration:none}
 </center>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 600);
-        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_fullpage.png"), bmp.Encode(BImageFormat.Png, 100));
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 600);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_fullpage.png"), bmp.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (roughly y=200-350)
         int darkPixels = 0;
@@ -134,7 +134,7 @@ a{color:#4b11a8;text-decoration:none}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     darkPixels++;
             }
         _output.WriteLine($"Button area dark pixels (y=180-350): {darkPixels}");
@@ -149,8 +149,8 @@ a{color:#4b11a8;text-decoration:none}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red >= 0xF0 && px.Green >= 0xF0 && px.Blue >= 0xF0
-                    && (px.Red < 0xFE || px.Green < 0xFE || px.Blue < 0xFE))
+                if (px.R >= 0xF0 && px.G >= 0xF0 && px.B >= 0xF0
+                    && (px.R < 0xFE || px.G < 0xFE || px.B < 0xFE))
                 {
                     if (x < gLeft) gLeft = x;
                     if (x > gRight) gRight = x;
@@ -173,7 +173,7 @@ a{color:#4b11a8;text-decoration:none}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     headerDark++;
             }
         _output.WriteLine($"Header dark pixels (y=0-30): {headerDark}");
@@ -197,7 +197,7 @@ a{color:#4b11a8;text-decoration:none}
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         // Find the red border extent
         int left = bmp.Width, right = 0;
@@ -205,7 +205,7 @@ a{color:#4b11a8;text-decoration:none}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+                if (px.R > 200 && px.G < 50 && px.B < 50)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -254,15 +254,15 @@ a{color:#4b11a8;text-decoration:none}
 </center>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 120);
-        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"), bmp.Encode(BImageFormat.Png, 100));
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 120);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"), bmp.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
 
         int darkPixels = 0;
         for (int y = 0; y < bmp.Height; y++)
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     darkPixels++;
             }
         _output.WriteLine($"Modern buttons dark pixels: {darkPixels}");
@@ -277,7 +277,7 @@ a{color:#4b11a8;text-decoration:none}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                if (px.R < 250 || px.G < 250 || px.B < 250)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -311,14 +311,14 @@ a{color:#4b11a8;text-decoration:none}
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 80);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 80);
 
         int darkPixels = 0;
         for (int y = 0; y < bmp.Height; y++)
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     darkPixels++;
             }
         _output.WriteLine($"Button elements dark pixels: {darkPixels}");
@@ -372,8 +372,8 @@ input{font-family:inherit}
 </center>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 200);
-        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_real_html.png"), bmp.Encode(BImageFormat.Png, 100));
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 200);
+        System.IO.File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_real_html.png"), bmp.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (y=30-100)
         int darkInBtnArea = 0;
@@ -381,7 +381,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     darkInBtnArea++;
             }
         _output.WriteLine($"Button area dark pixels (y=30-100): {darkInBtnArea}");
@@ -396,7 +396,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                if (px.R < 250 || px.G < 250 || px.B < 250)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -423,8 +423,8 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red >= 0xF0 && px.Green >= 0xF0 && px.Blue >= 0xF0
-                    && (px.Red < 0xFE || px.Green < 0xFE || px.Blue < 0xFE))
+                if (px.R >= 0xF0 && px.G >= 0xF0 && px.B >= 0xF0
+                    && (px.R < 0xFE || px.G < 0xFE || px.B < 0xFE))
                 {
                     if (x < gLeft) gLeft = x;
                     if (x > gRight) gRight = x;
@@ -453,7 +453,7 @@ input{font-family:inherit}
 <input type='submit' value='Submit'>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 60);
 
         // The hidden input should be invisible
         // Only the submit button should render
@@ -462,7 +462,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                if (px.R < 100 && px.G < 100 && px.B < 100)
                     darkPixels++;
             }
         _output.WriteLine($"Dark pixels: {darkPixels}");
@@ -474,7 +474,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                if (px.R < 250 || px.G < 250 || px.B < 250)
                     nonWhite++;
             }
         _output.WriteLine($"Non-white pixels: {nonWhite}");
@@ -496,7 +496,7 @@ input{font-family:inherit}
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
         
         bool prevDark = false;
         var gaps = new List<int>();
@@ -508,7 +508,7 @@ input{font-family:inherit}
             for (int y = 0; y < bmp.Height; y++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 100 || px.Green < 100 || px.Blue < 100)
+                if (px.R < 100 || px.G < 100 || px.B < 100)
                 { isDark = true; break; }
             }
             if (!isDark && prevDark) endX = x;

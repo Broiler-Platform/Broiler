@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using Broiler.Layout.IR;
 using Broiler.HTML.Core.IR;
 using Broiler.HTML.Image;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -127,7 +129,7 @@ public class GraphicsBackendStabilizationTests
     private static BBitmap RenderHtmlWithBackend(string backendId, string html, int width, int height, string? baseUrl = null)
     {
         using var _ = BGraphicsBackend.OverrideForCurrentThread(backendId);
-        return HtmlRender.RenderToImage(html, width, height, BColor.White, baseUrl: baseUrl);
+        return HtmlRender.RenderToImageWithStyleSet(html, width, height, backgroundColor: BColor.White, baseUrl: baseUrl);
     }
 
     private static BBitmap RenderCliCaptureSampleWithBackend(string backendId)

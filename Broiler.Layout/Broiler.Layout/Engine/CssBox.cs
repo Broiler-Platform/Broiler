@@ -1,12 +1,10 @@
-﻿using Broiler.Layout;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
+using Broiler.Graphics;
+﻿using System.Drawing;
 using System.Globalization;
-
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
-namespace Broiler.Layout;
+
+namespace Broiler.Layout.Engine;
 
 internal class CssBox : CssBoxProperties, IDisposable
 {
@@ -18,13 +16,13 @@ internal class CssBox : CssBoxProperties, IDisposable
     internal bool _tableFixed;
 
     /// <summary>
-    /// The canonical <see cref="Broiler.Dom.DomElement"/> this box was built from,
-    /// when the box tree was generated from a <see cref="Broiler.Dom.DomDocument"/>
+    /// The canonical <see cref="Dom.DomElement"/> this box was built from,
+    /// when the box tree was generated from a <see cref="Dom.DomDocument"/>
     /// (the <c>SetDocument</c> path). <c>null</c> on the legacy HTML-string parse path.
     /// Phase 5 uses this to run the shared <c>Broiler.CSS.Dom</c> cascade on the
     /// canonical element and project the result onto this box.
     /// </summary>
-    internal Broiler.Dom.DomElement SourceElement { get; set; }
+    internal Dom.DomElement SourceElement { get; set; }
 
     /// <summary>
     /// When the block-inside-inline correction (CSS2.1 §9.2.1.1) splits a
@@ -55,14 +53,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         return Math.Max(0, cssHeight);
     }
 
-    private double ResolveSpecifiedWidthToContentBox(double cssWidth)
-    {
-        if (UsesBorderBoxSizing)
-            cssWidth -= ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
-
-        return Math.Max(0, cssWidth);
-    }
-
     /// <summary>
     /// When the block-inside-inline correction splits a positioned inline
     /// element, the original box loses its children to anonymous "left" and
@@ -89,43 +79,7 @@ internal class CssBox : CssBoxProperties, IDisposable
     private List<ILayoutImageLoader?>? _backgroundImageLoadHandlers;
     private bool _backgroundImagesInitialized;
 
-    /// <summary>
-    /// CSS property names that were applied with <c>!important</c> during
-    /// cascade.  Normal-priority declarations must not override these.
-    /// CSS2.1 §6.4.2.
-    /// </summary>
-    internal HashSet<string> ImportantProperties { get; private set; }
-
-    /// <summary>
-    /// CSS property names that were set by an author-origin declaration
-    /// during cascade.  User-agent declarations must not override these.
-    /// CSS2.1 §6.4.1: Author origin beats UA origin regardless of
-    /// specificity.
-    /// </summary>
-    internal HashSet<string> AuthorProperties { get; private set; }
-
     internal Dictionary<string, string> CustomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Marks a property as having been set via an <c>!important</c>
-    /// declaration so that subsequent normal-priority rules cannot
-    /// override it.
-    /// </summary>
-    internal void MarkPropertyImportant(string propertyName)
-    {
-        ImportantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        ImportantProperties.Add(propertyName);
-    }
-
-    /// <summary>
-    /// Marks a property as having been set by an author-origin
-    /// declaration so that UA declarations cannot override it.
-    /// </summary>
-    internal void MarkPropertyAuthor(string propertyName)
-    {
-        AuthorProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        AuthorProperties.Add(propertyName);
-    }
 
     internal void SetCustomProperty(string propertyName, string value)
     {
@@ -4815,7 +4769,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     protected override ILayoutFont GetCachedFont(string fontFamily, double fsize, LayoutFontStyle st, string fontFeatures) => LayoutEnvironment.GetFont(fontFamily, fsize, st, fontFeatures);
 
-    protected override Color GetActualColor(string colorStr) => LayoutEnvironment.ParseColor(colorStr);
+    protected override BColor GetActualColor(string colorStr) => LayoutEnvironment.ParseColor(colorStr);
 
     protected override PointF GetActualLocation(string X, string Y)
     {

@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj" />
     <ProjectReference Include="..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj" />
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
   </ItemGroup>
 
   <!-- CssBox and the concrete layout engine remain internal. Keep only assemblies that

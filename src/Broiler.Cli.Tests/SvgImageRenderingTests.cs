@@ -106,7 +106,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""50"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
         Assert.Equal(200, bitmap.Height);
@@ -114,9 +114,9 @@ public class SvgImageRenderingTests
         // The top-left area (where the 50×50 red SVG should be) must
         // contain red pixels — proving the SVG was rasterized.
         var pixel = bitmap.GetPixel(10, 10);
-        Assert.True(pixel.Red > 200, $"Expected red channel > 200, got {pixel.Red}");
-        Assert.True(pixel.Green < 50, $"Expected green channel < 50, got {pixel.Green}");
-        Assert.True(pixel.Blue < 50, $"Expected blue channel < 50, got {pixel.Blue}");
+        Assert.True(pixel.R > 200, $"Expected red channel > 200, got {pixel.R}");
+        Assert.True(pixel.G < 50, $"Expected green channel < 50, got {pixel.G}");
+        Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
     }
 
     [Fact]
@@ -130,13 +130,13 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // Center of the circle (50,50) should be blue.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Blue > 200, $"Expected blue channel > 200, got {pixel.Blue}");
-        Assert.True(pixel.Red < 50, $"Expected red channel < 50, got {pixel.Red}");
+        Assert.True(pixel.B > 200, $"Expected blue channel > 200, got {pixel.B}");
+        Assert.True(pixel.R < 50, $"Expected red channel < 50, got {pixel.R}");
     }
 
     [Fact]
@@ -151,12 +151,12 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""80"" height=""60""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // The green rect should be visible at the top-left.
         var pixel = bitmap.GetPixel(10, 10);
-        Assert.True(pixel.Green > 100, $"Expected green channel > 100, got {pixel.Green}");
+        Assert.True(pixel.G > 100, $"Expected green channel > 100, got {pixel.G}");
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class SvgImageRenderingTests
 
         var html = $@"<!DOCTYPE html><html><body><img src=""{svgDataUri}""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
     }
@@ -238,7 +238,7 @@ public class SvgImageRenderingTests
         var pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
         var html = $@"<!DOCTYPE html><html><body><img src=""data:image/png;base64,{pngBase64}"" width=""1"" height=""1""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
     }
@@ -256,15 +256,15 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
 
         // The triangle is in the top-left 100×100 area.
         // At (50, 50) we should have the orange fill.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Red > 150, $"Expected red channel > 150 (orange), got {pixel.Red}");
-        Assert.True(pixel.Green > 100, $"Expected green channel > 100 (orange), got {pixel.Green}");
+        Assert.True(pixel.R > 150, $"Expected red channel > 150 (orange), got {pixel.R}");
+        Assert.True(pixel.G > 100, $"Expected green channel > 100 (orange), got {pixel.G}");
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""200"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(300, bitmap.Width);
     }
@@ -303,16 +303,16 @@ public class SvgImageRenderingTests
                    $@"<img src=""{redSvg}"" width=""50"" height=""50""/>" +
                    $@"<img src=""{blueSvg}"" width=""50"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // First image area should be red
         var redPixel = bitmap.GetPixel(10, 10);
-        Assert.True(redPixel.Red > 200, $"Expected red pixel, got R={redPixel.Red}");
+        Assert.True(redPixel.R > 200, $"Expected red pixel, got R={redPixel.R}");
 
         // Second image area should be blue (starts at x≈50)
         var bluePixel = bitmap.GetPixel(60, 10);
-        Assert.True(bluePixel.Blue > 200, $"Expected blue pixel, got B={bluePixel.Blue}");
+        Assert.True(bluePixel.B > 200, $"Expected blue pixel, got B={bluePixel.B}");
     }
 
     [Theory]
@@ -330,13 +330,13 @@ public class SvgImageRenderingTests
 </body>
 </html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         var interiorPixel = bitmap.GetPixel(100, 100);
-        Assert.True(interiorPixel.Green > 200,
-            $"Expected contain background interior to be green, got R={interiorPixel.Red} G={interiorPixel.Green} B={interiorPixel.Blue}");
-        Assert.True(interiorPixel.Red < 50, $"Expected red channel < 50, got {interiorPixel.Red}");
-        Assert.True(interiorPixel.Blue < 50, $"Expected blue channel < 50, got {interiorPixel.Blue}");
+        Assert.True(interiorPixel.G > 200,
+            $"Expected contain background interior to be green, got R={interiorPixel.R} G={interiorPixel.G} B={interiorPixel.B}");
+        Assert.True(interiorPixel.R < 50, $"Expected red channel < 50, got {interiorPixel.R}");
+        Assert.True(interiorPixel.B < 50, $"Expected blue channel < 50, got {interiorPixel.B}");
     }
 
     [Fact]
@@ -350,11 +350,11 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;background:#123456"">" +
                    $@"<img src=""{svgDataUri}"" width=""40"" height=""30""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 80, 60);
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 80, 60);
 
         var pixel = bitmap.GetPixel(10, 10);
-        Assert.InRange(pixel.Red, 0x10, 0x14);
-        Assert.InRange(pixel.Green, 0x32, 0x36);
-        Assert.InRange(pixel.Blue, 0x54, 0x58);
+        Assert.InRange(pixel.R, 0x10, 0x14);
+        Assert.InRange(pixel.G, 0x32, 0x36);
+        Assert.InRange(pixel.B, 0x54, 0x58);
     }
 }

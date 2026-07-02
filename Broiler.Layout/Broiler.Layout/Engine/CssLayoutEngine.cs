@@ -1,13 +1,11 @@
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using Broiler.Layout;
-
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
-namespace Broiler.Layout;
+
+
+namespace Broiler.Layout.Engine;
 
 internal static class CssLayoutEngine
 {

@@ -15,6 +15,9 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 using CanonicalDocument = Broiler.Dom.DomDocument;
+using Broiler.HtmlBridge.Dom;
+using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Scripting;
 
 namespace Broiler.HtmlBridge;
 

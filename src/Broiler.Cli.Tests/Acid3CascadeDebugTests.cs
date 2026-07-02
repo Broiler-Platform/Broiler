@@ -25,7 +25,7 @@ body { background: white; }
 <div class=""c""><p style=""width:60px;height:40px;background:lime"">X</p></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         // Count red pixels in the border area (the 2em=40px region around content)
         int redPixels = 0;
@@ -34,8 +34,8 @@ body { background: white; }
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Red > 200 && p.Green < 80 && p.Blue < 80) redPixels++;
-                if (p.Green > 200 && p.Red < 80 && p.Blue < 80) limePixels++;
+                if (p.R > 200 && p.G < 80 && p.B < 80) redPixels++;
+                if (p.G > 200 && p.R < 80 && p.B < 80) limePixels++;
             }
 
         _output.WriteLine($"Red pixels (should be ~0 with !important): {redPixels}");
@@ -66,14 +66,14 @@ body { background: white; }
 <div class=""c""><p style=""width:60px;height:40px;background:lime"">X</p></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         int redPixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Red > 200 && p.Green < 80 && p.Blue < 80) redPixels++;
+                if (p.R > 200 && p.G < 80 && p.B < 80) redPixels++;
             }
 
         _output.WriteLine($"Red pixels (higher specificity wins): {redPixels}");

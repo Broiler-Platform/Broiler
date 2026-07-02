@@ -1,6 +1,7 @@
 using CssConstants = Broiler.CSS.CssConstants;
 
-namespace Broiler.Layout;
+
+namespace Broiler.Layout.Engine;
 
 /// <summary>
 /// Box-tree navigation helpers used by the layout engine (previous-sibling /

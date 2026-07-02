@@ -1,11 +1,10 @@
-﻿using Broiler.Layout;
-using System;
-using System.Drawing;
-
+﻿using System.Drawing;
 using CssConstants = Broiler.CSS.CssConstants;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
-namespace Broiler.Layout;
+
+
+namespace Broiler.Layout.Engine;
 
 internal sealed class CssBoxImage : CssBox
 {

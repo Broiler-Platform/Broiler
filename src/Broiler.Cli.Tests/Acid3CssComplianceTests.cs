@@ -1774,7 +1774,7 @@ div { width: 50px; height: 300px; background: red; }
 </body></html>";
 
         // Render with maxHeight = 100 to clip at viewport height
-        using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: 200, maxHeight: 100);
+        using var bitmap = HtmlRender.RenderToImageAutoSizedWithStyleSet(html, maxWidth: 200, maxHeight: 100);
 
         // The bitmap height must not exceed maxHeight
         Assert.True(bitmap.Height <= 100,
@@ -1809,24 +1809,24 @@ body { margin: 0; }
 <div id=""target""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // Top-left corner should NOT have red border (top=0, left=0)
         var topLeft = bitmap.GetPixel(1, 1);
-        Assert.False(topLeft.Red > 200 && topLeft.Green < 50 && topLeft.Blue < 50,
-            $"Top-left should not be red border, got ({topLeft.Red},{topLeft.Green},{topLeft.Blue})");
+        Assert.False(topLeft.R > 200 && topLeft.G < 50 && topLeft.B < 50,
+            $"Top-left should not be red border, got ({topLeft.R},{topLeft.G},{topLeft.B})");
 
         // Bottom-right corner area should have red border
         // The element is at (0,0), width=60, height=40
         // Right border is at x=60 to x=65 (5px wide), from y=0 to y=45
         var rightBorder = bitmap.GetPixel(62, 20);
-        Assert.True(rightBorder.Red > 200,
-            $"Right border pixel should be red, got ({rightBorder.Red},{rightBorder.Green},{rightBorder.Blue})");
+        Assert.True(rightBorder.R > 200,
+            $"Right border pixel should be red, got ({rightBorder.R},{rightBorder.G},{rightBorder.B})");
 
         // Bottom border is at y=40 to y=45 (5px wide), from x=0 to x=65
         var bottomBorder = bitmap.GetPixel(30, 42);
-        Assert.True(bottomBorder.Red > 200,
-            $"Bottom border pixel should be red, got ({bottomBorder.Red},{bottomBorder.Green},{bottomBorder.Blue})");
+        Assert.True(bottomBorder.R > 200,
+            $"Bottom border pixel should be red, got ({bottomBorder.R},{bottomBorder.G},{bottomBorder.B})");
     }
 
     /// <summary>
@@ -1877,7 +1877,7 @@ body { margin: 0; padding: 0; }
 <div style=""width:100px;height:50px;background:blue""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // Left margin is 10px, border-left is 0
         // Content starts at x=10 (margin only)
@@ -1886,13 +1886,13 @@ body { margin: 0; padding: 0; }
 
         // Inside content area (should be blue)
         var content = bitmap.GetPixel(50, 25);
-        Assert.True(content.Blue > 200,
-            $"Content area should be blue, got ({content.Red},{content.Green},{content.Blue})");
+        Assert.True(content.B > 200,
+            $"Content area should be blue, got ({content.R},{content.G},{content.B})");
 
         // Right border area (should be gray)
         var rightBorder = bitmap.GetPixel(111, 25);
-        Assert.True(rightBorder.Red > 100 && rightBorder.Green > 100 && rightBorder.Blue > 100,
-            $"Right border should be gray, got ({rightBorder.Red},{rightBorder.Green},{rightBorder.Blue})");
+        Assert.True(rightBorder.R > 100 && rightBorder.G > 100 && rightBorder.B > 100,
+            $"Right border should be gray, got ({rightBorder.R},{rightBorder.G},{rightBorder.B})");
     }
 
     /// <summary>
@@ -1919,23 +1919,23 @@ body { margin: 0; padding: 0; }
 <div id=""target""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // Top-left pixel should NOT be green (border-top=0, border-left=0)
         // The content should be at (0,0) since there's no top or left border
         var topLeftContent = bitmap.GetPixel(5, 5);
-        Assert.False(topLeftContent.Green > 200 && topLeftContent.Red < 50 && topLeftContent.Blue < 50,
-            $"Top-left should not be green border, got ({topLeftContent.Red},{topLeftContent.Green},{topLeftContent.Blue})");
+        Assert.False(topLeftContent.G > 200 && topLeftContent.R < 50 && topLeftContent.B < 50,
+            $"Top-left should not be green border, got ({topLeftContent.R},{topLeftContent.G},{topLeftContent.B})");
 
         // Bottom border area should be green (at y >= 60, up to y < 70)
         var bottomBorderPixel = bitmap.GetPixel(40, 65);
-        Assert.True(bottomBorderPixel.Green > 100,
-            $"Bottom border should be green, got ({bottomBorderPixel.Red},{bottomBorderPixel.Green},{bottomBorderPixel.Blue})");
+        Assert.True(bottomBorderPixel.G > 100,
+            $"Bottom border should be green, got ({bottomBorderPixel.R},{bottomBorderPixel.G},{bottomBorderPixel.B})");
 
         // Right border area should be green (at x >= 80, up to x < 90)
         var rightBorderPixel = bitmap.GetPixel(85, 30);
-        Assert.True(rightBorderPixel.Green > 100,
-            $"Right border should be green, got ({rightBorderPixel.Red},{rightBorderPixel.Green},{rightBorderPixel.Blue})");
+        Assert.True(rightBorderPixel.G > 100,
+            $"Right border should be green, got ({rightBorderPixel.R},{rightBorderPixel.G},{rightBorderPixel.B})");
     }
 
     /// <summary>
@@ -1960,14 +1960,14 @@ body { margin: 0; }
 <div class=""normal""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The blue div should start near the top (y ≈ 0-2) since the
         // zero-font div has near-zero height. If font-size:0 is clipped
         // to a large default, the blue div would be pushed further down.
         var nearTop = bitmap.GetPixel(50, 3);
-        Assert.True(nearTop.Blue > 200,
+        Assert.True(nearTop.B > 200,
             $"Blue div should start near top (font-size:0 has near-zero height), " +
-            $"got pixel at (50,3) = ({nearTop.Red},{nearTop.Green},{nearTop.Blue})");
+            $"got pixel at (50,3) = ({nearTop.R},{nearTop.G},{nearTop.B})");
     }
 }

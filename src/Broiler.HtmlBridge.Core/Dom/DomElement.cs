@@ -4,6 +4,9 @@ using CanonicalElement = Broiler.Dom.DomElement;
 using CanonicalNodeType = Broiler.Dom.DomNodeType;
 using CanonicalName = Broiler.Dom.DomName;
 using CanonicalNamespaces = Broiler.Dom.DomNamespaces;
+using System.Collections.Generic;
+using System.Linq;
+using System;
 
 namespace Broiler.HtmlBridge;
 

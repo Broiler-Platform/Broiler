@@ -1,3 +1,5 @@
+using Broiler.HtmlBridge.Dom;
+
 namespace Broiler.HtmlBridge;
 
 public sealed class DomBridgeFactory : IDomBridgeRuntimeFactory

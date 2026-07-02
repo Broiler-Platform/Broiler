@@ -91,7 +91,7 @@ public class GoogleSearchComplianceTests
     /// </summary>
     private static BBitmap RenderGoogleLike(int width = 1024, int height = 768)
     {
-        return HtmlRender.RenderToImage(GoogleLikeHtml, width, height);
+        return HtmlRender.RenderToImageWithStyleSet(GoogleLikeHtml, width, height);
     }
 
     /// <summary>
@@ -108,7 +108,7 @@ public class GoogleSearchComplianceTests
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Red < threshold || px.Green < threshold || px.Blue < threshold)
+                if (px.R < threshold || px.G < threshold || px.B < threshold)
                     count++;
             }
         }
@@ -231,13 +231,13 @@ public class GoogleSearchComplianceTests
             {
                 var px = bitmap.GetPixel(x, y);
                 // Blue: accommodate Google blue (#4285F4 = 66,133,244)
-                if (px.Red < 100 && px.Green < 140 && px.Blue > 150)
+                if (px.R < 100 && px.G < 140 && px.B > 150)
                     hasBlue = true;
                 // Red: R>180, G<100, B<100
-                if (px.Red > 180 && px.Green < 100 && px.Blue < 100)
+                if (px.R > 180 && px.G < 100 && px.B < 100)
                     hasRed = true;
                 // Green: R<100, G>130, B<100
-                if (px.Red < 100 && px.Green > 130 && px.Blue < 100)
+                if (px.R < 100 && px.G > 130 && px.B < 100)
                     hasGreen = true;
             }
         }

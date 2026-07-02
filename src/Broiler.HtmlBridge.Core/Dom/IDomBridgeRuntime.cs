@@ -1,8 +1,9 @@
+using Broiler.HtmlBridge.Scripting;
+using Broiler.JavaScript.Engine;
 using System;
 using System.Collections.Generic;
-using Broiler.JavaScript.Engine;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// Narrow runtime surface required by script execution and interactive sessions.

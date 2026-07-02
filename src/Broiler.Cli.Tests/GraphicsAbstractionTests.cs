@@ -1,8 +1,13 @@
+using BColor = Broiler.Graphics.BColor;
+using BBitmap = Broiler.HTML.Image.BBitmap;
+using BCanvas = Broiler.HTML.Image.BCanvas;
 using Broiler.Cli;
+using Broiler.Graphics;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
 using Broiler.Dom.Html;
+using Broiler.Layout.IR;
 using Broiler.HTML.Core.IR;
 using System.Drawing;
 using RectangleF = System.Drawing.RectangleF;
@@ -14,7 +19,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void RenderToPng_With_BColor_Background_Fills_Empty_Canvas()
     {
-        var png = HtmlRender.RenderToPng(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
+        var png = HtmlRender.RenderToPngWithStyleSet(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
 
         using var bitmap = BBitmap.Decode(png);
 
@@ -28,7 +33,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void RenderToImage_With_BColor_Background_Returns_BBitmap()
     {
-        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(string.Empty, 2, 2, backgroundColor: new BColor(12, 34, 56, 255));
 
         var pixel = bitmap.GetPixel(0, 0);
         Assert.Equal((byte)12, pixel.R);
@@ -40,7 +45,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void RenderToImage_With_Defaultable_BColor_Background_Returns_BBitmap()
     {
-        using var bitmap = HtmlRender.RenderToImage(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(string.Empty, 2, 2, backgroundColor: new BColor(12, 34, 56, 255));
 
         var pixel = bitmap.GetPixel(0, 0);
         Assert.Equal((byte)12, pixel.R);
@@ -76,7 +81,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFile(string.Empty, 2, 2, outputPath, BImageFormat.Jpeg, backgroundColor: BColor.White);
+            HtmlRender.RenderToFileWithStyleSet(string.Empty, 2, 2, outputPath, Broiler.Graphics.BImageEncodeFormat.Jpeg, backgroundColor: BColor.White);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 2);
@@ -97,7 +102,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFileAutoSized("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: BImageFormat.Png);
+            HtmlRender.RenderToFileAutoSizedWithStyleSet("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: Broiler.Graphics.BImageEncodeFormat.Png);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 8);
@@ -118,7 +123,7 @@ public class GraphicsAbstractionTests
     {
         const string html = "<html><body style='margin:0'><div style='width:40px;height:30px;background:#123456'></div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImageAutoSized(html, 200, 200, BColor.White);
+        using var bitmap = HtmlRender.RenderToImageAutoSizedWithStyleSet(html, maxWidth: 200, maxHeight: 200, backgroundColor: BColor.White);
 
         Assert.True(bitmap.Width >= 40);
         Assert.True(bitmap.Height >= 30);
@@ -134,7 +139,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var bitmap = HtmlRender.RenderToImageAtAnchor(html, "target", 20, 20, BColor.White);
+        using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet(html, "target", 20, 20, backgroundColor: BColor.White);
 
         Assert.NotNull(bitmap);
         var pixel = bitmap!.GetPixel(0, 0);
@@ -147,7 +152,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void RenderToImageAtAnchor_With_Missing_Anchor_Returns_Null()
     {
-        using var bitmap = HtmlRender.RenderToImageAtAnchor("<html><body>test</body></html>", "missing", 20, 20, BColor.White);
+        using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet("<html><body>test</body></html>", "missing", 20, 20, backgroundColor: BColor.White);
 
         Assert.Null(bitmap);
     }
@@ -201,7 +206,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new System.Drawing.SizeF(50, 50);
-        container.SetHtml("<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>");
+        container.SetHtmlWithStyleSet("<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>");
 
         container.PerformLayout(new RectangleF(0, 0, 50, 50));
 
@@ -218,8 +223,8 @@ public class GraphicsAbstractionTests
         using var serialized = new HtmlContainer();
         using var typed = new HtmlContainer();
         serialized.MaxSize = typed.MaxSize = new SizeF(50, 50);
-        serialized.SetHtml(html);
-        typed.SetDocument(document);
+        serialized.SetHtmlWithStyleSet(html);
+        typed.SetDocumentWithStyleSet(document);
 
         var viewport = new RectangleF(0, 0, 50, 50);
         serialized.PerformLayout(viewport);
@@ -240,7 +245,7 @@ public class GraphicsAbstractionTests
 
         using var container = new HtmlContainer();
         container.MaxSize = new SizeF(100, 50);
-        container.SetDocument(document);
+        container.SetDocumentWithStyleSet(document);
         container.PerformLayout(new RectangleF(0, 0, 100, 50));
         var before = container.GetElementRectangle("target");
 
@@ -259,7 +264,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new System.Drawing.SizeF(40, 40);
-        container.SetHtml("<html><body style='margin:0;background:#123456'></body></html>");
+        container.SetHtmlWithStyleSet("<html><body style='margin:0;background:#123456'></body></html>");
 
         using var bitmap = new BBitmap(40, 40);
         bitmap.Erase(BColor.White);
@@ -282,7 +287,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new System.Drawing.SizeF(20, 20);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <div style='height:5px;background:#ffffff'></div>
             <div style='width:20px;height:15px;background:#123456'></div>
@@ -344,7 +349,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 128));
 
         using var copy = source.Copy();
-        using var roundTripped = BBitmap.Decode(copy.Encode(BImageFormat.Png));
+        using var roundTripped = BBitmap.Decode(copy.Encode(Broiler.Graphics.BImageEncodeFormat.Png));
 
         Assert.Equal(source.GetPixel(0, 0), roundTripped.GetPixel(0, 0));
         Assert.Equal(source.GetPixel(1, 0), roundTripped.GetPixel(1, 0));
@@ -358,7 +363,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 2);
         source.Clear(new BColor(220, 30, 40, 255));
 
-        using var roundTripped = BBitmap.Decode(source.Encode(BImageFormat.Jpeg, 100));
+        using var roundTripped = BBitmap.Decode(source.Encode(Broiler.Graphics.BImageEncodeFormat.Jpeg, 100));
 
         Assert.Equal(source.Width, roundTripped.Width);
         Assert.Equal(source.Height, roundTripped.Height);
@@ -380,7 +385,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
 
         using var loaded = Assert.IsType<ImageAdapter>(
-            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(BImageFormat.Png))));
+            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png))));
         using var target = new BBitmap(4, 4);
         using var graphics = Assert.IsType<GraphicsAdapter>(target.OpenGraphics(new RectangleF(0, 0, 4, 4)));
 
@@ -413,7 +418,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         using (var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)))
         {
-            using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+            using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
             graphics.DrawRectangle(brush, 0, 0, 4, 4);
         }
 
@@ -426,8 +431,8 @@ public class GraphicsAbstractionTests
     {
         using var bitmap = new BBitmap(6, 6);
         var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
-        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.FromArgb(255, 123, 45, 67)));
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 17, 33, 197)));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(BColor.FromArgb(255, 123, 45, 67)));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.FromArgb(255, 17, 33, 197)));
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
@@ -479,7 +484,7 @@ public class GraphicsAbstractionTests
     {
         using var bitmap = new BBitmap(6, 6);
         var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.FromArgb(255, 211, 19, 173)));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.FromArgb(255, 211, 19, 173)));
         pen.DashStyle = DashStyle.Dash;
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
@@ -504,8 +509,8 @@ public class GraphicsAbstractionTests
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
         using var brush = Assert.IsType<BrushAdapter>(graphics.GetLinearGradientBrush(
             new RectangleF(0, 0, 6, 6),
-            Color.Red,
-            Color.Blue,
+            BColor.Red,
+            BColor.Blue,
             90));
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
@@ -520,8 +525,8 @@ public class GraphicsAbstractionTests
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
         using var brush = Assert.IsType<BrushAdapter>(graphics.GetLinearGradientBrush(
             new RectangleF(0, 0, 6, 6),
-            Color.Red,
-            Color.Blue,
+            BColor.Red,
+            BColor.Blue,
             90));
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
@@ -551,7 +556,7 @@ public class GraphicsAbstractionTests
         Assert.True(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
 
-        graphics.DrawString("abc", font, Color.Black, new PointF(0, 0), size, rtl: false);
+        graphics.DrawString("abc", font, BColor.Black, new PointF(0, 0), size, rtl: false);
 
         Assert.True(font.HasMaterializedRenderFont);
     }
@@ -604,7 +609,7 @@ public class GraphicsAbstractionTests
         Assert.False(graphics.HasMaterializedCanvas);
         Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
 
-        graphics.DrawString("XX", font, Color.Black, new PointF(4, 4), size, rtl: false);
+        graphics.DrawString("XX", font, BColor.Black, new PointF(4, 4), size, rtl: false);
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
@@ -669,7 +674,7 @@ public class GraphicsAbstractionTests
 
         var measureSize = graphics.MeasureString("measure", font);
         graphics.MeasureString("limit", font, 12, out var charFit, out var charFitWidth);
-        graphics.DrawString("draw", font, Color.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
+        graphics.DrawString("draw", font, BColor.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
         graphics.DrawGradientString(
             "gradient",
             font,
@@ -677,7 +682,7 @@ public class GraphicsAbstractionTests
             new PointF(5, 6),
             new SizeF(7, 8),
             rtl: false,
-            colors: [Color.Red, Color.Blue],
+            colors: [BColor.Red, BColor.Blue],
             positions: [0f, 1f],
             angle: 45f);
 
@@ -706,8 +711,8 @@ public class GraphicsAbstractionTests
             image,
             new RectangleF(0, 0, 2, 1),
             new PointF(3, 4)));
-        using var solidBrush = graphics.GetSolidBrush(Color.Red);
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.Blue));
+        using var solidBrush = graphics.GetSolidBrush(BColor.Red);
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.Blue));
         using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
 
         Assert.False(textureBrush.HasMaterializedPaint);
@@ -792,7 +797,7 @@ public class GraphicsAbstractionTests
         _ = font.Height;
         _ = font.Font;
         _ = font.RenderFont;
-        graphics.DrawString("draw", font, Color.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
+        graphics.DrawString("draw", font, BColor.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
         graphics.PushClip(new RectangleF(2, 3, 4, 5));
         graphics.DrawImage(image, new RectangleF(4, 5, 6, 7));
         path.Start(1, 1);
@@ -814,9 +819,9 @@ public class GraphicsAbstractionTests
 
         var family = adapter.LoadFontFromFile("/tmp/fake-font.ttf", "AliasFont");
         var font = Assert.IsType<FontAdapter>(adapter.GetFont("AliasFont", 12, FontStyle.Regular));
-        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Blue));
-        var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
-        var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(new RectangleF(0, 0, 10, 10), Color.Red, Color.Blue, 45));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(BColor.Blue));
+        var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(BColor.Red));
+        var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(new RectangleF(0, 0, 10, 10), BColor.Red, BColor.Blue, 45));
 
         Assert.Equal("AliasFont", family);
         _ = font.Typeface;
@@ -931,7 +936,7 @@ public class GraphicsAbstractionTests
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
 
-        textShaper.DrawString(surface.Canvas, font, "draw", Color.Black, new PointF(1, 2));
+        textShaper.DrawString(surface.Canvas, font, "draw", BColor.Black, new PointF(1, 2));
         textShaper.DrawGradientString(
             surface.Canvas,
             font,
@@ -939,7 +944,7 @@ public class GraphicsAbstractionTests
             new RectangleF(0, 0, 8, 9),
             new PointF(5, 6),
             new SizeF(7, 8),
-            [Color.Red, Color.Blue],
+            [BColor.Red, BColor.Blue],
             [0f, 1f],
             45f);
 
@@ -961,13 +966,13 @@ public class GraphicsAbstractionTests
             "UpdatePenPaint",
             "UpdatePenPaint",
         };
-        using var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(Color.Red));
+        using var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(BColor.Red));
         using var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(
             new RectangleF(1, 2, 3, 4),
-            Color.Red,
-            Color.Blue,
+            BColor.Red,
+            BColor.Blue,
             45));
-        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(Color.Green));
+        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(BColor.Green));
 
         Assert.False(solidBrush.HasMaterializedPaint);
         Assert.False(gradientBrush.HasMaterializedPaint);
@@ -996,7 +1001,7 @@ public class GraphicsAbstractionTests
 
         path.Start(1, 2);
         path.LineTo(3, 4);
-        path.ArcTo(5, 6, 2, Broiler.HTML.Adapters.RGraphicsPath.Corner.TopRight);
+        path.ArcTo(5, 6, 2, Broiler.Graphics.Corner.TopRight);
 
         Assert.False(path.HasMaterializedPath);
         Assert.Empty(pathCompat.Calls);
@@ -1017,7 +1022,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(7, 7);
         bitmap.Clear(BColor.White);
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7)));
-        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.Blue));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(BColor.Blue));
         using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
         path.Start(1, 5);
         path.LineTo(3, 1);
@@ -1039,7 +1044,7 @@ public class GraphicsAbstractionTests
     {
         using var bitmap = new BBitmap(7, 7);
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7)));
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(Color.Black));
+        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.Black));
         using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
         pen.DashStyle = DashStyle.Dash;
         path.Start(1, 1);
@@ -1062,7 +1067,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(6, 6);
         bitmap.Clear(BColor.White);
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6), new PointF(1, 1)));
-        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(Color.FromArgb(255, 200, 10, 20)));
+        using var brush = Assert.IsType<BrushAdapter>(graphics.GetSolidBrush(BColor.FromArgb(255, 200, 10, 20)));
 
         graphics.PushClip(new RectangleF(1, 1, 3, 3));
 
@@ -1251,7 +1256,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         bitmap.Clear(BColor.White);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
 
         graphics.HintNextLayerCanUseRaster(true);
         graphics.SaveOpacityLayer(0.5f);
@@ -1271,7 +1276,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         bitmap.Clear(new BColor(128, 128, 128, 255));
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
 
         graphics.HintNextLayerCanUseRaster(true);
         graphics.SaveBlendLayer("darken");
@@ -1289,7 +1294,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         bitmap.Clear(new BColor(128, 128, 128, 255));
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
 
         graphics.HintNextLayerCanUseRaster(true);
         graphics.SaveBlendLayer("lighten");
@@ -1307,7 +1312,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         bitmap.Clear(new BColor(128, 128, 128, 255));
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
 
         graphics.HintNextLayerCanUseRaster(true);
         graphics.SaveBlendLayer("overlay");
@@ -1326,7 +1331,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(4, 4);
         bitmap.Clear(new BColor(128, 128, 128, 255));
         using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
 
         graphics.HintNextLayerCanUseRaster(true);
         graphics.SaveBlendLayer("difference");
@@ -1348,8 +1353,8 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(6, 6);
         bitmap.Clear(BColor.White);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6));
-        using var brush = graphics.GetSolidBrush(Color.FromArgb(255, 255, 0, 0));
-        var pen = graphics.GetPen(Color.FromArgb(255, 0, 0, 255));
+        using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
+        var pen = graphics.GetPen(BColor.FromArgb(255, 0, 0, 255));
         pen.Width = 1;
 
         graphics.DrawRectangle(brush, 1, 1, 3, 3);
@@ -1368,7 +1373,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(8, 8);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <div style='width:4px;height:4px;border:2px solid #ff0000;background:#0000ff'></div>
             </body></html>
@@ -1412,13 +1417,13 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(BImageFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(4, 2);
-        container.SetHtml($"""
+        container.SetHtmlWithStyleSet($"""
             <html><body style='margin:0'>
             <div style="width:4px;height:2px;background-image:url(data:image/png;base64,{pngBase64});background-repeat:no-repeat;background-size:4px 2px"></div>
             </body></html>
@@ -1464,13 +1469,13 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(BImageFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(4, 2);
-        container.SetHtml($"""
+        container.SetHtmlWithStyleSet($"""
             <html><body style='margin:0'>
             <div style="width:4px;height:2px;background-image:url(data:image/png;base64,{pngBase64});background-repeat:repeat"></div>
             </body></html>
@@ -1496,7 +1501,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(4, 2);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <div style='width:4px;height:2px;background-image:linear-gradient(#00ff00, #00ff00);background-size:2px 1px;background-repeat:repeat'></div>
             </body></html>
@@ -1518,7 +1523,7 @@ public class GraphicsAbstractionTests
     {
         using var bitmap = new BBitmap(1, 1);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 1, 1));
-        using var tile = graphics.CreateLinearGradientTile(4, 1, [Color.Red, Color.Blue], [0f, 1f], 90f);
+        using var tile = graphics.CreateLinearGradientTile(4, 1, [BColor.Red, BColor.Blue], [0f, 1f], 90f);
 
         var image = Assert.IsType<ImageAdapter>(tile);
         var left = image.Bitmap.GetPixel(0, 0);
@@ -1539,7 +1544,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(4, 4);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <div style='width:4px;height:4px;background-image:linear-gradient(#ff0000, #0000ff);background-repeat:no-repeat'></div>
             </body></html>
@@ -1570,7 +1575,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(20, 20);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' style='display:block'>
               <ellipse cx='10' cy='10' rx='8' ry='5' fill='#0000ff'/>
@@ -1598,11 +1603,11 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(7, 7);
         bitmap.Clear(BColor.White);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7));
-        var pen = graphics.GetPen(Color.Black);
+        var pen = graphics.GetPen(BColor.Black);
         pen.Width = 1;
         using var path = graphics.GetGraphicsPath();
         path.Start(1, 4);
-        path.ArcTo(4, 1, 3, Broiler.HTML.Adapters.RGraphicsPath.Corner.TopLeft);
+        path.ArcTo(4, 1, 3, Broiler.Graphics.Corner.TopLeft);
         path.LineTo(5, 1);
 
         graphics.DrawPath(pen, path);
@@ -1626,7 +1631,7 @@ public class GraphicsAbstractionTests
         using var bitmap = new BBitmap(7, 7);
         bitmap.Clear(BColor.White);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7));
-        using var brush = graphics.GetSolidBrush(Color.Blue);
+        using var brush = graphics.GetSolidBrush(BColor.Blue);
         using var path = graphics.GetGraphicsPath();
         path.Start(1, 5);
         path.LineTo(3, 1);
@@ -1650,7 +1655,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 12, 12, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 12, 12, backgroundColor: BColor.White);
         using var expected = new BBitmap(12, 12);
         expected.Clear(BColor.White);
         FillRect(expected, 0, 0, 12, 3, new BColor(255, 0, 0, 255));
@@ -1673,7 +1678,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 12, 12, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 12, 12, backgroundColor: BColor.White);
         using var expected = new BBitmap(12, 12);
         expected.Clear(BColor.White);
         FillRect(expected, 0, 0, 12, 12, new BColor(255, 0, 0, 255));
@@ -1698,7 +1703,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 8, 8, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 8, 8, backgroundColor: BColor.White);
         using var expected = new BBitmap(8, 8);
         expected.Clear(BColor.White);
         FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
@@ -1720,7 +1725,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(BColor.White);
         FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
@@ -1742,7 +1747,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(128, 0, 0, 255));
@@ -1764,7 +1769,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
@@ -1786,7 +1791,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(128, 0, 0, 255));
@@ -1808,7 +1813,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(255, 128, 128, 255));
@@ -1830,7 +1835,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(255, 1, 1, 255));
@@ -1852,7 +1857,7 @@ public class GraphicsAbstractionTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 6, 6, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 6, 6, backgroundColor: BColor.White);
         using var expected = new BBitmap(6, 6);
         expected.Clear(new BColor(128, 128, 128, 255));
         FillRect(expected, 1, 1, 4, 4, new BColor(127, 128, 128, 255));
@@ -1872,7 +1877,7 @@ public class GraphicsAbstractionTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(10, 10);
-        container.SetHtml("""
+        container.SetHtmlWithStyleSet("""
             <html><body style='margin:0'>
             <div style='width:6px;height:6px;border:2px solid #ff0000;border-radius:4px;background:#0000ff'></div>
             </body></html>
@@ -2058,17 +2063,17 @@ public class GraphicsAbstractionTests
             charFitWidth = 0;
         }
 
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point) => false;
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point) => false;
 
-        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle) => false;
+        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle) => false;
 
-        public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point) =>
+        public void DrawString(object canvas, FontAdapter font, string text, BColor color, PointF point) =>
             textCanvasCompat?.DrawString(canvas, font, font.RenderFont, text, color, point);
 
-        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle) =>
+        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle) =>
             textCanvasCompat?.DrawGradientString(canvas, font, font.RenderFont, text, rect, point, size, colors, positions, angle);
 
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point, float glyphRotationDeg = 0)
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point, float glyphRotationDeg = 0)
         {
             throw new NotImplementedException();
         }
@@ -2091,31 +2096,31 @@ public class GraphicsAbstractionTests
             charFitWidth = 9;
         }
 
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point)
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point)
         {
             Calls.Add("TryDrawString");
             return false;
         }
 
-        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle)
         {
             Calls.Add("TryDrawGradientString");
             return false;
         }
 
-        public void DrawString(object canvas, FontAdapter font, string text, Color color, PointF point)
+        public void DrawString(object canvas, FontAdapter font, string text, BColor color, PointF point)
         {
             Calls.Add("DrawString");
             Assert.IsType<SKCanvas>(canvas);
         }
 
-        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
             Assert.IsType<SKCanvas>(canvas);
         }
 
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, Color color, PointF point, float glyphRotationDeg = 0)
+        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point, float glyphRotationDeg = 0)
         {
             throw new NotImplementedException();
         }
@@ -2180,14 +2185,14 @@ public class GraphicsAbstractionTests
     {
         public List<string> Calls { get; } = [];
 
-        public void DrawString(object canvas, FontAdapter font, object renderFont, string text, Color color, PointF point)
+        public void DrawString(object canvas, FontAdapter font, object renderFont, string text, BColor color, PointF point)
         {
             Calls.Add("DrawString");
             Assert.IsType<SKCanvas>(canvas);
             Assert.Same(font.RenderFont, renderFont);
         }
 
-        public void DrawGradientString(object canvas, FontAdapter font, object renderFont, string text, RectangleF rect, PointF point, SizeF size, Color[] colors, float[] positions, float angle)
+        public void DrawGradientString(object canvas, FontAdapter font, object renderFont, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle)
         {
             Calls.Add("DrawGradientString");
             Assert.IsType<SKCanvas>(canvas);
@@ -2219,19 +2224,19 @@ public class GraphicsAbstractionTests
 
         public List<(float StrokeWidth, DashStyle DashStyle)> PenUpdates { get; } = [];
 
-        public object CreateSolidBrushPaint(Color color)
+        public object CreateSolidBrushPaint(BColor color)
         {
             Calls.Add("CreateSolidBrushPaint");
             return new SKPaint();
         }
 
-        public object CreateLinearGradientBrushPaint(RectangleF rect, Color color1, Color color2, double angle)
+        public object CreateLinearGradientBrushPaint(RectangleF rect, BColor color1, BColor color2, double angle)
         {
             Calls.Add("CreateLinearGradientBrushPaint");
             return new SKPaint();
         }
 
-        public object CreatePenPaint(Color color, float strokeWidth, DashStyle dashStyle)
+        public object CreatePenPaint(BColor color, float strokeWidth, DashStyle dashStyle)
         {
             Calls.Add("CreatePenPaint");
             return new SKPaint { StrokeWidth = strokeWidth };

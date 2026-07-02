@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Text.Json;
 using Broiler.Cli;
 using Broiler.HTML.Image;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -131,7 +132,7 @@ public class GraphicsBackendCutoverTests
     private static BBitmap RenderWithBackend(string backendId, string html, int width, int height)
     {
         using var _ = BGraphicsBackend.OverrideForCurrentThread(backendId);
-        return HtmlRender.RenderToImage(html, width, height, BColor.White);
+        return HtmlRender.RenderToImageWithStyleSet(html, width, height, backgroundColor: BColor.White);
     }
 
     private static void EnsureAhemLoaded()

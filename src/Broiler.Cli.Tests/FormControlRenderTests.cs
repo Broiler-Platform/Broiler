@@ -24,7 +24,7 @@ public class FormControlRenderTests
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+            if (px.R < 250 || px.G < 250 || px.B < 250)
                 count++;
         }
         return count;
@@ -48,7 +48,7 @@ public class FormControlRenderTests
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Green < 120 || px.Red > 120 || px.Blue > 120)
+            if (px.G < 120 || px.R > 120 || px.B > 120)
                 continue;
 
             count++;
@@ -65,7 +65,7 @@ public class FormControlRenderTests
     public void InputSubmit_Renders_Visible()
     {
         var html = @"<html><body><input type='submit' value='Search'></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Submit button should render visible pixels (border + text)");
     }
@@ -74,7 +74,7 @@ public class FormControlRenderTests
     public void InputText_Renders_Visible()
     {
         var html = @"<html><body><input type='text' value='Hello'></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Text input should render visible pixels (border + text)");
     }
@@ -83,7 +83,7 @@ public class FormControlRenderTests
     public void Button_Element_Renders_Visible()
     {
         var html = @"<html><body><button>Click Me</button></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Button element should render visible pixels");
     }
@@ -92,7 +92,7 @@ public class FormControlRenderTests
     public void Select_Element_Renders_Visible()
     {
         var html = @"<html><body><select><option>One</option></select></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Select element should render visible pixels (border)");
     }
@@ -101,7 +101,7 @@ public class FormControlRenderTests
     public void Textarea_Element_Renders_Visible()
     {
         var html = @"<html><body><textarea>Some text</textarea></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Textarea element should render visible pixels (border + text)");
     }
@@ -144,7 +144,7 @@ public class FormControlRenderTests
         </body></html>";
 
         var processed = HtmlPostProcessor.Process(html);
-        using var bmp = HtmlRender.RenderToImage(processed, 600, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(processed, 600, 100);
         Assert.True(CountNonWhitePixels(bmp) > 50,
             "Form-wrapped controls should render visible pixels after post-processing");
     }
@@ -157,7 +157,7 @@ public class FormControlRenderTests
     public void InputHidden_Renders_Invisible()
     {
         var html = @"<html><body style='margin:0'><input type='hidden' name='x'></body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 50);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 50);
         Assert.Equal(0, CountNonWhitePixels(bmp));
     }
 
@@ -177,7 +177,7 @@ public class FormControlRenderTests
         <input type='submit' value='Test'>
         </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Author CSS on input must not make submit buttons invisible");
     }
@@ -196,7 +196,7 @@ public class FormControlRenderTests
         <input type='submit' value='Test'>
         </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Author CSS attribute selector must apply to matching inputs");
     }
@@ -221,7 +221,7 @@ public class FormControlRenderTests
         </div>
         </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 600, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 600, 100);
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Compound class + attribute selector buttons must be visible");
     }
@@ -463,7 +463,7 @@ document.getElementById('result').textContent = [
 </body></html>";
 
         var serialized = HtmlPostProcessor.Process(CaptureService.ExecuteScriptsWithDom(html, "file:///test.html"));
-        using var bmp = HtmlRender.RenderToImage(serialized, 200, 200);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);
         var bounds = FindFillBounds(bmp);
 
         Assert.True(bounds.count > 0, "Serialized meter fallback should paint a visible fill region.");

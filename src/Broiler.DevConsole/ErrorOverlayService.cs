@@ -1,4 +1,4 @@
-using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Logging;
 
 namespace Broiler.DevConsole;
 

@@ -1,4 +1,4 @@
-namespace Broiler.Layout;
+namespace Broiler.Layout.Engine;
 
 internal sealed class CssRectWord(CssBox owner, string text, bool hasSpaceBefore, bool hasSpaceAfter) : CssRect(owner)
 {

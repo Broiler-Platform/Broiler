@@ -1,3 +1,4 @@
+using Broiler.Graphics;
 using System.Drawing;
 
 namespace Broiler.Layout;
@@ -43,7 +44,7 @@ public interface ILayoutEnvironment
     ImageIntrinsics GetImageIntrinsics(object imageHandle);
 
     /// <summary>Parses a CSS colour string into a concrete colour.</summary>
-    Color ParseColor(string value);
+    BColor ParseColor(string value);
 
     /// <summary>
     /// Asks the host to refresh; when <paramref name="relayout"/> is <c>true</c>

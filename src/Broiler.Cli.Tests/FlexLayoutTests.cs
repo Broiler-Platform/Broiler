@@ -33,7 +33,7 @@ public class FlexLayoutTests
             "<div style='background:blue; padding:10px; color:white'><span>Longer</span></div>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 100);
 
         int firstRed = -1, firstBlue = -1;
         bool bothOnSameRow = false;
@@ -43,8 +43,8 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red > 200 && px.Green < 50 && px.Blue < 50) hasRed = true;
-                if (px.Red < 50 && px.Green < 50 && px.Blue > 200) hasBlue = true;
+                if (px.R > 200 && px.G < 50 && px.B < 50) hasRed = true;
+                if (px.R < 50 && px.G < 50 && px.B > 200) hasBlue = true;
             }
             if (hasRed && firstRed < 0) firstRed = y;
             if (hasBlue && firstBlue < 0) firstBlue = y;
@@ -67,7 +67,7 @@ public class FlexLayoutTests
             "<input type='submit' value='Two' style='background:blue; color:white; padding:10px'>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 100);
 
         int firstRed = -1, firstBlue = -1;
         for (int y = 0; y < bmp.Height; y++)
@@ -76,8 +76,8 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red > 200 && px.Green < 50 && px.Blue < 50) hasRed = true;
-                if (px.Red < 50 && px.Green < 50 && px.Blue > 200) hasBlue = true;
+                if (px.R > 200 && px.G < 50 && px.B < 50) hasRed = true;
+                if (px.R < 50 && px.G < 50 && px.B > 200) hasBlue = true;
             }
             if (hasRed && firstRed < 0) firstRed = y;
             if (hasBlue && firstBlue < 0) firstBlue = y;
@@ -99,7 +99,7 @@ public class FlexLayoutTests
             "<div style='display:block; background:#f0f0f0; padding:5px'>Short</div>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         int maxRight = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -107,7 +107,7 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 && px.Green < 250 && px.Blue < 250)
+                if (px.R < 250 && px.G < 250 && px.B < 250)
                     maxRight = Math.Max(maxRight, x);
             }
         }
@@ -127,7 +127,7 @@ public class FlexLayoutTests
             "<div style='display:block; background:#f0f0f0; padding:5px'>Grid item</div>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         int maxRight = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -135,7 +135,7 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 && px.Green < 250 && px.Blue < 250)
+                if (px.R < 250 && px.G < 250 && px.B < 250)
                     maxRight = Math.Max(maxRight, x);
             }
         }
@@ -157,7 +157,7 @@ public class FlexLayoutTests
             "<div style='background:blue; padding:5px; color:white'><span>Second</span></div>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 80);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 80);
 
         int firstRed = -1, lastRed = -1, firstBlue = -1;
         for (int y = 0; y < bmp.Height; y++)
@@ -166,8 +166,8 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red > 200 && px.Green < 50 && px.Blue < 50) hasRed = true;
-                if (px.Red < 50 && px.Green < 50 && px.Blue > 200) hasBlue = true;
+                if (px.R > 200 && px.G < 50 && px.B < 50) hasRed = true;
+                if (px.R < 50 && px.G < 50 && px.B > 200) hasBlue = true;
             }
             if (hasRed)
             {
@@ -194,7 +194,7 @@ public class FlexLayoutTests
             "<input type='submit' value='OK' style='background:#f0f0f0'>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
 
         int btnLeft = bmp.Width, btnRight = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -202,7 +202,7 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red == 0xF0 && px.Green == 0xF0 && px.Blue == 0xF0)
+                if (px.R == 0xF0 && px.G == 0xF0 && px.B == 0xF0)
                 {
                     if (x < btnLeft) btnLeft = x;
                     if (x > btnRight) btnRight = x;
@@ -227,7 +227,7 @@ public class FlexLayoutTests
             "<input type='submit' value='This is a long button label' style='max-width:100px; background:#f0f0f0'>" +
             "</div></body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
 
         int left = bmp.Width, right = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -235,7 +235,7 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red == 0xF0 && px.Green == 0xF0 && px.Blue == 0xF0)
+                if (px.R == 0xF0 && px.G == 0xF0 && px.B == 0xF0)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -262,7 +262,7 @@ public class FlexLayoutTests
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 800, 120);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 120);
 
         // Find the extent of button backgrounds (#F8F9FA)
         int btnLeft = bmp.Width, btnRight = 0;
@@ -276,8 +276,8 @@ public class FlexLayoutTests
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red >= 0xF5 && px.Green >= 0xF5 && px.Blue >= 0xF5
-                    && (px.Red < 0xFF || px.Green < 0xFF || px.Blue < 0xFF))
+                if (px.R >= 0xF5 && px.G >= 0xF5 && px.B >= 0xF5
+                    && (px.R < 0xFF || px.G < 0xFF || px.B < 0xFF))
                 {
                     hasBtn = true;
                     if (x < btnLeft) btnLeft = x;

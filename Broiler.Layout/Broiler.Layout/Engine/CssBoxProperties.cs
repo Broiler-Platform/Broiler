@@ -1,15 +1,15 @@
-﻿using Broiler.Layout;
-using RegexParserUtils = Broiler.CSS.RegexParserUtils;
-using System;
+using Broiler.Graphics;
+﻿using RegexParserUtils = Broiler.CSS.RegexParserUtils;
 using System.Drawing;
 using System.Globalization;
 using System.Text.RegularExpressions;
-
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
-namespace Broiler.Layout;
+
+
+namespace Broiler.Layout.Engine;
 
 internal abstract class CssBoxProperties
 {
@@ -63,7 +63,7 @@ internal abstract class CssBoxProperties
     private double _actualCornerNe = double.NaN;
     private double _actualCornerSw = double.NaN;
     private double _actualCornerSe = double.NaN;
-    private Color _actualColor = System.Drawing.Color.Empty;
+    private BColor _actualColor = BColor.Empty;
     private double _actualBackgroundGradientAngle = double.NaN;
     private double _actualHeight = double.NaN;
     private double _actualWidth = double.NaN;
@@ -88,13 +88,13 @@ internal abstract class CssBoxProperties
     private double _actualTextIndent = double.NaN;
     private double _actualBorderSpacingHorizontal = double.NaN;
     private double _actualBorderSpacingVertical = double.NaN;
-    private Color _actualBackgroundGradient = System.Drawing.Color.Empty;
-    private Color _actualBorderTopColor = System.Drawing.Color.Empty;
-    private Color _actualBorderLeftColor = System.Drawing.Color.Empty;
-    private Color _actualBorderBottomColor = System.Drawing.Color.Empty;
-    private Color _actualBorderRightColor = System.Drawing.Color.Empty;
-    private Color _actualTextDecorationColor = System.Drawing.Color.Empty;
-    private Color _actualBackgroundColor = System.Drawing.Color.Empty;
+    private BColor _actualBackgroundGradient = BColor.Empty;
+    private BColor _actualBorderTopColor = BColor.Empty;
+    private BColor _actualBorderLeftColor = BColor.Empty;
+    private BColor _actualBorderBottomColor = BColor.Empty;
+    private BColor _actualBorderRightColor = BColor.Empty;
+    private BColor _actualTextDecorationColor = BColor.Empty;
+    private BColor _actualBackgroundColor = BColor.Empty;
     private ILayoutFont _actualFont;
 
     #endregion
@@ -180,7 +180,7 @@ internal abstract class CssBoxProperties
         set
         {
             _borderBottomColor = value;
-            _actualBorderBottomColor = System.Drawing.Color.Empty;
+            _actualBorderBottomColor = BColor.Empty;
         }
     }
 
@@ -190,7 +190,7 @@ internal abstract class CssBoxProperties
         set
         {
             _borderLeftColor = value;
-            _actualBorderLeftColor = System.Drawing.Color.Empty;
+            _actualBorderLeftColor = BColor.Empty;
         }
     }
 
@@ -200,7 +200,7 @@ internal abstract class CssBoxProperties
         set
         {
             _borderRightColor = value;
-            _actualBorderRightColor = System.Drawing.Color.Empty;
+            _actualBorderRightColor = BColor.Empty;
         }
     }
 
@@ -210,7 +210,7 @@ internal abstract class CssBoxProperties
         set
         {
             _borderTopColor = value;
-            _actualBorderTopColor = System.Drawing.Color.Empty;
+            _actualBorderTopColor = BColor.Empty;
         }
     }
 
@@ -245,7 +245,7 @@ internal abstract class CssBoxProperties
     /// unset colour resolve to <c>currentColor</c> (the element's text colour),
     /// matching modern browsers.
     /// </summary>
-    public Color ActualOutlineColor
+    public BColor ActualOutlineColor
     {
         get
         {
@@ -456,7 +456,7 @@ internal abstract class CssBoxProperties
         set
         {
             _backgroundColor = value;
-            _actualBackgroundColor = System.Drawing.Color.Empty;
+            _actualBackgroundColor = BColor.Empty;
         }
     }
     public string BackgroundImage
@@ -488,7 +488,7 @@ internal abstract class CssBoxProperties
         set
         {
             _color = value;
-            _actualColor = System.Drawing.Color.Empty;
+            _actualColor = BColor.Empty;
         }
     }
 
@@ -557,7 +557,7 @@ internal abstract class CssBoxProperties
         set
         {
             _textDecorationColor = value;
-            _actualTextDecorationColor = System.Drawing.Color.Empty;
+            _actualTextDecorationColor = BColor.Empty;
         }
     }
     public string WhiteSpace { get; set; } = "normal";
@@ -1080,7 +1080,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualBorderTopColor
+    public BColor ActualBorderTopColor
     {
         get
         {
@@ -1093,7 +1093,7 @@ internal abstract class CssBoxProperties
 
     protected abstract PointF GetActualLocation(string X, string Y);
 
-    protected abstract Color GetActualColor(string colorStr);
+    protected abstract BColor GetActualColor(string colorStr);
 
     protected virtual bool TryGetCustomPropertyValue(string propertyName, out string value)
     {
@@ -1131,7 +1131,7 @@ internal abstract class CssBoxProperties
         return resolved;
     }
 
-    public Color ActualBorderLeftColor
+    public BColor ActualBorderLeftColor
     {
         get
         {
@@ -1142,7 +1142,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualBorderBottomColor
+    public BColor ActualBorderBottomColor
     {
         get
         {
@@ -1153,7 +1153,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualBorderRightColor
+    public BColor ActualBorderRightColor
     {
         get
         {
@@ -1164,7 +1164,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualTextDecorationColor
+    public BColor ActualTextDecorationColor
     {
         get
         {
@@ -1318,7 +1318,7 @@ internal abstract class CssBoxProperties
 
     public double ActualWordSpacing { get; private set; } = double.NaN;
 
-    public Color ActualColor
+    public BColor ActualColor
     {
         get
         {
@@ -1329,7 +1329,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualBackgroundColor
+    public BColor ActualBackgroundColor
     {
         get
         {
@@ -1340,7 +1340,7 @@ internal abstract class CssBoxProperties
         }
     }
 
-    public Color ActualBackgroundGradient
+    public BColor ActualBackgroundGradient
     {
         get
         {
@@ -1353,7 +1353,7 @@ internal abstract class CssBoxProperties
                 // black fills.
                 if (string.IsNullOrEmpty(BackgroundGradient) ||
                     string.Equals(BackgroundGradient, "none", StringComparison.OrdinalIgnoreCase))
-                    _actualBackgroundGradient = System.Drawing.Color.FromArgb(0, 0, 0, 0);
+                    _actualBackgroundGradient = BColor.FromArgb(0, 0, 0, 0);
                 else
                     _actualBackgroundGradient = GetActualColor(BackgroundGradient);
             }
@@ -1684,16 +1684,6 @@ internal abstract class CssBoxProperties
         if (string.IsNullOrEmpty(fontWeight) || fontWeight == CssConstants.Normal || fontWeight == CssConstants.Inherit)
             return false;
         return ResolveNumericFontWeight(fontWeight, parent) >= 600;
-    }
-
-    protected string NoEms(string length)
-    {
-        var len = new CssLength(length);
-
-        if (len.Unit == CssUnit.Em)
-            length = len.ConvertEmToPixels(GetEmHeight()).ToString();
-
-        return length;
     }
 
     protected void SetAllBorders(string style = null, string width = null, string color = null)

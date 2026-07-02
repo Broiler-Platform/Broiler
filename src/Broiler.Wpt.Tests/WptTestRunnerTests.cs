@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using Broiler.HTML.Image;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Wpt.Tests;
 
@@ -6210,7 +6211,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 <div id=""after"" style=""width:200px; height:50px; background:blue""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 400);
 
         // The blue box should start at y~104 (100px box + 4px border area).
         // If overflow clipping is broken, it would be pushed to ~304px.
@@ -6232,7 +6233,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 <div id=""after"" style=""width:200px; height:50px; background:blue""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 400);
 
         var pixel = bitmap.GetPixel(100, 130);
         Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
@@ -6256,7 +6257,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 500, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 500, 100);
 
         // Green box must be at the right edge (x in 360..400), not the left.
         var right = bitmap.GetPixel(380, 20);
@@ -6282,7 +6283,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 <div id=""after"" style=""width:200px; height:50px; background:blue""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 400);
 
         var pixel = bitmap.GetPixel(100, 130);
         Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
@@ -6303,7 +6304,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </svg>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The SVG should render a green rectangle.  Check center of the
         // SVG area for green pixels.
@@ -6329,7 +6330,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </body></html>";
 
         // Should render without throwing.
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
 
         // Verify the blue float is present.
         var pixel = bitmap.GetPixel(50, 50);
@@ -6350,7 +6351,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </svg>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 500, 500);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 500, 500);
 
         // The green rect fills the entire viewBox (100×100) which is scaled
         // to the 400×400 CSS element bounds.  Check that the center of the
@@ -6380,7 +6381,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         // Top border should be visible (black at y=0).
         var topBorder = bitmap.GetPixel(100, 0);
@@ -6417,7 +6418,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         // Blue float: centered at (110, 60), should be blue.
         var blue = bitmap.GetPixel(110, 60);

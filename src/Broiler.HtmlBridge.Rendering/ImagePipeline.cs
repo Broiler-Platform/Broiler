@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
+using Broiler.HtmlBridge.Logging;
 
 namespace Broiler.HtmlBridge;
 

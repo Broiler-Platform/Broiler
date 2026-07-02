@@ -1,13 +1,11 @@
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using Broiler.Layout;
-
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
-namespace Broiler.Layout;
+
+
+namespace Broiler.Layout.Engine;
 
 internal sealed class CssLayoutEngineTable
 {
@@ -798,7 +796,7 @@ internal sealed class CssLayoutEngineTable
 
         // CSS2.1 §17.5.3: when the table's specified height exceeds the height
         // the rows naturally occupy, distribute the surplus over the rows.
-        maxBottom = DistributeExtraTableHeight(g, rowBounds, starty, maxBottom);
+        maxBottom = DistributeExtraTableHeight(g, rowBounds, maxBottom);
 
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
@@ -826,7 +824,7 @@ internal sealed class CssLayoutEngineTable
     /// </summary>
     private double DistributeExtraTableHeight(
         ILayoutEnvironment g, List<(CssBox Row, double Top, double Bottom)> rowBounds,
-        double starty, double naturalBottom)
+        double naturalBottom)
     {
         if (rowBounds.Count == 0)
             return naturalBottom;
@@ -1038,7 +1036,7 @@ internal sealed class CssLayoutEngineTable
         }
     }
 
-    private void ResolveOuterEdge(CssBox cell, string side, EdgeBorder tableEdge, HashSet<(CssBox, string)> done)
+    private static void ResolveOuterEdge(CssBox cell, string side, EdgeBorder tableEdge, HashSet<(CssBox, string)> done)
     {
         if (!done.Add((cell, side)))
             return;

@@ -7,6 +7,9 @@ using Broiler.JavaScript.Runtime;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Broiler.HTML.Core.Entities;
+using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Scripting;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Wpt;
 

@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Scripting;
 
 /// <summary>
 /// Lightweight Content Security Policy (CSP) model for the bridge script
@@ -41,26 +41,6 @@ public sealed class ContentSecurityPolicy
     /// Whether any honored script directive contains <c>'strict-dynamic'</c>.
     /// </summary>
     public bool StrictDynamic { get; private set; }
-
-    /// <summary>
-    /// The raw <c>default-src</c> tokens parsed from the policy.
-    /// </summary>
-    public IReadOnlyCollection<string> DefaultSrcTokens => _defaultSrcTokens;
-
-    /// <summary>
-    /// The raw <c>script-src</c> tokens parsed from the policy.
-    /// </summary>
-    public IReadOnlyCollection<string> ScriptSrcTokens => _scriptSrcTokens;
-
-    /// <summary>
-    /// The raw <c>script-src-elem</c> tokens parsed from the policy.
-    /// </summary>
-    public IReadOnlyCollection<string> ScriptSrcElemTokens => _scriptSrcElemTokens;
-
-    /// <summary>
-    /// The raw <c>script-src-attr</c> tokens parsed from the policy.
-    /// </summary>
-    public IReadOnlyCollection<string> ScriptSrcAttrTokens => _scriptSrcAttrTokens;
 
     /// <summary>
     /// Parse a CSP header value and apply the honored script directives.
@@ -200,17 +180,6 @@ public sealed class ContentSecurityPolicy
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Guard method: throws <see cref="InvalidOperationException"/> when
-    /// <c>eval()</c> is disallowed by the current policy.
-    /// </summary>
-    public void EnforceEval()
-    {
-        if (!AllowsEval)
-            throw new InvalidOperationException(
-                "Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source in the Content Security Policy.");
     }
 
     /// <summary>

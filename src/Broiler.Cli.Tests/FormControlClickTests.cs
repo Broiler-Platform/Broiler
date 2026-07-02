@@ -1,8 +1,8 @@
 using Broiler.HTML.Dom;
-using Broiler.Layout;
 using Broiler.HTML.Dom.Utils;
 using Broiler.HTML.Image;
 using System.Drawing;
+using Broiler.Layout.Engine;
 
 namespace Broiler.Cli.Tests;
 
@@ -25,7 +25,7 @@ public class FormControlClickTests
         container.MaxSize = new SizeF(width, height);
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
-        container.SetHtml(html, null);
+        container.SetHtmlWithStyleSet(html, null);
 
         using var bmp = new BBitmap(width, height);
         var clip = new RectangleF(0, 0, width, height);
@@ -41,7 +41,7 @@ public class FormControlClickTests
         container.MaxSize = new SizeF(width, height);
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
-        container.SetHtml(html, null);
+        container.SetHtmlWithStyleSet(html, null);
 
         using var bmp = new BBitmap(width, height);
         var clip = new RectangleF(0, 0, width, height);

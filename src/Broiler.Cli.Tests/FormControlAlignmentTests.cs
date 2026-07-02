@@ -24,7 +24,7 @@ public class FormControlAlignmentTests
             for (int y = 0; y < bmp.Height; y++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                if (px.R < 250 || px.G < 250 || px.B < 250)
                 {
                     if (left < 0) left = x;
                     right = x;
@@ -48,7 +48,7 @@ public class FormControlAlignmentTests
                 <input type='submit' value='Go'>
             </div>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
         var (left, right) = FindHorizontalExtent(bmp);
         int center = (left + right) / 2;
         Assert.True(left > 200 && right < 600,
@@ -66,7 +66,7 @@ public class FormControlAlignmentTests
                 <input type='text'>
             </center>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
         var (left, right) = FindHorizontalExtent(bmp);
         int center = (left + right) / 2;
         // Input is ~173px wide. Centered at 400, left≈313, right≈486.
@@ -86,7 +86,7 @@ public class FormControlAlignmentTests
                 <button>OK</button>
             </div>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
         var (left, right) = FindHorizontalExtent(bmp);
         // Right-aligned: the button should be near x=800
         Assert.True(left > 600 && right >= 790,
@@ -102,7 +102,7 @@ public class FormControlAlignmentTests
         var html = @"<html><body style='margin:0'>
             <input type='submit' value='Search'>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 40);
         var (left, right) = FindHorizontalExtent(bmp);
         int width = right - left + 1;
         Assert.True(width < 400,
@@ -118,7 +118,7 @@ public class FormControlAlignmentTests
     public void FormControl_HasVisibleText(string control)
     {
         var html = $"<html><body style='margin:0; padding:0;'>{control}</body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 400, 40);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 40);
 
         // Count dark pixels (text rendered in black or near-black)
         int darkPixels = 0;
@@ -126,7 +126,7 @@ public class FormControlAlignmentTests
         for (int x = 0; x < bmp.Width; x++)
         {
             var px = bmp.GetPixel(x, y);
-            if (px.Red < 100 || px.Green < 100 || px.Blue < 100)
+            if (px.R < 100 || px.G < 100 || px.B < 100)
                 darkPixels++;
         }
 
@@ -145,7 +145,7 @@ public class FormControlAlignmentTests
                 <input type='text' name='q'>
             </center>
         </body></html>";
-        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 60);
 
         var (left, right) = FindHorizontalExtent(bmp);
         int center = (left + right) / 2;

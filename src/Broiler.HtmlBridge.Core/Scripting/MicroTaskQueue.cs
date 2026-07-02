@@ -1,7 +1,8 @@
+using Broiler.HtmlBridge.Logging;
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Scripting;
 
 /// <summary>
 /// A simple micro-task queue that collects callbacks and drains them in

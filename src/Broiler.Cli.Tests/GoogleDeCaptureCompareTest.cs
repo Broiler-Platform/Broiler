@@ -83,7 +83,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 128 && px.Green < 128 && px.Blue < 128) count++;
+                if (px.R < 128 && px.G < 128 && px.B < 128) count++;
             }
         return count;
     }
@@ -100,7 +100,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                if (px.R < 250 || px.G < 250 || px.B < 250)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -123,10 +123,10 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red >= 0xF0 && px.Red <= 0xF8
-                    && px.Green >= 0xF0 && px.Green <= 0xF8
-                    && px.Blue >= 0xF0 && px.Blue <= 0xF8
-                    && !(px.Red == 0xFF && px.Green == 0xFF && px.Blue == 0xFF))
+                if (px.R >= 0xF0 && px.R <= 0xF8
+                    && px.G >= 0xF0 && px.G <= 0xF8
+                    && px.B >= 0xF0 && px.B <= 0xF8
+                    && !(px.R == 0xFF && px.G == 0xFF && px.B == 0xFF))
                 {
                     if (top < 0) top = y;
                     bottom = y;
@@ -140,7 +140,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_ButtonsVisible()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         // Scan entire image for dark text pixels in the button region (lower half)
         int dark = CountDarkPixels(bmp, bmp.Height / 4, bmp.Height * 3 / 4);
@@ -152,7 +152,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_NoFullWidthGrayLines()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         int fullWidth = CountFullWidthLines(bmp, 700);
         _output.WriteLine($"Full-width lines (>700px): {fullWidth}");
@@ -162,7 +162,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_ButtonsContentSized()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         // Find button gray background region
         var (top, bottom, left, right) = FindGrayRegion(bmp, 50, bmp.Height);
@@ -177,7 +177,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_ButtonsCentered()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         var (_, _, left, right) = FindGrayRegion(bmp, 50, bmp.Height);
         if (left > right) { Assert.Fail("No button region found"); return; }
@@ -194,7 +194,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_SearchBoxBordersVisible()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         // The search input (.lst) has UA border: 1px solid #767676 and width:496px.
         // Look for horizontal rows with non-white pixels spanning > 300px
@@ -206,7 +206,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 240 || px.Green < 240 || px.Blue < 240)
+                if (px.R < 240 || px.G < 240 || px.B < 240)
                 {
                     if (x < left) left = x;
                     if (x > right) right = x;
@@ -230,13 +230,13 @@ input{font-family:inherit}
 <input name='source' type='hidden' value='hp'>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         int nonWhite = 0;
         for (int y = 0; y < bmp.Height; y++)
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250) nonWhite++;
+                if (px.R < 250 || px.G < 250 || px.B < 250) nonWhite++;
             }
         _output.WriteLine($"Hidden input non-white pixels: {nonWhite}");
         Assert.Equal(0, nonWhite);
@@ -256,7 +256,7 @@ input{font-family:inherit}
 </div>
 </body></html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
         int dark = CountDarkPixels(bmp, 0, bmp.Height);
         _output.WriteLine($"Button dark pixels: {dark}");
         Assert.True(dark > 5,
@@ -266,7 +266,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_GoogleLogoTextVisible()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 500);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
 
         // The colored "Google" text uses large font (48px) with specific colors.
         // Check for colored pixels in the logo area (top quarter of image).
@@ -276,10 +276,10 @@ input{font-family:inherit}
             {
                 var px = bmp.GetPixel(x, y);
                 // Look for the Google brand colors (blue, red, yellow, green)
-                bool isBlue = px.Blue > 200 && px.Red < 100 && px.Green < 150;
-                bool isRed = px.Red > 200 && px.Green < 100 && px.Blue < 100;
-                bool isYellow = px.Red > 200 && px.Green > 150 && px.Blue < 100;
-                bool isGreen = px.Green > 150 && px.Red < 100 && px.Blue < 100;
+                bool isBlue = px.B > 200 && px.R < 100 && px.G < 150;
+                bool isRed = px.R > 200 && px.G < 100 && px.B < 100;
+                bool isYellow = px.R > 200 && px.G > 150 && px.B < 100;
+                bool isGreen = px.G > 150 && px.R < 100 && px.B < 100;
                 if (isBlue || isRed || isYellow || isGreen) colored++;
             }
         _output.WriteLine($"Google logo colored pixels: {colored}");
@@ -290,7 +290,7 @@ input{font-family:inherit}
     [Fact]
     public void Capture_FooterLinksVisible()
     {
-        using var bmp = HtmlRender.RenderToImage(GoogleDeHtml, 800, 600);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 600);
 
         // First, find button bottom by looking for the gray button region
         var (_, btnBottom, _, _) = FindGrayRegion(bmp, 50, bmp.Height);
@@ -302,7 +302,7 @@ input{font-family:inherit}
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 250 || px.Green < 250 || px.Blue < 250) nonWhite++;
+                if (px.R < 250 || px.G < 250 || px.B < 250) nonWhite++;
             }
         _output.WriteLine($"Footer non-white pixels (y>{scanStart}): {nonWhite}");
         Assert.True(nonWhite > 50,

@@ -1,6 +1,4 @@
-using System;
-
-namespace Broiler.Layout;
+namespace Broiler.Layout.Engine;
 
 /// <summary>
 /// Feature gate for vertical writing-mode flow (logical layout + post-layout

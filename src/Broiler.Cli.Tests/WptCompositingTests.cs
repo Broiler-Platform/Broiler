@@ -39,7 +39,7 @@ body { background-color: green; }
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0);
     }
@@ -63,12 +63,12 @@ body { background-color: green; }
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         // The background shorthand resets background-color to transparent.
         // The extreme size makes the image invisible → white page.
         var pixel = bitmap.GetPixel(100, 100);
-        Assert.True(pixel.Red >= 245 && pixel.Green >= 245 && pixel.Blue >= 245,
-            $"Expected near-white page (background shorthand accepted) but got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        Assert.True(pixel.R >= 245 && pixel.G >= 245 && pixel.B >= 245,
+            $"Expected near-white page (background shorthand accepted) but got ({pixel.R},{pixel.G},{pixel.B})");
     }
 
     /// <summary>
@@ -97,18 +97,18 @@ body {{ margin: 0; background: white; }}
 <body><div class=""test""></div></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 120, 120);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 120, 120);
 
         var topBorder = bitmap.GetPixel(50, 10);
         var center = bitmap.GetPixel(50, 50);
         var hiddenRightBorder = bitmap.GetPixel(95, 50);
 
-        Assert.True(topBorder.Blue >= 245 && topBorder.Red <= 10 && topBorder.Green <= 10,
-            $"Expected a blue top border pixel but got ({topBorder.Red},{topBorder.Green},{topBorder.Blue})");
-        Assert.True(center.Blue >= 245 && center.Red <= 10 && center.Green <= 10,
-            $"Expected center to be blue but got ({center.Red},{center.Green},{center.Blue})");
-        Assert.True(hiddenRightBorder.Blue >= 245 && hiddenRightBorder.Red <= 10 && hiddenRightBorder.Green <= 10,
-            $"Expected hidden right side to remain blue but got ({hiddenRightBorder.Red},{hiddenRightBorder.Green},{hiddenRightBorder.Blue})");
+        Assert.True(topBorder.B >= 245 && topBorder.R <= 10 && topBorder.G <= 10,
+            $"Expected a blue top border pixel but got ({topBorder.R},{topBorder.G},{topBorder.B})");
+        Assert.True(center.B >= 245 && center.R <= 10 && center.G <= 10,
+            $"Expected center to be blue but got ({center.R},{center.G},{center.B})");
+        Assert.True(hiddenRightBorder.B >= 245 && hiddenRightBorder.R <= 10 && hiddenRightBorder.G <= 10,
+            $"Expected hidden right side to remain blue but got ({hiddenRightBorder.R},{hiddenRightBorder.G},{hiddenRightBorder.B})");
     }
 
     /// <summary>
@@ -139,21 +139,21 @@ body {{ margin: 8px; background: white; }}
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         var aboveFirstRow = bitmap.GetPixel(28, 8);
         var firstRowBorder = bitmap.GetPixel(28, 28);
         var gapBeforeSecondRow = bitmap.GetPixel(28, 200);
         var secondRowBorder = bitmap.GetPixel(28, 222);
 
-        Assert.True(aboveFirstRow.Red >= 245 && aboveFirstRow.Green >= 245 && aboveFirstRow.Blue >= 245,
-            $"Expected whitespace above first inline-block row but got ({aboveFirstRow.Red},{aboveFirstRow.Green},{aboveFirstRow.Blue})");
-        Assert.True(firstRowBorder.Blue >= 245 && firstRowBorder.Red <= 10 && firstRowBorder.Green <= 10,
-            $"Expected first row border to be blue but got ({firstRowBorder.Red},{firstRowBorder.Green},{firstRowBorder.Blue})");
-        Assert.True(gapBeforeSecondRow.Red >= 245 && gapBeforeSecondRow.Green >= 245 && gapBeforeSecondRow.Blue >= 245,
-            $"Expected whitespace before second row but got ({gapBeforeSecondRow.Red},{gapBeforeSecondRow.Green},{gapBeforeSecondRow.Blue})");
-        Assert.True(secondRowBorder.Blue >= 245 && secondRowBorder.Red <= 10 && secondRowBorder.Green <= 10,
-            $"Expected second row border to be blue but got ({secondRowBorder.Red},{secondRowBorder.Green},{secondRowBorder.Blue})");
+        Assert.True(aboveFirstRow.R >= 245 && aboveFirstRow.G >= 245 && aboveFirstRow.B >= 245,
+            $"Expected whitespace above first inline-block row but got ({aboveFirstRow.R},{aboveFirstRow.G},{aboveFirstRow.B})");
+        Assert.True(firstRowBorder.B >= 245 && firstRowBorder.R <= 10 && firstRowBorder.G <= 10,
+            $"Expected first row border to be blue but got ({firstRowBorder.R},{firstRowBorder.G},{firstRowBorder.B})");
+        Assert.True(gapBeforeSecondRow.R >= 245 && gapBeforeSecondRow.G >= 245 && gapBeforeSecondRow.B >= 245,
+            $"Expected whitespace before second row but got ({gapBeforeSecondRow.R},{gapBeforeSecondRow.G},{gapBeforeSecondRow.B})");
+        Assert.True(secondRowBorder.B >= 245 && secondRowBorder.R <= 10 && secondRowBorder.G <= 10,
+            $"Expected second row border to be blue but got ({secondRowBorder.R},{secondRowBorder.G},{secondRowBorder.B})");
     }
 
     /// <summary>
@@ -216,12 +216,12 @@ body {
 </style>
 There should be a 20px green border around the edge of the viewport.";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         var center = bitmap.GetPixel(512, 384);
 
-        Assert.True(center.Green >= 120 && center.Red <= 10 && center.Blue <= 10,
-            $"Expected viewport center to be green but got ({center.Red},{center.Green},{center.Blue})");
+        Assert.True(center.G >= 120 && center.R <= 10 && center.B <= 10,
+            $"Expected viewport center to be green but got ({center.R},{center.G},{center.B})");
     }
 
     /// <summary>
@@ -244,7 +244,7 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
     }
 
@@ -264,7 +264,7 @@ Test
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
     }
 
@@ -288,7 +288,7 @@ Test
 }
 </style>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0);
     }
@@ -313,7 +313,7 @@ Test
 </style>
 <object data=""x""></object>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
         Assert.NotNull(bitmap);
     }
 
@@ -335,7 +335,7 @@ Test
 </style>
 <object id=""a""></object>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
         Assert.NotNull(bitmap);
     }
 
@@ -354,15 +354,15 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0);
 
         // The canvas background should be inverted: #000 → #FFF (white)
         var pixel = bitmap.GetPixel(150, 150);
-        Assert.InRange(pixel.Red, 250, 255);
-        Assert.InRange(pixel.Green, 250, 255);
-        Assert.InRange(pixel.Blue, 250, 255);
+        Assert.InRange(pixel.R, 250, 255);
+        Assert.InRange(pixel.G, 250, 255);
+        Assert.InRange(pixel.B, 250, 255);
     }
 
     // ──────────── Root element opacity/transparency ──────────────────────
@@ -383,15 +383,15 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // Sample a pixel away from any content.
         // #BBB = (187,187,187) at 50% over white (255,255,255)
         // = 187*0.5 + 255*0.5 = 221
         var pixel = bitmap.GetPixel(150, 150);
-        Assert.InRange(pixel.Red, 218, 224);
-        Assert.InRange(pixel.Green, 218, 224);
-        Assert.InRange(pixel.Blue, 218, 224);
+        Assert.InRange(pixel.R, 218, 224);
+        Assert.InRange(pixel.G, 218, 224);
+        Assert.InRange(pixel.B, 218, 224);
     }
 
     /// <summary>
@@ -409,13 +409,13 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // rgba(45,45,45,0.5) over white = 45*0.5 + 255*0.5 = 150
         var pixel = bitmap.GetPixel(150, 150);
-        Assert.InRange(pixel.Red, 147, 153);
-        Assert.InRange(pixel.Green, 147, 153);
-        Assert.InRange(pixel.Blue, 147, 153);
+        Assert.InRange(pixel.R, 147, 153);
+        Assert.InRange(pixel.G, 147, 153);
+        Assert.InRange(pixel.B, 147, 153);
     }
 
     /// <summary>
@@ -433,12 +433,12 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         var pixel = bitmap.GetPixel(150, 150);
-        Assert.InRange(pixel.Red, 148, 152);
-        Assert.InRange(pixel.Green, 148, 152);
-        Assert.InRange(pixel.Blue, 148, 152);
+        Assert.InRange(pixel.R, 148, 152);
+        Assert.InRange(pixel.G, 148, 152);
+        Assert.InRange(pixel.B, 148, 152);
     }
 
     /// <summary>
@@ -457,15 +457,15 @@ Test
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // green (#008000) at 0.5 opacity over white (255,255,255):
         //   R = 0*0.5 + 255*0.5 = 128, G = 128*0.5 + 255*0.5 = 192, B = 0*0.5 + 255*0.5 = 128
         var pixel = bitmap.GetPixel(100, 100);
-        Assert.InRange(pixel.Red, 125, 131);
-        Assert.InRange(pixel.Green, 189, 195);
-        Assert.InRange(pixel.Blue, 125, 131);
+        Assert.InRange(pixel.R, 125, 131);
+        Assert.InRange(pixel.G, 189, 195);
+        Assert.InRange(pixel.B, 125, 131);
     }
 
     /// <summary>
@@ -493,7 +493,7 @@ body {{ margin: 0; }}
 <body></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // The green (#008000 = 0,128,0) SVG tiles the canvas at 50% opacity
         // over white (255,255,255):
@@ -501,9 +501,9 @@ body {{ margin: 0; }}
         //   G = 128*0.5 + 255*0.5 ≈ 192
         //   B = 0*0.5 + 255*0.5 ≈ 128
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.InRange(pixel.Red, 120, 135);
-        Assert.InRange(pixel.Green, 185, 200);
-        Assert.InRange(pixel.Blue, 120, 135);
+        Assert.InRange(pixel.R, 120, 135);
+        Assert.InRange(pixel.G, 185, 200);
+        Assert.InRange(pixel.B, 120, 135);
     }
 
     /// <summary>
@@ -528,14 +528,14 @@ body {{ margin: 0; }}
 <body></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // Red (#FF0000) should tile the entire canvas.
         // Check a pixel in the corner away from any content.
         var pixel = bitmap.GetPixel(95, 95);
-        Assert.InRange(pixel.Red, 250, 255);
-        Assert.InRange(pixel.Green, 0, 10);
-        Assert.InRange(pixel.Blue, 0, 10);
+        Assert.InRange(pixel.R, 250, 255);
+        Assert.InRange(pixel.G, 0, 10);
+        Assert.InRange(pixel.B, 0, 10);
     }
 
     /// <summary>
@@ -564,13 +564,13 @@ body { margin: 0; }
 </html>";
 
             var baseUrl = new Uri(Path.Combine(tempDir, "test.html")).AbsoluteUri;
-            using var bitmap = HtmlRender.RenderToImage(html, 100, 100, baseUrl: baseUrl);
+            using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100, baseUrl: baseUrl);
 
             // The green SVG should tile across the canvas.
             var pixel = bitmap.GetPixel(50, 50);
-            Assert.InRange(pixel.Green, 120, 135);
-            Assert.InRange(pixel.Red, 0, 10);
-            Assert.InRange(pixel.Blue, 0, 10);
+            Assert.InRange(pixel.G, 120, 135);
+            Assert.InRange(pixel.R, 0, 10);
+            Assert.InRange(pixel.B, 0, 10);
         }
         finally
         {
@@ -609,12 +609,12 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 600, 600);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 600, 600);
         Assert.NotNull(bitmap);
 
         // Verify the blue box at (10,10) has some dark-blue content
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Blue > 0, "Blue box should be visible");
+        Assert.True(pixel.B > 0, "Blue box should be visible");
     }
 
     /// <summary>
@@ -637,7 +637,7 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
     }
 
@@ -661,13 +661,13 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
     }
 
     /// <summary>
@@ -692,13 +692,13 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
     }
 
     /// <summary>
@@ -721,13 +721,13 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
     }
 
     // ──────────── Reference tests (no mix-blend-mode) ────────────────────
@@ -744,13 +744,13 @@ body { background: lightgray; }
         var html = @"<!DOCTYPE html>
 <div style=""width: 100px; height: 100px; background: lime""></div>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The lime div should produce green pixels.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.Equal(0, pixel.Red);
-        Assert.Equal(255, pixel.Green);
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(0, pixel.R);
+        Assert.Equal(255, pixel.G);
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>
@@ -772,13 +772,13 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
     }
 
     /// <summary>
@@ -800,20 +800,20 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
 
         // The container should have a yellow (#FF0) background
         // Sample at (15, 95) — near the bottom of the container, below the text area
         var container = bitmap.GetPixel(15, 95);
-        Assert.Equal(255, container.Red);
-        Assert.Equal(255, container.Green);
-        Assert.Equal(0, container.Blue);
+        Assert.Equal(255, container.R);
+        Assert.Equal(255, container.G);
+        Assert.Equal(0, container.B);
     }
 
     /// <summary>
@@ -837,13 +837,13 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // Background must be lightgray (#D3D3D3), not black
         var bg = bitmap.GetPixel(280, 280);
-        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
-            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+        Assert.True(bg.R >= 200 && bg.G >= 200 && bg.B >= 200,
+            $"Background should be lightgray but got ({bg.R},{bg.G},{bg.B})");
     }
 
     /// <summary>
@@ -873,7 +873,7 @@ body { background: lightgray; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 600, 600);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 600, 600);
         Assert.NotNull(bitmap);
     }
 
@@ -924,12 +924,12 @@ document.getElementById('result').textContent =
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // The red child should be visible (non-white pixel at its position)
         var pixel = bitmap.GetPixel(25, 25);
-        Assert.True(pixel.Red > 200 || pixel.Blue > 200,
+        Assert.True(pixel.R > 200 || pixel.B > 200,
             "Stacking context child should be visible");
     }
 
@@ -946,7 +946,7 @@ body { background-color: green; background-blend-mode: overlay; }
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
     }
 
@@ -963,7 +963,7 @@ div { filter: blur(5px); width: 100px; height: 100px; background: red; }
 <body><div>Test</div></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
     }
 
@@ -990,16 +990,16 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // Sample center of the overlapping region
         var pixel = bitmap.GetPixel(50, 50);
         // Difference of red (#FF0000) on yellow (#FFFF00):
         // R: abs(FF-FF) = 0, G: abs(00-FF) = FF, B: abs(00-00) = 0 → green
-        Assert.True(pixel.Red < 30, $"Expected near-zero red but got {pixel.Red}");
-        Assert.True(pixel.Green > 200, $"Expected high green but got {pixel.Green}");
-        Assert.True(pixel.Blue < 30, $"Expected near-zero blue but got {pixel.Blue}");
+        Assert.True(pixel.R < 30, $"Expected near-zero red but got {pixel.R}");
+        Assert.True(pixel.G > 200, $"Expected high green but got {pixel.G}");
+        Assert.True(pixel.B < 30, $"Expected near-zero blue but got {pixel.B}");
     }
 
     /// <summary>
@@ -1023,16 +1023,16 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
         // Multiply: green * gray → darker green
         // R: (0x00 * 0x80) / 255 ≈ 0, G: (0xFF * 0x80) / 255 ≈ 0x80, B: 0
-        Assert.True(pixel.Red < 20, $"Expected near-zero red but got {pixel.Red}");
-        Assert.True(pixel.Green > 100 && pixel.Green < 180,
-            $"Expected green around 128 (multiply) but got {pixel.Green}");
-        Assert.True(pixel.Blue < 20, $"Expected near-zero blue but got {pixel.Blue}");
+        Assert.True(pixel.R < 20, $"Expected near-zero red but got {pixel.R}");
+        Assert.True(pixel.G > 100 && pixel.G < 180,
+            $"Expected green around 128 (multiply) but got {pixel.G}");
+        Assert.True(pixel.B < 20, $"Expected near-zero blue but got {pixel.B}");
     }
 
     /// <summary>
@@ -1055,14 +1055,14 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
         // Screen: R: FF+00 - FF*00/255 = FF, G: 0, B: 00+FF - 00*FF/255 = FF → magenta
-        Assert.True(pixel.Red > 200, $"Expected high red but got {pixel.Red}");
-        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
-        Assert.True(pixel.Blue > 200, $"Expected high blue but got {pixel.Blue}");
+        Assert.True(pixel.R > 200, $"Expected high red but got {pixel.R}");
+        Assert.True(pixel.G < 30, $"Expected near-zero green but got {pixel.G}");
+        Assert.True(pixel.B > 200, $"Expected high blue but got {pixel.B}");
     }
 
     /// <summary>
@@ -1084,13 +1084,13 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.Equal((byte)0, pixel.Red);
-        Assert.Equal((byte)0, pixel.Green);
-        Assert.Equal((byte)0, pixel.Blue);
+        Assert.Equal((byte)0, pixel.R);
+        Assert.Equal((byte)0, pixel.G);
+        Assert.Equal((byte)0, pixel.B);
     }
 
     /// <summary>
@@ -1112,13 +1112,13 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Red > 200, $"Expected high red but got {pixel.Red}");
-        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
-        Assert.True(pixel.Blue > 200, $"Expected high blue but got {pixel.Blue}");
+        Assert.True(pixel.R > 200, $"Expected high red but got {pixel.R}");
+        Assert.True(pixel.G < 30, $"Expected near-zero green but got {pixel.G}");
+        Assert.True(pixel.B > 200, $"Expected high blue but got {pixel.B}");
     }
 
     /// <summary>
@@ -1142,15 +1142,15 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         var pixel = bitmap.GetPixel(50, 50);
         // Overlay of red (#FF0000) on lime (#00FF00):
         // The green channel of lime is > 0.5, so overlay uses screen formula for G.
         // Result should have a green component (not pure red).
-        Assert.True(pixel.Green > 100,
-            $"Expected green channel present after overlay blending but got G={pixel.Green}");
+        Assert.True(pixel.G > 100,
+            $"Expected green channel present after overlay blending but got G={pixel.G}");
     }
 
     // ──────────── Gradient rendering tests ────────────────────────────────
@@ -1177,7 +1177,7 @@ html {
 }
 </style>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 800, 600);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 600);
 
         // Inside the element box (100-200, 100-200):
         // Green (#008000 = R0 G128 B0) at 0.5 opacity over white →
@@ -1185,20 +1185,20 @@ html {
         //   G = 128*0.5 + 255*0.5 = 192
         //   B = 0*0.5 + 255*0.5 = 128
         var pInside = bitmap.GetPixel(150, 150);
-        Assert.InRange(pInside.Red, 120, 140);
-        Assert.InRange(pInside.Green, 185, 200);
-        Assert.InRange(pInside.Blue, 120, 140);
+        Assert.InRange(pInside.R, 120, 140);
+        Assert.InRange(pInside.G, 185, 200);
+        Assert.InRange(pInside.B, 120, 140);
 
         // Outside the element box: white canvas preserved
         var pAbove = bitmap.GetPixel(50, 50);
-        Assert.InRange(pAbove.Red, 250, 255);
-        Assert.InRange(pAbove.Green, 250, 255);
-        Assert.InRange(pAbove.Blue, 250, 255);
+        Assert.InRange(pAbove.R, 250, 255);
+        Assert.InRange(pAbove.G, 250, 255);
+        Assert.InRange(pAbove.B, 250, 255);
 
         var pBelow = bitmap.GetPixel(300, 300);
-        Assert.InRange(pBelow.Red, 250, 255);
-        Assert.InRange(pBelow.Green, 250, 255);
-        Assert.InRange(pBelow.Blue, 250, 255);
+        Assert.InRange(pBelow.R, 250, 255);
+        Assert.InRange(pBelow.G, 250, 255);
+        Assert.InRange(pBelow.B, 250, 255);
     }
 
     // ──────────── Viewport unit tests ────────────────────────────────────
@@ -1223,18 +1223,18 @@ body { margin: 0; background-color: green; height: 100vh; }
 <body></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 300);
         // With 100vh, the body should fill the full viewport height (300px).
         // The center and bottom should both be green.
         var pCenter = bitmap.GetPixel(100, 150);
-        Assert.InRange(pCenter.Green, 100, 130);
-        Assert.InRange(pCenter.Red, 0, 10);
-        Assert.InRange(pCenter.Blue, 0, 10);
+        Assert.InRange(pCenter.G, 100, 130);
+        Assert.InRange(pCenter.R, 0, 10);
+        Assert.InRange(pCenter.B, 0, 10);
 
         var pBottom = bitmap.GetPixel(100, 280);
-        Assert.InRange(pBottom.Green, 100, 130);
-        Assert.InRange(pBottom.Red, 0, 10);
-        Assert.InRange(pBottom.Blue, 0, 10);
+        Assert.InRange(pBottom.G, 100, 130);
+        Assert.InRange(pBottom.R, 0, 10);
+        Assert.InRange(pBottom.B, 0, 10);
     }
 
     /// <summary>
@@ -1252,17 +1252,17 @@ div { width: 50vw; height: 100px; background-color: red; }
 <body><div></div></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 200);
         // 50vw on a 400px viewport = 200px wide red div.
         // At x=100 (inside div), should be red.
         var pInside = bitmap.GetPixel(100, 50);
-        Assert.InRange(pInside.Red, 200, 255);
-        Assert.InRange(pInside.Green, 0, 20);
+        Assert.InRange(pInside.R, 200, 255);
+        Assert.InRange(pInside.G, 0, 20);
 
         // At x=300 (outside div), should be white.
         var pOutside = bitmap.GetPixel(300, 50);
-        Assert.InRange(pOutside.Red, 245, 255);
-        Assert.InRange(pOutside.Green, 245, 255);
+        Assert.InRange(pOutside.R, 245, 255);
+        Assert.InRange(pOutside.G, 245, 255);
     }
 
     /// <summary>
@@ -1287,16 +1287,16 @@ body { margin: 0; }
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 200);
         // .a (50vmin=100px): x=50 should be blue, x=150 should be white
         var pA = bitmap.GetPixel(50, 25);
-        Assert.InRange(pA.Blue, 200, 255);
-        Assert.InRange(pA.Red, 0, 20);
+        Assert.InRange(pA.B, 200, 255);
+        Assert.InRange(pA.R, 0, 20);
 
         // .b (50vmax=200px): x=150 should be red
         var pB = bitmap.GetPixel(150, 75);
-        Assert.InRange(pB.Red, 200, 255);
-        Assert.InRange(pB.Blue, 0, 20);
+        Assert.InRange(pB.R, 200, 255);
+        Assert.InRange(pB.B, 0, 20);
     }
 
     // ──────────── Video element placeholder tests ────────────────────────
@@ -1324,18 +1324,18 @@ body { margin: 0; background-color: white; }
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
         // The video placeholder should render as a 300×150 black box.
         var pInside = bitmap.GetPixel(150, 75);
-        Assert.InRange(pInside.Red, 0, 20);
-        Assert.InRange(pInside.Green, 0, 20);
-        Assert.InRange(pInside.Blue, 0, 20);
+        Assert.InRange(pInside.R, 0, 20);
+        Assert.InRange(pInside.G, 0, 20);
+        Assert.InRange(pInside.B, 0, 20);
 
         // Outside the placeholder (to the right) should be white.
         var pOutside = bitmap.GetPixel(350, 75);
-        Assert.InRange(pOutside.Red, 245, 255);
-        Assert.InRange(pOutside.Green, 245, 255);
-        Assert.InRange(pOutside.Blue, 245, 255);
+        Assert.InRange(pOutside.R, 245, 255);
+        Assert.InRange(pOutside.G, 245, 255);
+        Assert.InRange(pOutside.B, 245, 255);
     }
 
     /// <summary>
@@ -1357,17 +1357,17 @@ body { margin: 0; background-color: white; }
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
         // 200×100 black box
         var pInside = bitmap.GetPixel(100, 50);
-        Assert.InRange(pInside.Red, 0, 20);
-        Assert.InRange(pInside.Green, 0, 20);
-        Assert.InRange(pInside.Blue, 0, 20);
+        Assert.InRange(pInside.R, 0, 20);
+        Assert.InRange(pInside.G, 0, 20);
+        Assert.InRange(pInside.B, 0, 20);
 
         // At x=250 (outside 200px width) should be white.
         var pOutside = bitmap.GetPixel(250, 50);
-        Assert.InRange(pOutside.Red, 245, 255);
-        Assert.InRange(pOutside.Green, 245, 255);
+        Assert.InRange(pOutside.R, 245, 255);
+        Assert.InRange(pOutside.G, 245, 255);
     }
 
     /// <summary>
@@ -1389,13 +1389,13 @@ body { margin: 0; background-color: white; font-size: 20px; }
 </body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
         // The video placeholder should be a 300×150 black box.
         // The fallback text "This is fallback text..." should NOT be rendered.
         var pCenter = bitmap.GetPixel(150, 75);
-        Assert.InRange(pCenter.Red, 0, 20);
-        Assert.InRange(pCenter.Green, 0, 20);
-        Assert.InRange(pCenter.Blue, 0, 20);
+        Assert.InRange(pCenter.R, 0, 20);
+        Assert.InRange(pCenter.G, 0, 20);
+        Assert.InRange(pCenter.B, 0, 20);
     }
 
     // ──────────── Isolation group tests ────────────────────────────────────
@@ -1426,14 +1426,14 @@ body { margin: 0; }
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
         Assert.NotNull(bitmap);
 
         // The blended div should only blend with the isolated container's
         // green background, not with the red backdrop.
         // difference of blue (#0000FF) on green (#00FF00) = (0, FF, FF) cyan
         var pixel = bitmap.GetPixel(100, 50);
-        Assert.True(pixel.Green > 150, $"Expected high green but got {pixel.Green}");
+        Assert.True(pixel.G > 150, $"Expected high green but got {pixel.G}");
     }
 
     /// <summary>
@@ -1456,13 +1456,13 @@ body { margin: 0; }
 <div class=""sibling""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // The blue sibling should be on top of the red transformed element
         // at the overlap region (y=50-100)
         var pixel = bitmap.GetPixel(50, 75);
-        Assert.True(pixel.Blue > 200, $"Expected blue on top at overlap but got B={pixel.Blue}");
+        Assert.True(pixel.B > 200, $"Expected blue on top at overlap but got B={pixel.B}");
     }
 
     /// <summary>
@@ -1482,7 +1482,7 @@ body { margin: 0; background: green; }
 <body></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // The root has mix-blend-mode: difference, but per spec this should
@@ -1490,7 +1490,7 @@ body { margin: 0; background: green; }
         // should render normally, not as the difference of green vs white.
         var pixel = bitmap.GetPixel(100, 100);
         // Green (#008000) should be visible, not difference result
-        Assert.True(pixel.Green > 100, $"Expected green visible but got G={pixel.Green}");
+        Assert.True(pixel.G > 100, $"Expected green visible but got G={pixel.G}");
     }
 
     /// <summary>
@@ -1517,13 +1517,13 @@ body { margin: 0; }
 <div class=""blended""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // Screen of red (#FF0000) on green (#00FF00) should produce yellow (#FFFF00).
         // Verify both red and green channels are high.
         var pixel = bitmap.GetPixel(50, 50);
-        Assert.True(pixel.Red > 150 || pixel.Green > 150,
-            $"Expected lighter blended output but got R={pixel.Red}, G={pixel.Green}");
+        Assert.True(pixel.R > 150 || pixel.G > 150,
+            $"Expected lighter blended output but got R={pixel.R}, G={pixel.G}");
     }
 }

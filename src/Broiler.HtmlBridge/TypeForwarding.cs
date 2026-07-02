@@ -1,9 +1,10 @@
+using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Scripting;
 using System.Runtime.CompilerServices;
 
 // RF-BRIDGE-1a: some forwarded types (the dead bridge paint pipeline) are now
 // [Obsolete] but stay forwarded for public-surface compatibility until their v2
 // removal. The forwards themselves are not deprecated, so silence CS0618 here.
-#pragma warning disable CS0618
 
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssDisplay))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssPosition))]
@@ -28,9 +29,9 @@ using System.Runtime.CompilerServices;
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssFontFace))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.CssFontFaceCollection))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.TextLayout))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.PageContent))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ContentSecurityPolicy))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.MicroTaskQueue))]
+[assembly: TypeForwardedTo(typeof(PageContent))]
+[assembly: TypeForwardedTo(typeof(ContentSecurityPolicy))]
+[assembly: TypeForwardedTo(typeof(MicroTaskQueue))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ImageFormat))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.DecodedImage))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ImageDecoder))]
@@ -50,14 +51,14 @@ using System.Runtime.CompilerServices;
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.RenderOutput))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptExecutionResult))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptError))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.LogCategory))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.LogLevel))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.RenderLogEntry))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.RenderLogger))]
+[assembly: TypeForwardedTo(typeof(LogCategory))]
+[assembly: TypeForwardedTo(typeof(LogLevel))]
+[assembly: TypeForwardedTo(typeof(RenderLogEntry))]
+[assembly: TypeForwardedTo(typeof(RenderLogger))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptProfilingHook))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptTimingEntry))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptExtractionResult))]
-[assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.IScriptExtractor))]
+[assembly: TypeForwardedTo(typeof(ScriptExtractionResult))]
+[assembly: TypeForwardedTo(typeof(IScriptExtractor))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.ScriptEngine))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.IScriptEngine))]
 [assembly: TypeForwardedTo(typeof(Broiler.HtmlBridge.InteractiveSession))]

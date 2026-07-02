@@ -25,13 +25,13 @@ public class CssImportantCascadeTests
 </style></head>
 <body><div id=""target"" style=""width:50px;height:50px"">X</div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // Sample pixels inside the div — should be red, not blue.
         var pixel = bitmap.GetPixel(25, 25);
-        Assert.Equal(255, pixel.Red);
-        Assert.Equal(0, pixel.Green);
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(255, pixel.R);
+        Assert.Equal(0, pixel.G);
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>
@@ -48,13 +48,13 @@ public class CssImportantCascadeTests
 </style></head>
 <body><div id=""target"" style=""width:50px;height:50px"">X</div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // #target has higher specificity — blue should win.
         var pixel = bitmap.GetPixel(25, 25);
-        Assert.Equal(0, pixel.Red);
-        Assert.Equal(0, pixel.Green);
-        Assert.Equal(255, pixel.Blue);
+        Assert.Equal(0, pixel.R);
+        Assert.Equal(0, pixel.G);
+        Assert.Equal(255, pixel.B);
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ p { border: 2px solid !important; }
 </style></head>
 <body><p style=""width:60px;height:40px"">Text</p></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The p's border should be solid (not blue); default color is
         // currentColor which inherits black.  Sample the top-left border
@@ -82,8 +82,8 @@ p { border: 2px solid !important; }
         var pixel = bitmap.GetPixel(1, 8);
         // With !important, border-style is "solid" — the border should
         // be visible (not absent).  Blue channel should not dominate.
-        Assert.True(pixel.Blue <= pixel.Red || pixel.Blue <= pixel.Green,
-            $"Expected non-blue border from !important override, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        Assert.True(pixel.B <= pixel.R || pixel.B <= pixel.G,
+            $"Expected non-blue border from !important override, got ({pixel.R},{pixel.G},{pixel.B})");
     }
 
     /// <summary>
@@ -100,13 +100,13 @@ p { border: 2px solid !important; }
 </style></head>
 <body><div id=""target"" style=""width:50px;height:50px"">X</div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // Higher specificity #target blue should win.
         var pixel = bitmap.GetPixel(25, 25);
-        Assert.Equal(0, pixel.Red);
-        Assert.Equal(0, pixel.Green);
-        Assert.Equal(255, pixel.Blue);
+        Assert.Equal(0, pixel.R);
+        Assert.Equal(0, pixel.G);
+        Assert.Equal(255, pixel.B);
     }
 
     /// <summary>
@@ -123,14 +123,14 @@ div > p { border: 1px solid black !important; }
 </style></head>
 <body><div><p id=""target"" style=""width:60px;height:40px"">Text</p></div></body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The p element's border should be solid black (from !important),
         // not blue (from the universal rule).  Sample a border pixel.
         // The exact position depends on layout, but the border should
         // definitely not be pure blue.
         var pixel = bitmap.GetPixel(1, 8);
-        Assert.True(pixel.Blue < 200 || (pixel.Red > 0 && pixel.Green > 0),
-            $"Expected non-blue border from !important, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        Assert.True(pixel.B < 200 || (pixel.R > 0 && pixel.G > 0),
+            $"Expected non-blue border from !important, got ({pixel.R},{pixel.G},{pixel.B})");
     }
 }

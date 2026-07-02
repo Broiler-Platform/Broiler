@@ -1,6 +1,7 @@
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using System.Drawing;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -52,7 +53,7 @@ public class Acid2ImageComparisonTests
     private static BBitmap RenderAcid2(int width = 1024, int height = 768)
     {
         var html = LoadAcid2Html();
-        return HtmlRender.RenderToImage(html, width, height);
+        return HtmlRender.RenderToImageWithStyleSet(html, width, height);
     }
 
     private static string CreateSolidTempPng(BColor color, int width = 300, int height = 300)
@@ -85,7 +86,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+            if (px.R > 200 && px.G < 50 && px.B < 50)
                 redCount++;
         }
 
@@ -119,10 +120,10 @@ public class Acid2ImageComparisonTests
         {
             var px = bitmap.GetPixel(x, y);
             // Black text or dark border from the intro section
-            if (px.Red < 80 && px.Green < 80 && px.Blue < 80)
+            if (px.R < 80 && px.G < 80 && px.B < 80)
                 foundDarkText = true;
             // Blue link text
-            if (px.Blue > 150 && px.Red < 50 && px.Green < 50)
+            if (px.B > 150 && px.R < 50 && px.G < 50)
                 foundDarkText = true;
         }
 
@@ -154,7 +155,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < 30 && px.Green < 30 && px.Blue < 30)
+            if (px.R < 30 && px.G < 30 && px.B < 30)
                 blackPixels++;
         }
 
@@ -193,7 +194,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red < whiteThreshold || px.Green < whiteThreshold || px.Blue < whiteThreshold)
+            if (px.R < whiteThreshold || px.G < whiteThreshold || px.B < whiteThreshold)
                 contentPixels++;
         }
 
@@ -223,9 +224,9 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red > 250 && px.Green > 250 && px.Blue > 250)
+            if (px.R > 250 && px.G > 250 && px.B > 250)
                 whiteCount++;
-            if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+            if (px.R > 200 && px.G < 50 && px.B < 50)
                 redCount++;
         }
 
@@ -255,7 +256,7 @@ public class Acid2ImageComparisonTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(w, 99999);
-        container.SetHtml(html);
+        container.SetHtmlWithStyleSet(html);
 
         using var layoutBmp = new BBitmap(w, 2000);
         layoutBmp.Erase(BColor.White);
@@ -344,7 +345,7 @@ public class Acid2ImageComparisonTests
                 </div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         // Scan for horizontal runs of blue pixels in the fixed-position bar.
         int maxBlueRunWidth = 0;
@@ -354,7 +355,7 @@ public class Acid2ImageComparisonTests
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                bool isBlue = px.Blue > 200 && px.Red < 50 && px.Green < 50;
+                bool isBlue = px.B > 200 && px.R < 50 && px.G < 50;
 
                 if (isBlue && runStart < 0)
                     runStart = x;
@@ -402,7 +403,7 @@ public class Acid2ImageComparisonTests
                             background:blue;'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // Count blue rows: any row with at least one blue pixel
         int blueRows = 0;
@@ -412,7 +413,7 @@ public class Acid2ImageComparisonTests
             for (int x = 0; x < bitmap.Width && !rowHasBlue; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                if (px.B > 200 && px.R < 50 && px.G < 50)
                     rowHasBlue = true;
             }
 
@@ -445,7 +446,7 @@ public class Acid2ImageComparisonTests
                 </div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 400, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 100);
 
         // If float:inherit works correctly, the green box floats right
         // within the right-floated parent.  The parent itself floats to
@@ -457,7 +458,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+            if (px.G > 200 && px.R < 50 && px.B < 50)
             {
                 if (x >= 200) greenRight++;
                 else greenLeft++;
@@ -489,14 +490,14 @@ public class Acid2ImageComparisonTests
                 <div class='test'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         int bluePixels = 0;
         for (int y = 0; y < 120; y++)
         for (int x = 0; x < 120; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+            if (px.B > 200 && px.R < 50 && px.G < 50)
                 bluePixels++;
         }
 
@@ -531,14 +532,14 @@ public class Acid2ImageComparisonTests
                 <p style='background:red; width:100px; height:100px;'>Hidden</p>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 300);
 
         int redPixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+            if (px.R > 200 && px.G < 50 && px.B < 50)
                 redPixels++;
         }
 
@@ -571,7 +572,7 @@ public class Acid2ImageComparisonTests
                 <div class='second two'>NoMatch</div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         int greenPixels = 0;
         int redPixels = 0;
@@ -580,9 +581,9 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+            if (px.G > 200 && px.R < 50 && px.B < 50)
                 greenPixels++;
-            if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+            if (px.R > 200 && px.G < 50 && px.B < 50)
                 redPixels++;
         }
 
@@ -615,7 +616,7 @@ public class Acid2ImageComparisonTests
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
         container.MaxSize = new SizeF(w, 99999);
-        container.SetHtml(html);
+        container.SetHtmlWithStyleSet(html);
 
         using var layoutBmp = new BBitmap(w, 2000);
         layoutBmp.Erase(BColor.White);
@@ -674,7 +675,7 @@ public class Acid2ImageComparisonTests
                 <div style='width:100px; height:50px; background:#00ff00;'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The blue box starts at y=0 in flow, then bottom:-20px means
         // dy = -(-20px) = +20px offset.  The blue box visually renders
@@ -684,11 +685,11 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < 100; x++)
         {
             var px0 = bitmap.GetPixel(x, 0);
-            if (px0.Blue > 200 && px0.Red < 50 && px0.Green < 50)
+            if (px0.B > 200 && px0.R < 50 && px0.G < 50)
                 blueAtY0++;
 
             var px25 = bitmap.GetPixel(x, 25);
-            if (px25.Blue > 200 && px25.Red < 50 && px25.Green < 50)
+            if (px25.B > 200 && px25.R < 50 && px25.G < 50)
                 blueAtY25++;
         }
 
@@ -720,7 +721,7 @@ public class Acid2ImageComparisonTests
                 <div style='width:100px; height:50px; background:#00ff00;'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The parent has borders, so the child's -10px margin should NOT
         // collapse through.  The green box should start at approx y=52
@@ -734,7 +735,7 @@ public class Acid2ImageComparisonTests
             for (int x = 0; x < 100; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+                if (px.G > 200 && px.R < 50 && px.B < 50)
                 {
                     hasGreen = true;
                     break;
@@ -780,7 +781,7 @@ public class Acid2ImageComparisonTests
                 </ul>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         // The table-cell li should render as a cell.  The block li should
         // be wrapped in an anonymous table-cell.  Both should appear as
@@ -791,8 +792,8 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < 200; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Blue > 200 && px.Red < 50 && px.Green < 50) bluePixels++;
-            if (px.Green > 200 && px.Red < 50 && px.Blue < 50) greenPixels++;
+            if (px.B > 200 && px.R < 50 && px.G < 50) bluePixels++;
+            if (px.G > 200 && px.R < 50 && px.B < 50) greenPixels++;
         }
 
         // Both cells should render with visible content.
@@ -824,7 +825,7 @@ public class Acid2ImageComparisonTests
                 <div style='width:100px; height:50px; background:#00ff00;'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 300);
 
         // The blue box is 200px tall but clipped to 50px by overflow:hidden.
         // The green box should start at y=50 (not y=200).
@@ -834,13 +835,13 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < 100; x++)
         {
             var px40 = bitmap.GetPixel(x, 40);
-            if (px40.Blue > 200 && px40.Red < 50 && px40.Green < 50)
+            if (px40.B > 200 && px40.R < 50 && px40.G < 50)
                 blueAtY40++;
 
             var px60 = bitmap.GetPixel(x, 60);
-            if (px60.Blue > 200 && px60.Red < 50 && px60.Green < 50)
+            if (px60.B > 200 && px60.R < 50 && px60.G < 50)
                 blueAtY60++;
-            if (px60.Green > 200 && px60.Red < 50 && px60.Blue < 50)
+            if (px60.G > 200 && px60.R < 50 && px60.B < 50)
                 greenAtY60++;
         }
 
@@ -873,7 +874,7 @@ public class Acid2ImageComparisonTests
                             background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4%2F58BAAT%2FAf9jgNErAAAAAElFTkSuQmCC) fixed;'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The background is a 1x1 yellow pixel (#FFFF00) tiled from viewport
         // origin.  Within the 100x100 div (starting at y=50), the yellow
@@ -883,7 +884,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < 100; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red > 200 && px.Green > 200 && px.Blue < 80)
+            if (px.R > 200 && px.G > 200 && px.B < 80)
                 yellowPixels++;
         }
 
@@ -911,14 +912,14 @@ public class Acid2ImageComparisonTests
                             background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4%2F58BAAT%2FAf9jgNErAAAAAElFTkSuQmCC);'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         int yellowPixels = 0;
         for (int y = 0; y < 80; y++)
         for (int x = 0; x < 80; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Red > 200 && px.Green > 200 && px.Blue < 80)
+            if (px.R > 200 && px.G > 200 && px.B < 80)
                 yellowPixels++;
         }
 
@@ -947,7 +948,7 @@ public class Acid2ImageComparisonTests
                 </div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The blue child is 100px wide inside a 50px parent.  With default
         // overflow:visible, the blue should extend past the parent's right edge.
@@ -955,7 +956,7 @@ public class Acid2ImageComparisonTests
         for (int y = 1; y < 21; y++)
         {
             var px = bitmap.GetPixel(70, y);
-            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+            if (px.B > 200 && px.R < 50 && px.G < 50)
                 blueAtX70++;
         }
 
@@ -995,7 +996,7 @@ public class Acid2ImageComparisonTests
                 <div class='trick'></div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // The ::before pseudo-element should create a downward-pointing
         // triangle from borders.  Check for blue pixels from the border.
@@ -1004,7 +1005,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < 80; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+            if (px.B > 200 && px.R < 50 && px.G < 50)
                 bluePixels++;
         }
 
@@ -1041,7 +1042,7 @@ public class Acid2ImageComparisonTests
 <div class="icon"></div>
 """;
 
-        using var bitmap = HtmlRender.RenderToImage(
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(
             html,
             220,
             220,
@@ -1052,16 +1053,16 @@ public class Acid2ImageComparisonTests
             });
 
         var wrapperPixel = bitmap.GetPixel(10, 10);
-        Assert.True(wrapperPixel.Blue > 120 && wrapperPixel.Red > 120,
-            $"Expected purple pseudo-element wrapper, got ({wrapperPixel.Red},{wrapperPixel.Green},{wrapperPixel.Blue})");
+        Assert.True(wrapperPixel.B > 120 && wrapperPixel.R > 120,
+            $"Expected purple pseudo-element wrapper, got ({wrapperPixel.R},{wrapperPixel.G},{wrapperPixel.B})");
 
         var imagePixel = bitmap.GetPixel(40, 40);
-        Assert.True(imagePixel.Green > 100 && imagePixel.Red < 120 && imagePixel.Blue < 120,
-            $"Expected green pseudo-element image content, got ({imagePixel.Red},{imagePixel.Green},{imagePixel.Blue})");
+        Assert.True(imagePixel.G > 100 && imagePixel.R < 120 && imagePixel.B < 120,
+            $"Expected green pseudo-element image content, got ({imagePixel.R},{imagePixel.G},{imagePixel.B})");
 
         var overflowPixel = bitmap.GetPixel(150, 150);
-        Assert.True(overflowPixel.Green > 100 && overflowPixel.Red < 120 && overflowPixel.Blue < 120,
-            $"Expected overflowing image content to remain green, got ({overflowPixel.Red},{overflowPixel.Green},{overflowPixel.Blue})");
+        Assert.True(overflowPixel.G > 100 && overflowPixel.R < 120 && overflowPixel.B < 120,
+            $"Expected overflowing image content to remain green, got ({overflowPixel.R},{overflowPixel.G},{overflowPixel.B})");
         }
         finally
         {
@@ -1091,7 +1092,7 @@ public class Acid2ImageComparisonTests
                 </div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 500, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 500, 200);
 
         // The absolute box should shrink-to-fit around the 80px float.
         // With 2px border on each side, total width = 84px.
@@ -1102,7 +1103,7 @@ public class Acid2ImageComparisonTests
         for (int x = 0; x < bitmap.Width; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+            if (px.B > 200 && px.R < 50 && px.G < 50)
             {
                 if (x < 100) blueLeft++;
                 else if (x >= 200) blueRight++;
@@ -1137,7 +1138,7 @@ public class Acid2ImageComparisonTests
                 </div>
             </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 100);
 
         // The float (green) should paint over the parent block background (blue).
         // Left half should be green (float), right half should be blue (block bg).
@@ -1148,13 +1149,13 @@ public class Acid2ImageComparisonTests
             for (int x = 0; x < 90; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+                if (px.G > 200 && px.R < 50 && px.B < 50)
                     greenLeft++;
             }
             for (int x = 110; x < 200; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                if (px.B > 200 && px.R < 50 && px.G < 50)
                     blueRight++;
             }
         }

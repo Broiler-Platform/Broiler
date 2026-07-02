@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Scripting;
 
 /// <summary>
 /// Holds the result of processing an HTML page: the raw HTML, any

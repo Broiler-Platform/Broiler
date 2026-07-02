@@ -22,4 +22,7 @@
     <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
 </Project>

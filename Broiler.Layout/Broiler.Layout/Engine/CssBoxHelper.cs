@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-
+﻿using System.Diagnostics;
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
-namespace Broiler.Layout;
 
+
+namespace Broiler.Layout.Engine;
 
 internal static class CssBoxHelper
 {

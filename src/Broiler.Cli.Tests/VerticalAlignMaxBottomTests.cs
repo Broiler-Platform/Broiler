@@ -47,14 +47,14 @@ body { margin: 0; background: white; }
 <div class=""after"">X</div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // Find the first row of blue pixels (the .after div)
         int firstBlueRow = -1;
         for (int y = 0; y < bitmap.Height; y++)
         {
             var p = bitmap.GetPixel(0, y);
-            if (p.Blue > 200 && p.Red < 30 && p.Green < 30)
+            if (p.B > 200 && p.R < 30 && p.G < 30)
             {
                 firstBlueRow = y;
                 break;
@@ -79,7 +79,7 @@ body { margin: 0; background: white; }
         for (int y = 0; y < bitmap.Height; y++)
         {
             var p = bitmap.GetPixel(5, y);
-            if (p.Red > 200 && p.Green < 30 && p.Blue < 30)
+            if (p.R > 200 && p.G < 30 && p.B < 30)
             {
                 firstRedRow = y;
                 break;
@@ -115,14 +115,14 @@ body { margin: 0; background: white; font: 20px Arial; }
 <p class=""score"">X</p>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 800, 600);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 600);
 
         // Find first blue row (the score element)
         int firstBlueRow = -1;
         for (int y = 0; y < bitmap.Height; y++)
         {
             var p = bitmap.GetPixel(100, y);
-            if (p.Blue > 200 && p.Red < 30 && p.Green < 30)
+            if (p.B > 200 && p.R < 30 && p.G < 30)
             {
                 firstBlueRow = y;
                 break;

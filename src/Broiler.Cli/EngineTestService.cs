@@ -1,5 +1,5 @@
 using Broiler.CSS;
-using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Logging;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Engine;
 

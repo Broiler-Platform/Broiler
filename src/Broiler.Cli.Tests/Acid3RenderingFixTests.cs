@@ -38,7 +38,7 @@ body { margin: 0; padding: 0; }
 <div class=""container""><span class=""box""></span></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The green box should be raised by 0.5em (10px) from the baseline.
         // Scan the upper portion of the image for the green box.
@@ -47,7 +47,7 @@ body { margin: 0; padding: 0; }
         for (int x = 0; x < 40 && !foundGreen; x++)
         {
             var px = bitmap.GetPixel(x, y);
-            if (px.Green > 100 && px.Red < 50 && px.Blue < 50)
+            if (px.G > 100 && px.R < 50 && px.B < 50)
                 foundGreen = true;
         }
         Assert.True(foundGreen,
@@ -76,7 +76,7 @@ body { margin: 0; padding: 0; }
 <div class=""container""><span class=""ref""></span><span class=""box""></span></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 100);
 
         // Both boxes should render somewhere in the image.  The red box
         // with vertical-align:-10px should be offset downward from the
@@ -88,9 +88,9 @@ body { margin: 0; padding: 0; }
             for (int x = 0; x < 30; x++)
             {
                 var px = bitmap.GetPixel(x, y);
-                if (px.Red > 200 && px.Green < 50 && px.Blue < 50)
+                if (px.R > 200 && px.G < 50 && px.B < 50)
                     foundRed = true;
-                if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                if (px.B > 200 && px.R < 50 && px.G < 50)
                     foundBlue = true;
             }
         }
@@ -126,7 +126,7 @@ body { margin: 0; }
 <div class=""container""><span class=""box""></span></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The green box should be visible somewhere in the upper portion
         // of the container (y < 120).
@@ -134,7 +134,7 @@ body { margin: 0; }
         for (int y = 0; y < 120; y++)
         {
             var px = bitmap.GetPixel(10, y);
-            if (px.Green > 100 && px.Red < 50 && px.Blue < 50)
+            if (px.G > 100 && px.R < 50 && px.B < 50)
             {
                 foundGreen = true;
                 break;
@@ -197,17 +197,17 @@ body { margin: 0; background: white; }
 <div class=""box hidden""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // The red border should NOT be visible because the box is hidden.
         // Sample several positions where the border would be.
         var topBorder = bitmap.GetPixel(25, 2);
         var leftBorder = bitmap.GetPixel(2, 25);
 
-        Assert.False(topBorder.Red > 200 && topBorder.Green < 50,
-            $"visibility:hidden box should not render border, got ({topBorder.Red},{topBorder.Green},{topBorder.Blue})");
-        Assert.False(leftBorder.Red > 200 && leftBorder.Green < 50,
-            $"visibility:hidden box should not render border, got ({leftBorder.Red},{leftBorder.Green},{leftBorder.Blue})");
+        Assert.False(topBorder.R > 200 && topBorder.G < 50,
+            $"visibility:hidden box should not render border, got ({topBorder.R},{topBorder.G},{topBorder.B})");
+        Assert.False(leftBorder.R > 200 && leftBorder.G < 50,
+            $"visibility:hidden box should not render border, got ({leftBorder.R},{leftBorder.G},{leftBorder.B})");
     }
 
     /// <summary>
@@ -229,12 +229,12 @@ body { margin: 0; background: white; }
 <div class=""parent""><div class=""child""></div></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // The child should be visible (green) despite parent being hidden.
         var childPx = bitmap.GetPixel(10, 10);
-        Assert.True(childPx.Green > 100,
-            $"visibility:visible child should be painted, got ({childPx.Red},{childPx.Green},{childPx.Blue})");
+        Assert.True(childPx.G > 100,
+            $"visibility:visible child should be painted, got ({childPx.R},{childPx.G},{childPx.B})");
     }
 
     // ──────── P1 / TODO-6: word spacing between inline elements ────────
@@ -290,13 +290,13 @@ body { margin: 0; background: white; position: relative; }
 <div id=""container""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // The ::after pseudo-element should be positioned at (10, 10)
         // with a green background. Sample that area.
         var pseudoPx = bitmap.GetPixel(15, 15);
-        Assert.True(pseudoPx.Green > 100 || pseudoPx.Red < 200,
-            $"Expected pseudo-element at (10,10), got ({pseudoPx.Red},{pseudoPx.Green},{pseudoPx.Blue})");
+        Assert.True(pseudoPx.G > 100 || pseudoPx.R < 200,
+            $"Expected pseudo-element at (10,10), got ({pseudoPx.R},{pseudoPx.G},{pseudoPx.B})");
     }
 
     // ──────── P2 / TODO-11: inline-block with vertical-align in Acid3 context ────────
@@ -323,7 +323,7 @@ body { margin: 0; }
 <div class=""buckets""><p id=""bucket1"" class=""z""></p></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 800, 400);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 400);
 
         // The bucket is visibility:hidden, so it should not be rendered.
         // But it should still affect layout. The buckets div should have
@@ -360,13 +360,13 @@ body { margin: 0; background: white; }
 <div id=""target""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // The second 'border: 2px solid' should reset color to black.
         // Check the top-left border area for black (not red).
         var borderPx = bitmap.GetPixel(1, 1);
-        Assert.False(borderPx.Red > 200 && borderPx.Green < 50 && borderPx.Blue < 50,
-            $"Border shorthand should reset color to black, got red=({borderPx.Red},{borderPx.Green},{borderPx.Blue})");
+        Assert.False(borderPx.R > 200 && borderPx.G < 50 && borderPx.B < 50,
+            $"Border shorthand should reset color to black, got red=({borderPx.R},{borderPx.G},{borderPx.B})");
     }
 
     /// <summary>
@@ -390,7 +390,7 @@ body { margin: 0; background: white; }
 <div id=""target"" class=""wide-border override""></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
 
         // With 'border: 1px solid !important', the border should be
         // 1px wide (not 2em), solid (not dotted), and black (not red).
@@ -398,12 +398,12 @@ body { margin: 0; background: white; }
         // Sample just inside the expected 1px border.
         var contentPx = bitmap.GetPixel(3, 3);
         // Content should be white (not bordered area)
-        Assert.True(contentPx.Red > 200 && contentPx.Green > 200 && contentPx.Blue > 200,
-            $"With 1px border, (3,3) should be content area (white), got ({contentPx.Red},{contentPx.Green},{contentPx.Blue})");
+        Assert.True(contentPx.R > 200 && contentPx.G > 200 && contentPx.B > 200,
+            $"With 1px border, (3,3) should be content area (white), got ({contentPx.R},{contentPx.G},{contentPx.B})");
 
         // The border should be black (not red)
         var borderPx = bitmap.GetPixel(0, 0);
-        Assert.False(borderPx.Red > 200 && borderPx.Green < 50 && borderPx.Blue < 50,
-            $"border: 1px solid !important should reset color to black, got ({borderPx.Red},{borderPx.Green},{borderPx.Blue})");
+        Assert.False(borderPx.R > 200 && borderPx.G < 50 && borderPx.B < 50,
+            $"border: 1px solid !important should reset color to black, got ({borderPx.R},{borderPx.G},{borderPx.B})");
     }
 }

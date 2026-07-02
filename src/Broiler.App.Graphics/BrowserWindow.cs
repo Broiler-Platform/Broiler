@@ -1569,7 +1569,7 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     private BColor ResolveClearColor()
     {
-        Color background = _container.GetRootBackgroundColor();
+        BColor background = _container.GetRootBackgroundColor();
         return !background.IsEmpty && background.A > 0
             ? new BColor(background.R, background.G, background.B, background.A)
             : BColor.White;

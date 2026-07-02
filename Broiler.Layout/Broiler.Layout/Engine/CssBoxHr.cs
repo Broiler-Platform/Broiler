@@ -1,10 +1,9 @@
-﻿using System;
-using System.Drawing;
-using Broiler.Layout;
-
+﻿using System.Drawing;
 using CssConstants = Broiler.CSS.CssConstants;
 using CssValueParser = Broiler.CSS.CssLengthParser;
-namespace Broiler.Layout;
+
+
+namespace Broiler.Layout.Engine;
 
 internal sealed class CssBoxHr : CssBox
 {

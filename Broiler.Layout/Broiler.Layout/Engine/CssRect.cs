@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace Broiler.Layout;
+namespace Broiler.Layout.Engine;
 
 internal abstract class CssRect(CssBox owner)
 {

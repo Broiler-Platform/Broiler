@@ -1,5 +1,6 @@
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -24,13 +25,13 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         // Sample the top-left corner which should be silver (192, 192, 192).
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(192, pixel.Red);
-        Assert.Equal(192, pixel.Green);
-        Assert.Equal(192, pixel.Blue);
+        Assert.Equal(192, pixel.R);
+        Assert.Equal(192, pixel.G);
+        Assert.Equal(192, pixel.B);
     }
 
     /// <summary>
@@ -46,12 +47,12 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(255, pixel.Red);
-        Assert.Equal(255, pixel.Green);
-        Assert.Equal(255, pixel.Blue);
+        Assert.Equal(255, pixel.R);
+        Assert.Equal(255, pixel.G);
+        Assert.Equal(255, pixel.B);
     }
 
     /// <summary>
@@ -68,7 +69,7 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100, backgroundColor: new BColor(255, 0, 0, 255));
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100, backgroundColor: new BColor(255, 0, 0, 255));
 
         var pixel = bitmap.GetPixel(0, 0);
         Assert.Equal(255, pixel.R);
@@ -89,7 +90,7 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: 200);
+        using var bitmap = HtmlRender.RenderToImageAutoSizedWithStyleSet(html, maxWidth: 200);
 
         var pixel = bitmap.GetPixel(0, 0);
         Assert.Equal(192, pixel.R);
@@ -109,12 +110,12 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(255, pixel.Red);
-        Assert.Equal(0, pixel.Green);
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(255, pixel.R);
+        Assert.Equal(0, pixel.G);
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>
@@ -129,12 +130,12 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(0, pixel.Red);
-        Assert.Equal(255, pixel.Green);
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(0, pixel.R);
+        Assert.Equal(255, pixel.G);
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>
@@ -168,12 +169,12 @@ public class RootBackgroundTests
         // Simulate the CaptureService pipeline
         html = HtmlPostProcessor.Process(html);
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(192, pixel.Red);
-        Assert.Equal(192, pixel.Green);
-        Assert.Equal(192, pixel.Blue);
+        Assert.Equal(192, pixel.R);
+        Assert.Equal(192, pixel.G);
+        Assert.Equal(192, pixel.B);
     }
 
     /// <summary>
@@ -189,11 +190,11 @@ public class RootBackgroundTests
 <body><p>Test</p></body>
 </html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
 
         var pixel = bitmap.GetPixel(0, 0);
-        Assert.Equal(192, pixel.Red);
-        Assert.Equal(192, pixel.Green);
-        Assert.Equal(192, pixel.Blue);
+        Assert.Equal(192, pixel.R);
+        Assert.Equal(192, pixel.G);
+        Assert.Equal(192, pixel.B);
     }
 }

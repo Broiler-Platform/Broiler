@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Logging;
 
 /// <summary>
 /// Identifies the subsystem that produced a log entry.
@@ -75,7 +76,7 @@ public sealed class RenderLogEntry
 public static class RenderLogger
 {
     private static readonly List<RenderLogEntry> _entries = [];
-    private static readonly object _lock = new();
+    private static readonly Lock _lock = new();
     private static LogLevel _minimumLevel = LogLevel.Debug;
 
     /// <summary>
@@ -94,14 +95,6 @@ public static class RenderLogger
     {
         get { lock (_lock) return _minimumLevel; }
         set { lock (_lock) _minimumLevel = value; }
-    }
-
-    /// <summary>
-    /// Returns a snapshot of all captured log entries.
-    /// </summary>
-    public static IReadOnlyList<RenderLogEntry> GetEntries()
-    {
-        lock (_lock) return _entries.ToArray();
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System.Drawing;
 using Broiler.HTML.Image;
+using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -21,7 +22,7 @@ public class TextFidelityThresholdTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 100, 60, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 100, 60, backgroundColor: BColor.White);
         using var expected = new BBitmap(100, 60);
         expected.Clear(BColor.White);
         FillRect(expected, 10, 12, 60, 20, new BColor(0, 0, 0, 255));
@@ -47,7 +48,7 @@ public class TextFidelityThresholdTests
             </body></html>
             """;
 
-        using var rendered = HtmlRender.RenderToImage(html, 280, 160, BColor.White);
+        using var rendered = HtmlRender.RenderToImageWithStyleSet(html, 280, 160, backgroundColor: BColor.White);
 
         var inkBounds = FindInkBounds(rendered, RepresentativeInkThreshold);
 

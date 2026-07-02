@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Text;
 using Broiler.HTML.Dom.Utils;
 using SharedHtmlSerializer = Broiler.Dom.Html.HtmlSerializer;
-using LegacyHtmlSerializer = Broiler.HTML.Dom.Utils.HtmlSerializer;
 using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge;
@@ -71,7 +70,7 @@ public sealed partial class DomBridge
                 var styleText = string.Join(
                     "; ",
                     element.Style
-                        .OrderBy(kv => LegacyHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+                        .OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
                         .Select(static kv => $"{kv.Key}: {kv.Value}"));
                 if (!element.Attributes.TryGetValue("style", out var currentStyle) ||
                     !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
@@ -820,7 +819,7 @@ public sealed partial class DomBridge
                 !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
-            element.Style.OrderBy(kv => LegacyHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
+            element.Style.OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
         GetText: static element => element.TextContent,
         GetRawInnerHtml: static element => element.InnerHtml);
 

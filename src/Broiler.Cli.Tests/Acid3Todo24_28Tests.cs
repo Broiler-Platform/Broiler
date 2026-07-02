@@ -119,12 +119,12 @@ body { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAA
 <div style=""width:100px;height:100px;"">test</div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         var pixel = bitmap.GetPixel(50, 50);
         // Should be white (255,255,255) not silver (192,192,192)
-        Assert.Equal(255, pixel.Red);
-        Assert.Equal(255, pixel.Green);
-        Assert.Equal(255, pixel.Blue);
+        Assert.Equal(255, pixel.R);
+        Assert.Equal(255, pixel.G);
+        Assert.Equal(255, pixel.B);
     }
 
     /// <summary>
@@ -256,13 +256,13 @@ document.getElementById('result').textContent = r.join('|');
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         // If inline-block works, b1 is at ~(0,12) and b2 is at ~(40,12)
         // If block, both would be stacked vertically
         // Check that b2's position has a red pixel to the right of b1
         var rightOfFirst = bitmap.GetPixel(50, 30);
         // Should be red (part of b2's inline-block layout)
-        Assert.Equal(255, rightOfFirst.Red);
+        Assert.Equal(255, rightOfFirst.R);
     }
 
     // ────────────── TODO-26: Bucket color investigation ──────────────
@@ -319,11 +319,11 @@ p { margin: 0; padding: 0; display: block; width: 80px; height: 40px; }
 <p id=""bucket5"" class=""zPPPPPPPPPPPPPPPP"">B5</p>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         // Bucket4 should be lime (0, 128+, 0) in top area
         var b4pixel = bitmap.GetPixel(40, 10);
-        Assert.True(b4pixel.Green > 100, $"Expected green for bucket4, got R={b4pixel.Red} G={b4pixel.Green} B={b4pixel.Blue}");
-        Assert.True(b4pixel.Red < 50, $"Expected low red for bucket4, got R={b4pixel.Red}");
+        Assert.True(b4pixel.G > 100, $"Expected green for bucket4, got R={b4pixel.R} G={b4pixel.G} B={b4pixel.B}");
+        Assert.True(b4pixel.R < 50, $"Expected low red for bucket4, got R={b4pixel.R}");
     }
 
     // ────────────── TODO-27: h1:first-child selector and margin-bottom ──────────────
@@ -460,13 +460,13 @@ div { background: lime; width: 50px; height: 50px; }
 <div>test</div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
         // The div should be at the top-left since iframe takes no space
         var pixel = bitmap.GetPixel(25, 25);
         // Should be lime green (0, 255 or 128, 0) since the div is rendered there
-        Assert.Equal(0, pixel.Red);
-        Assert.True(pixel.Green > 100); // lime green
-        Assert.Equal(0, pixel.Blue);
+        Assert.Equal(0, pixel.R);
+        Assert.True(pixel.G > 100); // lime green
+        Assert.Equal(0, pixel.B);
     }
 
     /// <summary>
@@ -522,9 +522,9 @@ table { width: 0; height: 0; border: none; border-collapse: collapse; }
 <div style=""background: lime; width: 50px; height: 50px;"">test</div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 100, 100);
         // With zero-size table, the lime div should be visible in the upper portion
         var limePixel = bitmap.GetPixel(25, 25);
-        Assert.True(limePixel.Green > 100, $"Expected green for lime div, got R={limePixel.Red} G={limePixel.Green} B={limePixel.Blue}");
+        Assert.True(limePixel.G > 100, $"Expected green for lime div, got R={limePixel.R} G={limePixel.G} B={limePixel.B}");
     }
 }

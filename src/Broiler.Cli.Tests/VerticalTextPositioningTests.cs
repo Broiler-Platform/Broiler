@@ -33,8 +33,8 @@ h1 { margin: 0; padding: 0; font-size: 5em; font-weight: bold; line-height: 1.2;
 <body><h1>Acid3</h1></body>
 </html>";
 
-        using var bmpBg = HtmlRender.RenderToImage(htmlWithBg, 800, 300);
-        using var bmpNoBg = HtmlRender.RenderToImage(htmlNoBg, 800, 300);
+        using var bmpBg = HtmlRender.RenderToImageWithStyleSet(htmlWithBg, 800, 300);
+        using var bmpNoBg = HtmlRender.RenderToImageWithStyleSet(htmlNoBg, 800, 300);
 
         int yBg = FindFirstDarkRow(bmpBg);
         int yNoBg = FindFirstDarkRow(bmpNoBg);
@@ -51,7 +51,7 @@ h1 { margin: 0; padding: 0; font-size: 5em; font-weight: bold; line-height: 1.2;
             for (int x = 0; x < bmp.Width; x++)
             {
                 var px = bmp.GetPixel(x, y);
-                if (px.Red < 50 && px.Green < 50 && px.Blue < 50)
+                if (px.R < 50 && px.G < 50 && px.B < 50)
                     return y;
             }
         return -1;

@@ -24,7 +24,7 @@ body { background: white; }
 <div class=""container""><p>X</p></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         // Count lime pixels — with display:inline-block the p should render with lime bg
         int limePixels = 0;
@@ -32,7 +32,7 @@ body { background: white; }
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Green > 200 && p.Red < 150 && p.Blue < 50) limePixels++;
+                if (p.G > 200 && p.R < 150 && p.B < 50) limePixels++;
             }
 
         _output.WriteLine($"Lime pixels: {limePixels}");
@@ -53,14 +53,14 @@ p:last-child { background: red; }
 <p style=""width:80px;height:40px"">Last</p>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         int redPixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Red > 200 && p.Green < 80 && p.Blue < 80) redPixels++;
+                if (p.R > 200 && p.G < 80 && p.B < 80) redPixels++;
             }
 
         _output.WriteLine($"Red pixels from :last-child: {redPixels}");
@@ -81,14 +81,14 @@ h1:first-child { background: blue; }
 <p>Other</p>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
 
         int bluePixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Blue > 200 && p.Red < 80 && p.Green < 80) bluePixels++;
+                if (p.B > 200 && p.R < 80 && p.G < 80) bluePixels++;
             }
 
         _output.WriteLine($"Blue pixels from h1:first-child: {bluePixels}");
@@ -118,14 +118,14 @@ body { padding: 2em 2em 0; background: white; border: solid 1px black; margin: -
 </div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 800, 600);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 600);
 
         int redPixels = 0;
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
                 var p = bitmap.GetPixel(x, y);
-                if (p.Red > 200 && p.Green < 80 && p.Blue < 80) redPixels++;
+                if (p.R > 200 && p.G < 80 && p.B < 80) redPixels++;
             }
 
         _output.WriteLine($"Red pixels (bucket background): {redPixels}");

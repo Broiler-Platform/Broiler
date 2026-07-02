@@ -50,7 +50,7 @@ public class Acid3BarPositionTest
 </body>
 </html>";
 
-        using var bmp = HtmlRender.RenderToImage(html, 1024, 768);
+        using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         var colors = new Dictionary<string, (int minY, int maxY, int minX, int maxX)>();
 
@@ -60,12 +60,12 @@ public class Acid3BarPositionTest
             {
                 var p = bmp.GetPixel(x, y);
                 string? colorName = null;
-                if (p.Red > 200 && p.Green < 80 && p.Blue < 80) colorName = "red";
-                else if (p.Red > 200 && p.Green > 120 && p.Green < 200 && p.Blue < 80) colorName = "orange";
-                else if (p.Red > 200 && p.Green > 200 && p.Blue < 80) colorName = "yellow";
-                else if (p.Red < 80 && p.Green > 200 && p.Blue < 80) colorName = "lime";
-                else if (p.Red < 80 && p.Green < 80 && p.Blue > 200) colorName = "blue-bar";
-                else if (p.Red > 80 && p.Red < 200 && p.Green < 30 && p.Blue > 80 && p.Blue < 200) colorName = "purple";
+                if (p.R > 200 && p.G < 80 && p.B < 80) colorName = "red";
+                else if (p.R > 200 && p.G > 120 && p.G < 200 && p.B < 80) colorName = "orange";
+                else if (p.R > 200 && p.G > 200 && p.B < 80) colorName = "yellow";
+                else if (p.R < 80 && p.G > 200 && p.B < 80) colorName = "lime";
+                else if (p.R < 80 && p.G < 80 && p.B > 200) colorName = "blue-bar";
+                else if (p.R > 80 && p.R < 200 && p.G < 30 && p.B > 80 && p.B < 200) colorName = "purple";
 
                 if (colorName != null)
                 {
