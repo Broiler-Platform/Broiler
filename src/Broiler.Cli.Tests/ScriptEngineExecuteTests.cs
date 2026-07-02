@@ -1108,6 +1108,39 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void DomBridge_AnchorSize_Resolves_To_Sized_Ancestor_Not_Viewport_For_NoWidth_Anchor()
+    {
+        // Regression (css-anchor-position transform-005): an anchor with no explicit
+        // width nested inside a no-width containing-block wrapper (e.g. a transformed
+        // div) must take its used width from the nearest sized ancestor, not fall back
+        // to the viewport. anchor-size(width) on the anchored element must therefore
+        // resolve to the 137px ancestor width, not the ~1000px viewport width.
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <div style="width:137px; height:100px;">
+    <div style="transform:translateX(0);">
+      <div style="anchor-name:--a; height:50px;"></div>
+    </div>
+    <div id="anchored" style="position:absolute; position-anchor:--a; width:anchor-size(width); height:anchor-size(height);"></div>
+  </div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        bridge.ResolveAnchorPositions();
+
+        var anchoredWidth =
+            context.Eval("document.getElementById('anchored').style.width").ToString();
+        Assert.Equal("137px", anchoredWidth);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
     {
         const string html = """

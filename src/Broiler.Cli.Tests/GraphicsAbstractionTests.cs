@@ -766,6 +766,27 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
+    public void StubCanvas_Exposes_Save_Restore_Translate_Invoked_By_Compat_Reflection()
+    {
+        // Regression guard (WPT css-anchor-position/transform-*): CompatCanvasOperations
+        // invokes Save/Restore/Translate on the OpenCanvas() result by reflection. The
+        // OS-free StubCanvas must expose those exact signatures; when they were missing
+        // every transform-layer push threw InvalidOperationException, surfacing as a
+        // RenderingError across the transform-* family.
+        using var surface = new Broiler.HTML.Image.Compat.StubBitmapCompatSurface();
+        var canvas = surface.OpenCanvas();
+
+        var exception = Record.Exception(() =>
+        {
+            CompatCanvasOperations.Save(canvas);
+            CompatCanvasOperations.Translate(canvas, 3f, 5f);
+            CompatCanvasOperations.Restore(canvas);
+        });
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
     {
         var provider = new RecordingCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
