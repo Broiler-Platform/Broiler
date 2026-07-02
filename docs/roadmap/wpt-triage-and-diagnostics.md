@@ -648,7 +648,8 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 ### Known blockers / deferred
 
 - **`css-anchor-position/position-area-percents-001` (#1175) — triaged, deferred (three
-  compounding root causes, none a clean fix).** The test lays out four `float:left` 100×100
+  compounding root causes; #1 fixed in cluster 25, #2/#3 still open).** The test lays out four
+  `float:left` 100×100
   `.container`s, each with a `.anchor` (`inset:20px 20px 40px 20px`, no explicit size,
   `anchor-name:--foo`) and a `.anchored` (`position-area:bottom span-right`, `place-self:stretch`,
   percentage `inset`/`margin`/`padding`), across horizontal and vertical writing modes. Broiler
@@ -656,25 +657,30 @@ valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
   anchored boxes balloon to ~viewport width. Instrumenting `ComputePositionAreaRect` shows the CB is
   correctly 100×100 but the anchor rect is `L=-876,R=-816,T20,B60` (width 60 is right; the horizontal
   *position* is wildly negative). Three defects stack:
-  1. **Shared `anchor-name` not scoped.** All four `.anchor`s share `anchor-name:--foo`, but
-     `BuildAnchorRegistry` keys the registry by name into a *single* slot (last-wins), so every
-     `.anchored` resolves against one global `--foo` instead of the anchor in its own container. CSS
-     binds an anchored element to the acceptable anchor *in its scope* (here, its preceding sibling);
-     Broiler needs per-scope anchor selection (registry name→list + nearest-scope pick), which
-     touches every anchor-resolution path — regression-risky, CI-gated.
+  1. **Shared `anchor-name` not scoped — ✅ now fixed (cluster 25).** All four `.anchor`s share
+     `anchor-name:--foo`, but `BuildAnchorRegistry` keyed the registry by name into a *single* slot
+     (last-wins), so every `.anchored` resolved against one global `--foo` instead of the anchor in
+     its own container. Fixed by `ResolveAnchorForElement` (registry name→list + in-CB pick); the
+     other two defects still gate the test.
   2. **Float-container geometry via shared layout.** The single registered `--foo` comes back at a
      document X (~905) that doesn't match the anchor's own container — the shared-layout snapshot
      mis-places the later `float:left` containers (3rd/4th reported at x≈910 instead of ≈242/≈360),
      so the CB-origin subtraction yields the negative `anchorLeft`. Needs correct float placement in
      the shared-geometry layout.
-  3. **Writing-mode-aware margin/padding %.** `ResolvePositionAreaValues` resolves margin/padding
-     percentages against `cellW` unconditionally, but per CSS they resolve against the **inline
-     dimension of the containing block** — `cellH` when the container's writing mode is vertical
-     (`vertical-rl`). The reference confirms the axis follows the *container's* writing mode, not the
-     anchored element's (case 2 anchored-vertical-in-horizontal-container still uses the horizontal
-     axis; case 4 the reverse). This is the smallest of the three but is masked by (1)/(2) until they
-     land. All three are feature-depth; taken together they are the deferred "vertical writing-mode
-     position-area geometry" item, now with concrete root causes.
+  3. **Vertical writing-mode position-area geometry (grid *and* margin/padding %).** Two layers here,
+     both still open. (a) The **grid itself** is mis-computed under a vertical container writing mode:
+     a minimal `writing-mode:vertical-rl` repro (`position-area:bottom right` on a 300×60 container)
+     renders a **full-width** bottom band instead of the right-hand cell — the physical `right`
+     keyword is not producing the right column, so the cell/`ComputePositionAreaRect` output is wrong
+     before any margin math runs. (b) `ResolvePositionAreaValues` resolves margin/padding percentages
+     against `cellW` unconditionally, but per CSS they resolve against the **inline dimension of the
+     containing block** — `cellH` when the container is vertical; the reference confirms the axis
+     follows the *container's* writing mode (case 2 anchored-vertical-in-horizontal-container uses the
+     horizontal axis; case 4 the reverse). An isolated fix for (b) was prototyped (`inlineSize =
+     cbVertical ? cellH : cellW`) but **reverted**: it is byte-identical for horizontal CBs and could
+     not be validated because (a) makes the whole vertical-WM cell wrong, so there is no observable
+     margin effect to check and nothing flips. Both need the vertical-WM position-area grid built
+     first; feature-depth, CI-gated.
 
 - **`css-align/blocks/align-content-block-{002,004,006,008,010}` (5, `columns:3`) — triaged
   (issue #1152), NOT an align-content bug; deferred to the multicol engine.** The report signature
