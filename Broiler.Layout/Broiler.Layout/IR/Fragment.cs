@@ -61,6 +61,21 @@ public sealed class Fragment
     public string SvgContent { get; init; }
 
     /// <summary>
+    /// HTML source of a nested browsing context — an <c>&lt;object type="text/html"&gt;</c>,
+    /// <c>&lt;iframe&gt;</c>, or <c>&lt;frame&gt;</c> — loaded from the element's
+    /// <c>data</c>/<c>src</c> attribute.  The image renderer rasterises this document
+    /// at the element's content-box size and composites it over the box.  Null when
+    /// the element is not an embedded document or the source could not be loaded.
+    /// </summary>
+    public string EmbeddedDocumentHtml { get; init; }
+
+    /// <summary>
+    /// Base URL of the embedded document (see <see cref="EmbeddedDocumentHtml"/>), used
+    /// to resolve that document's own relative resources.
+    /// </summary>
+    public string EmbeddedDocumentBaseUrl { get; init; }
+
+    /// <summary>
     /// Per-line-box rectangles for inline elements. Used by paint to render
     /// backgrounds and borders for inline boxes that span multiple line boxes.
     /// When non-empty, paint uses these instead of <see cref="Bounds"/>.

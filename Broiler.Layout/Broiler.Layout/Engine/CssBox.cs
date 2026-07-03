@@ -507,8 +507,45 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (ContainingBlock?.ParentBox == null)
             return false;
 
+        // CSS 2.1 §10.5: the "resolves to auto when the containing block's
+        // height is indefinite" rule applies only when "this element is not
+        // absolutely positioned".  An absolutely (or fixed) positioned box's
+        // containing block is the padding box of its positioned ancestor (or
+        // the viewport for the initial containing block), whose height is
+        // always definite — so a percentage height never resolves to auto.
+        if (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+            return false;
+
         return ContainingBlock.Height == CssConstants.Auto
             || string.IsNullOrEmpty(ContainingBlock.Height);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.5: the containing-block height a percentage <c>height</c>
+    /// (or percentage <c>min-/max-height</c>) resolves against.  For
+    /// fixed-position boxes this is the viewport; for other absolutely
+    /// positioned boxes it is the height of the <em>positioned</em> containing
+    /// block's padding box (the viewport when that is the initial containing
+    /// block) — an abspos box's containing block always has a definite height,
+    /// unlike the flow containing block, whose height may be auto/indefinite.
+    /// Otherwise the flow containing block's used height is returned.
+    /// </summary>
+    private double PercentageHeightContainingBlockHeight()
+    {
+        if (Position == CssConstants.Fixed && LayoutEnvironment != null)
+            return LayoutEnvironment.ViewportSize.Height;
+
+        if (Position == CssConstants.Absolute)
+        {
+            var cb = FindPositionedContainingBlock();
+            GetAbsoluteContainingBlockPaddingBox(cb, out _, out _, out _, out double cbHeight);
+            return cbHeight;
+        }
+
+        if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
+            return LayoutEnvironment.ViewportSize.Height;
+
+        return ContainingBlock?.Size.Height ?? 0;
     }
 
     public HtmlTag HtmlTag { get; }
@@ -1615,13 +1652,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
                 && Height.Contains('%') && !HeightPercentageResolvesToAuto())
             {
-                double cbHeight;
-                if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                    cbHeight = LayoutEnvironment.ViewportSize.Height;
-                else if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
-                    cbHeight = LayoutEnvironment.ViewportSize.Height;
-                else
-                    cbHeight = ContainingBlock.Size.Height;
+                double cbHeight = PercentageHeightContainingBlockHeight();
                 double preHeight = ResolveSpecifiedHeightToBorderBox(
                     CssValueParser.ParseLength(Height, cbHeight, GetEmHeight()));
                 Size = new SizeF(Size.Width, (float)preHeight);
@@ -1837,13 +1868,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 double contentHeight;
                 if (Height.Contains('%'))
                 {
-                    double cbHeight;
-                    if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                        cbHeight = LayoutEnvironment.ViewportSize.Height;
-                    else if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
-                        cbHeight = LayoutEnvironment.ViewportSize.Height;
-                    else
-                        cbHeight = ContainingBlock.Size.Height;
+                    double cbHeight = PercentageHeightContainingBlockHeight();
                     contentHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
                 }
                 else
@@ -1971,13 +1996,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 double contentHeight;
                 if (Height.Contains('%'))
                 {
-                    double cbHeight;
-                    if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                        cbHeight = LayoutEnvironment.ViewportSize.Height;
-                    else if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
-                        cbHeight = LayoutEnvironment.ViewportSize.Height;
-                    else
-                        cbHeight = ContainingBlock.Size.Height;
+                    double cbHeight = PercentageHeightContainingBlockHeight();
                     contentHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
                 }
                 else
@@ -2030,8 +2049,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                     OffsetLeft(deltaX);
                 if (deltaY != 0)
                 {
+                    // OffsetTop already shifts Location.Y, and ActualBottom is a
+                    // derived value (ActualBottom => Location.Y + Size.Height), so the
+                    // box's bottom edge follows the move automatically.  A further
+                    // "ActualBottom += deltaY" would double-apply the shift — its
+                    // setter writes Size.Height = ActualBottom - Location.Y, growing
+                    // (or, as here for a bottom-anchored full-height abspos box,
+                    // collapsing) the height by deltaY.  Mirror the horizontal branch
+                    // above, which offsets without touching ActualRight.
                     OffsetTop(deltaY);
-                    ActualBottom += deltaY;
                 }
             }
 
