@@ -96,6 +96,71 @@ function createBrowserContextOptions(nonJsOnly) {
     };
 }
 
+/** Content-type for a filename extension, for route.fulfill(). */
+function contentTypeForExtension(ext) {
+    switch (ext.toLowerCase()) {
+        case '.css':   return 'text/css; charset=utf-8';
+        case '.js':    return 'text/javascript; charset=utf-8';
+        case '.html':
+        case '.htm':
+        case '.xht':
+        case '.xhtml': return 'text/html; charset=utf-8';
+        case '.svg':   return 'image/svg+xml';
+        case '.png':   return 'image/png';
+        case '.jpg':
+        case '.jpeg':  return 'image/jpeg';
+        case '.gif':   return 'image/gif';
+        case '.webp':  return 'image/webp';
+        case '.ttf':   return 'font/truetype';
+        case '.otf':   return 'font/opentype';
+        case '.woff':  return 'font/woff';
+        case '.woff2': return 'font/woff2';
+        default:       return 'application/octet-stream';
+    }
+}
+
+/**
+ * Resolve a file:// request URL to the on-disk resource the reference generator
+ * should serve for it, or `null` when Chromium should be left to load (or 404)
+ * the request itself.
+ *
+ * WPT tests reference shared support resources — fonts, stylesheets, images,
+ * harness scripts — with *root-relative* URLs (/fonts/ahem.css,
+ * /css/support/grid.css, /resources/testharness.js). A real WPT server resolves
+ * those against the WPT root; loaded over file://, Chromium resolves them
+ * against the filesystem root (file:///css/support/grid.css) where nothing
+ * exists, so the resource 404s and the reference renders unstyled. This mirrors
+ * a real server (and Broiler.Wpt's own runner, TryResolveWptRootRelativePath):
+ *   - a path that resolves on disk as-is (the test document, a relative
+ *     sub-resource) → `null` (Chromium loads it directly);
+ *   - a root-relative path that resolves under `baseDir` → that path (served),
+ *     contained within `baseDir` to reject `../` escapes;
+ *   - anything else → `null` (Chromium 404s it, as before).
+ */
+function resolveRootRelativeResource(baseDir, requestUrl) {
+    if (!/^file:\/\//i.test(requestUrl)) {
+        return null;
+    }
+    const rawPath = decodeURIComponent(requestUrl.replace(/^file:\/\//i, '').split(/[?#]/)[0]);
+    try {
+        if (fs.existsSync(rawPath) && fs.statSync(rawPath).isFile()) {
+            return null;
+        }
+    } catch { /* fall through to the base-dir remap */ }
+
+    const resolvedBaseDir = path.resolve(baseDir);
+    const rel = rawPath.startsWith('/') ? '.' + rawPath : './' + rawPath;
+    const candidate = path.resolve(resolvedBaseDir, rel);
+    const contained =
+        candidate === resolvedBaseDir || candidate.startsWith(resolvedBaseDir + path.sep);
+    try {
+        if (contained && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            return candidate;
+        }
+    } catch { /* fall through — leave it for Chromium to 404 */ }
+    return null;
+}
+
 /** Recursively discover test files (excluding WPT crashtests). */
 function discoverTests(dir) {
     const results = [];
@@ -218,55 +283,47 @@ async function main(args = process.argv.slice(2)) {
         args: ['--allow-file-access-from-files'],
     });
 
-    // Determine if there is a local fonts/ directory to serve.
-    // WPT tests import fonts via root-relative URLs such as /fonts/ahem.css.
-    // When loaded from file://, these become file:///fonts/... which do not
-    // exist on the filesystem.  We intercept those requests and serve them
-    // from {baseDir}/fonts/ so Chromium uses the correct test fonts.
-    const localFontsDir = path.join(baseDir, 'fonts');
-    const hasFontsDir = fs.existsSync(localFontsDir);
-    if (hasFontsDir) {
-        console.log(`Serving WPT fonts from: ${localFontsDir}`);
-    }
+    // WPT tests reference their support resources — fonts, shared stylesheets,
+    // images, harness scripts — via *root-relative* URLs such as /fonts/ahem.css,
+    // /css/support/grid.css, or /resources/testharness.js.  A real WPT server
+    // resolves those against the WPT root.  When a test is loaded over file://,
+    // Chromium instead resolves them against the filesystem root
+    // (file:///css/support/grid.css), where nothing exists — so the resource
+    // silently 404s and the reference renders *unstyled* (e.g. a grid test whose
+    // display:grid + track colours live in /css/support/grid.css screenshots
+    // blank).  Broiler.Wpt's own runner already remaps these to the WPT root
+    // (TryResolveWptRootRelativePath); the reference generator must do the same
+    // or the two sides render different documents and every such test fails on a
+    // spurious pixel mismatch.  Intercept file:// requests: paths that resolve on
+    // disk as-is (the test document and its relative sub-resources) load
+    // directly; a root-relative path that does not resolve is served from
+    // {baseDir}, contained within it to guard against ../ escapes.
+    const resolvedBaseDir = path.resolve(baseDir);
+    console.log(`Serving root-relative WPT resources from: ${resolvedBaseDir}`);
 
     let completed = 0;
     let errors = 0;
     const total = testFiles.length;
 
-    // Intercept root-relative /fonts/ requests and serve them from the
-    // local fonts directory.  WPT tests use paths like /fonts/ahem.css
-    // which a real WPT server resolves relative to the WPT root.  When
-    // loading via file://, Chrome resolves them as file:///fonts/... which
-    // does not exist on disk.  Playwright can intercept these requests via
-    // context.route() for both http:// and file:// origin requests.
-    async function fontRouteHandler(route) {
-        const url = route.request().url();
-        // Strip the file:///fonts/ prefix to get the filename/subpath.
-        const subpath = decodeURIComponent(url.replace(/^file:\/\/\/fonts\//i, ''));
-        const localPath = path.join(localFontsDir, subpath);
-        if (fs.existsSync(localPath)) {
-            const body = fs.readFileSync(localPath);
-            const ext = path.extname(localPath).toLowerCase();
-            const contentType =
-                ext === '.css'  ? 'text/css; charset=utf-8' :
-                ext === '.ttf'  ? 'font/truetype' :
-                ext === '.otf'  ? 'font/opentype' :
-                ext === '.woff' ? 'font/woff' :
-                ext === '.woff2'? 'font/woff2' :
-                'application/octet-stream';
-            await route.fulfill({ status: 200, contentType, body });
-        } else {
-            await route.abort('failed');
+    async function fileRouteHandler(route) {
+        const served = resolveRootRelativeResource(resolvedBaseDir, route.request().url());
+        if (served === null) {
+            // The test document, a resolvable relative sub-resource, or an
+            // unmappable path — let Chromium load (or 404) it directly.
+            return route.continue();
         }
+        await route.fulfill({
+            status: 200,
+            contentType: contentTypeForExtension(path.extname(served)),
+            body: fs.readFileSync(served),
+        });
     }
 
-    // Create a fresh context + page, registering the font route.  Used both
+    // Create a fresh context + page, registering the resource route.  Used both
     // for a worker's initial page and to recover after a renderer crash.
     async function newRenderTarget() {
         const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
-        if (hasFontsDir) {
-            await context.route(/file:\/\/\/fonts\//i, fontRouteHandler);
-        }
+        await context.route(/^file:\/\//i, fileRouteHandler);
         const page = await context.newPage();
         return { context, page };
     }
@@ -347,11 +404,13 @@ async function main(args = process.argv.slice(2)) {
 }
 
 module.exports = {
+    contentTypeForExtension,
     createBrowserContextOptions,
     discoverTests,
     isNonTestFile,
     main,
     requiresJavaScript,
+    resolveRootRelativeResource,
     shardIndexForPath,
 };
 

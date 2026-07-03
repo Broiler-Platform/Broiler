@@ -7,10 +7,12 @@ const path = require('node:path');
 const test = require('node:test');
 
 const {
+    contentTypeForExtension,
     createBrowserContextOptions,
     discoverTests,
     isNonTestFile,
     requiresJavaScript,
+    resolveRootRelativeResource,
     shardIndexForPath,
 } = require('../generate-wpt-references.js');
 
@@ -54,4 +56,51 @@ test('discovery includes xht and excludes WPT references and resources', () => {
 
 test('shard hash stays in lock-step with the C# runner', () => {
     assert.equal(shardIndexForPath('css/CSS2/foo.html', 8), 0x418AB4DC % 8);
+});
+
+test('root-relative resources resolve against the WPT root, like a real server', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'broiler-wpt-serve-'));
+    try {
+        fs.mkdirSync(path.join(root, 'css', 'support'), { recursive: true });
+        fs.mkdirSync(path.join(root, 'css', 'css-grid'), { recursive: true });
+        fs.mkdirSync(path.join(root, 'fonts'), { recursive: true });
+        const gridCss = path.join(root, 'css', 'support', 'grid.css');
+        const ahem = path.join(root, 'fonts', 'ahem.css');
+        const testDoc = path.join(root, 'css', 'css-grid', 'test.html');
+        const relResource = path.join(root, 'css', 'css-grid', 'ref.png');
+        fs.writeFileSync(gridCss, '.grid{display:grid}');
+        fs.writeFileSync(ahem, '@font-face{}');
+        fs.writeFileSync(testDoc, '<html></html>');
+        fs.writeFileSync(relResource, 'x');
+
+        // Root-relative support stylesheet / font → remapped under the WPT root.
+        assert.equal(
+            resolveRootRelativeResource(root, 'file:///css/support/grid.css'),
+            gridCss);
+        assert.equal(
+            resolveRootRelativeResource(root, 'file:///fonts/ahem.css?v=2'),
+            ahem);
+
+        // The test document and any path that resolves on disk as-is → null,
+        // so Chromium loads it directly rather than being re-served.
+        assert.equal(resolveRootRelativeResource(root, 'file://' + testDoc), null);
+        assert.equal(resolveRootRelativeResource(root, 'file://' + relResource), null);
+
+        // Missing resources and ../ escapes → null (Chromium 404s them).
+        assert.equal(resolveRootRelativeResource(root, 'file:///css/support/missing.css'), null);
+        assert.equal(resolveRootRelativeResource(root, 'file:///../../etc/passwd'), null);
+
+        // Non-file schemes are never intercepted.
+        assert.equal(resolveRootRelativeResource(root, 'https://example.test/x.css'), null);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('content type is inferred from the file extension', () => {
+    assert.equal(contentTypeForExtension('.css'), 'text/css; charset=utf-8');
+    assert.equal(contentTypeForExtension('.js'), 'text/javascript; charset=utf-8');
+    assert.equal(contentTypeForExtension('.ttf'), 'font/truetype');
+    assert.equal(contentTypeForExtension('.png'), 'image/png');
+    assert.equal(contentTypeForExtension('.unknown'), 'application/octet-stream');
 });
