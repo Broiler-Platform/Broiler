@@ -911,6 +911,20 @@ gates on substantial features:
 - **Real flex/grid layout** — `gap`, `self-align-safe-unsafe-{flex,grid}`,
   `baseline-of-scrollable` (inline-flex/grid baseline). Broiler currently
   approximates flex/grid via inline-block.
+  - **Definite-track grid pass shipped (issue #1206).** `Broiler.Layout`'s
+    `CssBoxGrid.TryApplyGridTrackLayout` now runs the real §8.5 placement
+    algorithm — fixed `grid-template-columns/rows` (`<length>`/`%`/`repeat()`),
+    line-based + `span` placement, `grid-auto-flow` row/column, sparse/dense
+    packing, implicit tracks (`grid-auto-rows/columns`), `gap`, and sizing items
+    to their grid area. It **engages only when both axes carry a fixed track
+    list**, declining (→ the single-column approximation, unchanged) on `fr`,
+    `auto`/content tracks, `minmax()`, `subgrid`, named lines, or
+    `grid-template-areas`. Verified pixel-exact on
+    `css-grid/placement/grid-auto-flow-sparse-001` via its embedded check-layout
+    geometry (`GridTrackLayoutTests`); `position-try-grid-001` improved
+    86.3 %→87.7 %. Still deferred: **subgrid** (6/10 of #1206's top problems),
+    `fr`/`auto`/`minmax()` track sizing, named lines, `grid-template-areas`, and
+    JS-driven dynamic re-placement (#1206 tests #7/#8/#10).
 - **Multicol** — `align-content-block-{002..010}`, `anchor-position-multicol`.
 - **Table-cell alignment** — `align-content-table-cell` (rowspan + collapsed rows
   + overflow + `vertical-align`→`align-self` mapping).

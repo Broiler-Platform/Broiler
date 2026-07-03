@@ -7,7 +7,7 @@ using CssValueParser = Broiler.CSS.CssLengthParser;
 
 namespace Broiler.Layout.Engine;
 
-internal class CssBox : CssBoxProperties, IDisposable
+internal partial class CssBox : CssBoxProperties, IDisposable
 {
     private CssBox _parentBox;
     protected object _htmlContainer;
@@ -1739,10 +1739,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // ContainsInlinesOnly() forces grid containers into
                     // the inline layout path for shrink-to-fit sizing.)
                     if (Display is "grid" or "inline-grid")
-                    {
-                        if (!ApplyGridStacking())
-                            ApplyGridAutoPlacement();
-                    }
+                        ApplyGridLayoutAfterInline();
 
                     // CSS Box Alignment §6.2: distribute flex/grid items along
                     // the block (cross) axis per align-items / align-self.
@@ -1804,10 +1801,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     ActualBottom = MarginBottomCollapse();
 
                     if (Display is "grid" or "inline-grid")
-                    {
-                        if (!ApplyGridStacking())
-                            ApplyGridAutoPlacement();
-                    }
+                        ApplyGridLayoutAfterInline();
                 }
             }
         }
@@ -4542,6 +4536,11 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal void ApplyGridLayoutAfterInline()
     {
+        // Prefer the real definite-track pass; it declines (returns false) unless
+        // the container declares fixed explicit templates, in which case the
+        // single-column approximation below runs unchanged.
+        if (TryApplyGridTrackLayout())
+            return;
         if (!ApplyGridStacking())
             ApplyGridAutoPlacement();
     }
@@ -4662,6 +4661,11 @@ internal class CssBox : CssBoxProperties, IDisposable
     private void ApplyFlexGridCrossAxisAlignment()
     {
         if (Display is not ("flex" or "inline-flex" or "grid" or "inline-grid"))
+            return;
+
+        // The real definite-track grid pass already placed items in their areas
+        // (including block-axis alignment); skip the approximate re-alignment.
+        if (_gridTrackLayoutApplied)
             return;
 
         // The cross axis must be the block (vertical) axis: true for grid and

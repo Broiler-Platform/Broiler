@@ -642,6 +642,14 @@ internal abstract class CssBoxProperties
     public string BreakInside { get; set; } = "auto";
     public string GridRow { get; set; } = "auto";
     public string GridColumn { get; set; } = "auto";
+    // CSS Grid Level 1 §7/§8: explicit track lists and implicit-track/flow
+    // controls consumed by the definite-track grid layout pass
+    // (CssBoxGrid.TryApplyGridTrackLayout). "none"/empty means no explicit grid.
+    public string GridTemplateColumns { get; set; } = "none";
+    public string GridTemplateRows { get; set; } = "none";
+    public string GridAutoFlow { get; set; } = "row";
+    public string GridAutoRows { get; set; } = "auto";
+    public string GridAutoColumns { get; set; } = "auto";
     public string FontFamily { get; set; }
 
     /// <summary>
