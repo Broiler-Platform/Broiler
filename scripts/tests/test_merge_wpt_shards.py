@@ -349,7 +349,13 @@ class MergeWptShardsTests(unittest.TestCase):
                         "summary": {"passed": 5, "failed": 3, "skipped": 0, "total": 8},
                         "shard": {"index": 0, "count": 8},
                         "triage": {
-                            "exceptionSignatures": [{"signature": "Foo.Bar — boom", "count": 12}],
+                            "exceptionSignatures": [
+                                {
+                                    "signature": "Foo.Bar — boom",
+                                    "count": 12,
+                                    "examples": ["css/a/crash.html"],
+                                }
+                            ],
                             "lowestMatchTests": [
                                 {
                                     "testPath": "css/a/broken.html",
@@ -387,6 +393,8 @@ class MergeWptShardsTests(unittest.TestCase):
                 ["IncompleteShards", "Crash", "LowMatch"], [p["kind"] for p in biggest]
             )
             self.assertEqual(12, biggest[1]["impact"])
+            # The crash carries the example test that hit it.
+            self.assertEqual(["css/a/crash.html"], biggest[1]["examples"])
             low = [p for p in biggest if p["kind"] == "LowMatch"]
             self.assertEqual(1, len(low))
             self.assertEqual(3.2, low[0]["matchPercent"])
@@ -399,8 +407,70 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("Crash gating 12 test(s)", markdown)
             self.assertIn("Foo.Bar — boom", markdown)
             self.assertIn("3.2% match — css/a/broken.html", markdown)
+            # The crash names an example test and the report spells out a --render
+            # reproduction pointed at the first reproducible test (the crash's).
+            self.assertIn("Example test(s): `css/a/crash.html`", markdown)
+            self.assertIn("### Reproduce locally", markdown)
+            self.assertIn(
+                "--wpt-dir tests/wpt/checkout --render tests/wpt/checkout/css/a/crash.html",
+                markdown,
+            )
             # The 88% near-miss is above threshold and never surfaces.
             self.assertNotIn("near.html", markdown)
+
+    def test_crash_examples_union_across_shards_deduped_and_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            # The same signature crashes in two shards, each reporting different
+            # example paths; one path overlaps.
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 3, "skipped": 0, "total": 3},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [
+                                {
+                                    "signature": "Same.Sig — boom",
+                                    "count": 2,
+                                    "examples": ["css/a/one.html", "css/a/two.html"],
+                                }
+                            ]
+                        },
+                        "results": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (shard_dir / "shard-1.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 3, "skipped": 0, "total": 3},
+                        "shard": {"index": 1, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [
+                                {
+                                    "signature": "Same.Sig — boom",
+                                    "count": 3,
+                                    # two.html repeats (dedup); three/four push past cap.
+                                    "examples": ["css/a/two.html", "css/a/three.html", "css/a/four.html"],
+                                }
+                            ]
+                        },
+                        "results": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=3)
+
+            crash = next(p for p in merged["biggestProblems"] if p["kind"] == "Crash")
+            self.assertEqual(5, crash["impact"])
+            # Union across shards, deduped, in first-seen order, capped at 3.
+            self.assertEqual(
+                ["css/a/one.html", "css/a/two.html", "css/a/three.html"], crash["examples"]
+            )
 
     def test_biggest_problems_are_diversity_first(self) -> None:
         # Three crashes plus one low match, limit 3: strict severity tiers would

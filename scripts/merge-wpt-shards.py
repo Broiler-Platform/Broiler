@@ -14,8 +14,10 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
 * ``--biggest-issue-md`` — a Markdown body for a *second*, severity-focused
   issue that lists only the run's few biggest problems, ranked by blast radius:
   incomplete shards first (a whole slice went unmeasured), then crashes (one bug
-  gating many tests), then the worst pixel mismatches. This is the "what hurt
-  most this run" companion to the frequency-ranked ``--issue-md`` view.
+  gating many tests), then the worst pixel mismatches. Each crash names an example
+  gated test and the issue spells out the ``--render`` command to reproduce a
+  listed test, so every entry points at its cause. This is the "what hurt most
+  this run" companion to the frequency-ranked ``--issue-md`` view.
 
 When ``--merge-into`` names an existing manifest, the run's failures are folded
 into it *by scope* instead of replacing it: entries for tests this run actually
@@ -42,6 +44,12 @@ from pathlib import Path
 
 DEFAULT_PROBLEM_LIMIT = 10
 PROBLEM_EXAMPLE_LIMIT = 3
+
+# Where the CI workflow checks out WPT (see .github/workflows/wpt-tests.yml
+# WPT_CHECKOUT_DIR and scripts/run-wpt-tests.sh). Test paths in the reports are
+# relative to it, so the biggest-problems issue can spell out a ready-to-run
+# ``--render`` reproduction: <checkout>/<relative-path>.
+WPT_CHECKOUT_DIR = "tests/wpt/checkout"
 
 # The second, severity-focused issue reports at most this many of the run's
 # biggest problems.
@@ -115,6 +123,7 @@ def _problem_identity(result: dict) -> tuple[str, str, str | None]:
 def _rank_biggest_problems(
     incomplete_shards: list[dict],
     exception_signatures: Counter[str],
+    exception_examples: dict[str, list[str]],
     low_match_tests: list[dict],
     limit: int,
     low_match_threshold: float,
@@ -174,6 +183,10 @@ def _rank_biggest_problems(
                 "impact": count,
                 "title": f"Crash gating {count} test(s)",
                 "detail": signature,
+                # Example tests that hit this crash — the reproduction the report
+                # points at. May be empty for reports produced before examples
+                # were emitted.
+                "examples": list(exception_examples.get(signature, [])),
             }
         )
 
@@ -197,6 +210,7 @@ def _rank_biggest_problems(
                 "severity": 100.0 - test["matchPercent"],
                 "impact": 1,
                 "matchPercent": test["matchPercent"],
+                "relativeTestPath": test["relativeTestPath"],
                 "title": f"{test['matchPercent']:.1f}% match — {test['relativeTestPath']}",
                 "detail": (
                     f"Rendered output matches the reference by only "
@@ -246,6 +260,7 @@ def merge(
     category_counter: Counter[str] = Counter()
     dropped_declaration_counter: Counter[str] = Counter()
     exception_signature_counter: Counter[str] = Counter()
+    exception_examples: dict[str, list[str]] = {}
     low_match_tests: list[dict] = []
     problem_groups: dict[str, dict] = {}
     family_groups: dict[str, dict] = {}
@@ -285,7 +300,16 @@ def merge(
                     continue
                 signature = entry.get("signature")
                 if signature:
-                    exception_signature_counter[str(signature)] += int(entry.get("count", 0) or 0)
+                    signature = str(signature)
+                    exception_signature_counter[signature] += int(entry.get("count", 0) or 0)
+                    # Union the example test paths this signature gated across
+                    # shards (bounded, deduped) so the biggest-problems issue can
+                    # name a concrete test to --render for the crash.
+                    examples = exception_examples.setdefault(signature, [])
+                    for example in entry.get("examples", []) or []:
+                        example = str(example)
+                        if example not in examples and len(examples) < PROBLEM_EXAMPLE_LIMIT:
+                            examples.append(example)
 
             # The worst-matching pixel comparisons this shard saw (already the N
             # lowest by matchPercent). Feeds the "low percent match" biggest-problem
@@ -419,6 +443,7 @@ def merge(
     biggest_problems = _rank_biggest_problems(
         incomplete_shards,
         exception_signature_counter,
+        exception_examples,
         low_match_tests,
         biggest_problem_limit,
         low_match_threshold,
@@ -614,17 +639,45 @@ def render_biggest_problems_markdown(merged: dict, run_url: str | None) -> str:
         "### Biggest problems",
         "",
     ]
+    # Concrete test paths a maintainer can render to reproduce, in report order:
+    # a crash's example test(s), a low match's own path. Feeds the reproduce hint.
+    repro_paths: list[str] = []
     if problems:
         for index, problem in enumerate(problems, start=1):
             lines.append(f"{index}. **{problem['title']}**")
             if problem["kind"] == "Crash":
                 lines.append(f"   - Signature: `{problem['detail']}`")
+                examples = problem.get("examples") or []
+                if examples:
+                    rendered = ", ".join(f"`{path}`" for path in examples)
+                    lines.append(f"   - Example test(s): {rendered}")
+                    repro_paths.extend(examples)
             elif problem.get("detail"):
                 lines.append(f"   - {problem['detail']}")
+                if problem["kind"] == "LowMatch" and problem.get("relativeTestPath"):
+                    repro_paths.append(problem["relativeTestPath"])
     else:
         lines.append(
             "- None — no incomplete shards, crashes, or sub-threshold pixel matches."
         )
+
+    # Point at the fix: spell out the exact command to render a listed test against
+    # the live engine. Only when a listed problem has a concrete test path — an
+    # incomplete-shard-only run has nothing single-test to render.
+    if repro_paths:
+        first = repro_paths[0]
+        lines += [
+            "",
+            "### Reproduce locally",
+            "",
+            "_Render a listed test against the live engine to watch the failure happen"
+            " — e.g. the first one. Swap in any `Example test(s)` path above._",
+            "",
+            "```sh",
+            "dotnet run --project src/Broiler.Wpt -- \\",
+            f"  --wpt-dir {WPT_CHECKOUT_DIR} --render {WPT_CHECKOUT_DIR}/{first}",
+            "```",
+        ]
 
     lines += [
         "",
