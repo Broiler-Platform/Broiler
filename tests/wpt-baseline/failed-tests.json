@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14618,
+    "failed": 14616,
     "skipped": 0,
-    "total": 14618
+    "total": 14616
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 14,
+      "count": 12,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
@@ -61,13 +61,13 @@
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      222
+      220
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      222
+      220
     ]
   ],
   "droppedDeclarations": [],
@@ -27784,7 +27784,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-005.html",
@@ -27830,13 +27830,6 @@
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-anchor-target-with-children.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-area-abs-inline-container.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -27904,13 +27897,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-area-inline-container.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-area-no-default-anchor.html",
@@ -28169,7 +28155,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-004.html",
