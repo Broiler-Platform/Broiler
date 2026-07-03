@@ -19,8 +19,17 @@ public sealed partial class DomBridge
         public double Right => Left + Width;
         public double Bottom => Top + Height;
     }
+
+    // All anchors, keyed by anchor-name, in document order. The name→single
+    // <see cref="AnchorInfo"/> registry keeps only the last element for a name;
+    // this keeps every element so a query can bind to the anchor in its own
+    // scope when several elements share an anchor-name (see
+    // <see cref="ResolveAnchorForElement"/>). Rebuilt by BuildAnchorRegistry.
+    private Dictionary<string, List<AnchorInfo>>? _anchorCandidates;
+
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
+        var candidates = new Dictionary<string, List<AnchorInfo>>(StringComparer.Ordinal);
         foreach (var el in Elements)
         {
             if (el.IsTextNode)
@@ -32,12 +41,65 @@ public sealed partial class DomBridge
 
             var box = ComputeElementBox(el);
             if (box != null)
-                registry[anchorName] = box with { SourceElement = el };
+            {
+                var info = box with { SourceElement = el };
+                registry[anchorName] = info;
+                if (!candidates.TryGetValue(anchorName, out var list))
+                    candidates[anchorName] = list = new List<AnchorInfo>();
+                list.Add(info);
+            }
         }
+        _anchorCandidates = candidates;
+    }
+    /// <summary>
+    /// Resolves the anchor a positioned element binds to for a given
+    /// <c>anchor-name</c>. When several elements share that name, CSS binds the
+    /// query element to the acceptable anchor <em>in its scope</em> rather than a
+    /// single global one; here that is approximated by the candidate inside the
+    /// query element's own containing block. Only diverges from the global
+    /// name→single registry when duplicates exist <em>and</em> an in-CB candidate
+    /// is found, so unique-name lookups (the overwhelming majority) are unchanged.
+    /// </summary>
+    private AnchorInfo? ResolveAnchorForElement(
+        string name, DomElement queryEl, Dictionary<string, AnchorInfo> registry)
+    {
+        if (_anchorCandidates != null &&
+            _anchorCandidates.TryGetValue(name, out var list) && list.Count > 1)
+        {
+            var cb = FindContainingBlockElement(queryEl);
+            if (cb != null)
+            {
+                AnchorInfo? scoped = null;
+                foreach (var cand in list) // document order
+                    if (cand.SourceElement != null &&
+                        IsDescendantOfElement(cand.SourceElement, cb))
+                        scoped = cand; // keep the last in-CB candidate
+                if (scoped != null)
+                    return scoped;
+            }
+        }
+        return registry.TryGetValue(name, out var global) ? global : (AnchorInfo?)null;
     }
     private AnchorInfo? ComputeElementBox(DomElement element)
     {
         var props = GetComputedProps(element);
+
+        string? position = props.GetValueOrDefault("position");
+        bool isPositioned = position == "absolute" || position == "fixed";
+
+        // An absolutely/fixed-positioned anchor whose containing block is an
+        // *inline* element (e.g. a `position:relative` <span>) cannot be placed by
+        // Broiler's renderer inside that inline box (see PromoteAbsPosFromInlineCBs)
+        // — its real layout lands at the inline-flow position, ignoring the box's own
+        // left/top insets. The shared-geometry path would therefore register the
+        // anchor at the wrong rect (css-anchor-position position-area-inline-container:
+        // an abspos anchor at left:100/top:25 in a <span> came back at the end of the
+        // preceding text, collapsing all four position-area cells). The CSS-inset
+        // estimator below resolves this case exactly from the explicit insets, so
+        // bypass the shared path for it.
+        bool absPosInInlineCB = isPositioned
+            && FindContainingBlockElement(element) is { } inlineCbAncestor
+            && IsInlineContainingBlock(inlineCbAncestor);
 
         // Prefer the renderer's real layout for the anchor rect when the shared
         // geometry path is active (RF-BRIDGE-1b). The CSS-property estimator below
@@ -49,14 +111,11 @@ public sealed partial class DomBridge
         // anchor() resolution is unchanged. Falls through to the estimator whenever
         // the geometry is unavailable (flag off, detached, no box) — so this is a
         // no-op unless UseSharedLayoutGeometry is enabled.
-        if (TryGetAnchorLayoutBox(element, out var layoutBox))
+        if (!absPosInInlineCB && TryGetAnchorLayoutBox(element, out var layoutBox))
             return layoutBox;
 
         double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
         double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
-
-        string? position = props.GetValueOrDefault("position");
-        bool isPositioned = position == "absolute" || position == "fixed";
 
         // For absolutely positioned elements, use their explicit insets.
         if (isPositioned)

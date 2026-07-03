@@ -39,6 +39,8 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 21 | Specified table `height` ignored (CSS2 tables all use `height:2in`) → tables rendered collapsed to content | ✅ fixed | Broiler.Layout |
 | 22 | Leading/trailing white space inside a table cell inflated its shrink-to-fit width → adjacent cells did not abut | ✅ fixed | Broiler.Layout |
 | 23 | `css-anchor-position` full-suite run (#1163, 227 fails) — triaged tail; scroll-offset tracking for `anchor()` across scrollers implemented | 🟡 partial | Broiler.HtmlBridge.Dom |
+| 24 | `position-area` grid collapses when the anchor is an abspos box inside an **inline** containing block (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
+| 25 | Shared `anchor-name` not scoped — every element bound to one global (last-wins) anchor instead of the one in its own scope (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -488,6 +490,65 @@ OuterAnchored_StickyAnchor_NotShiftedByScroll`. Broiler still doesn't *paint* st
 (`ScrollSimulation` shifts sticky children like normal flow), so the remaining
 `anchor-scroll-to-sticky-{002,003,005}` fails are a distinct, still-open gap.
 
+Cluster 24 (issue [#1175](https://github.com/Broiler-Platform/Broiler/issues/1175)) is the
+`position-area-inline-container` / `position-area-abs-inline-container` sub-cluster — a
+`position-area` grid anchored to an **abspos** box that lives inside an **inline** containing block
+(a `position:relative` `<span>`). Reproducing `position-area-inline-container` with the four
+`top|bottom × left|right` cells coloured distinctly showed **three of the four cells vanished and the
+survivor stretched to the full containing-block width** — the grid had collapsed. Instrumenting
+`ResolvePositionAreaValues` pinned it to the **anchor rect**: the anchor (`left:100; top:25; 200×50`
+inside the span) was registered at `(400, 0)` — the end of the preceding inline text — instead of
+`(100, 25)`. Root cause is in `DomBridge.ComputeElementBox`: with the shared renderer-layout geometry
+path enabled (the default since #1170), the anchor rect is sourced from real layout via
+`TryGetAnchorLayoutBox`; but Broiler's renderer **cannot place an abspos box inside an inline box**
+(that is exactly why `PromoteAbsPosFromInlineCBs` exists), so real layout drops the anchor at its
+inline-flow position, ignoring its own `left`/`top` insets. One wrong anchor rect feeds
+`ComputePositionAreaRect`, so every cell edge (derived from the anchor edges) lands wrong. Fixed by
+**bypassing the shared-geometry path for an abspos/fixed anchor whose containing block is an inline
+element** — detected with the existing `FindContainingBlockElement` + `IsInlineContainingBlock`
+helpers — falling through to the CSS-inset estimator, which resolves the explicit insets exactly. The
+condition is narrow (abspos + inline CB) and a no-op when the shared path is off, so ordinary
+block-CB and inline-text anchors (the `anchor-scroll-*` inline-anchor path) are untouched. With the
+fix the four cells land at the spec corners — verified against the authoritative reference HTML
+(`position-area-inline-container-ref.html`): the blue cells and the cyan anchor now match it
+**exactly**, the only residual being a ~1 % Ahem `XXXX` line-box baseline offset (the separate font
+tail). The two curated Broiler-vs-Broiler match tests
+(`Wpt_PositionArea{Inline,AbsInline}Container_MatchesReference`, which render both the test *and* the
+reference HTML through Broiler so both use Ahem consistently) move the anchor/geometry suite
+**14→12 failing with zero regressions**. Main-repo (`Broiler.HtmlBridge.Dom`), active on CI. Guard:
+`AnchorInlineContainingBlockTests.PositionAreaCells_AroundAbsPosAnchorInInlineContainingBlock_LandAtCorners`
+(a deterministic, Ahem-free repro that fails at the collapsed grid without the fix). *Note:* the
+committed `--reference-dir` PNGs for these two tests are stale **no-Ahem** captures (anchor and cells
+at the proportional-font positions), so the pixel-vs-committed-PNG subset run still scores them ~94 %;
+the fix is validated by the reference-HTML comparison and the offset guard, and lands on CI once those
+references are regenerated with Ahem.
+
+Cluster 25 (issue [#1175](https://github.com/Broiler-Platform/Broiler/issues/1175)) is root cause #1
+from the cluster-24 / percents-001 triage, taken on its own: **a shared `anchor-name` was not
+scoped.** `BuildAnchorRegistry` keyed each `anchor-name` to a *single* `AnchorInfo` (last element in
+document order wins), so every element referencing that name bound to that one global anchor — even
+across unrelated containers. When several elements legitimately share a name (e.g.
+`position-area-percents-001`'s four `.anchor`s all named `--foo`, one per `float` container), an
+anchored element in container 1 wrongly resolved against container 4's anchor. CSS binds an anchored
+element to the acceptable anchor *in its scope*. Fixed by keeping **all** candidates per name
+(`_anchorCandidates`, name→list in document order) alongside the existing registry, and adding
+`ResolveAnchorForElement(name, queryEl)`: when a name has more than one candidate, it binds the query
+element to the candidate inside the query element's **own containing block**
+(`FindContainingBlockElement` + `IsDescendantOfElement`), falling back to the global registry
+otherwise. Wired into the three `position-anchor`-based default-anchor lookups (position-area,
+position-area JS offset queries, `anchor-center`); the `anchor()`-function path is left unchanged (it
+already filters via `IsAnchorAccessible` and carries the delicate scroll-offset logic). **Additive and
+narrowly gated:** it diverges from the old behaviour *only* when a name is shared *and* an in-CB
+candidate exists, so the ~275 unique-name anchor configs are byte-identical — the full curated
+`Broiler.Wpt.Tests` suite is **453 pass / 61 fail, zero regressions** (net +1, the new guard). Guard:
+`AnchorNameScopeTests.AnchoredElement_BindsToAnchorInItsOwnScope_NotGlobalLastWins` — two containers
+sharing `--a`; the anchored box's bottom-right cell is non-empty only when it binds to its own
+container's anchor, so it vanishes without the fix. *Note:* this alone does **not** flip
+`position-area-percents-001` — that test is still blocked by root cause #2 (the shared-layout snapshot
+mis-places its later `float:left` containers) and #3 (writing-mode-aware margin/padding %), both still
+open (see the deferred entry). But the scope fix is correct for the whole class of shared-`anchor-name`
+tests independent of those.
+
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
 shifted content horizontally in comment-heavy tests. After scripts run, the bridge serializes
@@ -585,6 +646,41 @@ shape as cluster 6's `-webkit-right`. Fix added `inline-table` (the real win) pl
 valid CSS Display 3 single keywords (`flow`, the ruby family, `math`).
 
 ### Known blockers / deferred
+
+- **`css-anchor-position/position-area-percents-001` (#1175) — triaged, deferred (three
+  compounding root causes; #1 fixed in cluster 25, #2/#3 still open).** The test lays out four
+  `float:left` 100×100
+  `.container`s, each with a `.anchor` (`inset:20px 20px 40px 20px`, no explicit size,
+  `anchor-name:--foo`) and a `.anchored` (`position-area:bottom span-right`, `place-self:stretch`,
+  percentage `inset`/`margin`/`padding`), across horizontal and vertical writing modes. Broiler
+  renders the **reference** (explicit-inset boxes) correctly but the **test** grossly wrong — the
+  anchored boxes balloon to ~viewport width. Instrumenting `ComputePositionAreaRect` shows the CB is
+  correctly 100×100 but the anchor rect is `L=-876,R=-816,T20,B60` (width 60 is right; the horizontal
+  *position* is wildly negative). Three defects stack:
+  1. **Shared `anchor-name` not scoped — ✅ now fixed (cluster 25).** All four `.anchor`s share
+     `anchor-name:--foo`, but `BuildAnchorRegistry` keyed the registry by name into a *single* slot
+     (last-wins), so every `.anchored` resolved against one global `--foo` instead of the anchor in
+     its own container. Fixed by `ResolveAnchorForElement` (registry name→list + in-CB pick); the
+     other two defects still gate the test.
+  2. **Float-container geometry via shared layout.** The single registered `--foo` comes back at a
+     document X (~905) that doesn't match the anchor's own container — the shared-layout snapshot
+     mis-places the later `float:left` containers (3rd/4th reported at x≈910 instead of ≈242/≈360),
+     so the CB-origin subtraction yields the negative `anchorLeft`. Needs correct float placement in
+     the shared-geometry layout.
+  3. **Vertical writing-mode position-area geometry (grid *and* margin/padding %).** Two layers here,
+     both still open. (a) The **grid itself** is mis-computed under a vertical container writing mode:
+     a minimal `writing-mode:vertical-rl` repro (`position-area:bottom right` on a 300×60 container)
+     renders a **full-width** bottom band instead of the right-hand cell — the physical `right`
+     keyword is not producing the right column, so the cell/`ComputePositionAreaRect` output is wrong
+     before any margin math runs. (b) `ResolvePositionAreaValues` resolves margin/padding percentages
+     against `cellW` unconditionally, but per CSS they resolve against the **inline dimension of the
+     containing block** — `cellH` when the container is vertical; the reference confirms the axis
+     follows the *container's* writing mode (case 2 anchored-vertical-in-horizontal-container uses the
+     horizontal axis; case 4 the reverse). An isolated fix for (b) was prototyped (`inlineSize =
+     cbVertical ? cellH : cellW`) but **reverted**: it is byte-identical for horizontal CBs and could
+     not be validated because (a) makes the whole vertical-WM cell wrong, so there is no observable
+     margin effect to check and nothing flips. Both need the vertical-WM position-area grid built
+     first; feature-depth, CI-gated.
 
 - **`css-align/blocks/align-content-block-{002,004,006,008,010}` (5, `columns:3`) — triaged
   (issue #1152), NOT an align-content bug; deferred to the multicol engine.** The report signature

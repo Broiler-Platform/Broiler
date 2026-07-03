@@ -36,7 +36,7 @@ public sealed partial class DomBridge
             if (!string.IsNullOrWhiteSpace(positionArea) &&
                 positionArea != "none" &&
                 !string.IsNullOrWhiteSpace(positionAnchor) &&
-                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+                ResolveAnchorForElement(positionAnchor, element, anchorRegistry) is { } anchor)
             {
                 // Find the anchor element to determine its scroll container.
                 var anchorEl = FindElementByAnchorName(positionAnchor);
