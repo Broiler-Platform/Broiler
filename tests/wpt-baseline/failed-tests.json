@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14616,
+    "failed": 14613,
     "skipped": 0,
-    "total": 14616
+    "total": 14613
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 150,
+      "count": 147,
       "examples": [
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "css/css-anchor-position/anchor-position-multicol-017.html",
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 20,
+      "count": 19,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 12,
+      "count": 13,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
@@ -61,13 +61,13 @@
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      220
+      217
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      220
+      217
     ]
   ],
   "droppedDeclarations": [],
@@ -192,6 +192,28 @@
         "css/css-anchor-position/anchor-scroll-to-sticky-005.html",
         "css/css-anchor-position/anchor-scroll-to-sticky-003.html"
       ]
+    }
+  ],
+  "biggestProblemLimit": 3,
+  "lowMatchThreshold": 50.0,
+  "biggestProblems": [
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 99.53295389811197,
+      "impact": 1,
+      "matchPercent": 0.46704610188802453,
+      "title": "0.5% match \u2014 css/css-anchor-position/position-try-backdrop.html",
+      "detail": "Rendered output matches the reference by only 0.5% (PixelMismatch / MissingContent)."
+    },
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 85.3240966796875,
+      "impact": 1,
+      "matchPercent": 14.6759033203125,
+      "title": "14.7% match \u2014 css/css-anchor-position/anchor-scroll-to-sticky-005.html",
+      "detail": "Rendered output matches the reference by only 14.7% (PixelMismatch / ColorShift)."
     }
   ],
   "results": [
@@ -28109,28 +28131,7 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchor-visible.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-valid.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-after-scroll-in.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-after-scroll-out.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -28148,14 +28149,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-004.html",
