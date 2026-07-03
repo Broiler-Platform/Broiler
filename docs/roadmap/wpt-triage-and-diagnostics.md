@@ -456,12 +456,34 @@ match CI. Findings by bucket:
   `position-try` (3), `position-anchor` (5).** The stateful "last successful position option" and
   cascade-origin interactions already tracked as open in the position-try sub-task checklist.
 - **Sub-pixel / font tail (near-pass).**
-  `position-visibility-remove-anchors-visible` (98.4 %), `position-area-percents-001` /
-  `position-area-anchor-partially-outside` (93–94 %). Broiler's geometry matches Chromium to a few
-  px; the residual is border anti-aliasing, Ahem glyph metrics, and 50 %-of-cell box placement — the
-  same low-yield fidelity tail flagged for other directions. No local pixel win without touching the
-  mature position-area path (regression-risky, and only 39 anchor tests are in the local checkout to
-  net against).
+  `position-area-percents-001` / `position-area-anchor-partially-outside` (93–94 %). Broiler's
+  geometry matches Chromium to a few px; the residual is border anti-aliasing, Ahem glyph metrics,
+  and 50 %-of-cell box placement — the same low-yield fidelity tail flagged for other directions.
+  No local pixel win without touching the mature position-area path (regression-risky, and only 39
+  anchor tests are in the local checkout to net against).
+- **`position-visibility-remove-anchors-visible.html` (98.7 % → **99.7 %**, issue #1177) — ✅ fixed.**
+  Two coupled defects surfaced by this test's `overflow:hidden scroll` container: (1) the
+  position-area grid extent under a scroll container was keyed off the *scrollport* whenever the
+  container hadn't yet been marked as a CB — but `ResolvePositionAreaValues` always applies
+  `position:relative` to that scroller via `scrollContainersNeedingRelative`, so the target's real
+  CB is the scroller. With scrollport keyed, an anchor sitting at the scrollport bottom made the
+  "bottom" row collapse to zero height (`gridBottom = anchorBottom`), and the explicit
+  `height:100px` on the target was clamped by `Math.Min(explicitH, cellH)` back to zero — target
+  painted 100×0, no green box. Fixed by dropping the `containerIsCB` gate and always keying the
+  grid off `FindScrollContent{Width,Height}` (spec-correct for the "scroller is CB" case the
+  caller is arranging). (2) With (1) fixed, the target painted red where the reference was blank
+  because Broiler treated unset `position-visibility` as `always` — but the CSS Anchor Positioning
+  L1 § position-visibility reftest asserts the initial value hides a position-area target whose
+  anchor is scrolled out. Fixed by defaulting `posVis` to `anchors-visible` when the element has
+  both `position-anchor` and `position-area` (narrowly gated so raw `anchor()`-driven targets keep
+  their existing always-visible behaviour — Broiler's `IsAnchorVisibleForTarget` doesn't yet
+  handle sticky pinning or abspos anchors inside scrollers, and forcing the check on them drops
+  the `AnchorScrollTrackingTests` guards off-screen). Both changes in
+  `Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/`. Guards `Wpt_PositionVisibilityInitial_MatchesReference`
+  and `AnchorScrollTrackingTests` still pass unchanged; the ref-HTML comparison for this test
+  (`Wpt_PositionVisibilityRemoveAnchorsVisible_MatchesReference`) still fails at 98.4 % — a
+  separate margin-collapse-through-`overflow:hidden` rendering gap when the ref has a single
+  in-flow child with `margin-top`, unrelated to anchor positioning.
 - **Suspect committed references (Broiler matches its `rel=match` ref HTML, not the committed
   PNG) — issue #1177.** `--verify-reference` flags three css-anchor-position tests where Broiler's
   render matches the test's own `rel=match` reference HTML but not the committed Chromium PNG:
