@@ -85,7 +85,13 @@ public sealed partial class DomBridge
     /// </summary>
     private void FireDescendantOnloads(DomElement element)
     {
-        foreach (var child in element.Children)
+        // Snapshot before iterating: FireSubDocumentOnload runs a sub-document's
+        // onload handler, whose script can structurally mutate element.Children
+        // mid-walk (append/remove nodes). Enumerating the live collection then
+        // throws "Collection was modified" (crash signature
+        // DomBridge.FireDescendantOnloads). SnapshotChildren also tolerates a
+        // concurrent structural race, like the other DomBridge tree walks.
+        foreach (var child in SnapshotChildren(element))
         {
             var childTag = child.TagName?.ToLowerInvariant();
             if (childTag == "iframe" || childTag == "object")

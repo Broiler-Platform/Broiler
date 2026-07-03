@@ -151,7 +151,13 @@ public sealed partial class DomBridge
                 animValue, delayValue, nameValue);
         }
 
-        foreach (var child in element.Children)
+        // Snapshot before recursing: resolving an animation writes inline styles
+        // and can restructure the subtree (e.g. materialising generated content),
+        // and the walk can also race concurrent DOM mutation. Enumerating the live
+        // element.Children then throws "Collection was modified" (crash signature
+        // DomBridge.ResolveAnimationsOnTree). SnapshotChildren guards both, as the
+        // other DomBridge tree walks do.
+        foreach (var child in SnapshotChildren(element))
             ResolveAnimationsOnTree(child, keyframesMap);
     }
 
