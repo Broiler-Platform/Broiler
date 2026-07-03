@@ -455,14 +455,27 @@ match CI. Findings by bucket:
 - **`last-successful-*` / `position-try` cascade / `try-tactic` — `position-try-fallbacks` (4),
   `position-try` (3), `position-anchor` (5).** The stateful "last successful position option" and
   cascade-origin interactions already tracked as open in the position-try sub-task checklist.
-- **Sub-pixel / font tail (near-pass).** `position-visibility-anchors-valid` (98.6 %),
+- **Sub-pixel / font tail (near-pass).**
   `position-visibility-remove-anchors-visible` (98.4 %), `position-area-percents-001` /
-  `position-area-inline-container` / `position-area-abs-inline-container` /
   `position-area-anchor-partially-outside` (93–94 %). Broiler's geometry matches Chromium to a few
   px; the residual is border anti-aliasing, Ahem glyph metrics, and 50 %-of-cell box placement — the
   same low-yield fidelity tail flagged for other directions. No local pixel win without touching the
   mature position-area path (regression-risky, and only 39 anchor tests are in the local checkout to
   net against).
+- **Suspect committed references (Broiler matches its `rel=match` ref HTML, not the committed
+  PNG) — issue #1177.** `--verify-reference` flags three css-anchor-position tests where Broiler's
+  render matches the test's own `rel=match` reference HTML but not the committed Chromium PNG:
+  `position-area-inline-container` (ref HTML 99.2 %), `position-area-abs-inline-container` (ref HTML
+  99.2 %) — both are the cluster 24 fix whose PNGs were captured no-Ahem; and
+  `position-visibility-anchors-valid.tentative.html` (ref HTML **100.0 %**, committed PNG 98.6 %).
+  The reference HTML only shows the orange `.anchor` and the green `.target` (`target1`) — the
+  "`target2` hidden" case, so per spec `target2` (whose `top: anchor(--does-not-exist bottom)` fails
+  its `anchor()` lookup) must be hidden via `position-visibility: anchors-valid`, matching Broiler.
+  The committed PNG shows `target2` painted red at the viewport bottom-centre, i.e. Chromium's
+  reference generator didn't hide it — a Chromium-side gap on this tentative feature captured into
+  the reference. These stay red until the committed PNGs are regenerated; they are **not** Broiler
+  rendering bugs. Guard: `Wpt_PositionVisibilityAnchorsValidTentative_MatchesReference` renders both
+  the test *and* the reference HTML through Broiler and passes at 100 %.
 
 **Recommendation / status.** The scroll-driven lever's four increments have all **landed**:
 (1) cross-scroller `anchor()` scroll-offset tracking, (2) the Broiler.HTML inline-box geometry fix
