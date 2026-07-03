@@ -431,18 +431,17 @@ public sealed partial class DomBridge
 
             // For the position-area grid, use the scroll content dimensions
             // (the actual scrollable area) rather than the scroll port dimensions.
-            // The grid extends to cover the full scrollable content — but only
-            // when the scroll container actually establishes the containing block
-            // for the positioned element. When it does not (e.g. a static
-            // overflow:scroll box), the element's containing block is an ancestor,
-            // so the grid is keyed off the scroll port, not the scrollable extent;
-            // using the extent there would oversize the cell and surface content
-            // that should be clipped out of the scrollport.
-            bool containerIsCB = EstablishesContainingBlock(scProps);
+            // The scroll container is the CB for the target — either it already
+            // establishes a CB, or ResolvePositionAreaValues will apply
+            // position:relative to it via scrollContainersNeedingRelative — so
+            // keying the grid off the scrollable extent is what the target sees.
+            // Otherwise a target with position-area at the anchor's own edge
+            // (e.g. "bottom" on an anchor at the scrollport bottom) collapses to
+            // a zero-height cell — the "bottom" row spans gridBottom..anchorBottom
+            // which are both the scrollport bottom (WPT #1177,
+            // position-visibility-remove-anchors-visible).
             double scrollContentWidth = FindScrollContentWidth(scrollContainer, cbWidth);
-            double scrollContentHeight = containerIsCB
-                ? FindScrollContentHeight(scrollContainer, cbHeight)
-                : cbHeight;
+            double scrollContentHeight = FindScrollContentHeight(scrollContainer, cbHeight);
 
             // Compute anchor position relative to the scroll container.
             var anchorRelPos = ComputeAnchorRelativeToContainer(anchor, scrollContainer);
