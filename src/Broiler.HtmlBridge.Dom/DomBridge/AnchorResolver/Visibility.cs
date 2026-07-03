@@ -33,6 +33,21 @@ public sealed partial class DomBridge
             string? posVis = props.GetValueOrDefault("position-visibility");
             string? posAnchor = props.GetValueOrDefault("position-anchor");
 
+            // Position-area targets whose anchor is scrolled out of view must be
+            // hidden — the position-visibility-initial reftest asserts this even
+            // when position-visibility is unset (the reference paints nothing for
+            // a target whose position-area anchor is scrolled off). Only apply
+            // this default when the element uses both position-anchor AND
+            // position-area, so raw anchor()-driven abspos targets (e.g. the
+            // AnchorScrollTracking guards) keep their current always-visible
+            // behaviour — Broiler's IsAnchorVisibleForTarget doesn't yet handle
+            // sticky pinning or abspos anchors inside scrollers, and forcing
+            // the check on them drops the target off-screen (WPT #1177).
+            if (string.IsNullOrWhiteSpace(posVis) &&
+                !string.IsNullOrWhiteSpace(posAnchor) &&
+                !string.IsNullOrWhiteSpace(props.GetValueOrDefault("position-area")))
+                posVis = "anchors-visible";
+
             if (!string.IsNullOrWhiteSpace(posVis) &&
                 !posVis.Equals("always", StringComparison.OrdinalIgnoreCase))
             {
