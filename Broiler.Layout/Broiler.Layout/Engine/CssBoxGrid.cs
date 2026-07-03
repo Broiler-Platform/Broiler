@@ -129,8 +129,14 @@ internal partial class CssBox
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
         }
 
-        // The grid's implicit height is the block-end edge of the last row track.
-        double gridHeight = maxRowEnd > 0 ? rowEndEdge[maxRowEnd - 1] : 0;
+        // The grid's block size is the block-end edge of its last row track.
+        // That last track is the greater of the explicit template (every
+        // grid-template-rows track contributes to the container's size even when
+        // no item occupies it) and any implicit rows placement created past it —
+        // so a 4-track template with items in only the first 3 rows still sizes
+        // the container to all four tracks, matching Chromium.
+        int rowLineCount = Math.Max(maxRowEnd, rowTracks.Count);
+        double gridHeight = rowLineCount > 0 ? rowEndEdge[rowLineCount - 1] : 0;
         double borderBoxHeight = ActualPaddingTop + ActualPaddingBottom
             + ActualBorderTopWidth + ActualBorderBottomWidth + gridHeight;
         ActualBottom = Location.Y + borderBoxHeight;
@@ -346,6 +352,18 @@ internal partial class CssBox
         item.Size = new SizeF((float)newWidth, (float)newHeight);
         item.ActualRight = item.Location.X + newWidth;
         item.ActualBottom = item.Location.Y + newHeight;
+
+        // When the grid container was laid out through the inline path
+        // (ContainsInlinesOnly → CreateLineBoxes), each item div acquired a
+        // per-line-box entry in its Rectangles map sized to the inline-block it
+        // was measured as (typically the full container width/height). That map
+        // is what the paint walker uses for the item's own background/border
+        // (Fragment.InlineRects), so leaving it in place would paint the item at
+        // its pre-grid inline size even though we just resized the border box.
+        // Grid items are blockified (CSS Grid §4), so their background is always a
+        // single border box — clear the stale inline rects and let paint fall
+        // back to Location+Size.
+        item.RectanglesReset();
     }
 
     /// <summary>

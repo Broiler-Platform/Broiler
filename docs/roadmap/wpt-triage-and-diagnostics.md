@@ -41,6 +41,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 23 | `css-anchor-position` full-suite run (#1163, 227 fails) — triaged tail; scroll-offset tracking for `anchor()` across scrollers implemented | 🟡 partial | Broiler.HtmlBridge.Dom |
 | 24 | `position-area` grid collapses when the anchor is an abspos box inside an **inline** containing block (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
 | 25 | Shared `anchor-name` not scoped — every element bound to one global (last-wins) anchor instead of the one in its own scope (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
+| 26 | Definite-track grid items over-painted at stale inline-block size + grid collapsed to occupied rows; Chromium references rendered blank because the generator only served `/fonts/` (#1209) | ✅ fixed | Broiler.Layout + scripts/generate-wpt-references.js |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -583,6 +584,41 @@ container's anchor, so it vanishes without the fix. *Note:* this alone does **no
 mis-places its later `float:left` containers) and #3 (writing-mode-aware margin/padding %), both still
 open (see the deferred entry). But the scope fix is correct for the whole class of shared-`anchor-name`
 tests independent of those.
+
+Cluster 26 (issue [#1209](https://github.com/Broiler-Platform/Broiler/issues/1209), the
+"biggest problems" CSS Grid list — the `css-grid/placement` and `grid-definition` fixed-track
+tests at 0–6 % match) turned out to be **two independent bugs, one on each side of the pixel
+comparison**, both surfacing as `MissingContent`:
+
+1. **Broiler over-painted grid items at their pre-grid inline size.** The definite-track pass
+   (`CssBoxGrid.TryApplyGridTrackLayout`) places and sizes items correctly — `getBoundingClientRect`
+   already returned the right geometry, so the geometry-only `GridTrackLayoutTests` passed — but a
+   block-level grid container reaches that pass through the inline layout path
+   (`ContainsInlinesOnly` → `CreateLineBoxes`), which first lays each item out as an inline-block and
+   records a per-line-box entry in the item's `Rectangles` map sized to the full container. The paint
+   walker uses that map (`Fragment.InlineRects`) for the item's own background/border, so a correctly
+   placed 50×50 item was still *painted* at ~1000×1000 — the render was pure over-paint, not
+   mis-placement. Grid items are blockified (CSS Grid §4) so their background is always a single
+   border box; `PlaceItemInArea` now calls `item.RectanglesReset()` after positioning, letting paint
+   fall back to `Location`+`Size`. The grid's block size also now spans **all** `grid-template-rows`
+   tracks (`Math.Max(maxRowEnd, rowTracks.Count)`), not just occupied rows, matching Chromium.
+   Pixel regression guard: `GridTrackPaintTests` samples the rendered bitmap (both bugs make an empty
+   cell / unoccupied row show the item colour or the white canvas instead of the container background).
+2. **The Chromium references for these tests were blank.** `scripts/generate-wpt-references.js`
+   loads each test over `file://` but only remapped root-relative `/fonts/…` requests to the WPT
+   root; `/css/support/grid.css` (which carries `display:grid` and the item colours) resolved to
+   `file:///css/support/grid.css`, 404'd, and the reference screenshot came out unstyled/blank —
+   while Broiler's own runner *does* resolve `/css/support/` (`TryResolveWptRootRelativePath`), so the
+   two sides rendered different documents and every such test failed on a spurious mismatch. The
+   generator now serves **any** root-relative resource from the WPT root
+   (`resolveRootRelativeResource`), exactly like a real WPT server and like the runner. Verified
+   byte-identical output on the full `css-backgrounds` reference set (those tests use relative paths,
+   so nothing changes) and confirmed `grid-auto-flow-sparse-001` flips 1.8 % → **100 %** with both
+   fixes. `CACHE_EPOCH` bumped to `4` so CI regenerates references. The remaining #1209 entries stay
+   open for deeper reasons unrelated to grid layout: the `grid-container-change-*` /
+   `grid-template-*-changes` tests set their grid up in a `document.fonts.ready.then(…)` callback and
+   render the testharness results summary table on-screen (Broiler runs neither), and the six
+   `grid-lanes/subgrid` tests need `subgrid` support.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
