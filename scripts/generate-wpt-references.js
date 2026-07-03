@@ -120,6 +120,26 @@ function contentTypeForExtension(ext) {
 }
 
 /**
+ * Whether a request path targets a WPT test-harness script (testharness.js,
+ * testharnessreport.js, check-layout-th.js, …).
+ *
+ * Broiler.Wpt's runner does NOT load these: when it sees a `<script src>` whose
+ * URL contains "testharness" or "check-layout" it injects lightweight stubs
+ * instead (WptTestRunner.ExecuteScriptsWithDom / TestharnessStubs, where e.g.
+ * `checkLayout` is a no-op), so the rendered page never contains the harness's
+ * results table. The reference generator must render the *same* document, so it
+ * likewise refuses to serve the real harness scripts — otherwise Chromium runs
+ * the full harness and screenshots a PASS/FAIL results table that the stubbed
+ * Broiler side can never reproduce, and every harness-driven test (all of
+ * css-grid/parsing, the check-layout grid tests, …) fails on a spurious
+ * MissingContent mismatch. The substring predicate mirrors the runner exactly.
+ */
+function isWptHarnessScript(requestPath) {
+    const lower = requestPath.toLowerCase();
+    return lower.includes('testharness') || lower.includes('check-layout');
+}
+
+/**
  * Resolve a file:// request URL to the on-disk resource the reference generator
  * should serve for it, or `null` when Chromium should be left to load (or 404)
  * the request itself.
@@ -131,6 +151,9 @@ function contentTypeForExtension(ext) {
  * against the filesystem root (file:///css/support/grid.css) where nothing
  * exists, so the resource 404s and the reference renders unstyled. This mirrors
  * a real server (and Broiler.Wpt's own runner, TryResolveWptRootRelativePath):
+ *   - a WPT harness script (testharness.js, check-layout-th.js, …) → `null`, so
+ *     Chromium 404s it and never renders the harness results table the runner's
+ *     stubs omit (see isWptHarnessScript);
  *   - a path that resolves on disk as-is (the test document, a relative
  *     sub-resource) → `null` (Chromium loads it directly);
  *   - a root-relative path that resolves under `baseDir` → that path (served),
@@ -142,6 +165,12 @@ function resolveRootRelativeResource(baseDir, requestUrl) {
         return null;
     }
     const rawPath = decodeURIComponent(requestUrl.replace(/^file:\/\//i, '').split(/[?#]/)[0]);
+    // Keep the reference in lock-step with the runner, which stubs (never loads)
+    // the WPT harness scripts. Serving them here would render a results table
+    // Broiler's stubbed render lacks — a guaranteed MissingContent mismatch.
+    if (isWptHarnessScript(rawPath)) {
+        return null;
+    }
     try {
         if (fs.existsSync(rawPath) && fs.statSync(rawPath).isFile()) {
             return null;
@@ -408,6 +437,7 @@ module.exports = {
     createBrowserContextOptions,
     discoverTests,
     isNonTestFile,
+    isWptHarnessScript,
     main,
     requiresJavaScript,
     resolveRootRelativeResource,
