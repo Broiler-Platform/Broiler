@@ -638,9 +638,21 @@ internal static class CssLayoutEngine
                             maxbottom += strutHeight - (maxbottom - cury);
                     }
 
+                    // CSS Text §5.1: a line box may not be broken before its
+                    // first inline content. An unbreakable word wider than the
+                    // line stays on the (otherwise empty) line and overflows;
+                    // it must not be pushed to a phantom second line, which
+                    // would double the block's height (WPT max-height-109: a
+                    // 3000px Ahem word in a 200px line was wrapping to a second
+                    // line, so #red-parent grew to ~400px and red showed above
+                    // the green). Words are added to the line via
+                    // ReportExistanceOf below, so Words.Count == 0 means this
+                    // word is the first on the current line.
+                    bool lineHasContent = line.Words.Count > 0;
                     if ((b.WhiteSpace != CssConstants.NoWrap && b.WhiteSpace != CssConstants.Pre && curx + word.Width + rightspacing > limitRight
                          && (b.WhiteSpace != CssConstants.PreWrap || !word.IsSpaces)
-                         && (b.WhiteSpace != CssConstants.PreLine || !word.IsSpaces)) || word.IsLineBreak || wrapNoWrapBox)
+                         && (b.WhiteSpace != CssConstants.PreLine || !word.IsSpaces)
+                         && lineHasContent) || word.IsLineBreak || wrapNoWrapBox)
                     {
                         wrapNoWrapBox = false;
                         curx = startx;

@@ -3802,6 +3802,11 @@ internal class CssBox : CssBoxProperties, IDisposable
     private double ComputeShrinkToFitWidth()
     {
         double maxLineWidth = 0;
+        // Running width of a horizontal run of adjacent floated children. At
+        // max-content the container is under no width constraint, so a run of
+        // float:left/right children lays out side by side and their widths ADD;
+        // a non-floated (block) child ends the run and starts its own line.
+        double floatRunWidth = 0;
 
         foreach (var child in Boxes)
         {
@@ -3825,8 +3830,26 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
 
             childWidth += child.ActualMarginLeft + child.ActualMarginRight;
-            if (!double.IsNaN(childWidth))
+            if (double.IsNaN(childWidth))
+                continue;
+
+            // CSS Sizing 3 §5: the max-content width of a container whose
+            // children float must accumulate a run of adjacent floats rather
+            // than take only the widest single child — otherwise a container of
+            // two float:left children (WPT floats-143: a <ul> of two float:left
+            // <li>) shrinks to one child's width, wrapping the second below the
+            // first. Non-floated (block-level) children each start their own
+            // line, so they reset the run and contribute independently.
+            if (child.Float != CssConstants.None)
+            {
+                floatRunWidth += childWidth;
+                maxLineWidth = Math.Max(maxLineWidth, floatRunWidth);
+            }
+            else
+            {
+                floatRunWidth = 0;
                 maxLineWidth = Math.Max(maxLineWidth, childWidth);
+            }
         }
 
         return maxLineWidth;
