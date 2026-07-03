@@ -9,21 +9,25 @@ using CssValueParser = Broiler.CSS.CssLengthParser;
 namespace Broiler.Layout.Engine;
 
 /// <summary>
-/// CSS Grid Level 1 — a bounded, definite-track grid layout pass.
+/// CSS Grid Level 1 — a bounded, real track-sizing grid layout pass.
 ///
 /// The main renderer approximates <c>display:grid</c> with a single stacked
 /// column (see <see cref="ApplyGridStacking"/> / <see cref="ApplyGridAutoPlacement"/>
-/// in CssBox.cs). This partial adds a real track-based pass that engages only
-/// when the container declares <em>fixed</em> explicit templates on both axes
-/// (<c>grid-template-columns</c> and <c>grid-template-rows</c> made of
-/// <c>&lt;length&gt;</c>/<c>&lt;percentage&gt;</c>/<c>repeat()</c> tracks). It runs the
-/// §8.5 grid-item placement algorithm (line-based placement, spanning,
-/// <c>grid-auto-flow</c> row/column, sparse/dense packing, implicit tracks sized
-/// by <c>grid-auto-rows</c>/<c>grid-auto-columns</c>), sizes each item to its grid
-/// area, and positions it. Anything it cannot model (<c>fr</c>, <c>auto</c>/content
-/// tracks, <c>minmax()</c>, <c>subgrid</c>, named lines, <c>grid-template-areas</c>)
-/// makes the pass decline so the existing approximation is used unchanged — this
-/// confines the new behaviour to grids that genuinely need real track sizing.
+/// in CssBox.cs). This partial adds a real track-based pass that runs the §8.5
+/// grid-item placement algorithm (line-based placement, spanning,
+/// <c>grid-auto-flow</c> row/column with sparse/dense packing, implicit tracks) and
+/// a bounded §11 track-sizing algorithm covering <c>&lt;length&gt;</c>,
+/// <c>&lt;percentage&gt;</c>, <c>&lt;flex&gt;</c> (<c>fr</c>), <c>auto</c>,
+/// <c>min-content</c>, <c>max-content</c>, <c>minmax()</c>, and <c>repeat(&lt;int&gt;, …)</c>.
+///
+/// Intrinsic column sizing draws its content contributions from
+/// <see cref="GetMinMaxWidth"/> (a layout-independent measure); intrinsic row
+/// sizing uses each item's already-measured height and declines (falls back to the
+/// approximation) when a narrowed column would have reflowed that height, so it
+/// never sizes a row from a stale measurement. Anything still out of scope
+/// (<c>subgrid</c>, <c>fit-content()</c>, <c>repeat(auto-fill/auto-fit, …)</c>,
+/// named lines carrying sizes) makes the pass decline, confining the new behaviour
+/// to grids it can size correctly.
 /// </summary>
 internal partial class CssBox
 {
@@ -45,27 +49,63 @@ internal partial class CssBox
     // arrays or spin the placement search. Real content stays well under this.
     private const int MaxGridLine = 1000;
 
+    /// <summary>The kind of a single (min or max) track sizing function.</summary>
+    private enum GridSizeKind { Fixed, Percent, Fr, Auto, MinContent, MaxContent }
+
+    /// <summary>One side (min or max) of a track sizing function.</summary>
+    private readonly struct GridSize
+    {
+        public readonly GridSizeKind Kind;
+        public readonly double Value; // px for Fixed, flex factor for Fr; else 0
+        public GridSize(GridSizeKind kind, double value = 0) { Kind = kind; Value = value; }
+        public bool IsIntrinsic => Kind is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent;
+    }
+
+    /// <summary>A track's <c>minmax(min, max)</c> sizing function.</summary>
+    private readonly struct GridTrackSpec
+    {
+        public readonly GridSize Min;
+        public readonly GridSize Max;
+        public GridTrackSpec(GridSize min, GridSize max) { Min = min; Max = max; }
+    }
+
+    /// <summary>One grid item's span and content contributions along one axis.</summary>
+    private readonly struct AxisItem
+    {
+        public readonly int Start;
+        public readonly int Span;
+        public readonly double MinContent;
+        public readonly double MaxContent;
+        public AxisItem(int start, int span, double minContent, double maxContent)
+        { Start = start; Span = span; MinContent = minContent; MaxContent = maxContent; }
+    }
+
     /// <summary>
-    /// Runs the definite-track grid pass. Returns <c>true</c> when it laid the
+    /// Runs the real track-sizing grid pass. Returns <c>true</c> when it laid the
     /// container out (caller must not run the approximation), <c>false</c> to
-    /// decline (unsupported track syntax, no in-flow items, degenerate size).
+    /// decline (unsupported track syntax, no in-flow items, degenerate size, or a
+    /// row measurement that a narrowed column would have invalidated).
     /// </summary>
     private bool TryApplyGridTrackLayout()
     {
         double contentWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
             - ActualBorderLeftWidth - ActualBorderRightWidth;
-        double contentHeight = Size.Height - ActualPaddingTop - ActualPaddingBottom
-            - ActualBorderTopWidth - ActualBorderBottomWidth;
         double em = GetEmHeight();
+        if (contentWidth <= 0)
+            return false;
 
-        // Engage only when BOTH axes carry a fixed explicit track list — the case
-        // the approximation gets wrong and the definite-track math gets right.
-        List<double> colTracks = ParseFixedTrackList(GridTemplateColumns, contentWidth, em);
-        List<double> rowTracks = ParseFixedTrackList(GridTemplateRows, contentHeight, em);
-        if (colTracks == null || rowTracks == null || colTracks.Count == 0 || rowTracks.Count == 0)
+        // Parse both axes' explicit track lists into sizing functions. A null list
+        // (none/empty or an out-of-scope token) declines the whole pass.
+        List<GridTrackSpec> colSpecs = ParseTrackList(GridTemplateColumns, em);
+        List<GridTrackSpec> rowSpecs = ParseTrackList(GridTemplateRows, em);
+        if (colSpecs == null || rowSpecs == null || colSpecs.Count == 0 || rowSpecs.Count == 0)
             return false;
-        if (colTracks.Count > MaxGridLine || rowTracks.Count > MaxGridLine)
+        if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
+
+        // Implicit tracks (grid-auto-columns/rows); default 'auto'.
+        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
+        GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
 
         // Collect in-flow grid items in document order.
         var placements = new List<GridPlacement>();
@@ -97,9 +137,9 @@ internal partial class CssBox
         bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
         bool dense = (GridAutoFlow ?? "").IndexOf("dense", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        PlaceItems(placements, colTracks.Count, rowTracks.Count, flowRow, dense);
+        PlaceItems(placements, colSpecs.Count, rowSpecs.Count, flowRow, dense);
 
-        // Build track edge positions, extending with implicit tracks as needed.
+        // Track counts after placement, including any implicit tracks.
         int maxColEnd = 0, maxRowEnd = 0;
         foreach (var p in placements)
         {
@@ -108,14 +148,61 @@ internal partial class CssBox
         }
         if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
             return false;
+        int colCount = Math.Max(maxColEnd, colSpecs.Count);
+        int rowCount = Math.Max(maxRowEnd, rowSpecs.Count);
 
         double colGap = ResolveGridGap(ColumnGap, contentWidth, em);
-        double rowGap = ResolveGridGap(RowGap, contentHeight, em);
-        double implicitColSize = ResolveImplicitTrackSize(GridAutoColumns, contentWidth, em);
-        double implicitRowSize = ResolveImplicitTrackSize(GridAutoRows, contentHeight, em);
 
-        double[] colStartEdge = BuildTrackEdges(colTracks, maxColEnd, implicitColSize, colGap, out double[] colEndEdge);
-        double[] rowStartEdge = BuildTrackEdges(rowTracks, maxRowEnd, implicitRowSize, rowGap, out double[] rowEndEdge);
+        // ── Column axis (inline) ── content contributions are layout-independent.
+        var colItems = new List<AxisItem>(placements.Count);
+        foreach (var p in placements)
+        {
+            GridItemInlineContribution(p.Item, out double minW, out double maxW);
+            double marginX = p.Item.ActualMarginLeft + p.Item.ActualMarginRight;
+            colItems.Add(new AxisItem(p.PlacedCol, p.ColSpan, minW + marginX, maxW + marginX));
+        }
+        double[] colSizes = ResolveTrackSizes(colSpecs, implicitCol, colCount,
+            contentWidth, definite: true, colGap, contentWidth, em, colItems);
+        if (colSizes == null)
+            return false;
+
+        // ── Row axis (block) ── heights are width-dependent, so only trust a
+        // measured height when the item's final column width did not shrink it
+        // below its max-content (which would have reflowed the content taller).
+        // The row axis is definite only when 'height' is an explicit length (a
+        // percentage needs a definite containing block, out of scope here). Derive
+        // the definite content-box height straight from the declaration — Size.Height
+        // at this point may be a measurement, not the specified height — so it can
+        // drive fr/percentage rows. An indefinite height must not.
+        bool rowDefinite = TryGetDefiniteContentHeight(em, out double definiteHeight);
+        double rowBasis = rowDefinite ? definiteHeight : 0;
+        double rowGap = ResolveGridGap(RowGap, rowBasis, em);
+
+        var rowItems = new List<AxisItem>(placements.Count);
+        foreach (var p in placements)
+        {
+            double colWidth = TrackSpan(colSizes, p.PlacedCol, p.ColSpan, colGap);
+            GridItemInlineContribution(p.Item, out double _, out double maxW);
+            double marginX = p.Item.ActualMarginLeft + p.Item.ActualMarginRight;
+            // The item was measured at the container width; if its resolved column
+            // area is narrower than that max-content width, its measured height is
+            // stale — decline any content-based row sizing rather than guess.
+            if (RowNeedsMeasuredHeight(rowSpecs, implicitRow, p.PlacedRow, p.RowSpan, rowDefinite)
+                && colWidth + 0.5 < maxW + marginX)
+                return false;
+
+            double marginY = p.Item.ActualMarginTop + p.Item.ActualMarginBottom;
+            double h = (p.Item.ActualBottom - p.Item.Location.Y) + marginY;
+            if (h < 0) h = 0;
+            rowItems.Add(new AxisItem(p.PlacedRow, p.RowSpan, h, h));
+        }
+        double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
+            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems);
+        if (rowSizes == null)
+            return false;
+
+        double[] colStartEdge = BuildTrackEdges(colSizes, colGap, out double[] colEndEdge);
+        double[] rowStartEdge = BuildTrackEdges(rowSizes, rowGap, out double[] rowEndEdge);
 
         double contentLeft = Location.X + ActualBorderLeftWidth + ActualPaddingLeft;
         double contentTop = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
@@ -129,14 +216,10 @@ internal partial class CssBox
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
         }
 
-        // The grid's block size is the block-end edge of its last row track.
-        // That last track is the greater of the explicit template (every
-        // grid-template-rows track contributes to the container's size even when
-        // no item occupies it) and any implicit rows placement created past it —
-        // so a 4-track template with items in only the first 3 rows still sizes
-        // the container to all four tracks, matching Chromium.
-        int rowLineCount = Math.Max(maxRowEnd, rowTracks.Count);
-        double gridHeight = rowLineCount > 0 ? rowEndEdge[rowLineCount - 1] : 0;
+        // The grid's block size is the block-end edge of its last row track. Every
+        // grid-template-rows track contributes even when unoccupied, so a 4-track
+        // template with items in only the first 3 rows still sizes to all four.
+        double gridHeight = rowSizes.Length > 0 ? rowEndEdge[rowSizes.Length - 1] : 0;
         double borderBoxHeight = ActualPaddingTop + ActualPaddingBottom
             + ActualBorderTopWidth + ActualBorderBottomWidth + gridHeight;
         ActualBottom = Location.Y + borderBoxHeight;
@@ -149,6 +232,36 @@ internal partial class CssBox
     /// <summary>Set once the definite-track pass has positioned this grid's items,
     /// so the flex/grid cross-axis approximation does not re-align them.</summary>
     private bool _gridTrackLayoutApplied;
+
+    /// <summary>
+    /// An item's inline-axis content contribution (min-content, max-content) for
+    /// track sizing. A percentage width resolves against the track being sized, so
+    /// it contributes its content size (as if <c>auto</c>) rather than the resolved
+    /// percentage; a fixed/auto width uses the standard measure.
+    /// </summary>
+    private static void GridItemInlineContribution(CssBox item, out double min, out double max)
+    {
+        string w = item.Width;
+        if (!string.IsNullOrEmpty(w) && w.EndsWith("%", StringComparison.Ordinal))
+            item.GetContentMinMaxWidth(out min, out max);
+        else
+            item.GetMinMaxWidth(out min, out max);
+    }
+
+    /// <summary>Total pixel span of tracks <c>[start, start+span)</c>, gaps included.</summary>
+    private static double TrackSpan(double[] sizes, int start, int span, double gap)
+    {
+        double total = 0;
+        for (int i = 0; i < span; i++)
+        {
+            int t = start + i;
+            if (t >= 0 && t < sizes.Length)
+                total += sizes[t];
+        }
+        if (span > 1)
+            total += (span - 1) * gap;
+        return total;
+    }
 
     /// <summary>
     /// §8.5 grid item placement: resolves each item's final (row, column) origin.
@@ -397,25 +510,31 @@ internal partial class CssBox
         }
     }
 
+    // ─────────────────────────── Track-list parsing ───────────────────────────
+
     /// <summary>
-    /// Parses a fixed grid track list (<c>&lt;length&gt;</c>, <c>&lt;percentage&gt;</c>,
-    /// and <c>repeat(&lt;int&gt;, …)</c> of those) into pixel track sizes. Returns
-    /// <c>null</c> for <c>none</c>/empty or when any content-based, flexible, or
-    /// otherwise unsupported token appears — the signal to decline the pass.
+    /// Parses a track list (<c>&lt;track-size&gt;</c> values and
+    /// <c>repeat(&lt;int&gt;, …)</c>) into sizing functions. Returns <c>null</c> for
+    /// <c>none</c>/empty or when any out-of-scope token appears (<c>subgrid</c>,
+    /// <c>fit-content()</c>, <c>repeat(auto-fill/auto-fit, …)</c>) — the signal to
+    /// decline the pass and use the existing approximation.
     /// </summary>
-    private static List<double> ParseFixedTrackList(string value, double percentBasis, double em)
+    private static List<GridTrackSpec> ParseTrackList(string value, double em)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
         string v = value.Trim();
-        if (v.Equals("none", StringComparison.OrdinalIgnoreCase) || v.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        if (v.Equals("none", StringComparison.OrdinalIgnoreCase)
+            || v.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            || v.IndexOf("subgrid", StringComparison.OrdinalIgnoreCase) >= 0
+            || v.IndexOf("masonry", StringComparison.OrdinalIgnoreCase) >= 0)
             return null;
 
-        var tracks = new List<double>();
-        return ParseTrackTokens(v, percentBasis, em, tracks, depth: 0) ? tracks : null;
+        var specs = new List<GridTrackSpec>();
+        return ParseTrackTokens(v, specs, depth: 0, em) ? specs : null;
     }
 
-    private static bool ParseTrackTokens(string v, double percentBasis, double em, List<double> tracks, int depth)
+    private static bool ParseTrackTokens(string v, List<GridTrackSpec> specs, int depth, double em)
     {
         if (depth > 4)
             return false; // guard against pathological nesting
@@ -434,7 +553,7 @@ internal partial class CssBox
                 continue;
             }
 
-            // Read one token, respecting parentheses (repeat(...)).
+            // Read one token, respecting parentheses (repeat(...)/minmax(...)).
             int start = i;
             int paren = 0;
             while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
@@ -455,49 +574,380 @@ internal partial class CssBox
                 if (!int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
                     || count < 1 || count > 1000)
                     return false; // auto-fill / auto-fit / bad count — decline
-                var repeated = new List<double>();
-                if (!ParseTrackTokens(inner.Substring(comma + 1), percentBasis, em, repeated, depth + 1))
+                var repeated = new List<GridTrackSpec>();
+                if (!ParseTrackTokens(inner.Substring(comma + 1), repeated, depth + 1, em))
                     return false;
                 for (int r = 0; r < count; r++)
-                    tracks.AddRange(repeated);
+                    specs.AddRange(repeated);
                 continue;
             }
 
-            if (!TryParseFixedTrack(token, percentBasis, em, out double size))
+            if (!TryParseTrackSpec(token, em, out GridTrackSpec spec))
                 return false;
-            tracks.Add(size);
+            specs.Add(spec);
         }
-        return tracks.Count > 0;
+        return specs.Count > 0;
     }
 
-    private static bool TryParseFixedTrack(string token, double percentBasis, double em, out double size)
+    /// <summary>Parses one <c>&lt;track-size&gt;</c> token into a sizing function.</summary>
+    private static bool TryParseTrackSpec(string token, double em, out GridTrackSpec spec)
     {
-        size = 0;
+        spec = default;
         string t = token.Trim();
         if (t.Length == 0)
             return false;
-        // Flexible / content-based / functional track sizes are out of scope.
-        if (t.EndsWith("fr", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("auto", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("min-content", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("max-content", StringComparison.OrdinalIgnoreCase)
-            || t.IndexOf('(') >= 0)
-            return false;
-        if (t.EndsWith("%", StringComparison.Ordinal))
+
+        if (t.StartsWith("minmax(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(")"))
         {
-            if (double.TryParse(t.Substring(0, t.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double pct))
+            string inner = t.Substring(7, t.Length - 8);
+            int comma = SplitTopLevelComma(inner);
+            if (comma < 0) return false;
+            if (!TryParseGridSize(inner.Substring(0, comma).Trim(), allowFr: false, em, out GridSize min))
+                return false;
+            if (!TryParseGridSize(inner.Substring(comma + 1).Trim(), allowFr: true, em, out GridSize max))
+                return false;
+            spec = new GridTrackSpec(min, max);
+            return true;
+        }
+
+        // fit-content() and any other functional notation are out of scope.
+        if (t.IndexOf('(') >= 0)
+            return false;
+
+        if (!TryParseGridSize(t, allowFr: true, em, out GridSize size))
+            return false;
+        // A standalone <flex> implies an automatic minimum: minmax(auto, <flex>).
+        if (size.Kind == GridSizeKind.Fr)
+            spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto), size);
+        else
+            spec = new GridTrackSpec(size, size);
+        return true;
+    }
+
+    private static bool TryParseGridSize(string token, bool allowFr, double em, out GridSize size)
+    {
+        size = default;
+        string t = token.Trim().ToLowerInvariant();
+        if (t.Length == 0)
+            return false;
+        switch (t)
+        {
+            case "auto": size = new GridSize(GridSizeKind.Auto); return true;
+            case "min-content": size = new GridSize(GridSizeKind.MinContent); return true;
+            case "max-content": size = new GridSize(GridSizeKind.MaxContent); return true;
+        }
+        if (t.EndsWith("fr", StringComparison.Ordinal))
+        {
+            if (!allowFr) return false;
+            if (double.TryParse(t.Substring(0, t.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out double fr)
+                && fr >= 0)
             {
-                size = percentBasis > 0 ? percentBasis * pct / 100.0 : 0;
+                size = new GridSize(GridSizeKind.Fr, fr);
                 return true;
             }
             return false;
         }
-        double parsed = CssValueParser.ParseLength(t, percentBasis, em);
-        if (parsed < 0 || double.IsNaN(parsed) || double.IsInfinity(parsed))
+        if (t.EndsWith("%", StringComparison.Ordinal))
+        {
+            // Percentage magnitude; resolved against the axis basis at sizing time.
+            if (double.TryParse(t.Substring(0, t.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double pct)
+                && pct >= 0)
+            {
+                size = new GridSize(GridSizeKind.Percent, pct);
+                return true;
+            }
             return false;
-        size = parsed;
+        }
+        if (t.IndexOf('(') >= 0)
+            return false;
+        // A <length>. Resolve em-relative and absolute units to pixels now (the
+        // percent basis is irrelevant for a non-percentage length).
+        double px = CssValueParser.ParseLength(t, 0, em);
+        if (double.IsNaN(px) || double.IsInfinity(px) || px < 0)
+            return false;
+        size = new GridSize(GridSizeKind.Fixed, px);
         return true;
     }
+
+    private static int SplitTopLevelComma(string s)
+    {
+        int paren = 0;
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c == '(') paren++;
+            else if (c == ')') paren--;
+            else if (c == ',' && paren == 0) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Grid gap: <c>normal</c>/empty computes to 0 (unlike multicol).</summary>
+    private double ResolveGridGap(string gap, double percentBasis, double em)
+    {
+        if (string.IsNullOrEmpty(gap) || gap == "normal")
+            return 0;
+        double v = CssValueParser.ParseLength(gap, percentBasis, em);
+        return v > 0 ? v : 0;
+    }
+
+    private static GridTrackSpec ParseSingleImplicitSpec(string autoTracks, double em)
+    {
+        if (!string.IsNullOrWhiteSpace(autoTracks))
+        {
+            string first = FirstToken(autoTracks.Trim());
+            if (TryParseTrackSpec(first, em, out GridTrackSpec spec))
+                return spec;
+        }
+        // Default grid-auto-rows/columns is 'auto'.
+        return new GridTrackSpec(new GridSize(GridSizeKind.Auto), new GridSize(GridSizeKind.Auto));
+    }
+
+    private static string FirstToken(string v)
+    {
+        int i = 0, paren = 0;
+        while (i < v.Length && (paren > 0 || !char.IsWhiteSpace(v[i])))
+        {
+            if (v[i] == '(') paren++;
+            else if (v[i] == ')') paren--;
+            i++;
+        }
+        return v.Substring(0, i);
+    }
+
+    /// <summary>
+    /// True when a row's sizing function is content-based (auto/min-content/
+    /// max-content in its max), so the item's measured height feeds the track
+    /// size and must not have been invalidated by a narrowed column.
+    /// </summary>
+    private static bool RowNeedsMeasuredHeight(List<GridTrackSpec> rowSpecs, GridTrackSpec implicitRow,
+        int start, int span, bool rowDefinite)
+    {
+        for (int i = 0; i < span; i++)
+        {
+            int t = start + i;
+            GridTrackSpec s = t < rowSpecs.Count ? rowSpecs[t] : implicitRow;
+            if (s.Max.IsIntrinsic || s.Min.IsIntrinsic)
+                return true;
+            // A percentage row against an indefinite height resolves to 'auto',
+            // so it too is content-sized from the measured height.
+            if (!rowDefinite && (s.Max.Kind == GridSizeKind.Percent || s.Min.Kind == GridSizeKind.Percent))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True with the definite content-box height when 'height' is an explicit
+    /// length (not auto/empty and not a percentage — a percentage would need a
+    /// definite containing block, out of scope for this bounded pass). For
+    /// <c>box-sizing:border-box</c> the specified height includes padding+border,
+    /// so those are subtracted to yield the content box.
+    /// </summary>
+    private bool TryGetDefiniteContentHeight(double em, out double contentHeight)
+    {
+        contentHeight = 0;
+        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto
+            || Height.EndsWith("%", StringComparison.Ordinal))
+            return false;
+        double h = CssValueParser.ParseLength(Height, 0, em);
+        if (double.IsNaN(h) || double.IsInfinity(h) || h <= 0)
+            return false;
+        if (UsesBorderBoxSizing)
+            h -= ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+        if (h <= 0)
+            return false;
+        contentHeight = h;
+        return true;
+    }
+
+    // ─────────────────────────── Track sizing (§11) ───────────────────────────
+
+    /// <summary>
+    /// Bounded CSS Grid §11 track sizing: resolves each of <paramref name="count"/>
+    /// tracks to a pixel size. Fixed/percentage tracks resolve directly; intrinsic
+    /// tracks (auto/min-content/max-content) grow to their items' content
+    /// contributions; <c>fr</c> tracks split the leftover space. Returns
+    /// <c>null</c> to decline (a percentage against an indefinite basis, or a
+    /// negative/degenerate result).
+    /// </summary>
+    private double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
+        int count, double containerSize, bool definite, double gap, double percentBasis, double em,
+        List<AxisItem> items)
+    {
+        if (count < 1) return null;
+
+        var baseSize = new double[count];
+        var growth = new double[count];       // growth limit; double.PositiveInfinity when unbounded
+        var isFr = new bool[count];
+        var frFactor = new double[count];
+        var minKind = new GridSizeKind[count]; // effective (percent already resolved)
+        var maxKind = new GridSizeKind[count];
+
+        for (int t = 0; t < count; t++)
+        {
+            GridTrackSpec spec = t < explicitSpecs.Count ? explicitSpecs[t] : implicitSpec;
+            // Resolve percentages against the axis basis: a percentage against a
+            // definite basis is a fixed length; against an indefinite one it
+            // behaves as 'auto' (CSS Grid §7.2.1 / §11.5).
+            (GridSizeKind minK, double minPx) = ResolveEffective(spec.Min, percentBasis, definite);
+            (GridSizeKind maxK, double maxPx) = ResolveEffective(spec.Max, percentBasis, definite);
+            minKind[t] = minK;
+            maxKind[t] = maxK;
+
+            baseSize[t] = minK == GridSizeKind.Fixed ? Math.Max(0, minPx) : 0;
+
+            if (maxK == GridSizeKind.Fr)
+            {
+                isFr[t] = true;
+                frFactor[t] = maxPx; // ResolveEffective returns the flex factor here
+                growth[t] = double.PositiveInfinity;
+            }
+            else if (maxK == GridSizeKind.Fixed)
+            {
+                growth[t] = Math.Max(baseSize[t], Math.Max(0, maxPx));
+            }
+            else
+            {
+                growth[t] = double.PositiveInfinity; // auto / min-content / max-content
+            }
+        }
+
+        // Resolve intrinsic track sizes from single-span item contributions.
+        double[] contentBase = new double[count]; // desired base (min-content)
+        double[] contentGrow = new double[count]; // desired growth (max-content)
+        foreach (var it in items)
+        {
+            if (it.Span != 1) continue;
+            int t = it.Start;
+            if (t < 0 || t >= count) continue;
+            if (minKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            {
+                double c = minKind[t] == GridSizeKind.MaxContent ? it.MaxContent : it.MinContent;
+                contentBase[t] = Math.Max(contentBase[t], c);
+            }
+            if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            {
+                double c = maxKind[t] == GridSizeKind.MinContent ? it.MinContent : it.MaxContent;
+                contentGrow[t] = Math.Max(contentGrow[t], c);
+            }
+        }
+
+        // Spanning items: distribute any content deficit across the intrinsic
+        // tracks they cover (equal share — a bounded approximation of §11.5.1).
+        foreach (var it in items)
+        {
+            if (it.Span <= 1) continue;
+            DistributeSpanContribution(it, minKind, contentBase, count, gap, useMax: false, it.MinContent);
+            DistributeSpanContribution(it, maxKind, contentGrow, count, gap, useMax: true, it.MaxContent);
+        }
+
+        for (int t = 0; t < count; t++)
+        {
+            if (minKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+                baseSize[t] = Math.Max(baseSize[t], contentBase[t]);
+            if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            {
+                double g = Math.Max(baseSize[t], contentGrow[t]);
+                growth[t] = double.IsPositiveInfinity(growth[t]) ? g : Math.Max(growth[t], g);
+                // An intrinsic-max track grows to its max-content contribution.
+                baseSize[t] = Math.Max(baseSize[t], g);
+            }
+            if (growth[t] < baseSize[t]) growth[t] = baseSize[t];
+        }
+
+        var sizes = new double[count];
+        Array.Copy(baseSize, sizes, count);
+
+        // Distribute leftover space to flexible (fr) tracks.
+        double sumFr = 0;
+        for (int t = 0; t < count; t++) if (isFr[t]) sumFr += frFactor[t];
+        if (sumFr > 0 && definite && containerSize > 0)
+        {
+            double nonFr = 0;
+            for (int t = 0; t < count; t++) if (!isFr[t]) nonFr += sizes[t];
+            double totalGap = (count - 1) * gap;
+            double free = containerSize - nonFr - totalGap;
+            if (free < 0) free = 0;
+            double frUnit = free / sumFr;
+            for (int t = 0; t < count; t++)
+                if (isFr[t]) sizes[t] = Math.Max(sizes[t], frFactor[t] * frUnit);
+        }
+
+        for (int t = 0; t < count; t++)
+        {
+            if (double.IsNaN(sizes[t]) || double.IsInfinity(sizes[t]) || sizes[t] < 0)
+                return null;
+        }
+        return sizes;
+    }
+
+    private static void DistributeSpanContribution(AxisItem it, GridSizeKind[] kinds, double[] target,
+        int count, double gap, bool useMax, double contribution)
+    {
+        var intrinsic = new List<int>();
+        double covered = 0;
+        for (int i = 0; i < it.Span; i++)
+        {
+            int t = it.Start + i;
+            if (t < 0 || t >= count) continue;
+            covered += target[t];
+            if (kinds[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+                intrinsic.Add(t);
+        }
+        if (intrinsic.Count == 0) return;
+        double gapsInSpan = (it.Span - 1) * gap;
+        double need = contribution - covered - gapsInSpan;
+        if (need <= 0) return;
+        double share = need / intrinsic.Count;
+        foreach (int t in intrinsic)
+            target[t] += share;
+    }
+
+    /// <summary>
+    /// Resolves a sizing function to its effective kind + pixel value for one axis.
+    /// A percentage becomes a fixed length against a definite basis, or <c>auto</c>
+    /// against an indefinite one. Fixed lengths pass through; <c>fr</c> returns its
+    /// flex factor as the value; intrinsic kinds return 0.
+    /// </summary>
+    private static (GridSizeKind kind, double value) ResolveEffective(GridSize size, double basis, bool definite)
+    {
+        switch (size.Kind)
+        {
+            case GridSizeKind.Fixed:
+                return (GridSizeKind.Fixed, size.Value);
+            case GridSizeKind.Percent:
+                return definite && basis > 0
+                    ? (GridSizeKind.Fixed, basis * size.Value / 100.0)
+                    : (GridSizeKind.Auto, 0);
+            case GridSizeKind.Fr:
+                return (GridSizeKind.Fr, size.Value);
+            default:
+                return (size.Kind, 0);
+        }
+    }
+
+    /// <summary>
+    /// Builds cumulative track-edge arrays for the given <paramref name="sizes"/>,
+    /// inserting <paramref name="gap"/> between tracks.
+    /// </summary>
+    private static double[] BuildTrackEdges(double[] sizes, double gap, out double[] endEdge)
+    {
+        int count = Math.Max(sizes.Length, 1);
+        var startEdge = new double[count];
+        endEdge = new double[count];
+        double cursor = 0;
+        for (int i = 0; i < count; i++)
+        {
+            double size = i < sizes.Length ? sizes[i] : 0;
+            startEdge[i] = cursor;
+            endEdge[i] = cursor + size;
+            cursor += size + gap;
+        }
+        return startEdge;
+    }
+
+    // ─────────────────────────── Grid line parsing ───────────────────────────
 
     /// <summary>
     /// Parses a <c>grid-row</c>/<c>grid-column</c> value into a 0-indexed start
@@ -551,46 +1001,5 @@ internal partial class CssBox
         if (int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line) && line >= 1)
             return (line - 1, 1); // 1-based line -> 0-based track index
         return (null, 1);         // named line / negative -> auto
-    }
-
-    /// <summary>Grid gap: <c>normal</c>/empty computes to 0 (unlike multicol).</summary>
-    private double ResolveGridGap(string gap, double percentBasis, double em)
-    {
-        if (string.IsNullOrEmpty(gap) || gap == "normal")
-            return 0;
-        double v = CssValueParser.ParseLength(gap, percentBasis, em);
-        return v > 0 ? v : 0;
-    }
-
-    private static double ResolveImplicitTrackSize(string autoTracks, double percentBasis, double em)
-    {
-        if (string.IsNullOrWhiteSpace(autoTracks))
-            return 0;
-        // grid-auto-rows/columns may list several sizes; the first fixed one is a
-        // good-enough approximation for the bounded engine (auto/content -> 0).
-        string first = autoTracks.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)[0];
-        return TryParseFixedTrack(first, percentBasis, em, out double size) ? size : 0;
-    }
-
-    /// <summary>
-    /// Builds cumulative track-edge arrays for <paramref name="count"/> tracks,
-    /// using the explicit <paramref name="tracks"/> then <paramref name="implicitSize"/>
-    /// for any tracks beyond them, inserting <paramref name="gap"/> between tracks.
-    /// </summary>
-    private static double[] BuildTrackEdges(List<double> tracks, int count, double implicitSize, double gap,
-        out double[] endEdge)
-    {
-        if (count < tracks.Count) count = tracks.Count;
-        var startEdge = new double[Math.Max(count, 1)];
-        endEdge = new double[Math.Max(count, 1)];
-        double cursor = 0;
-        for (int i = 0; i < count; i++)
-        {
-            double size = i < tracks.Count ? tracks[i] : implicitSize;
-            startEdge[i] = cursor;
-            endEdge[i] = cursor + size;
-            cursor += size + gap;
-        }
-        return startEdge;
     }
 }

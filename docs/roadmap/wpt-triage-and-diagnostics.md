@@ -43,6 +43,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 25 | Shared `anchor-name` not scoped — every element bound to one global (last-wins) anchor instead of the one in its own scope (#1175) | ✅ fixed | Broiler.HtmlBridge.Dom |
 | 26 | Definite-track grid items over-painted at stale inline-block size + grid collapsed to occupied rows; Chromium references rendered blank because the generator only served `/fonts/` (#1209) | ✅ fixed | Broiler.Layout + scripts/generate-wpt-references.js |
 | 27 | #1209's reference generator over-corrected: serving **every** root-relative resource pulled in the real `/resources/testharness.js` + `check-layout-th.js`, so ~206 harness-driven `css-grid` tests regressed to `MissingContent` (Chromium painted a results table Broiler's harness stubs never render) (#1212) | ✅ fixed | scripts/generate-wpt-references.js |
+| 28 | Grid pass only did fixed tracks; `fr`/`auto`/`min-content`/`max-content`/`minmax()` declined to the single-column approximation, and subgrid needs real parent track sizing first (#1212) | 🟡 partial | Broiler.Layout/CssBoxGrid |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -641,6 +642,38 @@ while `grid.css`/fonts/images keep resolving (cluster 26's win is preserved). Ve
 synthetic harness test screenshots a 2-row results table under the old resolver and **blank** under the
 fixed one, and Broiler's own render of the same page is blank (0 non-white pixels). `CACHE_EPOCH`
 bumped to `5` so CI regenerates references.
+
+Cluster 28 (issue [#1212](https://github.com/Broiler-Platform/Broiler/issues/1212), the `css-grid`
+subgrid/track-sizing tail) is the first step toward subgrid: **real §11 track sizing**. #1206's pass only
+handled fixed `<length>`/`<percentage>`/`repeat(int)` tracks and declined everything else to the
+single-column approximation; but the subgrid tests' parents are overwhelmingly `auto`/content/`fr`
+grids, so subgrid cannot even be attempted until those size correctly. `CssBoxGrid` now carries a
+track-sizing-function model (`GridSize`/`GridTrackSpec`: `min-content`/`max-content`/`auto`/`fr`/
+`minmax()` in addition to lengths, percentages, and `repeat(<int>, …)`) and a bounded §11 pass:
+
+- **Column (inline) sizing is layout-independent and exact.** Content contributions come from
+  `GetMinMaxWidth`; a *percentage* item width is neutralised to its content size
+  (`GetContentMinMaxWidth`, which suppresses the item's own explicit width via a new
+  `GetMinMaxSumWords(..., suppressExplicitWidthFor)` flag) because a percentage resolves against the
+  track being sized and must be treated as `auto` for intrinsic sizing — otherwise a `width:100%` item
+  inflates a `1fr` track's automatic minimum to the full container.
+- **`fr` distribution** splits the leftover (container − fixed/content bases − gaps) by flex factor;
+  `minmax(fixed, 1fr)` grows from its floor.
+- **Row (block) sizing** uses each item's measured height, but *declines the whole pass* when a
+  narrowed column would have reflowed that height (comparing the resolved column width against the
+  item's max-content), so it never sizes a row from a stale measurement. `fr`/percentage rows engage
+  only against a definite `height`.
+
+Engagement is still gated to grids with an explicit track list on **both** axes, and it declines
+`subgrid`, `fit-content()`, `repeat(auto-fill/auto-fit, …)`, and named-line sizing — so the change
+stays confined to grids the pass can size correctly and cannot touch the single-column grids the
+approximation already handles. Verified by `GridTrackLayoutTests` (fr split, fixed+fr, `repeat`+gap+fr,
+`minmax`, content-sized `auto`, fr rows — all against embedded `data-expected` geometry) with the fixed
+`GridTrackLayoutTests`/`GridTrackPaintTests` staying green, and by confirming the `css-align` and
+`css-anchor-position` local subsets have an **identical failing set** before/after (no regressions;
+`position-try-grid-001` improves 87.7 % → 97.1 %). Still deferred, and the actual gate for the subgrid
+cluster: **subgrid track adoption** (a subgrid item inheriting its parent's spanned tracks), `fit-content()`,
+`repeat(auto-fill/auto-fit)`, and named lines.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
