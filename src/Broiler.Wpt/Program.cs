@@ -677,7 +677,7 @@ public class Program
         int shardCount = 1,
         int shardIndex = WptTestRunner.AllShards,
         IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null,
-        IReadOnlyList<(string Signature, int Count)>? exceptionSignatures = null)
+        IReadOnlyList<ExceptionBucket>? exceptionSignatures = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -760,6 +760,13 @@ public class Program
                     {
                         ["signature"] = s.Signature,
                         ["count"] = s.Count,
+                        // Example test paths that hit this signature, relativised like
+                        // lowestMatchTests, so the biggest-problems issue can point
+                        // straight at a reproduction (aggregated across shards by
+                        // scripts/merge-wpt-shards.py).
+                        ["examples"] = s.Examples
+                            .Select(p => Path.GetRelativePath(wptPath, p).Replace('\\', '/'))
+                            .ToList(),
                     })
                     .ToList(),
                 // First-class manual / tentative / crashtest buckets with their
@@ -823,7 +830,7 @@ public class Program
         string wptPath,
         string? subset,
         IReadOnlyList<(string Declaration, int Count)>? droppedDeclarations = null,
-        IReadOnlyList<(string Signature, int Count)>? exceptionSignatures = null)
+        IReadOnlyList<ExceptionBucket>? exceptionSignatures = null)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
@@ -951,7 +958,7 @@ public class Program
     }
 
     private static void PrintExceptionSignatures(
-        IReadOnlyList<(string Signature, int Count)> signatures)
+        IReadOnlyList<ExceptionBucket> signatures)
     {
         if (signatures.Count == 0)
             return;
@@ -959,12 +966,12 @@ public class Program
         Console.WriteLine();
         Console.WriteLine($"=== Exception signatures (top {signatures.Count}) ===");
         Console.WriteLine("(exception failures grouped by top frame + message — one signature often gates many tests)");
-        foreach (var (signature, count) in signatures)
-            Console.WriteLine($"  {count,6}  {signature}");
+        foreach (var bucket in signatures)
+            Console.WriteLine($"  {bucket.Count,6}  {bucket.Signature}");
     }
 
     private static void WriteExceptionSignaturesSection(
-        TextWriter writer, IReadOnlyList<(string Signature, int Count)>? signatures)
+        TextWriter writer, IReadOnlyList<ExceptionBucket>? signatures)
     {
         if (signatures is null || signatures.Count == 0)
             return;
@@ -975,8 +982,8 @@ public class Program
         writer.WriteLine("Exception failures grouped by top non-framework frame and message. A high");
         writer.WriteLine("count usually means one crash gates many tests (one signature → one fix).");
         writer.WriteLine();
-        foreach (var (signature, count) in signatures)
-            writer.WriteLine($"- `{signature}` — {count} failure(s)");
+        foreach (var bucket in signatures)
+            writer.WriteLine($"- `{bucket.Signature}` — {bucket.Count} failure(s)");
     }
 
     private static void PrintLayoutAssertionFailures(WptTestResult result, string indent)

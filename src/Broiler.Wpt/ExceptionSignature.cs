@@ -17,6 +17,11 @@ internal static class ExceptionSignature
 {
     private const int MaxMessageLength = 100;
 
+    // At most this many example test paths are kept per signature — enough to
+    // point a maintainer at a concrete reproduction without listing every gated
+    // test (one signature → one fix).
+    private const int MaxExamplesPerSignature = 3;
+
     // Stage prefixes the runner prepends to ex.Message at its catch sites. Stripped
     // so the signature keys on the underlying error rather than the pipeline stage
     // (which the failure category already records).
@@ -46,15 +51,16 @@ internal static class ExceptionSignature
     }
 
     /// <summary>
-    /// Groups exception-bearing failures by signature, most frequent first.
-    /// Only failures that carry a stack trace are bucketed (pixel mismatches and
-    /// other non-exception failures are excluded); timeouts are excluded too because
-    /// their synthetic trace is reported in the dedicated timeout section.
+    /// Groups exception-bearing failures by signature, most frequent first, each
+    /// carrying a few example test paths that hit it. Only failures that carry a
+    /// stack trace are bucketed (pixel mismatches and other non-exception failures
+    /// are excluded); timeouts are excluded too because their synthetic trace is
+    /// reported in the dedicated timeout section.
     /// </summary>
-    public static IReadOnlyList<(string Signature, int Count)> Buckets(
+    public static IReadOnlyList<ExceptionBucket> Buckets(
         IEnumerable<WptTestResult> failures, int limit)
     {
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var buckets = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
         foreach (var result in failures)
         {
             if (result.StackTrace is null || result.Category == FailureCategory.Timeout)
@@ -62,15 +68,33 @@ internal static class ExceptionSignature
             var signature = TryCompute(result.Message, result.StackTrace);
             if (signature is null)
                 continue;
-            counts[signature] = counts.GetValueOrDefault(signature) + 1;
+            if (!buckets.TryGetValue(signature, out var accumulator))
+            {
+                accumulator = new Accumulator();
+                buckets[signature] = accumulator;
+            }
+            accumulator.Count++;
+            // Keep the first few distinct paths so the report can name which test
+            // to --render to hit this crash.
+            if (accumulator.Examples.Count < MaxExamplesPerSignature &&
+                !accumulator.Examples.Contains(result.TestPath))
+            {
+                accumulator.Examples.Add(result.TestPath);
+            }
         }
 
-        return counts
-            .OrderByDescending(kv => kv.Value)
+        return buckets
+            .OrderByDescending(kv => kv.Value.Count)
             .ThenBy(kv => kv.Key, StringComparer.Ordinal)
             .Take(limit)
-            .Select(kv => (kv.Key, kv.Value))
+            .Select(kv => new ExceptionBucket(kv.Key, kv.Value.Count, kv.Value.Examples))
             .ToList();
+    }
+
+    private sealed class Accumulator
+    {
+        public int Count;
+        public List<string> Examples { get; } = new();
     }
 
     private static string? NormalizeMessage(string? message)
@@ -192,3 +216,10 @@ internal static class ExceptionSignature
         return builder.ToString();
     }
 }
+
+/// <summary>
+/// One exception-signature group: the <paramref name="Signature"/>, how many
+/// failures share it (<paramref name="Count"/>), and a few example test paths that
+/// hit it (<paramref name="Examples"/>) so a report can point at a reproduction.
+/// </summary>
+public sealed record ExceptionBucket(string Signature, int Count, IReadOnlyList<string> Examples);
