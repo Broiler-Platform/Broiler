@@ -78,6 +78,17 @@ internal static class FragmentTreeBuilder
             svgContent = SerializeSvgSubtree(box);
         }
 
+        // Nested browsing contexts: <object type="text/html">, <iframe>, and
+        // <frame> render a separate document into their content box.  Load the
+        // referenced document's HTML here; the image renderer rasterises it at
+        // the element's used size and composites it over the box.
+        string embeddedHtml = null;
+        string embeddedBaseUrl = null;
+        if (svgContent == null && imgHandle == null && box.HtmlTag != null)
+        {
+            (embeddedHtml, embeddedBaseUrl) = TryLoadEmbeddedDocument(box);
+        }
+
         // Capture per-line-box rectangles for inline elements (used for backgrounds/borders)
         List<RectangleF>? inlineRects = null;
         if (box.Rectangles.Count > 0)
@@ -122,6 +133,8 @@ internal static class FragmentTreeBuilder
             ImageHandle = imgHandle,
             ImageSourceRect = imgSourceRect,
             SvgContent = svgContent,
+            EmbeddedDocumentHtml = embeddedHtml,
+            EmbeddedDocumentBaseUrl = embeddedBaseUrl,
             InlineRects = inlineRects,
         };
     }
@@ -339,6 +352,91 @@ internal static class FragmentTreeBuilder
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Attempts to load the document of a nested browsing context —
+    /// <c>&lt;object type="text/html"&gt;</c>, <c>&lt;iframe&gt;</c>, or
+    /// <c>&lt;frame&gt;</c> — from its <c>data</c>/<c>src</c> attribute.
+    /// Returns the document HTML and its resolved base URL, or
+    /// <c>(null, null)</c> when the element is not an embedded HTML document
+    /// or the source cannot be read.
+    /// </summary>
+    private static (string Html, string BaseUrl) TryLoadEmbeddedDocument(CssBox box)
+    {
+        string tagName = box.HtmlTag.Name;
+        string url;
+        if (tagName.Equals("object", StringComparison.OrdinalIgnoreCase))
+        {
+            url = box.GetAttribute("data");
+            if (string.IsNullOrEmpty(url))
+                return (null, null);
+
+            // Only text/html objects are nested documents.  Image/SVG data is
+            // handled elsewhere; honour an explicit type, else fall back to the
+            // data URL's extension.
+            string type = box.GetAttribute("type");
+            bool isHtml = !string.IsNullOrEmpty(type)
+                ? type.Trim().StartsWith("text/html", StringComparison.OrdinalIgnoreCase)
+                  || type.Trim().StartsWith("application/xhtml", StringComparison.OrdinalIgnoreCase)
+                : HasHtmlExtension(url);
+            if (!isHtml)
+                return (null, null);
+        }
+        else if (tagName.Equals("iframe", StringComparison.OrdinalIgnoreCase)
+                 || tagName.Equals("frame", StringComparison.OrdinalIgnoreCase))
+        {
+            url = box.GetAttribute("src");
+            if (string.IsNullOrEmpty(url))
+                return (null, null);
+        }
+        else
+        {
+            return (null, null);
+        }
+
+        // data:text/html,<markup>
+        if (url.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase))
+        {
+            int comma = url.IndexOf(',');
+            if (comma >= 0 && comma + 1 < url.Length)
+                return (Uri.UnescapeDataString(url[(comma + 1)..]), box.BaseUrl?.AbsoluteUri);
+            return (null, null);
+        }
+
+        if (box.BaseUrl == null)
+            return (null, null);
+
+        try
+        {
+            string basePath = box.BaseUrl.IsAbsoluteUri && box.BaseUrl.IsFile
+                ? box.BaseUrl.LocalPath
+                : box.BaseUrl.OriginalString;
+            string dir = Path.GetDirectoryName(basePath);
+            if (string.IsNullOrEmpty(dir))
+                return (null, null);
+
+            string docPath = Path.GetFullPath(Path.Combine(dir, url));
+            if (!File.Exists(docPath))
+                return (null, null);
+
+            return (File.ReadAllText(docPath), new Uri(docPath).AbsoluteUri);
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    private static bool HasHtmlExtension(string url)
+    {
+        // Strip any query/fragment before checking the extension.
+        int cut = url.IndexOfAny(['?', '#']);
+        string path = cut >= 0 ? url[..cut] : url;
+        return path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".htm", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".xht", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

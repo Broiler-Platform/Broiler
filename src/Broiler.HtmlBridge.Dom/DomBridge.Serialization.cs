@@ -813,10 +813,16 @@ public sealed partial class DomBridge
             _ => HtmlSerializationNodeKind.Element
         },
         GetName: static element => element.TagName,
-        GetChildren: element => TrySerializeCurrentSrcDoc(element) is null
-            ? element.Children
-            : element.Children.Where(static child =>
-                !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
+        // Never serialise a materialised nested-browsing-context (#subdoc-root) into
+        // its container.  A sub-document is fetched and attached to its <iframe>/
+        // <object>/<frame> so scripts can reach contentDocument and onload can fire,
+        // but it is a *separate* document — emitting it inline leaks its <style> into
+        // the parent's cascade (WPT css/CSS2/box-display/root-canvas-001, where the
+        // embedded p{background:green;height:100%} painted the whole parent green).
+        // The renderer rasterises each embedded document in isolation instead
+        // (srcdoc content is round-tripped via the srcdoc attribute).
+        GetChildren: static element => element.Children.Where(static child =>
+            !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
             element.Style.OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
