@@ -1141,6 +1141,51 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void DomBridge_Backdrop_Honors_Author_Geometry_And_PositionTry_Fallback()
+    {
+        // Regression (css-anchor-position position-try-backdrop): a modal
+        // dialog's ::backdrop with an explicit size and an overflowing inset
+        // must not be materialised as a viewport-covering box. Author geometry
+        // is honoured (100x100) and position-try-fallbacks moves the
+        // overflowing backdrop into view (left:9999px -> left:300px), instead
+        // of painting the whole viewport seagreen (which scored 0.5% on CI).
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @position-try --pt { left: 300px; }
+  dialog::backdrop {
+    background: seagreen;
+    width: 100px;
+    height: 100px;
+    left: 9999px;
+    position-try-fallbacks: --pt;
+  }
+</style>
+</head>
+<body>
+  <dialog id="dialog">Dialog</dialog>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        context.Eval("document.getElementById('dialog').showModal();");
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        // position-try moved the overflowing backdrop from 9999px to 300px.
+        Assert.Contains("left: 300px", result);
+        // The backdrop honours its author 100x100 size and is NOT a
+        // full-viewport box (default viewport height is 768px).
+        Assert.DoesNotContain("768px", result);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
     {
         const string html = """
