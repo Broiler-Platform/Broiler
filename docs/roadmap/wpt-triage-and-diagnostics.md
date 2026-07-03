@@ -1313,6 +1313,41 @@ to that ref — so Broiler is correct and the committed PNG is the outlier.
 > ring/centre the ref HTML produces). These stay red until the committed references are
 > regenerated; they are **not** Broiler rendering bugs.
 
+### ✅ #15 — Second "biggest problems" issue, ranked by blast radius (DONE)
+
+The CI runner already files one issue ranking failure groups by **frequency**
+(`--issue-md`). That view buries the *most severe* items — a crashed shard or a
+near-blank render reads the same as any other line. So every failing run now also
+files a **second, severity-focused issue** listing the run's few biggest problems.
+
+- **What's "big"** (`_rank_biggest_problems` in `scripts/merge-wpt-shards.py`), three
+  severity tiers ranked by blast radius:
+  - **tier 0 — incomplete shards** (collapsed into one entry): a shard that never
+    finished leaves a whole slice unmeasured, so its pass/fail is unknown. Sourced
+    from the per-shard `*-status.json` non-zero exits, same signal as the existing
+    `ShardProcessError` group.
+  - **tier 1 — crashes**, one entry per `triage.exceptionSignatures` signature,
+    ordered by the number of tests it gated (one throw → many failures → one fix).
+  - **tier 2 — low percent matches**, one entry per `triage.lowestMatchTests` case
+    below `--low-match-threshold` (default 50%): the render is substantially wrong,
+    not a near-miss. The 99% pass threshold means anything this low is a gross error.
+- **Selection is diversity-first**: the worst entry of each distinct kind is taken
+  before a second slot is spent on a kind already shown, then leftover slots fill by
+  next-worst overall. So the top-3 spans *incomplete shard + crash + low match* when
+  all three exist, rather than three crashes crowding out a near-blank render, while
+  the list stays ordered by severity.
+- **Output**: merged `biggestProblems` (`{kind, tier, severity, impact, title, detail}`)
+  + `--biggest-issue-md` renders the second issue body; the CLI emits
+  `create_biggest_issue` / `biggest_problem_count` step outputs. `wpt-tests.yml`'s
+  report job creates the issue only when there is at least one big problem (a run whose
+  only failures are near-miss mismatches files the primary issue but not this one). The
+  count is bounded by `--biggest-problem-limit` (workflow input `biggest_problems_limit`,
+  default 3).
+- **Tests** (`test_merge_wpt_shards.py`): `test_ranks_biggest_problems_by_blast_radius`,
+  `test_biggest_problems_are_diversity_first`, `test_biggest_problem_limit_bounds_the_list`,
+  `test_cli_emits_biggest_issue_outputs`, `test_no_biggest_issue_when_only_near_miss_mismatches`,
+  `test_cli_rejects_out_of_range_low_match_threshold`.
+
 ---
 
 ## 3. Performance & permanence of the diagnostics hook

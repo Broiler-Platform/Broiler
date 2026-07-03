@@ -11,7 +11,10 @@ name: WPT Tests
 #
 # The manually dispatched workflow can target the full suite, a subset, a
 # single shard, or only the previously-failed tests. Every run merges the shard
-# results and files a focused GitHub issue when failures exist.
+# results and, when failures exist, files two GitHub issues: one ranking the
+# most common failure groups (by frequency) and a second, severity-focused issue
+# listing the run's few biggest problems (crashes, low-percent matches, and
+# incomplete shards, ranked by blast radius).
 #
 # Reference generation (Chromium via Playwright) is expensive, so each shard
 # caches its reference slice. Bump CACHE_EPOCH to refresh WPT master + refs.
@@ -44,6 +47,10 @@ on:
         description: Maximum number of common failure groups to include in the GitHub issue.
         required: false
         default: '10'
+      biggest_problems_limit:
+        description: Maximum number of biggest problems to include in the second (severity-focused) GitHub issue.
+        required: false
+        default: '3'
 
 permissions:
   contents: write   # persist-failed commits the failing-test manifest
@@ -58,6 +65,7 @@ env:
   RESULTS_DIR: tests/wpt-results
   FAILED_TESTS_FILE: tests/wpt-baseline/failed-tests.json
   MOST_COMMON_PROBLEMS_LIMIT: ${{ github.event.inputs.most_common_problems_limit || '10' }}
+  BIGGEST_PROBLEMS_LIMIT: ${{ github.event.inputs.biggest_problems_limit || '3' }}
 
 jobs:
   # ── Resolve the shard matrix and whether to run incrementally ────────────
@@ -254,7 +262,9 @@ jobs:
             --shard-dir shard-results \
             --merged-json wpt-merged/wpt-results.json \
             --issue-md wpt-merged/issue.md \
+            --biggest-issue-md wpt-merged/biggest-issue.md \
             --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
+            --biggest-problem-limit "$BIGGEST_PROBLEMS_LIMIT" \
             --github-output "$GITHUB_OUTPUT"
 
       - name: Publish merged summary
@@ -295,6 +305,28 @@ jobs:
               body,
             });
             core.info(`Created issue #${issue.data.number}: ${issue.data.html_url}`);
+
+      - name: Create GitHub issue for the biggest problems
+        if: steps.merge.outputs.create_biggest_issue == 'true'
+        uses: actions/github-script@v7
+        env:
+          BIGGEST_PROBLEM_COUNT: ${{ steps.merge.outputs.biggest_problem_count }}
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/biggest-issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const count = Number(process.env.BIGGEST_PROBLEM_COUNT || 0);
+            const title = `WPT run: top ${count} biggest problem(s) (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created biggest-problems issue #${issue.data.number}: ${issue.data.html_url}`);
 
   # ── Persist the failing-test manifest for incremental reruns ─────────────
   persist-failed:

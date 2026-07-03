@@ -11,6 +11,11 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
   manifest that drives incremental reruns.
 * ``--issue-md``     — a Markdown body summarising totals and a bounded list
   of the most common failure groups, suitable for posting as a GitHub issue.
+* ``--biggest-issue-md`` — a Markdown body for a *second*, severity-focused
+  issue that lists only the run's few biggest problems, ranked by blast radius:
+  incomplete shards first (a whole slice went unmeasured), then crashes (one bug
+  gating many tests), then the worst pixel mismatches. This is the "what hurt
+  most this run" companion to the frequency-ranked ``--issue-md`` view.
 
 When ``--merge-into`` names an existing manifest, the run's failures are folded
 into it *by scope* instead of replacing it: entries for tests this run actually
@@ -21,8 +26,9 @@ without shrinking it, so persistence is safe on every run, not just a full-suite
 one.
 
 When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
-writes ``failed_count``, ``total_count``, ``incomplete_shard_count`` and
-``create_issue`` step outputs.
+writes ``failed_count``, ``total_count``, ``incomplete_shard_count``,
+``create_issue``, ``biggest_problem_count`` and ``create_biggest_issue`` step
+outputs. The last two drive the second (biggest-problems) issue.
 """
 
 from __future__ import annotations
@@ -36,6 +42,15 @@ from pathlib import Path
 
 DEFAULT_PROBLEM_LIMIT = 10
 PROBLEM_EXAMPLE_LIMIT = 3
+
+# The second, severity-focused issue reports at most this many of the run's
+# biggest problems.
+DEFAULT_BIGGEST_PROBLEM_LIMIT = 3
+# A pixel mismatch counts as a "low percent match" big problem only when the
+# rendered output matches the reference by less than this percentage — i.e. the
+# render is substantially wrong, not merely off by a hair (the pass threshold is
+# 99%). Runs where every mismatch is a near-miss surface no low-match problem.
+DEFAULT_LOW_MATCH_THRESHOLD = 50.0
 
 
 def _bucket_directory(relative_path: str) -> str:
@@ -97,7 +112,132 @@ def _problem_identity(result: dict) -> tuple[str, str, str | None]:
     return category, category, None
 
 
-def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
+def _rank_biggest_problems(
+    incomplete_shards: list[dict],
+    exception_signatures: Counter[str],
+    low_match_tests: list[dict],
+    limit: int,
+    low_match_threshold: float,
+) -> list[dict]:
+    """Rank the run's few most severe problems, worst first.
+
+    Unlike ``topProblems`` (which ranks by *frequency*), this ranks by *blast
+    radius* across three severity tiers:
+
+    * tier 0 — **incomplete shards** (collapsed into one entry). A shard that
+      never finished leaves a whole slice of the suite unmeasured, so its
+      pass/fail is unknown — the most important thing to flag, even if only one
+      shard is affected.
+    * tier 1 — **crashes**, one entry per exception signature, ordered by the
+      number of tests that signature gated. A single engine throw commonly fails
+      many tests at once (one signature → one fix).
+    * tier 2 — **low percent matches**, one entry per test whose render matched
+      the reference by less than ``low_match_threshold`` percent, worst match
+      first.
+
+    Selection is diversity-first: the single worst entry of each distinct kind is
+    taken before any slot is spent on a second entry of a kind already shown, then
+    remaining slots (if ``limit`` exceeds the number of kinds present) are filled
+    by the next-worst overall. This keeps a short list representative — a lone but
+    severe low match still surfaces even when crashes would otherwise fill every
+    slot — while the returned list stays ordered by blast radius. A healthy-ish
+    run with no incomplete shards naturally surfaces its worst crashes and
+    mismatches instead.
+    """
+    problems: list[dict] = []
+
+    if incomplete_shards:
+        shards = sorted(incomplete_shards, key=lambda status: status["shardIndex"])
+        listing = ", ".join(
+            f"shard {status['shardIndex']} (exit {status['exitCode']})" for status in shards
+        )
+        problems.append(
+            {
+                "kind": "IncompleteShards",
+                "tier": 0,
+                "severity": len(shards),
+                "impact": len(shards),
+                "title": f"{len(shards)} shard(s) did not complete",
+                "detail": (
+                    "A whole shard's tests are unaccounted for — the pass/fail of that "
+                    f"slice is unknown. {listing}."
+                ),
+            }
+        )
+
+    for signature, count in exception_signatures.most_common():
+        problems.append(
+            {
+                "kind": "Crash",
+                "tier": 1,
+                "severity": count,
+                "impact": count,
+                "title": f"Crash gating {count} test(s)",
+                "detail": signature,
+            }
+        )
+
+    # A test can appear once per shard at most, but dedupe defensively and keep
+    # the lowest match seen for each path.
+    lowest_by_path: dict[str, dict] = {}
+    for test in low_match_tests:
+        if test["matchPercent"] >= low_match_threshold:
+            continue
+        existing = lowest_by_path.get(test["relativeTestPath"])
+        if existing is None or test["matchPercent"] < existing["matchPercent"]:
+            lowest_by_path[test["relativeTestPath"]] = test
+    for test in lowest_by_path.values():
+        label = test["category"]
+        if test["subCategory"]:
+            label = f"{label} / {test['subCategory']}"
+        problems.append(
+            {
+                "kind": "LowMatch",
+                "tier": 2,
+                "severity": 100.0 - test["matchPercent"],
+                "impact": 1,
+                "matchPercent": test["matchPercent"],
+                "title": f"{test['matchPercent']:.1f}% match — {test['relativeTestPath']}",
+                "detail": (
+                    f"Rendered output matches the reference by only "
+                    f"{test['matchPercent']:.1f}% ({label})."
+                ),
+            }
+        )
+
+    # Lower tier first; within a tier the larger blast radius first; then a stable
+    # alphabetical tie-break on the title.
+    ordered = sorted(
+        problems, key=lambda problem: (problem["tier"], -problem["severity"], problem["title"])
+    )
+
+    # Diversity-first selection over the severity-ordered list: pass 1 takes the
+    # worst entry of each not-yet-seen kind; pass 2 fills any leftover slots with
+    # the next-worst overall. `ordered` is already globally sorted, so slicing the
+    # chosen indices back out in index order keeps the result severity-ranked.
+    selected_indices: list[int] = []
+    seen_kinds: set[str] = set()
+    for index, problem in enumerate(ordered):
+        if len(selected_indices) >= limit:
+            break
+        if problem["kind"] not in seen_kinds:
+            seen_kinds.add(problem["kind"])
+            selected_indices.append(index)
+    for index in range(len(ordered)):
+        if len(selected_indices) >= limit:
+            break
+        if index not in selected_indices:
+            selected_indices.append(index)
+
+    return [ordered[index] for index in sorted(selected_indices)]
+
+
+def merge(
+    shard_dir: Path,
+    problem_limit: int = DEFAULT_PROBLEM_LIMIT,
+    biggest_problem_limit: int = DEFAULT_BIGGEST_PROBLEM_LIMIT,
+    low_match_threshold: float = DEFAULT_LOW_MATCH_THRESHOLD,
+) -> dict:
     passed = failed = skipped = total = 0
     shard_count = 0
     failures: list[dict] = []
@@ -106,6 +246,7 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
     category_counter: Counter[str] = Counter()
     dropped_declaration_counter: Counter[str] = Counter()
     exception_signature_counter: Counter[str] = Counter()
+    low_match_tests: list[dict] = []
     problem_groups: dict[str, dict] = {}
     family_groups: dict[str, dict] = {}
     reported_shard_indexes: set[int] = set()
@@ -145,6 +286,26 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
                 signature = entry.get("signature")
                 if signature:
                     exception_signature_counter[str(signature)] += int(entry.get("count", 0) or 0)
+
+            # The worst-matching pixel comparisons this shard saw (already the N
+            # lowest by matchPercent). Feeds the "low percent match" biggest-problem
+            # entries — a near-0% match means the render is substantially wrong.
+            for entry in triage.get("lowestMatchTests", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                match_percent = entry.get("matchPercent")
+                relative_path = entry.get("testPath") or entry.get("relativeTestPath")
+                if relative_path is None or not isinstance(match_percent, (int, float)):
+                    continue
+                sub_category = entry.get("subCategory")
+                low_match_tests.append(
+                    {
+                        "relativeTestPath": str(relative_path),
+                        "matchPercent": float(match_percent),
+                        "category": str(entry.get("category") or "Unknown"),
+                        "subCategory": str(sub_category) if sub_category else None,
+                    }
+                )
 
         for result in report.get("results", []):
             if not isinstance(result, dict):
@@ -255,6 +416,14 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         key=lambda group: (-group["count"], group["family"]),
     )[:problem_limit]
 
+    biggest_problems = _rank_biggest_problems(
+        incomplete_shards,
+        exception_signature_counter,
+        low_match_tests,
+        biggest_problem_limit,
+        low_match_threshold,
+    )
+
     return {
         "summary": {
             "passed": passed,
@@ -271,6 +440,9 @@ def merge(shard_dir: Path, problem_limit: int = DEFAULT_PROBLEM_LIMIT) -> dict:
         "droppedDeclarations": dropped_declaration_counter.most_common(problem_limit),
         "exceptionSignatures": exception_signature_counter.most_common(problem_limit),
         "failureFamilies": top_families,
+        "biggestProblemLimit": biggest_problem_limit,
+        "lowMatchThreshold": low_match_threshold,
+        "biggestProblems": biggest_problems,
         "results": failures,
     }
 
@@ -422,6 +594,50 @@ def render_issue_markdown(merged: dict, run_url: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_biggest_problems_markdown(merged: dict, run_url: str | None) -> str:
+    """Render the body of the second, severity-focused issue: the run's few
+    biggest problems ranked by blast radius (see ``_rank_biggest_problems``)."""
+    problems = merged.get("biggestProblems") or []
+    threshold = merged.get("lowMatchThreshold", DEFAULT_LOW_MATCH_THRESHOLD)
+    summary = merged["summary"]
+    lines = [
+        f"## WPT run — top {len(problems)} biggest problem(s)",
+        "",
+        "_The run's most severe issues, ranked by blast radius rather than"
+        " frequency: incomplete shards first (a whole slice went unmeasured), then"
+        " crashes (one bug gating many tests), then the worst pixel mismatches"
+        f" (< {threshold:g}% match). Companion to the most-common-failures issue._",
+        "",
+        f"- Failed: {summary['failed']}",
+        f"- Incomplete shards: {len(merged['incompleteShards'])}",
+        "",
+        "### Biggest problems",
+        "",
+    ]
+    if problems:
+        for index, problem in enumerate(problems, start=1):
+            lines.append(f"{index}. **{problem['title']}**")
+            if problem["kind"] == "Crash":
+                lines.append(f"   - Signature: `{problem['detail']}`")
+            elif problem.get("detail"):
+                lines.append(f"   - {problem['detail']}")
+    else:
+        lines.append(
+            "- None — no incomplete shards, crashes, or sub-threshold pixel matches."
+        )
+
+    lines += [
+        "",
+        "### CI metadata",
+        f"- Workflow run: {run_url}" if run_url else "- Workflow run: (unknown)",
+        "- Artifact: `wpt-merged`",
+        "",
+        "_Auto-generated by `.github/workflows/wpt-tests.yml`. See the companion"
+        " most-common-failures issue for the full frequency breakdown._",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard-dir", required=True, type=Path, help="Directory containing per-shard JSON reports")
@@ -434,10 +650,29 @@ def main() -> int:
     )
     parser.add_argument("--issue-md", type=Path, help="Where to write the Markdown issue body")
     parser.add_argument(
+        "--biggest-issue-md",
+        type=Path,
+        help="Where to write the Markdown body for the second, biggest-problems issue",
+    )
+    parser.add_argument(
         "--problem-limit",
         type=int,
         default=DEFAULT_PROBLEM_LIMIT,
         help=f"Maximum common failure groups/directories to report (default: {DEFAULT_PROBLEM_LIMIT})",
+    )
+    parser.add_argument(
+        "--biggest-problem-limit",
+        type=int,
+        default=DEFAULT_BIGGEST_PROBLEM_LIMIT,
+        help="Maximum biggest problems to report in the second issue "
+        f"(default: {DEFAULT_BIGGEST_PROBLEM_LIMIT})",
+    )
+    parser.add_argument(
+        "--low-match-threshold",
+        type=float,
+        default=DEFAULT_LOW_MATCH_THRESHOLD,
+        help="A pixel match below this percent counts as a 'low percent match' big "
+        f"problem (default: {DEFAULT_LOW_MATCH_THRESHOLD:g})",
     )
     parser.add_argument("--run-url", default=os.environ.get("WPT_RUN_URL"), help="Workflow run URL for the issue footer")
     parser.add_argument("--github-output", type=Path, help="Path to $GITHUB_OUTPUT for step outputs")
@@ -445,8 +680,17 @@ def main() -> int:
 
     if args.problem_limit < 1:
         parser.error("--problem-limit must be a positive integer")
+    if args.biggest_problem_limit < 1:
+        parser.error("--biggest-problem-limit must be a positive integer")
+    if not 0 <= args.low_match_threshold <= 100:
+        parser.error("--low-match-threshold must be between 0 and 100")
 
-    merged = merge(args.shard_dir, args.problem_limit)
+    merged = merge(
+        args.shard_dir,
+        args.problem_limit,
+        args.biggest_problem_limit,
+        args.low_match_threshold,
+    )
 
     if args.merge_into:
         # Read the existing manifest before any write below (the same path may be
@@ -461,9 +705,16 @@ def main() -> int:
         args.issue_md.parent.mkdir(parents=True, exist_ok=True)
         args.issue_md.write_text(render_issue_markdown(merged, args.run_url), encoding="utf-8")
 
+    if args.biggest_issue_md:
+        args.biggest_issue_md.parent.mkdir(parents=True, exist_ok=True)
+        args.biggest_issue_md.write_text(
+            render_biggest_problems_markdown(merged, args.run_url), encoding="utf-8"
+        )
+
     failed = merged["summary"]["failed"]
     total = merged["summary"]["total"]
     incomplete_shard_count = len(merged["incompleteShards"])
+    biggest_problem_count = len(merged.get("biggestProblems") or [])
     print(f"Merged {merged['shardCount']} shard(s): {merged['summary']['passed']} passed, "
           f"{failed} failed, {merged['summary']['skipped']} skipped, {total} total.")
 
@@ -473,6 +724,8 @@ def main() -> int:
             handle.write(f"total_count={total}\n")
             handle.write(f"incomplete_shard_count={incomplete_shard_count}\n")
             handle.write(f"create_issue={'true' if failed > 0 or incomplete_shard_count > 0 else 'false'}\n")
+            handle.write(f"biggest_problem_count={biggest_problem_count}\n")
+            handle.write(f"create_biggest_issue={'true' if biggest_problem_count > 0 else 'false'}\n")
 
     return 0
 
