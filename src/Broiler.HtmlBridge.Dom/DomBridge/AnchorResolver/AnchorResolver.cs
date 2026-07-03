@@ -94,7 +94,9 @@ public sealed partial class DomBridge
         }
 
         // 4. Insert backdrop elements for modal dialogs.
-        InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
+        InsertDialogBackdrops(
+            DocumentElement, viewportWidth, viewportHeight,
+            anchorRegistry, positionTryRules);
 
         // 5. Ensure fixed-position elements from CSS have explicit pixel
         //    dimensions (the Broiler renderer does not resolve width/height

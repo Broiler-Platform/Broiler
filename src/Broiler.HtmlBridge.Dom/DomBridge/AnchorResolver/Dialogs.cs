@@ -47,7 +47,10 @@ public sealed partial class DomBridge
     // Dialog backdrop insertion
     // -----------------------------------------------------------------
 
-    private void InsertDialogBackdrops(DomElement root, int vpW, int vpH)
+    private void InsertDialogBackdrops(
+        DomElement root, int vpW, int vpH,
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
         var modals = new List<(DomElement dialog, DomElement parent)>();
         FindModalDialogs(root, modals);
@@ -62,6 +65,10 @@ public sealed partial class DomBridge
             // Insert a backdrop div BEFORE the dialog.
             // Use 'position: fixed' with explicit pixel viewport dimensions
             // because the Broiler renderer cannot resolve opposing insets.
+            // These viewport-covering defaults materialise the ::backdrop UA
+            // style (position:fixed; inset:0); any author-declared geometry
+            // overlaid below overrides them, so an explicitly sized/positioned
+            // backdrop is honoured instead of always filling the viewport.
             var backdropStyle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["position"] = "fixed",
@@ -72,6 +79,10 @@ public sealed partial class DomBridge
                 ["background-color"] = backdropBg,
             };
 
+            var backdropDecls = GetSyncedScopedEngine(dialog)
+                .GetCascadedDeclaredValues(dialog, "::backdrop");
+            OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
+
             var backdrop = new DomElement(
                 "div", null, null, string.Empty,
                 style: backdropStyle);
@@ -80,6 +91,16 @@ public sealed partial class DomBridge
             int idx = parent.Children.IndexOf(dialog);
             if (idx >= 0)
                 parent.Children.Insert(idx, backdrop);
+
+            // If the ::backdrop declares position-try-fallbacks and its base
+            // geometry overflows the containing block, resolve the fallback
+            // now: the main position-try pass (ResolvePositionTryFallbacks) ran
+            // before this backdrop div existed, so it never saw it.
+            if (backdropStyle.ContainsKey("position-try-fallbacks") ||
+                backdropStyle.ContainsKey("position-try"))
+            {
+                ResolvePositionTryFallbacksTree(backdrop, anchorRegistry, positionTryRules);
+            }
 
             // Ensure the dialog has UA default styles.
             // Check both inline styles and CSS rules before applying defaults.
@@ -104,6 +125,46 @@ public sealed partial class DomBridge
                 dialog.Style["background-color"] = "white";
         }
     }
+    /// <summary>
+    /// Property names on a <c>::backdrop</c> rule that control the backdrop's
+    /// geometry and fallback positioning. When the author declares any of
+    /// these they override the viewport-covering defaults so an explicitly
+    /// sized or positioned backdrop is honoured (e.g. WPT
+    /// <c>position-try-backdrop.html</c>, where the backdrop is a 100×100 box
+    /// moved by <c>position-try-fallbacks</c>).
+    /// </summary>
+    private static readonly string[] BackdropGeometryProps =
+    {
+        "width", "height", "left", "right", "top", "bottom",
+        "position", "position-anchor", "position-try-fallbacks", "position-try",
+    };
+
+    /// <summary>
+    /// Overlays author-declared <c>::backdrop</c> geometry / fallback
+    /// properties onto the synthesized backdrop div's style, replacing the
+    /// viewport-covering defaults where the author was explicit.
+    /// </summary>
+    private static void OverlayBackdropAuthorGeometry(
+        IReadOnlyDictionary<string, string> declarations,
+        Dictionary<string, string> backdropStyle)
+    {
+        foreach (var prop in BackdropGeometryProps)
+        {
+            if (declarations.TryGetValue(prop, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+                backdropStyle[prop] = value.Trim();
+        }
+
+        // The default fills the viewport with top:0/left:0 + width/height. If
+        // the author positions the backdrop from the opposite edge only, drop
+        // the conflicting default inset so the box is not over-constrained
+        // (the renderer cannot resolve opposing left+right / top+bottom insets).
+        if (declarations.ContainsKey("right") && !declarations.ContainsKey("left"))
+            backdropStyle.Remove("left");
+        if (declarations.ContainsKey("bottom") && !declarations.ContainsKey("top"))
+            backdropStyle.Remove("top");
+    }
+
     /// <summary>
     /// Determines the background color for a dialog's <c>::backdrop</c>
     /// pseudo-element by checking CSS rules for <c>::backdrop</c> selectors
