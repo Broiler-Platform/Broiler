@@ -7992,6 +7992,40 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_ResolveAnchorPositions_AbsPosChildOfInlineContainingBlock_PromotedWithoutThrow()
+    {
+        // Regression for issue #1195 (top WPT crash, signature
+        // "DomBridge.CollectInlineCBPromotions — Destination array was not long
+        // enough"). CollectInlineCBPromotions walked the live child list with a raw
+        // element.Children.ToList(): Enumerable.ToList reads Count, allocates a
+        // destination of that size, then CopyTo materialises the current (possibly
+        // larger) child array, so a mid-walk mutation overflows the copy. The walk
+        // now goes through the tolerant SnapshotChildren helper (same fix already
+        // used by CollectStyleElementsInTree). This drives the promotion path: an
+        // absolutely-positioned box inside an inline (position:relative <span>)
+        // containing block must be moved out to its nearest block-level ancestor.
+        const string html = @"<!DOCTYPE html>
+<div id=""block""><span id=""ic"" style=""position:relative"">ab<span id=""abs"" style=""position:absolute; left:10px; top:20px; width:5px; height:5px; background:red""></span></span></div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        // Must not throw (previously crashed with "Destination array was not long enough").
+        bridge.ResolveAnchorPositions();
+
+        Broiler.HtmlBridge.DomElement? abs = null;
+        FindDomElement(bridge.DocumentElement, "abs", ref abs);
+        Assert.NotNull(abs);
+
+        // The abspos child is promoted out of the inline containing block (#ic) to
+        // its nearest block-level ancestor (#block), since Broiler's renderer cannot
+        // place an abspos box inside an inline box.
+        Assert.NotNull(abs!.Parent);
+        Assert.Equal("block", abs!.Parent!.Id);
+    }
+
+    [Fact]
     public void Wpt_CssomView_ElementScroll_Alias_And_Object_Arguments_Work()
     {
         const string html = @"<!DOCTYPE html>

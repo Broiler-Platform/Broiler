@@ -399,9 +399,10 @@ public sealed partial class DomBridge
         // this parent, mutating the list mid-walk and throwing "Collection was
         // modified" — which aborts position-area resolution for the whole
         // document (WPT issue #1147, signature
-        // DomBridge.ResolvePositionAreaValues). Same defensive .ToList() idiom as
-        // BuildAnchorRegistry / ResolveAnchorCenter / InlineContainingBlocks.
-        foreach (var child in element.Children.ToList())
+        // DomBridge.ResolvePositionAreaValues). Same defensive snapshot idiom
+        // (SnapshotChildren) as BuildAnchorRegistry / ResolveAnchorCenter /
+        // InlineContainingBlocks.
+        foreach (var child in SnapshotChildren(element))
             ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative,
                 deferredDomMoves);
     }
@@ -585,7 +586,7 @@ public sealed partial class DomBridge
     private double FindScrollContentWidth(DomElement scrollContainer, double containerWidth)
     {
         double maxWidth = containerWidth;
-        foreach (var child in scrollContainer.Children)
+        foreach (var child in SnapshotChildren(scrollContainer))
         {
             if (child.IsTextNode) continue;
             var childProps = GetComputedProps(child);
@@ -612,7 +613,7 @@ public sealed partial class DomBridge
     private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
     {
         double stackedHeight = 0;
-        foreach (var child in scrollContainer.Children)
+        foreach (var child in SnapshotChildren(scrollContainer))
         {
             if (child.IsTextNode) continue;
             var childProps = GetComputedProps(child);
