@@ -134,6 +134,11 @@ internal static class CssUtils
             "break-inside" => cssBox.BreakInside,
             "grid-row" => cssBox.GridRow,
             "grid-column" => cssBox.GridColumn,
+            "grid-template-columns" => cssBox.GridTemplateColumns,
+            "grid-template-rows" => cssBox.GridTemplateRows,
+            "grid-auto-flow" => cssBox.GridAutoFlow,
+            "grid-auto-rows" => cssBox.GridAutoRows,
+            "grid-auto-columns" => cssBox.GridAutoColumns,
             "contain" => cssBox.Contain,
             _ => null,
         };
@@ -325,6 +330,21 @@ internal static class CssUtils
                 break;
             case "grid-column":
                 cssBox.GridColumn = value;
+                break;
+            case "grid-template-columns":
+                cssBox.GridTemplateColumns = value;
+                break;
+            case "grid-template-rows":
+                cssBox.GridTemplateRows = value;
+                break;
+            case "grid-auto-flow":
+                cssBox.GridAutoFlow = value;
+                break;
+            case "grid-auto-rows":
+                cssBox.GridAutoRows = value;
+                break;
+            case "grid-auto-columns":
+                cssBox.GridAutoColumns = value;
                 break;
             case "contain":
                 cssBox.Contain = value;
