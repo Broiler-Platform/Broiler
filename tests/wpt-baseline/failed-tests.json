@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 14613,
+    "failed": 14611,
     "skipped": 0,
-    "total": 14613
+    "total": 14611
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,11 +14,11 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 147,
+      "count": 247,
       "examples": [
-        "css/css-anchor-position/anchor-center-safe-rtl.html",
-        "css/css-anchor-position/anchor-position-multicol-017.html",
-        "css/css-anchor-position/anchor-position-multicol-colspan-001.html"
+        "css/css-align/abspos/align-self-static-position-003.html",
+        "css/css-align/abspos/default-overflow-with-scroll.html",
+        "css/css-align/abspos/safe-align-self-htb.html"
       ]
     },
     {
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 38,
+      "count": 46,
       "examples": [
         "css/css-anchor-position/anchor-position-multicol-fixed-001.html",
         "css/css-anchor-position/position-anchor-normal-pseudo-element-implicit-002.html",
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 19,
+      "count": 29,
       "examples": [
         "css/css-anchor-position/anchor-inherited.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -50,27 +50,50 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 13,
+      "count": 20,
       "examples": [
         "css/css-anchor-position/position-anchor-002.html",
         "css/css-anchor-position/position-try-004.html",
         "css/css-anchor-position/position-try-container-query.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:SubpixelAntiAliasing",
+      "label": "PixelMismatch / SubpixelAntiAliasing",
+      "category": "PixelMismatch",
+      "subCategory": "SubpixelAntiAliasing",
+      "count": 1,
+      "examples": [
+        "css/css-animations/animate-with-color-mix-2.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-anchor-position",
-      217
+      218
+    ],
+    [
+      "css/css-align",
+      100
+    ],
+    [
+      "css/css-animations",
+      25
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      217
+      343
     ]
   ],
-  "droppedDeclarations": [],
+  "droppedDeclarations": [
+    [
+      "display: flow-root list-item",
+      1
+    ]
+  ],
   "exceptionSignatures": [],
   "failureFamilies": [
     {
@@ -98,6 +121,18 @@
       ]
     },
     {
+      "family": "css/css-align/blocks/align-content-block-{N}.html",
+      "count": 11,
+      "categories": {
+        "PixelMismatch": 11
+      },
+      "examples": [
+        "css/css-align/blocks/align-content-block-007.html",
+        "css/css-align/blocks/align-content-block-002.html",
+        "css/css-align/blocks/align-content-block-011.html"
+      ]
+    },
+    {
       "family": "css/css-anchor-position/transform-{N}.html",
       "count": 10,
       "categories": {
@@ -119,6 +154,18 @@
         "css/css-anchor-position/scroll-to-anchored-fixed-000.html",
         "css/css-anchor-position/scroll-to-anchored-fixed-005.html",
         "css/css-anchor-position/scroll-to-anchored-fixed-002.html"
+      ]
+    },
+    {
+      "family": "css/css-align/abspos/align-self-static-position-{N}.html",
+      "count": 6,
+      "categories": {
+        "PixelMismatch": 6
+      },
+      "examples": [
+        "css/css-align/abspos/align-self-static-position-003.html",
+        "css/css-align/abspos/align-self-static-position-004.html",
+        "css/css-align/abspos/align-self-static-position-007.html"
       ]
     },
     {
@@ -168,44 +215,11 @@
         "css/css-anchor-position/anchor-position-inline-007.html",
         "css/css-anchor-position/anchor-position-inline-004.html"
       ]
-    },
-    {
-      "family": "css/css-anchor-position/anchor-scroll-chained-{N}.html",
-      "count": 4,
-      "categories": {
-        "PixelMismatch": 4
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-chained-002.html",
-        "css/css-anchor-position/anchor-scroll-chained-003.html",
-        "css/css-anchor-position/anchor-scroll-chained-001.html"
-      ]
-    },
-    {
-      "family": "css/css-anchor-position/anchor-scroll-to-sticky-{N}.html",
-      "count": 4,
-      "categories": {
-        "PixelMismatch": 4
-      },
-      "examples": [
-        "css/css-anchor-position/anchor-scroll-to-sticky-002.html",
-        "css/css-anchor-position/anchor-scroll-to-sticky-005.html",
-        "css/css-anchor-position/anchor-scroll-to-sticky-003.html"
-      ]
     }
   ],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
   "biggestProblems": [
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 99.53295389811197,
-      "impact": 1,
-      "matchPercent": 0.46704610188802453,
-      "title": "0.5% match \u2014 css/css-anchor-position/position-try-backdrop.html",
-      "detail": "Rendered output matches the reference by only 0.5% (PixelMismatch / MissingContent)."
-    },
     {
       "kind": "LowMatch",
       "tier": 2,
@@ -28138,6 +28152,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-after-scroll-in-document.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-chained-001.html",
       "passed": false,
       "skipped": false,
@@ -28425,13 +28446,6 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "css/css-animations/animate-with-background-color-oklch-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "css/css-animations/animate-with-color-mix-2.html",
       "passed": false,
       "skipped": false,
@@ -28443,7 +28457,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-animations/animation-delay-009.html",
@@ -28451,6 +28465,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "css/css-animations/animation-delay-010.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-animations/animation-delay-011.html",
@@ -28461,13 +28482,6 @@
     },
     {
       "relativeTestPath": "css/css-animations/animation-duration-infinite.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-animations/animation-important-with-transition.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -28509,13 +28523,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-animations/dialog-backdrop-animation.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-animations/flip-running-animation-via-variable.html",
       "passed": false,
       "skipped": false,
@@ -28545,13 +28552,6 @@
     },
     {
       "relativeTestPath": "css/css-animations/missing-values-last-keyframe.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-animations/missing-values-middle-keyframe.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
