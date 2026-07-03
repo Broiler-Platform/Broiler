@@ -411,9 +411,9 @@ public sealed partial class DomBridge
         // a lazy offset query that re-enters anchor resolution) throws
         // "Collection was modified" mid-traversal and aborts the registry build
         // for the whole document (WPT issue #1131, signature
-        // DomBridge.BuildAnchorRegistry). Same defensive idiom as the .ToList()
-        // walks in ResolveAnchorCenter and InlineContainingBlocks.
-        foreach (var sibling in element.Parent.Children.ToList())
+        // DomBridge.BuildAnchorRegistry). Same defensive snapshot (SnapshotChildren)
+        // idiom as ResolveAnchorCenter and InlineContainingBlocks.
+        foreach (var sibling in SnapshotChildren(element.Parent))
         {
             if (sibling == element) break;
             if (sibling.IsTextNode) continue;

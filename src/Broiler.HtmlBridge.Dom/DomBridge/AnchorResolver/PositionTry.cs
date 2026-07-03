@@ -35,7 +35,7 @@ public sealed partial class DomBridge
     {
         if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var child in el.Children)
+            foreach (var child in SnapshotChildren(el))
             {
                 if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
                 {
@@ -64,7 +64,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in el.Children.ToList())
+        foreach (var child in SnapshotChildren(el))
             CollectPositionTryRulesFromTree(child, result);
     }
     /// <summary>
@@ -104,7 +104,7 @@ public sealed partial class DomBridge
         // Snapshot: TryApplyFallback resolves anchor geometry, which can lazily
         // reflect style into the DOM and mutate a Children collection an enclosing
         // recursion frame is still walking ("Collection was modified", issue #1143).
-        foreach (var child in element.Children.ToList())
+        foreach (var child in SnapshotChildren(element))
             ResolvePositionTryFallbacksTree(child, anchorRegistry, positionTryRules);
     }
     private void TryApplyFallback(
@@ -284,7 +284,7 @@ public sealed partial class DomBridge
     private double EstimateMinContentWidth(DomElement element)
     {
         double maxWidth = 0;
-        foreach (var child in element.Children)
+        foreach (var child in SnapshotChildren(element))
         {
             if (child.IsTextNode) continue;
             var childProps = CollectMatchedRuleProperties(child);

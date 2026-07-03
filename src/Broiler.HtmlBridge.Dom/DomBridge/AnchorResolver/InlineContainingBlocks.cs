@@ -208,8 +208,9 @@ public sealed partial class DomBridge
         // Snapshot before iterating: this estimation is reached from
         // BuildAnchorRegistry's box computation, where the live ChildNodes list
         // can be mutated mid-walk and throw "Collection was modified" (WPT issue
-        // #1131). Matches the .ToList() idiom used elsewhere in this file.
-        foreach (var child in element.Children.ToList())
+        // #1131) or overflow the ToList() copy ("Destination array was not long
+        // enough"). SnapshotChildren tolerates both, matching the other walks here.
+        foreach (var child in SnapshotChildren(element))
         {
             if (child.IsTextNode)
             {
@@ -374,7 +375,7 @@ public sealed partial class DomBridge
             if (blockAncestor != null)
             {
                 // Collect absolutely positioned children.
-                foreach (var child in element.Children.ToList())
+                foreach (var child in SnapshotChildren(element))
                 {
                     if (child.IsTextNode) continue;
                     var childProps = GetComputedProps(child);
@@ -387,7 +388,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in element.Children.ToList())
+        foreach (var child in SnapshotChildren(element))
             CollectInlineCBPromotions(child, promotions);
     }
     /// <summary>
@@ -492,7 +493,11 @@ public sealed partial class DomBridge
         double fontSize = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
         double lineHeight = ResolveLineHeight(parentProps, fontSize);
 
-        foreach (var sibling in parent.Children)
+        // Snapshot the child list: a raw foreach over the live LegacyChildList can
+        // throw "Collection was modified" (or the sibling ToList() overflow) if the
+        // tree is mutated mid-walk, aborting anchor resolution. SnapshotChildren
+        // tolerates that, matching the idiom used across these anchor walks.
+        foreach (var sibling in SnapshotChildren(parent))
         {
             if (sibling == element) break;
             if (sibling.IsTextNode)
@@ -563,7 +568,7 @@ public sealed partial class DomBridge
         var props = GetComputedProps(parent);
         double fontSize = TryParsePx(props.GetValueOrDefault("font-size")) ?? 16;
 
-        foreach (var sibling in parent.Children)
+        foreach (var sibling in SnapshotChildren(parent))
         {
             if (sibling == element) break;
 

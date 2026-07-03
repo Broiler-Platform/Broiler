@@ -71,10 +71,10 @@ public sealed partial class DomBridge
         // Snapshot children before recursing: element.Children enumerates the
         // live ChildNodes list, so any concurrent mutation of it (e.g. an
         // anchor-driven DOM move on another node sharing this parent) throws
-        // "Collection was modified" mid-traversal. Iterating a snapshot is the
-        // same defensive idiom already used by the .ToList() walks in
+        // "Collection was modified" mid-traversal (or overflows the ToList() copy).
+        // SnapshotChildren tolerates both, the same defensive idiom used across
         // InlineContainingBlocks and the deferred moves in ResolveAnchorPositions.
-        foreach (var child in element.Children.ToList())
+        foreach (var child in SnapshotChildren(element))
             ResolveAnchorCenter(child, anchorRegistry);
     }
     /// <summary>

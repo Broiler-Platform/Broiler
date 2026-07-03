@@ -67,7 +67,7 @@ public sealed partial class DomBridge
                         wrapper.Style["left"] =
                             $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
 
-                    var originalChildren = el.Children.ToList();
+                    var originalChildren = SnapshotChildren(el);
                     el.Children.Clear();
                     el.Children.Add(wrapper);
                     foreach (var child in originalChildren)
@@ -105,7 +105,7 @@ public sealed partial class DomBridge
                     if (scrollTop > 0 && !isDocScrollingElement)
                     {
                         double childOffset = 0;
-                        foreach (var child in wrapper.Children)
+                        foreach (var child in SnapshotChildren(wrapper))
                         {
                             if (child.IsTextNode) continue;
                             var cp = GetComputedProps(child);
@@ -143,7 +143,7 @@ public sealed partial class DomBridge
     /// </summary>
     private void CollectFixedDescendants(DomElement parent, List<DomElement> results)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in SnapshotChildren(parent))
         {
             if (child.IsTextNode) continue;
             var cp = GetComputedProps(child);

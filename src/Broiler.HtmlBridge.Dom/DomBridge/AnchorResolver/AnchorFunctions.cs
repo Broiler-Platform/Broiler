@@ -165,8 +165,9 @@ public sealed partial class DomBridge
         // Snapshot the child list: resolving anchor functions on a descendant can
         // mutate the live DOM (e.g. anchor-driven style/structure changes under
         // content-visibility), and iterating the live collection while it changes
-        // throws "Collection was modified" (WPT content-visibility-anchor-positioning).
-        foreach (var child in element.Children.ToList())
+        // throws "Collection was modified" (WPT content-visibility-anchor-positioning)
+        // or overflows the ToList() copy. SnapshotChildren tolerates both.
+        foreach (var child in SnapshotChildren(element))
             ResolveAnchorFunctions(child, anchorRegistry);
     }
     /// <summary>

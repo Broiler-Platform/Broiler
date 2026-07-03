@@ -24,15 +24,16 @@ public sealed partial class DomBridge
         {
             // Snapshot: assigning child.TextContent re-parses the <style> element's
             // text node, mutating root.Children mid-enumeration ("Collection was
-            // modified", WPT issue #1143). Same .ToList() idiom as AnchorRegistry.
-            foreach (var child in root.Children.ToList())
+            // modified", WPT issue #1143). SnapshotChildren also guards the ToList()
+            // copy overflow ("Destination array…"), same idiom as AnchorRegistry.
+            foreach (var child in SnapshotChildren(root))
             {
                 if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
                     child.TextContent = RemoveUnsupportedCssRules(child.TextContent);
             }
         }
 
-        foreach (var child in root.Children.ToList())
+        foreach (var child in SnapshotChildren(root))
             NeutralizeStyleElementsForAnchorRules(child);
     }
     private static readonly System.Text.RegularExpressions.Regex CssRuleBlockPattern = new(

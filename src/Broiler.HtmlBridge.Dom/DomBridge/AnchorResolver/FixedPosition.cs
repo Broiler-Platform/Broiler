@@ -84,7 +84,10 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in el.Children)
+        // Snapshot before recursing: the live child list can be mutated mid-walk
+        // (concurrent/lazy DOM edit) and throw, aborting resolution. SnapshotChildren
+        // tolerates that — same idiom as the other anchor-resolver tree walks.
+        foreach (var child in SnapshotChildren(el))
             ResolveFixedPositionSizingInTree(child, vpW, vpH);
     }
 }
