@@ -340,6 +340,248 @@ class MergeWptShardsTests(unittest.TestCase):
                 ["css/a/one.html"], [entry["relativeTestPath"] for entry in result["results"]]
             )
 
+    def test_ranks_biggest_problems_by_blast_radius(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 5, "failed": 3, "skipped": 0, "total": 8},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [{"signature": "Foo.Bar — boom", "count": 12}],
+                            "lowestMatchTests": [
+                                {
+                                    "testPath": "css/a/broken.html",
+                                    "matchPercent": 3.2,
+                                    "category": "PixelMismatch",
+                                    "subCategory": "MissingContent",
+                                },
+                                # A near-miss above the threshold: NOT a big problem.
+                                {
+                                    "testPath": "css/a/near.html",
+                                    "matchPercent": 88.0,
+                                    "category": "PixelMismatch",
+                                    "subCategory": "LayoutShift",
+                                },
+                            ],
+                        },
+                        "results": [
+                            self._failure("css/a/broken.html", "PixelMismatch", "MissingContent"),
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # Shard 0 finished (with failures); shard 7 aborted before any report.
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+            self._write_status(shard_dir, shard_index=7, exit_code=134)
+
+            merged = MODULE.merge(
+                shard_dir, problem_limit=10, biggest_problem_limit=3, low_match_threshold=50.0
+            )
+
+            biggest = merged["biggestProblems"]
+            # Ranked by blast radius: incomplete shard, then crash, then worst match.
+            self.assertEqual(
+                ["IncompleteShards", "Crash", "LowMatch"], [p["kind"] for p in biggest]
+            )
+            self.assertEqual(12, biggest[1]["impact"])
+            low = [p for p in biggest if p["kind"] == "LowMatch"]
+            self.assertEqual(1, len(low))
+            self.assertEqual(3.2, low[0]["matchPercent"])
+            self.assertIn("css/a/broken.html", low[0]["title"])
+
+            markdown = MODULE.render_biggest_problems_markdown(merged, "https://example.test/run/1")
+            self.assertIn("top 3 biggest problem(s)", markdown)
+            self.assertIn("1 shard(s) did not complete", markdown)
+            self.assertIn("shard 7 (exit 134)", markdown)
+            self.assertIn("Crash gating 12 test(s)", markdown)
+            self.assertIn("Foo.Bar — boom", markdown)
+            self.assertIn("3.2% match — css/a/broken.html", markdown)
+            # The 88% near-miss is above threshold and never surfaces.
+            self.assertNotIn("near.html", markdown)
+
+    def test_biggest_problems_are_diversity_first(self) -> None:
+        # Three crashes plus one low match, limit 3: strict severity tiers would
+        # show three crashes and hide the low match. Diversity-first keeps the low
+        # match by spending only one slot on the (worst) crash before covering the
+        # other kind, then fills the last slot with the next crash.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 4, "skipped": 0, "total": 4},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [
+                                {"signature": "A.a — big", "count": 30},
+                                {"signature": "B.b — mid", "count": 20},
+                                {"signature": "C.c — small", "count": 6},
+                            ],
+                            "lowestMatchTests": [
+                                {
+                                    "testPath": "css/a/blank.html",
+                                    "matchPercent": 2.0,
+                                    "category": "PixelMismatch",
+                                    "subCategory": "MissingContent",
+                                }
+                            ],
+                        },
+                        "results": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=3)
+
+            biggest = merged["biggestProblems"]
+            self.assertEqual(3, len(biggest))
+            kinds = [p["kind"] for p in biggest]
+            # The low match survives; the smallest (count-6) crash is what drops.
+            self.assertIn("LowMatch", kinds)
+            self.assertEqual([30, 20], [p["impact"] for p in biggest if p["kind"] == "Crash"])
+            # Result stays ordered by blast radius: crashes (tier 1) before the
+            # low match (tier 2).
+            self.assertEqual(["Crash", "Crash", "LowMatch"], kinds)
+
+    def test_biggest_problem_limit_bounds_the_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 3, "skipped": 0, "total": 3},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [
+                                {"signature": "A.a — one", "count": 9},
+                                {"signature": "B.b — two", "count": 4},
+                                {"signature": "C.c — three", "count": 1},
+                            ],
+                        },
+                        "results": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=2)
+
+            # Only the two biggest crashes survive the limit; the smallest drops.
+            self.assertEqual(2, len(merged["biggestProblems"]))
+            self.assertEqual([9, 4], [p["impact"] for p in merged["biggestProblems"]])
+
+    def test_cli_emits_biggest_issue_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            github_output = shard_dir / "github-output.txt"
+            biggest_md = shard_dir / "biggest.md"
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 1, "failed": 1, "skipped": 0, "total": 2},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "exceptionSignatures": [{"signature": "Crash.Here — kaput", "count": 7}]
+                        },
+                        "results": [self._failure("css/a/x.html", "ScriptError")],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--biggest-issue-md",
+                    str(biggest_md),
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            self.assertIn("create_biggest_issue=true", outputs)
+            self.assertIn("biggest_problem_count=1", outputs)
+            self.assertIn("Crash gating 7 test(s)", biggest_md.read_text(encoding="utf-8"))
+
+    def test_no_biggest_issue_when_only_near_miss_mismatches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            github_output = shard_dir / "github-output.txt"
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 1, "failed": 1, "skipped": 0, "total": 2},
+                        "shard": {"index": 0, "count": 8},
+                        "triage": {
+                            "lowestMatchTests": [
+                                {
+                                    "testPath": "css/a/x.html",
+                                    "matchPercent": 97.5,
+                                    "category": "PixelMismatch",
+                                    "subCategory": "LayoutShift",
+                                }
+                            ]
+                        },
+                        "results": [self._failure("css/a/x.html", "PixelMismatch", "LayoutShift")],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            # No crash, no incomplete shard, only a near-miss match → no second issue.
+            self.assertIn("create_biggest_issue=false", outputs)
+            self.assertIn("biggest_problem_count=0", outputs)
+            # The run still failed, so the primary (most-common) issue is still filed.
+            self.assertIn("create_issue=true", outputs)
+
+    def test_cli_rejects_out_of_range_low_match_threshold(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--low-match-threshold",
+                    "150",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("--low-match-threshold must be between 0 and 100", result.stderr)
+
     def test_cli_rejects_non_positive_problem_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             result = subprocess.run(
