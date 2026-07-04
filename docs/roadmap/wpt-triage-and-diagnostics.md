@@ -44,6 +44,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 26 | Definite-track grid items over-painted at stale inline-block size + grid collapsed to occupied rows; Chromium references rendered blank because the generator only served `/fonts/` (#1209) | ✅ fixed | Broiler.Layout + scripts/generate-wpt-references.js |
 | 27 | #1209's reference generator over-corrected: serving **every** root-relative resource pulled in the real `/resources/testharness.js` + `check-layout-th.js`, so ~206 harness-driven `css-grid` tests regressed to `MissingContent` (Chromium painted a results table Broiler's harness stubs never render) (#1212) | ✅ fixed | scripts/generate-wpt-references.js |
 | 28 | Grid pass only did fixed tracks; `fr`/`auto`/`min-content`/`max-content`/`minmax()` declined to the single-column approximation, and subgrid needs real parent track sizing first (#1212) | 🟡 partial | Broiler.Layout/CssBoxGrid |
+| 29 | `grid-lanes/subgrid` reftests at 0–1 %: empty **orthogonal-flow** (`vertical-rl`) box filled its container and rotated into a viewport-tall strip instead of collapsing to fit-content (§7.3) — whole `row-subgrid-auto-fill-*` cluster now matches; `column-subgrid-auto-fill-*` still needs multi-column named-line subgrid layout (#1221) | 🟡 partial | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -620,7 +621,9 @@ comparison**, both surfacing as `MissingContent`:
    open for deeper reasons unrelated to grid layout: the `grid-container-change-*` /
    `grid-template-*-changes` tests set their grid up in a `document.fonts.ready.then(…)` callback and
    render the testharness results summary table on-screen (Broiler runs neither), and the six
-   `grid-lanes/subgrid` tests need `subgrid` support.
+   `grid-lanes/subgrid` tests need `subgrid` support. (Update: the `row-subgrid-auto-fill-*` half of
+   those was fixed in cluster 29 — it was an orthogonal-flow sizing bug, not missing subgrid support;
+   the `column-subgrid-auto-fill-*` half still needs multi-column named-line subgrid layout.)
 
 Cluster 27 (issue [#1212](https://github.com/Broiler-Platform/Broiler/issues/1212), "about 100
 more failures since the last change") was a **regression introduced by cluster 26's own fix**. Point 2
@@ -674,6 +677,39 @@ approximation already handles. Verified by `GridTrackLayoutTests` (fr split, fix
 `position-try-grid-001` improves 87.7 % → 97.1 %). Still deferred, and the actual gate for the subgrid
 cluster: **subgrid track adoption** (a subgrid item inheriting its parent's spanned tracks), `fit-content()`,
 `repeat(auto-fill/auto-fit)`, and named lines.
+
+Cluster 29 (issue [#1221](https://github.com/Broiler-Platform/Broiler/issues/1221), the
+`css-grid/grid-lanes/subgrid` reftests at 0–1 % match) split into two independent causes, both
+downstream of `grid-lanes` dropping to a block (#1218 — no browser ships the experimental Grid Level 3
+`grid-lanes` keyword unflagged, so the reference generator's Chromium and Broiler alike drop it to the
+element's default display):
+
+1. **`row-subgrid-auto-fill-*` (the 0 % worst case, `row-subgrid-auto-fill-007`) — fixed.** Each
+   test's `.subgrid` is an empty `writing-mode: vertical-rl` grid inside the auto-height block the
+   `grid-lanes` container became — a box **establishing an orthogonal flow**. The vertical-flow
+   prototype lays such a box out in a logical horizontal frame and rotates it into physical space; with
+   an auto inline size it filled its containing block's *width* in that frame, so the rotation mapped
+   that width onto the box's physical **height** and the empty box became a viewport-tall light-grey
+   strip where Chromium collapses to blank (0 % / `MissingContent`). Fixed in `CssBox.PerformLayoutImp`
+   per CSS Writing Modes 4 §7.3 (auto-sizing in orthogonal flows): an in-flow vertical rotation root
+   with an auto inline size and an **indefinite** orthogonal available size (an auto-height containing
+   block) is sized to fit-content instead of stretched — so it collapses to its content, matching
+   Chromium. Gated on the indefinite case so a definite orthogonal size (a root box filling the
+   viewport, an explicit-height container) keeps the existing fill behaviour. The whole
+   `row-subgrid-auto-fill-*` cluster (8 tests) now matches its Chromium reference (`-007` 0 % → 100 %,
+   the rest ≥ 88 %), verified by re-rendering each test file against a locally-generated Playwright
+   Chromium screenshot (grid-lanes drops identically in every Chromium version, so the local shot
+   reproduces the CI reference — confirmed by the `-007`/`column-001` matches reproducing the issue's
+   0.0 %/0.5 % exactly); the full local `css` subset (147 tests) has an identical pass set before/after
+   (zero regressions). Guard: `OrthogonalFlowCollapseTests` (`Broiler.Wpt.Tests`).
+2. **`column-subgrid-auto-fill-*` — still open (larger feature).** Here `.subgrid` is a *horizontal*
+   block-level grid with `grid-auto-rows: 8px` and many named-line-placed children
+   (`grid-column: y N`); Chromium renders a grey multi-column grid (≈ 89 % of the reference is the grey
+   `.subgrid` background). Broiler's single-column grid approximation ignores `grid-auto-rows` and
+   cannot resolve the `subgrid` / `repeat(auto-fill, [line-names])` / named-line columns, so the
+   subgrids collapse to a thin strip. Matching these needs the deferred **multi-column named-line
+   subgrid** track layout (cluster 28's tail); a `grid-auto-rows`-only shortcut would stack the children
+   full-width and over-paint the grey, so it is not attempted here.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
