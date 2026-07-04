@@ -346,6 +346,12 @@ internal static class CssUtils
             case "grid-auto-columns":
                 cssBox.GridAutoColumns = value;
                 break;
+            case "grid":
+                ApplyGridShorthand(cssBox, value, resetAutoTracks: true);
+                break;
+            case "grid-template":
+                ApplyGridShorthand(cssBox, value, resetAutoTracks: false);
+                break;
             case "contain":
                 cssBox.Contain = value;
                 break;
@@ -636,6 +642,76 @@ internal static class CssUtils
                 cssBox.AnimationPlayState = value;
                 break;
         }
+    }
+
+    /// <summary>
+    /// CSS Grid §7.4/§7.8: expand the <c>grid</c> and <c>grid-template</c>
+    /// shorthands into <c>grid-template-rows</c>/<c>grid-template-columns</c>.
+    /// Only the <c>none</c> and <c>&lt;rows&gt; / &lt;columns&gt;</c> forms are
+    /// expanded (they cover the common author usage, e.g.
+    /// <c>grid: 50px 50px / 50px 50px</c>); the <c>auto-flow</c> and
+    /// template-areas <c>&lt;string&gt;</c> forms are left untouched — their
+    /// longhands keep their cascaded/initial values — rather than risk
+    /// mis-parsing them. The full <c>grid</c> shorthand additionally resets the
+    /// implicit-track longhands to their initial values when it applies, per the
+    /// spec's reset semantics.
+    /// </summary>
+    private static void ApplyGridShorthand(CssBox cssBox, string value, bool resetAutoTracks)
+    {
+        string v = value.Trim();
+        if (v.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.GridTemplateRows = "none";
+            cssBox.GridTemplateColumns = "none";
+            if (resetAutoTracks) ResetGridAutoTracks(cssBox);
+            return;
+        }
+
+        // The auto-flow and template-areas (<string>) forms are out of scope:
+        // leave every longhand as the cascade already set it.
+        if (v.IndexOf("auto-flow", StringComparison.OrdinalIgnoreCase) >= 0
+            || v.Contains('"') || v.Contains('\''))
+            return;
+
+        int slash = TopLevelSlashIndex(v);
+        if (slash < 0)
+            return;
+        string rows = v.Substring(0, slash).Trim();
+        string cols = v.Substring(slash + 1).Trim();
+        if (rows.Length == 0 || cols.Length == 0)
+            return;
+
+        cssBox.GridTemplateRows = rows;
+        cssBox.GridTemplateColumns = cols;
+        if (resetAutoTracks) ResetGridAutoTracks(cssBox);
+    }
+
+    private static void ResetGridAutoTracks(CssBox cssBox)
+    {
+        cssBox.GridAutoFlow = "row";
+        cssBox.GridAutoRows = "auto";
+        cssBox.GridAutoColumns = "auto";
+    }
+
+    /// <summary>
+    /// Index of the row/column separator slash in a <c>grid</c>/<c>grid-template</c>
+    /// value, ignoring any slash nested inside <c>()</c> or <c>[]</c> (a track list
+    /// itself never contains a top-level slash). Returns -1 when there is none.
+    /// </summary>
+    private static int TopLevelSlashIndex(string v)
+    {
+        int paren = 0, bracket = 0;
+        for (int i = 0; i < v.Length; i++)
+        {
+            char c = v[i];
+            if (c == '(') paren++;
+            else if (c == ')') { if (paren > 0) paren--; }
+            else if (c == '[') bracket++;
+            else if (c == ']') { if (bracket > 0) bracket--; }
+            else if (c == '/' && paren == 0 && bracket == 0)
+                return i;
+        }
+        return -1;
     }
 
     private static void ApplyLogicalBorderShorthand(CssBox cssBox, string value, bool inlineAxis)

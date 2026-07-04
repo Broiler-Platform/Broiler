@@ -107,14 +107,25 @@ internal partial class CssBox
         GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
         GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
 
-        // Collect in-flow grid items in document order.
+        // Collect in-flow grid items in document order. Absolutely-positioned
+        // children are gathered separately: they take no part in track sizing or
+        // auto-placement, but when the grid container is their containing block
+        // (i.e. it is positioned) their grid area forms their containing block
+        // (CSS Grid §9), which the abspos pass below resolves once tracks exist.
+        bool gridIsAbsposContainingBlock =
+            Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
         var placements = new List<GridPlacement>();
+        List<CssBox> absposItems = null;
         foreach (var child in Boxes)
         {
-            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-                continue;
             if (child.Display == CssConstants.None)
                 continue;
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+            {
+                if (gridIsAbsposContainingBlock)
+                    (absposItems ??= new List<CssBox>()).Add(child);
+                continue;
+            }
 
             var (rowStart, rowSpan) = ParseGridLine(child.GridRow);
             var (colStart, colSpan) = ParseGridLine(child.GridColumn);
@@ -225,6 +236,13 @@ internal partial class CssBox
         ActualBottom = Location.Y + borderBoxHeight;
         ActualRight = CalculateActualRight();
         Size = new SizeF(Size.Width, (float)borderBoxHeight);
+
+        // Now that the grid has its final size and track edges, position any
+        // absolutely-positioned grid items within their resolved grid areas.
+        if (absposItems != null)
+            PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
+                colSizes.Length, rowSizes.Length, contentLeft, contentTop);
+
         _gridTrackLayoutApplied = true;
         return true;
     }
@@ -477,6 +495,139 @@ internal partial class CssBox
         // single border box — clear the stale inline rects and let paint fall
         // back to Location+Size.
         item.RectanglesReset();
+    }
+
+    /// <summary>
+    /// CSS Grid §9 (Absolute Positioning): resolve each absolutely-positioned
+    /// grid item's grid area from the sized tracks and position the item within
+    /// it. The area — not the grid container's padding box — is the item's
+    /// containing block, so an <c>auto</c> grid line resolves to the container's
+    /// padding edge and specified lines resolve to grid line positions.
+    /// </summary>
+    private void PlaceAbsposGridItems(List<CssBox> items,
+        double[] colStartEdge, double[] colEndEdge,
+        double[] rowStartEdge, double[] rowEndEdge,
+        int colCount, int rowCount, double contentLeft, double contentTop)
+    {
+        double padLeft = Location.X + ActualBorderLeftWidth;
+        double padRight = Location.X + Size.Width - ActualBorderRightWidth;
+        double padTop = Location.Y + ActualBorderTopWidth;
+        double padBottom = ActualBottom - ActualBorderBottomWidth;
+
+        foreach (var item in items)
+        {
+            var (rowStart, rowSpan) = ParseGridLine(item.GridRow);
+            var (colStart, colSpan) = ParseGridLine(item.GridColumn);
+            var (left, right) = ResolveAbsposAxis(colStart, colSpan, colStartEdge, colEndEdge,
+                colCount, contentLeft, padLeft, padRight);
+            var (top, bottom) = ResolveAbsposAxis(rowStart, rowSpan, rowStartEdge, rowEndEdge,
+                rowCount, contentTop, padTop, padBottom);
+            PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);
+        }
+    }
+
+    /// <summary>
+    /// Resolve the [start, end] extent (absolute px) of an abspos grid item's
+    /// grid area along one axis. <paramref name="start"/> is a 0-indexed track
+    /// (null for an <c>auto</c> line, which resolves to the container's padding
+    /// edges per CSS Grid §9.2); lines are clamped into the grid's line range.
+    /// </summary>
+    private static (double start, double end) ResolveAbsposAxis(int? start, int span,
+        double[] startEdge, double[] endEdge, int trackCount, double contentOrigin,
+        double padStart, double padEnd)
+    {
+        if (start == null || trackCount == 0)
+            return (padStart, padEnd);
+        int a = Math.Clamp(start.Value, 0, trackCount);
+        int b = Math.Clamp(start.Value + Math.Max(1, span), 0, trackCount);
+        if (b <= a) b = Math.Min(a + 1, trackCount);
+        double s = a < trackCount ? contentOrigin + startEdge[a] : contentOrigin + endEdge[trackCount - 1];
+        double e = contentOrigin + endEdge[b - 1];
+        return e < s ? (s, s) : (s, e);
+    }
+
+    /// <summary>
+    /// CSS Grid §9: position an absolutely-positioned grid item within its
+    /// resolved grid area, which forms the item's containing block. Insets
+    /// (top/left/right/bottom) offset from the area edges; a percentage or fixed
+    /// width/height resolves against the area, while an <c>auto</c> size keeps
+    /// the item's shrink-to-fit measurement (grid abspos items align to
+    /// <c>start</c>, not <c>stretch</c>, by default) unless both insets pin it.
+    /// The area is recorded on the item so any later abspos re-resolution
+    /// (<see cref="GetAbsoluteContainingBlockPaddingBox"/>) uses it too.
+    /// </summary>
+    private static void PlaceAbsposItemInArea(CssBox item,
+        double areaLeft, double areaTop, double areaWidth, double areaHeight)
+    {
+        item.GridAreaContainingBlock =
+            new RectangleF((float)areaLeft, (float)areaTop, (float)areaWidth, (float)areaHeight);
+        double em = item.GetEmHeight();
+
+        double marginL = item.ActualMarginLeft, marginR = item.ActualMarginRight;
+        double? left = ParseAbsposInset(item.Left, areaWidth, em);
+        double? right = ParseAbsposInset(item.Right, areaWidth, em);
+        double width = ResolveAbsposSize(item.Width, areaWidth, em, item.Size.Width,
+            left, right, marginL, marginR, out bool widthAuto);
+        if (!widthAuto) width = item.ResolveSpecifiedWidthToBorderBox(width);
+        double x;
+        if (left.HasValue) x = areaLeft + left.Value + marginL;
+        else if (right.HasValue) x = areaLeft + areaWidth - right.Value - marginR - width;
+        else x = areaLeft + marginL;
+
+        double marginT = item.ActualMarginTop, marginB = item.ActualMarginBottom;
+        double? top = ParseAbsposInset(item.Top, areaHeight, em);
+        double? bottom = ParseAbsposInset(item.Bottom, areaHeight, em);
+        double height = ResolveAbsposSize(item.Height, areaHeight, em, item.Size.Height,
+            top, bottom, marginT, marginB, out bool heightAuto);
+        if (!heightAuto) height = item.ResolveSpecifiedHeightToBorderBox(height);
+        double y;
+        if (top.HasValue) y = areaTop + top.Value + marginT;
+        else if (bottom.HasValue) y = areaTop + areaHeight - bottom.Value - marginB - height;
+        else y = areaTop + marginT;
+
+        double dx = x - item.Location.X;
+        double dy = y - item.Location.Y;
+        if (Math.Abs(dx) > 0.01) item.OffsetLeft(dx);
+        if (Math.Abs(dy) > 0.01) item.OffsetTop(dy);
+        item.Size = new SizeF((float)Math.Max(0, width), (float)Math.Max(0, height));
+        item.ActualRight = item.Location.X + item.Size.Width;
+        item.ActualBottom = item.Location.Y + item.Size.Height;
+        item.AbsposLocationFinalized = true;
+        item.RectanglesReset();
+    }
+
+    /// <summary>An inset (top/left/right/bottom): null for <c>auto</c>, else px
+    /// resolved against the grid area extent <paramref name="basis"/>.</summary>
+    private static double? ParseAbsposInset(string value, double basis, double em)
+    {
+        if (string.IsNullOrEmpty(value) || value == CssConstants.Auto)
+            return null;
+        return CssValueParser.ParseLength(value, basis, em);
+    }
+
+    /// <summary>
+    /// Used inline/block size of an abspos grid item along one axis. A fixed or
+    /// percentage size resolves against the area; <c>auto</c> (or an intrinsic
+    /// keyword) keeps the shrink-to-fit measurement, except when both insets are
+    /// specified (CSS2.1 §10.3.7/§10.6.4), where the size fills the remaining gap.
+    /// </summary>
+    private static double ResolveAbsposSize(string size, double areaSize, double em,
+        double measured, double? startInset, double? endInset,
+        double marginStart, double marginEnd, out bool wasAuto)
+    {
+        if (!string.IsNullOrEmpty(size) && size != CssConstants.Auto
+            && !IsIntrinsicWidthKeyword(size))
+        {
+            wasAuto = false;
+            return CssValueParser.ParseLength(size, areaSize, em);
+        }
+        wasAuto = true;
+        if (startInset.HasValue && endInset.HasValue)
+        {
+            double gap = areaSize - startInset.Value - endInset.Value - marginStart - marginEnd;
+            return gap > 0 ? gap : 0;
+        }
+        return measured;
     }
 
     /// <summary>

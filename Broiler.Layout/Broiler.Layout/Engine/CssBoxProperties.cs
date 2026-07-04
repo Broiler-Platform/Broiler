@@ -419,6 +419,16 @@ internal abstract class CssBoxProperties
     /// rely on <c>AdjustAbsolutePosition</c>.
     /// </summary>
     internal bool AbsposLocationFinalized { get; set; }
+
+    /// <summary>
+    /// When this box is an absolutely-positioned grid item, the grid container's
+    /// track-sizing pass records the item's resolved grid area here in absolute
+    /// coordinates (X/Y = area origin, Width/Height = area size). CSS Grid §9
+    /// makes that area — not the grid container's padding box — the box's
+    /// containing block, so <see cref="CssBox.GetAbsoluteContainingBlockPaddingBox"/>
+    /// returns it when set. Null for every other box.
+    /// </summary>
+    internal RectangleF? GridAreaContainingBlock { get; set; }
     public string Height
     {
         get => ResolvePhysicalSize(_height, isWidth: false);

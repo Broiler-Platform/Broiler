@@ -363,6 +363,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         out double cbPadWidth,
         out double cbPadHeight)
     {
+        // CSS Grid §9: an absolutely-positioned grid item's containing block is
+        // the grid area the grid container's track-sizing pass resolved for it,
+        // not the container's padding box. All abspos size/offset resolution
+        // routes through here, so returning the area makes width/height/inset
+        // percentages and the static position use it uniformly.
+        if (GridAreaContainingBlock is { } gridArea)
+        {
+            cbPadLeft = gridArea.Left;
+            cbPadTop = gridArea.Top;
+            cbPadWidth = gridArea.Width;
+            cbPadHeight = gridArea.Height;
+            return;
+        }
+
         if (IsInlineContainingBlock(cb))
         {
             var bbox = GetInlineBoundingBox(cb);
