@@ -346,6 +346,12 @@ internal static class CssUtils
             case "grid-auto-columns":
                 cssBox.GridAutoColumns = value;
                 break;
+            case "grid":
+                ApplyGridShorthand(cssBox, value, resetAutoTracks: true);
+                break;
+            case "grid-template":
+                ApplyGridShorthand(cssBox, value, resetAutoTracks: false);
+                break;
             case "contain":
                 cssBox.Contain = value;
                 break;
@@ -519,7 +525,7 @@ internal static class CssUtils
                 cssBox.Content = value;
                 break;
             case "display":
-                cssBox.Display = value;
+                cssBox.Display = NormalizeDisplayValue(value);
                 break;
             case "direction":
                 cssBox.Direction = value;
@@ -636,6 +642,115 @@ internal static class CssUtils
                 cssBox.AnimationPlayState = value;
                 break;
         }
+    }
+
+    /// <summary>
+    /// CSS Grid §7.4/§7.8: expand the <c>grid</c> and <c>grid-template</c>
+    /// shorthands into <c>grid-template-rows</c>/<c>grid-template-columns</c>.
+    /// Only the <c>none</c> and <c>&lt;rows&gt; / &lt;columns&gt;</c> forms are
+    /// expanded (they cover the common author usage, e.g.
+    /// <c>grid: 50px 50px / 50px 50px</c>); the <c>auto-flow</c> and
+    /// template-areas <c>&lt;string&gt;</c> forms are left untouched — their
+    /// longhands keep their cascaded/initial values — rather than risk
+    /// mis-parsing them. The full <c>grid</c> shorthand additionally resets the
+    /// implicit-track longhands to their initial values when it applies, per the
+    /// spec's reset semantics.
+    /// </summary>
+    private static void ApplyGridShorthand(CssBox cssBox, string value, bool resetAutoTracks)
+    {
+        string v = value.Trim();
+        if (v.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.GridTemplateRows = "none";
+            cssBox.GridTemplateColumns = "none";
+            if (resetAutoTracks) ResetGridAutoTracks(cssBox);
+            return;
+        }
+
+        // The auto-flow and template-areas (<string>) forms are out of scope:
+        // leave every longhand as the cascade already set it.
+        if (v.IndexOf("auto-flow", StringComparison.OrdinalIgnoreCase) >= 0
+            || v.Contains('"') || v.Contains('\''))
+            return;
+
+        int slash = TopLevelSlashIndex(v);
+        if (slash < 0)
+            return;
+        string rows = v.Substring(0, slash).Trim();
+        string cols = v.Substring(slash + 1).Trim();
+        if (rows.Length == 0 || cols.Length == 0)
+            return;
+
+        cssBox.GridTemplateRows = rows;
+        cssBox.GridTemplateColumns = cols;
+        if (resetAutoTracks) ResetGridAutoTracks(cssBox);
+    }
+
+    private static void ResetGridAutoTracks(CssBox cssBox)
+    {
+        cssBox.GridAutoFlow = "row";
+        cssBox.GridAutoRows = "auto";
+        cssBox.GridAutoColumns = "auto";
+    }
+
+    private static readonly string[] DisplayOutsideKeywords = ["block", "inline", "run-in"];
+
+    /// <summary>
+    /// Normalize a <c>display</c> value the layout engine consumes: collapse the
+    /// CSS Display 3 two-value syntax (<c>inline grid</c>, <c>block flow-root</c>,
+    /// …) to its legacy single keyword, and map the experimental CSS Grid Level 3
+    /// <c>grid-lanes</c> &lt;display-inside&gt; to a grid formatting context
+    /// (<c>grid</c>/<c>inline-grid</c>). Single-keyword values pass through
+    /// unchanged apart from a bare <c>grid-lanes</c>.
+    /// </summary>
+    internal static string NormalizeDisplayValue(string value)
+    {
+        string v = value.Trim();
+        var parts = v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1)
+            return parts[0].Equals("grid-lanes", StringComparison.OrdinalIgnoreCase) ? "grid" : v;
+        if (parts.Length != 2)
+            return v;
+
+        string a = parts[0].ToLowerInvariant(), b = parts[1].ToLowerInvariant();
+        string outside, inside;
+        if (Array.IndexOf(DisplayOutsideKeywords, a) >= 0) { outside = a; inside = b; }
+        else if (Array.IndexOf(DisplayOutsideKeywords, b) >= 0) { outside = b; inside = a; }
+        else return v; // not a recognized two-value form; leave for the caller
+
+        // grid-lanes behaves as grid for our engine (experimental CSS Grid L3).
+        if (inside == "grid-lanes") inside = "grid";
+        bool isInline = outside == "inline";
+        return inside switch
+        {
+            "grid" => isInline ? "inline-grid" : "grid",
+            "flex" => isInline ? "inline-flex" : "flex",
+            "table" => isInline ? "inline-table" : "table",
+            "flow-root" => isInline ? "inline-block" : "flow-root",
+            "flow" => isInline ? "inline" : "block",
+            _ => v,
+        };
+    }
+
+    /// <summary>
+    /// Index of the row/column separator slash in a <c>grid</c>/<c>grid-template</c>
+    /// value, ignoring any slash nested inside <c>()</c> or <c>[]</c> (a track list
+    /// itself never contains a top-level slash). Returns -1 when there is none.
+    /// </summary>
+    private static int TopLevelSlashIndex(string v)
+    {
+        int paren = 0, bracket = 0;
+        for (int i = 0; i < v.Length; i++)
+        {
+            char c = v[i];
+            if (c == '(') paren++;
+            else if (c == ')') { if (paren > 0) paren--; }
+            else if (c == '[') bracket++;
+            else if (c == ']') { if (bracket > 0) bracket--; }
+            else if (c == '/' && paren == 0 && bracket == 0)
+                return i;
+        }
+        return -1;
     }
 
     private static void ApplyLogicalBorderShorthand(CssBox cssBox, string value, bool inlineAxis)

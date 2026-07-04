@@ -419,6 +419,31 @@ internal abstract class CssBoxProperties
     /// rely on <c>AdjustAbsolutePosition</c>.
     /// </summary>
     internal bool AbsposLocationFinalized { get; set; }
+
+    /// <summary>
+    /// When this box is an absolutely-positioned grid item, the grid container's
+    /// track-sizing pass records the item's resolved grid area here in absolute
+    /// coordinates (X/Y = area origin, Width/Height = area size). CSS Grid §9
+    /// makes that area — not the grid container's padding box — the box's
+    /// containing block, so <see cref="CssBox.GetAbsoluteContainingBlockPaddingBox"/>
+    /// returns it when set. Null for every other box.
+    /// </summary>
+    internal RectangleF? GridAreaContainingBlock { get; set; }
+
+    /// <summary>
+    /// CSS Grid Level 2 §7.3 (subgrid): when this box is a grid item whose
+    /// <c>grid-template-columns</c> is <c>subgrid</c>, the parent grid's
+    /// track-sizing pass records here the sizes (px) of the parent tracks this
+    /// item's grid area spans, so the subgrid lays its own items out into the
+    /// inherited tracks instead of parsing a template. Null when not a
+    /// column-subgrid or not yet resolved by the parent. <see cref="SubgridRowSizes"/>
+    /// is the analogous row-axis inheritance; the gaps carry the parent's gutters,
+    /// which a subgridded axis adopts (CSS Grid L2 §7.3).
+    /// </summary>
+    internal double[] SubgridColumnSizes { get; set; }
+    internal double[] SubgridRowSizes { get; set; }
+    internal double? SubgridColumnGap { get; set; }
+    internal double? SubgridRowGap { get; set; }
     public string Height
     {
         get => ResolvePhysicalSize(_height, isWidth: false);

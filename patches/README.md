@@ -21,7 +21,19 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
-_(none currently pending)_
+- **0002-css-two-value-display-grid-lanes.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — makes `IsAcceptableDeclarationValue`
+  accept the CSS Display 3 two-value `display` syntax (`<display-outside>
+  <display-inside>`, e.g. `inline grid`, `block flow-root`) and the experimental
+  CSS Grid Level 3 `grid-lanes` `<display-inside>`, instead of dropping them.
+  The parent repo's `CssUtils.NormalizeDisplayValue` then collapses those to a
+  legacy single keyword (`inline grid` → `inline-grid`, `grid-lanes` → `grid`).
+  Until this patch is applied, the submodule still drops the two-value/grid-lanes
+  declarations at validation, so `NormalizeDisplayValue` never sees them and the
+  parent-repo change is an inert no-op (single-keyword values pass through
+  unchanged) — no CI fallback is needed. The companion **subgrid** support
+  (`Broiler.Layout` `CssBoxGrid.TryApplyGridTrackLayout`) is entirely in the
+  parent repo and is live on CI without this patch.
 
 ## Applied / obsolete
 
