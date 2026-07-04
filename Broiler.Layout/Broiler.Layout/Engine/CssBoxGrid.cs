@@ -91,39 +91,89 @@ internal partial class CssBox
         double contentWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
             - ActualBorderLeftWidth - ActualBorderRightWidth;
         double em = GetEmHeight();
-        if (contentWidth <= 0)
+        // A subgrid grid can be handed a zero-width area — a nested subgrid whose
+        // parent's auto columns collapsed to 0 because its empty content
+        // contributes no width — yet it must still size its rows: the block size is
+        // width-independent (grid-auto-rows) and the visible grey area is the box's
+        // own background over its border box. Only decline a zero-width area for an
+        // ordinary grid, whose column-driven layout would be degenerate there.
+        bool subgridInvolved = StartsWithSubgrid(GridTemplateColumns)
+            || StartsWithSubgrid(GridTemplateRows);
+        if (contentWidth <= 0 && !subgridInvolved)
             return false;
+        if (contentWidth < 0)
+            contentWidth = 0;
 
         // CSS Grid Level 2 §7.3 (subgrid): an axis whose template is `subgrid`
         // takes its tracks from the parent grid over the item's spanned area. The
         // parent's track pass resolves and records those sizes (SubgridColumn/RowSizes)
-        // and re-runs this layout; until then (or with no grid parent) the axis is
-        // unresolved and the pass declines, falling back to the approximation.
+        // and re-runs this layout; until then the axis is unresolved and the pass
+        // declines, falling back to the approximation.
         bool colSubgrid = SubgridColumnSizes != null && StartsWithSubgrid(GridTemplateColumns);
         bool rowSubgrid = SubgridRowSizes != null && StartsWithSubgrid(GridTemplateRows);
         bool anySubgrid = colSubgrid || rowSubgrid;
 
-        // Parse both axes' explicit track lists into sizing functions. A null list
-        // (none/empty or an out-of-scope token) declines the whole pass.
-        List<GridTrackSpec> colSpecs = colSubgrid ? FixedTrackSpecs(SubgridColumnSizes) : ParseTrackList(GridTemplateColumns, em);
-        List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes) : ParseTrackList(GridTemplateRows, em);
+        // CSS Grid Level 2 §7.3: an axis that declares `subgrid` but has no
+        // inherited tracks yet (SubgridColumn/RowSizes still null) is unresolved —
+        // either this box has no grid to subgrid onto (a true orphan) or its parent
+        // grid has not recorded the inherited sizes yet. For THIS pass the axis
+        // computes to `none` and the box lays out as a standalone grid: crucially
+        // its *other*, non-subgridded axis (e.g. `grid-auto-rows` on a column
+        // subgrid) still sizes correctly, so the grid gets its proper block size
+        // instead of collapsing. A true orphan keeps this result; a real subgrid is
+        // re-run by its parent's LayoutSubgridItem once the inherited sizes exist,
+        // which replaces this standalone layout with the true subgridded one.
+        //
+        // Unflagged browsers reach this for the subgridded children of a
+        // `display: grid-lanes` container: the (unsupported) grid-lanes display is
+        // dropped to block, so the child grids have no grid parent and their
+        // `grid-template-columns: subgrid …` falls back this way — including the
+        // nested `subgrid > subgrid` case — matching the Chromium reference for the
+        // WPT css-grid/grid-lanes grid-subgridded-to-grid-lanes suite.
+        bool colOrphanSubgrid = SubgridColumnSizes == null && StartsWithSubgrid(GridTemplateColumns);
+        bool rowOrphanSubgrid = SubgridRowSizes == null && StartsWithSubgrid(GridTemplateRows);
+        bool anyOrphanSubgrid = colOrphanSubgrid || rowOrphanSubgrid;
 
-        // When one axis is a resolved subgrid, the other axis may legitimately be
-        // implicit-only (e.g. a column subgrid with `grid-auto-rows`): treat a
-        // none/empty track list there as zero explicit tracks so the placed items
-        // generate implicit tracks, rather than declining. The general (non-subgrid)
-        // path keeps requiring both axes to have explicit tracks.
-        if (anySubgrid)
+        // Parse both axes' explicit track lists into sizing functions. A null list
+        // (none/empty or an out-of-scope token) declines the whole pass; an orphan
+        // subgrid axis contributes no explicit tracks (its `subgrid` computed to none).
+        List<GridTrackSpec> colSpecs = colSubgrid ? FixedTrackSpecs(SubgridColumnSizes)
+            : colOrphanSubgrid ? new List<GridTrackSpec>() : ParseTrackList(GridTemplateColumns, em);
+        List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes)
+            : rowOrphanSubgrid ? new List<GridTrackSpec>() : ParseTrackList(GridTemplateRows, em);
+
+        // When one axis is a resolved subgrid (or an orphan subgrid resolved to
+        // none), the other axis may legitimately be implicit-only (e.g. a column
+        // subgrid with `grid-auto-rows`): treat a none/empty track list there as
+        // zero explicit tracks so the placed items generate implicit tracks, rather
+        // than declining. The general (non-subgrid) path keeps requiring both axes
+        // to have explicit tracks.
+        if (anySubgrid || anyOrphanSubgrid)
         {
             if (colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns)) colSpecs = new List<GridTrackSpec>();
             if (rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows)) rowSpecs = new List<GridTrackSpec>();
+            // A bare `auto` template is one explicit auto-sized track, but
+            // ParseTrackList lumps it in with `none` (returns null so the general
+            // path declines to the approximation). For a subgrid/standalone grid,
+            // keep it as a real auto track so a nested item taller than the implicit
+            // grid-auto-* size grows the track instead of the pass declining — the
+            // `grid-lanes > .subgrid { grid-template-rows: auto }` outer grids that
+            // wrap a taller inner subgrid (WPT grid-subgridded-to-grid-lanes) need this.
+            if (colSpecs == null && IsBareAutoTemplate(GridTemplateColumns))
+                colSpecs = new List<GridTrackSpec> { AutoTrackSpec };
+            if (rowSpecs == null && IsBareAutoTemplate(GridTemplateRows))
+                rowSpecs = new List<GridTrackSpec> { AutoTrackSpec };
         }
 
         if (colSpecs == null || rowSpecs == null)
             return false;
-        if (colSpecs.Count == 0 && rowSpecs.Count == 0)
+        // A standalone orphan-subgrid grid can have zero explicit tracks in both
+        // axes (subgrid→none on one, `none` on the other) yet still be sized from
+        // its implicit tracks and auto-placed items, so it is allowed through where
+        // the general both-empty case declines.
+        if (colSpecs.Count == 0 && rowSpecs.Count == 0 && !anyOrphanSubgrid)
             return false;
-        if (!anySubgrid && (colSpecs.Count == 0 || rowSpecs.Count == 0))
+        if (!anySubgrid && !anyOrphanSubgrid && (colSpecs.Count == 0 || rowSpecs.Count == 0))
             return false;
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
@@ -722,6 +772,14 @@ internal partial class CssBox
     private static bool IsNoneOrEmptyTemplate(string template)
         => string.IsNullOrWhiteSpace(template)
             || template.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True for a bare <c>auto</c> track template (one auto-sized track).</summary>
+    private static bool IsBareAutoTemplate(string template)
+        => template != null && template.Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A single <c>auto</c> min/max track sizing function.</summary>
+    private static GridTrackSpec AutoTrackSpec
+        => new(new GridSize(GridSizeKind.Auto), new GridSize(GridSizeKind.Auto));
 
     /// <summary>Build fixed (px) track-sizing functions from inherited subgrid sizes.</summary>
     private static List<GridTrackSpec> FixedTrackSpecs(double[] sizes)
