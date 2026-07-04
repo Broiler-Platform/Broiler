@@ -525,7 +525,7 @@ internal static class CssUtils
                 cssBox.Content = value;
                 break;
             case "display":
-                cssBox.Display = NormalizeDisplayValue(value);
+                cssBox.Display = NormalizeDisplayValue(value, cssBox);
                 break;
             case "direction":
                 cssBox.Direction = value;
@@ -698,17 +698,27 @@ internal static class CssUtils
     /// <summary>
     /// Normalize a <c>display</c> value the layout engine consumes: collapse the
     /// CSS Display 3 two-value syntax (<c>inline grid</c>, <c>block flow-root</c>,
-    /// …) to its legacy single keyword, and map the experimental CSS Grid Level 3
-    /// <c>grid-lanes</c> &lt;display-inside&gt; to a grid formatting context
-    /// (<c>grid</c>/<c>inline-grid</c>). Single-keyword values pass through
-    /// unchanged apart from a bare <c>grid-lanes</c>.
+    /// …) to its legacy single keyword. The experimental CSS Grid Level 3
+    /// <c>grid-lanes</c> &lt;display-inside&gt; is treated as an invalid,
+    /// dropped declaration — the element falls back to its default display —
+    /// matching reference browsers, which ship no unflagged grid-lanes support.
     /// </summary>
-    internal static string NormalizeDisplayValue(string value)
+    internal static string NormalizeDisplayValue(string value, CssBox box = null)
     {
         string v = value.Trim();
         var parts = v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 1)
-            return parts[0].Equals("grid-lanes", StringComparison.OrdinalIgnoreCase) ? "grid" : v;
+
+        // `display: grid-lanes` / `<outside> grid-lanes` is invalid: no stable
+        // browser ships the CSS Grid Level 3 grid-lanes keyword unflagged, so the
+        // whole declaration is dropped and the element keeps its default display.
+        // Broiler.CSS rejects it at validation once
+        // patches/0003-css-reject-display-grid-lanes.patch lands; until then the
+        // pinned submodule still accepts grid-lanes and forwards it here, so this
+        // reproduces the dropped-declaration result (a no-op once the patch lands,
+        // since a rejected grid-lanes never reaches this method).
+        if (Array.Exists(parts, static p => p.Equals("grid-lanes", StringComparison.OrdinalIgnoreCase)))
+            return DefaultDisplayForElement(box);
+
         if (parts.Length != 2)
             return v;
 
@@ -718,8 +728,6 @@ internal static class CssUtils
         else if (Array.IndexOf(DisplayOutsideKeywords, b) >= 0) { outside = b; inside = a; }
         else return v; // not a recognized two-value form; leave for the caller
 
-        // grid-lanes behaves as grid for our engine (experimental CSS Grid L3).
-        if (inside == "grid-lanes") inside = "grid";
         bool isInline = outside == "inline";
         return inside switch
         {
@@ -731,6 +739,33 @@ internal static class CssUtils
             _ => v,
         };
     }
+
+    /// <summary>
+    /// The default (user-agent) display an element falls back to when its
+    /// <c>display</c> declaration is invalid and dropped: <c>block</c> for
+    /// block-level HTML elements, otherwise <c>inline</c> (inline elements and
+    /// unknown/custom elements such as <c>&lt;grid&gt;</c>). Only used by the
+    /// grid-lanes fallback in <see cref="NormalizeDisplayValue"/>.
+    /// </summary>
+    private static string DefaultDisplayForElement(CssBox box)
+    {
+        string name = box?.HtmlTag?.Name;
+        return name != null && BlockLevelHtmlTags.Contains(name)
+            ? CssConstants.Block
+            : CssConstants.Inline;
+    }
+
+    /// <summary>HTML elements whose user-agent <c>display</c> is <c>block</c>
+    /// (the ones exercised by the css-grid/grid-lanes tests plus the common flow
+    /// block elements). Table and list-item elements are deliberately excluded —
+    /// their UA display is not <c>block</c> — but no grid-lanes test targets them.</summary>
+    private static readonly HashSet<string> BlockLevelHtmlTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "address", "article", "aside", "blockquote", "center", "dd", "details",
+        "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+        "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup",
+        "hr", "main", "menu", "nav", "ol", "p", "pre", "section", "summary", "ul",
+    };
 
     /// <summary>
     /// Index of the row/column separator slash in a <c>grid</c>/<c>grid-template</c>
