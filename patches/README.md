@@ -21,21 +21,39 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
-- **0002-css-two-value-display-grid-lanes.patch** → `Broiler.CSS`
+- **0003-css-reject-display-grid-lanes.patch** → `Broiler.CSS`
   (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — makes `IsAcceptableDeclarationValue`
-  accept the CSS Display 3 two-value `display` syntax (`<display-outside>
-  <display-inside>`, e.g. `inline grid`, `block flow-root`) and the experimental
-  CSS Grid Level 3 `grid-lanes` `<display-inside>`, instead of dropping them.
-  The parent repo's `CssUtils.NormalizeDisplayValue` then collapses those to a
-  legacy single keyword (`inline grid` → `inline-grid`, `grid-lanes` → `grid`).
-  Until this patch is applied, the submodule still drops the two-value/grid-lanes
-  declarations at validation, so `NormalizeDisplayValue` never sees them and the
-  parent-repo change is an inert no-op (single-keyword values pass through
-  unchanged) — no CI fallback is needed. The companion **subgrid** support
-  (`Broiler.Layout` `CssBoxGrid.TryApplyGridTrackLayout`) is entirely in the
-  parent repo and is live on CI without this patch.
+  **reject** `display: grid-lanes` and the two-value `<display-outside> grid-lanes`
+  as invalid, so the declaration is dropped and the element keeps its default
+  display. No stable browser ships the experimental CSS Grid Level 3 `grid-lanes`
+  keyword unflagged, so treating it as a grid formatting context (what patch 0002
+  previously did) diverged from every reference on the css-grid/grid-lanes WPT
+  suite (issue #1218); dropping it matches the reference browsers the run compares
+  against. Applies cleanly to the pinned `Broiler.CSS` pointer.
+  **Active CI fallback until applied:** the pinned submodule still *accepts*
+  grid-lanes and forwards it to the layout engine, so `Broiler.Layout`
+  `CssUtils.NormalizeDisplayValue` reproduces the dropped-declaration result —
+  it maps a forwarded `grid-lanes` display to the element's default display
+  (block for block-level HTML elements, otherwise inline). Once this patch lands
+  and the pointer is bumped, a rejected grid-lanes never reaches
+  `NormalizeDisplayValue`, so that fallback becomes an inert no-op. The companion
+  block percentage-height fix (`Broiler.Layout`
+  `CssBox.PercentageHeightContainingBlockHeight`, resolving `height:%` children
+  against a definite-height block parent) is entirely in the parent repo and live
+  on CI without any patch.
 
 ## Applied / obsolete
+
+- **0002-css-two-value-display-grid-lanes.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — **applied at the pinned pointer.**
+  Made `IsAcceptableDeclarationValue` accept the CSS Display 3 two-value `display`
+  syntax (`<display-outside> <display-inside>`, e.g. `inline grid`, `block
+  flow-root`) and the experimental `grid-lanes` `<display-inside>`. The pinned
+  `Broiler.CSS` already carries this behaviour (the two-value support is live and
+  correct); the exact patch text no longer applies because the surrounding
+  validator has since changed, so it is retained only for history. Its
+  `grid-lanes` acceptance turned out to diverge from reference browsers and is
+  reverted by **0003** above — the two-value support is unaffected and stays.
 
 - **0001-broiler-html-inline-layout-geometry.patch** → `Broiler.HTML`
   (`Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — **APPLIED upstream**,

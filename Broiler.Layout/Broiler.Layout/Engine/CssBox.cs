@@ -559,7 +559,26 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
             return LayoutEnvironment.ViewportSize.Height;
 
-        return ContainingBlock?.Size.Height ?? 0;
+        // A flow containing block with a definite (non-auto, non-percentage)
+        // specified height exposes that height to its percentage-height
+        // children even before its own block size is applied. Block heights
+        // resolve bottom-up — children lay out (and resolve their percentages)
+        // before the containing block sets its used height — and a fixed-height
+        // box, unlike a percentage-height one, is not pre-resolved into
+        // Size.Height (see the §10.5 pre-resolution in the layout pass). Reading
+        // Size.Height here would then yield 0 and collapse every percentage-height
+        // child. Derive the basis straight from the specification instead, the
+        // same way the abspos IMCB fallback does for a definite containing block.
+        var flowCb = ContainingBlock;
+        if (flowCb != null && flowCb.Height != CssConstants.Auto && !string.IsNullOrEmpty(flowCb.Height)
+            && !flowCb.Height.Contains('%'))
+        {
+            double cssHeight = CssValueParser.ParseLength(flowCb.Height, 0, flowCb.GetEmHeight());
+            if (cssHeight > 0)
+                return flowCb.ResolveSpecifiedHeightToBorderBox(cssHeight);
+        }
+
+        return flowCb?.Size.Height ?? 0;
     }
 
     public HtmlTag HtmlTag { get; }
