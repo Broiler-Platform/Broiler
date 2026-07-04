@@ -1275,6 +1275,53 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                     Size = new SizeF((float)stfWidth, Size.Height);
                 }
+                else if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+                    && Float == CssConstants.None
+                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                    && VerticalFlowPrototype.Enabled
+                    && IsVerticalWritingMode(WritingMode)
+                    && (ParentBox == null || !IsVerticalWritingMode(ParentBox.WritingMode))
+                    && ContainingBlock is { ParentBox: not null } orthoCb
+                    && (string.IsNullOrEmpty(orthoCb.Height) || orthoCb.Height == CssConstants.Auto))
+                {
+                    // CSS Writing Modes 4 §7.3 (auto-sizing in orthogonal flows):
+                    // a box establishing an orthogonal flow — here a vertical
+                    // writing-mode box inside a non-vertical containing block — with
+                    // an auto inline size is sized to fit-content, NOT stretched to
+                    // the containing block's (perpendicular) inline size. In the
+                    // vertical-flow prototype this box is laid out in a logical
+                    // horizontal frame where its logical width IS its inline size, so
+                    // compute that width as shrink-to-fit; the post-layout rotation
+                    // (ApplyVerticalWritingModeFlow) then maps it onto physical height.
+                    // Gated on an indefinite containing-block block size (an auto-height
+                    // in-flow ancestor) so a definite orthogonal size — a root box
+                    // filling the viewport, or an explicit-height container — keeps the
+                    // existing fill behaviour. Without this, an empty (or short)
+                    // vertical box fills the container width and rotates into a
+                    // viewport-tall strip instead of collapsing to its content
+                    // (WPT css-grid/grid-lanes row-subgrid-auto-fill-007).
+                    EnsureDescendantWordsMeasured(g);
+
+                    double preferred = ComputeShrinkToFitWidth();
+                    // Indefinite orthogonal available inline size falls back to the
+                    // initial containing block (viewport) block size — here the
+                    // viewport height, the vertical inline axis's extent.
+                    double available = LayoutEnvironment?.ViewportSize.Height ?? width;
+
+                    GetMinMaxWidth(out double prefMin, out _);
+                    if (double.IsNaN(prefMin)) prefMin = 0;
+                    if (double.IsNaN(preferred)) preferred = 0;
+                    double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
+
+                    // Border/padding added for the border-box width Size.Width holds
+                    // (shrink-to-fit yields a content width). max-width/min-width are
+                    // physical-width (block-size) constraints and do not clamp the
+                    // inline size resolved here.
+                    stfWidth += ActualBorderLeftWidth + ActualBorderRightWidth
+                              + ActualPaddingLeft + ActualPaddingRight;
+
+                    Size = new SizeF((float)stfWidth, Size.Height);
+                }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
                 {
                     // Margins reduce the box width only for auto-width elements.
