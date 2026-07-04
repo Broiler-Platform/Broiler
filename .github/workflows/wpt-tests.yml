@@ -58,7 +58,7 @@ permissions:
 
 env:
   # Bump to invalidate the cached WPT checkout + references.
-  CACHE_EPOCH: '4' # reference generator now serves root-relative /css/support, /resources, … from the WPT root
+  CACHE_EPOCH: '5' # reference generator no longer serves WPT harness scripts (testharness/check-layout), matching the runner's stubs
   SHARD_COUNT: '8'
   WPT_CHECKOUT_DIR: tests/wpt/checkout
   REFERENCE_DIR: tests/wpt/references

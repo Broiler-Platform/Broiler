@@ -151,7 +151,7 @@ internal static class CssBoxHelper
         return currentMaxBottom;
     }
 
-    public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum)
+    public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum, CssBox suppressExplicitWidthFor = null)
     {
         double? oldSum = null;
 
@@ -164,10 +164,17 @@ internal static class CssBoxHelper
             maxSum = marginSum;
         }
 
+        // When measuring a grid item's content contribution, its own explicit
+        // width is ignored (a percentage width resolves against the track being
+        // sized, so it is treated as auto/content — CSS Grid §11.5); descendants'
+        // explicit widths still count.
+        bool useExplicitWidth = box != suppressExplicitWidthFor;
+
         // CSS2.1 §10.3.5/§10.3.7: When a floated child has an explicit width,
         // use the declared width directly for shrink-to-fit calculation
         // instead of measuring content words.
-        if (box.Float != CssConstants.None
+        if (useExplicitWidth
+            && box.Float != CssConstants.None
             && box.Width != CssConstants.Auto
             && !string.IsNullOrEmpty(box.Width))
         {
@@ -186,7 +193,8 @@ internal static class CssBoxHelper
         // CSS2.1 §17.5.2: Non-floated block-level children (e.g. display:table
         // or display:list-item inside an anonymous table-cell) with explicit
         // width contribute that width to the intrinsic minimum/maximum.
-        if (box.Display != CssConstants.Inline
+        if (useExplicitWidth
+            && box.Display != CssConstants.Inline
             && box.Display != CssConstants.TableCell
             && box.Float == CssConstants.None
             && box.Width != CssConstants.Auto

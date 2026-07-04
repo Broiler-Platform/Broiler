@@ -11,6 +11,7 @@ const {
     createBrowserContextOptions,
     discoverTests,
     isNonTestFile,
+    isWptHarnessScript,
     requiresJavaScript,
     resolveRootRelativeResource,
     shardIndexForPath,
@@ -92,6 +93,36 @@ test('root-relative resources resolve against the WPT root, like a real server',
 
         // Non-file schemes are never intercepted.
         assert.equal(resolveRootRelativeResource(root, 'https://example.test/x.css'), null);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('WPT harness scripts are never served, matching the runner stubs', () => {
+    assert.equal(isWptHarnessScript('/resources/testharness.js'), true);
+    assert.equal(isWptHarnessScript('/resources/testharnessreport.js'), true);
+    assert.equal(isWptHarnessScript('/resources/check-layout-th.js'), true);
+    assert.equal(isWptHarnessScript('/css/support/grid.css'), false);
+    assert.equal(isWptHarnessScript('/fonts/ahem.css'), false);
+    assert.equal(isWptHarnessScript('/resources/testdriver.js'), false);
+});
+
+test('the reference generator refuses to serve harness scripts', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'broiler-wpt-harness-'));
+    try {
+        fs.mkdirSync(path.join(root, 'resources'), { recursive: true });
+        const harness = path.join(root, 'resources', 'testharness.js');
+        const checkLayout = path.join(root, 'resources', 'check-layout-th.js');
+        fs.writeFileSync(harness, 'window.test = function(){};');
+        fs.writeFileSync(checkLayout, 'window.checkLayout = function(){};');
+
+        // The harness scripts exist under the WPT root but must NOT be served:
+        // Broiler.Wpt stubs them, so its render has no results table. Serving
+        // them would make Chromium render the table and the test fail spuriously.
+        assert.equal(
+            resolveRootRelativeResource(root, 'file:///resources/testharness.js'), null);
+        assert.equal(
+            resolveRootRelativeResource(root, 'file:///resources/check-layout-th.js?v=1'), null);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

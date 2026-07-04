@@ -3752,6 +3752,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return maxWidth + padding;
     }
 
+    /// <summary>
+    /// Min/max-content width measured from this box's <em>content</em>, ignoring
+    /// its own explicit width (a percentage width is resolved against the caller's
+    /// context, so for grid track sizing it is treated as auto). Descendants'
+    /// explicit widths are honoured. Used by the grid track-sizing algorithm.
+    /// </summary>
+    internal void GetContentMinMaxWidth(out double minWidth, out double maxWidth)
+    {
+        double min = 0f;
+        double maxSum = 0f;
+        double paddingSum = 0f;
+        double marginSum = 0f;
+
+        CssBoxHelper.GetMinMaxSumWords(this, ref min, ref maxSum, ref paddingSum, ref marginSum, suppressExplicitWidthFor: this);
+
+        maxWidth = paddingSum + maxSum;
+        minWidth = paddingSum + (min < 90999 ? min : 0);
+        maxWidth -= CssBoxHelper.EdgeWhitespaceSpacing(this);
+        if (maxWidth < minWidth)
+            maxWidth = minWidth;
+    }
+
     internal void GetMinMaxWidth(out double minWidth, out double maxWidth)
     {
         double min = 0f;
