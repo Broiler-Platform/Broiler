@@ -94,11 +94,36 @@ internal partial class CssBox
         if (contentWidth <= 0)
             return false;
 
+        // CSS Grid Level 2 §7.3 (subgrid): an axis whose template is `subgrid`
+        // takes its tracks from the parent grid over the item's spanned area. The
+        // parent's track pass resolves and records those sizes (SubgridColumn/RowSizes)
+        // and re-runs this layout; until then (or with no grid parent) the axis is
+        // unresolved and the pass declines, falling back to the approximation.
+        bool colSubgrid = SubgridColumnSizes != null && StartsWithSubgrid(GridTemplateColumns);
+        bool rowSubgrid = SubgridRowSizes != null && StartsWithSubgrid(GridTemplateRows);
+        bool anySubgrid = colSubgrid || rowSubgrid;
+
         // Parse both axes' explicit track lists into sizing functions. A null list
         // (none/empty or an out-of-scope token) declines the whole pass.
-        List<GridTrackSpec> colSpecs = ParseTrackList(GridTemplateColumns, em);
-        List<GridTrackSpec> rowSpecs = ParseTrackList(GridTemplateRows, em);
-        if (colSpecs == null || rowSpecs == null || colSpecs.Count == 0 || rowSpecs.Count == 0)
+        List<GridTrackSpec> colSpecs = colSubgrid ? FixedTrackSpecs(SubgridColumnSizes) : ParseTrackList(GridTemplateColumns, em);
+        List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes) : ParseTrackList(GridTemplateRows, em);
+
+        // When one axis is a resolved subgrid, the other axis may legitimately be
+        // implicit-only (e.g. a column subgrid with `grid-auto-rows`): treat a
+        // none/empty track list there as zero explicit tracks so the placed items
+        // generate implicit tracks, rather than declining. The general (non-subgrid)
+        // path keeps requiring both axes to have explicit tracks.
+        if (anySubgrid)
+        {
+            if (colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns)) colSpecs = new List<GridTrackSpec>();
+            if (rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows)) rowSpecs = new List<GridTrackSpec>();
+        }
+
+        if (colSpecs == null || rowSpecs == null)
+            return false;
+        if (colSpecs.Count == 0 && rowSpecs.Count == 0)
+            return false;
+        if (!anySubgrid && (colSpecs.Count == 0 || rowSpecs.Count == 0))
             return false;
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
@@ -162,7 +187,10 @@ internal partial class CssBox
         int colCount = Math.Max(maxColEnd, colSpecs.Count);
         int rowCount = Math.Max(maxRowEnd, rowSpecs.Count);
 
-        double colGap = ResolveGridGap(ColumnGap, contentWidth, em);
+        // A subgridded axis adopts the parent grid's gutter (CSS Grid L2 §7.3).
+        double colGap = colSubgrid && SubgridColumnGap.HasValue
+            ? SubgridColumnGap.Value
+            : ResolveGridGap(ColumnGap, contentWidth, em);
 
         // ── Column axis (inline) ── content contributions are layout-independent.
         var colItems = new List<AxisItem>(placements.Count);
@@ -185,9 +213,11 @@ internal partial class CssBox
         // the definite content-box height straight from the declaration — Size.Height
         // at this point may be a measurement, not the specified height — so it can
         // drive fr/percentage rows. An indefinite height must not.
-        bool rowDefinite = TryGetDefiniteContentHeight(em, out double definiteHeight);
+        bool rowDefinite = TryGetDefiniteContentHeight(em, out double definiteHeight) || rowSubgrid;
         double rowBasis = rowDefinite ? definiteHeight : 0;
-        double rowGap = ResolveGridGap(RowGap, rowBasis, em);
+        double rowGap = rowSubgrid && SubgridRowGap.HasValue
+            ? SubgridRowGap.Value
+            : ResolveGridGap(RowGap, rowBasis, em);
 
         var rowItems = new List<AxisItem>(placements.Count);
         foreach (var p in placements)
@@ -225,6 +255,11 @@ internal partial class CssBox
             double areaTop = contentTop + rowStartEdge[p.PlacedRow];
             double areaBottom = contentTop + rowEndEdge[p.PlacedRow + p.RowSpan - 1];
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
+
+            // CSS Grid L2 §7.3: a subgrid item, now sized to its grid area, takes
+            // its tracks in the subgridded axis from this grid's tracks over the
+            // spanned range and lays its own items into them.
+            LayoutSubgridItem(p, colSizes, rowSizes, colGap, rowGap);
         }
 
         // The grid's block size is the block-end edge of its last row track. Every
@@ -628,6 +663,78 @@ internal partial class CssBox
             return gap > 0 ? gap : 0;
         }
         return measured;
+    }
+
+    // ─────────────────────────────── Subgrid ────────────────────────────────
+
+    /// <summary>
+    /// CSS Grid Level 2 §7.3: resolve a subgrid item's inherited tracks from this
+    /// grid's sized tracks over the item's spanned area, then re-run the item's
+    /// own grid layout so its children flow into those tracks. A no-op unless the
+    /// item is itself a grid container declaring <c>subgrid</c> on an axis.
+    /// </summary>
+    private void LayoutSubgridItem(GridPlacement p, double[] colSizes, double[] rowSizes,
+        double colGap, double rowGap)
+    {
+        var item = p.Item;
+        if (item.Display is not ("grid" or "inline-grid"))
+            return;
+        bool colSub = StartsWithSubgrid(item.GridTemplateColumns);
+        bool rowSub = StartsWithSubgrid(item.GridTemplateRows);
+        if (!colSub && !rowSub)
+            return;
+
+        if (colSub)
+        {
+            item.SubgridColumnSizes = SliceTrackSizes(colSizes, p.PlacedCol, p.ColSpan);
+            item.SubgridColumnGap = colGap;
+        }
+        if (rowSub)
+        {
+            item.SubgridRowSizes = SliceTrackSizes(rowSizes, p.PlacedRow, p.RowSpan);
+            item.SubgridRowGap = rowGap;
+        }
+        item.TryApplyGridTrackLayout();
+    }
+
+    /// <summary>The <paramref name="span"/> track sizes starting at <paramref name="start"/>
+    /// (clamped to the available tracks).</summary>
+    private static double[] SliceTrackSizes(double[] sizes, int start, int span)
+    {
+        int n = Math.Max(0, Math.Min(span, sizes.Length - start));
+        var slice = new double[n];
+        for (int i = 0; i < n; i++)
+            slice[i] = sizes[start + i];
+        return slice;
+    }
+
+    /// <summary>True when a track template's first token is the <c>subgrid</c> keyword.</summary>
+    private static bool StartsWithSubgrid(string template)
+    {
+        if (string.IsNullOrWhiteSpace(template))
+            return false;
+        string t = template.TrimStart();
+        return t.StartsWith("subgrid", StringComparison.OrdinalIgnoreCase)
+            && (t.Length == 7 || (!char.IsLetterOrDigit(t[7]) && t[7] != '-'));
+    }
+
+    /// <summary>True for a <c>none</c>/empty track template (no explicit tracks).</summary>
+    private static bool IsNoneOrEmptyTemplate(string template)
+        => string.IsNullOrWhiteSpace(template)
+            || template.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Build fixed (px) track-sizing functions from inherited subgrid sizes.</summary>
+    private static List<GridTrackSpec> FixedTrackSpecs(double[] sizes)
+    {
+        if (sizes == null)
+            return null;
+        var specs = new List<GridTrackSpec>(sizes.Length);
+        foreach (var s in sizes)
+        {
+            var g = new GridSize(GridSizeKind.Fixed, s);
+            specs.Add(new GridTrackSpec(g, g));
+        }
+        return specs;
     }
 
     /// <summary>

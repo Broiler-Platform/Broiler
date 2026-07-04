@@ -525,7 +525,7 @@ internal static class CssUtils
                 cssBox.Content = value;
                 break;
             case "display":
-                cssBox.Display = value;
+                cssBox.Display = NormalizeDisplayValue(value);
                 break;
             case "direction":
                 cssBox.Direction = value;
@@ -691,6 +691,45 @@ internal static class CssUtils
         cssBox.GridAutoFlow = "row";
         cssBox.GridAutoRows = "auto";
         cssBox.GridAutoColumns = "auto";
+    }
+
+    private static readonly string[] DisplayOutsideKeywords = ["block", "inline", "run-in"];
+
+    /// <summary>
+    /// Normalize a <c>display</c> value the layout engine consumes: collapse the
+    /// CSS Display 3 two-value syntax (<c>inline grid</c>, <c>block flow-root</c>,
+    /// …) to its legacy single keyword, and map the experimental CSS Grid Level 3
+    /// <c>grid-lanes</c> &lt;display-inside&gt; to a grid formatting context
+    /// (<c>grid</c>/<c>inline-grid</c>). Single-keyword values pass through
+    /// unchanged apart from a bare <c>grid-lanes</c>.
+    /// </summary>
+    internal static string NormalizeDisplayValue(string value)
+    {
+        string v = value.Trim();
+        var parts = v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1)
+            return parts[0].Equals("grid-lanes", StringComparison.OrdinalIgnoreCase) ? "grid" : v;
+        if (parts.Length != 2)
+            return v;
+
+        string a = parts[0].ToLowerInvariant(), b = parts[1].ToLowerInvariant();
+        string outside, inside;
+        if (Array.IndexOf(DisplayOutsideKeywords, a) >= 0) { outside = a; inside = b; }
+        else if (Array.IndexOf(DisplayOutsideKeywords, b) >= 0) { outside = b; inside = a; }
+        else return v; // not a recognized two-value form; leave for the caller
+
+        // grid-lanes behaves as grid for our engine (experimental CSS Grid L3).
+        if (inside == "grid-lanes") inside = "grid";
+        bool isInline = outside == "inline";
+        return inside switch
+        {
+            "grid" => isInline ? "inline-grid" : "grid",
+            "flex" => isInline ? "inline-flex" : "flex",
+            "table" => isInline ? "inline-table" : "table",
+            "flow-root" => isInline ? "inline-block" : "flow-root",
+            "flow" => isInline ? "inline" : "block",
+            _ => v,
+        };
     }
 
     /// <summary>
