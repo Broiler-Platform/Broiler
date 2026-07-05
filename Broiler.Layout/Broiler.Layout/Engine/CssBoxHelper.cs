@@ -568,6 +568,16 @@ internal static class CssBoxHelper
     /// </summary>
     internal static bool IsEmptyCollapsible(CssBox box)
     {
+        // CSS2.1 §8.3.1: a box that establishes a new block formatting context
+        // (float, inline-block, grid/flex, overflow≠visible, abspos, table-cell)
+        // does not collapse its top and bottom margins through itself — even with
+        // no content — so an empty such box still separates its neighbours by both
+        // its margins. Chromium keeps an empty overflow:hidden / grid container's
+        // top and bottom margins distinct; only a plain in-flow block collapses
+        // through. (Floats/abspos are already excluded from flow collapsing, but
+        // covering them here keeps the predicate self-consistent.)
+        if (EstablishesBfc(box))
+            return false;
         if (box.ActualBorderTopWidth > 0.1 || box.ActualBorderBottomWidth > 0.1)
             return false;
         if (box.ActualPaddingTop > 0.1 || box.ActualPaddingBottom > 0.1)

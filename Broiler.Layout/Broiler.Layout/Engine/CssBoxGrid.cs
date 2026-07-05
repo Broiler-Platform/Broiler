@@ -265,8 +265,12 @@ internal partial class CssBox
             double marginX = p.Item.ActualMarginLeft + p.Item.ActualMarginRight;
             colItems.Add(new AxisItem(p.PlacedCol, p.ColSpan, minW + marginX, maxW + marginX));
         }
+        // CSS Grid §11.7: the default (normal) / explicit stretch content
+        // distribution grows auto tracks to fill the container; a packing/spacing
+        // justify-content leaves them at content size and positions them instead.
+        bool stretchCols = IsStretchContentDistribution(JustifyContent);
         double[] colSizes = ResolveTrackSizes(colSpecs, implicitCol, colCount,
-            contentWidth, definite: true, colGap, contentWidth, em, colItems);
+            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols);
         if (colSizes == null)
             return false;
 
@@ -302,13 +306,21 @@ internal partial class CssBox
             if (h < 0) h = 0;
             rowItems.Add(new AxisItem(p.PlacedRow, p.RowSpan, h, h));
         }
+        bool stretchRows = IsStretchContentDistribution(AlignContent);
         double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
-            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems);
+            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows);
         if (rowSizes == null)
             return false;
 
-        double[] colStartEdge = BuildTrackEdges(colSizes, colGap, out double[] colEndEdge);
-        double[] rowStartEdge = BuildTrackEdges(rowSizes, rowGap, out double[] rowEndEdge);
+        // CSS Box Alignment §5 (content distribution): when the tracks do not
+        // fill the container along an axis, justify-content (inline) / align-content
+        // (block) positions or spaces them within the leftover room. The block axis
+        // only has leftover room when the container's block size is definite.
+        double rowContainerSize = rowDefinite ? definiteHeight : SumTrackSizes(rowSizes, rowGap);
+        double[] colStartEdge = BuildTrackEdgesAligned(colSizes, colGap, contentWidth,
+            JustifyContent, out double[] colEndEdge);
+        double[] rowStartEdge = BuildTrackEdgesAligned(rowSizes, rowGap, rowContainerSize,
+            AlignContent, out double[] rowEndEdge);
 
         double contentLeft = Location.X + ActualBorderLeftWidth + ActualPaddingLeft;
         double contentTop = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
@@ -1293,6 +1305,41 @@ internal partial class CssBox
         return true;
     }
 
+    /// <summary>Total pixel extent of all <paramref name="sizes"/> plus the gaps
+    /// between them — the grid's content-box size along that axis.</summary>
+    private static double SumTrackSizes(double[] sizes, double gap)
+    {
+        if (sizes == null || sizes.Length == 0) return 0;
+        double total = 0;
+        foreach (double s in sizes) total += s;
+        total += (sizes.Length - 1) * gap;
+        return total > 0 ? total : 0;
+    }
+
+    /// <summary>
+    /// CSS Grid §7.2.1: re-resolve pure-percentage row tracks against the grid's
+    /// computed intrinsic block size after the indefinite-height pass sized them as
+    /// 'auto'. Only a track sized purely by percentage (min and max the same
+    /// percentage — i.e. <c>grid-template-rows: 60%</c>) becomes definite here;
+    /// mixed intrinsic/percentage tracks keep their auto-derived size.
+    /// </summary>
+    private static void ResolvePercentRowTracksAgainstIntrinsic(List<GridTrackSpec> specs,
+        GridTrackSpec implicitSpec, double[] sizes, double intrinsicHeight)
+    {
+        if (sizes == null || intrinsicHeight < 0) return;
+        for (int t = 0; t < sizes.Length; t++)
+        {
+            GridTrackSpec spec = t < specs.Count ? specs[t] : implicitSpec;
+            if (spec.Min.Kind == GridSizeKind.Percent && spec.Max.Kind == GridSizeKind.Percent
+                && spec.Min.Value == spec.Max.Value)
+            {
+                double px = spec.Max.Value / 100.0 * intrinsicHeight;
+                if (!double.IsNaN(px) && !double.IsInfinity(px) && px >= 0)
+                    sizes[t] = px;
+            }
+        }
+    }
+
     // ─────────────────────────── Track sizing (§11) ───────────────────────────
 
     /// <summary>
@@ -1305,7 +1352,7 @@ internal partial class CssBox
     /// </summary>
     private double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
         int count, double containerSize, bool definite, double gap, double percentBasis, double em,
-        List<AxisItem> items)
+        List<AxisItem> items, bool stretchAutoTracks = false)
     {
         if (count < 1) return null;
 
@@ -1406,6 +1453,28 @@ internal partial class CssBox
                 if (isFr[t]) sizes[t] = Math.Max(sizes[t], frFactor[t] * frUnit);
         }
 
+        // CSS Grid §11.7 "Stretch auto Tracks": under the default (normal) content
+        // distribution, leftover space in a definite container is shared equally
+        // among the tracks with an 'auto' max sizing function. fr tracks already
+        // absorbed free space, so skip when any is present.
+        if (stretchAutoTracks && definite && containerSize > 0 && sumFr == 0)
+        {
+            double used = 0;
+            for (int t = 0; t < count; t++) used += sizes[t];
+            double free = containerSize - used - (count - 1) * gap;
+            if (free > 0.5)
+            {
+                int autoCount = 0;
+                for (int t = 0; t < count; t++) if (maxKind[t] == GridSizeKind.Auto) autoCount++;
+                if (autoCount > 0)
+                {
+                    double share = free / autoCount;
+                    for (int t = 0; t < count; t++)
+                        if (maxKind[t] == GridSizeKind.Auto) sizes[t] += share;
+                }
+            }
+        }
+
         for (int t = 0; t < count; t++)
         {
             if (double.IsNaN(sizes[t]) || double.IsInfinity(sizes[t]) || sizes[t] < 0)
@@ -1477,6 +1546,106 @@ internal partial class CssBox
             cursor += size + gap;
         }
         return startEdge;
+    }
+
+    /// <summary>
+    /// Builds cumulative track-edge arrays, positioning the whole track set within
+    /// <paramref name="containerSize"/> according to the axis's content-distribution
+    /// value (<c>justify-content</c> for columns, <c>align-content</c> for rows) when
+    /// the tracks leave free space. Positional values (start/center/end) offset the
+    /// set; distribution values (space-between/around/evenly) also widen the spacing
+    /// between tracks. With no free space this matches <see cref="BuildTrackEdges"/>.
+    /// </summary>
+    private static double[] BuildTrackEdgesAligned(double[] sizes, double gap,
+        double containerSize, string contentAlign, out double[] endEdge)
+    {
+        int count = Math.Max(sizes.Length, 1);
+        var startEdge = new double[count];
+        endEdge = new double[count];
+
+        double sum = 0;
+        for (int i = 0; i < sizes.Length; i++) sum += sizes[i];
+        double free = containerSize - sum - (count - 1) * gap;
+
+        double leading = 0, between = gap;
+        if (free > 0.5)
+            ResolveContentDistribution(contentAlign, free, count, gap, out leading, out between);
+
+        double cursor = leading;
+        for (int i = 0; i < count; i++)
+        {
+            double size = i < sizes.Length ? sizes[i] : 0;
+            startEdge[i] = cursor;
+            endEdge[i] = cursor + size;
+            cursor += size + between;
+        }
+        return startEdge;
+    }
+
+    /// <summary>
+    /// True when a <c>justify-content</c>/<c>align-content</c> value leaves auto
+    /// tracks stretching to fill the container — the initial <c>normal</c> (and the
+    /// explicit <c>stretch</c>). Any packing/spacing keyword (start/center/end/
+    /// space-*) suppresses the stretch and instead positions the tracks.
+    /// </summary>
+    private static bool IsStretchContentDistribution(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        string v = value.Trim().ToLowerInvariant();
+        return v == "normal" || v == "stretch";
+    }
+
+    /// <summary>
+    /// CSS Box Alignment §5: resolves a content-distribution value into a leading
+    /// offset for the first track and the spacing to insert between adjacent tracks
+    /// (the base <paramref name="gap"/> plus any distributed free space). Only the
+    /// physical (LTR / top-to-bottom) mapping is handled; <c>normal</c>/<c>stretch</c>
+    /// and unrecognised values pack at the start (track growth for stretch is done
+    /// during sizing, not here).
+    /// </summary>
+    private static void ResolveContentDistribution(string value, double free, int count,
+        double gap, out double leading, out double between)
+    {
+        leading = 0;
+        between = gap;
+        string v = (value ?? "").Trim().ToLowerInvariant();
+        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
+        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+        switch (v)
+        {
+            case "center":
+                leading = free / 2;
+                break;
+            case "end":
+            case "flex-end":
+            case "right":
+                leading = free;
+                break;
+            case "space-between":
+                // ≥2 tracks share the free space between them; a single track packs
+                // at the start.
+                if (count > 1) between = gap + free / (count - 1);
+                break;
+            case "space-around":
+                // Free space as equal gaps around every track (half at each end).
+                {
+                    double unit = free / count;
+                    between = gap + unit;
+                    leading = unit / 2;
+                }
+                break;
+            case "space-evenly":
+                // Free space as equal gaps between and outside every track.
+                {
+                    double unit = free / (count + 1);
+                    between = gap + unit;
+                    leading = unit;
+                }
+                break;
+            default:
+                // start / flex-start / left / normal / stretch / baseline → pack start.
+                break;
+        }
     }
 
     // ─────────────────────────── Grid line parsing ───────────────────────────
