@@ -2520,6 +2520,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // falls back to start when content overflows, but for blocks this
         // is handled implicitly (shift is clamped to ≥ 0).
         if (AlignContent != null && AlignContent != "normal"
+            // The definite-track grid pass distributes align-content across its
+            // row tracks itself; this block-level shift would double it.
+            && !_gridTrackLayoutApplied
             && (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.InlineBlock
                 || Display == CssConstants.TableCell)
             && Boxes.Count > 0
