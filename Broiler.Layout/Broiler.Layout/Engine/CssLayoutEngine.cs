@@ -858,6 +858,28 @@ internal static class CssLayoutEngine
     }
 
     /// <summary>
+    /// True when a grid container has at least one in-flow grid item that is an
+    /// inline-level replaced element (an <c>&lt;img&gt;</c>). Such an item's word
+    /// is positioned by the container's line-box flow, not by the item's own
+    /// <see cref="CssBox.PerformLayout"/>, so the per-item block layout path in
+    /// <see cref="FlowInlineBlock"/> would leave it orphaned and unpainted. When
+    /// this is true the grid is instead laid out through the inline formatting
+    /// context (<see cref="CreateLineBoxes"/>), matching the block-level grid path.
+    /// </summary>
+    private static bool GridHasInlineReplacedItem(CssBox grid)
+    {
+        foreach (var child in grid.Boxes)
+        {
+            if (child.Display == CssConstants.None
+                || child.Position is CssConstants.Absolute or CssConstants.Fixed)
+                continue;
+            if (child.IsImage && child.IsInline)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// CSS 2.1 §10.3.9 / §10.6.6: Lay out an inline-block box as a
     /// block internally, then place it atomically in the inline flow.
     /// The inline-block establishes a new block formatting context for
@@ -980,13 +1002,35 @@ internal static class CssLayoutEngine
             // (not inline-blocks) so that width:auto stretches to the
             // column width.  Use the block layout path, then apply grid
             // stacking or auto-placement to fix positioning.
-            foreach (var child in b.Boxes)
-                child.PerformLayout(g);
+            //
+            // Exception: an inline replaced grid item (an <img>) is neither sized
+            // nor painted by its own PerformLayout — a replaced inline element's
+            // word is positioned by the *container's* line-box flow, which the
+            // block path never runs, leaving the word orphaned (no container line
+            // box owns it) so the image renders blank. Route such a grid through
+            // the inline formatting context instead — the same CreateLineBoxes
+            // path the block-level `display:grid` case in CssBox.PerformLayoutImp
+            // uses — so the image's word lands in a container line box and is
+            // painted; ApplyGridLayoutAfterInline then re-flows the items into
+            // their tracks and re-stretches auto-width items. (WPT
+            // css-grid/grid-items/grid-minimum-size-grid-items-021 and the other
+            // inline-grid + <img> tests rendered blank before this.) Narrowed to
+            // grids that actually contain such an item so every other grid keeps
+            // its existing block-layout path.
+            if (GridHasInlineReplacedItem(b))
+            {
+                CreateLineBoxes(g, b);
+            }
+            else
+            {
+                foreach (var child in b.Boxes)
+                    child.PerformLayout(g);
 
-            double childMaxBottom = b.Location.Y;
-            foreach (var child in b.Boxes)
-                childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
-            b.ActualBottom = childMaxBottom;
+                double childMaxBottom = b.Location.Y;
+                foreach (var child in b.Boxes)
+                    childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
+                b.ActualBottom = childMaxBottom;
+            }
 
             b.ApplyGridLayoutAfterInline();
         }
