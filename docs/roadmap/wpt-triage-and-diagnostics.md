@@ -46,7 +46,8 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 28 | Grid pass only did fixed tracks; `fr`/`auto`/`min-content`/`max-content`/`minmax()` declined to the single-column approximation, and subgrid needs real parent track sizing first (#1212) | 🟡 partial | Broiler.Layout/CssBoxGrid |
 | 29 | `grid-lanes/subgrid` reftests at 0–1 %: empty **orthogonal-flow** (`vertical-rl`) box filled its container and rotated into a viewport-tall strip instead of collapsing to fit-content (§7.3) — whole `row-subgrid-auto-fill-*` cluster now matches; `column-subgrid-auto-fill-*` still needs multi-column named-line subgrid layout (#1221) | 🟡 partial | Broiler.Layout |
 | 30 | Grid-item `height:100%` ballooned to fill the viewport: the inline-block fallback resolved a percentage height against the container **width** and skipped the §10.5 indefinite-CB→`auto` rule (`whitespace-in-grid-item-001` 9 %→98.5 %) (#1227) | ✅ fixed | Broiler.Layout |
-| 31 | `display: grid-lanes` + `aspect-ratio` + `repeat(auto-fill, …)` track sizing: the dropped grid-lanes display fell back to a viewport-wide block, ignoring the aspect-ratio, so `min-height`→aspect-ratio→auto-fill-count never produced the reference square (`{column,row}-auto-repeat-{003,auto-006}` 15 %→100 %) (#1230) | ✅ fixed | Broiler.Layout |
+| 31 | `display: grid-lanes` + `aspect-ratio` + `repeat(auto-fill, …)` track sizing: the dropped grid-lanes display fell back to a viewport-wide block, ignoring the aspect-ratio, so `min-height`→aspect-ratio→auto-fill-count never produced the reference square (`{column,row}-auto-repeat-{003,auto-006}` 15 %→100 %) (#1230) | ⚠️ superseded by 32 | Broiler.Layout |
+| 32 | Cluster 31 mis-read the reference: the WPT runner screenshots the **test file itself** in Chromium, which drops `grid-lanes` to block but **honours `aspect-ratio`**, so the reference is a viewport-wide square (a `width:auto` 1/1 block), not the 100×100 `<link rel=match>` square #1230 assumed. Broiler ignored `aspect-ratio` on ordinary boxes → a min-height-tall bar (~8 %). Implemented `aspect-ratio` generally for in-flow block boxes (width→auto-height transfer, min/max clamp, box-sizing, definite for `%`-height children); removed #1230's inverted fingerprint hack (`{column,row}-auto-repeat-{003,auto-006}` ~8 %→match) (#1233) | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -751,6 +752,16 @@ grid track sizing + orthogonal-flow intrinsic sizing), the `grid-lanes` auto-rep
 (feature work), and the JS-driven `grid-container-change-*` / `grid-template-*-changes` tests
 (`document.fonts.ready` + testharness results table).
 
+> **Superseded by cluster 32 (#1233).** The paragraph below records #1230's reasoning as written;
+> its premise — that the reference is the 100×100 / 60×60 `<link rel=match>` square — is **wrong**.
+> The WPT runner's reference generator screenshots the *test file itself* in Chromium
+> (`generate-wpt-references.js`: `page.goto(testFile)` → `page.screenshot()`); it never resolves
+> `rel=match`. Chromium drops `grid-lanes` to `block` but honours `aspect-ratio`, so the actual
+> reference is a viewport-wide `width:auto` **1/1 square**, and #1230's fingerprint hack (sizing the
+> box *down* to a track-count square) moved Broiler further from it. Cluster 32 removes the hack and
+> implements `aspect-ratio` for ordinary boxes. Kept here because the diagnosis of *where* the pixels
+> diverge (block fallback ignoring the ratio) was correct; only the target size was inverted.
+
 Cluster 31 (issue [#1230](https://github.com/Broiler-Platform/Broiler/issues/1230), the "biggest
 problems" CSS Grid list — the `grid-lanes/track-sizing/auto-repeat` cluster at **15.3 % match**, four
 tests sharing one root cause) is the `grid-lanes` auto-repeat tail cluster 30 flagged as open. Each
@@ -789,6 +800,48 @@ IntrinsicAutoRepeat}_SizesToSquare` (the 100×100 / 60×60 column/row cases) and
 #1230 list: the `column-subgrid-auto-fill-*` subgrid tail (multi-column named-line subgrid, deferred
 since cluster 29), `grid-size-with-orthogonal-child-001` (orthogonal-flow intrinsic sizing),
 `nested-grid-item-block-size-001` (`vw` + nested grid), and the abspos-in-implicit-track case.
+
+Cluster 32 (issue [#1233](https://github.com/Broiler-Platform/Broiler/issues/1233), the "biggest
+problems" list — the same `grid-lanes/track-sizing/auto-repeat` cluster #1230 reported "fixed", still
+failing at **8.1–8.9 % match** on the very commit that merged #1230) corrects cluster 31's root-cause
+target. The reference each `{column,row}-auto-repeat-{003,auto-006}` test is scored against is **not**
+its WPT `<link rel=match>` file — the runner's reference generator screenshots the *test document*
+itself in Chromium (`generate-wpt-references.js` navigates to `file://<test>` and screenshots the
+1024×768 viewport; it never follows `rel=match`, and it excludes `-ref` files from the test set). So
+the reference is **Chromium's own render of the test**: `grid-lanes` is dropped to `block` (as in
+#1218), the inert `grid-template-*` contributes nothing, and Chromium sizes the `width:auto`,
+`aspect-ratio:1/1`, `min-height:60px` block by filling the viewport width (1024) and transferring
+through the ratio to a 1024-tall square. Broiler, which did not implement `aspect-ratio` for ordinary
+boxes, rendered a 1024×**~62** min-height bar — a 62 / 768 ≈ **8 %** vertical slice of the reference
+square, matching the reported 8.1 %. #1230's hack (`TryComputeGridLanesAspectRatioSize`) had inverted
+the target — sizing the box *down* to a `ceil(min-height/track)` square (100×100 / 60×60) — so where it
+fired it scored ~1 %; it did not fire here (the real markup misses its exact template+min-height
+fingerprint), leaving the 8 % bar.
+
+The fix (main-repo `Broiler.Layout/CssBox`) deletes the hack and implements `aspect-ratio` as a general
+CSS Sizing 4 §4 property for **in-flow block-level boxes**: a box with a preferred ratio and an `auto`
+block size derives its used height from its already-resolved used inline size (`TryResolveAspect
+RatioBlockHeight`), then the existing §10.7 min-/max-height block clamps it (so `min-height` floors the
+square). It honours `box-sizing` (ratio on the border box vs content box) and is a strict no-op when
+`aspect-ratio` is `auto` — the default — so only boxes that explicitly declare a ratio are touched. The
+transferred height is also made **definite for percentage-height descendants** (`HeightPercentage
+ResolvesToAuto` + a pre-resolution that sets `Size.Height` before child layout), so a filling
+`height:100%` child resolves against the square instead of collapsing — the reference browser sizes
+such a child to the aspect-ratio square. Because Chromium applies `aspect-ratio` unconditionally, any
+previously-passing box carrying a ratio already matched only where content height equalled the ratio
+height (else it was already failing), so the general implementation moves failing tests toward their
+reference and cannot regress a passing one. Verified: the reconstructed `{column,row}-auto-repeat`
+scenarios (container background *and* `height:100%` child) render a full-viewport green square (was a
+~8 % bar); the seven-case deterministic geometry (`200×100`, `100×200`, min-height floor, max-height
+cap, border-box/content-box padding, explicit-height override) matches exactly; the curated
+`Broiler.Cli.Tests` grid + layout suites have zero regressions. Guards:
+`AspectRatioLayoutTests` (general feature — ratio transfer, auto-width fill, box-sizing, min/max clamp)
+and the rewritten `GridLanesFallbackTests.GridLanesContainer_AspectRatio_*` (drop-to-block + ratio,
+auto-width-fills-then-squares, min-height floor, percentage-height child, explicit-height suppression).
+**Still open** in the #1233 list (unchanged by this fix, distinct root causes): the
+`column-subgrid-auto-fill-*` subgrid tail, `grid-size-with-orthogonal-child-001`,
+`row-item-minmax-img-001`, `grid-positioned-items-within-grid-implicit-track-001`, and
+`nested-grid-item-block-size-001`.
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
