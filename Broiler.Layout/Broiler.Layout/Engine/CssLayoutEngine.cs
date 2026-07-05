@@ -1007,7 +1007,30 @@ internal static class CssLayoutEngine
 
         // --- Compute height ---
         double ibHeight;
-        if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
+        bool heightIsPercent = !string.IsNullOrEmpty(b.Height) && b.Height.Contains('%');
+        // A grid item's percentage block size resolves against its grid *area*
+        // (the track), which is not known here — the track pass / PlaceItemInArea
+        // sizes percentage/auto grid items to their area later. So measure an
+        // in-flow grid item at its content height for now instead of resolving
+        // the percentage against the container *width* (the wrong basis in the
+        // branch below): that basis made an auto-height grid item with
+        // height:100% balloon to ~100% of the grid width and, clipped to the
+        // viewport, paint a full-viewport box (WPT
+        // css-grid/grid-items/whitespace-in-grid-item-001); it also handed the
+        // §11 track pass an inflated block size that tripped its "did a narrowed
+        // column reflow this?" guard into declining to the stacking
+        // approximation. Restricted to in-flow grid items — every other box
+        // (inline-block, flex item, replaced inline SVG/img, out-of-flow static
+        // positions) keeps its existing sizing untouched.
+        bool isInFlowGridItem =
+            b.Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            && b.ParentBox != null
+            && b.ParentBox.Display is "grid" or "inline-grid";
+        if (heightIsPercent && isInFlowGridItem)
+        {
+            ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+        }
+        else if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
         {
             double cssHeight = CssValueParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
             ibHeight = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)

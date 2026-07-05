@@ -91,4 +91,39 @@ public sealed class GridTrackPaintTests
         var belowGrid = bitmap.GetPixel(25, 165);
         Assert.True(Near(belowGrid, 255, 255, 255), $"below the grid should be white canvas, got {Describe(belowGrid)}");
     }
+
+    /// <summary>
+    /// A grid item's <c>height:100%</c> resolves against its grid <em>area</em>;
+    /// in an auto-height grid with no row template the area is itself content-sized,
+    /// so the percentage computes to <c>auto</c> and the empty item collapses to
+    /// zero height (CSS 2.1 §10.5). Before the fix the inline-block fallback
+    /// (<c>CssLayoutEngine.FlowInlineBlock</c>) resolved a percentage height against
+    /// the container <em>width</em> and never checked the containing block's height,
+    /// so an empty <c>height:100%</c> item ballooned to ~100% of the grid width and
+    /// the grey grid filled the entire viewport
+    /// (WPT css-grid/grid-items/whitespace-in-grid-item-001). The grid must instead
+    /// collapse, leaving the canvas below its top edge white.
+    /// </summary>
+    [Fact]
+    public void GridItem_PercentHeight_InAutoHeightGrid_CollapsesInsteadOfFillingViewport()
+    {
+        const string html =
+            "<!DOCTYPE html><html><head></head>"
+            + "<body style=\"margin:0\">"
+            + "<div style=\"display:grid;background:#808080;\">"
+            + "<div style=\"width:30px;height:100%;background:salmon;\"></div>"
+            + "</div></body></html>";
+
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+
+        // The empty height:100% item collapses to content (0), so the auto-height
+        // grid has no block extent: points below its top edge are the white canvas,
+        // not the grey grid background (which filled the viewport before the fix).
+        var mid = bitmap.GetPixel(10, 100);
+        Assert.True(Near(mid, 255, 255, 255),
+            $"grid must collapse (auto height), so y=100 is white canvas, got {Describe(mid)}");
+        var low = bitmap.GetPixel(120, 180);
+        Assert.True(Near(low, 255, 255, 255),
+            $"y=180 must be white canvas (grid collapsed), got {Describe(low)}");
+    }
 }
