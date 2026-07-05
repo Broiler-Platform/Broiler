@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16434,
+    "failed": 16435,
     "skipped": 0,
-    "total": 16434
+    "total": 16435
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -68,18 +68,32 @@
         "css/css-grid/grid-model/grid-container-ignores-first-letter-002.html",
         "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/line-names/column-line-names-005.html"
       ]
+    },
+    {
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "css/css-grid/parsing/grid-template-columns-crash.html"
+      ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-grid",
-      1316
+      1317
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
       1316
+    ],
+    [
+      "Timeout",
+      1
     ]
   ],
   "droppedDeclarations": [
@@ -243,22 +257,22 @@
     {
       "kind": "LowMatch",
       "tier": 2,
-      "severity": 91.0180409749349,
+      "severity": 91.93458557128906,
       "impact": 1,
-      "matchPercent": 8.9819590250651,
-      "relativeTestPath": "css/css-grid/grid-items/grid-size-with-orthogonal-child-001.html",
-      "title": "9.0% match \u2014 css/css-grid/grid-items/grid-size-with-orthogonal-child-001.html",
-      "detail": "Rendered output matches the reference by only 9.0% (PixelMismatch / MissingContent)."
+      "matchPercent": 8.065414428710938,
+      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-006.html",
+      "title": "8.1% match \u2014 css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-006.html",
+      "detail": "Rendered output matches the reference by only 8.1% (PixelMismatch / MissingContent)."
     },
     {
       "kind": "LowMatch",
       "tier": 2,
-      "severity": 88.38729858398438,
+      "severity": 91.93458557128906,
       "impact": 1,
-      "matchPercent": 11.612701416015625,
-      "relativeTestPath": "css/css-grid/grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport.html",
-      "title": "11.6% match \u2014 css/css-grid/grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport.html",
-      "detail": "Rendered output matches the reference by only 11.6% (PixelMismatch / LayoutShift)."
+      "matchPercent": 8.065414428710938,
+      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-003.html",
+      "title": "8.1% match \u2014 css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-003.html",
+      "detail": "Rendered output matches the reference by only 8.1% (PixelMismatch / MissingContent)."
     }
   ],
   "results": [
@@ -65309,6 +65323,12 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-grid/parsing/grid-template-columns-crash.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "css/css-grid/placement/grid-auto-placement-implicit-tracks-001.html",
