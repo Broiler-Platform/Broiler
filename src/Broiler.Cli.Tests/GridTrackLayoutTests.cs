@@ -315,4 +315,66 @@ public sealed class GridTrackLayoutTests
             ("grid-column:1;grid-row:2;", 0, 100, 100, 100));
         AssertCheckLayout(html, "file:///grid-fr-rows.html");
     }
+
+    [Fact]
+    public void GridAutoFillColumns_ResolveCountFromDefiniteWidth()
+    {
+        // repeat(auto-fill, 100px) in a 350px grid -> 3 tracks (a 4th would
+        // overflow); the extra 50px stays empty, so column 3 starts at 200px.
+        string html = GridDoc("width:350px;grid-template-columns:repeat(auto-fill,100px);grid-template-rows:50px;",
+            ("grid-column:1;grid-row:1;", 0, 0, 100, 50),
+            ("grid-column:3;grid-row:1;", 200, 0, 100, 50));
+        AssertCheckLayout(html, "file:///grid-auto-fill-cols.html");
+    }
+
+    [Fact]
+    public void GridAutoFillColumnsWithGap_CountAndNegativeRangeSpan()
+    {
+        // repeat(auto-fill, 60px) with a 10px gap over 305px -> 4 tracks:
+        // (305 + 10) / (60 + 10) = 4.5 -> 4. Column edges: 0-60, 70-130,
+        // 140-200, 210-270. `grid-column: 2 / -1` spans tracks 2..4 (line -1 is
+        // the last line of the 4-track explicit grid) -> x=70, width=200.
+        string html = GridDoc("width:305px;grid-template-columns:repeat(auto-fill,60px);grid-template-rows:40px;gap:10px;",
+            ("grid-column:1;grid-row:1;", 0, 0, 60, 40),
+            ("grid-column:4;grid-row:1;", 210, 0, 60, 40),
+            ("grid-column:2 / -1;grid-row:1;", 70, 0, 200, 40));
+        AssertCheckLayout(html, "file:///grid-auto-fill-gap-neg.html");
+    }
+
+    [Fact]
+    public void GridNegativeLine_ResolvesFromEndOfExplicitGrid()
+    {
+        // Three fixed columns (40, 60, 80). Negative lines count back from the
+        // last line: -2 is the 80px track (x=100), -3 the 60px (x=40), -4 the
+        // 40px (x=0).
+        string html = GridDoc("grid-template-columns:40px 60px 80px;grid-template-rows:30px;",
+            ("grid-column:-2;grid-row:1;", 100, 0, 80, 30),
+            ("grid-column:-3;grid-row:1;", 40, 0, 60, 30),
+            ("grid-column:-4;grid-row:1;", 0, 0, 40, 30));
+        AssertCheckLayout(html, "file:///grid-negative-line.html");
+    }
+
+    [Fact]
+    public void GridAutoFillRows_ResolveCountFromMinHeight()
+    {
+        // repeat(auto-fill, 50px) rows with an indefinite height but a definite
+        // min-height:160px -> 3 tracks (160 / 50 = 3.2 -> 3). Row edges: 0-50,
+        // 50-100, 100-150; `grid-row: -3` is the first of the three tracks.
+        string html = GridDoc("width:100px;min-height:160px;grid-template-columns:100px;grid-template-rows:repeat(auto-fill,50px);",
+            ("grid-column:1;grid-row:1;", 0, 0, 100, 50),
+            ("grid-column:1;grid-row:3;", 0, 100, 100, 50),
+            ("grid-column:1;grid-row:-3;", 0, 50, 100, 50));
+        AssertCheckLayout(html, "file:///grid-auto-fill-rows.html");
+    }
+
+    [Fact]
+    public void GridLineNameContainingAutoFill_ParsesAsOrdinaryTracks()
+    {
+        // The "auto-fill" substring inside a line name must NOT be mistaken for an
+        // auto-repeat: this is two fixed 100px columns with an [auto-fill-x] line.
+        string html = GridDoc("grid-template-columns:[auto-fill-x] 100px 100px;grid-template-rows:40px;",
+            ("grid-column:1;grid-row:1;", 0, 0, 100, 40),
+            ("grid-column:2;grid-row:1;", 100, 0, 100, 40));
+        AssertCheckLayout(html, "file:///grid-linename-auto-fill.html");
+    }
 }

@@ -18,16 +18,19 @@ namespace Broiler.Layout.Engine;
 /// <c>grid-auto-flow</c> row/column with sparse/dense packing, implicit tracks) and
 /// a bounded §11 track-sizing algorithm covering <c>&lt;length&gt;</c>,
 /// <c>&lt;percentage&gt;</c>, <c>&lt;flex&gt;</c> (<c>fr</c>), <c>auto</c>,
-/// <c>min-content</c>, <c>max-content</c>, <c>minmax()</c>, and <c>repeat(&lt;int&gt;, …)</c>.
+/// <c>min-content</c>, <c>max-content</c>, <c>minmax()</c>, <c>repeat(&lt;int&gt;, …)</c>,
+/// and <c>repeat(auto-fill, &lt;fixed-track-list&gt;)</c> (§7.2.3.1 repeat-to-fill).
 ///
 /// Intrinsic column sizing draws its content contributions from
 /// <see cref="GetMinMaxWidth"/> (a layout-independent measure); intrinsic row
 /// sizing uses each item's already-measured height and declines (falls back to the
 /// approximation) when a narrowed column would have reflowed that height, so it
-/// never sizes a row from a stale measurement. Anything still out of scope
-/// (<c>subgrid</c>, <c>fit-content()</c>, <c>repeat(auto-fill/auto-fit, …)</c>,
-/// named lines carrying sizes) makes the pass decline, confining the new behaviour
-/// to grids it can size correctly.
+/// never sizes a row from a stale measurement. Negative grid lines
+/// (e.g. <c>grid-column: -2</c>) resolve against the explicit track count.
+/// Anything still out of scope (<c>subgrid</c>, <c>fit-content()</c>,
+/// <c>repeat(auto-fit, …)</c> — whose empty-track collapsing is unmodelled — and
+/// named lines carrying sizes) makes the pass decline, confining the new
+/// behaviour to grids it can size correctly.
 /// </summary>
 internal partial class CssBox
 {
@@ -134,13 +137,25 @@ internal partial class CssBox
         bool rowOrphanSubgrid = SubgridRowSizes == null && StartsWithSubgrid(GridTemplateRows);
         bool anyOrphanSubgrid = colOrphanSubgrid || rowOrphanSubgrid;
 
+        // Available content-box sizes and gaps for resolving repeat(auto-fill, …)
+        // track counts (CSS Grid §7.2.3.1). The inline size is the container's
+        // already-clamped used content width; the block size is a definite height
+        // (or a definite min-height when the height is indefinite), else 0 → one
+        // repetition. Gaps enter the repeat-to-fill count, so resolve them here.
+        double autoRepeatColGap = ResolveGridGap(ColumnGap, contentWidth, em);
+        double autoRepeatBlock = ComputeAutoRepeatBlockSize(em);
+        double autoRepeatRowGap = ResolveGridGap(RowGap, autoRepeatBlock, em);
+
         // Parse both axes' explicit track lists into sizing functions. A null list
         // (none/empty or an out-of-scope token) declines the whole pass; an orphan
         // subgrid axis contributes no explicit tracks (its `subgrid` computed to none).
+        // A repeat(auto-fill, …) template is expanded to a concrete track list here.
         List<GridTrackSpec> colSpecs = colSubgrid ? FixedTrackSpecs(SubgridColumnSizes)
-            : colOrphanSubgrid ? new List<GridTrackSpec>() : ParseTrackList(GridTemplateColumns, em);
+            : colOrphanSubgrid ? new List<GridTrackSpec>()
+            : ParseTrackListMaybeAutoRepeat(GridTemplateColumns, em, contentWidth, autoRepeatColGap);
         List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes)
-            : rowOrphanSubgrid ? new List<GridTrackSpec>() : ParseTrackList(GridTemplateRows, em);
+            : rowOrphanSubgrid ? new List<GridTrackSpec>()
+            : ParseTrackListMaybeAutoRepeat(GridTemplateRows, em, autoRepeatBlock, autoRepeatRowGap);
 
         // When one axis is a resolved subgrid (or an orphan subgrid resolved to
         // none), the other axis may legitimately be implicit-only (e.g. a column
@@ -202,8 +217,8 @@ internal partial class CssBox
                 continue;
             }
 
-            var (rowStart, rowSpan) = ParseGridLine(child.GridRow);
-            var (colStart, colSpan) = ParseGridLine(child.GridColumn);
+            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count);
+            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count);
             // Decline rather than lay out an implausibly large grid.
             if (rowSpan > MaxGridLine || colSpan > MaxGridLine
                 || (rowStart ?? 0) > MaxGridLine || (colStart ?? 0) > MaxGridLine)
@@ -601,8 +616,8 @@ internal partial class CssBox
 
         foreach (var item in items)
         {
-            var (rowStart, rowSpan) = ParseGridLine(item.GridRow);
-            var (colStart, colSpan) = ParseGridLine(item.GridColumn);
+            var (rowStart, rowSpan) = ParseGridLine(item.GridRow, rowCount);
+            var (colStart, colSpan) = ParseGridLine(item.GridColumn, colCount);
             var (left, right) = ResolveAbsposAxis(colStart, colSpan, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
             var (top, bottom) = ResolveAbsposAxis(rowStart, rowSpan, rowStartEdge, rowEndEdge,
@@ -848,6 +863,207 @@ internal partial class CssBox
 
         var specs = new List<GridTrackSpec>();
         return ParseTrackTokens(v, specs, depth: 0, em) ? specs : null;
+    }
+
+    /// <summary>
+    /// Parses a track list, expanding a top-level <c>repeat(auto-fill, …)</c> to a
+    /// concrete list of tracks from the axis's available size. Templates without an
+    /// auto-repeat fall through to <see cref="ParseTrackList(string,double)"/>
+    /// unchanged; an auto-repeat that cannot be resolved (non-fixed repeated tracks,
+    /// <c>auto-fit</c>, or combined with subgrid) returns <c>null</c> to decline.
+    /// </summary>
+    private List<GridTrackSpec> ParseTrackListMaybeAutoRepeat(string value, double em,
+        double availableSize, double gap)
+    {
+        var expanded = ExpandAutoRepeatTrackList(value, em, availableSize, gap, out bool hasAutoRepeat);
+        if (hasAutoRepeat)
+            return expanded;               // resolved list, or null to decline
+        return ParseTrackList(value, em);  // no auto-repeat — ordinary parse
+    }
+
+    /// <summary>
+    /// CSS Grid §7.2.3.1 (repeat-to-fill): when <paramref name="value"/> contains a
+    /// top-level <c>repeat(auto-fill, &lt;fixed-track-list&gt;)</c>, computes the
+    /// number of repetitions that fit in <paramref name="availableSize"/> (gaps
+    /// included) and returns the fully expanded track list. Sets
+    /// <paramref name="hasAutoRepeat"/> only when a genuine auto-repeat is present
+    /// (a <c>repeat()</c> counted by auto-fill/auto-fit — not the keyword inside a
+    /// line name); returns <c>null</c> (declining the pass) for an auto-repeat this
+    /// bounded pass cannot resolve — <c>auto-fit</c> (empty-track collapsing is
+    /// unmodelled), non-fixed repeated tracks, or a repeated block that would exceed
+    /// <see cref="MaxGridLine"/> tracks.
+    /// </summary>
+    private List<GridTrackSpec> ExpandAutoRepeatTrackList(string value, double em,
+        double availableSize, double gap, out bool hasAutoRepeat)
+    {
+        hasAutoRepeat = false;
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        string v = value.Trim();
+        // Fast path: auto-fill/auto-fit as a repeat count must spell the keyword, so
+        // its absence proves there is no auto-repeat (this method is only reached off
+        // the non-subgrid track-parsing path).
+        if (v.IndexOf("auto-fill", StringComparison.OrdinalIgnoreCase) < 0
+            && v.IndexOf("auto-fit", StringComparison.OrdinalIgnoreCase) < 0)
+            return null;                    // no auto-repeat — caller uses ParseTrackList
+
+        var before = new List<GridTrackSpec>();
+        var auto = new List<GridTrackSpec>();
+        var after = new List<GridTrackSpec>();
+        bool seenAuto = false;
+
+        int i = 0, n = v.Length;
+        while (i < n)
+        {
+            while (i < n && char.IsWhiteSpace(v[i])) i++;
+            if (i >= n) break;
+            if (v[i] == '[')                // named-line brackets carry no size
+            {
+                int close = v.IndexOf(']', i);
+                if (close < 0) return null;
+                i = close + 1;
+                continue;
+            }
+            int start = i, paren = 0;
+            while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
+            {
+                if (v[i] == '(') paren++;
+                else if (v[i] == ')') paren--;
+                i++;
+            }
+            string token = v.Substring(start, i - start);
+            if (token.Length == 0) continue;
+
+            // Only a repeat() whose *count* argument is auto-fill/auto-fit is an
+            // auto-repeat; the keyword appearing inside a line name (e.g.
+            // [auto-fill-start]) is not, and must fall through to the ordinary parse.
+            string autoKind = AutoRepeatCountKind(token);
+            if (autoKind == "auto-fit")
+            {
+                hasAutoRepeat = true;       // empty-track collapsing unmodelled → decline
+                return null;
+            }
+            if (autoKind == "auto-fill")
+            {
+                if (seenAuto)
+                    return null;            // at most one auto-repeat per track list
+                seenAuto = true;
+                string inner = token.Substring(7, token.Length - 8);
+                int comma = inner.IndexOf(',');
+                if (comma < 0) return null;
+                if (!ParseTrackTokens(inner.Substring(comma + 1), auto, depth: 1, em))
+                    return null;
+            }
+            else
+            {
+                var bucket = seenAuto ? after : before;
+                if (!ParseTrackTokens(token, bucket, depth: 1, em))
+                    return null;            // bad fixed token / integer repeat
+            }
+        }
+
+        if (!seenAuto || auto.Count == 0)
+            return null;                    // keyword was only a line name → not auto-repeat
+        hasAutoRepeat = true;
+
+        // Every track in the repeated block must have a definite (fixed) size — the
+        // repeat count is undefined otherwise (§7.2.3.1).
+        double sumAuto = 0;
+        foreach (var s in auto)
+        {
+            if (!TryFixedTrackSize(s, out double px)) return null;
+            sumAuto += px;
+        }
+        double sumFixed = 0;
+        foreach (var s in before) sumFixed += TryFixedTrackSize(s, out double px) ? px : 0;
+        foreach (var s in after) sumFixed += TryFixedTrackSize(s, out double px) ? px : 0;
+
+        int nFixed = before.Count + after.Count;
+        int nAuto = auto.Count;
+
+        // Largest k ≥ 1 with sumFixed + k·sumAuto + (nFixed + k·nAuto − 1)·gap ≤ available.
+        int k = 1;
+        double denom = sumAuto + nAuto * gap;
+        if (availableSize > 0 && !double.IsInfinity(availableSize) && !double.IsNaN(availableSize)
+            && denom > 0)
+        {
+            double numer = availableSize - sumFixed - (nFixed - 1) * gap;
+            double kf = numer / denom;
+            k = kf >= 1 ? (int)Math.Floor(kf + 1e-6) : 1;
+        }
+        if (k < 1) k = 1;
+        // Bound the expansion so a tiny track in a large area cannot allocate a
+        // pathological number of tracks.
+        long total = (long)nFixed + (long)k * nAuto;
+        if (total > MaxGridLine)
+            return null;
+
+        var result = new List<GridTrackSpec>(before.Count + k * nAuto + after.Count);
+        result.AddRange(before);
+        for (int r = 0; r < k; r++)
+            result.AddRange(auto);
+        result.AddRange(after);
+        return result;
+    }
+
+    /// <summary>
+    /// Classifies a single track-list token: returns <c>"auto-fill"</c> or
+    /// <c>"auto-fit"</c> when it is a <c>repeat()</c> whose first (count) argument is
+    /// that keyword, else <c>null</c>. Distinguishes a genuine auto-repeat from the
+    /// keyword merely occurring inside a line-name token.
+    /// </summary>
+    private static string AutoRepeatCountKind(string token)
+    {
+        if (!token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase)
+            || !token.EndsWith(")", StringComparison.Ordinal))
+            return null;
+        string inner = token.Substring(7, token.Length - 8);
+        int comma = inner.IndexOf(',');
+        if (comma < 0) return null;
+        string count = inner.Substring(0, comma).Trim();
+        if (count.Equals("auto-fill", StringComparison.OrdinalIgnoreCase)) return "auto-fill";
+        if (count.Equals("auto-fit", StringComparison.OrdinalIgnoreCase)) return "auto-fit";
+        return null;
+    }
+
+    /// <summary>
+    /// The definite pixel size of a single-side fixed track (used for repeat-to-fill
+    /// counting): a fixed min/max, or a <c>minmax()</c> whose max — else min — is a
+    /// fixed length. Returns <c>false</c> for intrinsic/flex tracks, whose size is
+    /// not definite until layout.
+    /// </summary>
+    private static bool TryFixedTrackSize(GridTrackSpec spec, out double px)
+    {
+        if (spec.Max.Kind == GridSizeKind.Fixed) { px = Math.Max(0, spec.Max.Value); return true; }
+        if (spec.Min.Kind == GridSizeKind.Fixed) { px = Math.Max(0, spec.Min.Value); return true; }
+        px = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Available content-box block size for resolving <c>repeat(auto-fill, …)</c>
+    /// row counts: the definite content height when <c>height</c> is a length,
+    /// raised to a definite <c>min-height</c> (each reduced to the content box under
+    /// <c>box-sizing:border-box</c>). Returns 0 when the block size is indefinite,
+    /// which resolves auto-fill to a single repetition.
+    /// </summary>
+    private double ComputeAutoRepeatBlockSize(double em)
+    {
+        double h = TryGetDefiniteContentHeight(em, out double dh) ? dh : 0;
+        if (!string.IsNullOrEmpty(MinHeight) && MinHeight != "0"
+            && !MinHeight.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+            && !MinHeight.EndsWith("%", StringComparison.Ordinal))
+        {
+            double mh = CssValueParser.ParseLength(MinHeight, 0, em);
+            if (!double.IsNaN(mh) && !double.IsInfinity(mh) && mh > 0)
+            {
+                if (UsesBorderBoxSizing)
+                    mh -= ActualPaddingTop + ActualPaddingBottom
+                        + ActualBorderTopWidth + ActualBorderBottomWidth;
+                if (mh > h) h = mh;
+            }
+        }
+        return h > 0 ? h : 0;
     }
 
     private static bool ParseTrackTokens(string v, List<GridTrackSpec> specs, int depth, double em)
@@ -1268,10 +1484,13 @@ internal partial class CssBox
     /// <summary>
     /// Parses a <c>grid-row</c>/<c>grid-column</c> value into a 0-indexed start
     /// line (null when auto) and a span. Supports <c>auto</c>, an integer line,
-    /// <c>span &lt;int&gt;</c>, and the <c>start / end</c> two-value forms. Named
-    /// lines and negative (from-end) indices fall back to <c>auto</c>.
+    /// <c>span &lt;int&gt;</c>, and the <c>start / end</c> two-value forms. A
+    /// negative line counts back from the end of the explicit grid
+    /// (<paramref name="explicitTracks"/>): <c>-1</c> is the final line,
+    /// <c>-2</c> the one before it, and so on; a negative line pointing before the
+    /// grid's start, or a named line, falls back to <c>auto</c>.
     /// </summary>
-    private static (int? start, int span) ParseGridLine(string value)
+    private static (int? start, int span) ParseGridLine(string value, int explicitTracks)
     {
         if (string.IsNullOrWhiteSpace(value))
             return (null, 1);
@@ -1281,10 +1500,10 @@ internal partial class CssBox
 
         int slash = v.IndexOf('/');
         if (slash < 0)
-            return ParseSingleGridLine(v);
+            return ParseSingleGridLine(v, explicitTracks);
 
-        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim());
-        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim());
+        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks);
+        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks);
 
         if (startLine.HasValue && endLine.HasValue)
         {
@@ -1303,7 +1522,7 @@ internal partial class CssBox
         return (null, 1);
     }
 
-    private static (int? start, int span) ParseSingleGridLine(string token)
+    private static (int? start, int span) ParseSingleGridLine(string token, int explicitTracks)
     {
         if (string.IsNullOrEmpty(token) || token.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return (null, 1);
@@ -1314,8 +1533,20 @@ internal partial class CssBox
                 return (null, s);
             return (null, 1);
         }
-        if (int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line) && line >= 1)
-            return (line - 1, 1); // 1-based line -> 0-based track index
-        return (null, 1);         // named line / negative -> auto
+        if (int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
+        {
+            if (line >= 1)
+                return (line - 1, 1);         // 1-based line -> 0-based track boundary
+            if (line <= -1 && explicitTracks >= 0)
+            {
+                // Negative line -N counts back from the last explicit line: the grid
+                // has explicitTracks+1 lines, so line -1 is boundary `explicitTracks`.
+                int boundary = explicitTracks + 1 + line;
+                if (boundary >= 0)
+                    return (boundary, 1);
+            }
+            return (null, 1);                 // line 0 / before-grid negative -> auto
+        }
+        return (null, 1);                     // named line -> auto
     }
 }
