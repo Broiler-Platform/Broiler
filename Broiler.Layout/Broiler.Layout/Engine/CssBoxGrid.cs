@@ -161,8 +161,7 @@ internal partial class CssBox
         // none), the other axis may legitimately be implicit-only (e.g. a column
         // subgrid with `grid-auto-rows`): treat a none/empty track list there as
         // zero explicit tracks so the placed items generate implicit tracks, rather
-        // than declining. The general (non-subgrid) path keeps requiring both axes
-        // to have explicit tracks.
+        // than declining.
         if (anySubgrid || anyOrphanSubgrid)
         {
             if (colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns)) colSpecs = new List<GridTrackSpec>();
@@ -180,15 +179,46 @@ internal partial class CssBox
                 rowSpecs = new List<GridTrackSpec> { AutoTrackSpec };
         }
 
+        // An axis with no explicit template (`none`/empty) but a `grid-auto-*`
+        // sizing function is implicit-only: its tracks come entirely from
+        // auto-placement (§7.5). Treat the empty template as zero explicit tracks
+        // so the placed items generate implicit tracks, rather than declining the
+        // whole pass — this is the common `display:grid` + `grid-auto-columns/rows`
+        // shape (the css-grid alignment suite, whose grids omit templates), which
+        // the approximation renders collapsed. An *unsupported* token (subgrid,
+        // fit-content, …) still parses to null and declines below.
+        bool colImplicitOnly = colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns);
+        bool rowImplicitOnly = rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows);
+        if (colImplicitOnly) colSpecs = new List<GridTrackSpec>();
+        if (rowImplicitOnly) rowSpecs = new List<GridTrackSpec>();
+
         if (colSpecs == null || rowSpecs == null)
             return false;
-        // A standalone orphan-subgrid grid can have zero explicit tracks in both
-        // axes (subgrid→none on one, `none` on the other) yet still be sized from
-        // its implicit tracks and auto-placed items, so it is allowed through where
-        // the general both-empty case declines.
-        if (colSpecs.Count == 0 && rowSpecs.Count == 0 && !anyOrphanSubgrid)
+        // The implicit-only (`none` template + grid-auto-*) path is a newly enabled
+        // takeover from the baseline-aware cross-axis approximation, so it declines
+        // for the two shapes this bounded pass sizes worse than that approximation:
+        //   • baseline self-alignment (`align-self: baseline`, `justify-items: last
+        //     baseline`, …) synthesizes a shared baseline across a column/row
+        //     (CSS Align §9) this pass does not compute — it would fall to start;
+        //   • an item whose used block size the pass cannot trust from a single
+        //     measurement — a nested flex/grid/table container, a replaced or
+        //     form-control item, or a scroll container — where sizing an auto row
+        //     from the measured height collapses or mis-stretches the item.
+        // Grids with an explicit template on the affected axis keep going through
+        // this pass exactly as before; only the implicit-only takeover is gated.
+        if ((colImplicitOnly || rowImplicitOnly)
+            && (GridUsesBaselineSelfAlignment() || !GridImplicitPathItemsAreSimple()))
             return false;
-        if (!anySubgrid && !anyOrphanSubgrid && (colSpecs.Count == 0 || rowSpecs.Count == 0))
+        // Implicit tracks are allowed to carry the whole axis for a subgrid, an
+        // orphan subgrid, or an implicit-only (`none` template + grid-auto-*) axis;
+        // the placed items below generate them. Any other empty axis is degenerate
+        // and declines to the approximation.
+        bool implicitTracksAllowed =
+            anySubgrid || anyOrphanSubgrid || colImplicitOnly || rowImplicitOnly;
+        if (colSpecs.Count == 0 && rowSpecs.Count == 0
+            && !anyOrphanSubgrid && !(colImplicitOnly && rowImplicitOnly))
+            return false;
+        if (!implicitTracksAllowed && (colSpecs.Count == 0 || rowSpecs.Count == 0))
             return false;
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
@@ -832,6 +862,76 @@ internal partial class CssBox
         if (string.IsNullOrEmpty(size) || size == CssConstants.Auto)
             return true;
         return size.EndsWith("%", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// True when this grid or any of its in-flow items requests baseline
+    /// self-alignment on either axis (<c>align-items</c>/<c>justify-items</c> on
+    /// the container, or <c>align-self</c>/<c>justify-self</c> on an item). Baseline
+    /// alignment needs a synthesized shared baseline the bounded track pass does not
+    /// compute, so callers use this to decline to the baseline-aware approximation.
+    /// </summary>
+    private bool GridUsesBaselineSelfAlignment()
+    {
+        if (MentionsBaseline(AlignItems) || MentionsBaseline(JustifyItems))
+            return true;
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None)
+                continue;
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (MentionsBaseline(child.AlignSelf) || MentionsBaseline(child.JustifySelf))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>True when an alignment value is (or ends with) the
+    /// <c>baseline</c> keyword — covering <c>baseline</c>, <c>first baseline</c>,
+    /// and <c>last baseline</c>.</summary>
+    private static bool MentionsBaseline(string value)
+        => !string.IsNullOrEmpty(value)
+            && value.IndexOf("baseline", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    /// <summary>
+    /// True when every in-flow item of this grid is a plain box whose used block
+    /// size the bounded track pass can trust from a single measurement — used to
+    /// gate the implicit-only takeover away from item shapes the pass sizes worse
+    /// than the approximation it replaces (see the caller). An item is *not* simple
+    /// when it establishes a nested flex/grid/table formatting context (whose
+    /// intrinsic block size the single measurement can under-size — collapsing an
+    /// auto row), is a replaced element or form control (whose stretch/aspect-ratio
+    /// sizing differs from a plain box), or is a scroll container. A plain block
+    /// item with <c>height:100%</c> is simple: that just stretches it to the row.
+    /// </summary>
+    private bool GridImplicitPathItemsAreSimple()
+    {
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None)
+                continue;
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                or CssConstants.Table or CssConstants.InlineTable)
+                return false;
+            if (child.IsImage)
+                return false;
+            if (child.HtmlTag != null)
+            {
+                string tag = child.HtmlTag.Name;
+                if (tag.Equals("button", StringComparison.OrdinalIgnoreCase)
+                    || tag.Equals("input", StringComparison.OrdinalIgnoreCase)
+                    || tag.Equals("select", StringComparison.OrdinalIgnoreCase)
+                    || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase)
+                    || tag.Equals("img", StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            if (!string.IsNullOrEmpty(child.Overflow) && child.Overflow != CssConstants.Visible)
+                return false;
+        }
+        return true;
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)
