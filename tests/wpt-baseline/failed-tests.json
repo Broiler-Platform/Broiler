@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16435,
+    "failed": 16427,
     "skipped": 0,
-    "total": 16435
+    "total": 16427
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 958,
+      "count": 950,
       "examples": [
         "css/css-grid/abspos/grid-abspos-staticpos-align-self-002.html",
         "css/css-grid/abspos/grid-abspos-staticpos-justify-self-rtl-002.html",
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 149,
+      "count": 150,
       "examples": [
         "css/css-grid/alignment/grid-alignment-style-changes-006.html",
         "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-010.html",
@@ -68,32 +68,18 @@
         "css/css-grid/grid-model/grid-container-ignores-first-letter-002.html",
         "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/line-names/column-line-names-005.html"
       ]
-    },
-    {
-      "key": "Timeout",
-      "label": "Timeout",
-      "category": "Timeout",
-      "subCategory": null,
-      "count": 1,
-      "examples": [
-        "css/css-grid/parsing/grid-template-columns-crash.html"
-      ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-grid",
-      1317
+      1309
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1316
-    ],
-    [
-      "Timeout",
-      1
+      1309
     ]
   ],
   "droppedDeclarations": [
@@ -257,22 +243,22 @@
     {
       "kind": "LowMatch",
       "tier": 2,
-      "severity": 91.93458557128906,
+      "severity": 91.0180409749349,
       "impact": 1,
-      "matchPercent": 8.065414428710938,
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-006.html",
-      "title": "8.1% match \u2014 css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-006.html",
-      "detail": "Rendered output matches the reference by only 8.1% (PixelMismatch / MissingContent)."
+      "matchPercent": 8.9819590250651,
+      "relativeTestPath": "css/css-grid/grid-items/grid-size-with-orthogonal-child-001.html",
+      "title": "9.0% match \u2014 css/css-grid/grid-items/grid-size-with-orthogonal-child-001.html",
+      "detail": "Rendered output matches the reference by only 9.0% (PixelMismatch / MissingContent)."
     },
     {
       "kind": "LowMatch",
       "tier": 2,
-      "severity": 91.93458557128906,
+      "severity": 88.38729858398438,
       "impact": 1,
-      "matchPercent": 8.065414428710938,
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-003.html",
-      "title": "8.1% match \u2014 css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-003.html",
-      "detail": "Rendered output matches the reference by only 8.1% (PixelMismatch / MissingContent)."
+      "matchPercent": 11.612701416015625,
+      "relativeTestPath": "css/css-grid/grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport.html",
+      "title": "11.6% match \u2014 css/css-grid/grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport.html",
+      "detail": "Rendered output matches the reference by only 11.6% (PixelMismatch / LayoutShift)."
     }
   ],
   "results": [
@@ -60947,7 +60933,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-grid/grid-items/grid-item-minmax-img-002.html",
@@ -63190,13 +63176,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-grid/grid-lanes/items/column-item-minmax-img-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-grid/grid-lanes/items/column-minimum-contribution-baseline-shim-vertical-lr.html",
       "passed": false,
       "skipped": false,
@@ -63233,13 +63212,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/items/row-flex-spanning-items.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/items/row-item-minmax-img-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -64471,21 +64443,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/column-auto-repeat-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/column-auto-repeat-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/column-auto-repeat-007.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -64534,13 +64492,6 @@
       "subCategory": "LayoutShift"
     },
     {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/column-auto-repeat-auto-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/column-auto-repeat-auto-009.html",
       "passed": false,
       "skipped": false,
@@ -64549,13 +64500,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/column-auto-repeat-auto-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-006.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -64598,13 +64542,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/intrinsic-auto-repeat/row-auto-repeat-auto-031.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -65323,12 +65260,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/parsing/grid-template-columns-crash.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "css/css-grid/placement/grid-auto-placement-implicit-tracks-001.html",
