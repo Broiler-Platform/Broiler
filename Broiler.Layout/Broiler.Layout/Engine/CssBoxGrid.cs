@@ -1293,6 +1293,41 @@ internal partial class CssBox
         return true;
     }
 
+    /// <summary>Total pixel extent of all <paramref name="sizes"/> plus the gaps
+    /// between them — the grid's content-box size along that axis.</summary>
+    private static double SumTrackSizes(double[] sizes, double gap)
+    {
+        if (sizes == null || sizes.Length == 0) return 0;
+        double total = 0;
+        foreach (double s in sizes) total += s;
+        total += (sizes.Length - 1) * gap;
+        return total > 0 ? total : 0;
+    }
+
+    /// <summary>
+    /// CSS Grid §7.2.1: re-resolve pure-percentage row tracks against the grid's
+    /// computed intrinsic block size after the indefinite-height pass sized them as
+    /// 'auto'. Only a track sized purely by percentage (min and max the same
+    /// percentage — i.e. <c>grid-template-rows: 60%</c>) becomes definite here;
+    /// mixed intrinsic/percentage tracks keep their auto-derived size.
+    /// </summary>
+    private static void ResolvePercentRowTracksAgainstIntrinsic(List<GridTrackSpec> specs,
+        GridTrackSpec implicitSpec, double[] sizes, double intrinsicHeight)
+    {
+        if (sizes == null || intrinsicHeight < 0) return;
+        for (int t = 0; t < sizes.Length; t++)
+        {
+            GridTrackSpec spec = t < specs.Count ? specs[t] : implicitSpec;
+            if (spec.Min.Kind == GridSizeKind.Percent && spec.Max.Kind == GridSizeKind.Percent
+                && spec.Min.Value == spec.Max.Value)
+            {
+                double px = spec.Max.Value / 100.0 * intrinsicHeight;
+                if (!double.IsNaN(px) && !double.IsInfinity(px) && px >= 0)
+                    sizes[t] = px;
+            }
+        }
+    }
+
     // ─────────────────────────── Track sizing (§11) ───────────────────────────
 
     /// <summary>
