@@ -455,6 +455,11 @@ internal abstract class CssBoxProperties
     }
     public string MaxHeight { get; set; } = "none";
     public string MinHeight { get; set; } = "0";
+    /// <summary>CSS Sizing 4 <c>aspect-ratio</c> (raw value, e.g. <c>1 / 1</c>).
+    /// Only consulted by the CSS Grid Level 3 grid-lanes intrinsic-sizing path
+    /// (<see cref="CssBox.TryComputeGridLanesAspectRatioSize"/>); general boxes
+    /// do not yet honour it.</summary>
+    public string AspectRatio { get; set; } = "auto";
     public string InlineSize
     {
         get => _inlineSize;

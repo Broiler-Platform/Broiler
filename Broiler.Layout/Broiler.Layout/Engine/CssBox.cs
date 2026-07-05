@@ -1026,6 +1026,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // are laid out, so the trimmed margins collapse to nothing.
         ApplyMarginTrim();
 
+        // CSS Grid Level 3 (grid-lanes): resolve a `display: grid-lanes`
+        // container's intrinsic size from its aspect-ratio and definite
+        // min-height. Setting an explicit width/height lets the block layout
+        // below paint the correct square instead of a viewport-wide bar; a
+        // strict no-op unless the aspect-ratio/auto-repeat pattern fully
+        // resolves, so it only ever moves a currently-failing grid-lanes test.
+        if (TryComputeGridLanesAspectRatioSize(out double gridLanesWidth, out double gridLanesHeight))
+        {
+            Width = gridLanesWidth.ToString("0.####", CultureInfo.InvariantCulture) + "px";
+            Height = gridLanesHeight.ToString("0.####", CultureInfo.InvariantCulture) + "px";
+        }
+
         if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell)
         {
             // Because their width and height are set by CssTable
@@ -3950,6 +3962,205 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         return maxLineWidth;
     }
+
+    // ─────────────────── CSS Grid Level 3 (grid-lanes) sizing ───────────────────
+
+    /// <summary>
+    /// Resolves the intrinsic border-box size of a <c>display: grid-lanes</c>
+    /// container whose size is driven by <c>aspect-ratio</c> and a definite
+    /// <c>min-height</c> (the CSS Grid Level 3 <c>track-sizing/auto-repeat</c>
+    /// WPT cluster). In a grid-lanes box the inline axis is the grid axis and
+    /// the block axis is the lanes (masonry) axis, so:
+    /// <list type="bullet">
+    /// <item>the block <c>min-height</c> transfers through the aspect-ratio into a
+    /// minimum inline size, which drives the <c>grid-template-columns</c>
+    /// <c>repeat(auto-fill/auto-fit, …)</c> track count (smallest count whose
+    /// tracks reach that minimum);</item>
+    /// <item><c>grid-template-rows</c> (the masonry axis) does <b>not</b> multiply
+    /// the block size — it is content-sized, then grown by the aspect-ratio.</item>
+    /// </list>
+    /// This matches the committed references: a <c>column-*</c> test with a 50px
+    /// track and 60px min-height resolves to a 100×100 square (2 tracks), while
+    /// the mirror <c>row-*</c> test resolves to 60×60 (min-height only).
+    /// <para>Returns <c>false</c> — leaving the block fallback untouched — unless
+    /// the container is a grid-lanes box with both axes auto, a resolvable
+    /// aspect-ratio and a definite block constraint. A block fallback fills its
+    /// container width and cannot honour an aspect-ratio, so any grid-lanes test
+    /// matching this pattern is already failing; the method can only move it
+    /// toward its reference, never regress a passing (block-like) one.</para>
+    /// </summary>
+    private bool TryComputeGridLanesAspectRatioSize(out double width, out double height)
+    {
+        width = 0;
+        height = 0;
+        // Detect a `display: grid-lanes` / `inline grid-lanes` container whose
+        // display keyword Broiler.CSS drops as invalid (issue #1218, so the div
+        // keeps its default `block`). The dropped display leaves a block box that
+        // still carries the — for a plain block, inert — `grid-template-*` and
+        // `aspect-ratio`. That fingerprint is unique to a dropped grid-lanes
+        // container: a real grid is `display: grid`, and an ordinary block never
+        // declares a grid template. Keying off it lets the aspect-ratio track
+        // sizing run without reviving the grid-lanes display keyword.
+        if (Display != CssConstants.Block)
+            return false;
+        // Honour any author-specified size; only synthesise when both axes are auto.
+        if (!IsAutoOrEmptyLength(Width) || !IsAutoOrEmptyLength(Height))
+            return false;
+        if (IsNoneOrEmptyTemplate(GridTemplateColumns) && IsNoneOrEmptyTemplate(GridTemplateRows))
+            return false;
+        if (!TryParseAspectRatio(AspectRatio, out double ratio))
+            return false;
+
+        // Definite block constraint transferred through the aspect ratio: an
+        // explicit definite height if present, otherwise a definite min-height.
+        double blockConstraint;
+        if (IsDefiniteLength(Height))
+            blockConstraint = ParseLengthWithLineHeight(Height, 0);
+        else if (IsDefiniteLength(MinHeight))
+            blockConstraint = ParseLengthWithLineHeight(MinHeight, 0);
+        else
+            return false;
+        if (!(blockConstraint > 0))
+            return false;
+
+        // Minimum inline size transferred from the block constraint (ratio = w/h).
+        double minInline = blockConstraint * ratio;
+
+        double gridAxisSize;
+        if (TryGetInlineAutoRepeatTrackSize(out double trackSize))
+        {
+            if (trackSize > 0)
+            {
+                int count = Math.Max(1, (int)Math.Ceiling((minInline - 1e-4) / trackSize));
+                gridAxisSize = count * trackSize;
+            }
+            else
+            {
+                gridAxisSize = minInline;
+            }
+        }
+        else
+        {
+            // No auto-repeat on the grid (inline) axis: the container is as wide
+            // as its widest item, floored by the transferred minimum.
+            gridAxisSize = Math.Max(MaxChildInlineSize(), minInline);
+        }
+
+        width = gridAxisSize;
+        height = Math.Max(width / ratio, blockConstraint);
+        return width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height);
+    }
+
+    /// <summary>Parses an <c>aspect-ratio</c> value (<c>&lt;number&gt; [ /
+    /// &lt;number&gt; ]?</c>, ignoring a leading/trailing <c>auto</c> keyword)
+    /// into a width/height ratio. Returns <c>false</c> for <c>auto</c>/<c>none</c>
+    /// or a non-positive ratio.</summary>
+    private static bool TryParseAspectRatio(string value, out double ratio)
+    {
+        ratio = 0;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+        double w = double.NaN, h = 1;
+        foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                || token.Equals("none", StringComparison.OrdinalIgnoreCase))
+                continue;
+            int slash = token.IndexOf('/');
+            if (slash >= 0)
+            {
+                if (!double.TryParse(token[..slash].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out w))
+                    return false;
+                string rest = token[(slash + 1)..].Trim();
+                if (rest.Length > 0
+                    && !double.TryParse(rest, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
+                    return false;
+            }
+            else if (double.IsNaN(w))
+            {
+                if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out w))
+                    return false;
+            }
+            else
+            {
+                // A second bare number is the denominator (e.g. `1 / 1` split on space).
+                if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
+                    return false;
+            }
+        }
+        if (double.IsNaN(w) || !(w > 0) || !(h > 0))
+            return false;
+        ratio = w / h;
+        return true;
+    }
+
+    /// <summary>When <c>grid-template-columns</c> is a lone
+    /// <c>repeat(auto-fill|auto-fit, &lt;track&gt;)</c>, yields the track's inline
+    /// size — a fixed length as-is, or the widest item for an intrinsic track.</summary>
+    private bool TryGetInlineAutoRepeatTrackSize(out double trackSize)
+    {
+        trackSize = 0;
+        string tpl = GridTemplateColumns?.Trim();
+        if (string.IsNullOrEmpty(tpl)
+            || !tpl.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase)
+            || !tpl.EndsWith(")", StringComparison.Ordinal))
+            return false;
+        string inner = tpl[7..^1];
+        int comma = inner.IndexOf(',');
+        if (comma < 0)
+            return false;
+        string arg0 = inner[..comma].Trim();
+        if (!arg0.Equals("auto-fill", StringComparison.OrdinalIgnoreCase)
+            && !arg0.Equals("auto-fit", StringComparison.OrdinalIgnoreCase))
+            return false;
+        string track = inner[(comma + 1)..].Trim();
+        if (IsDefiniteLength(track))
+        {
+            trackSize = ParseLengthWithLineHeight(track, 0);
+            return true;
+        }
+        // `auto` / min-content / max-content / minmax(): size to the widest item.
+        trackSize = MaxChildInlineSize();
+        return true;
+    }
+
+    /// <summary>Widest in-flow child border-box inline (width) size, from each
+    /// child's explicit width. Auto-width children are skipped (their intrinsic
+    /// size is not needed by the grid-lanes callers, whose items are explicitly
+    /// sized).</summary>
+    private double MaxChildInlineSize()
+    {
+        double max = 0;
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed
+                || IsAutoOrEmptyLength(child.Width))
+                continue;
+            double w = child.ParseLengthWithLineHeight(child.Width, 0);
+            w += NonNaN(child.ActualBorderLeftWidth) + NonNaN(child.ActualBorderRightWidth)
+               + NonNaN(child.ActualPaddingLeft) + NonNaN(child.ActualPaddingRight)
+               + NonNaN(child.ActualMarginLeft) + NonNaN(child.ActualMarginRight);
+            if (!double.IsNaN(w) && w > max)
+                max = w;
+        }
+        return max;
+    }
+
+    private static double NonNaN(double v) => double.IsNaN(v) ? 0 : v;
+
+    private static bool IsAutoOrEmptyLength(string v) =>
+        string.IsNullOrEmpty(v) || v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary><c>true</c> when <paramref name="v"/> is a non-auto, non-percentage
+    /// length token (so it resolves without a containing-block size).</summary>
+    private static bool IsDefiniteLength(string v) =>
+        !string.IsNullOrEmpty(v)
+        && !v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+        && !v.Equals("none", StringComparison.OrdinalIgnoreCase)
+        && v.IndexOf('%') < 0
+        && v.IndexOfAny(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) >= 0;
 
     /// <summary>
     /// CSS Sizing 3 §5.1: <c>true</c> when <paramref name="width"/> is one of

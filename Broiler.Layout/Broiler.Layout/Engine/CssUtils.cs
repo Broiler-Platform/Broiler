@@ -491,6 +491,9 @@ internal static class CssUtils
             case "min-height":
                 cssBox.MinHeight = value;
                 break;
+            case "aspect-ratio":
+                cssBox.AspectRatio = value;
+                break;
             case "background-color":
                 cssBox.BackgroundColor = value;
                 break;
