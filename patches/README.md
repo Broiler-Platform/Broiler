@@ -42,6 +42,27 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   against a definite-height block parent) is entirely in the parent repo and live
   on CI without any patch.
 
+- **0004-css-expand-margin-padding-shorthand-cascade.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.cs`) — makes a `margin`/`padding` box shorthand
+  seed a cascade slot for each of its four physical longhands (carrying the
+  shorthand's origin rank / specificity / source order), so a higher-origin
+  author shorthand overrides a lower-origin longhand. Without it, the post-cascade
+  shorthand expansion "keeps any already-present longhand", so a user-agent
+  longhand — most visibly the list indent `ol, ul { margin-left: 40px }` — was
+  never reset by an author `margin: 0` / `padding: 0`, leaving lists (and any
+  `<div class=container style="margin:0">` reset over a UA longhand) indented
+  (issue #1239; `css-grid/nested-grid-item-block-size-001` 78 %→84 % once applied,
+  as the nested list no longer inherits the 40px indent). Verified regression-free
+  against the committed css-backgrounds/CSS2 reference suite, the css-grid
+  grid-items and stratified samples, and the `Broiler.Cli.Tests` Acid/Google
+  layout tests. Applies cleanly to the pinned `Broiler.CSS` pointer.
+  **No active CI fallback:** the cascade lives entirely in the `Broiler.CSS`
+  submodule and the parent's layout consumes its computed styles, so there is no
+  parent-repo layer to reproduce the origin-aware shorthand/longhand resolution;
+  `nested-grid-item-block-size-001` therefore stays at the parent-repo-only 78 %
+  (its `block-size`/`aspect-ratio` image fix) on CI until this patch lands and the
+  pointer is bumped.
+
 ## Applied / obsolete
 
 - **0002-css-two-value-display-grid-lanes.patch** → `Broiler.CSS`

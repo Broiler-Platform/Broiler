@@ -4063,7 +4063,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// &lt;number&gt; ]?</c>, ignoring a leading/trailing <c>auto</c> keyword)
     /// into a width/height ratio. Returns <c>false</c> for <c>auto</c>/<c>none</c>
     /// or a non-positive ratio.</summary>
-    private static bool TryParseAspectRatio(string value, out double ratio)
+    internal static bool TryParseAspectRatio(string value, out double ratio)
     {
         ratio = 0;
         if (string.IsNullOrWhiteSpace(value))
