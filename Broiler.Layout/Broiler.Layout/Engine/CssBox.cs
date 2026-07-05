@@ -530,9 +530,30 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
             return false;
 
+        // CSS Sizing 4 §4: a containing block whose height is auto but that has a
+        // preferred aspect-ratio and a definite used width has a definite used
+        // block size (its transferred aspect-ratio height), so a percentage height
+        // resolves against it rather than to auto — matching the reference browser,
+        // which sizes a filling child to the aspect-ratio square.
+        if (ContainingBlock.HasDefiniteAspectRatioBlockHeight())
+            return false;
+
         return ContainingBlock.Height == CssConstants.Auto
             || string.IsNullOrEmpty(ContainingBlock.Height);
     }
+
+    /// <summary>CSS Sizing 4 §4: <c>true</c> when this box's block (height) axis is
+    /// <c>auto</c> but resolvable from its used width and preferred
+    /// <c>aspect-ratio</c>, so its used height is definite for percentage-height
+    /// descendants. Scoped to in-flow block-level boxes, matching
+    /// <see cref="TryResolveAspectRatioBlockHeight"/>'s applicability.</summary>
+    internal bool HasDefiniteAspectRatioBlockHeight() =>
+        (Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+        && Display == CssConstants.Block
+        && Float == CssConstants.None
+        && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+        && !IsImage
+        && TryResolveAspectRatioBlockHeight(out _);
 
     /// <summary>
     /// CSS2.1 §10.5: the containing-block height a percentage <c>height</c>
@@ -1025,18 +1046,6 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // this container's first/last in-flow block-level children before they
         // are laid out, so the trimmed margins collapse to nothing.
         ApplyMarginTrim();
-
-        // CSS Grid Level 3 (grid-lanes): resolve a `display: grid-lanes`
-        // container's intrinsic size from its aspect-ratio and definite
-        // min-height. Setting an explicit width/height lets the block layout
-        // below paint the correct square instead of a viewport-wide bar; a
-        // strict no-op unless the aspect-ratio/auto-repeat pattern fully
-        // resolves, so it only ever moves a currently-failing grid-lanes test.
-        if (TryComputeGridLanesAspectRatioSize(out double gridLanesWidth, out double gridLanesHeight))
-        {
-            Width = gridLanesWidth.ToString("0.####", CultureInfo.InvariantCulture) + "px";
-            Height = gridLanesHeight.ToString("0.####", CultureInfo.InvariantCulture) + "px";
-        }
 
         if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell)
         {
@@ -1749,6 +1758,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     CssValueParser.ParseLength(Height, cbHeight, GetEmHeight()));
                 Size = new SizeF(Size.Width, (float)preHeight);
             }
+            // CSS Sizing 4 §4: likewise pre-resolve an aspect-ratio block size from
+            // the used width so a percentage-height child (e.g. a filling
+            // background element) can resolve against the container's definite
+            // aspect-ratio height. The final ActualBottom is re-established after
+            // child layout below; this only makes the height visible to
+            // descendants beforehand, mirroring the §10.5 pre-resolution above.
+            else if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+                && Display == CssConstants.Block
+                && Float == CssConstants.None
+                && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                && !IsImage
+                && TryResolveAspectRatioBlockHeight(out double aspectRatioPreHeight))
+            {
+                Size = new SizeF(Size.Width, (float)aspectRatioPreHeight);
+            }
 
             //If we're talking about a table here..
             if (Display == CssConstants.Table || Display == CssConstants.InlineTable)
@@ -1999,6 +2023,23 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (resolvedHeight < 0) resolvedHeight = 0;
             double borderBoxH = resolvedHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
             ActualBottom = Location.Y + borderBoxH;
+        }
+
+        // CSS Sizing 4 §4: a box with a preferred aspect-ratio and an auto block
+        // (height) axis derives its used height from its used inline (width) size.
+        // Runs after the explicit-height paths above (so an author height still
+        // wins) and before the §10.7 min-/max-height clamp below (so e.g. a
+        // min-height floors the transferred square). Scoped to in-flow block-level
+        // boxes, whose used width is already resolved and does not itself depend on
+        // the aspect ratio; replaced elements keep their intrinsic-ratio sizing.
+        if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+            && Display == CssConstants.Block
+            && Float == CssConstants.None
+            && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && !IsImage
+            && TryResolveAspectRatioBlockHeight(out double aspectRatioBorderBoxHeight))
+        {
+            ActualBottom = Location.Y + aspectRatioBorderBoxHeight;
         }
 
         // CSS2.1 §10.7: Apply min-height / max-height constraints.
@@ -3963,92 +4004,59 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return maxLineWidth;
     }
 
-    // ─────────────────── CSS Grid Level 3 (grid-lanes) sizing ───────────────────
+    // ─────────────────────── CSS Sizing 4: aspect-ratio ───────────────────────
 
     /// <summary>
-    /// Resolves the intrinsic border-box size of a <c>display: grid-lanes</c>
-    /// container whose size is driven by <c>aspect-ratio</c> and a definite
-    /// <c>min-height</c> (the CSS Grid Level 3 <c>track-sizing/auto-repeat</c>
-    /// WPT cluster). In a grid-lanes box the inline axis is the grid axis and
-    /// the block axis is the lanes (masonry) axis, so:
-    /// <list type="bullet">
-    /// <item>the block <c>min-height</c> transfers through the aspect-ratio into a
-    /// minimum inline size, which drives the <c>grid-template-columns</c>
-    /// <c>repeat(auto-fill/auto-fit, …)</c> track count (smallest count whose
-    /// tracks reach that minimum);</item>
-    /// <item><c>grid-template-rows</c> (the masonry axis) does <b>not</b> multiply
-    /// the block size — it is content-sized, then grown by the aspect-ratio.</item>
-    /// </list>
-    /// This matches the committed references: a <c>column-*</c> test with a 50px
-    /// track and 60px min-height resolves to a 100×100 square (2 tracks), while
-    /// the mirror <c>row-*</c> test resolves to 60×60 (min-height only).
-    /// <para>Returns <c>false</c> — leaving the block fallback untouched — unless
-    /// the container is a grid-lanes box with both axes auto, a resolvable
-    /// aspect-ratio and a definite block constraint. A block fallback fills its
-    /// container width and cannot honour an aspect-ratio, so any grid-lanes test
-    /// matching this pattern is already failing; the method can only move it
-    /// toward its reference, never regress a passing (block-like) one.</para>
+    /// CSS Sizing 4 §4: resolve the used border-box block (height) size of a box
+    /// whose height is <c>auto</c> from its already-resolved used inline (width)
+    /// size and its preferred <c>aspect-ratio</c>. The caller applies this only to
+    /// in-flow block-level boxes, whose used width fills the containing block and
+    /// so does not itself depend on the aspect ratio, making the transfer
+    /// unambiguous.
+    /// <para>The reference browser drops the experimental <c>display: grid-lanes</c>
+    /// keyword to the element's default display (block; issue #1218) but still
+    /// honours <c>aspect-ratio</c>, so a dropped grid-lanes container with an auto
+    /// height is sized to a square — the <c>css-grid/grid-lanes/track-sizing/
+    /// auto-repeat</c> cluster expects exactly this. Broiler previously ignored
+    /// <c>aspect-ratio</c> on ordinary boxes and rendered a viewport-wide,
+    /// min-height-tall bar, matching those references by only ~8%.</para>
+    /// <para>Returns the transferred border-box height; the caller then applies the
+    /// CSS2.1 §10.7 min-/max-height clamp (so a <c>min-height</c> floors the
+    /// square). Returns <c>false</c> when there is no preferred aspect ratio,
+    /// leaving every aspect-ratio-less box (the overwhelming majority) untouched.</para>
     /// </summary>
-    private bool TryComputeGridLanesAspectRatioSize(out double width, out double height)
+    private bool TryResolveAspectRatioBlockHeight(out double borderBoxHeight)
     {
-        width = 0;
-        height = 0;
-        // Detect a `display: grid-lanes` / `inline grid-lanes` container whose
-        // display keyword Broiler.CSS drops as invalid (issue #1218, so the div
-        // keeps its default `block`). The dropped display leaves a block box that
-        // still carries the — for a plain block, inert — `grid-template-*` and
-        // `aspect-ratio`. That fingerprint is unique to a dropped grid-lanes
-        // container: a real grid is `display: grid`, and an ordinary block never
-        // declares a grid template. Keying off it lets the aspect-ratio track
-        // sizing run without reviving the grid-lanes display keyword.
-        if (Display != CssConstants.Block)
-            return false;
-        // Honour any author-specified size; only synthesise when both axes are auto.
-        if (!IsAutoOrEmptyLength(Width) || !IsAutoOrEmptyLength(Height))
-            return false;
-        if (IsNoneOrEmptyTemplate(GridTemplateColumns) && IsNoneOrEmptyTemplate(GridTemplateRows))
-            return false;
-        if (!TryParseAspectRatio(AspectRatio, out double ratio))
+        borderBoxHeight = 0;
+        if (!TryParseAspectRatio(AspectRatio, out double ratio) || !(ratio > 0))
             return false;
 
-        // Definite block constraint transferred through the aspect ratio: an
-        // explicit definite height if present, otherwise a definite min-height.
-        double blockConstraint;
-        if (IsDefiniteLength(Height))
-            blockConstraint = ParseLengthWithLineHeight(Height, 0);
-        else if (IsDefiniteLength(MinHeight))
-            blockConstraint = ParseLengthWithLineHeight(MinHeight, 0);
-        else
-            return false;
-        if (!(blockConstraint > 0))
+        double borderBoxWidth = Size.Width;
+        if (!(borderBoxWidth > 0))
             return false;
 
-        // Minimum inline size transferred from the block constraint (ratio = w/h).
-        double minInline = blockConstraint * ratio;
-
-        double gridAxisSize;
-        if (TryGetInlineAutoRepeatTrackSize(out double trackSize))
+        // aspect-ratio relates the two sizes of the box named by box-sizing
+        // (CSS Sizing 4 §4): the border box under `box-sizing: border-box`,
+        // otherwise the content box. Transfer width→height in that box (ratio is
+        // width/height), then map back to a border-box height for ActualBottom.
+        double specifiedHeight;
+        if (UsesBorderBoxSizing)
         {
-            if (trackSize > 0)
-            {
-                int count = Math.Max(1, (int)Math.Ceiling((minInline - 1e-4) / trackSize));
-                gridAxisSize = count * trackSize;
-            }
-            else
-            {
-                gridAxisSize = minInline;
-            }
+            specifiedHeight = borderBoxWidth / ratio;
         }
         else
         {
-            // No auto-repeat on the grid (inline) axis: the container is as wide
-            // as its widest item, floored by the transferred minimum.
-            gridAxisSize = Math.Max(MaxChildInlineSize(), minInline);
+            double contentWidth = borderBoxWidth
+                - ActualPaddingLeft - ActualPaddingRight
+                - ActualBorderLeftWidth - ActualBorderRightWidth;
+            if (!(contentWidth > 0))
+                return false;
+            specifiedHeight = contentWidth / ratio;
         }
 
-        width = gridAxisSize;
-        height = Math.Max(width / ratio, blockConstraint);
-        return width > 0 && height > 0 && !double.IsNaN(width) && !double.IsNaN(height);
+        borderBoxHeight = ResolveSpecifiedHeightToBorderBox(specifiedHeight);
+        return borderBoxHeight > 0
+            && !double.IsNaN(borderBoxHeight) && !double.IsInfinity(borderBoxHeight);
     }
 
     /// <summary>Parses an <c>aspect-ratio</c> value (<c>&lt;number&gt; [ /
@@ -4093,74 +4101,6 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         ratio = w / h;
         return true;
     }
-
-    /// <summary>When <c>grid-template-columns</c> is a lone
-    /// <c>repeat(auto-fill|auto-fit, &lt;track&gt;)</c>, yields the track's inline
-    /// size — a fixed length as-is, or the widest item for an intrinsic track.</summary>
-    private bool TryGetInlineAutoRepeatTrackSize(out double trackSize)
-    {
-        trackSize = 0;
-        string tpl = GridTemplateColumns?.Trim();
-        if (string.IsNullOrEmpty(tpl)
-            || !tpl.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase)
-            || !tpl.EndsWith(")", StringComparison.Ordinal))
-            return false;
-        string inner = tpl[7..^1];
-        int comma = inner.IndexOf(',');
-        if (comma < 0)
-            return false;
-        string arg0 = inner[..comma].Trim();
-        if (!arg0.Equals("auto-fill", StringComparison.OrdinalIgnoreCase)
-            && !arg0.Equals("auto-fit", StringComparison.OrdinalIgnoreCase))
-            return false;
-        string track = inner[(comma + 1)..].Trim();
-        if (IsDefiniteLength(track))
-        {
-            trackSize = ParseLengthWithLineHeight(track, 0);
-            return true;
-        }
-        // `auto` / min-content / max-content / minmax(): size to the widest item.
-        trackSize = MaxChildInlineSize();
-        return true;
-    }
-
-    /// <summary>Widest in-flow child border-box inline (width) size, from each
-    /// child's explicit width. Auto-width children are skipped (their intrinsic
-    /// size is not needed by the grid-lanes callers, whose items are explicitly
-    /// sized).</summary>
-    private double MaxChildInlineSize()
-    {
-        double max = 0;
-        foreach (var child in Boxes)
-        {
-            if (child.Display == CssConstants.None
-                || child.Position == CssConstants.Absolute
-                || child.Position == CssConstants.Fixed
-                || IsAutoOrEmptyLength(child.Width))
-                continue;
-            double w = child.ParseLengthWithLineHeight(child.Width, 0);
-            w += NonNaN(child.ActualBorderLeftWidth) + NonNaN(child.ActualBorderRightWidth)
-               + NonNaN(child.ActualPaddingLeft) + NonNaN(child.ActualPaddingRight)
-               + NonNaN(child.ActualMarginLeft) + NonNaN(child.ActualMarginRight);
-            if (!double.IsNaN(w) && w > max)
-                max = w;
-        }
-        return max;
-    }
-
-    private static double NonNaN(double v) => double.IsNaN(v) ? 0 : v;
-
-    private static bool IsAutoOrEmptyLength(string v) =>
-        string.IsNullOrEmpty(v) || v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase);
-
-    /// <summary><c>true</c> when <paramref name="v"/> is a non-auto, non-percentage
-    /// length token (so it resolves without a containing-block size).</summary>
-    private static bool IsDefiniteLength(string v) =>
-        !string.IsNullOrEmpty(v)
-        && !v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
-        && !v.Equals("none", StringComparison.OrdinalIgnoreCase)
-        && v.IndexOf('%') < 0
-        && v.IndexOfAny(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) >= 0;
 
     /// <summary>
     /// CSS Sizing 3 §5.1: <c>true</c> when <paramref name="width"/> is one of

@@ -11,9 +11,12 @@ namespace Broiler.Cli.Tests;
 /// <c>display: grid-lanes</c> (and the two-value <c>inline grid-lanes</c>) is an
 /// invalid declaration: reference browsers drop it and the element keeps its
 /// default display. These tests lock in that fallback — a <c>&lt;div&gt;</c>
-/// grid-lanes container lays its children out as a block, not a grid — and the
-/// definite-height percentage resolution the fallback depends on (a block child's
-/// <c>height:%</c> against a fixed-height block parent).
+/// grid-lanes container lays its children out as a block, not a grid — together
+/// with the CSS Sizing 4 <c>aspect-ratio</c> the block fallback still honours
+/// (the grid-lanes container derives its auto block size from its used width, so
+/// it renders as an aspect-ratio square) and the definite-height percentage
+/// resolution the fallback depends on (a block child's <c>height:%</c> against a
+/// fixed- or aspect-ratio-height block parent).
 ///
 /// Companion to <see cref="GridTrackLayoutTests"/>; both drive the check-layout
 /// <c>data-offset-*</c>/<c>data-expected-*</c> geometry through the real engine.
@@ -64,30 +67,27 @@ public sealed class GridLanesFallbackTests
     }
 
     /// <summary>
-    /// CSS Grid Level 3 (grid-lanes) track sizing: a <c>display: grid-lanes</c>
-    /// container with an <c>aspect-ratio</c> and a definite <c>min-height</c>
-    /// resolves to a square even though the display keyword is dropped to block.
-    /// The inline axis is the grid axis: the block <c>min-height</c> (60px)
-    /// transfers through the 1/1 aspect-ratio into a 60px minimum inline size,
-    /// which drives <c>grid-template-columns: repeat(auto-fill, 50px)</c> to two
-    /// tracks (100px), then the aspect-ratio makes the block size 100px → a
-    /// 100×100 square. The mirror test declares the tracks on the block (masonry)
-    /// axis via <c>grid-template-rows</c>, which does not multiply the block size,
-    /// so only the 60px min-height applies → a 60×60 square. Matches the committed
-    /// WPT references (<c>ref-filled-green-100px-square-only</c> /
-    /// <c>row-auto-repeat-003-ref</c>). Without the sizing, the block fallback
-    /// fills the viewport width and both assertions fail.
+    /// CSS Sizing 4 aspect-ratio on the dropped grid-lanes container: reference
+    /// browsers drop <c>display: grid-lanes</c> to <c>block</c> (issue #1218) but
+    /// still honour <c>aspect-ratio</c>. A block with an explicit inline size and a
+    /// preferred aspect ratio derives its auto block size from that width, so a
+    /// grid-lanes box is sized to the ratio — <c>grid-template-*</c> is inert on the
+    /// block and does not enter the calculation. (The css-grid/grid-lanes/
+    /// track-sizing/auto-repeat WPT cluster renders exactly this square; Broiler
+    /// previously ignored aspect-ratio and rendered a min-height-tall bar, matching
+    /// the reference by only ~8%.)
     /// </summary>
     [Theory]
-    [InlineData("grid-template-columns: repeat(auto-fill, 50px)", 100, 100)]
-    [InlineData("grid-template-rows: repeat(auto-fill, 50px)", 60, 60)]
-    public void GridLanesContainer_AspectRatioAutoRepeat_SizesToSquare(
-        string template, int expectedWidth, int expectedHeight)
+    [InlineData("1/1", 200, 200, 200)]
+    [InlineData("2/1", 200, 200, 100)]
+    [InlineData("1/2", 100, 100, 200)]
+    public void GridLanesContainer_AspectRatio_DerivesHeightFromWidth(
+        string ratio, int width, int expectedWidth, int expectedHeight)
     {
         string html =
             "<!DOCTYPE html><html><head><style>"
-            + ".gl{display:inline grid-lanes;aspect-ratio:1/1;min-height:60px;"
-            + template + ";position:relative}"
+            + $".gl{{display:inline grid-lanes;aspect-ratio:{ratio};width:{width}px;"
+            + "grid-template-columns:repeat(auto-fill,50px);position:relative}}"
             + "</style></head><body style=\"margin:0\">"
             + "<div class=\"gl\" data-offset-x=\"0\" data-offset-y=\"0\" "
             + $"data-expected-width=\"{expectedWidth}\" data-expected-height=\"{expectedHeight}\"></div>"
@@ -96,38 +96,74 @@ public sealed class GridLanesFallbackTests
     }
 
     /// <summary>
-    /// The <c>intrinsic-auto-repeat</c> variant: an <c>auto</c>-sized track takes
-    /// its size from the widest item, so a 50px-wide item still yields two 50px
-    /// columns (100×100), while a row-axis (masonry) auto template collapses to
-    /// the 60px min-height (60×60).
+    /// The real grid-lanes auto-repeat scenario: the container's inline size is
+    /// <c>auto</c>, so as an in-flow block it fills its containing block's width,
+    /// then the 1/1 aspect-ratio makes it a square that tall. A 180px-wide parent
+    /// yields a 180×180 grid-lanes square — the fill-then-square path the reference
+    /// browser takes, and the reason the auto-repeat references are viewport-wide
+    /// squares rather than the small track-count squares #1230 assumed.
     /// </summary>
-    [Theory]
-    [InlineData("grid-template-columns: repeat(auto-fill, auto)",
-        "<div style=\"width:50px;height:1px;visibility:hidden\">x</div>", 100, 100)]
-    [InlineData("grid-template-rows: repeat(auto-fill, auto)",
-        "<div style=\"width:1px;height:50px\"></div>", 60, 60)]
-    public void GridLanesContainer_AspectRatioIntrinsicAutoRepeat_SizesToSquare(
-        string template, string child, int expectedWidth, int expectedHeight)
+    [Fact]
+    public void GridLanesContainer_AspectRatio_AutoWidthFillsThenSquares()
     {
         string html =
             "<!DOCTYPE html><html><head><style>"
+            + ".wrap{width:180px;position:relative}"
             + ".gl{display:inline grid-lanes;aspect-ratio:1/1;min-height:60px;"
-            + template + ";position:relative}"
+            + "grid-template-columns:repeat(auto-fill,50px)}"
+            + "</style></head><body style=\"margin:0\"><div class=\"wrap\">"
+            + "<div class=\"gl\" data-offset-x=\"0\" data-offset-y=\"0\" "
+            + "data-expected-width=\"180\" data-expected-height=\"180\"></div>"
+            + "</div></body></html>";
+        AssertCheckLayout(html);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.7: a definite <c>min-height</c> floors the transferred
+    /// aspect-ratio height. A 50px-wide 1/1 box would be 50px tall, but a 200px
+    /// min-height wins, so the box is 50×200 (an intentionally non-square result
+    /// that pins the clamp order — aspect-ratio first, then min-height).
+    /// </summary>
+    [Fact]
+    public void GridLanesContainer_AspectRatio_MinHeightFloorsSquare()
+    {
+        string html =
+            "<!DOCTYPE html><html><head><style>"
+            + ".gl{display:grid-lanes;aspect-ratio:1/1;width:50px;min-height:200px;position:relative}"
             + "</style></head><body style=\"margin:0\">"
             + "<div class=\"gl\" data-offset-x=\"0\" data-offset-y=\"0\" "
-            + $"data-expected-width=\"{expectedWidth}\" data-expected-height=\"{expectedHeight}\">"
-            + child + "</div>"
+            + "data-expected-width=\"50\" data-expected-height=\"200\"></div>"
             + "</body></html>";
         AssertCheckLayout(html);
     }
 
     /// <summary>
-    /// The aspect-ratio sizing is gated: a grid-lanes container with an explicit
-    /// (definite) size keeps the plain block fallback. Here the explicit
-    /// <c>width</c>/<c>height</c> win, so the container is exactly 120×80 — not an
-    /// aspect-ratio square — proving the path never overrides an author size (were
-    /// the grid-lanes sizing to fire, the aspect-ratio would force a square width,
-    /// not 120px).
+    /// A percentage-height child resolves against the container's transferred
+    /// aspect-ratio height, which is definite even though the container's own
+    /// <c>height</c> is <c>auto</c> — the reference browser sizes a filling
+    /// <c>height:100%</c> child to the aspect-ratio square. Here a 120px-wide 1/1
+    /// grid-lanes container is 120×120, so its <c>height:100%</c> child is 120 tall.
+    /// </summary>
+    [Fact]
+    public void GridLanesContainer_AspectRatio_PercentageHeightChildFillsSquare()
+    {
+        string html =
+            "<!DOCTYPE html><html><head><style>"
+            + ".gl{display:inline grid-lanes;aspect-ratio:1/1;width:120px;position:relative}"
+            + "</style></head><body style=\"margin:0\">"
+            + "<div class=\"gl\">"
+            + "<div id=\"c\" style=\"height:100%\" data-offset-x=\"0\" data-offset-y=\"0\" "
+            + "data-expected-width=\"120\" data-expected-height=\"120\"></div>"
+            + "</div></body></html>";
+        AssertCheckLayout(html);
+    }
+
+    /// <summary>
+    /// An explicit block <c>height</c> suppresses the aspect-ratio transfer (CSS
+    /// Sizing 4 §4 only derives an <em>auto</em> block size from the ratio). Here
+    /// the author <c>width:120px</c>/<c>height:80px</c> both win, so the container
+    /// is exactly 120×80 — not the 120×120 aspect-ratio square — proving the ratio
+    /// never overrides an author-specified height.
     /// </summary>
     [Fact]
     public void GridLanesContainer_ExplicitSize_KeepsAuthorDimensions()
