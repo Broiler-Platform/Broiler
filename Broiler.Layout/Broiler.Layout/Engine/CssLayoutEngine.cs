@@ -40,6 +40,39 @@ internal static class CssLayoutEngine
     /// </summary>
     private const double PtToCssPx = 96.0 / 72.0;
 
+    /// <summary>
+    /// Resolves a replaced element's specified width/height to a definite pixel
+    /// length when it is neither <c>auto</c>, a percentage, nor an intrinsic-size
+    /// keyword. Unlike a raw <see cref="CssLength"/> pixel check this resolves
+    /// font- and viewport-relative units (em/rem, vw/vh, …) through the length
+    /// parser, so e.g. <c>block-size: 55vw</c> sizes an image. Percentages are
+    /// excluded here because they resolve against the containing block, which the
+    /// caller handles separately.
+    /// </summary>
+    private static bool TryResolveDefiniteImageLength(string value, double em, out double px)
+    {
+        px = 0;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+        string t = value.Trim();
+        // Only a numeric length (or calc()) is a definite tag size. Reject every
+        // keyword size — auto, none, min/max/fit-content, stretch,
+        // fill-available, … — which resolves against layout, not to a fixed px
+        // value here (and a percentage, which the caller resolves against the
+        // containing block). A definite length always begins with a digit, sign,
+        // or decimal point.
+        char c0 = t[0];
+        bool looksNumeric = char.IsDigit(c0) || c0 == '+' || c0 == '-' || c0 == '.';
+        bool isCalc = t.StartsWith("calc(", StringComparison.OrdinalIgnoreCase);
+        if (!(looksNumeric || isCalc) || t.EndsWith("%", StringComparison.Ordinal))
+            return false;
+        double v = CssValueParser.ParseLength(t, 0, em);
+        if (double.IsNaN(v) || double.IsInfinity(v) || v < 0)
+            return false;
+        px = v;
+        return true;
+    }
+
     public static void MeasureImageSize(ILayoutEnvironment g, CssRectImage imageWord)
     {
         ArgumentNullException.ThrowIfNull(imageWord);
@@ -51,14 +84,21 @@ internal static class CssLayoutEngine
 
         var width = new CssLength(imageWord.OwnerBox.Width);
         var height = new CssLength(imageWord.OwnerBox.Height);
+        double em = imageWord.OwnerBox.GetEmHeight();
 
-        bool hasImageTagWidth = width.Number > 0 && width.Unit == CssUnit.Px;
-        bool hasImageTagHeight = height.Number > 0 && height.Unit == CssUnit.Px;
+        // A specified, non-percentage size counts as a "tag" size — but resolve it
+        // through the length parser rather than only accepting raw pixels, so
+        // font- and viewport-relative units (em/rem, vw/vh, …) that map onto an
+        // image's width/height (including the logical block-size/inline-size, e.g.
+        // `block-size: 55vw`) size the image instead of silently falling through to
+        // its intrinsic size. (WPT css-grid/nested-grid-item-block-size-001.)
+        bool hasImageTagWidth = TryResolveDefiniteImageLength(imageWord.OwnerBox.Width, em, out double tagWidthPx);
+        bool hasImageTagHeight = TryResolveDefiniteImageLength(imageWord.OwnerBox.Height, em, out double tagHeightPx);
         bool scaleImageHeight = false;
 
         if (hasImageTagWidth)
         {
-            imageWord.Width = width.Number;
+            imageWord.Width = tagWidthPx;
         }
         else if (width.Number > 0 && width.IsPercentage)
         {
@@ -76,7 +116,7 @@ internal static class CssLayoutEngine
         }
         else
         {
-            imageWord.Width = hasImageTagHeight ? height.Number / 1.14f : 20;
+            imageWord.Width = hasImageTagHeight ? tagHeightPx / 1.14f : 20;
         }
 
         var maxWidth = new CssLength(imageWord.OwnerBox.MaxWidth);
@@ -101,7 +141,7 @@ internal static class CssLayoutEngine
 
         if (hasImageTagHeight)
         {
-            imageWord.Height = height.Number;
+            imageWord.Height = tagHeightPx;
         }
         else if (image != null)
         {
@@ -112,7 +152,24 @@ internal static class CssLayoutEngine
             imageWord.Height = imageWord.Width > 0 ? imageWord.Width * 1.14f : 22.8f;
         }
 
-        if (image != null && image.Value.HasIntrinsicRatio)
+        // CSS Sizing 4 §4: an explicit `aspect-ratio` on a replaced element with a
+        // natural aspect ratio overrides that natural ratio for computing the
+        // dimension left `auto`. Derive the missing side from the specified one
+        // through the CSS ratio (width/height); fall back to the intrinsic image
+        // ratio when no `aspect-ratio` is declared. (WPT css-grid/
+        // nested-grid-item-block-size-001: `aspect-ratio: 2/1` + `block-size: 55vw`.)
+        bool hasCssAspectRatio =
+            CssBox.TryParseAspectRatio(imageWord.OwnerBox.AspectRatio, out double cssAspectRatio)
+            && cssAspectRatio > 0;
+        if (hasCssAspectRatio)
+        {
+            bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
+            if (widthDriven)
+                imageWord.Height = imageWord.Width / cssAspectRatio;
+            else if (hasImageTagHeight && !hasImageTagWidth)
+                imageWord.Width = imageWord.Height * cssAspectRatio;
+        }
+        else if (image != null && image.Value.HasIntrinsicRatio)
         {
             bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
             // If only the width was set in the html tag, ratio the height.
