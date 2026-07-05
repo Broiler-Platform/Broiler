@@ -45,6 +45,7 @@ Status snapshot and next steps for the Web Platform Tests (WPT) effort tracked i
 | 27 | #1209's reference generator over-corrected: serving **every** root-relative resource pulled in the real `/resources/testharness.js` + `check-layout-th.js`, so ~206 harness-driven `css-grid` tests regressed to `MissingContent` (Chromium painted a results table Broiler's harness stubs never render) (#1212) | ✅ fixed | scripts/generate-wpt-references.js |
 | 28 | Grid pass only did fixed tracks; `fr`/`auto`/`min-content`/`max-content`/`minmax()` declined to the single-column approximation, and subgrid needs real parent track sizing first (#1212) | 🟡 partial | Broiler.Layout/CssBoxGrid |
 | 29 | `grid-lanes/subgrid` reftests at 0–1 %: empty **orthogonal-flow** (`vertical-rl`) box filled its container and rotated into a viewport-tall strip instead of collapsing to fit-content (§7.3) — whole `row-subgrid-auto-fill-*` cluster now matches; `column-subgrid-auto-fill-*` still needs multi-column named-line subgrid layout (#1221) | 🟡 partial | Broiler.Layout |
+| 30 | Grid-item `height:100%` ballooned to fill the viewport: the inline-block fallback resolved a percentage height against the container **width** and skipped the §10.5 indefinite-CB→`auto` rule (`whitespace-in-grid-item-001` 9 %→98.5 %) (#1227) | ✅ fixed | Broiler.Layout |
 
 Cluster 13 (issue [#1140](https://github.com/MaiRat/Broiler/issues/1140), the dominant new
 `css-backgrounds` directory — 30 failures, with `background-clip-root` at the worst-case **0 %
@@ -710,6 +711,44 @@ element's default display):
    subgrids collapse to a thin strip. Matching these needs the deferred **multi-column named-line
    subgrid** track layout (cluster 28's tail); a `grid-auto-rows`-only shortcut would stack the children
    full-width and over-paint the grey, so it is not attempted here.
+
+Cluster 30 (issue [#1227](https://github.com/Broiler-Platform/Broiler/issues/1227), the "biggest
+problems" CSS Grid list — the `grid-items` tests at ~9 % match) was a **grid-item percentage-height**
+bug in the inline-block fallback. `css-grid/grid-items/whitespace-in-grid-item-001`'s `.item`
+(`height:100%; width:30px`) rendered the grey `.grid` container filling the **whole viewport** instead
+of collapsing. Root cause was `CssLayoutEngine.FlowInlineBlock` — the path every flex/grid item and
+inline-block takes in Broiler's approximation — resolving a percentage `height` with
+`ParseLength(b.Height, containerWidth, …)`, i.e. against the container **width**. A grid item's
+percentage block size resolves against its grid *area* (the track), which is not known at this point —
+the §11 track pass / `PlaceItemInArea` sizes percentage/auto grid items to their area *later*. So the
+empty `height:100%` item was sized to 100 % of the grid *width* and, clipped to the viewport, painted a
+full-viewport grey box (the reference collapses to nothing). Fixed **narrowly**: an in-flow grid item
+(`b.ParentBox` is `grid`/`inline-grid`, not abspos/fixed) with a percentage height is measured at its
+**content height** here, and `PlaceItemInArea` then sizes it to the resolved track. Every other box —
+plain inline-block, flex item, replaced inline SVG/img, out-of-flow static positions — keeps the exact
+original width-basis path, so the change is byte-neutral outside grid items. The grid-item case had a
+subtlety: the old width basis coincidentally sized `GridDoc`'s `.i{height:100%}` items right only when
+the grid width equalled the track height, and against a definite-height `fr` grid an over-broad first
+cut (measuring the item at the full container *height*) made the track pass's "would a narrowed column
+have reflowed this?" guard **decline** and drop to the stacking approximation — measuring at content
+height avoids that. (A broader variant that also applied §10.5 indefinite-CB→`auto` to *all*
+inline-blocks was reverted: it regressed `inline-svg-100-percent-in-body` — a replaced inline SVG with
+`height:100%` that must fill the body — so the fix is deliberately scoped to grid items only.) Verified:
+`whitespace-in-grid-item-001` **9.1 % → 98.5 %** against a locally-generated Chromium screenshot (the
+residual is the instruction-paragraph font/anti-aliasing tail, not the grid); minimal repros — a
+`display:grid` with an empty `height:100%` child now **collapses** (was viewport-filling), while a plain
+block, a flex container, and the replaced inline SVG were already correct and stay so;
+`GridTrackLayoutTests`/`GridTrackPaintTests` (16) all green including the fr-row split guard
+`GridFrRows_SplitDefiniteHeight` (caught the over-broad first cut); the inline-block/positioning-heavy
+local reftest subset (`css-align` + `CSS2/{abspos,normal-flow,visudet,positioning}`, 36 tests) has a
+**byte-identical** failure set before/after, and the two curated grid tests
+(`Wpt_PositionTryGrid001` 97.1 %, unchanged; `RunTestWithTimeout_GridTemplateColumnsCrash`) are
+unchanged. Main-repo (`Broiler.Layout`), active on CI. Guard:
+`GridTrackPaintTests.GridItem_PercentHeight_InAutoHeightGrid_CollapsesInsteadOfFillingViewport`.
+**Still open** in the #1227 list: `grid-size-with-orthogonal-child-001` (needs single-explicit-axis
+grid track sizing + orthogonal-flow intrinsic sizing), the `grid-lanes` auto-repeat / subgrid tail
+(feature work), and the JS-driven `grid-container-change-*` / `grid-template-*-changes` tests
+(`document.fonts.ready` + testharness results table).
 
 Cluster 11 (issue [#1119](https://github.com/MaiRat/Broiler/issues/1119), the dominant
 `PixelMismatch / MissingContent` family, 328 failures) was a render-serialization bug that
