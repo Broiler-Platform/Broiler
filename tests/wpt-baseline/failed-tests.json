@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16427,
+    "failed": 16425,
     "skipped": 0,
-    "total": 16427
+    "total": 16425
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 950,
+      "count": 947,
       "examples": [
         "css/css-grid/abspos/grid-abspos-staticpos-align-self-002.html",
         "css/css-grid/abspos/grid-abspos-staticpos-justify-self-rtl-002.html",
@@ -68,18 +68,32 @@
         "css/css-grid/grid-model/grid-container-ignores-first-letter-002.html",
         "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/line-names/column-line-names-005.html"
       ]
+    },
+    {
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "css/css-grid/parsing/grid-template-columns-crash.html"
+      ]
     }
   ],
   "topFailingDirectories": [
     [
       "css/css-grid",
-      1309
+      1307
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1309
+      1306
+    ],
+    [
+      "Timeout",
+      1
     ]
   ],
   "droppedDeclarations": [
@@ -60502,13 +60516,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-grid/grid-definition/grid-auto-repeat-multiple-values-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-grid/grid-definition/grid-auto-repeat-multiple-values-003.html",
       "passed": false,
       "skipped": false,
@@ -65262,6 +65269,12 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-grid/parsing/grid-template-columns-crash.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
       "relativeTestPath": "css/css-grid/placement/grid-auto-placement-implicit-tracks-001.html",
       "passed": false,
       "skipped": false,
@@ -65340,20 +65353,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/placement/grid-placement-using-named-grid-lines-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/placement/grid-placement-using-named-grid-lines-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/placement/grid-placement-using-named-grid-lines-005.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
