@@ -46,12 +46,58 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return Math.Max(0, cssWidth);
     }
 
+    /// <summary>CSS Sizing 3: <c>true</c> for a content-based intrinsic width
+    /// keyword (<c>min-content</c>, <c>max-content</c>, <c>fit-content</c> /
+    /// <c>fit-content()</c>) that resolves to the box's content size rather than a
+    /// length against the containing block.</summary>
+    private static bool IsIntrinsicSizingWidthKeyword(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return false;
+        string v = value.Trim();
+        return v.Equals("min-content", StringComparison.OrdinalIgnoreCase)
+            || v.Equals("max-content", StringComparison.OrdinalIgnoreCase)
+            || v.Equals("fit-content", StringComparison.OrdinalIgnoreCase)
+            || v.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase);
+    }
+
     private double ResolveSpecifiedHeightToBorderBox(double cssHeight)
     {
         if (!UsesBorderBoxSizing)
             cssHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
 
         return Math.Max(0, cssHeight);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.7: clamp a specified (author-declared) height to
+    /// <c>min-height</c>/<c>max-height</c> in the same box-sizing frame (both share
+    /// it), returning the clamped specified value — the caller normalizes to the
+    /// border box via <see cref="ResolveSpecifiedHeightToBorderBox"/>. A percentage
+    /// min-/max-height against an indefinite (auto-height) flow containing block is
+    /// treated as its initial value (<c>0</c>/<c>none</c>), per §10.7.
+    /// </summary>
+    private double ClampSpecifiedHeightToMinMax(double specifiedHeight)
+    {
+        double cbHeight = (Position == CssConstants.Fixed && LayoutEnvironment != null)
+            ? LayoutEnvironment.ViewportSize.Height
+            : ContainingBlock?.Size.Height ?? 0;
+        bool cbIndefinite = Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            && ContainingBlock?.ParentBox != null
+            && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
+
+        if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight)
+            && !(MaxHeight.Contains('%') && cbIndefinite))
+        {
+            double maxH = CssValueParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
+            if (specifiedHeight > maxH) specifiedHeight = maxH;
+        }
+        if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight)
+            && !(MinHeight.Contains('%') && cbIndefinite))
+        {
+            double minH = CssValueParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
+            if (specifiedHeight < minH) specifiedHeight = minH;
+        }
+        return specifiedHeight;
     }
 
     /// <summary>
@@ -1369,6 +1415,47 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                     Size = new SizeF((float)stfWidth, Size.Height);
                 }
+                else if (IsIntrinsicSizingWidthKeyword(Width))
+                {
+                    // CSS Sizing 3 §5.1: an intrinsic-sizing keyword width resolves
+                    // to the box's content-based size, not the containing block.
+                    //   min-content → the min-content (preferred-minimum) width,
+                    //   max-content → the max-content (preferred) width,
+                    //   fit-content → min(max(min-content, available), max-content).
+                    // Without this these keywords fell through to the stretched
+                    // container width (e.g. a shrink-to-fit grid stayed 1024 instead
+                    // of its min-width — WPT css-grid grid-auto-repeat-min-size-001).
+                    // Mirrors the float shrink-to-fit path (content widths + own
+                    // border/padding for the border-box Size.Width, then min/max-width).
+                    EnsureDescendantWordsMeasured(g);
+
+                    double maxContent = ComputeShrinkToFitWidth();
+                    GetMinMaxWidth(out double minContent, out _);
+                    if (double.IsNaN(minContent)) minContent = 0;
+                    if (double.IsNaN(maxContent)) maxContent = 0;
+                    double available = width - ActualMarginLeft - ActualMarginRight;
+
+                    double resolved = Width.StartsWith("min-content", StringComparison.OrdinalIgnoreCase)
+                        ? minContent
+                        : Width.StartsWith("max-content", StringComparison.OrdinalIgnoreCase)
+                            ? maxContent
+                            : Math.Min(Math.Max(minContent, available), maxContent); // fit-content
+
+                    if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+                    {
+                        double maxW = ParseLengthWithLineHeight(MaxWidth, width);
+                        if (resolved > maxW) resolved = maxW;
+                    }
+                    if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                    {
+                        double minW = ParseLengthWithLineHeight(MinWidth, width);
+                        if (resolved < minW) resolved = minW;
+                    }
+
+                    resolved += ActualBorderLeftWidth + ActualBorderRightWidth
+                              + ActualPaddingLeft + ActualPaddingRight;
+                    Size = new SizeF((float)resolved, Size.Height);
+                }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
                 {
                     // Margins reduce the box width only for auto-width elements.
@@ -2156,6 +2243,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     contentHeight = ActualHeight;
                 }
+                // CSS2.1 §10.7: min-height/max-height also constrain a float's
+                // explicit height. This override runs after the §10.7 clamp above,
+                // so without re-clamping here a float with height:100; min-height:200
+                // kept 100 (e.g. a float:left grid whose auto-fill row count already
+                // grew to min-height — WPT css-grid grid-auto-repeat-min-size-001).
+                // height and min/max-height share the box-sizing frame, so clamp the
+                // specified value; ResolveSpecifiedHeightToBorderBox normalizes it.
+                contentHeight = ClampSpecifiedHeightToMinMax(contentHeight);
                 double borderBoxHeight = ResolveSpecifiedHeightToBorderBox(contentHeight);
                 ActualBottom = Location.Y + borderBoxHeight;
             }

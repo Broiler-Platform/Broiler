@@ -44,7 +44,7 @@ do not yet *pass* because of Workstream A below.
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | 35.8 % | Gutter contribution to track/spanning/margin sizing | **E** |
 | 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Grid-axis transposition (residual page-level drift) | **A** |
-| 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 43.8 % | Auto-fill track count under shrink-to-fit + min-size | **C** |
+| 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 9/12 cases³ | 3 `border-box` variants (border-box + auto-fill + min-height) | **C** |
 | 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | Grid-axis transposition + margin/border/padding in vertical | **A** |
 
 ¹ (superseded — see ² and Workstream B) The pre-fix "~84 %" was an optimistic
@@ -58,6 +58,12 @@ and the test lays out identically to `-ref.html` in-sandbox. Ledger clusters 34
 (replaced-item logical/`aspect-ratio` sizing) and 35 (box-shorthand cascade,
 `Broiler.CSS` commit `5a4fae1`, pointer bumped) remain the prerequisites. The full
 css-grid pixel score is a CI item (corpus not vendored).
+
+³ Scored in-sandbox via the check-layout geometry harness (Workstream C, this
+session): **9 of 12** cases now fully correct after two fixes — a `min-height`
+clamp on a float's explicit height, and intrinsic-sizing width keywords
+(`min-content`/`max-content`/`fit-content`). The 3 `box-sizing:border-box` variants
+remain (border-box + auto-fill-count + `min-height`). Full pixel score is a CI item.
 
 ---
 
@@ -286,6 +292,46 @@ vendored and cannot be fetched in the sandbox (WPT clone → 403; empty
 `checkLayout` variants (border / `box-sizing` / `min-content` / `max-content`)
 still need a full-suite score on CI.
 
+**Update (this session) — the 12 variants scored in-sandbox; 2 more root causes
+fixed (9/12 now pass).** The percentage-child balloon fix above did **not** close
+this test — its items have *no* width, so that path never engaged. Fetching the
+verbatim test (it is fully self-contained; the external `grid.css` is overridden)
+and running all 12 `checkLayout` cases through the geometry harness showed **10/12
+failing** on two *distinct* defects the earlier note did not cover:
+
+1. **`min-height`/`max-height` was not re-applied to a float's explicit height.**
+   The `float` + explicit-`height` override (`CssBox.PerformLayoutImp`, the
+   `Float != none && Height != auto` branch) runs *after* the §10.7 min/max clamp,
+   so a `float:left` grid with `height:100; min-height:200` kept **100** even
+   though its auto-fill row count had already grown to `min-height` (item correctly
+   at y=150, container wrongly 100). Not grid-specific — any float ignored
+   `min-height` on this path. Fixed with `ClampSpecifiedHeightToMinMax` (clamps in
+   the shared box-sizing frame before `ResolveSpecifiedHeightToBorderBox`
+   normalizes), flipping g2/g6/g10 heights → 200/220/200.
+2. **Intrinsic-sizing width keywords fell through to the stretched width.**
+   `width: min-content`/`max-content`/`fit-content` matched none of the auto/float
+   shrink-to-fit branches, so they stayed at the container width (**1024**). Added
+   an `IsIntrinsicSizingWidthKeyword` branch (CSS Sizing 3 §5.1): `min-content` →
+   min-content, `max-content` → max-content, `fit-content` → `min(max(min, avail),
+   max)`, then the `min-width`/`max-width` clamp and own border/padding — mirroring
+   the proven float shrink-to-fit path. Flips the six `min/max-content` cases
+   (g3/g4/g7/g8/g11/g12) width → 300/320.
+
+Together these take **grid-auto-repeat-min-size-001 from 2/12 → 9/12** cases fully
+correct in the geometry harness. Guard: `GridAutoRepeatMinSizeTests` (the 8
+non-`border-box` cases; fails without either fix). **Zero regressions** — 74 grid/
+aspect/table/percent Cli.Tests green, and the runner over vendored
+**css-anchor-position (40) + css-align (28) + css-backgrounds (61)** shows a
+**byte-identical pass set** before/after (0 status diffs across 129 tests).
+
+**Still open (the 3 `box-sizing:border-box` variants g9/g11/g12).** They resolve to
+a 200 border-box height where WPT expects 220 — a border-box + auto-fill-row-count +
+`min-height` subtlety (whether the row count is computed against the border-box or
+content-box `min-height`), further tangled by a float-context dependence (g10's
+border-box width resolves correctly only when preceded by g9 in the DOM). This is a
+separate border-box sizing increment; the full pixel score of all 12 still lands on
+CI.
+
 <details><summary>Original (pre-reproduction) analysis — superseded</summary>
 
 `repeat(auto-fill, …)` **column** count is resolved against
@@ -382,10 +428,12 @@ named-line auto-fill. **Risk: high, value: low.**
 1. **B** — ✅ replaced-item-in-grid **height collapse fixed** (item #5 no longer
    renders blank; lays out identically to `-ref.html` in-sandbox). Remaining: the
    ~16 % `ul`/`li` + font tail and the full css-grid pixel score, both CI items.
-2. **C** — item #9: ✅ **shrink-to-fit balloon fixed** — the real cause was a
-   percentage-width grid item inflating intrinsic width (CSS Sizing 3 §5.1), not an
-   auto-fill-count gap. See Workstream C. Remaining: score the 12 `checkLayout`
-   variants on CI (needs the css-grid WPT corpus, unavailable in the sandbox).
+2. **C** — item #9: ✅ **9/12 cases now correct** — beyond the earlier
+   percentage-width balloon fix, this session scored all 12 `checkLayout` variants
+   in-sandbox and fixed two more root causes: a `min-height` clamp on a float's
+   explicit height, and intrinsic-sizing width keywords (`min-content`/
+   `max-content`/`fit-content`). See Workstream C. Remaining: the 3 `border-box`
+   variants (border-box + auto-fill + min-height) and the full pixel score on CI.
 3. **The #8 ~5 % vertical text-drift** — investigated (this session): it is a UA
    default paragraph/line-box rhythm difference on a plain intro `<p>`, **not** a
    bounded sandbox win — its fix surface is a high-blast-radius UA default that is
