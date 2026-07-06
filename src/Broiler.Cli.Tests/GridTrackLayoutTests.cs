@@ -377,4 +377,37 @@ public sealed class GridTrackLayoutTests
             ("grid-column:2;grid-row:1;", 100, 0, 100, 40));
         AssertCheckLayout(html, "file:///grid-linename-auto-fill.html");
     }
+
+    [Fact]
+    public void GridImplicitOnlyTracks_WithAlignContent_DistributeRowsInDefiniteHeight()
+    {
+        // A template-less grid (no grid-template-columns/rows) sized purely by
+        // grid-auto-columns/-rows: 20px columns, 40px rows, in a 200x300 box.
+        // Before the implicit-only fix this whole shape declined the §11 pass and
+        // collapsed under the approximation; now the placed items generate the two
+        // implicit rows and `align-content:space-between` pushes row 2 to the
+        // block end (300 - 40 = 260). Mirrors the css-grid alignment suite
+        // (grid-align-content-distribution.html), whose grids omit templates.
+        string html = GridDoc(
+            "width:200px;height:300px;grid-auto-columns:20px;grid-auto-rows:40px;align-content:space-between;",
+            ("grid-column:1;grid-row:1;", 0, 0, 20, 40),
+            ("grid-column:2;grid-row:1;", 20, 0, 20, 40),
+            ("grid-column:1;grid-row:2;", 0, 260, 20, 40),
+            ("grid-column:2;grid-row:2;", 20, 260, 20, 40));
+        AssertCheckLayout(html, "file:///grid-implicit-align-content.html");
+    }
+
+    [Fact]
+    public void GridImplicitOnlyRows_WithExplicitColumns_SizeFromGridAutoRows()
+    {
+        // Explicit columns but a template-less row axis fed by grid-auto-rows:50px.
+        // The row axis is implicit-only; the two placed rows must each size to
+        // 50px rather than declining the pass.
+        string html = GridDoc(
+            "grid-template-columns:60px 60px;grid-auto-rows:50px;",
+            ("grid-column:1;grid-row:1;", 0, 0, 60, 50),
+            ("grid-column:2;grid-row:1;", 60, 0, 60, 50),
+            ("grid-column:1;grid-row:2;", 0, 50, 60, 50));
+        AssertCheckLayout(html, "file:///grid-implicit-rows.html");
+    }
 }
