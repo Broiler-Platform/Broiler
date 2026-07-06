@@ -660,8 +660,19 @@ internal partial class CssBox
         double marginL = item.ActualMarginLeft, marginR = item.ActualMarginRight;
         double marginT = item.ActualMarginTop, marginB = item.ActualMarginBottom;
 
-        bool widthFills = FillsArea(item.Width);
-        bool heightFills = FillsArea(item.Height);
+        // CSS Box Alignment §4.3 / CSS Grid §6.1: an auto-sized grid item fills its
+        // area only under the (default) stretch self-alignment. A positional or
+        // baseline align-self/justify-self (self-start, center, baseline, …) keeps
+        // the item at its content size and positions it in the area instead — a
+        // percentage size always fills, resolving against the area regardless.
+        bool widthIsPercent = !string.IsNullOrEmpty(item.Width)
+            && item.Width.EndsWith("%", StringComparison.Ordinal);
+        bool heightIsPercent = !string.IsNullOrEmpty(item.Height)
+            && item.Height.EndsWith("%", StringComparison.Ordinal);
+        bool widthFills = FillsArea(item.Width)
+            && (widthIsPercent || SelfAlignmentStretches(item.JustifySelf, JustifyItems));
+        bool heightFills = FillsArea(item.Height)
+            && (heightIsPercent || SelfAlignmentStretches(item.AlignSelf, AlignItems));
 
         double targetLeft = areaLeft + marginL;
         double targetTop = areaTop + marginT;
@@ -1173,6 +1184,26 @@ internal partial class CssBox
             h += item.ActualPaddingTop + item.ActualPaddingBottom
                 + item.ActualBorderTopWidth + item.ActualBorderBottomWidth;
         return h > 0 ? h : 0;
+    }
+
+    /// <summary>
+    /// True when a grid item's used self-alignment on an axis is <c>stretch</c>
+    /// (so an auto-sized item fills the area). Resolves <c>align-self</c>/
+    /// <c>justify-self</c> of <c>auto</c>/<c>normal</c> to the container's
+    /// <c>align-items</c>/<c>justify-items</c>, whose own initial value
+    /// (<c>normal</c>) is stretch. Any positional or baseline value
+    /// (<c>start</c>, <c>center</c>, <c>self-end</c>, <c>baseline</c>, …) is not
+    /// stretch, so the item is content-sized and then positioned.
+    /// </summary>
+    private static bool SelfAlignmentStretches(string self, string items)
+    {
+        string v = self;
+        if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
+            v = items;
+        v = (v ?? "").Trim().ToLowerInvariant();
+        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
+        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+        return string.IsNullOrEmpty(v) || v == "normal" || v == "stretch";
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)
