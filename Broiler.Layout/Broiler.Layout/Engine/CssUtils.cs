@@ -714,11 +714,11 @@ internal static class CssUtils
         // `display: grid-lanes` / `<outside> grid-lanes` is invalid: no stable
         // browser ships the CSS Grid Level 3 grid-lanes keyword unflagged, so the
         // whole declaration is dropped and the element keeps its default display.
-        // Broiler.CSS rejects it at validation once
-        // patches/0003-css-reject-display-grid-lanes.patch lands; until then the
-        // pinned submodule still accepts grid-lanes and forwards it here, so this
-        // reproduces the dropped-declaration result (a no-op once the patch lands,
-        // since a rejected grid-lanes never reaches this method).
+        // The pinned Broiler.CSS now rejects grid-lanes at validation (commit
+        // 1f75198, formerly patches/0003-css-reject-display-grid-lanes.patch), so a
+        // rejected grid-lanes never reaches this method — this branch is an inert
+        // defensive no-op kept for builds against an older submodule pointer that
+        // still forwards the value here.
         if (Array.Exists(parts, static p => p.Equals("grid-lanes", StringComparison.OrdinalIgnoreCase)))
             return DefaultDisplayForElement(box);
 
