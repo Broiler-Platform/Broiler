@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16412,
+    "failed": 16409,
     "skipped": 0,
-    "total": 16412
+    "total": 16409
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 934,
+      "count": 923,
       "examples": [
         "css/css-grid/abspos/grid-abspos-staticpos-align-self-002.html",
         "css/css-grid/abspos/grid-abspos-staticpos-justify-self-rtl-002.html",
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 154,
+      "count": 160,
       "examples": [
         "css/css-grid/abspos/positioned-grid-items-010.html",
         "css/css-grid/alignment/grid-inline-axis-alignment-auto-margins-008.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 76,
+      "count": 78,
       "examples": [
         "css/css-grid/alignment/grid-alignment-implies-size-change-016.html",
         "css/css-grid/alignment/grid-self-alignment-stretch-012.html",
@@ -83,13 +83,13 @@
   "topFailingDirectories": [
     [
       "css/css-grid",
-      1294
+      1291
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1293
+      1290
     ],
     [
       "Timeout",
@@ -57037,13 +57037,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-grid/abspos/grid-abspos-staticpos-align-self-safe-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-grid/abspos/grid-abspos-staticpos-align-self-vertWM-001.html",
       "passed": false,
       "skipped": false,
@@ -60170,35 +60163,35 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/alignment/self-baseline/grid-self-baseline-vertical-rl-004.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/alignment/self-baseline/grid-self-baseline-vertical-rl-005.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/alignment/self-baseline/grid-self-baseline-vertical-rl-006.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/alignment/self-baseline/grid-self-baseline-vertical-rl-007.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/child-border-box-and-max-content-002.html",
@@ -60867,13 +60860,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-items/grid-item-inline-contribution-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-items/grid-item-margins-and-writing-modes-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -62788,7 +62774,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/item-placement/column-negative-margin-004.html",
@@ -64139,7 +64125,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/tentative/intrinsic-sizing/grid-lanes-baseline-alignment-affects-intrinsic-size-007.html",
@@ -64430,13 +64416,6 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/column-auto-repeat-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/track-sizing/auto-repeat/column-auto-repeat-010.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -64909,7 +64888,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-grid/layout-algorithm/flex-and-intrinsic-sizes-001.html",
