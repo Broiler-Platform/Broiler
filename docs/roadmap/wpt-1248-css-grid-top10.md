@@ -487,10 +487,16 @@ vendored css-align (28) + css-anchor-position (40).
     wrong cell. ✅ **Fixed** (`ApplyGridAreaShorthand` + `SetGridLineSide` in
     `CssUtils`; guard `GridPlacementShorthandTests`, 0 regressions). Test 5 now
     places correctly (numeric + `grid-area`).
-  - **Named-line *placement resolution*** (`grid-column: bar`, `grid-row: 1 / bar`)
-    — still open: `ParseSingleGridLine` maps a named line to `auto`. Needs a
-    per-axis line-name → index map from the template, threaded into placement.
-    Blocks tests 6/12.
+  - **Named-line *placement resolution*** (`grid-column: bar`, `grid-row: 1 / bar`,
+    `grid-area: bar / bar`, `grid-column-start: foo`) — ✅ **fixed** (this session).
+    `ParseLineNames` builds a per-axis line-name → index map from the template
+    (expanding `repeat(<int>,…)`), threaded into `ParseSingleGridLine` and the
+    abspos `ParseAbsposGridLines`; a `<name>` resolves to its first labelled line
+    (or `<int> <name>` to the Nth), an unknown name still falls back to `auto`.
+    Guard `GridNamedLineTests`. With this + `grid-area`, tests 5/6/12's placement is
+    correct; their gutter assertions resolve on CI (the harness's −1 offsetParent
+    border still offsets the check-layout offsets uniformly). 0 regressions on the
+    vendored subsets.
 - **`width:fit-content` grid intrinsic width — ✅ implemented (this session, see
   Workstream A).** A grid with a fixed column template now sums its column tracks
   (+ gaps + padding/border) for `min-content`/`max-content`/`fit-content`/`float`,

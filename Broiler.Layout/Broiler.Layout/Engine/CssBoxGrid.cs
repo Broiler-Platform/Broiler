@@ -236,6 +236,8 @@ internal partial class CssBox
             Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
         var placements = new List<GridPlacement>();
         List<CssBox> absposItems = null;
+        var colNames = ParseLineNames(GridTemplateColumns);
+        var rowNames = ParseLineNames(GridTemplateRows);
         foreach (var child in Boxes)
         {
             if (child.Display == CssConstants.None)
@@ -247,8 +249,8 @@ internal partial class CssBox
                 continue;
             }
 
-            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count);
-            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count);
+            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count, rowNames);
+            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count, colNames);
             // Decline rather than lay out an implausibly large grid. A negative
             // start references a leading implicit track (normalised below), so bound
             // its magnitude too.
@@ -427,7 +429,8 @@ internal partial class CssBox
         if (absposItems != null)
             PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
                 colSizes.Length, rowSizes.Length, contentLeft, contentTop,
-                colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart);
+                colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart,
+                colNames, rowNames);
 
         _gridTrackLayoutApplied = true;
         return true;
@@ -700,7 +703,8 @@ internal partial class CssBox
         double[] colStartEdge, double[] colEndEdge,
         double[] rowStartEdge, double[] rowEndEdge,
         int colCount, int rowCount, double contentLeft, double contentTop,
-        int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart)
+        int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart,
+        IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames)
     {
         double padLeft = Location.X + ActualBorderLeftWidth;
         double padRight = Location.X + Size.Width - ActualBorderRightWidth;
@@ -709,8 +713,8 @@ internal partial class CssBox
 
         foreach (var item in items)
         {
-            var (colStartLine, colEndLine) = ParseAbsposGridLines(item.GridColumn, explicitCols, explicitColStart);
-            var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart);
+            var (colStartLine, colEndLine) = ParseAbsposGridLines(item.GridColumn, explicitCols, explicitColStart, colNames);
+            var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart, rowNames);
             var (left, right) = ResolveAbsposAxis(colStartLine, colEndLine, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
             var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge,
@@ -731,7 +735,8 @@ internal partial class CssBox
     /// indexes the same coordinate as the sized tracks.
     /// </summary>
     private static (int? startLine, int? endLine) ParseAbsposGridLines(
-        string value, int explicitTracks, int explicitStart)
+        string value, int explicitTracks, int explicitStart,
+        IReadOnlyDictionary<string, List<int>> names = null)
     {
         string v = (value ?? "").Trim();
         int slash = v.IndexOf('/');
@@ -743,12 +748,29 @@ internal partial class CssBox
             if (string.IsNullOrEmpty(tok) || tok.Equals("auto", StringComparison.OrdinalIgnoreCase)
                 || tok.StartsWith("span", StringComparison.OrdinalIgnoreCase))
                 return null;                    // auto / span -> padding edge (§9.2)
-            if (!int.TryParse(tok, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
-                return null;                    // named line unsupported -> auto
-            int boundary = line >= 1
-                ? line - 1                       // 1-based line -> 0-based boundary
-                : explicitTracks + 1 + line;     // negative -> back from the last line
-            return boundary + explicitStart;     // into the leading-shifted coordinate
+            if (int.TryParse(tok, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
+            {
+                int b = line >= 1
+                    ? line - 1                   // 1-based line -> 0-based boundary
+                    : explicitTracks + 1 + line; // negative -> back from the last line
+                return b + explicitStart;        // into the leading-shifted coordinate
+            }
+            // Named line: resolve against the template's line-name map, else auto.
+            if (names != null)
+            {
+                int space = tok.IndexOf(' ');
+                int nth = 1;
+                string name = tok;
+                if (space > 0 && int.TryParse(tok.Substring(0, space).Trim(),
+                        NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
+                {
+                    nth = parsedNth;
+                    name = tok.Substring(space + 1).Trim();
+                }
+                if (names.TryGetValue(name, out var lines) && lines.Count > 0)
+                    return lines[Math.Min(nth, lines.Count) - 1] + explicitStart;
+            }
+            return null;                         // unresolved named line -> auto
         }
 
         return (Line(startTok), Line(endTok));
@@ -1942,7 +1964,8 @@ internal partial class CssBox
     /// <c>-2</c> the one before it, and so on; a negative line pointing before the
     /// grid's start, or a named line, falls back to <c>auto</c>.
     /// </summary>
-    private static (int? start, int span) ParseGridLine(string value, int explicitTracks)
+    private static (int? start, int span) ParseGridLine(string value, int explicitTracks,
+        IReadOnlyDictionary<string, List<int>> names = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             return (null, 1);
@@ -1952,10 +1975,10 @@ internal partial class CssBox
 
         int slash = v.IndexOf('/');
         if (slash < 0)
-            return ParseSingleGridLine(v, explicitTracks);
+            return ParseSingleGridLine(v, explicitTracks, names);
 
-        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks);
-        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks);
+        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks, names);
+        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks, names);
 
         if (startLine.HasValue && endLine.HasValue)
         {
@@ -1974,7 +1997,8 @@ internal partial class CssBox
         return (null, 1);
     }
 
-    private static (int? start, int span) ParseSingleGridLine(string token, int explicitTracks)
+    private static (int? start, int span) ParseSingleGridLine(string token, int explicitTracks,
+        IReadOnlyDictionary<string, List<int>> names = null)
     {
         if (string.IsNullOrEmpty(token) || token.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return (null, 1);
@@ -2001,6 +2025,95 @@ internal partial class CssBox
             }
             return (null, 1);                 // line 0 -> auto
         }
-        return (null, 1);                     // named line -> auto
+
+        // Named line: `<name>` (the first line with that name) or `<int> <name>`
+        // (the Nth). CSS Grid §8.3 — resolve against the template's line-name map.
+        if (names != null)
+        {
+            int space = token.IndexOf(' ');
+            int nth = 1;
+            string name = token;
+            if (space > 0 && int.TryParse(token.Substring(0, space).Trim(),
+                    NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
+            {
+                nth = parsedNth;
+                name = token.Substring(space + 1).Trim();
+            }
+            if (names.TryGetValue(name, out var lines) && lines.Count > 0)
+                return (lines[Math.Min(nth, lines.Count) - 1], 1);
+        }
+        return (null, 1);                     // unresolved named line -> auto
+    }
+
+    /// <summary>
+    /// CSS Grid §7.1: the template's line-name map — each custom line name (from a
+    /// <c>[name …]</c> bracket) to the 0-based line (track boundary) indices it
+    /// labels. <c>repeat(&lt;int&gt;, …)</c> is expanded so names inside repeat
+    /// exist at every repetition; <c>auto-fill</c>/<c>auto-fit</c> repeats stop the
+    /// walk (their count is layout-dependent). Returns an empty map for an unnamed
+    /// template.
+    /// </summary>
+    private static Dictionary<string, List<int>> ParseLineNames(string template)
+    {
+        var result = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(template))
+        {
+            int line = 0;
+            CollectLineNames(template, result, ref line, depth: 0);
+        }
+        return result;
+    }
+
+    private static void CollectLineNames(string v, Dictionary<string, List<int>> result, ref int line, int depth)
+    {
+        if (depth > 4) return;
+        int i = 0, n = v.Length;
+        while (i < n)
+        {
+            while (i < n && char.IsWhiteSpace(v[i])) i++;
+            if (i >= n) break;
+
+            if (v[i] == '[')
+            {
+                int close = v.IndexOf(']', i);
+                if (close < 0) return;
+                foreach (var name in v.Substring(i + 1, close - i - 1)
+                             .Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!result.TryGetValue(name, out var list))
+                        result[name] = list = new List<int>();
+                    if (!list.Contains(line)) list.Add(line);
+                }
+                i = close + 1;
+                continue;
+            }
+
+            int start = i, paren = 0;
+            while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
+            {
+                if (v[i] == '(') paren++;
+                else if (v[i] == ')') paren--;
+                i++;
+            }
+            string token = v.Substring(start, i - start);
+            if (token.Length == 0) continue;
+
+            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
+            {
+                string inner = token.Substring(7, token.Length - 8);
+                int comma = inner.IndexOf(',');
+                if (comma < 0) return;
+                if (int.TryParse(inner.Substring(0, comma).Trim(),
+                        NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
+                    && count >= 1 && count <= 1000)
+                    for (int r = 0; r < count; r++)
+                        CollectLineNames(inner.Substring(comma + 1), result, ref line, depth + 1);
+                else
+                    return;              // auto-fill/auto-fit — line count unknown
+                continue;
+            }
+
+            line++;                      // one track (length / minmax / keyword)
+        }
     }
 }
