@@ -269,6 +269,20 @@ internal static class CssBoxHelper
             for (int i = 0; i < box.Boxes.Count; i++)
             {
                 CssBox childBox = box.Boxes[i];
+
+                // A <br> forces a line break, so max-content is the widest line:
+                // close the running line here and start a fresh one. Otherwise the
+                // recursion below (a <br> computes to a block box, which resets and
+                // then restores the running sum) leaves the following inline content
+                // accumulating on the same line — `A<br>B` would measure as A + B
+                // instead of max(A, B), doubling a multi-line item's width.
+                if (childBox.IsBrElement)
+                {
+                    oldSum = oldSum.HasValue ? Math.Max(oldSum.Value, maxSum) : maxSum;
+                    maxSum = marginSum;
+                    continue;
+                }
+
                 marginSum += childBox.ActualMarginLeft + childBox.ActualMarginRight;
 
                 //maxSum += childBox.ActualMarginLeft + childBox.ActualMarginRight;
