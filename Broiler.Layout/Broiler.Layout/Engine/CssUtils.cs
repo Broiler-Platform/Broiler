@@ -128,9 +128,9 @@ internal static class CssUtils
             "column-count" => cssBox.ColumnCount,
             "column-width" => cssBox.ColumnWidth,
             "column-fill" => cssBox.ColumnFill,
-            "row-gap" => cssBox.RowGap,
-            "column-gap" => cssBox.ColumnGap,
-            "gap" => cssBox.RowGap == cssBox.ColumnGap ? cssBox.RowGap : $"{cssBox.RowGap} {cssBox.ColumnGap}",
+            "row-gap" or "grid-row-gap" => cssBox.RowGap,
+            "column-gap" or "grid-column-gap" => cssBox.ColumnGap,
+            "gap" or "grid-gap" => cssBox.RowGap == cssBox.ColumnGap ? cssBox.RowGap : $"{cssBox.RowGap} {cssBox.ColumnGap}",
             "break-inside" => cssBox.BreakInside,
             "grid-row" => cssBox.GridRow,
             "grid-column" => cssBox.GridColumn,
@@ -302,12 +302,16 @@ internal static class CssUtils
                 cssBox.ColumnFill = value;
                 break;
             case "row-gap":
+            // Legacy CSS Grid Level 1 aliases (still supported by browsers).
+            case "grid-row-gap":
                 cssBox.RowGap = value;
                 break;
             case "column-gap":
+            case "grid-column-gap":
                 cssBox.ColumnGap = value;
                 break;
             case "gap":
+            case "grid-gap":
                 {
                     var parts = value.Trim().Split([' '], StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length == 1)

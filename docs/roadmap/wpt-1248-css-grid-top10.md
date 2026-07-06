@@ -42,7 +42,7 @@ do not yet *pass* because of Workstream A below.
 | 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | 23.4 % | Abspos grid item resolving to an implicit line | **D** |
 | 5 | `nested-grid-item-block-size-001` | 27.3 % | img no longer collapses² | Residual `ul`/`li` + font tail (CI pixel score pending) | **B** |
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
-| 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | 35.8 % | Gutter contribution to track/spanning/margin sizing | **E** |
+| 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | gap aliases fixed⁴ | Named-line/percentage-track decline; fit-content grid width | **E** |
 | 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Grid-axis transposition (residual page-level drift) | **A** |
 | 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 9/12 cases³ | 3 `border-box` variants (border-box + auto-fill + min-height) | **C** |
 | 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | Grid-axis transposition + margin/border/padding in vertical | **A** |
@@ -64,6 +64,12 @@ session): **9 of 12** cases now fully correct after two fixes — a `min-height`
 clamp on a float's explicit height, and intrinsic-sizing width keywords
 (`min-content`/`max-content`/`fit-content`). The 3 `box-sizing:border-box` variants
 remain (border-box + auto-fill-count + `min-height`). Full pixel score is a CI item.
+
+⁴ Workstream E (this session): the primary defect was the missing legacy gap
+aliases (`grid-gap`/`grid-row-gap`/`grid-column-gap` were dropped → no gutter),
+now fixed and guarded (`GridGapAliasTests`). The remaining sub-grids are blocked
+on named-line track support, grid-track-based `fit-content` width, and
+percentage-track sizing (separate items). Full pixel score is a CI item.
 
 ---
 
@@ -387,14 +393,48 @@ track sizing, across `fit-content`, percentage tracks, `minmax`, named lines, an
 a `verticalRL directionRTL` case. Broiler currently mismatches at 35.8 %
 (`MissingContent`), i.e. several sub-checks lay out wrong.
 
-**Approach.** Instrument which of the ~30 sub-grids fail (each `<div>` carries
-`data-expected-*`), then fix the specific gutter accounting — most likely the
-container's used size not including trailing/leading gaps, or spanning items not
-adding the spanned gaps. The final block also exercises `vertical-rl` + RTL, so it
-partly depends on **Workstream A**.
+**Root cause found — the primary defect is ✅ fixed (this session).** Fetching the
+verbatim test (16 sub-grids; classes from `support/grid.css` — the base `.grid` is
+`display:grid; position:relative`, `.fit-content` is `width:fit-content`) and
+running the fixed/percentage-track sub-grids through the check-layout geometry
+harness pinned the dominant cause: **Broiler never mapped the legacy CSS Grid
+Level 1 gap aliases.** The test writes `grid-gap:16px` (test 15),
+`grid-row-gap:12px; grid-column-gap:23px` (tests 3–8, 12), but `CssUtils`
+recognised only the modern `gap`/`row-gap`/`column-gap`, so every `grid-*-gap`
+declaration was dropped and the tracks abutted with **no gutter** — every item
+past the first landed exactly one gap short (test 15's column 2 at 100 instead of
+116, row 2 at 100 instead of 116). Fixed by aliasing `grid-gap`/`grid-row-gap`/
+`grid-column-gap` onto `gap`/`row-gap`/`column-gap` in `CssUtils.SetPropertyValue`
+(and the getter). With it the gutters land exactly (test 15 → 116/116). Guard:
+`GridGapAliasTests` (borderless grids so the offsets are exact; fails without the
+alias). **Zero regressions** — 23 grid guards green, byte-identical pass set on
+vendored css-align (28) + css-anchor-position (40).
 
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (`ResolveGridGap`, track
-positioning, container size). **Risk: medium.** **Effort:** medium.
+**Still open (each blocks a distinct group of the 16 sub-grids, separate work):**
+- **Named-line templates decline the real §11 pass** (tests 5/6/12,
+  `gridMultipleFixed = [first]37px[foo]…`): named lines still route to the
+  single-column approximation (cluster 28's documented decline), which does no
+  gutters/2-D placement. The largest remaining group — needs named-line track
+  support before its gutter assertions can pass.
+- **`width:fit-content` on a grid needs the grid's track-based intrinsic width**
+  (test 1a: empty `fit-content` grid → 10 not 170). The Workstream C
+  `IsIntrinsicSizingWidthKeyword` branch measures inline content
+  (`ComputeShrinkToFitWidth`), which is ~0 for a grid; a grid's min/max-content
+  contribution must sum its track base sizes + gaps. (Not a regression — bare
+  `fit-content` grids were already wrong.)
+- **Percentage-track grids collapse** (tests 9/10/13/14): rows/heights come back
+  short — the §11 percentage-track path declines or mis-sizes with gaps.
+- **check-layout estimator vs offsetParent border (uniform −1).** Broiler's
+  `offsetTop`/`offsetLeft` (`LayoutMetrics`, deliberately relative to the offset
+  parent's *padding* edge) is 1 px short of Chromium's values, which include the
+  parent's border, so every bordered sub-grid's item offsets are uniformly −1
+  in the harness. This is a check-layout **estimator** nuance (the #4 diagnostic),
+  not necessarily the pixel render; scoping a change to `offsetTop` border
+  handling is a separate, broader-impact item.
+
+**Key files.** `Broiler.Layout/Engine/CssUtils.cs` (gap aliases — done),
+`CssBoxGrid.cs` (`ResolveGridGap`, named-line + percentage track sizing — open).
+**Risk: medium.** **Effort:** medium (per remaining group).
 
 ---
 
@@ -439,10 +479,14 @@ named-line auto-fill. **Risk: high, value: low.**
    bounded sandbox win — its fix surface is a high-blast-radius UA default that is
    neither measurable nor regression-testable without the css-grid corpus +
    Chromium references. CI-gated (see the "Note on the #8 residual" above).
-4. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
+4. **E** — item #7: ✅ **gap aliases fixed** (`grid-gap`/`grid-row-gap`/
+   `grid-column-gap` were dropped → no gutter). Remaining sub-grids blocked on
+   named-line track support, grid-track-based `fit-content` width, and
+   percentage-track sizing — each a distinct follow-up.
+5. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
    big one).
-5. **D**, **E** — abspos implicit tracks, gutter accounting.
-6. **F**, **G** — subgrid-orthogonal and `grid-lanes` (depend on A).
+6. **D** — abspos implicit tracks.
+7. **F**, **G** — subgrid-orthogonal and `grid-lanes` (depend on A).
 
 ---
 
