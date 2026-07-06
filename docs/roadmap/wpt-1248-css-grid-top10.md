@@ -541,6 +541,21 @@ vendored css-align (28) + css-anchor-position (40).
   keep it from being exact *in the harness*: `fit-content` with a `minmax()` track
   (min≠max) needs a non-zero `available` (CI), and the `verticalRL` sub-grid needs
   the vertical-axis mapping (gated off). Guard `GridIntrinsicWidthTests`.
+- **`fit-content()` *track* sizing — ✅ implemented (this session).** The
+  `fit-content(<length-percentage>)` track function was declined outright (the whole
+  track list failed to parse → single-column approximation); now modelled as
+  `minmax(auto, fit-content(L))` with used size `max(min-content, min(L, max-content))`
+  (§7.2.3), a percentage limit resolving against the axis basis (indefinite basis →
+  max-content). **A prerequisite fix landed with it:** `CssBoxHelper.GetMinMaxSumWords`
+  reset the max-content line for an inline-block child (treating it as block-level),
+  so N inline-blocks in a row measured as the *widest* one, not their *sum* — which
+  collapsed every `max-content`/`fit-content` track holding them; atomic inline-level
+  boxes now stay on the line and accumulate. Verified end-to-end in the geometry
+  harness (two 40px inline-blocks → min-content 40, max-content 80, `fit-content(60)`
+  → 60, `fit-content(30)` → 40); guard `GridFitContentTrackTests`, 0 regressions
+  across the vendored css-align/css-anchor-position/css-backgrounds/CSS2 subsets.
+  (Table-column and multicol consumers of `GetMinMaxWidth` are not vendored, so their
+  pixel impact is CI-gated.)
 - **Percentage-track grids collapse** (tests 9/10/13/14): rows/heights come back
   short — the §11 percentage-track path declines or mis-sizes with gaps.
 - **check-layout estimator vs offsetParent border (uniform −1).** Broiler's
@@ -552,8 +567,9 @@ vendored css-align (28) + css-anchor-position (40).
   handling is a separate, broader-impact item.
 
 **Key files.** `Broiler.Layout/Engine/CssUtils.cs` (gap aliases — done),
-`CssBoxGrid.cs` (`ResolveGridGap`, named-line + percentage track sizing — open).
-**Risk: medium.** **Effort:** medium (per remaining group).
+`CssBoxGrid.cs` (`ResolveGridGap`, `fit-content()` track sizing — done; named-line +
+percentage track sizing — open), `CssBoxHelper.cs` (`GetMinMaxSumWords` inline-block
+max-content — done). **Risk: medium.** **Effort:** medium (per remaining group).
 
 ---
 
