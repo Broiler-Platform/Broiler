@@ -21,9 +21,28 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
-_No patches are currently pending._ All previously captured `Broiler.CSS` /
-`Broiler.HTML` patches have landed upstream and their pointers are bumped — see
-**Applied / obsolete** below.
+- **0005-broiler-html-block-inside-inline-oor.patch** → `Broiler.HTML`
+  (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`) — fixes an
+  `ArgumentOutOfRangeException` (`box.Boxes[1]` index out of range) in
+  `CorrectBlockInsideInlineImp`. After gathering the leading inline-only run into
+  `leftBlock`, the code accessed `box.Boxes[1]` (the block to split around)
+  unconditionally, but that box need not exist: the entry guard admits a
+  single-child box (`box.Boxes[0].Boxes.Count > 1`), and the collection loop can
+  fold **every** child into `leftBlock` when the only block that made `box` fail
+  `!ContainsInlinesOnlyDeep` sits inside an out-of-flow (float/abspos) descendant —
+  which `ContainsInlinesOnlyDeep` skips, so every child reads as inline-only-deep.
+  The patch (a) stops the loop folding `leftBlock` into itself and (b) when only
+  `leftBlock` remains, undoes the fold (moves the children back onto `box`, drops
+  `leftBlock`) and returns, leaving `box` `ContainsInlinesOnly` so the caller's
+  `!ContainsInlinesOnly` recursion skips it — a bare `return` there re-wraps forever
+  (stack overflow). Guarded by the existing `AnchorInlineContainingBlockTests`,
+  which exercise this fold-all path.
+  **No active CI fallback:** the fix is entirely inside the `Broiler.HTML`
+  submodule parser (`DomParser.CorrectBlockInsideInlineImp`) with no parent-repo
+  layer to reproduce it. The exception is already **caught and reported** as a
+  non-fatal parse error (`CorrectBlockInsideInline`'s try/catch), so CI keeps that
+  caught-and-logged behaviour (correction abandoned for the affected box) until a
+  maintainer applies this patch and bumps the pointer; nothing crashes the run.
 
 ## Applied / obsolete
 
