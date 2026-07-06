@@ -154,7 +154,7 @@ internal static class CssBoxHelper
     /// <summary>An atomic inline-level box (inline-block / inline-table /
     /// inline-flex / inline-grid): inline-level, so it shares a line with siblings
     /// for max-content sizing rather than starting a new one.</summary>
-    private static bool IsAtomicInlineLevel(string display) =>
+    internal static bool IsAtomicInlineLevel(string display) =>
         display is "inline-block" or "inline-table" or "inline-flex" or "inline-grid";
 
     public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum, CssBox suppressExplicitWidthFor = null)
