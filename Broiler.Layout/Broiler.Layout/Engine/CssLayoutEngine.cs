@@ -1098,8 +1098,17 @@ internal static class CssLayoutEngine
 
             b.ApplyGridLayoutAfterInline();
         }
-        else if (LayoutBoxUtils.ContainsInlinesOnly(b))
+        else if (LayoutBoxUtils.ContainsInlinesOnly(b) || InlineContentWithBrsOnly(b))
         {
+            // Inline-block content that is inline runs interrupted only by <br>
+            // line breaks is an inline formatting context: lay it out with line
+            // boxes so the breaks split it into lines. A <br> computes to a
+            // block-level box in Broiler, which would otherwise route this to the
+            // block-children branch below — that branch lays each anonymous inline
+            // child out via its own PerformLayout (which sets no block height for
+            // an inline box), collapsing the inline-block to zero height. This is
+            // the shape of a multi-line grid item (e.g. `X<br>X`), which the
+            // css-grid check-layout reference tests use throughout.
             CreateLineBoxes(g, b);
         }
         else if (b.Boxes.Count > 0)
@@ -1202,6 +1211,36 @@ internal static class CssLayoutEngine
 
         maxRight = Math.Max(maxRight, ibBorderLeft + physicalBoxWidth);
         maxbottom = Math.Max(maxbottom, b.ActualBottom + b.ActualMarginBottom);
+    }
+
+    /// <summary>
+    /// True when <paramref name="box"/>'s in-flow content is inline-level except
+    /// for <c>&lt;br&gt;</c> elements — which compute to block-level boxes in
+    /// Broiler but merely force a line break within an inline formatting context.
+    /// Such a box should be laid out with <see cref="CreateLineBoxes"/> (the
+    /// breaks split the inline content into lines) rather than the block-children
+    /// path, which never establishes line boxes for the anonymous inline runs and
+    /// so leaves the box zero-height. Requires at least one <c>&lt;br&gt;</c> so a
+    /// genuinely block-only box is unaffected (it is not inline content).
+    /// </summary>
+    private static bool InlineContentWithBrsOnly(CssBox box)
+    {
+        bool sawBr = false;
+        foreach (var child in box.Boxes)
+        {
+            if (child.Display == CssConstants.None)
+                continue;
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
+                continue;
+            if (child.IsBrElement)
+            {
+                sawBr = true;
+                continue;
+            }
+            if (!child.IsInline && child.Float == CssConstants.None)
+                return false;
+        }
+        return sawBr;
     }
 
     private static bool HasBlockLevelFlexItems(CssBox box)

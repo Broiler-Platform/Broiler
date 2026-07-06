@@ -393,11 +393,25 @@ internal partial class CssBox
         if (rowSizes == null)
             return false;
 
+        // CSS Grid §7.2.1: percentage rows against an indefinite block size are
+        // sized as 'auto' above (definite=false), producing the grid's intrinsic
+        // block size; they are then resolved against that intrinsic height for
+        // layout while the container keeps the intrinsic height (so a shrunken
+        // percentage row leaves trailing space rather than collapsing the grid).
+        // Mirrors the same-cell stacking path (TryApplyStackingRowTracks). For a
+        // grid with no percentage rows this is a no-op and intrinsicRowHeight
+        // equals the plain track sum, so non-percentage grids are unaffected.
+        double intrinsicRowHeight = SumTrackSizes(rowSizes, rowGap);
+        if (!rowDefinite)
+            ResolvePercentRowTracksAgainstIntrinsic(rowSpecs, implicitRow, rowSizes, intrinsicRowHeight);
+
         // CSS Box Alignment §5 (content distribution): when the tracks do not
         // fill the container along an axis, justify-content (inline) / align-content
         // (block) positions or spaces them within the leftover room. The block axis
-        // only has leftover room when the container's block size is definite.
-        double rowContainerSize = rowDefinite ? definiteHeight : SumTrackSizes(rowSizes, rowGap);
+        // only has leftover room when the container's block size is definite — or,
+        // for an indefinite height, when a percentage row shrank below the locked
+        // intrinsic height above.
+        double rowContainerSize = rowDefinite ? definiteHeight : intrinsicRowHeight;
         double[] colStartEdge = BuildTrackEdgesAligned(colSizes, colGap, contentWidth,
             JustifyContent, out double[] colEndEdge);
         double[] rowStartEdge = BuildTrackEdgesAligned(rowSizes, rowGap, rowContainerSize,
@@ -431,6 +445,10 @@ internal partial class CssBox
         // grid-template-rows track contributes even when unoccupied, so a 4-track
         // template with items in only the first 3 rows still sizes to all four.
         double gridHeight = rowSizes.Length > 0 ? rowEndEdge[rowSizes.Length - 1] : 0;
+        // §7.2.1: an indefinite-height grid keeps its intrinsic block size even
+        // after percentage rows resolved (shrank) against it, leaving trailing space.
+        if (!rowDefinite && intrinsicRowHeight > gridHeight)
+            gridHeight = intrinsicRowHeight;
         double borderBoxHeight = ActualPaddingTop + ActualPaddingBottom
             + ActualBorderTopWidth + ActualBorderBottomWidth + gridHeight;
         ActualBottom = Location.Y + borderBoxHeight;

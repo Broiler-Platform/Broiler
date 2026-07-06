@@ -648,7 +648,12 @@ internal abstract class CssBoxProperties
     public string FlexShrink { get; set; } = "1";
     public string FlexBasis { get; set; } = "auto";
     public string FlexWrap { get; set; } = "nowrap";
-    public string JustifyContent { get; set; } = "flex-start";
+    // CSS Box Alignment §8: the initial value of justify-content is 'normal',
+    // not 'flex-start'. In a flex container 'normal' behaves as 'flex-start'
+    // (packed at the main-start edge), so flex layout is unchanged; in a grid
+    // container 'normal' triggers the default stretch of auto tracks, which
+    // 'flex-start' (a packing distribution) suppresses.
+    public string JustifyContent { get; set; } = "normal";
     public string JustifyItems { get; set; } = "normal";
     public string AlignItems { get; set; } = "stretch";
     public string AlignContent { get; set; } = "normal";
