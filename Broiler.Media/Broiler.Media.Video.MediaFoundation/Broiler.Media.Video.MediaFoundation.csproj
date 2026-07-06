@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Broiler.Media.Video.MediaFoundation</RootNamespace>
+    <AssemblyName>Broiler.Media.Video.MediaFoundation</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Media.Video\Broiler.Media.Video.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Media.Video.MediaFoundation.Tests" />
+  </ItemGroup>
+
+</Project>

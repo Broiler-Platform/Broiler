@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Broiler.Media/Broiler.Media.csproj" />
+    <Project Path="Broiler.Media.Audio/Broiler.Media.Audio.csproj" />
+    <Project Path="Broiler.Media.Audio.Managed/Broiler.Media.Audio.Managed.csproj" />
+    <Project Path="Broiler.Media.Video/Broiler.Media.Video.csproj" />
+    <Project Path="Broiler.Media.Video.MediaFoundation/Broiler.Media.Video.MediaFoundation.csproj" />
+    <Project Path="Broiler.Media.Image/Broiler.Media.Image.csproj" />
+    <Project Path="Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="Broiler.Media.Tests/Broiler.Media.Tests.csproj" />
+    <Project Path="Broiler.Media.Audio.Tests/Broiler.Media.Audio.Tests.csproj" />
+    <Project Path="Broiler.Media.Audio.Managed.Tests/Broiler.Media.Audio.Managed.Tests.csproj" />
+    <Project Path="Broiler.Media.Video.Tests/Broiler.Media.Video.Tests.csproj" />
+    <Project Path="Broiler.Media.Video.MediaFoundation.Tests/Broiler.Media.Video.MediaFoundation.Tests.csproj" />
+    <Project Path="Broiler.Media.Image.Tests/Broiler.Media.Image.Tests.csproj" />
+    <Project Path="Broiler.Media.Image.Managed.Tests/Broiler.Media.Image.Managed.Tests.csproj" />
+  </Folder>
+</Solution>

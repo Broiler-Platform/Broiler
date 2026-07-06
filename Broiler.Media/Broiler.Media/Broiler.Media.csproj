@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Broiler.Media</RootNamespace>
+    <AssemblyName>Broiler.Media</AssemblyName>
+  </PropertyGroup>
+
+</Project>
+

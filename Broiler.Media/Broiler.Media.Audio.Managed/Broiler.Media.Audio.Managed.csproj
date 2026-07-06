@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Broiler.Media.Audio.Managed</RootNamespace>
+    <AssemblyName>Broiler.Media.Audio.Managed</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Media.Audio\Broiler.Media.Audio.csproj" />
+  </ItemGroup>
+
+</Project>
+

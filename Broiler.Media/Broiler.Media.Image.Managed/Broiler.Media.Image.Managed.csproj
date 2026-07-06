@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Broiler.Media.Image.Managed</RootNamespace>
+    <AssemblyName>Broiler.Media.Image.Managed</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Media.Image.Managed.Tests" />
+  </ItemGroup>
+
+</Project>

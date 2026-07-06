@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Broiler.Media.Video</RootNamespace>
+    <AssemblyName>Broiler.Media.Video</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Media\Broiler.Media.csproj" />
+  </ItemGroup>
+
+</Project>
+
