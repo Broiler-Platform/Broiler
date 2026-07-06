@@ -168,7 +168,19 @@ internal static class CssBoxHelper
         // width is ignored (a percentage width resolves against the track being
         // sized, so it is treated as auto/content — CSS Grid §11.5); descendants'
         // explicit widths still count.
-        bool useExplicitWidth = box != suppressExplicitWidthFor;
+        //
+        // CSS Sizing 3 §5.1: more generally, a *percentage* width resolves against
+        // the size we are computing (the container's intrinsic width), so it is
+        // treated as auto for intrinsic sizing regardless of grid — measuring the
+        // box's content instead of the percentage. Without this a `width:100%`
+        // child resolves against the containing block and reports the full
+        // available width, ballooning a float/inline-block/abspos shrink-to-fit to
+        // the container (e.g. a float wrapping a `width:100%` block, or an
+        // auto-fill grid item sized 100%, pinned to the viewport not its content).
+        bool widthIsPercentage = !string.IsNullOrEmpty(box.Width)
+            && box.Width.EndsWith("%", StringComparison.Ordinal)
+            && !box.Width.Contains('(');
+        bool useExplicitWidth = box != suppressExplicitWidthFor && !widthIsPercentage;
 
         // CSS2.1 §10.3.5/§10.3.7: When a floated child has an explicit width,
         // use the declared width directly for shrink-to-fit calculation
