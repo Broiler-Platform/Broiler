@@ -41,11 +41,11 @@ do not yet *pass* because of Workstream A below.
 | 3 | `grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport` | 11.6 % | 11.6 % | `grid-lanes` intrinsic sizing (quirks) | **G** |
 | 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | LTR 64/64⁵ | RTL variants; CI pixel score | **D** |
 | 5 | `nested-grid-item-block-size-001` | 27.3 % | img no longer collapses² | Residual `ul`/`li` + font tail (CI pixel score pending) | **B** |
-| 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
+| 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Baseline self-alignment synthesis (transposition OK⁶) | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | gap aliases fixed⁴ | Named-line/percentage-track decline; fit-content grid width | **E** |
-| 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Grid-axis transposition (residual page-level drift) | **A** |
+| 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Page-level paragraph drift + font (transposition OK⁶) | **A** |
 | 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 9/12 cases³ | 3 `border-box` variants (border-box + auto-fill + min-height) | **C** |
-| 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | Grid-axis transposition + margin/border/padding in vertical | **A** |
+| 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | fit-content grid width + margin/border/padding (transposition OK⁶) | **A** |
 
 ¹ (superseded — see ² and Workstream B) The pre-fix "~84 %" was an optimistic
 read: reproducing the actual markup in-sandbox showed the image collapses to
@@ -77,66 +77,84 @@ before-grid lines, CSS Grid §8.3) for in-flow items and dedicated abspos
 line-to-area resolution (§9.2). Guard `GridAbsposImplicitTrackTests`; 0 regressions
 on the vendored subsets. The `directionRTL` variants and the CI pixel score remain.
 
+⁶ Workstream A (this session): probing `vertical-rl` grids through the harness
+showed the grid-axis **transposition already works** — placement, content
+distribution, and self alignment all produce spec-correct transposed geometry
+(guard `GridVerticalWritingModeTests`). The original "fundamentally broken /
+multi-day rewrite" premise was stale; the real remaining gaps are grid-track-based
+`fit-content` width and baseline self-alignment (each a standalone feature). See
+the re-scoped Workstream A.
+
 ---
 
-## Workstream A — grid-axis transposition for vertical writing modes
+## Workstream A — vertical-writing-mode grids: transposition already works
+
+> **Re-scoped this session — the original premise (below the fold) was stale.**
+> The prior analysis assumed the grid pass had *no* writing-mode handling and that
+> vertical grids were fundamentally mis-transposed (a "multi-day rewrite"). Probing
+> `vertical-rl` grids through the check-layout geometry harness disproves that: the
+> grid-axis transposition is **already correct** for the core cases. What remains
+> are two *narrower, specific* features, not a transposition rewrite.
+
+**What already works (verified in-sandbox, guard `GridVerticalWritingModeTests`).**
+For a `vertical-rl` grid the pass + the cluster-36 `ApplyVerticalWritingModeFlow`
+rotation produce the spec-correct transposed geometry:
+
+- **Placement / track transposition.** `grid-template-columns` (inline axis) drives
+  the **vertical** extent, `grid-template-rows` (block axis) the **horizontal**
+  extent right→left. A 2×2 `60/40 × 100/50` grid places `c1r1` at `(200,0) 100×60`,
+  `c2r2` at `(150,60) 50×40`, … — exact.
+- **Content distribution.** `justify-content` (inline→vertical) and `align-content`
+  (block→horizontal, rtl-aware) both map correctly: `justify-content:end` shifts
+  down, `align-content:end` shifts left, `space-between` spreads to the axis ends —
+  all exact.
+- **Self alignment.** `align-self`/`justify-self` `start`/`end`/`center` resolve to
+  the transposed physical axes (start block = right, start inline = top; center,
+  end, all exact).
+
+So the "~94 %" on the vertical clusters is **not** coincidental overlap — the core
+layout is right. The failures are the tail below.
+
+**Actual remaining gaps (each a distinct, standalone feature — NOT transposition):**
+
+1. **Grid-track-based `fit-content` intrinsic width.** Both #10
+   (`…-margin-border-padding-vertical-rl`, whose container is `fit-content`;
+   expected width 475 = block-axis rows `200+200` + horizontal padding `45` +
+   border `30`) and Workstream E's test 1a need a grid's `fit-content`/`min-content`/
+   `max-content` width to sum its **physical-width-axis track sizes** (+ gaps +
+   padding + border), writing-mode aware (columns for horizontal-tb, rows for
+   vertical). Today `ComputeShrinkToFitWidth` measures inline *content*, so an
+   empty/small-item grid collapses. Chicken-and-egg with the track pass, but the
+   fixed-track case is computable from the template alone. **The highest-leverage
+   next item** — it unblocks #10's container *and* the E fit-content sub-grids.
+2. **Baseline self-alignment.** #6 (`grid-align-baseline-vertical`) needs
+   `align-self:baseline` / `justify-items:*baseline` to synthesise a shared baseline
+   across a row/column (CSS Align §9) and shift each item to it. The pass currently
+   falls to `start` for baseline. A cross-item feature, independent of writing mode
+   (horizontal baseline grids are affected too).
+3. **Margin/border/padding detail + font/paragraph tail.** #10 also exercises
+   physical vs logical margin mapping under alignment; #8's residual is the
+   deferred UA paragraph-rhythm (see the note below), plus Ahem sub-pixel.
+
+**Key files.** `CssBox.cs` (`ComputeShrinkToFitWidth`/`GetMinMaxWidth` for the
+fit-content grid width — writing-mode aware); `CssBoxGrid.cs` (baseline synthesis in
+`ResolveTrackSizes`/`PlaceItemInArea`). **Risk: medium** per feature (the fit-content
+grid width touches all shrink-to-fit grids — gate to fixed/known tracks and diff the
+vendored subsets). **Effort:** medium per feature — *not* the multi-day rewrite the
+original framing implied.
+
+<details><summary>Original (pre-reproduction) analysis — superseded: assumed a full
+transposition rewrite was needed</summary>
 
 **Blast radius: largest.** Covers issue items #6, #8, #10 and ~58 more
 `css-grid/alignment` tests (61 vertical/orthogonal alignment tests, currently
-0 passing). This is the single highest-value grid workstream.
+0 passing). `CssBoxGrid.cs` assumes `horizontal-tb` throughout … *(the premise that
+vertical grids come out as "a plain physical 2×2 instead of the transposed
+arrangement" is contradicted by `GridVerticalWritingModeTests`; the two
+implementation options for a logical-axis rewrite are moot for the core cases,
+which already transpose correctly)*.
 
-**Root cause.** `Broiler.Layout/Engine/CssBoxGrid.cs` (~1,800 lines) assumes
-`horizontal-tb` throughout: `grid-template-columns` is sized against the physical
-width, `grid-template-rows` against the physical height, item placement and track
-positions are all physical. It has **no** writing-mode / logical-axis handling
-(one incidental match on a grep). For a `vertical-rl`/`vertical-lr` grid the
-inline axis is vertical and the block axis is horizontal, so:
-
-- `grid-template-columns` (inline-axis track sizes) must drive the **vertical**
-  extent, `grid-template-rows` the **horizontal** extent;
-- auto-placement and `grid-auto-flow` advance along the transposed axes;
-- self/content alignment (`align-*` = block axis, `justify-*` = inline axis) must
-  map to the physical axes through the grid's own writing mode.
-
-Today the grid lays out physically and the whole subtree is then rotated by
-`ApplyVerticalWritingModeFlow`. That rotation gets the *container* and simple
-content right (why #8 reached 94.7 %), but a genuine 2×2 track grid comes out as a
-plain physical 2×2 instead of the transposed arrangement — the ~94 % on the
-`grid-self-alignment-stretch-vertical-*` cluster is **coincidental block overlap**,
-not near-correct layout (verified by eye against the Chromium reference).
-
-**Proposed approach.** Introduce a logical-axis abstraction inside the grid pass:
-resolve `writing-mode`/`direction` once, then read/write track sizes and item
-rectangles through inline/block accessors that map to physical width/height/x/y
-per the grid's own writing mode — mirroring how the block engine already
-distinguishes logical vs physical. Two implementation options:
-
-1. **Lay out in a logical frame, keep the post-layout rotation.** Have the grid
-   pass emit a logical (as-if-`horizontal-tb`) layout with columns→inline and
-   rows→block, and let the existing `ApplyVerticalWritingModeFlow` rotation map it
-   to physical. Smaller change, reuses the rotation, but must guarantee the grid's
-   logical dimensions (from `width`/`height` transposed via
-   `WillBeVerticalTransposed`) feed track sizing correctly and that alignment is
-   computed in logical space *before* rotation.
-2. **Full physical transposition in the grid pass.** Make the pass writing-mode
-   aware end-to-end and *not* rely on the rotation for grids. Cleaner long-term,
-   larger diff, higher regression surface.
-
-Start with option 1 — it composes with cluster 36 and the existing rotation, and
-the ~94 % on `content-distribution` shows the rotation already handles the easy
-cases.
-
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (track sizing, placement,
-alignment); `CssBox.cs` (`ApplyVerticalWritingModeFlow`, `WillBeVerticalTransposed`,
-`GetShrinkToFitHeight`); `CssBoxProperties.cs` (`IsVerticalWritingMode`).
-
-**Risk: high.** ~91 horizontal `css-grid/alignment` tests pass today and must stay
-green. Gate every new logical-axis branch behind
-`IsVerticalWritingMode(WritingMode)` so horizontal grids are byte-identical, and
-diff the full passing set (baseline vs after) exactly as cluster 36 did.
-
-**Effort:** large (multi-day). **Validation:** `css-grid/alignment` full suite
-diff + `css-grid/{grid-model,grid-definition,subgrid}` as regression guards.
+</details>
 
 **Note on the #8 residual — investigated in-sandbox, deferred to CI.** After
 cluster 36 `content-distribution-vertical-rl` is at 94.7 % with items visually
@@ -523,9 +541,13 @@ named-line auto-fill. **Risk: high, value: low.**
 5. **D** — item #4: ✅ **LTR passes 64/64** — implemented leading implicit tracks
    (negative before-grid lines) for in-flow items + abspos line-to-area resolution.
    Remaining: the `directionRTL` variants and the CI pixel score.
-6. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
-   big one).
-7. **F**, **G** — subgrid-orthogonal and `grid-lanes` (depend on A).
+6. **A** — vertical-writing-mode grids: ✅ **transposition already works** (this
+   session — placement, content distribution, self alignment all verified;
+   guard `GridVerticalWritingModeTests`). Re-scoped from "multi-day rewrite" to two
+   standalone features: **grid-track-based `fit-content` width** (also unblocks E's
+   test 1a and #10 — highest leverage next) and **baseline self-alignment** (#6).
+7. **F**, **G** — subgrid-orthogonal and `grid-lanes`. F's dependency on A is now
+   just the fit-content/transposed sizing, not a logical-axis rewrite.
 
 ---
 
