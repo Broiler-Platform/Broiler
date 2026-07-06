@@ -236,6 +236,8 @@ internal partial class CssBox
             Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
         var placements = new List<GridPlacement>();
         List<CssBox> absposItems = null;
+        var colNames = ParseLineNames(GridTemplateColumns);
+        var rowNames = ParseLineNames(GridTemplateRows);
         foreach (var child in Boxes)
         {
             if (child.Display == CssConstants.None)
@@ -247,11 +249,13 @@ internal partial class CssBox
                 continue;
             }
 
-            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count);
-            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count);
-            // Decline rather than lay out an implausibly large grid.
+            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count, rowNames);
+            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count, colNames);
+            // Decline rather than lay out an implausibly large grid. A negative
+            // start references a leading implicit track (normalised below), so bound
+            // its magnitude too.
             if (rowSpan > MaxGridLine || colSpan > MaxGridLine
-                || (rowStart ?? 0) > MaxGridLine || (colStart ?? 0) > MaxGridLine)
+                || Math.Abs(rowStart ?? 0) > MaxGridLine || Math.Abs(colStart ?? 0) > MaxGridLine)
                 return false;
             placements.Add(new GridPlacement
             {
@@ -265,10 +269,42 @@ internal partial class CssBox
         if (placements.Count == 0)
             return false;
 
+        // CSS Grid §8.3: a definite line that resolves before the explicit grid
+        // (a negative index here) references a *leading* implicit track. Normalise
+        // by shifting every placement right/down so the leftmost/topmost referenced
+        // line is index 0; the explicit grid then begins at explicitColStart /
+        // explicitRowStart. leading == 0 for every grid without a before-grid line,
+        // so those are byte-identical to before. Auto-placement into leading tracks
+        // is out of scope, so decline when an auto-placed item coexists with them.
+        int explicitColStart = 0, explicitRowStart = 0;
+        {
+            int minCol = 0, minRow = 0;
+            foreach (var p in placements)
+            {
+                if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
+                if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
+            }
+            explicitColStart = -minCol;
+            explicitRowStart = -minRow;
+            if (explicitColStart > 0 || explicitRowStart > 0)
+            {
+                foreach (var p in placements)
+                    if (!p.ColStart.HasValue || !p.RowStart.HasValue)
+                        return false;
+                for (int i = 0; i < placements.Count; i++)
+                {
+                    var p = placements[i];
+                    p.ColStart += explicitColStart;
+                    p.RowStart += explicitRowStart;
+                    placements[i] = p;
+                }
+            }
+        }
+
         bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
         bool dense = (GridAutoFlow ?? "").IndexOf("dense", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        PlaceItems(placements, colSpecs.Count, rowSpecs.Count, flowRow, dense);
+        PlaceItems(placements, colSpecs.Count + explicitColStart, rowSpecs.Count + explicitRowStart, flowRow, dense);
 
         // Track counts after placement, including any implicit tracks.
         int maxColEnd = 0, maxRowEnd = 0;
@@ -279,8 +315,10 @@ internal partial class CssBox
         }
         if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
             return false;
-        int colCount = Math.Max(maxColEnd, colSpecs.Count);
-        int rowCount = Math.Max(maxRowEnd, rowSpecs.Count);
+        // The explicit tracks occupy [explicitColStart, explicitColStart+count); any
+        // leading implicit tracks precede them, so the axis is at least that wide.
+        int colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count);
+        int rowCount = Math.Max(maxRowEnd, explicitRowStart + rowSpecs.Count);
 
         // A subgridded axis adopts the parent grid's gutter (CSS Grid L2 §7.3).
         double colGap = colSubgrid && SubgridColumnGap.HasValue
@@ -300,7 +338,8 @@ internal partial class CssBox
         // justify-content leaves them at content size and positions them instead.
         bool stretchCols = IsStretchContentDistribution(JustifyContent);
         double[] colSizes = ResolveTrackSizes(colSpecs, implicitCol, colCount,
-            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols);
+            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols,
+            explicitStart: explicitColStart);
         if (colSizes == null)
             return false;
 
@@ -332,13 +371,19 @@ internal partial class CssBox
                 return false;
 
             double marginY = p.Item.ActualMarginTop + p.Item.ActualMarginBottom;
-            double h = (p.Item.ActualBottom - p.Item.Location.Y) + marginY;
+            // A replaced item with a definite block-size records its height on its
+            // image word (measured through the container line box), leaving the box
+            // ActualBottom at 0; trust the definite block-size for the row instead
+            // of that stale zero (WPT css-grid/nested-grid-item-block-size-001).
+            double replacedH = GridReplacedItemDefiniteBorderBoxHeight(p.Item);
+            double h = (replacedH > 0 ? replacedH : p.Item.ActualBottom - p.Item.Location.Y) + marginY;
             if (h < 0) h = 0;
             rowItems.Add(new AxisItem(p.PlacedRow, p.RowSpan, h, h));
         }
         bool stretchRows = IsStretchContentDistribution(AlignContent);
         double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
-            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows);
+            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows,
+            explicitStart: explicitRowStart);
         if (rowSizes == null)
             return false;
 
@@ -355,10 +400,17 @@ internal partial class CssBox
         double contentLeft = Location.X + ActualBorderLeftWidth + ActualPaddingLeft;
         double contentTop = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
 
+        // CSS Writing Modes §3: an `rtl` inline (column) axis runs right→left, so a
+        // cell's physical x mirrors within the content box. Mirroring the resolved
+        // (LTR) column edges also flips justify-content start↔end correctly.
+        bool rtl = string.Equals(Direction, "rtl", StringComparison.OrdinalIgnoreCase);
+
         foreach (var p in placements)
         {
-            double areaLeft = contentLeft + colStartEdge[p.PlacedCol];
-            double areaRight = contentLeft + colEndEdge[p.PlacedCol + p.ColSpan - 1];
+            double ltrLeft = colStartEdge[p.PlacedCol];
+            double ltrRight = colEndEdge[p.PlacedCol + p.ColSpan - 1];
+            double areaLeft = rtl ? contentLeft + contentWidth - ltrRight : contentLeft + ltrLeft;
+            double areaRight = rtl ? contentLeft + contentWidth - ltrLeft : contentLeft + ltrRight;
             double areaTop = contentTop + rowStartEdge[p.PlacedRow];
             double areaBottom = contentTop + rowEndEdge[p.PlacedRow + p.RowSpan - 1];
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
@@ -383,7 +435,9 @@ internal partial class CssBox
         // absolutely-positioned grid items within their resolved grid areas.
         if (absposItems != null)
             PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
-                colSizes.Length, rowSizes.Length, contentLeft, contentTop);
+                colSizes.Length, rowSizes.Length, contentLeft, contentTop,
+                colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart,
+                colNames, rowNames, rtl);
 
         _gridTrackLayoutApplied = true;
         return true;
@@ -595,7 +649,13 @@ internal partial class CssBox
             if (w > 0) newWidth = w;
         }
         double newHeight = item.Size.Height;
-        if (heightFills)
+        // A replaced item with a definite block-size measured its height onto its
+        // image word, so item.Size.Height is a stale 0 here; use the definite
+        // block-size (column-independent) rather than filling or keeping the zero.
+        double replacedDefiniteH = GridReplacedItemDefiniteBorderBoxHeight(item);
+        if (replacedDefiniteH > 0)
+            newHeight = replacedDefiniteH;
+        else if (heightFills)
         {
             double h = areaHeight - marginT - marginB;
             if (h > 0) newHeight = h;
@@ -649,7 +709,10 @@ internal partial class CssBox
     private void PlaceAbsposGridItems(List<CssBox> items,
         double[] colStartEdge, double[] colEndEdge,
         double[] rowStartEdge, double[] rowEndEdge,
-        int colCount, int rowCount, double contentLeft, double contentTop)
+        int colCount, int rowCount, double contentLeft, double contentTop,
+        int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart,
+        IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames,
+        bool rtl)
     {
         double padLeft = Location.X + ActualBorderLeftWidth;
         double padRight = Location.X + Size.Width - ActualBorderRightWidth;
@@ -658,33 +721,93 @@ internal partial class CssBox
 
         foreach (var item in items)
         {
-            var (rowStart, rowSpan) = ParseGridLine(item.GridRow, rowCount);
-            var (colStart, colSpan) = ParseGridLine(item.GridColumn, colCount);
-            var (left, right) = ResolveAbsposAxis(colStart, colSpan, colStartEdge, colEndEdge,
+            var (colStartLine, colEndLine) = ParseAbsposGridLines(item.GridColumn, explicitCols, explicitColStart, colNames);
+            var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart, rowNames);
+            var (left, right) = ResolveAbsposAxis(colStartLine, colEndLine, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
-            var (top, bottom) = ResolveAbsposAxis(rowStart, rowSpan, rowStartEdge, rowEndEdge,
+            // rtl: the inline (column) axis runs right→left, so mirror the resolved
+            // area around the containing block's padding box (CSS Grid §9.2).
+            if (rtl)
+            {
+                double m = padLeft + padRight;
+                (left, right) = (m - right, m - left);
+            }
+            var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge,
                 rowCount, contentTop, padTop, padBottom);
             PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);
         }
     }
 
     /// <summary>
-    /// Resolve the [start, end] extent (absolute px) of an abspos grid item's
-    /// grid area along one axis. <paramref name="start"/> is a 0-indexed track
-    /// (null for an <c>auto</c> line, which resolves to the container's padding
-    /// edges per CSS Grid §9.2); lines are clamped into the grid's line range.
+    /// CSS Grid §9.2: resolve an abspos grid item's <c>grid-column</c>/<c>grid-row</c>
+    /// to its two edge lines, each as a 0-based track *boundary* index in the
+    /// (leading-shifted) grid coordinate, or <c>null</c> for an <c>auto</c> line —
+    /// which resolves to the grid container's padding edge, NOT a track line.
+    /// Unlike the in-flow <see cref="ParseGridLine"/>, an <c>auto</c> here stays
+    /// auto rather than collapsing into a span. Negative lines count back from the
+    /// last explicit line; every resolved line is shifted by
+    /// <paramref name="explicitStart"/> (the leading implicit track count) so it
+    /// indexes the same coordinate as the sized tracks.
     /// </summary>
-    private static (double start, double end) ResolveAbsposAxis(int? start, int span,
+    private static (int? startLine, int? endLine) ParseAbsposGridLines(
+        string value, int explicitTracks, int explicitStart,
+        IReadOnlyDictionary<string, List<int>> names = null)
+    {
+        string v = (value ?? "").Trim();
+        int slash = v.IndexOf('/');
+        string startTok = slash < 0 ? v : v.Substring(0, slash).Trim();
+        string endTok = slash < 0 ? "" : v.Substring(slash + 1).Trim();
+
+        int? Line(string tok)
+        {
+            if (string.IsNullOrEmpty(tok) || tok.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                || tok.StartsWith("span", StringComparison.OrdinalIgnoreCase))
+                return null;                    // auto / span -> padding edge (§9.2)
+            if (int.TryParse(tok, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
+            {
+                int b = line >= 1
+                    ? line - 1                   // 1-based line -> 0-based boundary
+                    : explicitTracks + 1 + line; // negative -> back from the last line
+                return b + explicitStart;        // into the leading-shifted coordinate
+            }
+            // Named line: resolve against the template's line-name map, else auto.
+            if (names != null)
+            {
+                int space = tok.IndexOf(' ');
+                int nth = 1;
+                string name = tok;
+                if (space > 0 && int.TryParse(tok.Substring(0, space).Trim(),
+                        NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
+                {
+                    nth = parsedNth;
+                    name = tok.Substring(space + 1).Trim();
+                }
+                if (names.TryGetValue(name, out var lines) && lines.Count > 0)
+                    return lines[Math.Min(nth, lines.Count) - 1] + explicitStart;
+            }
+            return null;                         // unresolved named line -> auto
+        }
+
+        return (Line(startTok), Line(endTok));
+    }
+
+    /// <summary>
+    /// Resolve the [start, end] extent (absolute px) of an abspos grid item's grid
+    /// area along one axis from its two boundary lines. A <c>null</c> line resolves
+    /// to the container's padding edge (CSS Grid §9.2); a line index is clamped into
+    /// the grid's boundary range and mapped through the track edges.
+    /// </summary>
+    private static (double start, double end) ResolveAbsposAxis(int? startLine, int? endLine,
         double[] startEdge, double[] endEdge, int trackCount, double contentOrigin,
         double padStart, double padEnd)
     {
-        if (start == null || trackCount == 0)
-            return (padStart, padEnd);
-        int a = Math.Clamp(start.Value, 0, trackCount);
-        int b = Math.Clamp(start.Value + Math.Max(1, span), 0, trackCount);
-        if (b <= a) b = Math.Min(a + 1, trackCount);
-        double s = a < trackCount ? contentOrigin + startEdge[a] : contentOrigin + endEdge[trackCount - 1];
-        double e = contentOrigin + endEdge[b - 1];
+        double Boundary(int line)
+        {
+            int l = Math.Clamp(line, 0, trackCount);
+            return contentOrigin + (l < trackCount ? startEdge[l] : endEdge[trackCount - 1]);
+        }
+        double s = startLine == null || trackCount == 0 ? padStart : Boundary(startLine.Value);
+        double e = endLine == null || trackCount == 0 ? padEnd : Boundary(endLine.Value);
         return e < s ? (s, s) : (s, e);
     }
 
@@ -916,22 +1039,116 @@ internal partial class CssBox
             if (child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                 or CssConstants.Table or CssConstants.InlineTable)
                 return false;
-            if (child.IsImage)
-                return false;
+            bool isImg = child.IsImage
+                || (child.HtmlTag != null && child.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase));
+            if (isImg)
+            {
+                // A replaced image whose block-size (height) is a definite length
+                // — `block-size:55vw`, `height:200px`, … — can size an auto row
+                // safely: its used height has no reflow dependence on the resolved
+                // column width, so the row's measured-height contribution is stable
+                // (WPT css-grid/nested-grid-item-block-size-001, whose img nested in
+                // `display:grid` otherwise collapses to height 0 under the fallback
+                // approximation). An image with an indefinite/percentage/ratio-only
+                // block size still declines — its height would change with the
+                // column, which this bounded pass measures once and cannot re-solve.
+                if (!GridReplacedItemHasDefiniteBlockSize(child))
+                    return false;
+                continue;
+            }
             if (child.HtmlTag != null)
             {
                 string tag = child.HtmlTag.Name;
                 if (tag.Equals("button", StringComparison.OrdinalIgnoreCase)
                     || tag.Equals("input", StringComparison.OrdinalIgnoreCase)
                     || tag.Equals("select", StringComparison.OrdinalIgnoreCase)
-                    || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase)
-                    || tag.Equals("img", StringComparison.OrdinalIgnoreCase))
+                    || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase))
                     return false;
             }
             if (!string.IsNullOrEmpty(child.Overflow) && child.Overflow != CssConstants.Visible)
                 return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// True when a replaced (image) grid item carries a definite block-size — a
+    /// non-auto, non-percentage length on its block axis (the <c>Height</c> getter
+    /// maps <c>block-size</c>/writing-mode onto physical height), resolved through
+    /// the length parser so viewport/font units (<c>55vw</c>, <c>10rem</c>) count.
+    /// Such an item's used height is fixed independent of its resolved column
+    /// width, so sizing an auto row from its single measurement is safe — unlike a
+    /// ratio-only or percentage-height image whose height follows the column.
+    /// </summary>
+    private static bool GridReplacedItemHasDefiniteBlockSize(CssBox item) =>
+        CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out _);
+
+    /// <summary>
+    /// CSS Grid §5.1 / Sizing 3: the grid container's intrinsic (min-content when
+    /// <paramref name="useMax"/> is false, else max-content) **content-box** width —
+    /// the sum of its <c>grid-template-columns</c> track sizes plus gaps, for a
+    /// horizontal writing mode (a vertical grid's physical-width axis is the rows,
+    /// applied through the rotation — declined below). Bounded to templates whose
+    /// tracks are all definite fixed lengths (a plain length or a <c>minmax()</c>
+    /// with fixed sides — <c>repeat(&lt;int&gt;,…)</c> already expanded by
+    /// <see cref="ParseTrackList"/>): declines for <c>fr</c>/<c>auto</c>/
+    /// content/percentage/<c>auto-fill</c> tracks, whose size needs the real track
+    /// pass (and the items). Lets a shrink-to-fit grid (float, <c>inline-grid</c>,
+    /// <c>fit-content</c>/<c>min-content</c>/<c>max-content</c>) size to its tracks
+    /// instead of collapsing to its (often empty) inline content
+    /// (WPT css-grid grid-gutters-and-tracks-001, …-margin-border-padding-vertical-rl).
+    /// </summary>
+    private bool TryComputeGridIntrinsicContentWidth(bool useMax, out double contentWidth)
+    {
+        contentWidth = 0;
+        if (Display is not ("grid" or "inline-grid"))
+            return false;
+        // Vertical writing modes lay the grid out in a logical frame and rotate it,
+        // so the physical-width axis (rows) must be applied through the rotation —
+        // out of scope here; a vertical grid keeps its existing sizing.
+        if (IsVerticalWritingMode(WritingMode))
+            return false;
+        double em = GetEmHeight();
+        var specs = ParseTrackList(GridTemplateColumns, em);
+        if (specs == null || specs.Count == 0 || specs.Count > MaxGridLine)
+            return false;
+
+        double sum = 0;
+        foreach (var spec in specs)
+        {
+            GridSize side = useMax ? spec.Max : spec.Min;
+            if (side.Kind != GridSizeKind.Fixed)
+                return false;                 // needs the real track pass
+            sum += Math.Max(0, side.Value);
+        }
+        double gap = ResolveGridGap(ColumnGap, 0, em);
+        sum += gap * (specs.Count - 1);
+        contentWidth = sum;
+        return true;
+    }
+
+    /// <summary>
+    /// The definite border-box block-size (height) of a replaced (image) grid
+    /// item, or <c>0</c> when its block size is not a definite length. A replaced
+    /// element measured through its container's line box (the inline path used for
+    /// a grid holding an <c>&lt;img&gt;</c>) records its height on its image word,
+    /// not on the box's <c>ActualBottom</c> — which stays <c>0</c> — so the track
+    /// pass must read the definite block-size straight from the declaration to size
+    /// its auto row and place the item, rather than the stale zero measurement.
+    /// The specified <c>block-size</c> is the content box (content-box sizing) or
+    /// the border box (border-box sizing).
+    /// </summary>
+    private static double GridReplacedItemDefiniteBorderBoxHeight(CssBox item)
+    {
+        if (!item.IsImage
+            && !(item.HtmlTag != null && item.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase)))
+            return 0;
+        if (!CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out double h))
+            return 0;
+        if (!item.UsesBorderBoxSizing)
+            h += item.ActualPaddingTop + item.ActualPaddingBottom
+                + item.ActualBorderTopWidth + item.ActualBorderBottomWidth;
+        return h > 0 ? h : 0;
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)
@@ -1452,7 +1669,7 @@ internal partial class CssBox
     /// </summary>
     private double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
         int count, double containerSize, bool definite, double gap, double percentBasis, double em,
-        List<AxisItem> items, bool stretchAutoTracks = false)
+        List<AxisItem> items, bool stretchAutoTracks = false, int explicitStart = 0)
     {
         if (count < 1) return null;
 
@@ -1465,7 +1682,10 @@ internal partial class CssBox
 
         for (int t = 0; t < count; t++)
         {
-            GridTrackSpec spec = t < explicitSpecs.Count ? explicitSpecs[t] : implicitSpec;
+            // The explicit tracks occupy [explicitStart, explicitStart+Count);
+            // leading (before) and trailing (after) tracks use the implicit spec.
+            int e = t - explicitStart;
+            GridTrackSpec spec = e >= 0 && e < explicitSpecs.Count ? explicitSpecs[e] : implicitSpec;
             // Resolve percentages against the axis basis: a percentage against a
             // definite basis is a fixed length; against an indefinite one it
             // behaves as 'auto' (CSS Grid §7.2.1 / §11.5).
@@ -1759,7 +1979,8 @@ internal partial class CssBox
     /// <c>-2</c> the one before it, and so on; a negative line pointing before the
     /// grid's start, or a named line, falls back to <c>auto</c>.
     /// </summary>
-    private static (int? start, int span) ParseGridLine(string value, int explicitTracks)
+    private static (int? start, int span) ParseGridLine(string value, int explicitTracks,
+        IReadOnlyDictionary<string, List<int>> names = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             return (null, 1);
@@ -1769,10 +1990,10 @@ internal partial class CssBox
 
         int slash = v.IndexOf('/');
         if (slash < 0)
-            return ParseSingleGridLine(v, explicitTracks);
+            return ParseSingleGridLine(v, explicitTracks, names);
 
-        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks);
-        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks);
+        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks, names);
+        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks, names);
 
         if (startLine.HasValue && endLine.HasValue)
         {
@@ -1791,7 +2012,8 @@ internal partial class CssBox
         return (null, 1);
     }
 
-    private static (int? start, int span) ParseSingleGridLine(string token, int explicitTracks)
+    private static (int? start, int span) ParseSingleGridLine(string token, int explicitTracks,
+        IReadOnlyDictionary<string, List<int>> names = null)
     {
         if (string.IsNullOrEmpty(token) || token.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return (null, 1);
@@ -1810,12 +2032,103 @@ internal partial class CssBox
             {
                 // Negative line -N counts back from the last explicit line: the grid
                 // has explicitTracks+1 lines, so line -1 is boundary `explicitTracks`.
+                // A boundary that lands before the explicit grid (negative) references
+                // a *leading* implicit track (CSS Grid §8.3); the caller normalises
+                // these to non-negative indices by shifting the whole grid right/down.
                 int boundary = explicitTracks + 1 + line;
-                if (boundary >= 0)
-                    return (boundary, 1);
+                return (boundary, 1);
             }
-            return (null, 1);                 // line 0 / before-grid negative -> auto
+            return (null, 1);                 // line 0 -> auto
         }
-        return (null, 1);                     // named line -> auto
+
+        // Named line: `<name>` (the first line with that name) or `<int> <name>`
+        // (the Nth). CSS Grid §8.3 — resolve against the template's line-name map.
+        if (names != null)
+        {
+            int space = token.IndexOf(' ');
+            int nth = 1;
+            string name = token;
+            if (space > 0 && int.TryParse(token.Substring(0, space).Trim(),
+                    NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
+            {
+                nth = parsedNth;
+                name = token.Substring(space + 1).Trim();
+            }
+            if (names.TryGetValue(name, out var lines) && lines.Count > 0)
+                return (lines[Math.Min(nth, lines.Count) - 1], 1);
+        }
+        return (null, 1);                     // unresolved named line -> auto
+    }
+
+    /// <summary>
+    /// CSS Grid §7.1: the template's line-name map — each custom line name (from a
+    /// <c>[name …]</c> bracket) to the 0-based line (track boundary) indices it
+    /// labels. <c>repeat(&lt;int&gt;, …)</c> is expanded so names inside repeat
+    /// exist at every repetition; <c>auto-fill</c>/<c>auto-fit</c> repeats stop the
+    /// walk (their count is layout-dependent). Returns an empty map for an unnamed
+    /// template.
+    /// </summary>
+    private static Dictionary<string, List<int>> ParseLineNames(string template)
+    {
+        var result = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(template))
+        {
+            int line = 0;
+            CollectLineNames(template, result, ref line, depth: 0);
+        }
+        return result;
+    }
+
+    private static void CollectLineNames(string v, Dictionary<string, List<int>> result, ref int line, int depth)
+    {
+        if (depth > 4) return;
+        int i = 0, n = v.Length;
+        while (i < n)
+        {
+            while (i < n && char.IsWhiteSpace(v[i])) i++;
+            if (i >= n) break;
+
+            if (v[i] == '[')
+            {
+                int close = v.IndexOf(']', i);
+                if (close < 0) return;
+                foreach (var name in v.Substring(i + 1, close - i - 1)
+                             .Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!result.TryGetValue(name, out var list))
+                        result[name] = list = new List<int>();
+                    if (!list.Contains(line)) list.Add(line);
+                }
+                i = close + 1;
+                continue;
+            }
+
+            int start = i, paren = 0;
+            while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
+            {
+                if (v[i] == '(') paren++;
+                else if (v[i] == ')') paren--;
+                i++;
+            }
+            string token = v.Substring(start, i - start);
+            if (token.Length == 0) continue;
+
+            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
+            {
+                string inner = token.Substring(7, token.Length - 8);
+                int comma = inner.IndexOf(',');
+                if (comma < 0) return;
+                if (int.TryParse(inner.Substring(0, comma).Trim(),
+                        NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
+                    && count >= 1 && count <= 1000)
+                    for (int r = 0; r < count; r++)
+                        CollectLineNames(inner.Substring(comma + 1), result, ref line, depth + 1);
+                else
+                    return;              // auto-fill/auto-fit — line count unknown
+                continue;
+            }
+
+            line++;                      // one track (length / minmax / keyword)
+        }
     }
 }
