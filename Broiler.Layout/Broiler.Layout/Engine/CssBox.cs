@@ -60,6 +60,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             || v.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>CSS Sizing 3: <c>true</c> for a content-based intrinsic <c>height</c>
+    /// keyword. A block box's min-/max-/fit-content block size is its content
+    /// height, so such a height must not be treated as a specified length (which,
+    /// under <c>box-sizing:border-box</c>, would wrongly reinterpret the already
+    /// content-derived height as a border-box value and drop the border/padding);
+    /// leave the content-computed <c>ActualBottom</c> in place and let the §10.7
+    /// min-/max-height clamp apply.</summary>
+    private static bool IsIntrinsicSizingHeightKeyword(string value) =>
+        IsIntrinsicSizingWidthKeyword(value);
+
     private double ResolveSpecifiedHeightToBorderBox(double cssHeight)
     {
         if (!UsesBorderBoxSizing)
@@ -2081,8 +2091,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         // CSS content-box model: 'height' specifies the content height only;
-        // padding and border are additive (CSS2.1 §10.6.3).
-        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        // padding and border are additive (CSS2.1 §10.6.3). An intrinsic-sizing
+        // height keyword (min-/max-/fit-content) is not a length — the content
+        // height already in ActualBottom is its used value, so leave it be.
+        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+            && !IsIntrinsicSizingHeightKeyword(Height))
         {
             // CSS2.1 §10.5: If height is a percentage and the containing
             // block's height is not explicitly specified (auto), the
@@ -2230,7 +2243,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // content overflow from child floats (CSS2.1 §10.6.1).
         // CSS2.1 §10.5: Percentage heights resolve to auto when
         // the containing block's height is not explicitly specified.
-        if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+            && !IsIntrinsicSizingHeightKeyword(Height))
         {
             if (!HeightPercentageResolvesToAuto())
             {
@@ -4141,14 +4155,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (double.IsNaN(childWidth))
                 continue;
 
-            // CSS Sizing 3 §5: the max-content width of a container whose
-            // children float must accumulate a run of adjacent floats rather
-            // than take only the widest single child — otherwise a container of
-            // two float:left children (WPT floats-143: a <ul> of two float:left
-            // <li>) shrinks to one child's width, wrapping the second below the
-            // first. Non-floated (block-level) children each start their own
-            // line, so they reset the run and contribute independently.
-            if (child.Float != CssConstants.None)
+            // CSS Sizing 3 §5: the max-content width of a container is the widest
+            // of its lines with no wrapping. Inline-level content stays on the line
+            // and accumulates — adjacent floats (WPT floats-143: a <ul> of two
+            // float:left <li> would otherwise shrink to one child's width and wrap
+            // the second below the first) and **atomic inline-level boxes**
+            // (inline-block / inline-table / inline-flex / inline-grid), which sit
+            // side by side, so two 40px inline-blocks contribute 80, not 40. Only a
+            // block-level child ends the run and starts its own line.
+            if (child.Float != CssConstants.None
+                || CssBoxHelper.IsAtomicInlineLevel(child.Display))
             {
                 floatRunWidth += childWidth;
                 maxLineWidth = Math.Max(maxLineWidth, floatRunWidth);

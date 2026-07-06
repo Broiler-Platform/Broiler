@@ -22,20 +22,35 @@ namespace Broiler.Cli.Tests;
 ///     container width (1024) instead of shrink-to-fit + min-width.
 ///
 /// In-process check-layout geometry (the browser-correct answer), no pixel
-/// reference. The <c>box-sizing:border-box</c> variants are a separate open
-/// border-box + auto-fill-count + min-height subtlety (documented in the
-/// workstream) and are not asserted here.
+/// reference.
+///
+/// The <c>box-sizing:border-box</c> variants (g9/g11/g12) close two further root
+/// causes (roadmap #1248 Workstream C, "the 3 border-box variants"):
+///  3. <b>auto-fill count under a definite min-size uses ceil, not floor</b> — the
+///     repeat count that fills a definite <em>size</em> is the largest that does not
+///     overflow (floor), but the count that fills a definite <em>min-size</em> (an
+///     indefinite used size) is the smallest that reaches it (ceil, §7.2.3.2). With
+///     <c>box-sizing:border-box</c> the content min-height is 200−20=180, so the row
+///     count is ⌈180/50⌉=4 (floor gave 3). A definite height (g10) still floors.
+///  4. <b>intrinsic-sizing height keyword under border-box</b> — <c>height:
+///     min-content</c>/<c>max-content</c> was reinterpreted as a specified border-box
+///     length, dropping the border (offsetHeight 200 vs 220); such a keyword is the
+///     content height already computed, so it is left in place.
 /// </summary>
 public sealed class GridAutoRepeatMinSizeTests
 {
     private const string Style =
         ".grid{position:relative;display:grid;grid:repeat(auto-fill,50px)/repeat(auto-fill,100px);min-width:300px;min-height:200px;float:left;}"
         + ".border{border:10px solid;}"
+        + ".borderBox{box-sizing:border-box;}"
         + ".item{grid-column:-2;grid-row:-2;}";
 
     private sealed record Case(string Id, string Cls, string Style, int W, int H, int Ix, int Iy);
 
-    // The nine variants whose full geometry the two fixes make correct.
+    // All twelve variants of grid-auto-repeat-min-size-001, resolved to their
+    // browser-correct geometry. g10 (border-box + a definite explicit height) keeps
+    // the definite-size floor count (2 cols / 3 rows), so its item lands at (100,100)
+    // in a 300×200 box — every other case fills the min-size and lands at (200,150).
     private static readonly Case[] Cases =
     {
         new("g1", "grid", "", 300, 200, 200, 150),
@@ -46,6 +61,10 @@ public sealed class GridAutoRepeatMinSizeTests
         new("g6", "grid border", "width:200px;height:100px;", 320, 220, 200, 150),
         new("g7", "grid border", "width:min-content;height:min-content;", 320, 220, 200, 150),
         new("g8", "grid border", "width:max-content;height:max-content;", 320, 220, 200, 150),
+        new("g9", "grid border borderBox", "", 320, 220, 200, 150),
+        new("g10", "grid border borderBox", "width:200px;height:100px;", 300, 200, 100, 100),
+        new("g11", "grid border borderBox", "width:min-content;height:min-content;", 320, 220, 200, 150),
+        new("g12", "grid border borderBox", "width:max-content;height:max-content;", 320, 220, 200, 150),
     };
 
     [Fact]
