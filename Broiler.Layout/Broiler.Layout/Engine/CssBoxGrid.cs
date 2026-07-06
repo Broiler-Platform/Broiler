@@ -18,8 +18,9 @@ namespace Broiler.Layout.Engine;
 /// <c>grid-auto-flow</c> row/column with sparse/dense packing, implicit tracks) and
 /// a bounded §11 track-sizing algorithm covering <c>&lt;length&gt;</c>,
 /// <c>&lt;percentage&gt;</c>, <c>&lt;flex&gt;</c> (<c>fr</c>), <c>auto</c>,
-/// <c>min-content</c>, <c>max-content</c>, <c>minmax()</c>, <c>repeat(&lt;int&gt;, …)</c>,
-/// and <c>repeat(auto-fill, &lt;fixed-track-list&gt;)</c> (§7.2.3.1 repeat-to-fill).
+/// <c>min-content</c>, <c>max-content</c>, <c>minmax()</c>, <c>fit-content()</c>,
+/// <c>repeat(&lt;int&gt;, …)</c>, and <c>repeat(auto-fill, &lt;fixed-track-list&gt;)</c>
+/// (§7.2.3.1 repeat-to-fill).
 ///
 /// Intrinsic column sizing draws its content contributions from
 /// <see cref="GetMinMaxWidth"/> (a layout-independent measure); intrinsic row
@@ -27,7 +28,7 @@ namespace Broiler.Layout.Engine;
 /// approximation) when a narrowed column would have reflowed that height, so it
 /// never sizes a row from a stale measurement. Negative grid lines
 /// (e.g. <c>grid-column: -2</c>) resolve against the explicit track count.
-/// Anything still out of scope (<c>subgrid</c>, <c>fit-content()</c>,
+/// Anything still out of scope (<c>subgrid</c>,
 /// <c>repeat(auto-fit, …)</c> — whose empty-track collapsing is unmodelled — and
 /// named lines carrying sizes) makes the pass decline, confining the new
 /// behaviour to grids it can size correctly.
@@ -52,16 +53,21 @@ internal partial class CssBox
     // arrays or spin the placement search. Real content stays well under this.
     private const int MaxGridLine = 1000;
 
-    /// <summary>The kind of a single (min or max) track sizing function.</summary>
-    private enum GridSizeKind { Fixed, Percent, Fr, Auto, MinContent, MaxContent }
+    /// <summary>The kind of a single (min or max) track sizing function.
+    /// <c>FitContent</c> is only ever a track's <em>max</em> (its min is auto):
+    /// <c>fit-content(L)</c> = <c>max(min-content, min(L, max-content))</c>.</summary>
+    private enum GridSizeKind { Fixed, Percent, Fr, Auto, MinContent, MaxContent, FitContent }
 
     /// <summary>One side (min or max) of a track sizing function.</summary>
     private readonly struct GridSize
     {
         public readonly GridSizeKind Kind;
-        public readonly double Value; // px for Fixed, flex factor for Fr; else 0
-        public GridSize(GridSizeKind kind, double value = 0) { Kind = kind; Value = value; }
-        public bool IsIntrinsic => Kind is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent;
+        public readonly double Value; // px for Fixed, flex factor for Fr, limit for FitContent; else 0
+        public readonly bool ValueIsPercent; // FitContent only: the limit is a percentage magnitude
+        public GridSize(GridSizeKind kind, double value = 0, bool valueIsPercent = false)
+        { Kind = kind; Value = value; ValueIsPercent = valueIsPercent; }
+        public bool IsIntrinsic => Kind is GridSizeKind.Auto or GridSizeKind.MinContent
+            or GridSizeKind.MaxContent or GridSizeKind.FitContent;
     }
 
     /// <summary>A track's <c>minmax(min, max)</c> sizing function.</summary>
@@ -1490,7 +1496,29 @@ internal partial class CssBox
             return true;
         }
 
-        // fit-content() and any other functional notation are out of scope.
+        // fit-content(<length-percentage>): modelled as minmax(auto, fit-content(L)).
+        // The track's used size is max(min-content, min(L, max-content)) (§7.2.3).
+        if (t.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(")"))
+        {
+            string inner = t.Substring(12, t.Length - 13).Trim();
+            if (inner.EndsWith("%", StringComparison.Ordinal))
+            {
+                if (!double.TryParse(inner.Substring(0, inner.Length - 1),
+                        NumberStyles.Float, CultureInfo.InvariantCulture, out double pct) || pct < 0)
+                    return false;
+                spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto),
+                    new GridSize(GridSizeKind.FitContent, pct, valueIsPercent: true));
+                return true;
+            }
+            double limit = CssValueParser.ParseLength(inner, 0, em);
+            if (double.IsNaN(limit) || double.IsInfinity(limit) || limit < 0)
+                return false;
+            spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto),
+                new GridSize(GridSizeKind.FitContent, limit));
+            return true;
+        }
+
+        // Any other functional notation is out of scope.
         if (t.IndexOf('(') >= 0)
             return false;
 
@@ -1698,6 +1726,7 @@ internal partial class CssBox
         var frFactor = new double[count];
         var minKind = new GridSizeKind[count]; // effective (percent already resolved)
         var maxKind = new GridSizeKind[count];
+        var fitLimit = new double[count];      // FitContent tracks only: the L in fit-content(L)
 
         for (int t = 0; t < count; t++)
         {
@@ -1727,7 +1756,8 @@ internal partial class CssBox
             }
             else
             {
-                growth[t] = double.PositiveInfinity; // auto / min-content / max-content
+                if (maxK == GridSizeKind.FitContent) fitLimit[t] = Math.Max(0, maxPx);
+                growth[t] = double.PositiveInfinity; // auto / min-/max-content / fit-content
             }
         }
 
@@ -1744,7 +1774,8 @@ internal partial class CssBox
                 double c = minKind[t] == GridSizeKind.MaxContent ? it.MaxContent : it.MinContent;
                 contentBase[t] = Math.Max(contentBase[t], c);
             }
-            if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent
+                or GridSizeKind.MaxContent or GridSizeKind.FitContent)
             {
                 double c = maxKind[t] == GridSizeKind.MinContent ? it.MinContent : it.MaxContent;
                 contentGrow[t] = Math.Max(contentGrow[t], c);
@@ -1764,7 +1795,18 @@ internal partial class CssBox
         {
             if (minKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
                 baseSize[t] = Math.Max(baseSize[t], contentBase[t]);
-            if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            if (maxKind[t] == GridSizeKind.FitContent)
+            {
+                // fit-content(L) = max(min-content, min(L, max-content)) (§7.2.3).
+                // baseSize[t] is the min-content floor (the fit-content minimum, auto);
+                // contentGrow[t] is the max-content contribution. The result is a fixed
+                // final size — it neither flexes (fr) nor stretches.
+                double maxContent = Math.Max(baseSize[t], contentGrow[t]);
+                double size = Math.Max(baseSize[t], Math.Min(fitLimit[t], maxContent));
+                baseSize[t] = size;
+                growth[t] = size;
+            }
+            else if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
             {
                 double g = Math.Max(baseSize[t], contentGrow[t]);
                 growth[t] = double.IsPositiveInfinity(growth[t]) ? g : Math.Max(growth[t], g);
@@ -1832,7 +1874,8 @@ internal partial class CssBox
             int t = it.Start + i;
             if (t < 0 || t >= count) continue;
             covered += target[t];
-            if (kinds[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
+            if (kinds[t] is GridSizeKind.Auto or GridSizeKind.MinContent
+                or GridSizeKind.MaxContent or GridSizeKind.FitContent)
                 intrinsic.Add(t);
         }
         if (intrinsic.Count == 0) return;
@@ -1862,6 +1905,16 @@ internal partial class CssBox
                     : (GridSizeKind.Auto, 0);
             case GridSizeKind.Fr:
                 return (GridSizeKind.Fr, size.Value);
+            case GridSizeKind.FitContent:
+                // The fit-content limit: a length passes through; a percentage
+                // resolves against the axis basis, or — against an indefinite basis —
+                // the limit is treated as max-content (fit-content → minmax(auto,
+                // max-content)), so the track becomes a plain max-content track.
+                if (!size.ValueIsPercent)
+                    return (GridSizeKind.FitContent, size.Value);
+                return definite && basis > 0
+                    ? (GridSizeKind.FitContent, basis * size.Value / 100.0)
+                    : (GridSizeKind.MaxContent, 0);
             default:
                 return (size.Kind, 0);
         }

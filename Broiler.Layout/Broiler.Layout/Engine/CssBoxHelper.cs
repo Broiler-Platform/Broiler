@@ -151,14 +151,29 @@ internal static class CssBoxHelper
         return currentMaxBottom;
     }
 
+    /// <summary>An atomic inline-level box (inline-block / inline-table /
+    /// inline-flex / inline-grid): inline-level, so it shares a line with siblings
+    /// for max-content sizing rather than starting a new one.</summary>
+    private static bool IsAtomicInlineLevel(string display) =>
+        display is "inline-block" or "inline-table" or "inline-flex" or "inline-grid";
+
     public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum, CssBox suppressExplicitWidthFor = null)
     {
         double? oldSum = null;
 
-        // not inline (block) boxes start a new line so we need to reset the max sum
-        // CSS2.1 §10.3.7: Floated children contribute to the same "line" for
-        // shrink-to-fit width calculation, so they do not reset maxSum.
-        if (box.Display != CssConstants.Inline && box.Display != CssConstants.TableCell && box.WhiteSpace != CssConstants.NoWrap && box.Float == CssConstants.None)
+        // Block-level boxes start a new line, so max-content resets the running sum
+        // to this line. Inline-*level* content stays on the line and accumulates:
+        // real inline boxes (CSS2.1 §10.3.7 floats likewise contribute to the same
+        // "line") and — the reason this guard also lists them — **atomic inline-level
+        // boxes** (inline-block / inline-table / inline-flex / inline-grid), which are
+        // inline-level and sit side by side on one line. Treating them as block reset
+        // the line, so N inline-blocks in a row measured as the *widest* one instead
+        // of their *sum* (e.g. two 40px inline-blocks → max-content 40, not 80),
+        // under-sizing every shrink-to-fit and collapsing max-content/fit-content
+        // grid tracks that hold them.
+        if (box.Display != CssConstants.Inline && box.Display != CssConstants.TableCell
+            && !IsAtomicInlineLevel(box.Display)
+            && box.WhiteSpace != CssConstants.NoWrap && box.Float == CssConstants.None)
         {
             oldSum = maxSum;
             maxSum = marginSum;
