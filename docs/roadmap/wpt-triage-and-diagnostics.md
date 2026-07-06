@@ -725,11 +725,16 @@ problems" run) was triaged end-to-end this session against a local Chromium-refe
 matches within noise). All eight are the hard tail and each needs a distinct, roadmap-scale feature — no
 single fix flips them:
 
-- **#1/#3/#4 `column-subgrid-auto-fill-{003,001,008}` and #6 `row-subgrid-grid-gap-012`** — the deferred
-  **multi-column named-line subgrid track adoption** (cluster 28/29 tail): a subgrid item inheriting its
-  parent's spanned tracks, `repeat(auto-fill, [line-names])`, and `subgrid`-side gap. Broiler's
-  single-column approximation over/under-sizes the grey subgrid bands (gap-012 renders the right band
-  order at ~2× height).
+- **#6 `row-subgrid-grid-gap-012` — ✅ fixed this session (46% → 99.8%).** Two bugs: (1) the collapsible
+  white space between the `<span>`s was being turned into phantom grid items (two extra rows); dropping
+  anonymous whitespace-only items per §4 took it to ~96%. (2) The row-subgrid over the parent's auto rows
+  lumped its 30/50/30 content into one span and distributed it equally (36.6/36.6/36.6); giving the parent
+  per-track contributions from the subgrid's children (§7.3, `TryGetSubgridRowContributions`) sized the
+  rows correctly. Guards `GridWhitespaceItemTests`, `SubgridRowContributionTests`.
+- **#1/#3/#4 `column-subgrid-auto-fill-{003,001,008}`** — the deferred **multi-column named-line subgrid
+  track adoption** (cluster 28/29 tail): a subgrid item inheriting its parent's spanned tracks,
+  `repeat(auto-fill, [line-names])`, and `subgrid`-side gap. Broiler's single-column approximation
+  over/under-sizes the grey subgrid bands. Still open (the harder half of the cluster).
 - **#2 `subgrid/orthogonal-writing-mode-006`** — same subgrid feature across an orthogonal flow; Broiler
   blows the fit-content outer grid up to the viewport.
 - **#5 `grid-lanes-quirks-fill-viewport`** — the quirks-mode *body-fills-viewport* / *html-fills-viewport*
