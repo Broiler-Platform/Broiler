@@ -1,0 +1,182 @@
+name: Prepare Broiler Writer Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to checkout recursively and release from.
+        required: true
+        default: main
+      target_platform:
+        description: Target platform.
+        required: true
+        type: choice
+        default: Windows
+        options:
+          - Windows
+
+permissions:
+  contents: write
+
+concurrency:
+  group: writer-draft-release-${{ github.event.inputs.branch }}-${{ github.event.inputs.target_platform }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_PATH: Broiler.Writer/Broiler.Writer.csproj
+  APP_NAME: Broiler.Writer
+  RELEASE_NAME: Broiler Writer
+  CONFIGURATION: Release
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  prepare-writer-draft-release:
+    name: Prepare Broiler Writer Draft Release (${{ github.event.inputs.target_platform }})
+    if: ${{ github.event.inputs.target_platform == 'Windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Resolve release metadata
+        id: metadata
+        shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+          TARGET_PLATFORM: ${{ github.event.inputs.target_platform }}
+        run: |
+          $branchSlug = $env:RELEASE_BRANCH -replace '[^A-Za-z0-9._-]+', '-'
+          $branchSlug = $branchSlug.Trim('-')
+          if ([string]::IsNullOrWhiteSpace($branchSlug)) {
+            $branchSlug = 'branch'
+          }
+
+          $platformSlug = $env:TARGET_PLATFORM.ToLowerInvariant()
+          $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+          $shortSha = (git rev-parse --short HEAD).Trim()
+          $tagName = "broiler-writer-$platformSlug-$branchSlug-$stamp-$env:GITHUB_RUN_NUMBER"
+          $releaseTitle = "$($env:RELEASE_NAME) $($env:TARGET_PLATFORM) draft ($env:RELEASE_BRANCH @ $shortSha)"
+
+          "tag_name=$tagName" >> $env:GITHUB_OUTPUT
+          "release_title=$releaseTitle" >> $env:GITHUB_OUTPUT
+          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
+
+      - name: Restore Windows runtime graph
+        shell: pwsh
+        run: dotnet restore $env:PROJECT_PATH --runtime win-x64
+
+      - name: Publish self-contained single exe
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained'
+          dotnet publish $env:PROJECT_PATH `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $output `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true
+
+          $exe = Join-Path $output "$($env:APP_NAME).exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Expected self-contained artifact was not produced: $exe"
+          }
+
+      - name: Publish framework-dependent single exe
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent'
+          dotnet publish $env:PROJECT_PATH `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained false `
+            --no-restore `
+            --output $output `
+            -p:PublishSingleFile=true `
+            -p:UseAppHost=true
+
+          $exe = Join-Path $output "$($env:APP_NAME).exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Expected framework-dependent artifact was not produced: $exe"
+          }
+
+      - name: Package release assets
+        shell: pwsh
+        run: |
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+
+          $selfContainedExe = Join-Path $env:RUNNER_TEMP "publish\windows-self-contained\$($env:APP_NAME).exe"
+          $frameworkDependentExe = Join-Path $env:RUNNER_TEMP "publish\windows-framework-dependent\$($env:APP_NAME).exe"
+
+          Compress-Archive `
+            -LiteralPath $selfContainedExe `
+            -DestinationPath (Join-Path $assetDir 'Broiler-Writer-Windows-self-contained.zip') `
+            -Force
+
+          Compress-Archive `
+            -LiteralPath $frameworkDependentExe `
+            -DestinationPath (Join-Path $assetDir 'Broiler-Writer-Windows-framework-dependent.zip') `
+            -Force
+
+      - name: Upload self-contained artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Broiler-Writer-Windows-self-contained
+          path: ${{ runner.temp }}/publish/windows-self-contained/Broiler.Writer.exe
+          if-no-files-found: error
+
+      - name: Upload framework-dependent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Broiler-Writer-Windows-framework-dependent
+          path: ${{ runner.temp }}/publish/windows-framework-dependent/Broiler.Writer.exe
+          if-no-files-found: error
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+          TARGET_PLATFORM: ${{ github.event.inputs.target_platform }}
+          TAG_NAME: ${{ steps.metadata.outputs.tag_name }}
+          RELEASE_TITLE: ${{ steps.metadata.outputs.release_title }}
+          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+        run: |
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $body = @"
+          Draft release prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.
+
+          Application: $env:RELEASE_NAME
+          Target platform: $env:TARGET_PLATFORM
+
+          Assets:
+          - Broiler-Writer-Windows-self-contained.zip: contains self-contained single-file Broiler.Writer.exe.
+          - Broiler-Writer-Windows-framework-dependent.zip: contains framework-dependent single-file Broiler.Writer.exe.
+          "@
+
+          $bodyPath = Join-Path $env:RUNNER_TEMP 'writer-draft-release-notes.md'
+          Set-Content -LiteralPath $bodyPath -Value $body -Encoding UTF8
+
+          gh release create $env:TAG_NAME `
+            (Join-Path $assetDir 'Broiler-Writer-Windows-self-contained.zip') `
+            (Join-Path $assetDir 'Broiler-Writer-Windows-framework-dependent.zip') `
+            --draft `
+            --target $env:RELEASE_BRANCH `
+            --title $env:RELEASE_TITLE `
+            --notes-file $bodyPath
