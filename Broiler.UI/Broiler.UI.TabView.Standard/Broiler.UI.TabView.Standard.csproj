@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.TabView.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.TabView.Standard</AssemblyName>
+    <PackageId>Broiler.UI.TabView.Standard</PackageId>
+    <Description>Standard platform-neutral Broiler tab view implementation.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.TabView\Broiler.UI.TabView.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

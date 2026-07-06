@@ -1,0 +1,73 @@
+{
+  "phase": "1",
+  "status": "implemented",
+  "date": "2026-07-02",
+  "runtimeProjects": [
+    {
+      "name": "Broiler.UI",
+      "path": "Broiler.UI/Broiler.UI.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+        "../../Broiler.Input/Broiler.Input/Broiler.Input.csproj",
+        "../../Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+        "../../Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+        "../../Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj",
+        "../../Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj",
+        "../../Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj"
+      ]
+    },
+    {
+      "name": "Broiler.UI.Standard",
+      "path": "Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+        "../../Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+        "../../Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+        "../../Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj",
+        "../../Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj",
+        "../../Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj"
+      ]
+    }
+  ],
+  "testProjects": [
+    "Broiler.UI.Tests/Broiler.UI.Tests.csproj",
+    "Broiler.UI.Standard.Tests/Broiler.UI.Standard.Tests.csproj",
+    "Broiler.UI.Phase0.Tests/Broiler.UI.Phase0.Tests.csproj"
+  ],
+  "forbiddenRuntimeReferences": [
+    "Broiler.Graphics.Windows",
+    "Broiler.Input.Windows",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Mouse.Windows",
+    "Win32",
+    "Direct2D",
+    "WPF",
+    "WinForms",
+    "COM",
+    "HWND"
+  ],
+  "definedContracts": [
+    "UiElement",
+    "UiSession",
+    "UiInputEvent",
+    "UiRenderContext",
+    "UiRoutedEvent",
+    "UiSemanticNode",
+    "IUiHost",
+    "IUiDispatcher",
+    "IUiClock",
+    "IUiElementFactory",
+    "UiFactorySet"
+  ],
+  "standardInfrastructure": [
+    "StandardUiSessionBuilder",
+    "StandardRenderTraversal",
+    "StandardInputRoute",
+    "StandardThemeTokens",
+    "StandardUiClock",
+    "ImmediateUiDispatcher"
+  ]
+}

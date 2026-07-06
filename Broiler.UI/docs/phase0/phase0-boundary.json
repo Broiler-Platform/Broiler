@@ -1,0 +1,64 @@
+{
+  "phase": "0",
+  "status": "approved-for-phase-1",
+  "date": "2026-07-02",
+  "componentRoot": "Broiler.UI",
+  "graphicsSource": "../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+  "browserBaseline": "../docs/testing/baselines/broiler-ui-phase0-browser-current.png",
+  "runtimeAssemblies": [
+    {
+      "name": "Broiler.UI",
+      "allowedBroilerReferences": [ "Broiler.Graphics", "Broiler.Input" ]
+    },
+    {
+      "name": "Broiler.UI.Standard",
+      "allowedBroilerReferences": [ "Broiler.UI", "Broiler.Graphics", "Broiler.Input" ]
+    }
+  ],
+  "firstVerticalSlice": [ "Window", "Panel", "Label", "Button", "Edit" ],
+  "controlPairs": [
+    "Window",
+    "Panel",
+    "Label",
+    "Button",
+    "Edit",
+    "CheckBox",
+    "RadioButton",
+    "ToggleButton",
+    "Slider",
+    "ProgressBar",
+    "ScrollView",
+    "ListView",
+    "ComboBox",
+    "TabView",
+    "Menu",
+    "ImageView",
+    "Dialog",
+    "Tooltip"
+  ],
+  "owners": {
+    "windowHosting": "Application host",
+    "inputTranslation": "Broiler.Input with temporary legacy Graphics adapter",
+    "focus": "Broiler.UI session",
+    "accessibility": "Broiler.UI semantic snapshots plus application host bridge",
+    "clipboard": "Application host port",
+    "cursor": "Application host port",
+    "rendering": "Broiler.Graphics",
+    "nativeControls": "Graphics compatibility path until UI migration"
+  },
+  "requiredAdrs": [
+    "0001-ui-root-and-per-type-assembly-rule.md",
+    "0002-logical-versus-native-windows.md",
+    "0003-graphics-submission-boundary.md",
+    "0004-input-and-text-service-boundary.md",
+    "0005-ui-context-and-reentrancy.md",
+    "0006-layout-protocol.md",
+    "0007-implementation-factories.md",
+    "0008-accessibility-semantic-bridge.md",
+    "0009-edit-text-model.md",
+    "0010-theme-and-visual-state-model.md",
+    "0011-compatibility-removal.md",
+    "0012-package-repository-topology.md"
+  ]
+}
+

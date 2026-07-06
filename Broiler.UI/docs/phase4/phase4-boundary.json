@@ -1,0 +1,101 @@
+{
+  "phase": "4",
+  "status": "implemented",
+  "date": "2026-07-03",
+  "runtimeProjects": [
+    {
+      "name": "Broiler.UI.Button",
+      "path": "Broiler.UI.Button/Broiler.UI.Button.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj"
+      ],
+      "primaryAbstractType": "UiButton"
+    },
+    {
+      "name": "Broiler.UI.Button.Standard",
+      "path": "Broiler.UI.Button.Standard/Broiler.UI.Button.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Button/Broiler.UI.Button.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardButton"
+    },
+    {
+      "name": "Broiler.UI.Edit",
+      "path": "Broiler.UI.Edit/Broiler.UI.Edit.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj"
+      ],
+      "primaryAbstractType": "UiEdit"
+    },
+    {
+      "name": "Broiler.UI.Edit.Standard",
+      "path": "Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Edit/Broiler.UI.Edit.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardEdit"
+    }
+  ],
+  "coreAdditions": [
+    "IUiClipboardHost",
+    "UiInputEvent.MouseButton",
+    "UiInputEvent.MouseButtonTransition",
+    "UiInputEvent.KeyTransition",
+    "UiInputEvent.KeyModifiers",
+    "UiInputEvent.NativeKeyCode",
+    "UiInputEvent.CompositionState"
+  ],
+  "standardAdapterAdditions": [
+    "StandardLegacyGraphicsInputAdapter preserves mouse button transitions",
+    "StandardLegacyGraphicsInputAdapter preserves keyboard key transitions"
+  ],
+  "graphicsUse": [
+    "BRenderList",
+    "BTextMeasurer",
+    "BTextMetrics"
+  ],
+  "appPreview": {
+    "project": "src/Broiler.App.Graphics/Broiler.App.Graphics.csproj",
+    "argument": "--ui-phase4-toolbar",
+    "proofControls": [
+      "StandardWindow",
+      "StandardPanel",
+      "StandardLabel",
+      "StandardButton",
+      "StandardEdit"
+    ],
+    "nativeChildControlsUsed": false,
+    "windowsSpecificCodeLocation": "application host only",
+    "productionCompatibilityPathPreserved": true
+  },
+  "exitGateTests": [
+    "Button_Activates_From_Pointer_And_Keyboard",
+    "Button_Command_Availability_Blocks_Clicks",
+    "Edit_Text_Selection_Clipboard_Undo_Composition_And_Submit",
+    "Password_Edit_Redacts_Rendering_Semantics_And_Copy",
+    "Toolbar_Proof_Navigates_By_Keyboard_And_Mouse",
+    "Phase4_Runtime_Projects_Target_Net10_And_Keep_Allowed_References",
+    "Phase4_Runtime_Assemblies_Do_Not_Expose_Native_Handles_Or_Windows_Types",
+    "Phase4_Adds_Only_The_Button_And_Edit_Concrete_Control_Pairs"
+  ],
+  "forbiddenRuntimeReferences": [
+    "Broiler.Graphics.Windows",
+    "Broiler.Input.Windows",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Mouse.Windows",
+    "Win32",
+    "Direct2D",
+    "WPF",
+    "WinForms",
+    "COM",
+    "HWND"
+  ]
+}

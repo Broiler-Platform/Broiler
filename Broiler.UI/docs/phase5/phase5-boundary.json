@@ -1,0 +1,175 @@
+{
+  "phase": "5",
+  "status": "implemented",
+  "date": "2026-07-03",
+  "runtimeProjects": [
+    {
+      "name": "Broiler.UI.CheckBox",
+      "path": "Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiCheckBox"
+    },
+    {
+      "name": "Broiler.UI.CheckBox.Standard",
+      "path": "Broiler.UI.CheckBox.Standard/Broiler.UI.CheckBox.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardCheckBox"
+    },
+    {
+      "name": "Broiler.UI.RadioButton",
+      "path": "Broiler.UI.RadioButton/Broiler.UI.RadioButton.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiRadioButton"
+    },
+    {
+      "name": "Broiler.UI.RadioButton.Standard",
+      "path": "Broiler.UI.RadioButton.Standard/Broiler.UI.RadioButton.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.RadioButton/Broiler.UI.RadioButton.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardRadioButton"
+    },
+    {
+      "name": "Broiler.UI.ToggleButton",
+      "path": "Broiler.UI.ToggleButton/Broiler.UI.ToggleButton.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Button/Broiler.UI.Button.csproj"
+      ],
+      "primaryAbstractType": "UiToggleButton"
+    },
+    {
+      "name": "Broiler.UI.ToggleButton.Standard",
+      "path": "Broiler.UI.ToggleButton.Standard/Broiler.UI.ToggleButton.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.ToggleButton/Broiler.UI.ToggleButton.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardToggleButton"
+    },
+    {
+      "name": "Broiler.UI.Slider",
+      "path": "Broiler.UI.Slider/Broiler.UI.Slider.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiSlider"
+    },
+    {
+      "name": "Broiler.UI.Slider.Standard",
+      "path": "Broiler.UI.Slider.Standard/Broiler.UI.Slider.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Slider/Broiler.UI.Slider.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardSlider"
+    },
+    {
+      "name": "Broiler.UI.ProgressBar",
+      "path": "Broiler.UI.ProgressBar/Broiler.UI.ProgressBar.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiProgressBar"
+    },
+    {
+      "name": "Broiler.UI.ProgressBar.Standard",
+      "path": "Broiler.UI.ProgressBar.Standard/Broiler.UI.ProgressBar.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.ProgressBar/Broiler.UI.ProgressBar.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardProgressBar"
+    },
+    {
+      "name": "Broiler.UI.ImageView",
+      "path": "Broiler.UI.ImageView/Broiler.UI.ImageView.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiImageView",
+      "imageContentContract": "BImageHandle only"
+    },
+    {
+      "name": "Broiler.UI.ImageView.Standard",
+      "path": "Broiler.UI.ImageView.Standard/Broiler.UI.ImageView.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.ImageView/Broiler.UI.ImageView.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardImageView"
+    }
+  ],
+  "coreAdditions": [
+    "UiFlowDirection",
+    "UiSemanticRole.CheckBox",
+    "UiSemanticRole.RadioButton",
+    "UiSemanticRole.ToggleButton",
+    "UiSemanticRole.Slider",
+    "UiSemanticRole.ProgressBar",
+    "UiSemanticRole.ImageView",
+    "UiSemanticState.Checked",
+    "UiSemanticState.Indeterminate",
+    "UiSemanticState.Selected"
+  ],
+  "imageViewContract": {
+    "acceptedContent": "Broiler.Graphics.BImageHandle",
+    "loadsFiles": false,
+    "decodesBytes": false,
+    "ownsBackendResource": false
+  },
+  "exitGateTests": [
+    "CheckBox_Toggles_TriState_Rtl_HighContrast_Keyboard_And_Semantics",
+    "RadioButton_Uses_Explicit_GroupScope_And_Stays_Deterministic_Under_Reentrancy",
+    "ToggleButton_Uses_Button_Activation_Command_And_TriState",
+    "Slider_Coerces_Steps_Pointer_Keyboard_Reversed_Direction_And_Semantics",
+    "ProgressBar_Coerces_Renders_Indeterminate_ReducedMotion_And_Direction",
+    "ImageView_Draws_Only_Existing_Graphics_Image_Handle",
+    "Phase5_Runtime_Projects_Target_Net10_And_Keep_Per_Control_References",
+    "Standard_Assemblies_Expose_Exactly_One_Primary_Concrete_Control_Each",
+    "ImageView_Public_Surface_Uses_Only_Graphics_Image_Handles_For_Image_Content",
+    "Phase5_Runtime_Assemblies_Do_Not_Expose_Native_Handles_Or_Windows_Types"
+  ],
+  "forbiddenRuntimeReferences": [
+    "Broiler.Graphics.Windows",
+    "Broiler.Input.Windows",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Mouse.Windows",
+    "Win32",
+    "Direct2D",
+    "WPF",
+    "WinForms",
+    "COM",
+    "HWND"
+  ]
+}

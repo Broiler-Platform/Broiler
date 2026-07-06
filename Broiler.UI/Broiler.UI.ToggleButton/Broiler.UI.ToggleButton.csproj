@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.ToggleButton</RootNamespace>
+    <AssemblyName>Broiler.UI.ToggleButton</AssemblyName>
+    <PackageId>Broiler.UI.ToggleButton</PackageId>
+    <Description>Platform-neutral Broiler toggle button abstraction.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.Button\Broiler.UI.Button.csproj" />
+  </ItemGroup>
+
+</Project>

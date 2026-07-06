@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.UI.Phase6.Tests</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.ScrollView.Standard\Broiler.UI.ScrollView.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.ComboBox.Standard\Broiler.UI.ComboBox.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.TabView.Standard\Broiler.UI.TabView.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Menu.Standard\Broiler.UI.Menu.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Tooltip.Standard\Broiler.UI.Tooltip.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

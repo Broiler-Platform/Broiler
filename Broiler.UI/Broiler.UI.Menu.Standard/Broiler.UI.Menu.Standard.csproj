@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.Menu.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.Menu.Standard</AssemblyName>
+    <PackageId>Broiler.UI.Menu.Standard</PackageId>
+    <Description>Standard platform-neutral Broiler menu implementation.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.Menu\Broiler.UI.Menu.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

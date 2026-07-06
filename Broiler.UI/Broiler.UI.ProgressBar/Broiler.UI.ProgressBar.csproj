@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.ProgressBar</RootNamespace>
+    <AssemblyName>Broiler.UI.ProgressBar</AssemblyName>
+    <PackageId>Broiler.UI.ProgressBar</PackageId>
+    <Description>Platform-neutral Broiler progress bar abstraction.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI\Broiler.UI.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

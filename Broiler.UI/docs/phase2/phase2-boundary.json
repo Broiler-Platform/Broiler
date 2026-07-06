@@ -1,0 +1,92 @@
+{
+  "phase": "2",
+  "status": "implemented",
+  "date": "2026-07-02",
+  "runtimeProjects": [
+    {
+      "name": "Broiler.UI",
+      "path": "Broiler.UI/Broiler.UI.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+        "../../Broiler.Input/Broiler.Input/Broiler.Input.csproj",
+        "../../Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+        "../../Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+        "../../Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj",
+        "../../Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj",
+        "../../Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj"
+      ]
+    },
+    {
+      "name": "Broiler.UI.Standard",
+      "path": "Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+        "../../Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+        "../../Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+        "../../Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj",
+        "../../Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj",
+        "../../Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj"
+      ]
+    }
+  ],
+  "platformNeutralInputContracts": [
+    "Broiler.Input.Keyboard",
+    "Broiler.Input.Mouse",
+    "Broiler.Input.Touch",
+    "Broiler.Input.Pen",
+    "Broiler.Input.Text"
+  ],
+  "uiInputEventKinds": [
+    "PointerMove",
+    "PointerButton",
+    "PointerWheel",
+    "KeyboardKey",
+    "TextInput",
+    "TouchContact",
+    "PenContact",
+    "TextComposition"
+  ],
+  "standardInfrastructure": [
+    "StandardTreeTraversal",
+    "StandardDirtyRootScheduler",
+    "StandardRenderTraversal",
+    "StandardInputRoute",
+    "StandardHitTestService",
+    "StandardFocusScope",
+    "StandardCommand",
+    "StandardCommandDispatcher",
+    "StandardThemeResolver",
+    "StandardSemanticSnapshot",
+    "StandardAnimationScheduler",
+    "StandardLegacyGraphicsInputAdapter"
+  ],
+  "legacyAdapter": {
+    "name": "StandardLegacyGraphicsInputAdapter",
+    "path": "Broiler.UI.Standard/StandardLegacyGraphicsInputAdapter.cs",
+    "isolated": true,
+    "obsoleteMarked": true,
+    "removalTrigger": "Remove after Broiler.Input cutover."
+  },
+  "exitGateTests": [
+    "Synthetic_Tree_Replays_Input_And_Emits_Deterministic_Render_List",
+    "Focus_Capture_Routing_Timing_And_Invalidation_Are_Reentrant_Safe",
+    "Commands_Theme_Semantics_Hit_Testing_Animation_And_Session_Isolation_Work",
+    "Legacy_Graphics_Adapter_Is_Isolated_And_Marked_For_Removal",
+    "Standard_Runtime_Contains_No_Public_Concrete_UiElement_Controls"
+  ],
+  "forbiddenRuntimeReferences": [
+    "Broiler.Graphics.Windows",
+    "Broiler.Input.Windows",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Mouse.Windows",
+    "Win32",
+    "Direct2D",
+    "WPF",
+    "WinForms",
+    "COM",
+    "HWND"
+  ]
+}

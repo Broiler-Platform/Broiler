@@ -1,0 +1,99 @@
+{
+  "phase": "3",
+  "status": "implemented",
+  "date": "2026-07-02",
+  "runtimeProjects": [
+    {
+      "name": "Broiler.UI.Window",
+      "path": "Broiler.UI.Window/Broiler.UI.Window.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiWindow"
+    },
+    {
+      "name": "Broiler.UI.Window.Standard",
+      "path": "Broiler.UI.Window.Standard/Broiler.UI.Window.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Window/Broiler.UI.Window.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardWindow"
+    },
+    {
+      "name": "Broiler.UI.Panel",
+      "path": "Broiler.UI.Panel/Broiler.UI.Panel.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj"
+      ],
+      "primaryAbstractType": "UiPanel"
+    },
+    {
+      "name": "Broiler.UI.Panel.Standard",
+      "path": "Broiler.UI.Panel.Standard/Broiler.UI.Panel.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Panel/Broiler.UI.Panel.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardPanel"
+    },
+    {
+      "name": "Broiler.UI.Label",
+      "path": "Broiler.UI.Label/Broiler.UI.Label.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI/Broiler.UI.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryAbstractType": "UiLabel"
+    },
+    {
+      "name": "Broiler.UI.Label.Standard",
+      "path": "Broiler.UI.Label.Standard/Broiler.UI.Label.Standard.csproj",
+      "targetFramework": "net10.0",
+      "allowedProjectReferences": [
+        "../Broiler.UI.Label/Broiler.UI.Label.csproj",
+        "../Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+        "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj"
+      ],
+      "primaryConcreteType": "StandardLabel"
+    }
+  ],
+  "graphicsAdditions": [
+    "BTextMetrics",
+    "BTextMeasurer"
+  ],
+  "appPreview": {
+    "project": "src/Broiler.App.Graphics/Broiler.App.Graphics.csproj",
+    "argument": "--ui-phase3",
+    "windowsSpecificCodeLocation": "application host only"
+  },
+  "exitGateTests": [
+    "Standard_Window_Displays_Nested_Panels_And_Labels",
+    "Resize_And_Scale_Changes_Relayout_And_Redraw",
+    "Managed_Subwindows_Open_Stack_Activate_And_Close_Without_Native_State",
+    "Panel_Stack_Dock_And_Overlay_Policies_Arrange_Children",
+    "Label_Wraps_Trims_Aligns_Rtl_And_Exposes_Semantics",
+    "Phase3_Runtime_Projects_Target_Net10_And_Keep_Allowed_References",
+    "Phase3_Runtime_Assemblies_Do_Not_Expose_Native_Handles_Or_Windows_Types"
+  ],
+  "forbiddenRuntimeReferences": [
+    "Broiler.Graphics.Windows",
+    "Broiler.Input.Windows",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Mouse.Windows",
+    "Win32",
+    "Direct2D",
+    "WPF",
+    "WinForms",
+    "COM",
+    "HWND"
+  ]
+}

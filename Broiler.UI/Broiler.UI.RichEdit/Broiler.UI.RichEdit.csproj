@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.RichEdit</RootNamespace>
+    <AssemblyName>Broiler.UI.RichEdit</AssemblyName>
+    <PackageId>Broiler.UI.RichEdit</PackageId>
+    <Description>Platform-neutral Broiler rich-edit document model and control abstraction.</Description>
+  </PropertyGroup>
+
+  <!--
+    Dependency graph approved by ADR 0013 and amended by ADR 0018: the RichEdit
+    control abstraction references Broiler.Documents.Model (the promoted rich-text
+    document model; ADR 0002), Broiler.UI (for UiElement, host ports, and semantic
+    contracts), and Broiler.Graphics (for value types such as BColor). No DOM,
+    input, or platform dependency.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
+    <ProjectReference Include="..\Broiler.UI\Broiler.UI.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+  <!--
+    Tests and the standard renderer may access internal members of the control
+    surface (UiRichEdit). The internal indexing behind RichTextPosition now lives
+    in Broiler.Documents.Model, which carries its own InternalsVisibleTo (ADR
+    0002/0018). Positions stay opaque to external consumers (ADR 0014).
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.UI.RichEdit.Tests" />
+    <InternalsVisibleTo Include="Broiler.UI.RichEdit.Standard" />
+    <InternalsVisibleTo Include="Broiler.UI.RichEdit.Standard.Tests" />
+  </ItemGroup>
+
+</Project>

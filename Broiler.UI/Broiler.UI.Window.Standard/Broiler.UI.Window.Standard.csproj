@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.Window.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.Window.Standard</AssemblyName>
+    <PackageId>Broiler.UI.Window.Standard</PackageId>
+    <Description>Standard platform-neutral Broiler logical window implementation.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.Window\Broiler.UI.Window.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>
