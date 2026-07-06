@@ -691,25 +691,51 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double logicalBlockExtent = ActualBottom - Location.Y;
         bool mirror = WritingMode is "vertical-rl" or "sideways-rl";
 
-        // vertical-rl / sideways-rl block flow runs right→left, so the root box
-        // is block-start (right) aligned within its containing block.  The
-        // logical horizontal layout frame left-aligned it at rootX; shift the
-        // whole rotated subtree right so the root's block-start edge sits at the
-        // containing block's content-right minus the block-start (right) margin.
-        // (vertical-lr keeps blockOffset 0: left-aligned is already correct.)
-        // In-flow vertical-rl roots are block-start (right) aligned within their
-        // containing block, so the left-aligned logical frame is shifted right.
-        // An out-of-flow (absolute/fixed) root is already placed at its resolved
-        // physical position by the abspos self-alignment (which aligns using the
-        // post-rotation physical extents), so this shift would override it — keep
-        // blockOffset 0 and rotate the content in place.
+        // Where the rotated root's border-box sits horizontally depends on whether
+        // its writing mode is the *principal* (viewport) writing mode or a local
+        // orthogonal flow:
         //
-        // An inline-block (or other inline-level) vertical root is positioned by
-        // the inline formatting context (FlowInlineBlock places it on the line),
-        // not block-aligned within its containing block, so it is likewise
-        // rotated in place — shifting it right would tear it off the line.
+        //  • Principal writing mode — a vertical-rl root/body whose value
+        //    propagates to the viewport (CSS Writing Modes §3.1). The whole page's
+        //    block flow runs right→left, so its content begins at the viewport's
+        //    right edge. This logical frame shrink-wrapped the root to its content
+        //    width and left-aligned it, so shift the rotated subtree right until
+        //    the root's block-start (right) edge meets the containing block's
+        //    content-right — putting the first block at the top-right corner.
+        //
+        //  • Local orthogonal flow — a vertical-rl block nested inside a
+        //    horizontal-tb (or vertical-lr) containing block. Its border-box is
+        //    placed by that containing block's own flow (inline-start / left for an
+        //    LTR horizontal container), independent of the box's own writing mode;
+        //    Chromium left-aligns such a box even with a definite width. Its
+        //    block-start being on the right only governs where its *content* flows
+        //    (right→left, handled by the `mirror` transform on descendants and
+        //    words below), not where the box itself is positioned — so no shift.
+        //
+        // The rotation-root test (this box vertical, its parent not) already
+        // guarantees a `<body>` reaches here only when its parent `<html>` is
+        // horizontal-tb, i.e. exactly when the body's writing mode propagates to
+        // the viewport — so "root element or body" is the principal-WM signal.
+        // Out-of-flow and inline-level roots are positioned by their own machinery
+        // (abspos self-alignment, the inline formatting context) and keep offset 0.
+        bool establishesPrincipalWm = ParentBox == null
+            || (HtmlTag is { } tag
+                && (tag.Name.Equals("body", StringComparison.OrdinalIgnoreCase)
+                    || tag.Name.Equals("html", StringComparison.OrdinalIgnoreCase)));
+
+        // A right-floated orthogonal box is a second right-anchored case. Float
+        // placement ran in the logical horizontal frame, where it pinned the box's
+        // *logical* right (its physical bottom) to the container's content-right —
+        // leaving the rotated border-box short of that edge by the difference
+        // between its logical and physical widths. Re-pin its physical right edge
+        // to the container's content-right so it renders flush against it, matching
+        // the block-start alignment the principal-WM shift performs. (Left floats
+        // and in-flow boxes are already at their correct physical left, offset 0.)
+        bool rightAnchored = establishesPrincipalWm || Float == CssConstants.Right;
+
         double blockOffset = 0;
-        if (mirror && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+        if (mirror && rightAnchored
+            && Position != CssConstants.Absolute && Position != CssConstants.Fixed
             && Display != CssConstants.InlineBlock
             && Display != "inline-flex" && Display != "inline-grid"
             && ContainingBlock is { } cb)

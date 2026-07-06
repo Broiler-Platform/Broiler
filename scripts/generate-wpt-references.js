@@ -307,6 +307,7 @@ async function main(args = process.argv.slice(2)) {
     const { chromium } = require('playwright');
     const browser = await chromium.launch({
         headless: true,
+        ...(process.env.BROILER_CHROMIUM_PATH ? { executablePath: process.env.BROILER_CHROMIUM_PATH } : {}),
         // Allow file:// pages to load other file:// resources (e.g. SVG images
         // referenced via <img src="support/...">) which Chrome blocks by default.
         args: ['--allow-file-access-from-files'],
