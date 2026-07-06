@@ -5,9 +5,10 @@ namespace Broiler.Layout;
 
 /// <summary>
 /// HTML element/attribute name constants used by layout (tag dispatch, link
-/// detection). Ported from the renderer's <c>Broiler.HTML.Utils.HtmlConstants</c>
-/// for the layout extraction (see <c>docs/roadmap/broiler-layout-component.md</c>);
-/// the renderer keeps its own copy until the Phase 7 cleanup dedups.
+/// detection). This is the single source for the names shared with the renderer:
+/// the renderer's <c>Broiler.HTML.Utils.HtmlConstants</c> forwards its
+/// <c>A</c>/<c>Hr</c>/<c>Iframe</c>/<c>Img</c>/<c>Href</c> members here
+/// (measurement-dedup roadmap M6), since it already references this lower layer.
 /// </summary>
 public static class HtmlConstants
 {

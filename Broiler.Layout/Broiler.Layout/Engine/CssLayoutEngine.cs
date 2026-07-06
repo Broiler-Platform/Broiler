@@ -1,5 +1,6 @@
 using System.Drawing;
 using CssConstants = Broiler.CSS.CssConstants;
+using CssMetrics = Broiler.CSS.CssMetrics;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
@@ -38,7 +39,7 @@ internal static class CssLayoutEngine
     /// the layout font is created at pt size).  This factor bridges the gap
     /// for line-height calculations where font.Height is the fallback.
     /// </summary>
-    private const double PtToCssPx = 96.0 / 72.0;
+    private const double PtToCssPx = CssMetrics.PtToPx;
 
     /// <summary>
     /// Resolves a replaced element's specified width/height to a definite pixel
@@ -82,8 +83,6 @@ internal static class CssLayoutEngine
         // rather than reading RImage members directly (see roadmap §4).
         ImageIntrinsics? image = imageWord.Image is { } handle ? g.GetImageIntrinsics(handle) : null;
 
-        var width = new CssLength(imageWord.OwnerBox.Width);
-        var height = new CssLength(imageWord.OwnerBox.Height);
         double em = imageWord.OwnerBox.GetEmHeight();
 
         // A specified, non-percentage size counts as a "tag" size — but resolve it
@@ -100,23 +99,31 @@ internal static class CssLayoutEngine
         {
             imageWord.Width = tagWidthPx;
         }
-        else if (width.Number > 0 && width.IsPercentage)
-        {
-            imageWord.Width = width.Number * imageWord.OwnerBox.ContainingBlock.Size.Width;
-            scaleImageHeight = true;
-        }
-        else if (image != null)
-        {
-            imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? image.Value.Width : imageWord.ImageRectangle.Width;
-
-            // CSS2.1 §10.3.2: when width is auto the used value is the
-            // intrinsic width.  Do NOT clamp to the containing block —
-            // inline replaced elements are allowed to overflow their
-            // container.  Authors use max-width:100% to opt into clamping.
-        }
         else
         {
-            imageWord.Width = hasImageTagHeight ? tagHeightPx / 1.14f : 20;
+            // Parse the width as a CssLength only here: it is unused when a definite
+            // tag width was resolved above, so this avoids a redundant parse per
+            // sized image. (The percentage branch needs the raw fraction, which the
+            // definite-length resolver above deliberately rejects.)
+            var width = new CssLength(imageWord.OwnerBox.Width);
+            if (width.Number > 0 && width.IsPercentage)
+            {
+                imageWord.Width = width.Number * imageWord.OwnerBox.ContainingBlock.Size.Width;
+                scaleImageHeight = true;
+            }
+            else if (image != null)
+            {
+                imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? image.Value.Width : imageWord.ImageRectangle.Width;
+
+                // CSS2.1 §10.3.2: when width is auto the used value is the
+                // intrinsic width.  Do NOT clamp to the containing block —
+                // inline replaced elements are allowed to overflow their
+                // container.  Authors use max-width:100% to opt into clamping.
+            }
+            else
+            {
+                imageWord.Width = hasImageTagHeight ? tagHeightPx / 1.14f : 20;
+            }
         }
 
         var maxWidth = new CssLength(imageWord.OwnerBox.MaxWidth);
