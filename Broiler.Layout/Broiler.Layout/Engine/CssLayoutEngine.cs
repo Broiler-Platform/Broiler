@@ -49,7 +49,7 @@ internal static class CssLayoutEngine
     /// excluded here because they resolve against the containing block, which the
     /// caller handles separately.
     /// </summary>
-    private static bool TryResolveDefiniteImageLength(string value, double em, out double px)
+    internal static bool TryResolveDefiniteImageLength(string value, double em, out double px)
     {
         px = 0;
         if (string.IsNullOrWhiteSpace(value))

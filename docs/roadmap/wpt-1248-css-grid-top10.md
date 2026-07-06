@@ -40,18 +40,24 @@ do not yet *pass* because of Workstream A below.
 | 2 | `subgrid/orthogonal-writing-mode-006` | 5.6 % | 5.6 % | Subgrid across an orthogonal flow | **F** |
 | 3 | `grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport` | 11.6 % | 11.6 % | `grid-lanes` intrinsic sizing (quirks) | **G** |
 | 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | 23.4 % | Abspos grid item resolving to an implicit line | **D** |
-| 5 | `nested-grid-item-block-size-001` | 27.3 % | ~84 %¹ | Residual `ul`/`li` + nested-inline-block offset | **B** |
+| 5 | `nested-grid-item-block-size-001` | 27.3 % | img no longer collapses² | Residual `ul`/`li` + font tail (CI pixel score pending) | **B** |
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | 35.8 % | Gutter contribution to track/spanning/margin sizing | **E** |
 | 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Grid-axis transposition (residual page-level drift) | **A** |
 | 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 43.8 % | Auto-fill track count under shrink-to-fit + min-size | **C** |
 | 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | Grid-axis transposition + margin/border/padding in vertical | **A** |
 
-¹ Item #5 is driven to ~84 % by ledger clusters 34 (replaced-item
-logical/`aspect-ratio` sizing) and 35 (box-shorthand-vs-longhand cascade). Cluster
-35 has now **landed upstream** — `Broiler.CSS` commit `5a4fae1`, the parent's
-submodule pointer bumped — so CI reflects the ~84 % (the earlier `patches/0004-…`
-fallback is obsolete and removed). Its true remaining work is Workstream B only.
+¹ (superseded — see ² and Workstream B) The pre-fix "~84 %" was an optimistic
+read: reproducing the actual markup in-sandbox showed the image collapses to
+height 0 in the nested `display:grid` (a **blank** test render, nearer the pre-fix
+27 %), not a near-pass with a small horizontal offset.
+
+² The replaced-item-in-grid **height collapse is now fixed** (Workstream B, this
+session): a definite-block-size `<img>` nested in `display:grid` keeps its height
+and the test lays out identically to `-ref.html` in-sandbox. Ledger clusters 34
+(replaced-item logical/`aspect-ratio` sizing) and 35 (box-shorthand cascade,
+`Broiler.CSS` commit `5a4fae1`, pointer bumped) remain the prerequisites. The full
+css-grid pixel score is a CI item (corpus not vendored).
 
 ---
 
@@ -124,29 +130,60 @@ from crossing the 99 % pixel threshold and is likely cheaper than Workstream A.
 
 ## Workstream B — replaced-item grid intrinsic sizing (#5)
 
-**Status: nearly done — the submodule patch has landed.** Clusters 34 & 35 take
-`nested-grid-item-block-size-001` to ~84 %; cluster 35 (`patches/0004-…`) is now
-**applied upstream** (`Broiler.CSS` commit `5a4fae1`, pointer bumped), so CI
-reflects the 84 %. Remaining action:
+**Status: root cause corrected and the collapse ✅ fixed (this session).** Clusters
+34 & 35 (aspect-ratio replaced sizing + box-shorthand cascade) landed; cluster 35
+(`patches/0004-…`) is applied upstream (`Broiler.CSS` commit `5a4fae1`, pointer
+bumped). But reproducing the actual test in-sandbox (`--render` + the in-process
+check-layout geometry harness, using the verbatim WPT markup fetched from the
+`master` raw path) showed the earlier "~16 % **horizontal** offset" premise is
+**wrong**: the image does not shift sideways — it **collapses to height 0** inside
+the nested `display:grid`, so the test renders **blank** (every box at `x=0`; the
+`<img>` is `w≈1130 h=0` where the reference is `w≈1130 h≈567`).
 
-1. ~~Land `patches/0004`~~ — ✅ done (pointer bumped to `5a4fae1`).
-2. Close the residual **~16 %**: a `ul`/`li` + nested-inline-block horizontal
-   offset exposed once the image sizes to full `55vw`. Compare Broiler vs the
-   `-ref.html` render (both available via `--render`); the item's grid/inline-block
-   chain offset is the suspect.
+**Root cause.** The test nests the image `li (grid item) > inline-block >
+display:grid > img{block-size:55vw; aspect-ratio:2/1}`. The inner `display:grid`
+has no explicit template, so it takes the implicit-only pass — which
+`GridImplicitPathItemsAreSimple` **declined for any replaced item**, falling back
+to the single-column approximation that dropped the image's height. Even forcing
+the real pass to engage was not enough: a replaced element laid out through its
+container's line box records its used height on its **image word**, leaving the
+box's `ActualBottom` at 0, so the auto row measured `ActualBottom − Location.Y = 0`
+and `PlaceItemInArea` then clobbered the image to height 0 (and `RectanglesReset()`
+wiped the correct line-rect). Isolation (`img` in inline-block vs block>grid vs
+inline-block>grid vs `block-size:200px`) confirmed the `display:grid` wrapper is
+the sole trigger and it is **not** `vw`-specific.
 
-Separately, the grid pass **declines for replaced items** by design (documented at
-`CssBoxGrid.cs` ~L197-209: "a replaced or form-control item … where sizing an auto
-row from the measured height collapses"). When a grid row must be sized from a
-replaced item's block size, the fallback approximation can collapse the row (seen
-in synthetic `img`-in-`display:grid` repros). Making the real pass trust a
-replaced item's definite block size (it has no reflow dependence on column width)
-would let more replaced-in-grid cases keep the real track pass — a contained
-follow-up.
+**Fix (landed, main-repo `Broiler.Layout/Engine/CssBoxGrid.cs`), narrowly gated to
+a replaced item with a *definite* block-size** (its height has no reflow dependence
+on the resolved column width, so a single measurement is safe — exactly the "make
+the real pass trust a replaced item's definite block size" follow-up flagged
+below):
 
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs`, `CssBoxImage.cs`,
-`CssBoxHelper.cs`; `Broiler.CSS` cascade (`patches/0004`). **Risk: low–medium.**
-**Effort:** small once the patch lands.
+1. `GridImplicitPathItemsAreSimple` now admits an `<img>` whose block-size (the
+   `Height` getter, which maps `block-size`/writing-mode → physical height) resolves
+   to a definite length via `CssLayoutEngine.TryResolveDefiniteImageLength`
+   (viewport/font units included). A ratio-only or percentage-height image still
+   declines — its height *does* follow the column.
+2. `GridReplacedItemDefiniteBorderBoxHeight` supplies that definite border-box
+   height to both the **row measurement** (in place of the stale
+   `ActualBottom − Location.Y`) and **`PlaceItemInArea`** (in place of the stale
+   `Size.Height`), so the row sizes correctly and the image is placed at full size.
+
+With the fix the test lays out **identically to `-ref.html`** — `<img>` at
+`x=0 y=0 w≈1130 h≈567`, exact match — and the `--render` output is the correct
+top-left red block (was blank). **Verification (in-sandbox, no css-grid corpus):**
+guard `NestedGridItemBlockSizeTests` (fails at `height=0` without the fix), the 42
+`GridTrackLayout`/`GridTrackPaint`/`GridLanesFallback`/`AspectRatio`/`PercentChild`
+Cli.Tests, `Table` (27) all green; the runner over the vendored **css-anchor-position
+(40)** and **css-align (28)** subsets shows a **byte-identical pass set** before/after
+(0 status diffs). The remaining ~16 % font/`ul`-`li` tail and the full css-grid pixel
+score still need a CI run (corpus not vendored — clone 403s in-sandbox).
+
+**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs`
+(`GridImplicitPathItemsAreSimple`, `GridReplacedItemDefiniteBorderBoxHeight`, the
+row-measurement + `PlaceItemInArea` sites), `CssLayoutEngine.cs`
+(`TryResolveDefiniteImageLength`, made `internal`). **Risk: low** (gated to
+definite-block-size replaced items; 0 regressions on the vendored subsets).
 
 ---
 
@@ -321,8 +358,9 @@ named-line auto-fill. **Risk: high, value: low.**
 
 ## Suggested sequencing
 
-1. **B** — `patches/0004` has landed (pointer bumped); close the ~16 % `ul`/`li`
-   offset (cheap, item #5).
+1. **B** — ✅ replaced-item-in-grid **height collapse fixed** (item #5 no longer
+   renders blank; lays out identically to `-ref.html` in-sandbox). Remaining: the
+   ~16 % `ul`/`li` + font tail and the full css-grid pixel score, both CI items.
 2. **C** — item #9: ✅ **shrink-to-fit balloon fixed** — the real cause was a
    percentage-width grid item inflating intrinsic width (CSS Sizing 3 §5.1), not an
    auto-fill-count gap. See Workstream C. Remaining: score the 12 `checkLayout`

@@ -332,7 +332,12 @@ internal partial class CssBox
                 return false;
 
             double marginY = p.Item.ActualMarginTop + p.Item.ActualMarginBottom;
-            double h = (p.Item.ActualBottom - p.Item.Location.Y) + marginY;
+            // A replaced item with a definite block-size records its height on its
+            // image word (measured through the container line box), leaving the box
+            // ActualBottom at 0; trust the definite block-size for the row instead
+            // of that stale zero (WPT css-grid/nested-grid-item-block-size-001).
+            double replacedH = GridReplacedItemDefiniteBorderBoxHeight(p.Item);
+            double h = (replacedH > 0 ? replacedH : p.Item.ActualBottom - p.Item.Location.Y) + marginY;
             if (h < 0) h = 0;
             rowItems.Add(new AxisItem(p.PlacedRow, p.RowSpan, h, h));
         }
@@ -595,7 +600,13 @@ internal partial class CssBox
             if (w > 0) newWidth = w;
         }
         double newHeight = item.Size.Height;
-        if (heightFills)
+        // A replaced item with a definite block-size measured its height onto its
+        // image word, so item.Size.Height is a stale 0 here; use the definite
+        // block-size (column-independent) rather than filling or keeping the zero.
+        double replacedDefiniteH = GridReplacedItemDefiniteBorderBoxHeight(item);
+        if (replacedDefiniteH > 0)
+            newHeight = replacedDefiniteH;
+        else if (heightFills)
         {
             double h = areaHeight - marginT - marginB;
             if (h > 0) newHeight = h;
@@ -916,22 +927,72 @@ internal partial class CssBox
             if (child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                 or CssConstants.Table or CssConstants.InlineTable)
                 return false;
-            if (child.IsImage)
-                return false;
+            bool isImg = child.IsImage
+                || (child.HtmlTag != null && child.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase));
+            if (isImg)
+            {
+                // A replaced image whose block-size (height) is a definite length
+                // — `block-size:55vw`, `height:200px`, … — can size an auto row
+                // safely: its used height has no reflow dependence on the resolved
+                // column width, so the row's measured-height contribution is stable
+                // (WPT css-grid/nested-grid-item-block-size-001, whose img nested in
+                // `display:grid` otherwise collapses to height 0 under the fallback
+                // approximation). An image with an indefinite/percentage/ratio-only
+                // block size still declines — its height would change with the
+                // column, which this bounded pass measures once and cannot re-solve.
+                if (!GridReplacedItemHasDefiniteBlockSize(child))
+                    return false;
+                continue;
+            }
             if (child.HtmlTag != null)
             {
                 string tag = child.HtmlTag.Name;
                 if (tag.Equals("button", StringComparison.OrdinalIgnoreCase)
                     || tag.Equals("input", StringComparison.OrdinalIgnoreCase)
                     || tag.Equals("select", StringComparison.OrdinalIgnoreCase)
-                    || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase)
-                    || tag.Equals("img", StringComparison.OrdinalIgnoreCase))
+                    || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase))
                     return false;
             }
             if (!string.IsNullOrEmpty(child.Overflow) && child.Overflow != CssConstants.Visible)
                 return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// True when a replaced (image) grid item carries a definite block-size — a
+    /// non-auto, non-percentage length on its block axis (the <c>Height</c> getter
+    /// maps <c>block-size</c>/writing-mode onto physical height), resolved through
+    /// the length parser so viewport/font units (<c>55vw</c>, <c>10rem</c>) count.
+    /// Such an item's used height is fixed independent of its resolved column
+    /// width, so sizing an auto row from its single measurement is safe — unlike a
+    /// ratio-only or percentage-height image whose height follows the column.
+    /// </summary>
+    private static bool GridReplacedItemHasDefiniteBlockSize(CssBox item) =>
+        CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out _);
+
+    /// <summary>
+    /// The definite border-box block-size (height) of a replaced (image) grid
+    /// item, or <c>0</c> when its block size is not a definite length. A replaced
+    /// element measured through its container's line box (the inline path used for
+    /// a grid holding an <c>&lt;img&gt;</c>) records its height on its image word,
+    /// not on the box's <c>ActualBottom</c> — which stays <c>0</c> — so the track
+    /// pass must read the definite block-size straight from the declaration to size
+    /// its auto row and place the item, rather than the stale zero measurement.
+    /// The specified <c>block-size</c> is the content box (content-box sizing) or
+    /// the border box (border-box sizing).
+    /// </summary>
+    private static double GridReplacedItemDefiniteBorderBoxHeight(CssBox item)
+    {
+        if (!item.IsImage
+            && !(item.HtmlTag != null && item.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase)))
+            return 0;
+        if (!CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out double h))
+            return 0;
+        if (!item.UsesBorderBoxSizing)
+            h += item.ActualPaddingTop + item.ActualPaddingBottom
+                + item.ActualBorderTopWidth + item.ActualBorderBottomWidth;
+        return h > 0 ? h : 0;
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)
