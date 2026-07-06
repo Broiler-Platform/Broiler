@@ -120,11 +120,32 @@ diff the full passing set (baseline vs after) exactly as cluster 36 did.
 **Effort:** large (multi-day). **Validation:** `css-grid/alignment` full suite
 diff + `css-grid/{grid-model,grid-definition,subgrid}` as regression guards.
 
-**Note on the #8 residual.** After cluster 36 `content-distribution-vertical-rl`
-is at 94.7 % with items visually correct; the residual is a per-section ~10 px
-**vertical** drift affecting the intro `<p>` too — a text-rhythm / paragraph-margin
-issue, *not* grid. Worth confirming separately; it may block several ~95 % tests
-from crossing the 99 % pixel threshold and is likely cheaper than Workstream A.
+**Note on the #8 residual — investigated in-sandbox, deferred to CI.** After
+cluster 36 `content-distribution-vertical-rl` is at 94.7 % with items visually
+correct; the residual is a per-section ~10 px **vertical** drift affecting the
+intro `<p>` too — a text-rhythm / paragraph-margin issue, *not* grid. Fetching the
+verbatim test confirmed it is a **check-layout** test whose intro is a plain
+`<p>` with **default UA margins** (its `vertical-rl` applies only inside the grid,
+via the support-file `.verticalRL` class — the paragraph itself is horizontal-tb).
+So the drift is a **UA default paragraph/line-box rhythm** difference, whose fix
+surface (default `<p>` margin, `<body>` margin, or `normal` line-height) is the
+**highest blast radius** in the engine. Two blockers make it unsafe to pursue
+in-sandbox:
+- **Not measurable here.** The drift is scored against a Chromium screenshot of
+  the test; the css-grid corpus clone 403s in-session, so there is no reference to
+  size the deviation against. Probing the intro `<p>` in isolation via the
+  check-layout geometry harness gives a self-consistent 35 px consumed height
+  (offsetTop-relative), but nothing to call it right *or* wrong against.
+- **Not regression-testable here.** A change to a UA default would ripple through
+  every rendered test, and the css-grid / css-writing-modes suites that would
+  catch a regression are **not vendored**. The two vendored subsets that *are*
+  present (CSS2, css-align, css-anchor-position, css-animations, css-backgrounds)
+  cannot net a paragraph-rhythm change safely.
+
+**Next step (CI-gated):** on a host with the css-grid corpus + Chromium
+references, diff the intro `<p>`'s rendered top/height against Chromium to fix the
+exact default (margin vs line-height), then re-net the full css/CSS2 pixel suite —
+it is *not* a bounded, sandbox-verifiable change like Workstream B was.
 
 ---
 
@@ -365,8 +386,11 @@ named-line auto-fill. **Risk: high, value: low.**
    percentage-width grid item inflating intrinsic width (CSS Sizing 3 §5.1), not an
    auto-fill-count gap. See Workstream C. Remaining: score the 12 `checkLayout`
    variants on CI (needs the css-grid WPT corpus, unavailable in the sandbox).
-3. **The #8 ~5 % vertical text-drift** — confirm/​fix the page-level paragraph
-   rhythm; may cheaply flip several ~95 % vertical tests.
+3. **The #8 ~5 % vertical text-drift** — investigated (this session): it is a UA
+   default paragraph/line-box rhythm difference on a plain intro `<p>`, **not** a
+   bounded sandbox win — its fix surface is a high-blast-radius UA default that is
+   neither measurable nor regression-testable without the css-grid corpus +
+   Chromium references. CI-gated (see the "Note on the #8 residual" above).
 4. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
    big one).
 5. **D**, **E** — abspos implicit tracks, gutter accounting.
