@@ -29,10 +29,24 @@ internal static class Program
 
         _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
 
-        string? initialUrl = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : null;
+        bool runUiPhase3Preview = args.Length > 0 && string.Equals(args[0], "--ui-phase3", StringComparison.OrdinalIgnoreCase);
+        bool runUiPhase4ToolbarPreview = args.Length > 0 && string.Equals(args[0], "--ui-phase4-toolbar", StringComparison.OrdinalIgnoreCase);
+        string? initialUrl = !runUiPhase3Preview && !runUiPhase4ToolbarPreview && args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : null;
 
         try
         {
+            if (runUiPhase3Preview)
+            {
+                using var previewWindow = new Phase3UiPreviewWindow();
+                return previewWindow.Run();
+            }
+
+            if (runUiPhase4ToolbarPreview)
+            {
+                using var toolbarWindow = new Phase4ToolbarPreviewWindow();
+                return toolbarWindow.Run();
+            }
+
             using var window = new BrowserWindow(initialUrl);
             return window.Run();
         }

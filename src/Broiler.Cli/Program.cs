@@ -14,6 +14,7 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         string? pdfInputPath = null;
+        string? convertDocInput = null;
         string? url = null;
         string? captureImageUrl = null;
         string? output = null;
@@ -34,6 +35,9 @@ public class Program
             {
                 case "--convert-pdf" when i + 1 < args.Length:
                     pdfInputPath = args[++i];
+                    break;
+                case "--convert-doc" when i + 1 < args.Length:
+                    convertDocInput = args[++i];
                     break;
                 case "--url" when i + 1 < args.Length:
                     url = args[++i];
@@ -91,6 +95,7 @@ public class Program
                     }
                     break;
                 case "--convert-pdf":
+                case "--convert-doc":
                 case "--url":
                 case "--capture-image":
                 case "--output":
@@ -109,6 +114,17 @@ public class Program
                     PrintUsage();
                     return 1;
             }
+        }
+
+        if (convertDocInput is not null)
+        {
+            if (output is null)
+            {
+                Console.Error.WriteLine("Error: '--convert-doc' requires '--output <file.txt|file.rtf>'.");
+                return 1;
+            }
+
+            return DocumentConvertService.Convert(convertDocInput, output);
         }
 
         if (testEngines)
