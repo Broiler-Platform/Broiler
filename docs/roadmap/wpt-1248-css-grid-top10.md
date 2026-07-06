@@ -40,18 +40,18 @@ do not yet *pass* because of Workstream A below.
 | 2 | `subgrid/orthogonal-writing-mode-006` | 5.6 % | 5.6 % | Subgrid across an orthogonal flow | **F** |
 | 3 | `grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport` | 11.6 % | 11.6 % | `grid-lanes` intrinsic sizing (quirks) | **G** |
 | 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | 23.4 % | Abspos grid item resolving to an implicit line | **D** |
-| 5 | `nested-grid-item-block-size-001` | 27.3 % | 27.3 %¹ | Mostly fixed in pending patches; residual `ul`/`li` offset | **B** |
+| 5 | `nested-grid-item-block-size-001` | 27.3 % | ~84 %¹ | Residual `ul`/`li` + nested-inline-block offset | **B** |
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | 35.8 % | Gutter contribution to track/spanning/margin sizing | **E** |
 | 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Grid-axis transposition (residual page-level drift) | **A** |
 | 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 43.8 % | Auto-fill track count under shrink-to-fit + min-size | **C** |
 | 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | Grid-axis transposition + margin/border/padding in vertical | **A** |
 
-¹ Item #5 is already driven to ~84 % in dev by ledger clusters 34 (replaced-item
-logical/`aspect-ratio` sizing) and 35 (box-shorthand-vs-longhand cascade), but
-cluster 35 ships as `patches/0004-…` in the `Broiler.CSS` submodule (push denied,
-403) and is not applied on CI — so the #1248 run still shows 27.3 %. Its true
-remaining work is Workstream B only.
+¹ Item #5 is driven to ~84 % by ledger clusters 34 (replaced-item
+logical/`aspect-ratio` sizing) and 35 (box-shorthand-vs-longhand cascade). Cluster
+35 has now **landed upstream** — `Broiler.CSS` commit `5a4fae1`, the parent's
+submodule pointer bumped — so CI reflects the ~84 % (the earlier `patches/0004-…`
+fallback is obsolete and removed). Its true remaining work is Workstream B only.
 
 ---
 
@@ -124,12 +124,12 @@ from crossing the 99 % pixel threshold and is likely cheaper than Workstream A.
 
 ## Workstream B — replaced-item grid intrinsic sizing (#5)
 
-**Status: nearly done, blocked on a submodule patch.** Clusters 34 & 35 already
-take `nested-grid-item-block-size-001` to ~84 % in dev; cluster 35 is stuck behind
-`patches/0004-…` (Broiler.CSS, push denied). Actions:
+**Status: nearly done — the submodule patch has landed.** Clusters 34 & 35 take
+`nested-grid-item-block-size-001` to ~84 %; cluster 35 (`patches/0004-…`) is now
+**applied upstream** (`Broiler.CSS` commit `5a4fae1`, pointer bumped), so CI
+reflects the 84 %. Remaining action:
 
-1. Land `patches/0004` (maintainer applies + bumps the `Broiler.CSS` pointer, or
-   grant `MaiRat/Broiler.CSS` push scope) so CI reflects the 84 %.
+1. ~~Land `patches/0004`~~ — ✅ done (pointer bumped to `5a4fae1`).
 2. Close the residual **~16 %**: a `ul`/`li` + nested-inline-block horizontal
    offset exposed once the image sizes to full `55vw`. Compare Broiler vs the
    `-ref.html` render (both available via `--render`); the item's grid/inline-block
@@ -159,28 +159,93 @@ min-height: 200px; float: left` and variants with explicit `width`/`height`,
 outer size 300×200 (3×4 tracks); the item pinned to the last cell (`grid-column:
 -2; grid-row: -2`) lands at (200, 150).
 
-**Root cause.** `repeat(auto-fill, …)` **column** count is resolved against
+**Root cause — corrected by reproduction (this session).** The original premise
+(below) was that the column-axis auto-fill count lacked a `min-width` raise
+mirroring the row axis's `ComputeAutoRepeatBlockSize`. Reproducing the scenario
+against the live layout engine via the in-process check-layout geometry harness
+(`Broiler.Cli.Tests/GridTrackLayoutTests` style — `DomBridge.EvaluateCheckLayoutAssertions`,
+no pixel reference needed) shows that premise is **wrong**. With
+`grid-template-columns: repeat(auto-fill, 100px); min-width: 300px` and an item at
+`grid-column: -2` (negative line, so its column depends on the resolved track
+count), the four width-source variants behave as:
+
+| Width source | container width | item `grid-column:-2` x | verdict |
+|---|---|---|---|
+| `width: 300px` (definite) | 300 | 200 | ✅ correct |
+| `width: fit-content` | **300** | **200** | ✅ correct |
+| `float: left` | **1024** | **900** | ❌ fills viewport |
+| `display: inline-grid` | **1024** | **900** | ❌ fills viewport |
+
+The row-axis control (`min-height: 200px`, item `grid-row: -2`) is correct at
+y=150, confirming the block axis already works. Crucially **`width: fit-content`
+already resolves to 300 with 3 columns and the item at x=200** — i.e. the auto-fill
+count *already* honours `min-width` once the used inline size is a real
+shrink-to-fit value. There is **no missing `ComputeAutoRepeatInlineSize`**.
+
+The actual defect is one layer up, in **grid intrinsic-width measurement**:
+`float: left` and `display: inline-grid` grids do **not** shrink-to-fit — they lay
+out at the full available width (1024). The float shrink-to-fit path exists
+(`CssBox.cs` ~L1294, `Width:auto && Float != none`: `preferred =
+ComputeShrinkToFitWidth()`, then `Math.Min(Math.Max(prefMin, available),
+preferred)`, then a `min-width` clamp that only *raises*), but for an auto-fill
+grid `ComputeShrinkToFitWidth()`/`GetMinMaxWidth` returns the full `available`
+(1024) as the preferred/max-content, so `min-width: 300` (300 < 1024) never
+reduces it. The `width: fit-content` path measures the same grid's preferred width
+correctly (small → clamped up to `min-width` 300), which is why only it and the
+definite case pass. So the two width-resolution paths disagree on a grid's
+intrinsic width.
+
+**Root cause narrowed further — ✅ fixed (this session).** Drilling in with the
+geometry harness pinned it precisely: a floated / `inline-grid` grid **does**
+shrink-to-fit correctly when its items have no explicit width (the `float`/
+`inline-grid` cases resolve to 300 with the item at x=200, same as `fit-content`).
+The `1024` only appears when a grid **item** carries a *percentage* width
+(`width:100%`, as WPT `sizedToGridArea` items do). Root cause: intrinsic-width
+measurement (`CssBoxHelper.GetMinMaxSumWords` and `CssBox.ComputeShrinkToFitWidth`)
+resolved a child's `width:100%` against the container's *tentative/available*
+width (1024) and used that as the child's max-content contribution — so the grid's
+shrink-to-fit width ballooned to 1024 and `min-width:300` (which only raises) never
+reduced it. Per **CSS Sizing 3 §5.1** a percentage width resolves against the size
+being computed, so it must be treated as `auto` for intrinsic sizing (the code
+already did this for grid items via `suppressExplicitWidthFor`; the fix generalizes
+it to any percentage width). The `fit-content` path escaped the bug only because it
+runs before `Size.Width` is set (so `100%` resolved against 0). Not grid-specific —
+a plain `float` wrapping a `width:100%` block had the same 1024 balloon.
+
+**Fix (landed, main-repo `Broiler.Layout`).** `GetMinMaxSumWords` treats a box
+whose own width is a percentage as auto (falls through to content measurement);
+`ComputeShrinkToFitWidth` measures a percentage-width child via `GetMinMaxWidth`
+instead of resolving the percentage. Now the `float`/`inline-grid` auto-fill grid
+resolves to `min-width` 300 with three 100px columns and the `grid-column:-2` item
+lands at x=200. Guard: `PercentChildShrinkToFitTests` (float / inline-block /
+abspos + the auto-fill grid case — in-process check-layout geometry, no pixel
+reference). **Validation:** a targeted layout-suite diff (Flex / Grid / AspectRatio
+/ Table check-layout classes) shows **zero regressions** vs baseline (47/49 pass on
+both; the 2 flex failures are pre-existing and font-rasterization dependent). The
+full **`css-grid` / CSS2 pixel diff still needs a CI run** — the WPT corpus is not
+vendored and cannot be fetched in the sandbox (WPT clone → 403; empty
+`node_modules`). This closes the shrink-to-fit balloon; item #9's remaining 12
+`checkLayout` variants (border / `box-sizing` / `min-content` / `max-content`)
+still need a full-suite score on CI.
+
+<details><summary>Original (pre-reproduction) analysis — superseded</summary>
+
+`repeat(auto-fill, …)` **column** count is resolved against
 `contentWidth = Size.Width − padding − border` (`CssBoxGrid.cs` L94). For a
 shrink-to-fit float the width is indefinite, so per CSS Grid §7.2.3.1 the count
 must be computed from the **definite `min-width`** — exactly what
 `ComputeAutoRepeatBlockSize` already does for the **row** axis via `min-height`
 (L1162). The column axis has no equivalent min-width raise, so the auto-fill count
-collapses to one repetition (or the wrong number) and the grid mis-sizes; the
-`border-box` cases also need the min reduced to the content box.
+collapses to one repetition. → *Disproved:* `width: fit-content` already yields 3
+columns and x=200, so the count already honours `min-width`; the real gap is
+float/inline-grid shrink-to-fit sizing above.
 
-**Proposed approach.** Add a `ComputeAutoRepeatInlineSize` mirror of
-`ComputeAutoRepeatBlockSize`: when the used inline size is indefinite (auto/float
-shrink-to-fit), raise `contentWidth` to a definite `min-width` (content-box
-adjusted under `box-sizing: border-box`), then feed that to
-`ParseTrackListMaybeAutoRepeat` for the column axis. Handle the `min-content`/
-`max-content` width cases (they resolve to the same 300×200 here) and verify the
-final shrink-to-fit width still clamps to `min-width`.
+</details>
 
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (`ComputeAutoRepeatBlockSize`
-→ add inline sibling; the `contentWidth` derivation at L94/L145). **Risk: medium**
-— touches auto-fill sizing used by many grids; guard with the `grid-definition`
-suite. **Effort:** medium. **Validation:** `css-grid/grid-definition` diff (12
-sub-checks in this test alone).
+**Key files.** `Broiler.Layout/Engine/CssBox.cs` (float/inline shrink-to-fit width
+at ~L1294; `ComputeShrinkToFitWidth` L3980; `GetShrinkToFitWidth` L4672),
+`CssBoxGrid.cs` (`GetMinMaxWidth` intrinsic grid-track measurement). **Effort:**
+medium.
 
 ---
 
@@ -256,8 +321,12 @@ named-line auto-fill. **Risk: high, value: low.**
 
 ## Suggested sequencing
 
-1. **B** — land `patches/0004` + close the ~16 % `ul`/`li` offset (cheap, item #5).
-2. **C** — auto-fill min-size inline count (self-contained, item #9).
+1. **B** — `patches/0004` has landed (pointer bumped); close the ~16 % `ul`/`li`
+   offset (cheap, item #5).
+2. **C** — item #9: ✅ **shrink-to-fit balloon fixed** — the real cause was a
+   percentage-width grid item inflating intrinsic width (CSS Sizing 3 §5.1), not an
+   auto-fill-count gap. See Workstream C. Remaining: score the 12 `checkLayout`
+   variants on CI (needs the css-grid WPT corpus, unavailable in the sandbox).
 3. **The #8 ~5 % vertical text-drift** — confirm/​fix the page-level paragraph
    rhythm; may cheaply flip several ~95 % vertical tests.
 4. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
@@ -270,7 +339,15 @@ named-line auto-fill. **Risk: high, value: low.**
 ## Reproduction harness (for whoever picks this up)
 
 The `css-grid` and `css-writing-modes` tests are not vendored; fetch and score
-them locally:
+them locally. **Sandbox caveat:** inside a Claude-Code-on-the-web session the WPT
+clone (step 1) returns **403** — `web-platform-tests/wpt` is outside the session's
+GitHub egress scope — and `tests/wpt/node_modules` is empty, so the Chromium
+reference generation (step 2) cannot run either. Run these steps on a host with
+open network (or a CI job) to produce the references. For layout-geometry work the
+in-process `data-offset-*`/`data-expected-*` harness
+(`Broiler.Cli.Tests/GridTrackLayoutTests`, `DomBridge.EvaluateCheckLayoutAssertions`)
+reproduces track geometry **without** a pixel reference and runs in the sandbox —
+use it to reproduce/bisect, then confirm the full pixel diff on CI.
 
 ```sh
 # 1. Sparse-checkout the needed WPT subtrees.

@@ -3990,9 +3990,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             double childWidth;
 
-            if (child.Width != CssConstants.Auto && !string.IsNullOrEmpty(child.Width))
+            if (child.Width != CssConstants.Auto && !string.IsNullOrEmpty(child.Width)
+                && !IsPercentageWidth(child.Width))
             {
-                // Explicit width: use declared width + borders/padding
+                // Explicit (definite) width: use declared width + borders/padding
                 double containingBlockWidth = Size.Width > 0 && !double.IsNaN(Size.Width) ? Size.Width : 0;
                 childWidth = child.ParseLengthWithLineHeight(child.Width, containingBlockWidth)
                            + child.ActualBorderLeftWidth + child.ActualBorderRightWidth
@@ -4000,7 +4001,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
             else
             {
-                // Auto-width child: compute its intrinsic preferred width.
+                // Auto- or percentage-width child: compute its intrinsic
+                // preferred width. CSS Sizing 3 §5.1: a child's percentage width
+                // resolves against the size we are *computing*, so it is treated
+                // as auto for the container's max-content — otherwise a
+                // width:100% child resolves against the container's current
+                // (available) width and balloons the shrink-to-fit result to the
+                // full container (e.g. a float or auto-fill grid item sized 100%
+                // pins the float to the viewport instead of its content).
                 // Guard against NaN from unmeasured words in deeply nested
                 // inline elements (e.g. Acid2 .eyes → #eyes-a → <object>).
                 child.GetMinMaxWidth(out _, out double childMax);
@@ -4140,6 +4148,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         string.Equals(width, "min-content", StringComparison.OrdinalIgnoreCase)
         || string.Equals(width, "max-content", StringComparison.OrdinalIgnoreCase)
         || string.Equals(width, "fit-content", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// CSS Sizing 3 §5.1: <c>true</c> when <paramref name="width"/> is a plain
+    /// percentage (e.g. <c>100%</c>). Such a width resolves against the size being
+    /// computed during a container's intrinsic (shrink-to-fit / max-content) pass,
+    /// so it must be treated as <c>auto</c> there rather than resolved against the
+    /// container's tentative width.
+    /// </summary>
+    private static bool IsPercentageWidth(string width) =>
+        !string.IsNullOrEmpty(width)
+        && width.EndsWith("%", StringComparison.Ordinal)
+        && !width.Contains('(');
 
     /// <summary>
     /// CSS Sizing 3 §5: Resolves an intrinsic-keyword width to a used
