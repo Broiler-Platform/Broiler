@@ -249,9 +249,11 @@ internal partial class CssBox
 
             var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count);
             var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count);
-            // Decline rather than lay out an implausibly large grid.
+            // Decline rather than lay out an implausibly large grid. A negative
+            // start references a leading implicit track (normalised below), so bound
+            // its magnitude too.
             if (rowSpan > MaxGridLine || colSpan > MaxGridLine
-                || (rowStart ?? 0) > MaxGridLine || (colStart ?? 0) > MaxGridLine)
+                || Math.Abs(rowStart ?? 0) > MaxGridLine || Math.Abs(colStart ?? 0) > MaxGridLine)
                 return false;
             placements.Add(new GridPlacement
             {
@@ -265,10 +267,42 @@ internal partial class CssBox
         if (placements.Count == 0)
             return false;
 
+        // CSS Grid §8.3: a definite line that resolves before the explicit grid
+        // (a negative index here) references a *leading* implicit track. Normalise
+        // by shifting every placement right/down so the leftmost/topmost referenced
+        // line is index 0; the explicit grid then begins at explicitColStart /
+        // explicitRowStart. leading == 0 for every grid without a before-grid line,
+        // so those are byte-identical to before. Auto-placement into leading tracks
+        // is out of scope, so decline when an auto-placed item coexists with them.
+        int explicitColStart = 0, explicitRowStart = 0;
+        {
+            int minCol = 0, minRow = 0;
+            foreach (var p in placements)
+            {
+                if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
+                if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
+            }
+            explicitColStart = -minCol;
+            explicitRowStart = -minRow;
+            if (explicitColStart > 0 || explicitRowStart > 0)
+            {
+                foreach (var p in placements)
+                    if (!p.ColStart.HasValue || !p.RowStart.HasValue)
+                        return false;
+                for (int i = 0; i < placements.Count; i++)
+                {
+                    var p = placements[i];
+                    p.ColStart += explicitColStart;
+                    p.RowStart += explicitRowStart;
+                    placements[i] = p;
+                }
+            }
+        }
+
         bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
         bool dense = (GridAutoFlow ?? "").IndexOf("dense", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        PlaceItems(placements, colSpecs.Count, rowSpecs.Count, flowRow, dense);
+        PlaceItems(placements, colSpecs.Count + explicitColStart, rowSpecs.Count + explicitRowStart, flowRow, dense);
 
         // Track counts after placement, including any implicit tracks.
         int maxColEnd = 0, maxRowEnd = 0;
@@ -279,8 +313,10 @@ internal partial class CssBox
         }
         if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
             return false;
-        int colCount = Math.Max(maxColEnd, colSpecs.Count);
-        int rowCount = Math.Max(maxRowEnd, rowSpecs.Count);
+        // The explicit tracks occupy [explicitColStart, explicitColStart+count); any
+        // leading implicit tracks precede them, so the axis is at least that wide.
+        int colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count);
+        int rowCount = Math.Max(maxRowEnd, explicitRowStart + rowSpecs.Count);
 
         // A subgridded axis adopts the parent grid's gutter (CSS Grid L2 §7.3).
         double colGap = colSubgrid && SubgridColumnGap.HasValue
@@ -300,7 +336,8 @@ internal partial class CssBox
         // justify-content leaves them at content size and positions them instead.
         bool stretchCols = IsStretchContentDistribution(JustifyContent);
         double[] colSizes = ResolveTrackSizes(colSpecs, implicitCol, colCount,
-            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols);
+            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols,
+            explicitStart: explicitColStart);
         if (colSizes == null)
             return false;
 
@@ -343,7 +380,8 @@ internal partial class CssBox
         }
         bool stretchRows = IsStretchContentDistribution(AlignContent);
         double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
-            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows);
+            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows,
+            explicitStart: explicitRowStart);
         if (rowSizes == null)
             return false;
 
@@ -388,7 +426,8 @@ internal partial class CssBox
         // absolutely-positioned grid items within their resolved grid areas.
         if (absposItems != null)
             PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
-                colSizes.Length, rowSizes.Length, contentLeft, contentTop);
+                colSizes.Length, rowSizes.Length, contentLeft, contentTop,
+                colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart);
 
         _gridTrackLayoutApplied = true;
         return true;
@@ -660,7 +699,8 @@ internal partial class CssBox
     private void PlaceAbsposGridItems(List<CssBox> items,
         double[] colStartEdge, double[] colEndEdge,
         double[] rowStartEdge, double[] rowEndEdge,
-        int colCount, int rowCount, double contentLeft, double contentTop)
+        int colCount, int rowCount, double contentLeft, double contentTop,
+        int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart)
     {
         double padLeft = Location.X + ActualBorderLeftWidth;
         double padRight = Location.X + Size.Width - ActualBorderRightWidth;
@@ -669,33 +709,68 @@ internal partial class CssBox
 
         foreach (var item in items)
         {
-            var (rowStart, rowSpan) = ParseGridLine(item.GridRow, rowCount);
-            var (colStart, colSpan) = ParseGridLine(item.GridColumn, colCount);
-            var (left, right) = ResolveAbsposAxis(colStart, colSpan, colStartEdge, colEndEdge,
+            var (colStartLine, colEndLine) = ParseAbsposGridLines(item.GridColumn, explicitCols, explicitColStart);
+            var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart);
+            var (left, right) = ResolveAbsposAxis(colStartLine, colEndLine, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
-            var (top, bottom) = ResolveAbsposAxis(rowStart, rowSpan, rowStartEdge, rowEndEdge,
+            var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge,
                 rowCount, contentTop, padTop, padBottom);
             PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);
         }
     }
 
     /// <summary>
-    /// Resolve the [start, end] extent (absolute px) of an abspos grid item's
-    /// grid area along one axis. <paramref name="start"/> is a 0-indexed track
-    /// (null for an <c>auto</c> line, which resolves to the container's padding
-    /// edges per CSS Grid §9.2); lines are clamped into the grid's line range.
+    /// CSS Grid §9.2: resolve an abspos grid item's <c>grid-column</c>/<c>grid-row</c>
+    /// to its two edge lines, each as a 0-based track *boundary* index in the
+    /// (leading-shifted) grid coordinate, or <c>null</c> for an <c>auto</c> line —
+    /// which resolves to the grid container's padding edge, NOT a track line.
+    /// Unlike the in-flow <see cref="ParseGridLine"/>, an <c>auto</c> here stays
+    /// auto rather than collapsing into a span. Negative lines count back from the
+    /// last explicit line; every resolved line is shifted by
+    /// <paramref name="explicitStart"/> (the leading implicit track count) so it
+    /// indexes the same coordinate as the sized tracks.
     /// </summary>
-    private static (double start, double end) ResolveAbsposAxis(int? start, int span,
+    private static (int? startLine, int? endLine) ParseAbsposGridLines(
+        string value, int explicitTracks, int explicitStart)
+    {
+        string v = (value ?? "").Trim();
+        int slash = v.IndexOf('/');
+        string startTok = slash < 0 ? v : v.Substring(0, slash).Trim();
+        string endTok = slash < 0 ? "" : v.Substring(slash + 1).Trim();
+
+        int? Line(string tok)
+        {
+            if (string.IsNullOrEmpty(tok) || tok.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                || tok.StartsWith("span", StringComparison.OrdinalIgnoreCase))
+                return null;                    // auto / span -> padding edge (§9.2)
+            if (!int.TryParse(tok, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
+                return null;                    // named line unsupported -> auto
+            int boundary = line >= 1
+                ? line - 1                       // 1-based line -> 0-based boundary
+                : explicitTracks + 1 + line;     // negative -> back from the last line
+            return boundary + explicitStart;     // into the leading-shifted coordinate
+        }
+
+        return (Line(startTok), Line(endTok));
+    }
+
+    /// <summary>
+    /// Resolve the [start, end] extent (absolute px) of an abspos grid item's grid
+    /// area along one axis from its two boundary lines. A <c>null</c> line resolves
+    /// to the container's padding edge (CSS Grid §9.2); a line index is clamped into
+    /// the grid's boundary range and mapped through the track edges.
+    /// </summary>
+    private static (double start, double end) ResolveAbsposAxis(int? startLine, int? endLine,
         double[] startEdge, double[] endEdge, int trackCount, double contentOrigin,
         double padStart, double padEnd)
     {
-        if (start == null || trackCount == 0)
-            return (padStart, padEnd);
-        int a = Math.Clamp(start.Value, 0, trackCount);
-        int b = Math.Clamp(start.Value + Math.Max(1, span), 0, trackCount);
-        if (b <= a) b = Math.Min(a + 1, trackCount);
-        double s = a < trackCount ? contentOrigin + startEdge[a] : contentOrigin + endEdge[trackCount - 1];
-        double e = contentOrigin + endEdge[b - 1];
+        double Boundary(int line)
+        {
+            int l = Math.Clamp(line, 0, trackCount);
+            return contentOrigin + (l < trackCount ? startEdge[l] : endEdge[trackCount - 1]);
+        }
+        double s = startLine == null || trackCount == 0 ? padStart : Boundary(startLine.Value);
+        double e = endLine == null || trackCount == 0 ? padEnd : Boundary(endLine.Value);
         return e < s ? (s, s) : (s, e);
     }
 
@@ -1513,7 +1588,7 @@ internal partial class CssBox
     /// </summary>
     private double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
         int count, double containerSize, bool definite, double gap, double percentBasis, double em,
-        List<AxisItem> items, bool stretchAutoTracks = false)
+        List<AxisItem> items, bool stretchAutoTracks = false, int explicitStart = 0)
     {
         if (count < 1) return null;
 
@@ -1526,7 +1601,10 @@ internal partial class CssBox
 
         for (int t = 0; t < count; t++)
         {
-            GridTrackSpec spec = t < explicitSpecs.Count ? explicitSpecs[t] : implicitSpec;
+            // The explicit tracks occupy [explicitStart, explicitStart+Count);
+            // leading (before) and trailing (after) tracks use the implicit spec.
+            int e = t - explicitStart;
+            GridTrackSpec spec = e >= 0 && e < explicitSpecs.Count ? explicitSpecs[e] : implicitSpec;
             // Resolve percentages against the axis basis: a percentage against a
             // definite basis is a fixed length; against an indefinite one it
             // behaves as 'auto' (CSS Grid §7.2.1 / §11.5).
@@ -1871,11 +1949,13 @@ internal partial class CssBox
             {
                 // Negative line -N counts back from the last explicit line: the grid
                 // has explicitTracks+1 lines, so line -1 is boundary `explicitTracks`.
+                // A boundary that lands before the explicit grid (negative) references
+                // a *leading* implicit track (CSS Grid §8.3); the caller normalises
+                // these to non-negative indices by shifting the whole grid right/down.
                 int boundary = explicitTracks + 1 + line;
-                if (boundary >= 0)
-                    return (boundary, 1);
+                return (boundary, 1);
             }
-            return (null, 1);                 // line 0 / before-grid negative -> auto
+            return (null, 1);                 // line 0 -> auto
         }
         return (null, 1);                     // named line -> auto
     }

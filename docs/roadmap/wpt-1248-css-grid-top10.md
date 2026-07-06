@@ -39,7 +39,7 @@ do not yet *pass* because of Workstream A below.
 | 1 | `grid-lanes/subgrid/…/column-subgrid-auto-fill-003` | 0.8 % | 0.8 % | Experimental `grid-lanes` + multi-column named-line subgrid | **G** |
 | 2 | `subgrid/orthogonal-writing-mode-006` | 5.6 % | 5.6 % | Subgrid across an orthogonal flow | **F** |
 | 3 | `grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport` | 11.6 % | 11.6 % | `grid-lanes` intrinsic sizing (quirks) | **G** |
-| 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | 23.4 % | Abspos grid item resolving to an implicit line | **D** |
+| 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | LTR 64/64⁵ | RTL variants; CI pixel score | **D** |
 | 5 | `nested-grid-item-block-size-001` | 27.3 % | img no longer collapses² | Residual `ul`/`li` + font tail (CI pixel score pending) | **B** |
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Grid-axis transposition + vertical baselines | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | gap aliases fixed⁴ | Named-line/percentage-track decline; fit-content grid width | **E** |
@@ -70,6 +70,12 @@ aliases (`grid-gap`/`grid-row-gap`/`grid-column-gap` were dropped → no gutter)
 now fixed and guarded (`GridGapAliasTests`). The remaining sub-grids are blocked
 on named-line track support, grid-track-based `fit-content` width, and
 percentage-track sizing (separate items). Full pixel score is a CI item.
+
+⁵ Workstream D (this session): the full **LTR** test passes 64/64 in the
+check-layout harness after implementing **leading implicit tracks** (negative
+before-grid lines, CSS Grid §8.3) for in-flow items and dedicated abspos
+line-to-area resolution (§9.2). Guard `GridAbsposImplicitTrackTests`; 0 regressions
+on the vendored subsets. The `directionRTL` variants and the CI pixel score remain.
 
 ---
 
@@ -361,26 +367,57 @@ medium.
 
 ## Workstream D — abspos grid items in implicit tracks (#4)
 
-`grid-positioned-items-within-grid-implicit-track-001`: an absolutely-positioned
-grid item whose line references land **outside** the explicit grid must resolve
-against the grid's *padding edge* extended by implicit lines, then be sized/placed
-into that area (the reference shows a magenta abspos box overflowing the grid; in
-Broiler it is dropped and the in-flow cyan item fills the grid instead).
+**✅ Fixed for LTR (this session); the root cause was bigger than assumed.**
+`grid-positioned-items-within-grid-implicit-track-001` is a **check-layout** test:
+a `.grid` (explicit `200px 300px / 150px 250px`, `grid-auto-*` 100/50, 800×600,
+border 5, padding 15) holds an in-flow magenta `.sixRowsAndSixColumns`
+(`grid-column:-5/5; grid-row:-5/5`) plus a cyan abspos item per case. Reproducing
+all 16 assertions through the geometry harness showed the suspected diagnosis
+("abspos line resolution to the padding edge") was only *half* of it — the
+**in-flow magenta itself** collapsed to a single 100×50 cell.
 
-**Root cause (suspected).** Abspos grid-item placement (`CssBoxGrid.cs`
-placement + `CssBox.cs` abspos self-alignment, cf. cluster from #1215
-"Fix absolutely-positioned grid items") does not resolve implicit-line references
-for out-of-flow items to the padding edge, so the item collapses / is not painted.
+**Root cause — leading implicit tracks were unsupported.** A definite line that
+resolves *before* the explicit grid (a negative index — `-5` with 2 explicit
+tracks → boundary `-2`) references a **leading implicit track** (CSS Grid §8.3).
+`ParseSingleGridLine` **clamped every such boundary to `auto`**, so `-5/5`
+degenerated to a 1-track span and no leading tracks were created — and every abspos
+item's expected geometry *depends* on those leading tracks shifting the explicit
+grid. Two coupled fixes (main-repo `CssBoxGrid.cs`), both gated so a grid with no
+before-grid line is byte-identical:
 
-**Proposed approach.** For an abspos grid item, resolve unknown/implicit grid
-lines to the grid container's padding edges (CSS Grid §9.1), build the
-containing-block rectangle from the resolved area, then run abspos sizing +
-self-alignment against it. Confirm the in-flow item's placement is unaffected.
+1. **In-flow leading tracks.** `ParseSingleGridLine` now returns the true (possibly
+   negative) boundary; the pass computes `explicitColStart`/`explicitRowStart` =
+   `−min(0, placed lines)`, shifts every placement right/down so index 0 is the
+   leftmost/topmost referenced line, and widens the track count. `ResolveTrackSizes`
+   gained an `explicitStart` offset so the explicit specs map to `[explicitStart,
+   explicitStart+count)` and leading/trailing tracks use `grid-auto-*`.
+   Auto-placement into leading tracks is out of scope, so the pass declines if an
+   auto-placed item coexists with a before-grid line. (Fixes the magenta:
+   `-5/5` → 6 tracks, 900×600 at the padding origin.)
+2. **Abspos placement into the extended grid.** A dedicated `ParseAbsposGridLines`
+   resolves `grid-column`/`grid-row` to two *boundary* lines in the shifted
+   coordinate — an `auto` line staying auto (→ padding edge, §9.2) rather than
+   collapsing into a span as the in-flow `ParseGridLine` does — and the rewritten
+   `ResolveAbsposAxis` builds the area from those two lines (a `null` line → the
+   container's padding edge). The area becomes the item's containing block,
+   overriding its `top/left/width/height:100%` fallback.
 
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs`, `CssBox.cs` (abspos
-resolution). **Risk: medium.** **Effort:** medium. **Validation:**
-`css-grid/abspos` suite (212 tests with references already generated in the repro
-harness below).
+**Result: the full LTR test passes — 64/64 assertions** (8 abspos cases × 4 props +
+8 magenta references) exact in the harness. Guard: `GridAbsposImplicitTrackTests`
+(fails at 57/64 without the fix). **Zero regressions** — 48 grid/aspect Cli.Tests
+green, byte-identical pass set on vendored css-anchor-position (40) + css-align (28)
++ css-backgrounds (61) (0 status diffs across 129 tests).
+
+**Still open:** the test's 8 **`directionRTL`** variants (the grid engine's RTL
+column-axis mirroring is separate), and the full `css-grid/abspos` **pixel** score
+on CI. The leading-implicit-track foundation also generally unblocks in-flow
+negative-line placement, not just this test.
+
+**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (`ParseSingleGridLine`, the
+leading-shift normalisation, `ResolveTrackSizes` `explicitStart`,
+`ParseAbsposGridLines`, `ResolveAbsposAxis`). **Risk: medium** (gated to grids with
+a before-grid line; 0 regressions on the vendored subsets). **Effort:** done for
+LTR; RTL is a follow-up.
 
 ---
 
@@ -483,9 +520,11 @@ named-line auto-fill. **Risk: high, value: low.**
    `grid-column-gap` were dropped → no gutter). Remaining sub-grids blocked on
    named-line track support, grid-track-based `fit-content` width, and
    percentage-track sizing — each a distinct follow-up.
-5. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
+5. **D** — item #4: ✅ **LTR passes 64/64** — implemented leading implicit tracks
+   (negative before-grid lines) for in-flow items + abspos line-to-area resolution.
+   Remaining: the `directionRTL` variants and the CI pixel score.
+6. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
    big one).
-6. **D** — abspos implicit tracks.
 7. **F**, **G** — subgrid-orthogonal and `grid-lanes` (depend on A).
 
 ---
