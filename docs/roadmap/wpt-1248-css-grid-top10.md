@@ -159,28 +159,77 @@ min-height: 200px; float: left` and variants with explicit `width`/`height`,
 outer size 300×200 (3×4 tracks); the item pinned to the last cell (`grid-column:
 -2; grid-row: -2`) lands at (200, 150).
 
-**Root cause.** `repeat(auto-fill, …)` **column** count is resolved against
+**Root cause — corrected by reproduction (this session).** The original premise
+(below) was that the column-axis auto-fill count lacked a `min-width` raise
+mirroring the row axis's `ComputeAutoRepeatBlockSize`. Reproducing the scenario
+against the live layout engine via the in-process check-layout geometry harness
+(`Broiler.Cli.Tests/GridTrackLayoutTests` style — `DomBridge.EvaluateCheckLayoutAssertions`,
+no pixel reference needed) shows that premise is **wrong**. With
+`grid-template-columns: repeat(auto-fill, 100px); min-width: 300px` and an item at
+`grid-column: -2` (negative line, so its column depends on the resolved track
+count), the four width-source variants behave as:
+
+| Width source | container width | item `grid-column:-2` x | verdict |
+|---|---|---|---|
+| `width: 300px` (definite) | 300 | 200 | ✅ correct |
+| `width: fit-content` | **300** | **200** | ✅ correct |
+| `float: left` | **1024** | **900** | ❌ fills viewport |
+| `display: inline-grid` | **1024** | **900** | ❌ fills viewport |
+
+The row-axis control (`min-height: 200px`, item `grid-row: -2`) is correct at
+y=150, confirming the block axis already works. Crucially **`width: fit-content`
+already resolves to 300 with 3 columns and the item at x=200** — i.e. the auto-fill
+count *already* honours `min-width` once the used inline size is a real
+shrink-to-fit value. There is **no missing `ComputeAutoRepeatInlineSize`**.
+
+The actual defect is one layer up, in **grid intrinsic-width measurement**:
+`float: left` and `display: inline-grid` grids do **not** shrink-to-fit — they lay
+out at the full available width (1024). The float shrink-to-fit path exists
+(`CssBox.cs` ~L1294, `Width:auto && Float != none`: `preferred =
+ComputeShrinkToFitWidth()`, then `Math.Min(Math.Max(prefMin, available),
+preferred)`, then a `min-width` clamp that only *raises*), but for an auto-fill
+grid `ComputeShrinkToFitWidth()`/`GetMinMaxWidth` returns the full `available`
+(1024) as the preferred/max-content, so `min-width: 300` (300 < 1024) never
+reduces it. The `width: fit-content` path measures the same grid's preferred width
+correctly (small → clamped up to `min-width` 300), which is why only it and the
+definite case pass. So the two width-resolution paths disagree on a grid's
+intrinsic width.
+
+**Proposed approach (revised).** Fix grid intrinsic-width measurement so a
+floated / `inline-grid` grid's `ComputeShrinkToFitWidth`/`GetMinMaxWidth`
+max-content is the content-based track width (bounded, not the full available
+width), matching the `width: fit-content` path — then the existing `min-width`
+clamp raises it to 300 and the already-correct auto-fill count produces 3 columns.
+Align the float/inline-grid path with the fit-content path rather than adding a
+new auto-fill count function. **Risk: medium-high** — grid intrinsic sizing feeds
+many grids; the fit-content case is the known-good oracle to match against.
+**Validation:** the in-process geometry harness above reproduces both the bug and
+the fit-content target without a pixel reference, but the full **`css-grid`
+regression protocol still requires the WPT corpus**, which is *not vendored* and
+*cannot be fetched in the sandboxed session* (the WPT clone returns 403 — out of
+the session's GitHub scope — and `tests/wpt/node_modules` is empty, so Chromium
+references can't be generated). This increment therefore needs a CI/maintainer run
+with the css-grid references to clear the mandated zero-regression diff before it
+can land.
+
+<details><summary>Original (pre-reproduction) analysis — superseded</summary>
+
+`repeat(auto-fill, …)` **column** count is resolved against
 `contentWidth = Size.Width − padding − border` (`CssBoxGrid.cs` L94). For a
 shrink-to-fit float the width is indefinite, so per CSS Grid §7.2.3.1 the count
 must be computed from the **definite `min-width`** — exactly what
 `ComputeAutoRepeatBlockSize` already does for the **row** axis via `min-height`
 (L1162). The column axis has no equivalent min-width raise, so the auto-fill count
-collapses to one repetition (or the wrong number) and the grid mis-sizes; the
-`border-box` cases also need the min reduced to the content box.
+collapses to one repetition. → *Disproved:* `width: fit-content` already yields 3
+columns and x=200, so the count already honours `min-width`; the real gap is
+float/inline-grid shrink-to-fit sizing above.
 
-**Proposed approach.** Add a `ComputeAutoRepeatInlineSize` mirror of
-`ComputeAutoRepeatBlockSize`: when the used inline size is indefinite (auto/float
-shrink-to-fit), raise `contentWidth` to a definite `min-width` (content-box
-adjusted under `box-sizing: border-box`), then feed that to
-`ParseTrackListMaybeAutoRepeat` for the column axis. Handle the `min-content`/
-`max-content` width cases (they resolve to the same 300×200 here) and verify the
-final shrink-to-fit width still clamps to `min-width`.
+</details>
 
-**Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (`ComputeAutoRepeatBlockSize`
-→ add inline sibling; the `contentWidth` derivation at L94/L145). **Risk: medium**
-— touches auto-fill sizing used by many grids; guard with the `grid-definition`
-suite. **Effort:** medium. **Validation:** `css-grid/grid-definition` diff (12
-sub-checks in this test alone).
+**Key files.** `Broiler.Layout/Engine/CssBox.cs` (float/inline shrink-to-fit width
+at ~L1294; `ComputeShrinkToFitWidth` L3980; `GetShrinkToFitWidth` L4672),
+`CssBoxGrid.cs` (`GetMinMaxWidth` intrinsic grid-track measurement). **Effort:**
+medium.
 
 ---
 
@@ -258,7 +307,10 @@ named-line auto-fill. **Risk: high, value: low.**
 
 1. **B** — `patches/0004` has landed (pointer bumped); close the ~16 % `ul`/`li`
    offset (cheap, item #5).
-2. **C** — auto-fill min-size inline count (self-contained, item #9).
+2. **C** — item #9: **re-scoped by reproduction** — not an auto-fill-count gap
+   (fit-content already resolves it) but float/`inline-grid` grid shrink-to-fit
+   sizing measuring the full available width. See Workstream C. Needs the css-grid
+   WPT corpus (unavailable in the sandbox) for the regression diff.
 3. **The #8 ~5 % vertical text-drift** — confirm/​fix the page-level paragraph
    rhythm; may cheaply flip several ~95 % vertical tests.
 4. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
@@ -271,7 +323,15 @@ named-line auto-fill. **Risk: high, value: low.**
 ## Reproduction harness (for whoever picks this up)
 
 The `css-grid` and `css-writing-modes` tests are not vendored; fetch and score
-them locally:
+them locally. **Sandbox caveat:** inside a Claude-Code-on-the-web session the WPT
+clone (step 1) returns **403** — `web-platform-tests/wpt` is outside the session's
+GitHub egress scope — and `tests/wpt/node_modules` is empty, so the Chromium
+reference generation (step 2) cannot run either. Run these steps on a host with
+open network (or a CI job) to produce the references. For layout-geometry work the
+in-process `data-offset-*`/`data-expected-*` harness
+(`Broiler.Cli.Tests/GridTrackLayoutTests`, `DomBridge.EvaluateCheckLayoutAssertions`)
+reproduces track geometry **without** a pixel reference and runs in the sandbox —
+use it to reproduce/bisect, then confirm the full pixel diff on CI.
 
 ```sh
 # 1. Sparse-checkout the needed WPT subtrees.
