@@ -1047,6 +1047,50 @@ internal partial class CssBox
         CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out _);
 
     /// <summary>
+    /// CSS Grid §5.1 / Sizing 3: the grid container's intrinsic (min-content when
+    /// <paramref name="useMax"/> is false, else max-content) **content-box** width —
+    /// the sum of its <c>grid-template-columns</c> track sizes plus gaps, for a
+    /// horizontal writing mode (a vertical grid's physical-width axis is the rows,
+    /// applied through the rotation — declined below). Bounded to templates whose
+    /// tracks are all definite fixed lengths (a plain length or a <c>minmax()</c>
+    /// with fixed sides — <c>repeat(&lt;int&gt;,…)</c> already expanded by
+    /// <see cref="ParseTrackList"/>): declines for <c>fr</c>/<c>auto</c>/
+    /// content/percentage/<c>auto-fill</c> tracks, whose size needs the real track
+    /// pass (and the items). Lets a shrink-to-fit grid (float, <c>inline-grid</c>,
+    /// <c>fit-content</c>/<c>min-content</c>/<c>max-content</c>) size to its tracks
+    /// instead of collapsing to its (often empty) inline content
+    /// (WPT css-grid grid-gutters-and-tracks-001, …-margin-border-padding-vertical-rl).
+    /// </summary>
+    private bool TryComputeGridIntrinsicContentWidth(bool useMax, out double contentWidth)
+    {
+        contentWidth = 0;
+        if (Display is not ("grid" or "inline-grid"))
+            return false;
+        // Vertical writing modes lay the grid out in a logical frame and rotate it,
+        // so the physical-width axis (rows) must be applied through the rotation —
+        // out of scope here; a vertical grid keeps its existing sizing.
+        if (IsVerticalWritingMode(WritingMode))
+            return false;
+        double em = GetEmHeight();
+        var specs = ParseTrackList(GridTemplateColumns, em);
+        if (specs == null || specs.Count == 0 || specs.Count > MaxGridLine)
+            return false;
+
+        double sum = 0;
+        foreach (var spec in specs)
+        {
+            GridSize side = useMax ? spec.Max : spec.Min;
+            if (side.Kind != GridSizeKind.Fixed)
+                return false;                 // needs the real track pass
+            sum += Math.Max(0, side.Value);
+        }
+        double gap = ResolveGridGap(ColumnGap, 0, em);
+        sum += gap * (specs.Count - 1);
+        contentWidth = sum;
+        return true;
+    }
+
+    /// <summary>
     /// The definite border-box block-size (height) of a replaced (image) grid
     /// item, or <c>0</c> when its block size is not a definite length. A replaced
     /// element measured through its container's line box (the inline path used for

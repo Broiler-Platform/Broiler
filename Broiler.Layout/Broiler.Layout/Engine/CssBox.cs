@@ -1429,10 +1429,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     // border/padding for the border-box Size.Width, then min/max-width).
                     EnsureDescendantWordsMeasured(g);
 
+                    double ownPadBorder = ActualBorderLeftWidth + ActualBorderRightWidth
+                                        + ActualPaddingLeft + ActualPaddingRight;
+                    // Both contributions must be in the same frame: ComputeShrinkToFitWidth
+                    // returns a content-box width, but GetMinMaxWidth returns a border-box
+                    // one, so strip this box's own padding/border off the min side before
+                    // combining — otherwise fit-content double-counts it.
                     double maxContent = ComputeShrinkToFitWidth();
-                    GetMinMaxWidth(out double minContent, out _);
-                    if (double.IsNaN(minContent)) minContent = 0;
+                    GetMinMaxWidth(out double minContentBorderBox, out _);
+                    if (double.IsNaN(minContentBorderBox)) minContentBorderBox = 0;
                     if (double.IsNaN(maxContent)) maxContent = 0;
+                    double minContent = Math.Max(0, minContentBorderBox - ownPadBorder);
                     double available = width - ActualMarginLeft - ActualMarginRight;
 
                     double resolved = Width.StartsWith("min-content", StringComparison.OrdinalIgnoreCase)
@@ -1452,8 +1459,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         if (resolved < minW) resolved = minW;
                     }
 
-                    resolved += ActualBorderLeftWidth + ActualBorderRightWidth
-                              + ActualPaddingLeft + ActualPaddingRight;
+                    resolved += ownPadBorder;
                     Size = new SizeF((float)resolved, Size.Height);
                 }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
@@ -4033,6 +4039,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     internal void GetMinMaxWidth(out double minWidth, out double maxWidth)
     {
+        // A grid with a fixed track template contributes its physical-width track
+        // sum (+ gaps + own border/padding) as both min- and max-content, rather
+        // than the intrinsic width of its inline content — so a shrink-to-fit grid
+        // (or a nested grid item) sizes to its tracks, not its (often empty) text.
+        if (TryComputeGridIntrinsicContentWidth(useMax: false, out double gridMin)
+            && TryComputeGridIntrinsicContentWidth(useMax: true, out double gridMax))
+        {
+            double pb = ActualBorderLeftWidth + ActualBorderRightWidth
+                      + ActualPaddingLeft + ActualPaddingRight;
+            minWidth = gridMin + pb;
+            maxWidth = gridMax + pb;
+            return;
+        }
+
         double min = 0f;
         double maxSum = 0f;
         double paddingSum = 0f;
@@ -4074,6 +4094,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private double ComputeShrinkToFitWidth()
     {
+        // A grid with a fixed track template shrink-to-fits to its physical-width
+        // track sum (+ gaps), not the max-content of its inline content — an empty
+        // or small-item grid would otherwise collapse (fit-content / float /
+        // inline-grid grids). Content-box width; the caller adds border/padding.
+        if (TryComputeGridIntrinsicContentWidth(useMax: true, out double gridMaxContent))
+            return gridMaxContent;
+
         double maxLineWidth = 0;
         // Running width of a horizontal run of adjacent floated children. At
         // max-content the container is under no width constraint, so a run of

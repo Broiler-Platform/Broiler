@@ -117,16 +117,26 @@ layout is right. The failures are the tail below.
 
 **Actual remaining gaps (each a distinct, standalone feature — NOT transposition):**
 
-1. **Grid-track-based `fit-content` intrinsic width.** Both #10
-   (`…-margin-border-padding-vertical-rl`, whose container is `fit-content`;
-   expected width 475 = block-axis rows `200+200` + horizontal padding `45` +
-   border `30`) and Workstream E's test 1a need a grid's `fit-content`/`min-content`/
-   `max-content` width to sum its **physical-width-axis track sizes** (+ gaps +
-   padding + border), writing-mode aware (columns for horizontal-tb, rows for
-   vertical). Today `ComputeShrinkToFitWidth` measures inline *content*, so an
-   empty/small-item grid collapses. Chicken-and-egg with the track pass, but the
-   fixed-track case is computable from the template alone. **The highest-leverage
-   next item** — it unblocks #10's container *and* the E fit-content sub-grids.
+1. **Grid-track-based `fit-content` intrinsic width — ✅ done for horizontal grids
+   (this session).** A grid with a **fixed** column template now sizes its
+   `min-content`/`max-content`/`fit-content`/`float`/`inline-grid` width to the sum
+   of its column tracks (+ gaps + own padding/border) instead of the max-content of
+   its (often empty) inline content, which collapsed the container. Implemented as
+   `TryComputeGridIntrinsicContentWidth` (fixed lengths + `minmax(fixed,fixed)`;
+   declines `fr`/`auto`/content/`auto-fill`/percentage — those need the real track
+   pass) hooked into `ComputeShrinkToFitWidth` (max-content) and `GetMinMaxWidth`
+   (both sides). Also fixed a **frame-mismatch bug** in the Workstream C fit-content
+   keyword branch (min-content was border-box, max-content content-box → padding
+   double-counted). Guard `GridIntrinsicWidthTests`; 0 regressions (55 grid guards,
+   vendored subsets byte-identical). **Verified in-harness:** `max-content` →
+   column sum (`minmax(10,50)`→50), `min-content` → min sides (→10), fixed
+   `fit-content`/`float` → track sum (100/100→200, +gap, +border). *Remaining for
+   #10 / E test 1a:* (a) **`fit-content` with min≠max** (a `minmax()` track) needs a
+   real viewport — `fit-content = min(max(min,available),max)` and the harness's
+   containing-block `available` is ~0, so it collapses to min-content here but
+   resolves on CI; (b) **vertical writing modes** are gated off — the physical-width
+   axis (rows) must be applied through the `ApplyVerticalWritingModeFlow` rotation
+   (#10 is `vertical-rl`), a separate increment.
 2. **Baseline self-alignment.** #6 (`grid-align-baseline-vertical`) needs
    `align-self:baseline` / `justify-items:*baseline` to synthesise a shared baseline
    across a row/column (CSS Align §9) and shift each item to it. The pass currently
@@ -471,12 +481,13 @@ vendored css-align (28) + css-anchor-position (40).
   single-column approximation (cluster 28's documented decline), which does no
   gutters/2-D placement. The largest remaining group — needs named-line track
   support before its gutter assertions can pass.
-- **`width:fit-content` on a grid needs the grid's track-based intrinsic width**
-  (test 1a: empty `fit-content` grid → 10 not 170). The Workstream C
-  `IsIntrinsicSizingWidthKeyword` branch measures inline content
-  (`ComputeShrinkToFitWidth`), which is ~0 for a grid; a grid's min/max-content
-  contribution must sum its track base sizes + gaps. (Not a regression — bare
-  `fit-content` grids were already wrong.)
+- **`width:fit-content` grid intrinsic width — ✅ implemented (this session, see
+  Workstream A).** A grid with a fixed column template now sums its column tracks
+  (+ gaps + padding/border) for `min-content`/`max-content`/`fit-content`/`float`,
+  so test 1a's container resolves correctly on a real viewport (CI). Two residuals
+  keep it from being exact *in the harness*: `fit-content` with a `minmax()` track
+  (min≠max) needs a non-zero `available` (CI), and the `verticalRL` sub-grid needs
+  the vertical-axis mapping (gated off). Guard `GridIntrinsicWidthTests`.
 - **Percentage-track grids collapse** (tests 9/10/13/14): rows/heights come back
   short — the §11 percentage-track path declines or mis-sizes with gaps.
 - **check-layout estimator vs offsetParent border (uniform −1).** Broiler's
@@ -544,8 +555,10 @@ named-line auto-fill. **Risk: high, value: low.**
 6. **A** — vertical-writing-mode grids: ✅ **transposition already works** (this
    session — placement, content distribution, self alignment all verified;
    guard `GridVerticalWritingModeTests`). Re-scoped from "multi-day rewrite" to two
-   standalone features: **grid-track-based `fit-content` width** (also unblocks E's
-   test 1a and #10 — highest leverage next) and **baseline self-alignment** (#6).
+   standalone features: **grid-track-based `fit-content` width** — ✅ **done for
+   horizontal grids this session** (`GridIntrinsicWidthTests`; unblocks E test 1a
+   and #10's container on CI; vertical-axis mapping + min≠max fit-content remain) —
+   and **baseline self-alignment** (#6, still open).
 7. **F**, **G** — subgrid-orthogonal and `grid-lanes`. F's dependency on A is now
    just the fit-content/transposed sizing, not a logical-axis rewrite.
 
