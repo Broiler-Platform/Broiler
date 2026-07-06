@@ -248,6 +248,16 @@ internal partial class CssBox
         {
             if (child.Display == CssConstants.None)
                 continue;
+            // CSS Grid §4: every in-flow child becomes a grid item, EXCEPT a
+            // contiguous run of collapsible white space that is not contained in
+            // a non-anonymous box — such an anonymous box "is not rendered (just
+            // as if it were display:none)" and must not occupy a track. Broiler's
+            // box tree keeps the inter-item white space between block-level grid
+            // items as anonymous whitespace-only boxes; left in, each auto-places
+            // into its own phantom track and inflates the grid (e.g. the
+            // grid-lanes subgrid reftests gained spurious rows).
+            if (IsCollapsibleWhitespaceItem(child))
+                continue;
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
             {
                 if (gridIsAbsposContainingBlock)
@@ -977,6 +987,21 @@ internal partial class CssBox
             slice[i] = sizes[start + i];
         return slice;
     }
+
+    /// <summary>
+    /// CSS Grid §4: an anonymous box holding only collapsible white space is not
+    /// rendered and generates no grid item. True only for an anonymous box (no
+    /// element), with no child boxes, whose text is entirely white space and
+    /// whose <c>white-space</c> would collapse it (i.e. not a <c>pre*</c> value
+    /// that preserves it).
+    /// </summary>
+    private static bool IsCollapsibleWhitespaceItem(CssBox child)
+        => child.HtmlTag == null
+           && child.Boxes.Count == 0
+           && child.WhiteSpace != CssConstants.Pre
+           && child.WhiteSpace != CssConstants.PreWrap
+           && child.WhiteSpace != CssConstants.PreLine
+           && child.Text.Span.IsWhiteSpace();
 
     /// <summary>True when a track template's first token is the <c>subgrid</c> keyword.</summary>
     private static bool StartsWithSubgrid(string template)
