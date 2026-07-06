@@ -195,22 +195,38 @@ correctly (small → clamped up to `min-width` 300), which is why only it and th
 definite case pass. So the two width-resolution paths disagree on a grid's
 intrinsic width.
 
-**Proposed approach (revised).** Fix grid intrinsic-width measurement so a
-floated / `inline-grid` grid's `ComputeShrinkToFitWidth`/`GetMinMaxWidth`
-max-content is the content-based track width (bounded, not the full available
-width), matching the `width: fit-content` path — then the existing `min-width`
-clamp raises it to 300 and the already-correct auto-fill count produces 3 columns.
-Align the float/inline-grid path with the fit-content path rather than adding a
-new auto-fill count function. **Risk: medium-high** — grid intrinsic sizing feeds
-many grids; the fit-content case is the known-good oracle to match against.
-**Validation:** the in-process geometry harness above reproduces both the bug and
-the fit-content target without a pixel reference, but the full **`css-grid`
-regression protocol still requires the WPT corpus**, which is *not vendored* and
-*cannot be fetched in the sandboxed session* (the WPT clone returns 403 — out of
-the session's GitHub scope — and `tests/wpt/node_modules` is empty, so Chromium
-references can't be generated). This increment therefore needs a CI/maintainer run
-with the css-grid references to clear the mandated zero-regression diff before it
-can land.
+**Root cause narrowed further — ✅ fixed (this session).** Drilling in with the
+geometry harness pinned it precisely: a floated / `inline-grid` grid **does**
+shrink-to-fit correctly when its items have no explicit width (the `float`/
+`inline-grid` cases resolve to 300 with the item at x=200, same as `fit-content`).
+The `1024` only appears when a grid **item** carries a *percentage* width
+(`width:100%`, as WPT `sizedToGridArea` items do). Root cause: intrinsic-width
+measurement (`CssBoxHelper.GetMinMaxSumWords` and `CssBox.ComputeShrinkToFitWidth`)
+resolved a child's `width:100%` against the container's *tentative/available*
+width (1024) and used that as the child's max-content contribution — so the grid's
+shrink-to-fit width ballooned to 1024 and `min-width:300` (which only raises) never
+reduced it. Per **CSS Sizing 3 §5.1** a percentage width resolves against the size
+being computed, so it must be treated as `auto` for intrinsic sizing (the code
+already did this for grid items via `suppressExplicitWidthFor`; the fix generalizes
+it to any percentage width). The `fit-content` path escaped the bug only because it
+runs before `Size.Width` is set (so `100%` resolved against 0). Not grid-specific —
+a plain `float` wrapping a `width:100%` block had the same 1024 balloon.
+
+**Fix (landed, main-repo `Broiler.Layout`).** `GetMinMaxSumWords` treats a box
+whose own width is a percentage as auto (falls through to content measurement);
+`ComputeShrinkToFitWidth` measures a percentage-width child via `GetMinMaxWidth`
+instead of resolving the percentage. Now the `float`/`inline-grid` auto-fill grid
+resolves to `min-width` 300 with three 100px columns and the `grid-column:-2` item
+lands at x=200. Guard: `PercentChildShrinkToFitTests` (float / inline-block /
+abspos + the auto-fill grid case — in-process check-layout geometry, no pixel
+reference). **Validation:** a targeted layout-suite diff (Flex / Grid / AspectRatio
+/ Table check-layout classes) shows **zero regressions** vs baseline (47/49 pass on
+both; the 2 flex failures are pre-existing and font-rasterization dependent). The
+full **`css-grid` / CSS2 pixel diff still needs a CI run** — the WPT corpus is not
+vendored and cannot be fetched in the sandbox (WPT clone → 403; empty
+`node_modules`). This closes the shrink-to-fit balloon; item #9's remaining 12
+`checkLayout` variants (border / `box-sizing` / `min-content` / `max-content`)
+still need a full-suite score on CI.
 
 <details><summary>Original (pre-reproduction) analysis — superseded</summary>
 
@@ -307,10 +323,10 @@ named-line auto-fill. **Risk: high, value: low.**
 
 1. **B** — `patches/0004` has landed (pointer bumped); close the ~16 % `ul`/`li`
    offset (cheap, item #5).
-2. **C** — item #9: **re-scoped by reproduction** — not an auto-fill-count gap
-   (fit-content already resolves it) but float/`inline-grid` grid shrink-to-fit
-   sizing measuring the full available width. See Workstream C. Needs the css-grid
-   WPT corpus (unavailable in the sandbox) for the regression diff.
+2. **C** — item #9: ✅ **shrink-to-fit balloon fixed** — the real cause was a
+   percentage-width grid item inflating intrinsic width (CSS Sizing 3 §5.1), not an
+   auto-fill-count gap. See Workstream C. Remaining: score the 12 `checkLayout`
+   variants on CI (needs the css-grid WPT corpus, unavailable in the sandbox).
 3. **The #8 ~5 % vertical text-drift** — confirm/​fix the page-level paragraph
    rhythm; may cheaply flip several ~95 % vertical tests.
 4. **A** — grid-axis transposition (unlocks #6/#8/#10 + ~58 alignment tests; the
