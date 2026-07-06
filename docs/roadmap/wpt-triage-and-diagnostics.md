@@ -719,6 +719,45 @@ element's default display):
    subgrid** track layout (cluster 28's tail); a `grid-auto-rows`-only shortcut would stack the children
    full-width and over-paint the grey, so it is not attempted here.
 
+Cluster 38 (issue [#1266](https://github.com/Broiler-Platform/Broiler/issues/1266), the "top-8 biggest
+problems" run) was triaged end-to-end this session against a local Chromium-reference pixel loop (sparse
+`css/css-grid` checkout + Playwright references + `Broiler.Wpt` compare, reproducing the issue's percent
+matches within noise). All eight are the hard tail and each needs a distinct, roadmap-scale feature — no
+single fix flips them:
+
+- **#1/#3/#4 `column-subgrid-auto-fill-{003,001,008}` and #6 `row-subgrid-grid-gap-012`** — the deferred
+  **multi-column named-line subgrid track adoption** (cluster 28/29 tail): a subgrid item inheriting its
+  parent's spanned tracks, `repeat(auto-fill, [line-names])`, and `subgrid`-side gap. Broiler's
+  single-column approximation over/under-sizes the grey subgrid bands (gap-012 renders the right band
+  order at ~2× height).
+- **#2 `subgrid/orthogonal-writing-mode-006`** — same subgrid feature across an orthogonal flow; Broiler
+  blows the fit-content outer grid up to the viewport.
+- **#5 `grid-lanes-quirks-fill-viewport`** — the quirks-mode *body-fills-viewport* / *html-fills-viewport*
+  behaviour (quirks.spec §"the body element fills the html element quirk"). Broiler tracks **no**
+  quirks/standards mode in the DOM→layout path, so even the `display:grid` `-ref` renders the body at
+  content height. Needs doctype→quirks plumbing before the fill can be implemented.
+- **#7 `alignment/grid-align-baseline-vertical`** — vertical-writing-mode grid **intrinsic (block-axis)
+  width** + **baseline self-alignment** (Workstream A's open tail): the `writing-mode:vertical-rl` grids
+  size their physical width to the viewport instead of shrink-wrapping their rows.
+- **#8 `table-grid-item-dynamic-002`** — three stacked gaps: (a) a `<table>` **grid item is declined as
+  "not simple"** (`GridImplicitPathItemsAreSimple`) and approximated *without laying its content out*, so
+  the `th` text vanishes; (b) **table `<caption>` boxes were dropped entirely** — fixed this session (see
+  below); (c) the `onload` **min-height 500→100 dynamic relayout** does not take effect. Passing needs
+  (a) grid non-simple-item content layout **and** (c) style-mutation reflow, both substantial.
+
+**Fixed this session — table `<caption>` layout (CSS2.1 §17.4.1).** While root-causing #8 the table
+engine was found to match `display:table-caption` with a bare `case …: break;` — captions were collected
+nowhere and laid out never, so caption text/background rendered nowhere and the table height excluded
+them. `CssLayoutEngineTable` now collects captions and lays them out as block boxes of the table's used
+width: top-side captions (the default) stack above the cell grid and push the rows down; a
+`caption-side:bottom` caption stacks below (a new inherited `CaptionSide` property, wired through
+`CssUtils`). `display:table-caption` also gained a real block-layout path in `CssBox.PerformLayoutImp`
+(it fell through every branch and stayed 0-height). Guard `TableCaptionTests` (top pushes rows down by
+the caption height; bottom sits below without moving them); zero regressions across the vendored
+css-align/css-anchor-position/CSS2 subsets (102/38/13 byte-identical before/after) and the grid Cli.Tests.
+This is a general table-rendering correctness win but does **not** by itself flip #8, which still needs
+the grid non-simple-item and dynamic-reflow work above.
+
 Cluster 30 (issue [#1227](https://github.com/Broiler-Platform/Broiler/issues/1227), the "biggest
 problems" CSS Grid list — the `grid-items` tests at ~9 % match) was a **grid-item percentage-height**
 bug in the inline-block fallback. `css-grid/grid-items/whitespace-in-grid-item-001`'s `.item`

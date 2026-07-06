@@ -1129,7 +1129,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // are laid out, so the trimmed margins collapse to nothing.
         ApplyMarginTrim();
 
-        if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell)
+        if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
         {
             // Because their width and height are set by CssTable
             if (Display != CssConstants.TableCell && Display != CssConstants.Table)

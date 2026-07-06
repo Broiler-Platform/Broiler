@@ -527,6 +527,7 @@ internal abstract class CssBoxProperties
     public string Display { get; set; } = "inline";
     public string Direction { get; set; } = "ltr";
     public string EmptyCells { get; set; } = "show";
+    public string CaptionSide { get; set; } = "top";
     public string Float { get; set; } = "none";
     public string Clear { get; set; } = "none";
     public string Position { get; set; } = "static";
@@ -1765,6 +1766,7 @@ internal abstract class CssBoxProperties
         BorderCollapse = p.BorderCollapse;
         _color = p._color;
         EmptyCells = p.EmptyCells;
+        CaptionSide = p.CaptionSide;
         WhiteSpace = p.WhiteSpace;
         Visibility = p.Visibility;
         _textIndent = p._textIndent;

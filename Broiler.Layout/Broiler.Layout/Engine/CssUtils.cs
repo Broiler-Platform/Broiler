@@ -90,6 +90,7 @@ internal static class CssUtils
             "display" => cssBox.Display,
             "direction" => cssBox.Direction,
             "empty-cells" => cssBox.EmptyCells,
+            "caption-side" => cssBox.CaptionSide,
             "float" => cssBox.Float,
             "clear" => cssBox.Clear,
             "position" => cssBox.Position,
@@ -554,6 +555,9 @@ internal static class CssUtils
                 break;
             case "empty-cells":
                 cssBox.EmptyCells = value;
+                break;
+            case "caption-side":
+                cssBox.CaptionSide = value;
                 break;
             case "float":
                 cssBox.Float = value;
