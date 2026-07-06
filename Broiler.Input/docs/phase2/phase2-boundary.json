@@ -1,0 +1,44 @@
+{
+  "phase": "2",
+  "status": "implemented-inside-broiler-input",
+  "componentRoot": "Broiler.Input",
+  "externalComponentsModified": false,
+  "implementedRuntimeProjects": [
+    "Broiler.Input",
+    "Broiler.Input.Keyboard",
+    "Broiler.Input.Keyboard.Windows",
+    "Broiler.Input.Legacy",
+    "Broiler.Input.Mouse",
+    "Broiler.Input.Mouse.Windows",
+    "Broiler.Input.Windows"
+  ],
+  "implementedDeliverables": [
+    "keyboard abstraction and Windows provider specified",
+    "mouse abstraction and Windows provider specified",
+    "borrowed Windows host/message-source contracts available",
+    "current key/text/pointer/button/leave/wheel cooked-message behavior preserved in Input translators",
+    "scan code, repeat count, extended bit, previous key state, system key, and key location metadata exposed",
+    "X buttons and horizontal wheel exposed",
+    "coordinate-space labels exposed",
+    "mouse capture-lost event exposed",
+    "provider hot-plug notifications exposed from WM_INPUT_DEVICE_CHANGE",
+    "legacy window-callback adapter added without referencing Graphics",
+    "keyboard and mouse remain independent from Camera and Microphone"
+  ],
+  "deferredBecauseOtherComponentsCannotBeModified": [
+    "Direct2DWindow final-path extraction",
+    "Broiler.App.Graphics direct consumption of Input abstractions",
+    "existing browser interaction test migration",
+    "removal of Graphics native input parsing"
+  ],
+  "contractChecks": [
+    "windows keyboard cooked translation",
+    "windows mouse cooked translation",
+    "windows provider hot plug messages",
+    "legacy window adapter",
+    "dispatcher stops after handled",
+    "keyboard mouse no media references"
+  ],
+  "nativeInteropPolicy": "Windows-specific code uses DllImport or LibraryImport only.",
+  "packagePolicy": "No PackageReference entries are allowed in Broiler.Input projects."
+}
