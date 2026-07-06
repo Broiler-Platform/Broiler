@@ -550,7 +550,11 @@ vendored css-align (28) + css-anchor-position (40).
   reset the max-content line for an inline-block child (treating it as block-level),
   so N inline-blocks in a row measured as the *widest* one, not their *sum* — which
   collapsed every `max-content`/`fit-content` track holding them; atomic inline-level
-  boxes now stay on the line and accumulate. Verified end-to-end in the geometry
+  boxes now stay on the line and accumulate. **The companion shrink-to-fit path**
+  (`CssBox.ComputeShrinkToFitWidth`, used by floats / inline-blocks / abspos) had the
+  same defect — it accumulated a run of adjacent floats but reset the line for an
+  inline-block — now fixed via the shared `CssBoxHelper.IsAtomicInlineLevel` predicate
+  (guard `ShrinkToFitInlineBlockRunTests`). Verified end-to-end in the geometry
   harness (two 40px inline-blocks → min-content 40, max-content 80, `fit-content(60)`
   → 60, `fit-content(30)` → 40); guard `GridFitContentTrackTests`, 0 regressions
   across the vendored css-align/css-anchor-position/css-backgrounds/CSS2 subsets.
