@@ -160,7 +160,7 @@ public sealed class ComputedStyle
     public string FlexShrink { get; init; } = "1";
     public string FlexBasis { get; init; } = "auto";
     public string FlexWrap { get; init; } = "nowrap";
-    public string JustifyContent { get; init; } = "flex-start";
+    public string JustifyContent { get; init; } = "normal";
     public string AlignItems { get; init; } = "stretch";
 
     // --- Table ---

@@ -393,11 +393,25 @@ internal partial class CssBox
         if (rowSizes == null)
             return false;
 
+        // CSS Grid §7.2.1: percentage rows against an indefinite block size are
+        // sized as 'auto' above (definite=false), producing the grid's intrinsic
+        // block size; they are then resolved against that intrinsic height for
+        // layout while the container keeps the intrinsic height (so a shrunken
+        // percentage row leaves trailing space rather than collapsing the grid).
+        // Mirrors the same-cell stacking path (TryApplyStackingRowTracks). For a
+        // grid with no percentage rows this is a no-op and intrinsicRowHeight
+        // equals the plain track sum, so non-percentage grids are unaffected.
+        double intrinsicRowHeight = SumTrackSizes(rowSizes, rowGap);
+        if (!rowDefinite)
+            ResolvePercentRowTracksAgainstIntrinsic(rowSpecs, implicitRow, rowSizes, intrinsicRowHeight);
+
         // CSS Box Alignment §5 (content distribution): when the tracks do not
         // fill the container along an axis, justify-content (inline) / align-content
         // (block) positions or spaces them within the leftover room. The block axis
-        // only has leftover room when the container's block size is definite.
-        double rowContainerSize = rowDefinite ? definiteHeight : SumTrackSizes(rowSizes, rowGap);
+        // only has leftover room when the container's block size is definite — or,
+        // for an indefinite height, when a percentage row shrank below the locked
+        // intrinsic height above.
+        double rowContainerSize = rowDefinite ? definiteHeight : intrinsicRowHeight;
         double[] colStartEdge = BuildTrackEdgesAligned(colSizes, colGap, contentWidth,
             JustifyContent, out double[] colEndEdge);
         double[] rowStartEdge = BuildTrackEdgesAligned(rowSizes, rowGap, rowContainerSize,
@@ -427,10 +441,19 @@ internal partial class CssBox
             LayoutSubgridItem(p, colSizes, rowSizes, colGap, rowGap);
         }
 
+        // CSS Box Alignment §9: baseline self-alignment. Items in a row that ask
+        // for align-self:baseline share a baseline — each is shifted in the block
+        // axis so its first baseline sits on the group's shared (max) baseline.
+        AlignGridRowBaselines(placements);
+
         // The grid's block size is the block-end edge of its last row track. Every
         // grid-template-rows track contributes even when unoccupied, so a 4-track
         // template with items in only the first 3 rows still sizes to all four.
         double gridHeight = rowSizes.Length > 0 ? rowEndEdge[rowSizes.Length - 1] : 0;
+        // §7.2.1: an indefinite-height grid keeps its intrinsic block size even
+        // after percentage rows resolved (shrank) against it, leaving trailing space.
+        if (!rowDefinite && intrinsicRowHeight > gridHeight)
+            gridHeight = intrinsicRowHeight;
         double borderBoxHeight = ActualPaddingTop + ActualPaddingBottom
             + ActualBorderTopWidth + ActualBorderBottomWidth + gridHeight;
         ActualBottom = Location.Y + borderBoxHeight;
@@ -642,8 +665,19 @@ internal partial class CssBox
         double marginL = item.ActualMarginLeft, marginR = item.ActualMarginRight;
         double marginT = item.ActualMarginTop, marginB = item.ActualMarginBottom;
 
-        bool widthFills = FillsArea(item.Width);
-        bool heightFills = FillsArea(item.Height);
+        // CSS Box Alignment §4.3 / CSS Grid §6.1: an auto-sized grid item fills its
+        // area only under the (default) stretch self-alignment. A positional or
+        // baseline align-self/justify-self (self-start, center, baseline, …) keeps
+        // the item at its content size and positions it in the area instead — a
+        // percentage size always fills, resolving against the area regardless.
+        bool widthIsPercent = !string.IsNullOrEmpty(item.Width)
+            && item.Width.EndsWith("%", StringComparison.Ordinal);
+        bool heightIsPercent = !string.IsNullOrEmpty(item.Height)
+            && item.Height.EndsWith("%", StringComparison.Ordinal);
+        bool widthFills = FillsArea(item.Width)
+            && (widthIsPercent || SelfAlignmentStretches(item.JustifySelf, JustifyItems));
+        bool heightFills = FillsArea(item.Height)
+            && (heightIsPercent || SelfAlignmentStretches(item.AlignSelf, AlignItems));
 
         double targetLeft = areaLeft + marginL;
         double targetTop = areaTop + marginT;
@@ -1155,6 +1189,98 @@ internal partial class CssBox
             h += item.ActualPaddingTop + item.ActualPaddingBottom
                 + item.ActualBorderTopWidth + item.ActualBorderBottomWidth;
         return h > 0 ? h : 0;
+    }
+
+    /// <summary>
+    /// True when a grid item's used self-alignment on an axis is <c>stretch</c>
+    /// (so an auto-sized item fills the area). Resolves <c>align-self</c>/
+    /// <c>justify-self</c> of <c>auto</c>/<c>normal</c> to the container's
+    /// <c>align-items</c>/<c>justify-items</c>, whose own initial value
+    /// (<c>normal</c>) is stretch. Any positional or baseline value
+    /// (<c>start</c>, <c>center</c>, <c>self-end</c>, <c>baseline</c>, …) is not
+    /// stretch, so the item is content-sized and then positioned.
+    /// </summary>
+    /// <summary>CSS Box Alignment §9.3 typical ascent fraction of the line box —
+    /// the baseline sits this far below the first line's top (matches the inline
+    /// layout's <c>TypicalAscentRatio</c>).</summary>
+    private const double BaselineAscentRatio = 0.8;
+
+    /// <summary>
+    /// CSS Box Alignment §9 (baseline self-alignment, block axis): within each
+    /// grid row, the items whose <c>align-self</c> resolves to (first) baseline
+    /// form a baseline-sharing group. Their shared baseline is the lowest of the
+    /// individual first baselines; every item is shifted down so its own first
+    /// baseline lands on it (the group's tallest-ascent item stays, shorter items
+    /// drop). A group of one needs no shift.
+    /// </summary>
+    private void AlignGridRowBaselines(List<GridPlacement> placements)
+    {
+        Dictionary<int, List<CssBox>> byRow = null;
+        foreach (var p in placements)
+        {
+            if (!ResolvesToFirstBaseline(p.Item.AlignSelf, AlignItems))
+                continue;
+            (byRow ??= new Dictionary<int, List<CssBox>>())
+                .TryGetValue(p.PlacedRow, out var list);
+            if (list == null) byRow[p.PlacedRow] = list = new List<CssBox>();
+            list.Add(p.Item);
+        }
+        if (byRow == null)
+            return;
+        foreach (var group in byRow.Values)
+        {
+            if (group.Count < 2)
+                continue;
+            double shared = double.MinValue;
+            var baselines = new double[group.Count];
+            for (int i = 0; i < group.Count; i++)
+            {
+                baselines[i] = GridItemFirstBaselineY(group[i]);
+                if (baselines[i] > shared) shared = baselines[i];
+            }
+            for (int i = 0; i < group.Count; i++)
+            {
+                double shift = shared - baselines[i];
+                if (shift > 0.5)
+                {
+                    group[i].OffsetTop(shift);
+                    group[i].ActualBottom += shift;
+                }
+            }
+        }
+    }
+
+    /// <summary>Absolute Y of a grid item's first baseline: its first line box's
+    /// baseline, approximated as the font ascent below the content-box top.</summary>
+    private static double GridItemFirstBaselineY(CssBox item)
+    {
+        double ascent = item.ActualFont.Height * BaselineAscentRatio;
+        return item.Location.Y + item.ActualBorderTopWidth + item.ActualPaddingTop + ascent;
+    }
+
+    /// <summary>True when a grid item's used <c>align-self</c>/<c>justify-self</c>
+    /// resolves to (first) <c>baseline</c> — resolving <c>auto</c>/<c>normal</c>
+    /// through the container's <c>align-items</c>/<c>justify-items</c>.</summary>
+    private static bool ResolvesToFirstBaseline(string self, string items)
+    {
+        string v = self;
+        if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
+            v = items;
+        v = (v ?? "").Trim().ToLowerInvariant();
+        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
+        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+        return v == "baseline" || v == "first baseline" || v == "first-baseline";
+    }
+
+    private static bool SelfAlignmentStretches(string self, string items)
+    {
+        string v = self;
+        if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
+            v = items;
+        v = (v ?? "").Trim().ToLowerInvariant();
+        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
+        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+        return string.IsNullOrEmpty(v) || v == "normal" || v == "stretch";
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)
