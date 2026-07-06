@@ -400,10 +400,17 @@ internal partial class CssBox
         double contentLeft = Location.X + ActualBorderLeftWidth + ActualPaddingLeft;
         double contentTop = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
 
+        // CSS Writing Modes §3: an `rtl` inline (column) axis runs right→left, so a
+        // cell's physical x mirrors within the content box. Mirroring the resolved
+        // (LTR) column edges also flips justify-content start↔end correctly.
+        bool rtl = string.Equals(Direction, "rtl", StringComparison.OrdinalIgnoreCase);
+
         foreach (var p in placements)
         {
-            double areaLeft = contentLeft + colStartEdge[p.PlacedCol];
-            double areaRight = contentLeft + colEndEdge[p.PlacedCol + p.ColSpan - 1];
+            double ltrLeft = colStartEdge[p.PlacedCol];
+            double ltrRight = colEndEdge[p.PlacedCol + p.ColSpan - 1];
+            double areaLeft = rtl ? contentLeft + contentWidth - ltrRight : contentLeft + ltrLeft;
+            double areaRight = rtl ? contentLeft + contentWidth - ltrLeft : contentLeft + ltrRight;
             double areaTop = contentTop + rowStartEdge[p.PlacedRow];
             double areaBottom = contentTop + rowEndEdge[p.PlacedRow + p.RowSpan - 1];
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
@@ -430,7 +437,7 @@ internal partial class CssBox
             PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
                 colSizes.Length, rowSizes.Length, contentLeft, contentTop,
                 colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart,
-                colNames, rowNames);
+                colNames, rowNames, rtl);
 
         _gridTrackLayoutApplied = true;
         return true;
@@ -704,7 +711,8 @@ internal partial class CssBox
         double[] rowStartEdge, double[] rowEndEdge,
         int colCount, int rowCount, double contentLeft, double contentTop,
         int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart,
-        IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames)
+        IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames,
+        bool rtl)
     {
         double padLeft = Location.X + ActualBorderLeftWidth;
         double padRight = Location.X + Size.Width - ActualBorderRightWidth;
@@ -717,6 +725,13 @@ internal partial class CssBox
             var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart, rowNames);
             var (left, right) = ResolveAbsposAxis(colStartLine, colEndLine, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
+            // rtl: the inline (column) axis runs right→left, so mirror the resolved
+            // area around the containing block's padding box (CSS Grid §9.2).
+            if (rtl)
+            {
+                double m = padLeft + padRight;
+                (left, right) = (m - right, m - left);
+            }
             var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge,
                 rowCount, contentTop, padTop, padBottom);
             PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);

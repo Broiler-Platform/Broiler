@@ -39,7 +39,7 @@ do not yet *pass* because of Workstream A below.
 | 1 | `grid-lanes/subgrid/…/column-subgrid-auto-fill-003` | 0.8 % | 0.8 % | Experimental `grid-lanes` + multi-column named-line subgrid | **G** |
 | 2 | `subgrid/orthogonal-writing-mode-006` | 5.6 % | 5.6 % | Subgrid across an orthogonal flow | **F** |
 | 3 | `grid-lanes/intrinsic-sizing/grid-lanes-quirks-fill-viewport` | 11.6 % | 11.6 % | `grid-lanes` intrinsic sizing (quirks) | **G** |
-| 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | LTR 64/64⁵ | RTL variants; CI pixel score | **D** |
+| 4 | `abspos/grid-positioned-items-within-grid-implicit-track-001` | 23.4 % | LTR+RTL⁵ | CI pixel score | **D** |
 | 5 | `nested-grid-item-block-size-001` | 27.3 % | img no longer collapses² | Residual `ul`/`li` + font tail (CI pixel score pending) | **B** |
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Baseline self-alignment synthesis (transposition OK⁶) | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | gap aliases fixed⁴ | Named-line/percentage-track decline; fit-content grid width | **E** |
@@ -436,9 +436,15 @@ before-grid line is byte-identical:
 green, byte-identical pass set on vendored css-anchor-position (40) + css-align (28)
 + css-backgrounds (61) (0 status diffs across 129 tests).
 
-**Still open:** the test's 8 **`directionRTL`** variants (the grid engine's RTL
-column-axis mirroring is separate), and the full `css-grid/abspos` **pixel** score
-on CI. The leading-implicit-track foundation also generally unblocks in-flow
+**RTL now also fixed (this session).** The 8 **`directionRTL`** variants exercised
+the grid engine's RTL column-axis mirroring, which was absent (RTL laid out
+identically to LTR). Added it for both in-flow items (mirror the resolved column
+edges within the content box — which also flips `justify-content` start↔end) and
+abspos items (mirror the resolved area around the padding box, CSS Grid §9.2).
+Verified against the test's RTL values (magenta `offset-x -85`, all 4 sampled
+abspos cases exact — 32/32 assertions), guard `GridRtlTests`, 0 regressions. Only
+the full `css-grid/abspos` **pixel** score on CI remains. The leading-implicit-track
+foundation also generally unblocks in-flow
 negative-line placement, not just this test.
 
 **Key files.** `Broiler.Layout/Engine/CssBoxGrid.cs` (`ParseSingleGridLine`, the
@@ -565,9 +571,10 @@ named-line auto-fill. **Risk: high, value: low.**
    `grid-column-gap` were dropped → no gutter). Remaining sub-grids blocked on
    named-line track support, grid-track-based `fit-content` width, and
    percentage-track sizing — each a distinct follow-up.
-5. **D** — item #4: ✅ **LTR passes 64/64** — implemented leading implicit tracks
-   (negative before-grid lines) for in-flow items + abspos line-to-area resolution.
-   Remaining: the `directionRTL` variants and the CI pixel score.
+5. **D** — item #4: ✅ **LTR + RTL** — leading implicit tracks (negative before-grid
+   lines) + abspos line-to-area resolution (LTR 64/64), then RTL column-axis
+   mirroring for in-flow and abspos items (RTL values exact, `GridRtlTests`).
+   Remaining: the CI pixel score.
 6. **A** — vertical-writing-mode grids: ✅ **transposition already works** (this
    session — placement, content distribution, self alignment all verified;
    guard `GridVerticalWritingModeTests`). Re-scoped from "multi-day rewrite" to two
