@@ -335,6 +335,21 @@ internal static class CssUtils
             case "grid-column":
                 cssBox.GridColumn = value;
                 break;
+            case "grid-area":
+                ApplyGridAreaShorthand(cssBox, value);
+                break;
+            case "grid-row-start":
+                SetGridLineSide(cssBox, isRow: true, isStart: true, value);
+                break;
+            case "grid-row-end":
+                SetGridLineSide(cssBox, isRow: true, isStart: false, value);
+                break;
+            case "grid-column-start":
+                SetGridLineSide(cssBox, isRow: false, isStart: true, value);
+                break;
+            case "grid-column-end":
+                SetGridLineSide(cssBox, isRow: false, isStart: false, value);
+                break;
             case "grid-template-columns":
                 cssBox.GridTemplateColumns = value;
                 break;
@@ -698,6 +713,63 @@ internal static class CssUtils
         cssBox.GridAutoFlow = "row";
         cssBox.GridAutoRows = "auto";
         cssBox.GridAutoColumns = "auto";
+    }
+
+    /// <summary>
+    /// CSS Grid §8.4: expand <c>grid-area</c>
+    /// (<c>&lt;row-start&gt; / &lt;col-start&gt; / &lt;row-end&gt; / &lt;col-end&gt;</c>,
+    /// 1–4 slash-separated components) into the <c>grid-row</c>/<c>grid-column</c>
+    /// (<c>start / end</c>) longhands the placement reader consumes. An omitted end
+    /// mirrors its start when the start is a custom-ident (a named line), else it is
+    /// <c>auto</c>; a lone custom-ident sets all four edges (§8.4).
+    /// </summary>
+    private static void ApplyGridAreaShorthand(CssBox cssBox, string value)
+    {
+        var parts = value.Split('/');
+        string rs = parts.Length > 0 ? parts[0].Trim() : "auto";
+        string cs = parts.Length > 1 ? parts[1].Trim() : Mirror(rs);
+        string re = parts.Length > 2 ? parts[2].Trim() : Mirror(rs);
+        string ce = parts.Length > 3 ? parts[3].Trim() : Mirror(cs);
+        if (rs.Length == 0) rs = "auto";
+        cssBox.GridRow = CombineGridLine(rs, re);
+        cssBox.GridColumn = CombineGridLine(cs, ce);
+
+        // A custom-ident (named line) mirrors to the opposite edge; a number/span/
+        // auto does not.
+        static string Mirror(string s) => IsCustomIdent(s) ? s : "auto";
+    }
+
+    /// <summary>Set one edge (<paramref name="isStart"/>) of <c>grid-row</c>/
+    /// <c>grid-column</c> from a <c>grid-*-start</c>/<c>grid-*-end</c> longhand,
+    /// preserving the other edge already stored.</summary>
+    private static void SetGridLineSide(CssBox cssBox, bool isRow, bool isStart, string value)
+    {
+        string cur = isRow ? cssBox.GridRow : cssBox.GridColumn;
+        int slash = cur?.IndexOf('/') ?? -1;
+        string start = slash >= 0 ? cur.Substring(0, slash).Trim()
+                     : string.IsNullOrWhiteSpace(cur) ? "auto" : cur.Trim();
+        string end = slash >= 0 ? cur.Substring(slash + 1).Trim() : "auto";
+        if (isStart) start = value.Trim(); else end = value.Trim();
+        string combined = CombineGridLine(start, end);
+        if (isRow) cssBox.GridRow = combined; else cssBox.GridColumn = combined;
+    }
+
+    private static string CombineGridLine(string start, string end)
+    {
+        if (string.IsNullOrWhiteSpace(start)) start = "auto";
+        return string.IsNullOrWhiteSpace(end) || end == "auto" ? start : start + " / " + end;
+    }
+
+    /// <summary>True for a grid-line custom-ident (a named line) — not a number,
+    /// <c>auto</c>, or a <c>span</c> expression.</summary>
+    private static bool IsCustomIdent(string s)
+    {
+        s = s?.Trim() ?? "";
+        if (s.Length == 0 || s.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("span", StringComparison.OrdinalIgnoreCase))
+            return false;
+        char c = s[0];
+        return !(char.IsDigit(c) || c == '-' || c == '+' || c == '.');
     }
 
     private static readonly string[] DisplayOutsideKeywords = ["block", "inline", "run-in"];

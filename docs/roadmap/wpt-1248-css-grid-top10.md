@@ -476,11 +476,21 @@ alias). **Zero regressions** — 23 grid guards green, byte-identical pass set o
 vendored css-align (28) + css-anchor-position (40).
 
 **Still open (each blocks a distinct group of the 16 sub-grids, separate work):**
-- **Named-line templates decline the real §11 pass** (tests 5/6/12,
-  `gridMultipleFixed = [first]37px[foo]…`): named lines still route to the
-  single-column approximation (cluster 28's documented decline), which does no
-  gutters/2-D placement. The largest remaining group — needs named-line track
-  support before its gutter assertions can pass.
+- **Named-line templates (tests 5/6/12, `gridMultipleFixed = [first]37px[foo]…`) —
+  corrected + partly fixed (this session).** The premise ("named lines decline the
+  pass") was stale: `ParseTrackTokens` already **skips** `[name]` brackets, so the
+  named-line *track sizes* parse and the pass engages. The real blockers were
+  **placement**, in two parts:
+  - **`grid-area` shorthand + `grid-*-start`/`grid-*-end` longhands were dropped** —
+    Broiler parsed only `grid-row`/`grid-column`, so `grid-area:3/3` (test 5's
+    `thirdRowThirdColumn`) and `grid-column-end:foo` (test 6) auto-placed into the
+    wrong cell. ✅ **Fixed** (`ApplyGridAreaShorthand` + `SetGridLineSide` in
+    `CssUtils`; guard `GridPlacementShorthandTests`, 0 regressions). Test 5 now
+    places correctly (numeric + `grid-area`).
+  - **Named-line *placement resolution*** (`grid-column: bar`, `grid-row: 1 / bar`)
+    — still open: `ParseSingleGridLine` maps a named line to `auto`. Needs a
+    per-axis line-name → index map from the template, threaded into placement.
+    Blocks tests 6/12.
 - **`width:fit-content` grid intrinsic width — ✅ implemented (this session, see
   Workstream A).** A grid with a fixed column template now sums its column tracks
   (+ gaps + padding/border) for `min-content`/`max-content`/`fit-content`/`float`,
