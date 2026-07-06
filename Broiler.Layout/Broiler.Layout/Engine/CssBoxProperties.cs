@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using CssConstants = Broiler.CSS.CssConstants;
+using CssMetrics = Broiler.CSS.CssMetrics;
 using CssValueParser = Broiler.CSS.CssLengthParser;
 using CssLength = Broiler.CSS.CssLength;
 using CssUnit = Broiler.CSS.CssUnit;
@@ -1545,7 +1546,7 @@ internal abstract class CssBoxProperties
 
     protected abstract CssBoxProperties GetParent();
 
-    public double GetEmHeight() => ActualFont.Size * (96.0 / 72.0);
+    public double GetEmHeight() => ActualFont.Size * CssMetrics.PtToPx;
 
     protected double ParseLengthWithLineHeight(string length, double hundredPercent)
     {
@@ -1613,14 +1614,14 @@ internal abstract class CssBoxProperties
         // 'normal' line height by ~1.33x (e.g. Arial 32px produced a 50px
         // line box instead of the ~37px browsers use).
         double fontHeight = ActualFont.Height;
-        return fontHeight > 0 ? Math.Ceiling(fontHeight) : GetEmHeight() * 1.2;
+        return fontHeight > 0 ? Math.Ceiling(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
     }
 
     private double GetRootEmHeight()
     {
         var root = GetEffectiveRootBoxProperties();
 
-        const double baseRootEmHeight = CssConstants.FontSize * (96.0 / 72.0);
+        const double baseRootEmHeight = CssMetrics.DefaultFontSizePx;
         if (!string.IsNullOrWhiteSpace(root.FontSize))
         {
             var resolved = CssValueParser.ParseLength(
@@ -1630,8 +1631,8 @@ internal abstract class CssBoxProperties
                 null,
                 false,
                 false,
-                baseRootEmHeight * 1.2,
-                baseRootEmHeight * 1.2);
+                baseRootEmHeight * CssMetrics.NormalLineHeightFactor,
+                baseRootEmHeight * CssMetrics.NormalLineHeightFactor);
 
             if (!double.IsNaN(resolved) && resolved > 0)
                 return resolved;

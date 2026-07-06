@@ -6,14 +6,16 @@ namespace Broiler.Layout.Tests;
 /// <summary>
 /// Freezes the <c>Broiler.Layout</c> dependency boundary for the layout extraction
 /// (see <c>docs/roadmap/broiler-layout-component.md</c> §3, §7). The component may
-/// reference only <c>Broiler.CSS</c>, <c>Broiler.CSS.Dom</c>, <c>Broiler.Dom</c>
-/// and the BCL; it must not leak the renderer, bridge, JavaScript or graphics
-/// backends through its public surface.
+/// reference only <c>Broiler.CSS</c>, <c>Broiler.CSS.Dom</c>, <c>Broiler.Dom</c>,
+/// the backend-agnostic <c>Broiler.Graphics</c> primitive layer (color/font
+/// metrics — <c>BColor</c>, <c>ILayoutFont</c>; no concrete rasterizer), and the
+/// BCL. It must not leak the renderer, bridge, JavaScript, or any concrete
+/// graphics backend through its public surface.
 /// </summary>
 public sealed class LayoutArchitectureTests
 {
     [Fact]
-    public void Production_Project_References_Only_Css_And_Dom()
+    public void Production_Project_References_Only_Css_Dom_And_Graphics_Primitives()
     {
         var project = XDocument.Load(FindProjectPath());
         var references = project
@@ -22,7 +24,11 @@ public sealed class LayoutArchitectureTests
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["Broiler.CSS", "Broiler.CSS.Dom", "Broiler.Dom"], references);
+        // Broiler.Graphics is the backend-agnostic primitive layer (BColor,
+        // ILayoutFont). A concrete backend (e.g. Broiler.Graphics.Windows) must
+        // NOT appear here — this allowlist is the structural gate that keeps them
+        // out of the layout engine.
+        Assert.Equal(["Broiler.CSS", "Broiler.CSS.Dom", "Broiler.Dom", "Broiler.Graphics"], references);
         Assert.Empty(project.Descendants("PackageReference"));
     }
 
@@ -60,7 +66,10 @@ public sealed class LayoutArchitectureTests
                 type.Namespace!.StartsWith("Broiler.HtmlBridge", StringComparison.Ordinal) ||
                 type.Namespace.StartsWith("Broiler.HTML", StringComparison.Ordinal) ||
                 type.Namespace.StartsWith("Broiler.JavaScript", StringComparison.Ordinal) ||
-                type.Namespace.StartsWith("Broiler.Graphics", StringComparison.Ordinal))
+                // Concrete graphics backends (e.g. Broiler.Graphics.Windows) must not
+                // leak; the backend-agnostic core (namespace "Broiler.Graphics" exactly:
+                // BColor, ILayoutFont) is an allowed primitive dependency.
+                type.Namespace.StartsWith("Broiler.Graphics.", StringComparison.Ordinal))
             .Distinct()
             .ToArray();
 

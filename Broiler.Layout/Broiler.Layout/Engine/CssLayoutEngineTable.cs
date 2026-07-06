@@ -349,7 +349,10 @@ internal sealed class CssLayoutEngineTable
 
                 if (len.IsPercentage) //Get width as a percentage
                 {
-                    _columnWidths[i] = CssValueParser.ParseNumber(_columns[i].Width, availCellSpace);
+                    // len.Number already holds the percentage as a fraction (parsed
+                    // against a 100%-basis of 1), so scale it here instead of
+                    // re-parsing the same string via ParseNumber.
+                    _columnWidths[i] = len.Number * availCellSpace;
                 }
                 else if (len.Unit == CssUnit.Px || len.Unit == CssUnit.None)
                 {
