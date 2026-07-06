@@ -358,12 +358,14 @@ public sealed class GridTrackLayoutTests
     public void GridAutoFillRows_ResolveCountFromMinHeight()
     {
         // repeat(auto-fill, 50px) rows with an indefinite height but a definite
-        // min-height:160px -> 3 tracks (160 / 50 = 3.2 -> 3). Row edges: 0-50,
-        // 50-100, 100-150; `grid-row: -3` is the first of the three tracks.
+        // min-height:160px. Per CSS Grid §7.2.3.2 a definite *min* size fills with
+        // the smallest repetition count that reaches it (ceil), so 160/50 = 3.2 -> 4
+        // tracks (not floor's 3). Row edges: 0-50, 50-100, 100-150, 150-200;
+        // `grid-row: -3` (line 3 of the five) is the third track -> y=100.
         string html = GridDoc("width:100px;min-height:160px;grid-template-columns:100px;grid-template-rows:repeat(auto-fill,50px);",
             ("grid-column:1;grid-row:1;", 0, 0, 100, 50),
             ("grid-column:1;grid-row:3;", 0, 100, 100, 50),
-            ("grid-column:1;grid-row:-3;", 0, 50, 100, 50));
+            ("grid-column:1;grid-row:-3;", 0, 100, 100, 50));
         AssertCheckLayout(html, "file:///grid-auto-fill-rows.html");
     }
 

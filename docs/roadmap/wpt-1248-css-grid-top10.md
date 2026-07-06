@@ -44,7 +44,7 @@ do not yet *pass* because of Workstream A below.
 | 6 | `alignment/grid-align-baseline-vertical` | 34.1 % | 49.4 % | Baseline self-alignment synthesis (transposition OK⁶) | **A** |
 | 7 | `grid-model/grid-gutters-and-tracks-001` | 35.8 % | gap aliases fixed⁴ | Named-line/percentage-track decline; fit-content grid width | **E** |
 | 8 | `alignment/grid-align-content-distribution-vertical-rl` | 36.2 % | 94.7 % | Page-level paragraph drift + font (transposition OK⁶) | **A** |
-| 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 9/12 cases³ | 3 `border-box` variants (border-box + auto-fill + min-height) | **C** |
+| 9 | `grid-definition/grid-auto-repeat-min-size-001` | 43.8 % | 12/12 cases³ | CI pixel score | **C** |
 | 10 | `alignment/grid-align-justify-margin-border-padding-vertical-rl` | 45.1 % | 61.4 % | fit-content grid width + margin/border/padding (transposition OK⁶) | **A** |
 
 ¹ (superseded — see ² and Workstream B) The pre-fix "~84 %" was an optimistic
@@ -59,11 +59,15 @@ and the test lays out identically to `-ref.html` in-sandbox. Ledger clusters 34
 `Broiler.CSS` commit `5a4fae1`, pointer bumped) remain the prerequisites. The full
 css-grid pixel score is a CI item (corpus not vendored).
 
-³ Scored in-sandbox via the check-layout geometry harness (Workstream C, this
-session): **9 of 12** cases now fully correct after two fixes — a `min-height`
-clamp on a float's explicit height, and intrinsic-sizing width keywords
-(`min-content`/`max-content`/`fit-content`). The 3 `box-sizing:border-box` variants
-remain (border-box + auto-fill-count + `min-height`). Full pixel score is a CI item.
+³ Scored in-sandbox via the check-layout geometry harness (Workstream C): **all 12
+of 12** cases now fully correct. The first pass fixed a `min-height` clamp on a
+float's explicit height and intrinsic-sizing width keywords
+(`min-content`/`max-content`/`fit-content`); this session's follow-up closed the 3
+`box-sizing:border-box` variants with two more root causes — the auto-fill count
+under a definite *min*-size uses ceil (smallest count that reaches it, §7.2.3.2),
+not floor, and an intrinsic-sizing *height* keyword under `border-box` must keep the
+content-derived height rather than be reinterpreted as a border-box length. Full
+pixel score is a CI item.
 
 ⁴ Workstream E (this session): the primary defect was the missing legacy gap
 aliases (`grid-gap`/`grid-row-gap`/`grid-column-gap` were dropped → no gutter),
@@ -364,13 +368,40 @@ aspect/table/percent Cli.Tests green, and the runner over vendored
 **css-anchor-position (40) + css-align (28) + css-backgrounds (61)** shows a
 **byte-identical pass set** before/after (0 status diffs across 129 tests).
 
-**Still open (the 3 `box-sizing:border-box` variants g9/g11/g12).** They resolve to
-a 200 border-box height where WPT expects 220 — a border-box + auto-fill-row-count +
-`min-height` subtlety (whether the row count is computed against the border-box or
-content-box `min-height`), further tangled by a float-context dependence (g10's
-border-box width resolves correctly only when preceded by g9 in the DOM). This is a
-separate border-box sizing increment; the full pixel score of all 12 still lands on
-CI.
+**✅ The 3 `box-sizing:border-box` variants g9/g11/g12 now fixed (this session) —
+grid-auto-repeat-min-size-001 is 12/12.** They resolved to a 200 border-box height
+where WPT expects 220; two distinct root causes, reproduced in the geometry harness
+(g9=320×220 item (200,150), g10 correctly 300×200 (100,100) — a definite height so it
+keeps floor, g11/g12=320×220 (200,150)):
+
+1. **Auto-fill repetition count under a definite *min*-size floored instead of
+   ceiling.** `ExpandAutoRepeatTrackList` computed the count as the largest that does
+   not overflow the available size (floor) — correct when the available size is a
+   definite *size* or *max-size*, but a definite *min*-size (indefinite used size) is
+   filled by the *smallest* count that reaches it (ceil, §7.2.3.2). The g1–g8 min-
+   sizes are clean track multiples (200/50=4, 300/100=3) so floor=ceil hid the bug;
+   with `box-sizing:border-box` the content min-height is 200−20=180, so the row
+   count is ⌈180/50⌉=4 (floor gave 3 → a 200-tall box with the item one row too high).
+   Fixed by threading a `fillMinimum` flag from `ComputeAutoRepeatBlockSize` (set only
+   when the returned block size came from `min-height` with **no** definite height, so
+   g10's definite explicit height still floors) into the count computation, which
+   ceils in that case. Only the row axis is threaded — the column path is unchanged
+   (byte-identical widths). Also corrected `GridTrackLayoutTests.GridAutoFillRows_
+   ResolveCountFromMinHeight`, which had encoded the old floored count.
+2. **Intrinsic-sizing *height* keyword under `border-box` dropped the border.**
+   `height:min-content`/`max-content` on the float was treated as a specified length:
+   the explicit-height branches fed the already content-derived `ActualHeight` (200,
+   the grid's 4-row content) into `ResolveSpecifiedHeightToBorderBox`, which under
+   `box-sizing:border-box` returns it unchanged as the *border-box* height → 200
+   instead of 220. Fixed with `IsIntrinsicSizingHeightKeyword`, which excludes such a
+   keyword from the two "explicit length height" branches (`CssBox`) so the content-
+   computed height stands and only the §10.7 min/max clamp applies.
+
+Both fixes are gated to the intrinsic/min case, so the vendored **css-align (19/28) +
+css-anchor-position (30/40) + css-backgrounds (39/61)** subsets are byte-identical
+before/after (0 regressions), and 93 grid/aspect/table/percent Cli.Tests stay green.
+Guard `GridAutoRepeatMinSizeTests` now asserts all 12 variants. The full pixel score
+of all 12 still lands on CI (corpus not vendored).
 
 <details><summary>Original (pre-reproduction) analysis — superseded</summary>
 
@@ -556,12 +587,13 @@ named-line auto-fill. **Risk: high, value: low.**
 1. **B** — ✅ replaced-item-in-grid **height collapse fixed** (item #5 no longer
    renders blank; lays out identically to `-ref.html` in-sandbox). Remaining: the
    ~16 % `ul`/`li` + font tail and the full css-grid pixel score, both CI items.
-2. **C** — item #9: ✅ **9/12 cases now correct** — beyond the earlier
-   percentage-width balloon fix, this session scored all 12 `checkLayout` variants
-   in-sandbox and fixed two more root causes: a `min-height` clamp on a float's
-   explicit height, and intrinsic-sizing width keywords (`min-content`/
-   `max-content`/`fit-content`). See Workstream C. Remaining: the 3 `border-box`
-   variants (border-box + auto-fill + min-height) and the full pixel score on CI.
+2. **C** — item #9: ✅ **12/12 cases now correct** — after the earlier
+   percentage-width balloon fix and the `min-height`-float-clamp / intrinsic-width-
+   keyword fixes, this session closed the last 3 `box-sizing:border-box` variants:
+   the auto-fill count under a definite *min*-size ceils (not floors, §7.2.3.2), and
+   an intrinsic-sizing *height* keyword under `border-box` keeps its content-derived
+   height. See Workstream C. Remaining: the full pixel score on CI (corpus not
+   vendored).
 3. **The #8 ~5 % vertical text-drift** — investigated (this session): it is a UA
    default paragraph/line-box rhythm difference on a plain intro `<p>`, **not** a
    bounded sandbox win — its fix surface is a high-blast-radius UA default that is

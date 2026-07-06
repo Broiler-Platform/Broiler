@@ -60,6 +60,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             || v.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>CSS Sizing 3: <c>true</c> for a content-based intrinsic <c>height</c>
+    /// keyword. A block box's min-/max-/fit-content block size is its content
+    /// height, so such a height must not be treated as a specified length (which,
+    /// under <c>box-sizing:border-box</c>, would wrongly reinterpret the already
+    /// content-derived height as a border-box value and drop the border/padding);
+    /// leave the content-computed <c>ActualBottom</c> in place and let the §10.7
+    /// min-/max-height clamp apply.</summary>
+    private static bool IsIntrinsicSizingHeightKeyword(string value) =>
+        IsIntrinsicSizingWidthKeyword(value);
+
     private double ResolveSpecifiedHeightToBorderBox(double cssHeight)
     {
         if (!UsesBorderBoxSizing)
@@ -2081,8 +2091,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         // CSS content-box model: 'height' specifies the content height only;
-        // padding and border are additive (CSS2.1 §10.6.3).
-        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        // padding and border are additive (CSS2.1 §10.6.3). An intrinsic-sizing
+        // height keyword (min-/max-/fit-content) is not a length — the content
+        // height already in ActualBottom is its used value, so leave it be.
+        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+            && !IsIntrinsicSizingHeightKeyword(Height))
         {
             // CSS2.1 §10.5: If height is a percentage and the containing
             // block's height is not explicitly specified (auto), the
@@ -2230,7 +2243,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // content overflow from child floats (CSS2.1 §10.6.1).
         // CSS2.1 §10.5: Percentage heights resolve to auto when
         // the containing block's height is not explicitly specified.
-        if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+            && !IsIntrinsicSizingHeightKeyword(Height))
         {
             if (!HeightPercentageResolvesToAuto())
             {

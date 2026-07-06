@@ -143,7 +143,7 @@ internal partial class CssBox
         // (or a definite min-height when the height is indefinite), else 0 → one
         // repetition. Gaps enter the repeat-to-fill count, so resolve them here.
         double autoRepeatColGap = ResolveGridGap(ColumnGap, contentWidth, em);
-        double autoRepeatBlock = ComputeAutoRepeatBlockSize(em);
+        double autoRepeatBlock = ComputeAutoRepeatBlockSize(em, out bool autoRepeatBlockFromMin);
         double autoRepeatRowGap = ResolveGridGap(RowGap, autoRepeatBlock, em);
 
         // Parse both axes' explicit track lists into sizing functions. A null list
@@ -155,7 +155,7 @@ internal partial class CssBox
             : ParseTrackListMaybeAutoRepeat(GridTemplateColumns, em, contentWidth, autoRepeatColGap);
         List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes)
             : rowOrphanSubgrid ? new List<GridTrackSpec>()
-            : ParseTrackListMaybeAutoRepeat(GridTemplateRows, em, autoRepeatBlock, autoRepeatRowGap);
+            : ParseTrackListMaybeAutoRepeat(GridTemplateRows, em, autoRepeatBlock, autoRepeatRowGap, autoRepeatBlockFromMin);
 
         // When one axis is a resolved subgrid (or an orphan subgrid resolved to
         // none), the other axis may legitimately be implicit-only (e.g. a column
@@ -1202,9 +1202,9 @@ internal partial class CssBox
     /// <c>auto-fit</c>, or combined with subgrid) returns <c>null</c> to decline.
     /// </summary>
     private List<GridTrackSpec> ParseTrackListMaybeAutoRepeat(string value, double em,
-        double availableSize, double gap)
+        double availableSize, double gap, bool fillMinimum = false)
     {
-        var expanded = ExpandAutoRepeatTrackList(value, em, availableSize, gap, out bool hasAutoRepeat);
+        var expanded = ExpandAutoRepeatTrackList(value, em, availableSize, gap, fillMinimum, out bool hasAutoRepeat);
         if (hasAutoRepeat)
             return expanded;               // resolved list, or null to decline
         return ParseTrackList(value, em);  // no auto-repeat — ordinary parse
@@ -1223,7 +1223,7 @@ internal partial class CssBox
     /// <see cref="MaxGridLine"/> tracks.
     /// </summary>
     private List<GridTrackSpec> ExpandAutoRepeatTrackList(string value, double em,
-        double availableSize, double gap, out bool hasAutoRepeat)
+        double availableSize, double gap, bool fillMinimum, out bool hasAutoRepeat)
     {
         hasAutoRepeat = false;
         if (string.IsNullOrWhiteSpace(value))
@@ -1310,7 +1310,10 @@ internal partial class CssBox
         int nFixed = before.Count + after.Count;
         int nAuto = auto.Count;
 
-        // Largest k ≥ 1 with sumFixed + k·sumAuto + (nFixed + k·nAuto − 1)·gap ≤ available.
+        // When available is a definite size, the largest k ≥ 1 that does not overflow
+        // it (floor); when it is a definite *min* size (fillMinimum), the smallest
+        // k ≥ 1 that reaches it (ceil) — §7.2.3.2. Both from
+        // sumFixed + k·sumAuto + (nFixed + k·nAuto − 1)·gap  vs  available.
         int k = 1;
         double denom = sumAuto + nAuto * gap;
         if (availableSize > 0 && !double.IsInfinity(availableSize) && !double.IsNaN(availableSize)
@@ -1318,7 +1321,9 @@ internal partial class CssBox
         {
             double numer = availableSize - sumFixed - (nFixed - 1) * gap;
             double kf = numer / denom;
-            k = kf >= 1 ? (int)Math.Floor(kf + 1e-6) : 1;
+            k = fillMinimum
+                ? (kf > 1 ? (int)Math.Ceiling(kf - 1e-6) : 1)
+                : (kf >= 1 ? (int)Math.Floor(kf + 1e-6) : 1);
         }
         if (k < 1) k = 1;
         // Bound the expansion so a tiny track in a large area cannot allocate a
@@ -1376,9 +1381,16 @@ internal partial class CssBox
     /// <c>box-sizing:border-box</c>). Returns 0 when the block size is indefinite,
     /// which resolves auto-fill to a single repetition.
     /// </summary>
-    private double ComputeAutoRepeatBlockSize(double em)
+    private double ComputeAutoRepeatBlockSize(double em, out bool fromMinConstraint)
     {
-        double h = TryGetDefiniteContentHeight(em, out double dh) ? dh : 0;
+        // A definite (used) block size fills the repeat with the largest count that
+        // does not overflow it (§7.2.3.2 — floor); an *indefinite* block size with a
+        // definite min-height instead fills with the smallest count that reaches the
+        // minimum (ceil). Report which case produced the returned size so the caller
+        // rounds the repeat count the correct way.
+        fromMinConstraint = false;
+        bool hasDefinite = TryGetDefiniteContentHeight(em, out double dh);
+        double h = hasDefinite ? dh : 0;
         if (!string.IsNullOrEmpty(MinHeight) && MinHeight != "0"
             && !MinHeight.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
             && !MinHeight.EndsWith("%", StringComparison.Ordinal))
@@ -1389,7 +1401,14 @@ internal partial class CssBox
                 if (UsesBorderBoxSizing)
                     mh -= ActualPaddingTop + ActualPaddingBottom
                         + ActualBorderTopWidth + ActualBorderBottomWidth;
-                if (mh > h) h = mh;
+                if (mh > h)
+                {
+                    h = mh;
+                    // Only a min-height with no definite used height fills to the
+                    // minimum (ceil); when a definite height exists the used size is
+                    // definite even if the min raised it, so it still floors.
+                    if (!hasDefinite) fromMinConstraint = true;
+                }
             }
         }
         return h > 0 ? h : 0;
