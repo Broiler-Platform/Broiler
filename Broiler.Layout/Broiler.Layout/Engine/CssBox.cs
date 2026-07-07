@@ -214,6 +214,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         set { _htmlContainer = value; }
     }
 
+    private bool? _documentQuirksMode;
+
+    /// <summary>
+    /// Whether the document being laid out is in quirks mode. Captured once —
+    /// from <see cref="Dom.DocumentModeContext"/>, which the HTML parser publishes
+    /// on the parse thread — onto the tree root the first time layout consults it,
+    /// then read from the root by every box. Caching on the root makes the value
+    /// survive re-layout passes (which may run on a different thread, where the
+    /// thread-local would have reset) without threading it through the box builder.
+    /// </summary>
+    internal bool DocumentQuirksMode
+    {
+        get
+        {
+            var root = this;
+            while (root._parentBox != null)
+                root = root._parentBox;
+            root._documentQuirksMode ??= DocumentModeContext.CurrentQuirksMode;
+            return root._documentQuirksMode.Value;
+        }
+    }
+
     /// <summary>
     /// Host-injected layout environment (see <see cref="ILayoutEnvironment"/>),
     /// resolved up the box tree like <see cref="ContainerInt"/>. Set on the root
@@ -2172,6 +2194,40 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             && TryResolveAspectRatioBlockHeight(out double aspectRatioBorderBoxHeight))
         {
             ActualBottom = Location.Y + aspectRatioBorderBoxHeight;
+        }
+
+        // Quirks-mode "the body element fills the html element" / "the html
+        // element fills the viewport" quirks (https://quirks.spec.whatwg.org/):
+        // in quirks mode an auto-height root <html> fills the viewport (minus its
+        // margins) and an auto-height <body> fills the html element's content box
+        // (minus its own margins), instead of shrink-wrapping to content. Acts as
+        // a floor (content taller than the fill still overflows/scrolls).
+        if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+            && DocumentQuirksMode
+            && LayoutEnvironment != null
+            && Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            && Float == CssConstants.None
+            && HtmlTag != null)
+        {
+            double? fillBorderBoxHeight = null;
+            if (HtmlTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                fillBorderBoxHeight = LayoutEnvironment.ViewportSize.Height
+                    - ActualMarginTop - ActualMarginBottom;
+            }
+            else if (HtmlTag.Name.Equals("body", StringComparison.OrdinalIgnoreCase)
+                && ParentBox is { HtmlTag: { } parentTag }
+                && parentTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                var html = ParentBox;
+                double htmlContentHeight = LayoutEnvironment.ViewportSize.Height
+                    - html.ActualMarginTop - html.ActualMarginBottom
+                    - html.ActualBorderTopWidth - html.ActualBorderBottomWidth
+                    - html.ActualPaddingTop - html.ActualPaddingBottom;
+                fillBorderBoxHeight = htmlContentHeight - ActualMarginTop - ActualMarginBottom;
+            }
+            if (fillBorderBoxHeight is { } fillH && fillH > ActualBottom - Location.Y)
+                ActualBottom = Location.Y + fillH;
         }
 
         // CSS2.1 §10.7: Apply min-height / max-height constraints.

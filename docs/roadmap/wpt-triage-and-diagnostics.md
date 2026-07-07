@@ -737,10 +737,19 @@ single fix flips them:
   over/under-sizes the grey subgrid bands. Still open (the harder half of the cluster).
 - **#2 `subgrid/orthogonal-writing-mode-006`** — same subgrid feature across an orthogonal flow; Broiler
   blows the fit-content outer grid up to the viewport.
-- **#5 `grid-lanes-quirks-fill-viewport`** — the quirks-mode *body-fills-viewport* / *html-fills-viewport*
-  behaviour (quirks.spec §"the body element fills the html element quirk"). Broiler tracks **no**
-  quirks/standards mode in the DOM→layout path, so even the `display:grid` `-ref` renders the body at
-  content height. Needs doctype→quirks plumbing before the fill can be implemented.
+- **#5 `grid-lanes-quirks-fill-viewport` — ✅ mostly fixed this session (11.6% → 98.1%).** The quirks-mode
+  *body-fills-viewport* / *html-fills-viewport* behaviour (quirks.spec §"the body element fills the html
+  element quirk"). Broiler tracked no quirks/standards mode, so an auto-height body shrink-wrapped to
+  content. Added a **main-repo-only** quirks pipeline (no submodule change — `Broiler.DOM` is an unpushable
+  submodule and the main repo must compile against its pinned commit): a thread-local
+  `Broiler.Layout.DocumentModeContext` (mirroring `CssLengthParser`'s per-render viewport state) that
+  `DomBridge` sets from the doctype on parse — every WPT render parses through the bridge before laying
+  out — and which `CssBox` caches on the tree root and consults to grow an auto `<html>`/`<body>` to the
+  viewport / html content minus margins. The residual ~1.9% is the body's vertical position: Broiler adds
+  the child `<p>`'s top margin to the body position instead of collapsing it through (a general
+  parent/first-child margin-collapse behaviour, not the fill quirk). Guard `QuirksBodyFillTests`
+  (doctype→quirks detection; the fill itself is pixel-verified by the reftest — the check-layout harness
+  reports the body rect as the full viewport regardless of mode).
 - **#7 `alignment/grid-align-baseline-vertical`** — vertical-writing-mode grid **intrinsic (block-axis)
   width** + **baseline self-alignment** (Workstream A's open tail): the `writing-mode:vertical-rl` grids
   size their physical width to the viewport instead of shrink-wrapping their rows.

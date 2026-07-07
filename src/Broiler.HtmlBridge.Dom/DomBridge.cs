@@ -696,6 +696,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             _knownNodes.Add(doctype);
         }
 
+        // Publish the document's quirks mode for the render that follows on this
+        // thread. Layout (which on the HTML-string path holds no back-reference to
+        // the document) reads it while sizing the root/body boxes for the
+        // quirks-mode fill-viewport behaviour. Every WPT render runs through this
+        // parse before laying out, so the flag is set for the render that matters.
+        Broiler.Layout.DocumentModeContext.CurrentQuirksMode =
+            Broiler.Layout.DocumentModeContext.IsQuirksHtml(html);
+
         // Use WHATWG-aligned tokeniser & tree builder
         var builder = new HtmlTreeBuilder();
         var (docElement, allElements, title) = builder.Build(html, _document);
