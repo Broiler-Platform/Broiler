@@ -481,8 +481,17 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         {
             _jsContext.Eval(@"
 (function() {
-  if (typeof window.onload === 'function') {
-    try { window.onload(); } catch(e) {}
+  // A page may register the load handler either as `window.onload = fn`
+  // or as a bare `onload = fn` assignment. In a browser `window` IS the
+  // global object so both are the same property; in this engine the global
+  // object and `window` are distinct, so a bare `onload = fn` lands on the
+  // global (globalThis.onload) and never on window.onload. Check both, with
+  // window.onload winning when present.
+  var h = null;
+  if (typeof window.onload === 'function') h = window.onload;
+  else if (typeof onload === 'function') h = onload;
+  if (h) {
+    try { h(); } catch(e) {}
   }
 })();");
         }

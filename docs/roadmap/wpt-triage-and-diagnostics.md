@@ -744,11 +744,18 @@ single fix flips them:
 - **#7 `alignment/grid-align-baseline-vertical`** — vertical-writing-mode grid **intrinsic (block-axis)
   width** + **baseline self-alignment** (Workstream A's open tail): the `writing-mode:vertical-rl` grids
   size their physical width to the viewport instead of shrink-wrapping their rows.
-- **#8 `table-grid-item-dynamic-002`** — three stacked gaps: (a) a `<table>` **grid item is declined as
-  "not simple"** (`GridImplicitPathItemsAreSimple`) and approximated *without laying its content out*, so
-  the `th` text vanishes; (b) **table `<caption>` boxes were dropped entirely** — fixed this session (see
-  below); (c) the `onload` **min-height 500→100 dynamic relayout** does not take effect. Passing needs
-  (a) grid non-simple-item content layout **and** (c) style-mutation reflow, both substantial.
+- **#8 `table-grid-item-dynamic-002` — ✅ layout fixed this session (49% → 98.7%).** Four stacked bugs,
+  each spec-grounded: (a) table `<caption>` boxes were dropped (fixed earlier this session); (b) a bare
+  `onload = fn` never fired because `window` ≠ the global object in the JS engine — a bare assignment
+  lands on `globalThis.onload`, so `FireWindowLoadEvent` now checks both (this made the `min-height`
+  500→100 dynamic relayout take effect); (c) a `<table>` laid out as a grid/inline item had its rows/cells
+  laid out as bare blocks (the table formatting algorithm never ran) so cell text vanished — `FlowInlineBlock`
+  now routes `display:table` through `CssLayoutEngineTable`; (d) a stretched table grid item filled the
+  column but its cells stayed shrink-wrapped and its `min-height` did not grow the row (so the
+  middle-aligned `th` was not vertically centred) — the stretch path re-runs the table at the filled width,
+  and `DistributeExtraTableHeight` now honours `min-height` (measured from the row-area top, below the
+  caption). The residual ~1.3% is glyph-level: the test's `monospace` renders narrower in Broiler than in
+  the reference Chromium (the grey box matches pixel-for-pixel). Guards `TableGridItemTests`.
 
 **Fixed this session — table `<caption>` layout (CSS2.1 §17.4.1).** While root-causing #8 the table
 engine was found to match `display:table-caption` with a bare `case …: break;` — captions were collected

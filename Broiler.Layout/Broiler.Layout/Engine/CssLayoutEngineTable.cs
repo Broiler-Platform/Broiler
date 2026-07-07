@@ -813,7 +813,7 @@ internal sealed class CssLayoutEngineTable
 
         // CSS2.1 §17.5.3: when the table's specified height exceeds the height
         // the rows naturally occupy, distribute the surplus over the rows.
-        maxBottom = DistributeExtraTableHeight(g, rowBounds, maxBottom);
+        maxBottom = DistributeExtraTableHeight(g, rowBounds, maxBottom, starty);
 
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
@@ -940,26 +940,51 @@ internal sealed class CssLayoutEngineTable
     /// </summary>
     private double DistributeExtraTableHeight(
         ILayoutEnvironment g, List<(CssBox Row, double Top, double Bottom)> rowBounds,
-        double naturalBottom)
+        double naturalBottom, double rowAreaTop)
     {
         if (rowBounds.Count == 0)
             return naturalBottom;
-        if (string.IsNullOrEmpty(_tableBox.Height) || _tableBox.Height == CssConstants.Auto)
-            return naturalBottom;
 
-        // Resolve the specified height against the containing block (percentages
-        // need a definite basis; fall back to no-op when unavailable).
         double cbHeight = _tableBox.ContainingBlock?.ActualHeight ?? 0;
-        double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, _tableBox.GetEmHeight());
-        if (double.IsNaN(specHeight) || specHeight <= 0)
-            return naturalBottom;
+        double em = _tableBox.GetEmHeight();
 
-        // Target bottom for the row area = table top + specified content height.
-        // ClientTop already includes the table's top border/padding; the bottom
-        // border/spacing is added by the caller, so target the row content box.
-        double specBottom = _tableBox.Location.Y + specHeight
-            - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
-        double surplus = specBottom - naturalBottom;
+        double target = naturalBottom;
+
+        // CSS2.1 §17.5.3: an explicit table 'height' greater than the content
+        // grows the rows. Target bottom for the row area = table top + specified
+        // content height (ClientTop already includes the top border/padding; the
+        // bottom border/spacing is added by the caller).
+        if (!string.IsNullOrEmpty(_tableBox.Height) && _tableBox.Height != CssConstants.Auto)
+        {
+            double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, em);
+            if (!double.IsNaN(specHeight) && specHeight > 0)
+            {
+                double specBottom = _tableBox.Location.Y + specHeight
+                    - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
+                if (specBottom > target)
+                    target = specBottom;
+            }
+        }
+
+        // CSS2.1 §17.5.3 / §10.7: a 'min-height' greater than the content grows
+        // the rows the same way. In the table wrapper model min-height applies to
+        // the inner table box (the rows), *not* the caption, so measure it from
+        // the row-area top (below any top caption) rather than the table origin —
+        // this is what vertically centres a `vertical-align:middle` cell whose
+        // table has a tall min-height (WPT table-grid-item-dynamic-002).
+        if (!string.IsNullOrEmpty(_tableBox.MinHeight) && _tableBox.MinHeight != "0")
+        {
+            double minH = CssValueParser.ParseLength(_tableBox.MinHeight, cbHeight, em);
+            if (!double.IsNaN(minH) && minH > 0)
+            {
+                double minBottom = rowAreaTop + minH
+                    - _tableBox.ActualBorderTopWidth - _tableBox.ActualBorderBottomWidth;
+                if (minBottom > target)
+                    target = minBottom;
+            }
+        }
+
+        double surplus = target - naturalBottom;
         if (surplus <= 0.5)
             return naturalBottom;
 

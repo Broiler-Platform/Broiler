@@ -5120,6 +5120,33 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // pre-stretch inline width. Grid items are blockified, so clear
                 // the stale inline rects and let paint fall back to Location+Size.
                 child.RectanglesReset();
+
+                // A stretched table grid item is sized to the column width like
+                // any other stretched item, but — unlike a block — its cell grid
+                // was already shrink-wrapped to content by the table formatting
+                // algorithm and does not reflow from a bare Size change. Re-run
+                // that algorithm with the filled width made definite so the
+                // columns (and their centered cell content) span the column
+                // instead of hugging the content (WPT table-grid-item-dynamic-002).
+                if ((child.Display == CssConstants.Table || child.Display == CssConstants.InlineTable)
+                    && child.LayoutEnvironment != null)
+                {
+                    string savedWidth = child.Width;
+                    float savedX = child.Location.X, savedY = child.Location.Y;
+                    // Make the filled width definite and re-run the box's own
+                    // layout (not just the table algorithm) so the §10.7 min-height
+                    // clamp still applies — a bare table-engine call would drop the
+                    // table's min-height and collapse it to content height.
+                    child.Width = targetWidth.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "px";
+                    child.PerformLayout(child.LayoutEnvironment);
+                    child.Width = savedWidth;
+                    // PerformLayout may reposition the box; the caller offsets it
+                    // into its cell next, so restore the pre-relayout origin.
+                    child.OffsetLeft(savedX - child.Location.X);
+                    child.OffsetTop(savedY - child.Location.Y);
+                    child.Size = new SizeF((float)targetWidth, child.Size.Height);
+                    child.ActualRight = child.Location.X + targetWidth;
+                }
             }
         }
         resolvedJustify = js;
