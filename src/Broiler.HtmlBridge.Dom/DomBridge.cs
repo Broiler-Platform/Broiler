@@ -883,8 +883,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         switch (property.ToLowerInvariant())
         {
             case "white-space":
-                return v is "normal" or "nowrap" or "pre" or "pre-wrap"
-                    or "pre-line" or "break-spaces";
+                return IsWhiteSpaceValue(v);
 
             case "display":
                 return v is "block" or "inline" or "inline-block" or "none"
@@ -1003,6 +1002,42 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // || full-size-kana ] | math-auto. The case keywords are mutually exclusive; a
     // valid multi-token value combines at most one case keyword with full-width
     // and/or full-size-kana (in any order), each at most once.
+    // CSS Text 4 §3: white-space is a shorthand for white-space-collapse and
+    // text-wrap-mode. Accepts a legacy single keyword or the two-longhand form
+    // <'white-space-collapse'> || <'text-wrap-mode'> (at most one collapse keyword
+    // combined with at most one wrap keyword, in either order), so modern values
+    // like "preserve-breaks" and "break-spaces nowrap" are not dropped.
+    private static bool IsWhiteSpaceValue(string v)
+    {
+        if (v is "normal" or "nowrap" or "pre" or "pre-wrap" or "pre-line")
+            return true;
+
+        bool collapseSeen = false, wrapSeen = false;
+        foreach (var token in v.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            switch (token)
+            {
+                case "collapse":
+                case "preserve":
+                case "preserve-breaks":
+                case "preserve-spaces":
+                case "break-spaces":
+                    if (collapseSeen) return false;
+                    collapseSeen = true;
+                    break;
+                case "wrap":
+                case "nowrap":
+                    if (wrapSeen) return false;
+                    wrapSeen = true;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return collapseSeen || wrapSeen;
+    }
+
     private static bool IsTextTransformValue(string v)
     {
         if (v is "none" or "math-auto")

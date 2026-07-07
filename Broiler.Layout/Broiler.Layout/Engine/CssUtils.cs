@@ -593,7 +593,7 @@ internal static class CssUtils
                 cssBox.TextDecorationColor = value;
                 break;
             case "white-space":
-                cssBox.WhiteSpace = value;
+                cssBox.WhiteSpace = NormalizeWhiteSpaceValue(value);
                 break;
             case "text-transform":
                 cssBox.TextTransform = value;
@@ -823,6 +823,83 @@ internal static class CssUtils
             "flow-root" => isInline ? "inline-block" : "flow-root",
             "flow" => isInline ? "inline" : "block",
             _ => v,
+        };
+    }
+
+    /// <summary>
+    /// Normalizes a CSS Text 4 <c>white-space</c> shorthand value to the legacy
+    /// single keyword the layout engine keys off (<c>normal</c>, <c>nowrap</c>,
+    /// <c>pre</c>, <c>pre-wrap</c>, <c>pre-line</c>, or the passthrough
+    /// <c>break-spaces</c>). <c>white-space</c> is a shorthand for
+    /// <c>white-space-collapse</c> and <c>text-wrap-mode</c>; the two-longhand
+    /// form <c>&lt;collapse&gt; || &lt;wrap-mode&gt;</c> and modern single
+    /// keywords (<c>preserve</c>, <c>preserve-breaks</c>, …) carry the same
+    /// meaning as a legacy keyword and are folded onto it so the existing
+    /// white-space handling in the engine applies unchanged. Longhand
+    /// combinations with no exact legacy equivalent are mapped to the closest
+    /// keyword that preserves the dominant collapse behaviour. Legacy keywords
+    /// and unrecognized values pass through untouched.
+    /// </summary>
+    internal static string NormalizeWhiteSpaceValue(string value)
+    {
+        string v = value.Trim().ToLowerInvariant();
+
+        // Legacy single keywords already map directly onto the engine's model.
+        if (v is CssConstants.Normal or CssConstants.NoWrap or CssConstants.Pre
+            or CssConstants.PreWrap or CssConstants.PreLine)
+            return v;
+
+        string collapse = null, wrap = null;
+        foreach (var token in v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            switch (token)
+            {
+                case "collapse":
+                case "preserve":
+                case "preserve-breaks":
+                case "preserve-spaces":
+                case "break-spaces":
+                    if (collapse != null) return v; // malformed; leave untouched
+                    collapse = token;
+                    break;
+                case "wrap":
+                case "nowrap":
+                    if (wrap != null) return v;
+                    wrap = token;
+                    break;
+                default:
+                    return v; // not a recognized modern token; leave as-is
+            }
+        }
+
+        if (collapse == null && wrap == null)
+            return v;
+
+        // Longhand initial values: white-space-collapse: collapse, text-wrap-mode: wrap.
+        collapse ??= "collapse";
+        wrap ??= "wrap";
+
+        // break-spaces has no legacy keyword; keep the token so the engine can
+        // special-case it (both wrap modes collapse to the same handling today).
+        if (collapse == "break-spaces")
+            return "break-spaces";
+
+        return (collapse, wrap) switch
+        {
+            ("collapse", "wrap") => CssConstants.Normal,
+            ("collapse", "nowrap") => CssConstants.NoWrap,
+            ("preserve", "wrap") => CssConstants.PreWrap,
+            ("preserve", "nowrap") => CssConstants.Pre,
+            ("preserve-breaks", "wrap") => CssConstants.PreLine,
+            // preserve-breaks + nowrap: preserves segment breaks with no exact
+            // legacy keyword — pre-line keeps the newline preservation that
+            // dominates the visual result.
+            ("preserve-breaks", "nowrap") => CssConstants.PreLine,
+            // preserve-spaces preserves spaces but collapses segment breaks; the
+            // closest legacy keyword that preserves spaces is pre-wrap/pre.
+            ("preserve-spaces", "nowrap") => CssConstants.Pre,
+            ("preserve-spaces", "wrap") => CssConstants.PreWrap,
+            _ => CssConstants.Normal,
         };
     }
 
