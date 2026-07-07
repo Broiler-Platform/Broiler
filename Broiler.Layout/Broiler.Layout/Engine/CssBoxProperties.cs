@@ -1,18 +1,13 @@
+using Broiler.CSS;
 using Broiler.Graphics;
-﻿using RegexParserUtils = Broiler.CSS.RegexParserUtils;
 using System.Drawing;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssMetrics = Broiler.CSS.CssMetrics;
-using CssValueParser = Broiler.CSS.CssLengthParser;
-using CssLength = Broiler.CSS.CssLength;
-using CssUnit = Broiler.CSS.CssUnit;
 
 
 namespace Broiler.Layout.Engine;
 
-internal abstract class CssBoxProperties
+internal abstract partial class CssBoxProperties
 {
     internal const string InvalidCustomPropertySentinel = "\u0000";
 
@@ -27,6 +22,9 @@ internal abstract class CssBoxProperties
     private string _borderBottomColor = "black";
     private string _borderLeftColor = "black";
     private string _outlineColor = string.Empty;
+    private string _outlineWidth = "medium";
+    private string _outlineStyle = "none";
+    private string _outlineOffset = "0";
     private string _bottom = "auto";
     private string _color = "black";
     private string _cornerRadius = "0";
@@ -40,6 +38,8 @@ internal abstract class CssBoxProperties
     private string _right = "auto";
     private string _width = "auto";
     private string _height = "auto";
+    private string _maxWidth = "none";
+    private string _minWidth = "0";
     private string _inlineSize = "auto";
     private string _blockSize = "auto";
     private string _writingMode = "horizontal-tb";
@@ -81,6 +81,11 @@ internal abstract class CssBoxProperties
     private double _actualBorderLeftWidth = double.NaN;
     private double _actualBorderBottomWidth = double.NaN;
     private double _actualBorderRightWidth = double.NaN;
+    private double _actualOutlineWidth = double.NaN;
+    private double _actualOutlineOffset = double.NaN;
+    private BColor _actualOutlineColor = BColor.Empty;
+    private double _actualMaxWidth = double.NaN;
+    private double _actualMinWidth = double.NaN;
 
     /// <summary>
     /// the width of whitespace between words
@@ -220,26 +225,63 @@ internal abstract class CssBoxProperties
 
     // CSS UI §2: outline is painted just outside the border edge and does not
     // affect layout. Stored uniformly (outline cannot be set per-side).
-    public string OutlineWidth { get; set; } = "medium";
-    public string OutlineStyle { get; set; } = "none";
-    public string OutlineColor { get => ResolveCssVariables(_outlineColor); set => _outlineColor = value ?? string.Empty; }
-    public string OutlineOffset { get; set; } = "0";
+    // Backing fields invalidate the lazily-resolved used values on set, matching
+    // the border-width/-colour caching pattern so repeated paint-time reads of
+    // ActualOutline* don't re-parse the length/colour strings.
+    public string OutlineWidth
+    {
+        get => _outlineWidth;
+        set { _outlineWidth = value; _actualOutlineWidth = double.NaN; }
+    }
+    public string OutlineStyle
+    {
+        // CSS UI §2: outline-style none/hidden forces the used width to zero, so
+        // invalidate the cached used width when the style changes.
+        get => _outlineStyle;
+        set { _outlineStyle = value; _actualOutlineWidth = double.NaN; }
+    }
+    public string OutlineColor
+    {
+        get => ResolveCssVariables(_outlineColor);
+        set { _outlineColor = value ?? string.Empty; _actualOutlineColor = BColor.Empty; }
+    }
+    public string OutlineOffset
+    {
+        get => _outlineOffset;
+        set { _outlineOffset = value; _actualOutlineOffset = double.NaN; }
+    }
 
     /// <summary>Used outline width in px; 0 when the outline style is none/hidden.</summary>
     public double ActualOutlineWidth
     {
         get
         {
-            if (string.IsNullOrEmpty(OutlineStyle) || OutlineStyle == CssConstants.None
-                || OutlineStyle.Equals("hidden", StringComparison.OrdinalIgnoreCase))
-                return 0;
-            return CssValueParser.GetActualBorderWidth(OutlineWidth, GetEmHeight());
+            if (double.IsNaN(_actualOutlineWidth))
+            {
+                if (string.IsNullOrEmpty(OutlineStyle) || OutlineStyle == CssConstants.None
+                    || OutlineStyle.Equals("hidden", StringComparison.OrdinalIgnoreCase))
+                    _actualOutlineWidth = 0;
+                else
+                    _actualOutlineWidth = CssLengthParser.GetActualBorderWidth(OutlineWidth, GetEmHeight());
+            }
+
+            return _actualOutlineWidth;
         }
     }
 
     /// <summary>Used outline-offset in px (the gap between border edge and outline).</summary>
-    public double ActualOutlineOffset =>
-        string.IsNullOrEmpty(OutlineOffset) ? 0 : CssValueParser.ParseLength(OutlineOffset, 0, GetEmHeight());
+    public double ActualOutlineOffset
+    {
+        get
+        {
+            if (double.IsNaN(_actualOutlineOffset))
+                _actualOutlineOffset = string.IsNullOrEmpty(OutlineOffset)
+                    ? 0
+                    : CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight());
+
+            return _actualOutlineOffset;
+        }
+    }
 
     /// <summary>
     /// Used outline colour. The initial value (<c>auto</c>/<c>invert</c>) and an
@@ -255,8 +297,12 @@ internal abstract class CssBoxProperties
                 || c.Equals("auto", StringComparison.OrdinalIgnoreCase)
                 || c.Equals("invert", StringComparison.OrdinalIgnoreCase)
                 || c.Equals("currentcolor", StringComparison.OrdinalIgnoreCase))
-                return GetActualColor(Color);
-            return GetActualColor(c);
+                return ActualColor; // cached element colour
+
+            if (_actualOutlineColor.IsEmpty)
+                _actualOutlineColor = GetActualColor(c);
+
+            return _actualOutlineColor;
         }
     }
 
@@ -266,6 +312,7 @@ internal abstract class CssBoxProperties
         set
         {
             string raw = value ?? string.Empty;
+
             int slashIndex = raw.IndexOf('/');
             if (slashIndex >= 0)
                 raw = raw[..slashIndex];
@@ -280,17 +327,20 @@ internal abstract class CssBoxProperties
                     CornerSeRadius = r[0];
                     CornerSwRadius = r[0];
                     break;
+
                 case 2:
                     CornerNeRadius = r[0];
                     CornerNwRadius = r[0];
                     CornerSeRadius = r[1];
                     CornerSwRadius = r[1];
                     break;
+
                 case 3:
                     CornerNeRadius = r[0];
                     CornerNwRadius = r[1];
                     CornerSeRadius = r[2];
                     break;
+
                 case 4:
                     CornerNeRadius = r[0];
                     CornerNwRadius = r[1];
@@ -377,7 +427,7 @@ internal abstract class CssBoxProperties
     public string Top
     {
         get { return _top; }
-        set 
+        set
         {
             _top = value;
 
@@ -407,9 +457,47 @@ internal abstract class CssBoxProperties
             _actualWidth = double.NaN;
         }
     }
-    public string MaxWidth { get; set; } = "none";
-    public string MinWidth { get; set; } = "0";
+    public string MaxWidth
+    {
+        get => _maxWidth;
+        set { _maxWidth = value; _actualMaxWidth = double.NaN; }
+    }
+    public string MinWidth
+    {
+        get => _minWidth;
+        set { _minWidth = value; _actualMinWidth = double.NaN; }
+    }
     internal bool IsMinWidthSpecified { get; set; }
+
+    /// <summary>
+    /// Resolves <see cref="MaxWidth"/> against a percentage basis, caching the
+    /// result when it is basis-independent (an absolute length with no
+    /// percentage term) so the repeated max-width clamps in width resolution do
+    /// not re-tokenize a fixed cap such as <c>"300px"</c>. Percentage caps still
+    /// resolve against the supplied basis every call.
+    /// </summary>
+    protected double ResolveMaxWidthLength(double basis)
+        => ResolveCachedConstraintLength(MaxWidth, basis, ref _actualMaxWidth);
+
+    /// <summary>Cached <see cref="MinWidth"/> resolution; see <see cref="ResolveMaxWidthLength"/>.</summary>
+    protected double ResolveMinWidthLength(double basis)
+        => ResolveCachedConstraintLength(MinWidth, basis, ref _actualMinWidth);
+
+    private double ResolveCachedConstraintLength(string value, double basis, ref double cache)
+    {
+        if (!double.IsNaN(cache))
+            return cache;
+
+        double resolved = ParseLengthWithLineHeight(value, basis);
+
+        // Only an absolute length (no percentage term) is independent of the
+        // basis; cache it. Percentage / expression-with-% values differ per
+        // basis and are re-resolved on every call.
+        if (value != null && value.IndexOf('%') < 0)
+            cache = resolved;
+
+        return resolved;
+    }
     /// <summary>
     /// True when this absolutely/fixed-positioned box has already had its
     /// <see cref="CssBoxProperties.Location"/> advanced to its final CSS
@@ -445,6 +533,7 @@ internal abstract class CssBoxProperties
     internal double[] SubgridRowSizes { get; set; }
     internal double? SubgridColumnGap { get; set; }
     internal double? SubgridRowGap { get; set; }
+
     public string Height
     {
         get => ResolvePhysicalSize(_height, isWidth: false);
@@ -454,13 +543,16 @@ internal abstract class CssBoxProperties
             _actualHeight = double.NaN;
         }
     }
+
     public string MaxHeight { get; set; } = "none";
     public string MinHeight { get; set; } = "0";
+
     /// <summary>CSS Sizing 4 <c>aspect-ratio</c> (raw value, e.g. <c>1 / 1</c>).
     /// Honoured for in-flow block-level boxes with an auto block size, which
     /// derive their used height from their used width and this ratio
     /// (<see cref="CssBox.TryResolveAspectRatioBlockHeight"/>).</summary>
     public string AspectRatio { get; set; } = "auto";
+
     public string InlineSize
     {
         get => _inlineSize;
@@ -471,6 +563,7 @@ internal abstract class CssBoxProperties
             _actualHeight = double.NaN;
         }
     }
+
     public string BlockSize
     {
         get => _blockSize;
@@ -481,6 +574,7 @@ internal abstract class CssBoxProperties
             _actualHeight = double.NaN;
         }
     }
+
     public string BackgroundColor
     {
         get => ResolveCssVariables(_backgroundColor);
@@ -495,6 +589,7 @@ internal abstract class CssBoxProperties
         get => ResolveCssVariables(_backgroundImage);
         set => _backgroundImage = value;
     }
+
     public string BackgroundPosition { get; set; } = "0% 0%";
     public string BackgroundRepeat { get; set; } = "repeat";
     public string BackgroundAttachment { get; set; } = "scroll";
@@ -558,7 +653,7 @@ internal abstract class CssBoxProperties
                 !value.EndsWith("mm", StringComparison.OrdinalIgnoreCase) &&
                 !value.EndsWith("in", StringComparison.OrdinalIgnoreCase) &&
                 !value.EndsWith("pc", StringComparison.OrdinalIgnoreCase) &&
-                !value.EndsWith("%") &&
+                !value.EndsWith('%') &&
                 double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             {
                 _lineHeight = value + "em";
@@ -664,6 +759,7 @@ internal abstract class CssBoxProperties
     public string FlexShrink { get; set; } = "1";
     public string FlexBasis { get; set; } = "auto";
     public string FlexWrap { get; set; } = "nowrap";
+
     // CSS Box Alignment §8: the initial value of justify-content is 'normal',
     // not 'flex-start'. In a flex container 'normal' behaves as 'flex-start'
     // (packed at the main-start edge), so flex layout is unchanged; in a grid
@@ -737,19 +833,22 @@ internal abstract class CssBoxProperties
 
             // "<tag>" [ <integer> | on | off ]; a 4-char quoted tag, optionally
             // followed by an on/off/value flag (default = on).
-            int firstQuote = item.IndexOf('"');
-            int altQuote = item.IndexOf('\'');
-            char quote = firstQuote >= 0 ? '"' : (altQuote >= 0 ? '\'' : '\0');
+            bool firstQuote = item.Contains('"');
+            bool altQuote = item.Contains('\'');
+            char quote = firstQuote ? '"' : (altQuote ? '\'' : '\0');
             string tag;
             string flag;
+            
             if (quote != '\0')
             {
                 int start = item.IndexOf(quote);
                 int endq = item.IndexOf(quote, start + 1);
+
                 if (endq <= start)
                     continue;
+
                 tag = item.Substring(start + 1, endq - start - 1).Trim();
-                flag = item.Substring(endq + 1).Trim();
+                flag = item[(endq + 1)..].Trim();
             }
             else
             {
@@ -765,10 +864,12 @@ internal abstract class CssBoxProperties
                 || flag.Equals("on", StringComparison.OrdinalIgnoreCase)
                 || flag == "1"
                 || (int.TryParse(flag, out int v) && v != 0);
+
             if (enabled)
             {
                 if (tags.Length > 0)
                     tags.Append(' ');
+
                 tags.Append(tag);
             }
         }
@@ -800,14 +901,16 @@ internal abstract class CssBoxProperties
                 && GetParent() != null
                 && double.TryParse(trimmedValue[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             {
-                double resolvedPoints = CssValueParser.ParseNumber(trimmedValue, GetParent().ActualFont.Size);
+                double resolvedPoints = CssLengthParser.ParseNumber(trimmedValue, GetParent().ActualFont.Size);
                 _fontSize = resolvedPoints.ToString("0.0###", CultureInfo.InvariantCulture) + "pt";
                 InvalidateFontDependentValues();
+                
                 if (this is CssBox percentBox)
                 {
                     foreach (var child in percentBox.Boxes)
                         child.InvalidateFontDependentSubtree();
                 }
+                
                 return;
             }
 
@@ -839,6 +942,7 @@ internal abstract class CssBoxProperties
             }
 
             InvalidateFontDependentValues();
+
             if (this is CssBox cssBox)
             {
                 foreach (var child in cssBox.Boxes)
@@ -1010,7 +1114,7 @@ internal abstract class CssBoxProperties
 
                 var actualMarginTop = ParseLengthWithLineHeight(MarginTop, Size.Width);
 
-                if (MarginTop.EndsWith("%"))
+                if (MarginTop.EndsWith('%'))
                     return actualMarginTop;
 
                 _actualMarginTop = actualMarginTop;
@@ -1037,7 +1141,7 @@ internal abstract class CssBoxProperties
 
                 var actualMarginLeft = ParseLengthWithLineHeight(MarginLeft, Size.Width);
 
-                if (MarginLeft.EndsWith("%"))
+                if (MarginLeft.EndsWith('%'))
                     return actualMarginLeft;
 
                 _actualMarginLeft = actualMarginLeft;
@@ -1057,7 +1161,7 @@ internal abstract class CssBoxProperties
 
                 var actualMarginBottom = ParseLengthWithLineHeight(MarginBottom, Size.Width);
 
-                if (MarginBottom.EndsWith("%"))
+                if (MarginBottom.EndsWith('%'))
                     return actualMarginBottom;
 
                 _actualMarginBottom = actualMarginBottom;
@@ -1077,13 +1181,13 @@ internal abstract class CssBoxProperties
                     MarginRight = "0";
 
                 var actualMarginRight = ParseLengthWithLineHeight(MarginRight, Size.Width);
-                
-                if (MarginRight.EndsWith("%"))
+
+                if (MarginRight.EndsWith('%'))
                     return actualMarginRight;
-                
+
                 _actualMarginRight = actualMarginRight;
             }
-            
+
             return _actualMarginRight;
         }
     }
@@ -1097,7 +1201,7 @@ internal abstract class CssBoxProperties
 
             if (double.IsNaN(_actualBorderTopWidth))
             {
-                _actualBorderTopWidth = CssValueParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight());
+                _actualBorderTopWidth = CssLengthParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight());
 
                 if (string.IsNullOrEmpty(BorderTopStyle) || BorderTopStyle == CssConstants.None)
                     _actualBorderTopWidth = 0f;
@@ -1116,7 +1220,7 @@ internal abstract class CssBoxProperties
 
             if (double.IsNaN(_actualBorderLeftWidth))
             {
-                _actualBorderLeftWidth = CssValueParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight());
+                _actualBorderLeftWidth = CssLengthParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight());
 
                 if (string.IsNullOrEmpty(BorderLeftStyle) || BorderLeftStyle == CssConstants.None)
                     _actualBorderLeftWidth = 0f;
@@ -1135,7 +1239,7 @@ internal abstract class CssBoxProperties
 
             if (double.IsNaN(_actualBorderBottomWidth))
             {
-                _actualBorderBottomWidth = CssValueParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight());
+                _actualBorderBottomWidth = CssLengthParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight());
 
                 if (string.IsNullOrEmpty(BorderBottomStyle) || BorderBottomStyle == CssConstants.None)
                     _actualBorderBottomWidth = 0f;
@@ -1154,7 +1258,7 @@ internal abstract class CssBoxProperties
 
             if (double.IsNaN(_actualBorderRightWidth))
             {
-                _actualBorderRightWidth = CssValueParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight());
+                _actualBorderRightWidth = CssLengthParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight());
 
                 if (string.IsNullOrEmpty(BorderRightStyle) || BorderRightStyle == CssConstants.None)
                     _actualBorderRightWidth = 0f;
@@ -1191,12 +1295,9 @@ internal abstract class CssBoxProperties
             return value;
 
         string resolved = value;
-        for (int i = 0; i < 8 && resolved.IndexOf("var(", StringComparison.OrdinalIgnoreCase) >= 0; i++)
+        for (int i = 0; i < 8 && resolved.Contains("var(", StringComparison.OrdinalIgnoreCase); i++)
         {
-            resolved = Regex.Replace(
-                resolved,
-                @"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*([^)]+))?\)",
-                match =>
+            resolved = CssRegex().Replace(resolved, match =>
                 {
                     var propertyName = match.Groups[1].Value;
                     if (TryGetCustomPropertyValue(propertyName, out var propertyValue))
@@ -1208,8 +1309,7 @@ internal abstract class CssBoxProperties
                     }
 
                     return match.Groups[2].Success ? match.Groups[2].Value.Trim() : string.Empty;
-                },
-                RegexOptions.IgnoreCase);
+                });
         }
 
         return resolved;
@@ -1377,7 +1477,7 @@ internal abstract class CssBoxProperties
     {
         if (string.IsNullOrEmpty(styleValue) || styleValue == CssConstants.None)
             return 0f;
-        return CssValueParser.GetActualBorderWidth(widthValue, GetEmHeight());
+        return CssLengthParser.GetActualBorderWidth(widthValue, GetEmHeight());
     }
 
     // Frame edges are the logical (horizontal-tb LTR) frame's physical edges;
@@ -1419,7 +1519,7 @@ internal abstract class CssBoxProperties
             ? Math.Max(0, Size.Width)
             : 0;
 
-        return CssValueParser.ParseLength(radius, basis, GetEmHeight());
+        return CssLengthParser.ParseLength(radius, basis, GetEmHeight());
     }
 
     public double ActualCornerNw
@@ -1537,7 +1637,7 @@ internal abstract class CssBoxProperties
         get
         {
             if (double.IsNaN(_actualBackgroundGradientAngle))
-                _actualBackgroundGradientAngle = CssValueParser.ParseNumber(BackgroundGradientAngle, 360f);
+                _actualBackgroundGradientAngle = CssLengthParser.ParseNumber(BackgroundGradientAngle, 360f);
 
             return _actualBackgroundGradientAngle;
         }
@@ -1558,7 +1658,7 @@ internal abstract class CssBoxProperties
 
             LayoutFontStyle st = LayoutFontStyle.Regular;
 
-            if (this.FontStyle == CssConstants.Italic || this.FontStyle == CssConstants.Oblique)
+            if (FontStyle == CssConstants.Italic || FontStyle == CssConstants.Oblique)
                 st |= LayoutFontStyle.Italic;
 
             if (IsBoldWeight(FontWeight, GetParent()))
@@ -1580,7 +1680,7 @@ internal abstract class CssBoxProperties
                 CssConstants.XXLarge => CssConstants.FontSize + 4,
                 CssConstants.Smaller => parentSize - 2,
                 CssConstants.Larger => parentSize + 2,
-                _ => CssValueParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
             };
 
             // CSS 2.1 §15.4: font-size: 0 results in a zero-size em box.
@@ -1712,7 +1812,7 @@ internal abstract class CssBoxProperties
                 return chCount * chWidth;
         }
 
-        return CssValueParser.ParseLength(
+        return CssLengthParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -1726,7 +1826,7 @@ internal abstract class CssBoxProperties
     private double ParseLineHeightLength(string length, double hundredPercent)
     {
         var parentLineHeight = GetParent()?.ActualLineHeight ?? GetNormalLineHeight();
-        return CssValueParser.ParseLength(
+        return CssLengthParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -1750,7 +1850,7 @@ internal abstract class CssBoxProperties
         if (LineHeight == "normal" || string.IsNullOrEmpty(LineHeight))
             return GetNormalLineHeight();
 
-        return CssValueParser.ParseLength(
+        return CssLengthParser.ParseLength(
             LineHeight,
             Size.Height,
             GetEmHeight(),
@@ -1779,7 +1879,7 @@ internal abstract class CssBoxProperties
         const double baseRootEmHeight = CssMetrics.DefaultFontSizePx;
         if (!string.IsNullOrWhiteSpace(root.FontSize))
         {
-            var resolved = CssValueParser.ParseLength(
+            var resolved = CssLengthParser.ParseLength(
                 root.FontSize,
                 baseRootEmHeight,
                 baseRootEmHeight,
@@ -1828,6 +1928,7 @@ internal abstract class CssBoxProperties
     {
         if (string.IsNullOrEmpty(fontWeight) || fontWeight == CssConstants.Normal || fontWeight == CssConstants.Inherit)
             return 400;
+
         if (fontWeight == CssConstants.Bold)
             return 700;
 
@@ -1856,6 +1957,7 @@ internal abstract class CssBoxProperties
     {
         if (parentWeight < 400) return 400;
         if (parentWeight < 600) return 700;
+
         return 900;
     }
 
@@ -1866,6 +1968,7 @@ internal abstract class CssBoxProperties
     {
         if (parentWeight > 700) return 400;
         if (parentWeight > 500) return 400;
+
         return 100;
     }
 
@@ -1877,6 +1980,7 @@ internal abstract class CssBoxProperties
     {
         if (string.IsNullOrEmpty(fontWeight) || fontWeight == CssConstants.Normal || fontWeight == CssConstants.Inherit)
             return false;
+
         return ResolveNumericFontWeight(fontWeight, parent) >= 600;
     }
 
@@ -1903,7 +2007,7 @@ internal abstract class CssBoxProperties
             return;
 
         string len = RegexParserUtils.Search(RegexParserUtils.CssLengthRegex(), WordSpacing);
-        ActualWordSpacing += CssValueParser.ParseLength(len, 1, GetEmHeight());
+        ActualWordSpacing += CssLengthParser.ParseLength(len, 1, GetEmHeight());
     }
 
     protected void InheritStyle(CssBox p, bool everything)
@@ -2048,6 +2152,13 @@ internal abstract class CssBoxProperties
         _actualBorderRightWidth = double.NaN;
         _actualBorderBottomWidth = double.NaN;
         _actualBorderLeftWidth = double.NaN;
+        // Outline width/offset resolve against the em height, so they are
+        // font-dependent and must be re-resolved when the font changes.
+        _actualOutlineWidth = double.NaN;
+        _actualOutlineOffset = double.NaN;
+        // A cached em/ex-based min/max width is font-dependent too.
+        _actualMaxWidth = double.NaN;
+        _actualMinWidth = double.NaN;
         _actualCornerNw = double.NaN;
         _actualCornerNe = double.NaN;
         _actualCornerSw = double.NaN;
@@ -2055,4 +2166,7 @@ internal abstract class CssBoxProperties
         _actualBorderSpacingHorizontal = double.NaN;
         _actualBorderSpacingVertical = double.NaN;
     }
+
+    [GeneratedRegex(@"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*([^)]+))?\)", RegexOptions.IgnoreCase, "de-DE")]
+    private static partial Regex CssRegex();
 }

@@ -1,5 +1,4 @@
 using System;
-using Broiler.UI.Tooltip;
 
 namespace Broiler.UI.Tooltip.Standard;
 

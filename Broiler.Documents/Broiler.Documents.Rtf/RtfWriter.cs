@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Broiler.Documents;
 using Broiler.Documents.Model;
 using Broiler.Graphics;
 
@@ -235,7 +234,7 @@ public static class RtfWriter
     {
         // Index 0 is reserved (default font / auto color); interned entries start at 1.
         private readonly Dictionary<T, int> _index;
-        private readonly List<T> _ordered = new();
+        private readonly List<T> _ordered = [];
 
         public ResourceTable(IEqualityComparer<T> comparer) => _index = new Dictionary<T, int>(comparer);
 

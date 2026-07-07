@@ -18,10 +18,10 @@ public sealed class LinuxEvdevCapabilitySet
         IEnumerable<int>? relativeAxes = null,
         IEnumerable<int>? absoluteAxes = null)
     {
-        _eventTypes = new HashSet<int>(eventTypes ?? []);
-        _keyCodes = new HashSet<int>(keyCodes ?? []);
-        _relativeAxes = new HashSet<int>(relativeAxes ?? []);
-        _absoluteAxes = new HashSet<int>(absoluteAxes ?? []);
+        _eventTypes = [.. eventTypes ?? []];
+        _keyCodes = [.. keyCodes ?? []];
+        _relativeAxes = [.. relativeAxes ?? []];
+        _absoluteAxes = [.. absoluteAxes ?? []];
     }
 
     public static LinuxEvdevCapabilitySet Empty { get; } = new();

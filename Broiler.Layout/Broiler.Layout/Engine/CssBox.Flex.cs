@@ -1,9 +1,7 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
+using Broiler.CSS;
+using System.Drawing;
 using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -16,7 +14,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private double ResolveColumnGap()
     {
         if (!string.IsNullOrEmpty(ColumnGap) && ColumnGap != "normal")
-            return CssValueParser.ParseLength(ColumnGap, Size.Width, GetEmHeight());
+            return CssLengthParser.ParseLength(ColumnGap, Size.Width, GetEmHeight());
+
         return GetEmHeight();
     }
 
@@ -76,6 +75,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 Shrink = ParseFlexFactor(child.FlexShrink, 1),
                 BaseOuterWidth = ResolveFlexItemBaseOuterWidth(child, contentWidth)
             };
+
             item.TargetOuterWidth = item.BaseOuterWidth;
 
             double candidateWidth = currentLine.BaseOuterWidth + item.BaseOuterWidth
@@ -104,24 +104,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             foreach (var item in line.Items)
             {
                 LayoutFlexItemAtTargetWidth(g, item.Box, item.TargetOuterWidth);
+
                 double itemHeight = GetFlexItemOuterHeight(item.Box);
+
                 if (itemHeight > line.CrossSize)
                     line.CrossSize = itemHeight;
             }
 
             double usedWidth = 0;
+
             foreach (var item in line.Items)
                 usedWidth += item.TargetOuterWidth;
 
             int itemCount = line.Items.Count;
             double freeSpace = contentWidth - usedWidth - Math.Max(0, itemCount - 1) * columnGap;
+
             if (freeSpace < 0)
                 freeSpace = 0;
 
-            ResolveJustifyContent(itemCount, freeSpace, columnGap,
-                out double lineOffset, out double itemGap);
+            ResolveJustifyContent(itemCount, freeSpace, columnGap, out double lineOffset, out double itemGap);
 
             double cursorX = contentLeft + lineOffset;
+
             if (reverse)
                 cursorX = contentLeft + contentWidth - lineOffset;
 
@@ -143,8 +147,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 double dx = itemLeft - child.Location.X;
                 double dy = itemTop - child.Location.Y;
+
                 if (Math.Abs(dx) > 0.1)
                     child.OffsetLeft(dx);
+
                 if (Math.Abs(dy) > 0.1)
                     child.OffsetTop(dy);
 
@@ -173,7 +179,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         child.Display != CssConstants.None
         && child.Position is not (CssConstants.Absolute or CssConstants.Fixed);
 
-    private double ResolveFlexItemBaseOuterWidth(CssBox child, double containerContentWidth)
+    private static double ResolveFlexItemBaseOuterWidth(CssBox child, double containerContentWidth)
     {
         double borderBoxWidth;
         string basis = child.FlexBasis?.Trim();
@@ -194,6 +200,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         else
         {
             child.GetMinMaxWidth(out _, out double preferred);
+
             if (double.IsNaN(preferred) || preferred < 0)
                 preferred = 0;
 
@@ -216,35 +223,36 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
-    private double ClampFlexItemBorderBoxWidth(CssBox child, double borderBoxWidth, double containerContentWidth)
+    private static double ClampFlexItemBorderBoxWidth(CssBox child, double borderBoxWidth, double containerContentWidth)
     {
-        if (!string.IsNullOrEmpty(child.MaxWidth)
-            && !child.MaxWidth.Equals("none", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(child.MaxWidth) && !child.MaxWidth.Equals("none", StringComparison.OrdinalIgnoreCase))
         {
-            double maxWidth = child.ResolveSpecifiedWidthToBorderBox(
-                ParseFlexLengthOrZero(child, child.MaxWidth, containerContentWidth));
+            double length = ParseFlexLengthOrZero(child, child.MaxWidth, containerContentWidth);
+            double maxWidth = child.ResolveSpecifiedWidthToBorderBox(length);
+
             if (borderBoxWidth > maxWidth)
                 borderBoxWidth = maxWidth;
         }
 
-        bool useAutomaticMinWidth = !child.IsMinWidthSpecified
-            || child.MinWidth.Equals("auto", StringComparison.OrdinalIgnoreCase);
+        bool useAutomaticMinWidth = !child.IsMinWidthSpecified || child.MinWidth.Equals("auto", StringComparison.OrdinalIgnoreCase);
+
         if (useAutomaticMinWidth)
         {
             child.GetMinMaxWidth(out double minContentWidth, out _);
+
             if (!double.IsNaN(minContentWidth) && minContentWidth > 0)
             {
-                double minBorderBoxWidth = minContentWidth
-                    + child.ActualBorderLeftWidth + child.ActualBorderRightWidth;
+                double minBorderBoxWidth = minContentWidth + child.ActualBorderLeftWidth + child.ActualBorderRightWidth;
+
                 if (borderBoxWidth < minBorderBoxWidth)
                     borderBoxWidth = minBorderBoxWidth;
             }
         }
-        else if (!string.IsNullOrEmpty(child.MinWidth)
-            && !child.MinWidth.Equals("0", StringComparison.OrdinalIgnoreCase))
+        else if (!string.IsNullOrEmpty(child.MinWidth) && !child.MinWidth.Equals("0", StringComparison.OrdinalIgnoreCase))
         {
-            double minWidth = child.ResolveSpecifiedWidthToBorderBox(
-                ParseFlexLengthOrZero(child, child.MinWidth, containerContentWidth));
+            double length = ParseFlexLengthOrZero(child, child.MinWidth, containerContentWidth);
+            double minWidth = child.ResolveSpecifiedWidthToBorderBox(length);
+
             if (borderBoxWidth < minWidth)
                 borderBoxWidth = minWidth;
         }
@@ -252,9 +260,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return Math.Max(0, borderBoxWidth);
     }
 
-    private void ResolveFlexLineWidths(FlexLineLayout line, double contentWidth, double columnGap)
+    private static void ResolveFlexLineWidths(FlexLineLayout line, double contentWidth, double columnGap)
     {
         int itemCount = line.Items.Count;
+
         if (itemCount == 0)
             return;
 
@@ -264,6 +273,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (freeSpace > 0.5)
         {
             double growTotal = 0;
+
             foreach (var item in line.Items)
                 growTotal += item.Grow;
 
@@ -276,6 +286,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         else if (freeSpace < -0.5)
         {
             double shrinkTotal = 0;
+
             foreach (var item in line.Items)
                 shrinkTotal += item.Shrink * Math.Max(0, item.BaseOuterWidth);
 
@@ -290,16 +301,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         item.Box,
                         Math.Max(0, target - marginWidth),
                         contentWidth);
+
                     item.TargetOuterWidth = borderBoxWidth + marginWidth;
                 }
             }
         }
     }
 
-    private void LayoutFlexItemAtTargetWidth(ILayoutEnvironment g, CssBox child, double targetOuterWidth)
+    private static void LayoutFlexItemAtTargetWidth(ILayoutEnvironment g, CssBox child, double targetOuterWidth)
     {
-        double targetBorderBoxWidth = Math.Max(0, targetOuterWidth
-            - child.ActualMarginLeft - child.ActualMarginRight);
+        double targetBorderBoxWidth = Math.Max(0, targetOuterWidth - child.ActualMarginLeft - child.ActualMarginRight);
         double cssWidth = child.UsesBorderBoxSizing
             ? targetBorderBoxWidth
             : targetBorderBoxWidth
@@ -307,21 +318,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
               - child.ActualBorderLeftWidth - child.ActualBorderRightWidth;
 
         string savedWidth = child.Width;
+
         child.Width = FormatCssPx(Math.Max(0, cssWidth));
         child.PerformLayout(g);
         child.Width = savedWidth;
     }
 
-    private static string FormatCssPx(double value) =>
-        value.ToString("0.####", CultureInfo.InvariantCulture) + "px";
+    private static string FormatCssPx(double value) => value.ToString("0.####", CultureInfo.InvariantCulture) + "px";
 
     private static double ParseFlexFactor(string value, double fallback)
     {
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)
-            && parsed >= 0)
-        {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) && parsed >= 0)
             return parsed;
-        }
 
         return fallback;
     }
@@ -333,7 +341,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         try
         {
-            return CssValueParser.ParseLength(value, percentBase, GetEmHeight());
+            return CssLengthParser.ParseLength(value, percentBase, GetEmHeight());
         }
         catch
         {
@@ -341,8 +349,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
-    private void ResolveJustifyContent(int itemCount, double freeSpace, double baseGap,
-        out double lineOffset, out double itemGap)
+    private void ResolveJustifyContent(int itemCount, double freeSpace, double baseGap, out double lineOffset, out double itemGap)
     {
         lineOffset = 0;
         itemGap = baseGap;
@@ -353,15 +360,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             case "center":
                 lineOffset = freeSpace / 2;
                 break;
+
             case "end":
             case "flex-end":
             case "right":
                 lineOffset = freeSpace;
                 break;
+
             case "space-between":
                 if (itemCount > 1)
                     itemGap = baseGap + freeSpace / (itemCount - 1);
                 break;
+
             case "space-around":
                 if (itemCount > 0)
                 {
@@ -369,6 +379,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     lineOffset = (itemGap - baseGap) / 2;
                 }
                 break;
+
             case "space-evenly":
                 if (itemCount > 0)
                 {
@@ -415,6 +426,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double contentWidth = Math.Max(0, Size.Width
             - ActualBorderLeftWidth - ActualBorderRightWidth
             - ActualPaddingLeft - ActualPaddingRight);
+
         if (contentWidth <= 0)
             return;
 
@@ -430,6 +442,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             double marginBoxWidth = child.Size.Width + child.ActualMarginLeft + child.ActualMarginRight;
             double freeSpace = contentWidth - marginBoxWidth;
+
             if (freeSpace <= 0.5)
                 continue;
 
@@ -439,11 +452,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 "end" or "flex-end" or "self-end" or "right" => freeSpace,
                 _ => 0
             };
+
             if (offset <= 0.5)
                 continue;
 
             double targetLeft = ClientLeft + offset + child.ActualMarginLeft;
             double dx = targetLeft - child.Location.X;
+
             if (Math.Abs(dx) > 0.5)
                 child.OffsetLeft(dx);
         }
@@ -473,19 +488,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // The cross axis must be the block (vertical) axis: true for grid and
         // for row-direction flex.  Column flex aligns items on the inline
         // axis, which this approximation does not handle.
-        if (Display is "flex" or "inline-flex"
-            && FlexDirection is "column" or "column-reverse")
+        if (Display is "flex" or "inline-flex" && FlexDirection is "column" or "column-reverse")
             return;
 
         // A definite block size is required to have free space to distribute.
         // (Size.Height is content-derived at this point — the specified height
         // is only pre-resolved into Size for percentage values — so resolve
         // the definite block size directly from the 'height' declaration.)
-        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto
-            || HeightPercentageResolvesToAuto())
+        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
             return;
 
         double cbHeight;
+        
         if (Position == CssConstants.Fixed && LayoutEnvironment != null)
             cbHeight = LayoutEnvironment.ViewportSize.Height;
         else if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
@@ -494,10 +508,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             cbHeight = ContainingBlock?.Size.Height ?? 0;
 
         double contentTop = ClientTop;
-        double contentHeight = ResolveSpecifiedHeightToBorderBox(
-                CssValueParser.ParseLength(Height, cbHeight, GetEmHeight()))
+        double length = CssLengthParser.ParseLength(Height, cbHeight, GetEmHeight());
+        double contentHeight = ResolveSpecifiedHeightToBorderBox(length)
             - ActualPaddingTop - ActualPaddingBottom
             - ActualBorderTopWidth - ActualBorderBottomWidth;
+        
         if (contentHeight <= 0)
             return;
 
@@ -507,9 +522,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             if (item.Display == CssConstants.None)
                 continue;
+
             // CSS2.1 §9.6.1 / §9.5: out-of-flow items are positioned separately.
             if (item.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             if (item.Float != CssConstants.None)
                 continue;
 
@@ -520,18 +537,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             bool toCenter = align == "center";
             bool toEnd = align is "end" or "flex-end" or "self-end";
+
             if (!toCenter && !toEnd)
                 continue; // start/flex-start/baseline/stretch → block-start
 
             double marginBoxHeight = (item.ActualBottom - item.Location.Y)
                 + item.ActualMarginTop + item.ActualMarginBottom;
             double free = contentHeight - marginBoxHeight;
+
             if (free <= 0.5)
                 continue; // safe alignment: no room → keep at start
 
             double marginBoxOffset = toCenter ? free / 2 : free;
             double targetTop = contentTop + marginBoxOffset + item.ActualMarginTop;
             double dy = targetTop - item.Location.Y;
+
             if (Math.Abs(dy) > 0.5)
             {
                 item.OffsetTop(dy);
@@ -548,12 +568,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         if (string.IsNullOrEmpty(value))
             return "";
+
         string v = value.Trim();
+
         if (v.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
-            v = v.Substring(5).Trim();
+            v = v[5..].Trim();
         else if (v.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
-            v = v.Substring(7).Trim();
+            v = v[7..].Trim();
+
         return v.ToLowerInvariant();
     }
-
 }

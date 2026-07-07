@@ -1,5 +1,4 @@
 using Broiler.HTML.Image;
-using Xunit;
 using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;

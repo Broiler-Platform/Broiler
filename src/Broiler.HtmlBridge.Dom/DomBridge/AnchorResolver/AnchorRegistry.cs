@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text.RegularExpressions;
-
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
@@ -45,7 +39,7 @@ public sealed partial class DomBridge
                 var info = box with { SourceElement = el };
                 registry[anchorName] = info;
                 if (!candidates.TryGetValue(anchorName, out var list))
-                    candidates[anchorName] = list = new List<AnchorInfo>();
+                    candidates[anchorName] = list = [];
                 list.Add(info);
             }
         }
@@ -345,7 +339,7 @@ public sealed partial class DomBridge
             // read the individual inset properties directly.
             if (props.TryGetValue("inset", out var insetVal2))
             {
-                var parts = insetVal2.Split(new[] { ' ', '\t' },
+                var parts = insetVal2.Split([' ', '\t'],
                     StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length > 0)
                 {

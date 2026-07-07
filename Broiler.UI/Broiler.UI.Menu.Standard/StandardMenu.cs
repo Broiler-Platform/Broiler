@@ -4,7 +4,6 @@ using System.Linq;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
-using Broiler.UI.Menu;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.Menu.Standard;

@@ -1,5 +1,4 @@
 using System;
-using Broiler.UI.CheckBox;
 
 namespace Broiler.UI.CheckBox.Standard;
 

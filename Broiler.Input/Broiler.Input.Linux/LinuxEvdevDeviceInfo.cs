@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Linux;
 
 public sealed record LinuxEvdevDeviceInfo(

@@ -1,9 +1,4 @@
 using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
@@ -122,19 +117,19 @@ public sealed partial class DomBridge
         // textContent (read/write)
         obj.FastAddProperty(
             (KeyString)"textContent",
-            new JSFunction((in Arguments _) => this.GetNodeTextValue(element), "get textContent"),
+            new JSFunction((in Arguments _) => GetNodeTextValue(element), "get textContent"),
             new JSFunction((in Arguments a) => JsJsObjectsSetTextContent021Core(bridge, element, in a), "set textContent"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty(
             (KeyString)"innerText",
-            new JSFunction((in Arguments _) => this.GetNodeTextValue(element), "get innerText"),
+            new JSFunction((in Arguments _) => GetNodeTextValue(element), "get innerText"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty(
             (KeyString)"outerText",
-            new JSFunction((in Arguments _) => this.GetNodeTextValue(element), "get outerText"),
+            new JSFunction((in Arguments _) => GetNodeTextValue(element), "get outerText"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 

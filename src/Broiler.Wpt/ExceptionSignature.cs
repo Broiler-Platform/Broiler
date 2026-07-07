@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace Broiler.Wpt;
@@ -26,12 +23,12 @@ internal static class ExceptionSignature
     // so the signature keys on the underlying error rather than the pipeline stage
     // (which the failure category already records).
     private static readonly string[] StagePrefixes =
-    {
+    [
         "Script execution failed: ",
         "Rendering failed: ",
         "Match test failed: ",
         "Failed to read test file: ",
-    };
+    ];
 
     /// <summary>
     /// Computes the signature for a failure, or <c>null</c> when there is nothing
@@ -94,7 +91,7 @@ internal static class ExceptionSignature
     private sealed class Accumulator
     {
         public int Count;
-        public List<string> Examples { get; } = new();
+        public List<string> Examples { get; } = [];
     }
 
     private static string? NormalizeMessage(string? message)

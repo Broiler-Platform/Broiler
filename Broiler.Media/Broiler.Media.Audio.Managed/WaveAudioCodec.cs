@@ -3,7 +3,6 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Media.Audio;
 
 namespace Broiler.Media.Audio.Managed;
 

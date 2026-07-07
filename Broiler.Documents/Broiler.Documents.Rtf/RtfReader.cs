@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Broiler.Documents;
 using Broiler.Documents.Model;
 using Broiler.Graphics;
 
@@ -35,7 +34,7 @@ public static class RtfReader
 
     private sealed class Worker
     {
-        private readonly List<DocumentDiagnostic> _diagnostics = new();
+        private readonly List<DocumentDiagnostic> _diagnostics = [];
         private readonly RtfColorTable _colors = new();
         private readonly RtfFontTable _fonts = new();
         private readonly Stack<State> _stack = new();
@@ -515,7 +514,7 @@ public static class RtfReader
 
     private sealed class Accumulator
     {
-        private readonly List<RichTextParagraph> _paragraphs = new();
+        private readonly List<RichTextParagraph> _paragraphs = [];
         private readonly int _maxParagraphs;
         private RichTextParagraph _current = RichTextParagraph.Create(string.Empty, InlineStyle.Default, ParagraphStyle.Default);
 

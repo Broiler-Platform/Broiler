@@ -1,8 +1,4 @@
-using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -263,7 +259,7 @@ public sealed partial class DomBridge
         {
             if (rule is Broiler.CSS.CssStyleRule styleRule)
             {
-                var declarations = ParseStyle(Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
+                var declarations = ParseStyle(CSS.CssSerializer.Serialize(styleRule.Declarations));
                 foreach (var selector in styleRule.Selectors.Selectors)
                 {
                     if (!string.IsNullOrWhiteSpace(selector.Text))
@@ -342,7 +338,7 @@ public sealed partial class DomBridge
     /// pseudo-elements. Inline styles are handled separately.
     /// </summary>
     public static int CalculateSpecificity(string selector) =>
-        Broiler.CSS.CssSelectorParser.CalculateSpecificity(selector).Encoded;
+        CSS.CssSelectorParser.CalculateSpecificity(selector).Encoded;
 
     /// <summary>
     /// Clears any CSS-derived compatibility values left in <see cref="DomElement.Style"/>
@@ -940,12 +936,12 @@ public sealed partial class DomBridge
         var rules = EnsureStyleSheetRulesCurrent(styleEl);
         var state = GetElementRuntimeState(styleEl).StyleSheet;
         return state.RulesMutated
-            ? string.Join("\n", rules.Select(Broiler.CSS.CssSerializer.Serialize))
+            ? string.Join("\n", rules.Select(CSS.CssSerializer.Serialize))
             : state.RulesSourceText ?? string.Empty;
     }
 
     private static string FormatPx(double value) =>
-        $"{Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture)}px";
+        $"{Math.Round(value).ToString(CultureInfo.InvariantCulture)}px";
 
     private static void ApplyUserAgentDisplayDefaults(
         Dictionary<string, string> computed,
@@ -1248,7 +1244,7 @@ public sealed partial class DomBridge
     private static bool IsFontLineHeightToken(string token) =>
         token.Equals("normal", StringComparison.OrdinalIgnoreCase)
         || IsLengthOrPercentage(token)
-        || double.TryParse(token, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
+        || double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
 
     /// <summary>
     /// Expands a 1–4 value CSS box shorthand (margin, padding, border-width, etc.)
@@ -1511,7 +1507,7 @@ public sealed partial class DomBridge
     /// like <c>(min-color: 0)</c>, <c>(min-monochrome: 0)</c>.
     /// </summary>
     private static bool EvaluateMediaQuery(string query, int viewportWidth = 0, int viewportHeight = 0)
-        => Broiler.CSS.Dom.CssStyleEngine.MatchesMediaQuery(
+        => CSS.Dom.CssStyleEngine.MatchesMediaQuery(
             query,
             new Broiler.CSS.Dom.CssEnvironment(viewportWidth, viewportHeight));
 
@@ -1527,8 +1523,8 @@ public sealed partial class DomBridge
         var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
         if (viewportHeight > 0 && v.EndsWith("vh"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var vh))
             {
                 return (vh / 100.0) * viewportHeight;
             }
@@ -1538,8 +1534,8 @@ public sealed partial class DomBridge
 
         if (viewportWidth > 0 && v.EndsWith("vw"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var vw))
             {
                 return (vw / 100.0) * viewportWidth;
             }
@@ -1550,8 +1546,8 @@ public sealed partial class DomBridge
         var viewportMin = Math.Min(viewportWidth, viewportHeight);
         if (viewportMin > 0 && v.EndsWith("vmin"))
         {
-            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vmin))
+            if (double.TryParse(v[..^4], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var vmin))
             {
                 return (vmin / 100.0) * viewportMin;
             }
@@ -1562,8 +1558,8 @@ public sealed partial class DomBridge
         var viewportMax = Math.Max(viewportWidth, viewportHeight);
         if (viewportMax > 0 && v.EndsWith("vmax"))
         {
-            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vmax))
+            if (double.TryParse(v[..^4], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var vmax))
             {
                 return (vmax / 100.0) * viewportMax;
             }
@@ -1573,57 +1569,57 @@ public sealed partial class DomBridge
 
         if (v.EndsWith("px"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var px))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var px))
                 return px;
             return double.NaN;
         }
         if (v.EndsWith("em") || v.EndsWith("rem"))
         {
             var numStr = v.EndsWith("rem") ? v[..^3] : v[..^2];
-            if (double.TryParse(numStr, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var em))
+            if (double.TryParse(numStr, NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var em))
                 return em * 16.0; // 1em = 16px default
             return double.NaN;
         }
         if (v.EndsWith("ex"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var ex))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var ex))
                 return ex * 8.0; // Match the core parser's 1ex ≈ 0.5em approximation at 16px.
             return double.NaN;
         }
         if (v.EndsWith("ch"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var ch))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var ch))
                 return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
             return double.NaN;
         }
         if (v.EndsWith("ic"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var ic))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var ic))
                 return ic * 16.0; // Approximate 1ic as 1em for the current focused Phase 3 slice.
             return double.NaN;
         }
         if (v.EndsWith("rlh"))
         {
-            if (double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var rlh))
+            if (double.TryParse(v[..^3], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var rlh))
                 return rlh * 19.2; // Approximate 1rlh as the default 16px root line-height × 1.2.
             return double.NaN;
         }
         if (v.EndsWith("lh"))
         {
-            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var lh))
+            if (double.TryParse(v[..^2], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var lh))
                 return lh * 19.2; // Approximate 1lh as the default 16px line-height × 1.2.
             return double.NaN;
         }
         // Plain number (treat as pixels)
-        if (double.TryParse(v, System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture, out var raw))
+        if (double.TryParse(v, NumberStyles.Float,
+            CultureInfo.InvariantCulture, out var raw))
             return raw;
         return double.NaN;
     }
@@ -1765,7 +1761,7 @@ public sealed partial class DomBridge
             if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
             {
                 var path = uri.LocalPath;
-                return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
+                return File.Exists(path) ? File.ReadAllText(path) : null;
             }
             return SharedHttpClient.GetStringAsync(url)
                 .ConfigureAwait(false)

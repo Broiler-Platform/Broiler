@@ -1,7 +1,6 @@
 using System;
 using Broiler.Graphics;
 using Broiler.UI.Standard;
-using Broiler.UI.Tooltip;
 
 namespace Broiler.UI.Tooltip.Standard;
 

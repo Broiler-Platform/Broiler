@@ -13,7 +13,7 @@ public sealed class StandardRichEditRenderTests
         BRenderList list = scene.Session.RenderFrame();
 
         string[] texts = list.Commands.OfType<BRenderCommand.DrawText>().Select(c => c.Text.Text).ToArray();
-        Assert.Equal(new[] { "one", "two", "three" }, texts);
+        Assert.Equal(["one", "two", "three"], texts);
         scene.Session.Dispose();
     }
 

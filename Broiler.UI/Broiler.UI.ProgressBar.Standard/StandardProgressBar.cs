@@ -1,6 +1,5 @@
 using System;
 using Broiler.Graphics;
-using Broiler.UI.ProgressBar;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.ProgressBar.Standard;

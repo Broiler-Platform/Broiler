@@ -137,7 +137,7 @@ public sealed class DomElement : CanonicalElement
 
     public DomElement? OwnerDocRoot { get; set; }
 
-    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = new();
+    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = [];
 
     private static bool IsSpecialNode(string tagName) => tagName.StartsWith('#');
 

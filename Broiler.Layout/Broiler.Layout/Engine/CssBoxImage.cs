@@ -1,7 +1,5 @@
-﻿using System.Drawing;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssLength = Broiler.CSS.CssLength;
-using CssUnit = Broiler.CSS.CssUnit;
+﻿using Broiler.CSS;
+using System.Drawing;
 
 
 namespace Broiler.Layout.Engine;
@@ -35,14 +33,14 @@ internal sealed class CssBoxImage : CssBox
                 _imageLoadHandler = LayoutEnvironment.CreateImageLoader(OnLoadImageComplete);
 
                 if (Content != null && Content != CssConstants.Normal)
-                    _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, base.BaseUrl);
+                    _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl);
                 else
                 {
                     var src = GetAttribute("src");
                     // <object data="..."> fallback: use 'data' attribute when 'src' is absent
                     if (string.IsNullOrEmpty(src))
                         src = GetAttribute("data");
-                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, base.BaseUrl);
+                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
                 }
             }
 

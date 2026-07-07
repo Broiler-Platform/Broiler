@@ -1,5 +1,3 @@
-using Broiler.Media;
-
 namespace Broiler.Media.Video;
 
 public sealed class VideoDecodeOptions

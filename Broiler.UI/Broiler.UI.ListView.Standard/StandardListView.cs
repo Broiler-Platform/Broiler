@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
-using Broiler.UI.ListView;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.ListView.Standard;
@@ -117,8 +116,9 @@ public sealed class StandardListView : UiListView
         int index = (int)Math.Floor((VerticalOffset + input.Position.Y - Bounds.Top) / Math.Max(1, ItemHeight));
         if ((uint)index < (uint)Items.Count)
         {
-            SelectIndex(index);
-            ScrollIntoView(Items[index].Id);
+            string itemId = Items[index].Id;
+            SelectItem(itemId);
+            ScrollIntoView(itemId);
         }
 
         return true;
@@ -162,8 +162,9 @@ public sealed class StandardListView : UiListView
             return false;
 
         Session?.SetFocus(this);
-        SelectIndex(index);
-        ScrollIntoView(Items[index].Id);
+        string itemId = Items[index].Id;
+        SelectItem(itemId);
+        ScrollIntoView(itemId);
         return true;
     }
 

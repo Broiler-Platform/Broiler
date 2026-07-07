@@ -1,6 +1,5 @@
-﻿using System.Diagnostics;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+﻿using Broiler.CSS;
+using System.Diagnostics;
 
 
 namespace Broiler.Layout.Engine;
@@ -193,7 +192,7 @@ internal static class CssBoxHelper
         // the container (e.g. a float wrapping a `width:100%` block, or an
         // auto-fill grid item sized 100%, pinned to the viewport not its content).
         bool widthIsPercentage = !string.IsNullOrEmpty(box.Width)
-            && box.Width.EndsWith("%", StringComparison.Ordinal)
+            && box.Width.EndsWith('%')
             && !box.Width.Contains('(');
         bool useExplicitWidth = box != suppressExplicitWidthFor && !widthIsPercentage;
 
@@ -205,7 +204,7 @@ internal static class CssBoxHelper
             && box.Width != CssConstants.Auto
             && !string.IsNullOrEmpty(box.Width))
         {
-            double explicitWidth = CssValueParser.ParseLength(
+            double explicitWidth = CssLengthParser.ParseLength(
                 box.Width, box.ContainingBlock?.Size.Width ?? 0, box.GetEmHeight());
             paddingSum += box.ActualBorderLeftWidth + box.ActualBorderRightWidth
                         + box.ActualPaddingRight + box.ActualPaddingLeft;
@@ -227,7 +226,7 @@ internal static class CssBoxHelper
             && box.Width != CssConstants.Auto
             && !string.IsNullOrEmpty(box.Width))
         {
-            double explicitWidth = CssValueParser.ParseLength(
+            double explicitWidth = CssLengthParser.ParseLength(
                 box.Width, box.ContainingBlock?.Size.Width ?? 0, box.GetEmHeight());
             if (explicitWidth > 0)
             {
@@ -260,8 +259,8 @@ internal static class CssBoxHelper
             }
 
             // remove the last word padding
-            if (box.Words.Count > 0 && !box.Words[box.Words.Count - 1].HasSpaceAfter)
-                maxSum -= box.Words[box.Words.Count - 1].ActualWordSpacing;
+            if (box.Words.Count > 0 && !box.Words[^1].HasSpaceAfter)
+                maxSum -= box.Words[^1].ActualWordSpacing;
         }
         else
         {
@@ -353,7 +352,7 @@ internal static class CssBoxHelper
     private static CssRect LastContentWord(CssBox box)
     {
         if (box.Words.Count > 0)
-            return box.Words[box.Words.Count - 1];
+            return box.Words[^1];
 
         for (int i = box.Boxes.Count - 1; i >= 0; i--)
         {
@@ -429,6 +428,7 @@ internal static class CssBoxHelper
             // clear:both → all floats.
             bool matchesDirection = clearDir == "both"
                 || string.Equals(box.Float, clearDir, StringComparison.OrdinalIgnoreCase);
+
             if (!matchesDirection)
                 return;
 
@@ -449,9 +449,12 @@ internal static class CssBoxHelper
             else
                 bottom = box.ActualBottom
                     + box.ActualMarginBottom;
+
             maxBottom = Math.Max(maxBottom, bottom);
-            considered ??= new List<(string, double)>();
+
+            considered ??= [];
             considered.Add((box.HtmlTag?.Name ?? box.Display, bottom));
+
             // Float establishes a new BFC – don't recurse into descendants.
             return;
         }
@@ -491,9 +494,11 @@ internal static class CssBoxHelper
                 || child.Position == CssConstants.Absolute
                 || child.Position == CssConstants.Fixed)
                 continue;
+
             if (child.Display == CssConstants.Inline
                 || child.Display == CssConstants.InlineBlock)
                 continue;
+
             lastInFlow = child;
         }
 
@@ -519,9 +524,11 @@ internal static class CssBoxHelper
         bool hasBottom = box.Bottom != null && box.Bottom != CssConstants.Auto;
 
         if (hasTop)
-            return CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+            return CssLengthParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+
         if (hasBottom)
-            return -CssValueParser.ParseLength(box.Bottom, box.Size.Height, box.GetEmHeight());
+            return -CssLengthParser.ParseLength(box.Bottom, box.Size.Height, box.GetEmHeight());
+
         return 0;
     }
 
@@ -619,8 +626,10 @@ internal static class CssBoxHelper
         // covering them here keeps the predicate self-consistent.)
         if (EstablishesBfc(box))
             return false;
+
         if (box.ActualBorderTopWidth > 0.1 || box.ActualBorderBottomWidth > 0.1)
             return false;
+
         if (box.ActualPaddingTop > 0.1 || box.ActualPaddingBottom > 0.1)
             return false;
 
@@ -630,9 +639,10 @@ internal static class CssBoxHelper
             bool resolvedToAuto = box.Height.Contains('%')
                 && (box.ContainingBlock.Height == CssConstants.Auto
                     || string.IsNullOrEmpty(box.ContainingBlock.Height));
+
             if (!resolvedToAuto)
             {
-                double h = CssValueParser.ParseLength(box.Height, box.Size.Height, box.GetEmHeight());
+                double h = CssLengthParser.ParseLength(box.Height, box.Size.Height, box.GetEmHeight());
                 if (h > 0.1)
                     return false;
             }
@@ -654,6 +664,7 @@ internal static class CssBoxHelper
         // check for line-box content when height is auto.
         bool hasExplicitZeroHeight = box.Height != CssConstants.Auto
             && !string.IsNullOrEmpty(box.Height);
+
         if (!hasExplicitZeroHeight)
         {
             foreach (var lb in box.LineBoxes)
@@ -707,6 +718,7 @@ internal static class CssBoxHelper
 
         double maxPos = 0, maxNeg = 0;
         CollectEmptyBoxMargins(box, ref maxPos, ref maxNeg);
+
         double collapsed = maxPos + maxNeg;
         return collapsed - box.CollapsedMarginTop;
     }

@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Net;
 
 namespace Broiler.Layout;
 
@@ -32,5 +31,5 @@ public static class CommonUtils
 
     /// <summary>Component-wise maximum of two sizes.</summary>
     public static SizeF Max(SizeF size, SizeF other)
-        => new(System.Math.Max(size.Width, other.Width), System.Math.Max(size.Height, other.Height));
+        => new(Math.Max(size.Width, other.Width), Math.Max(size.Height, other.Height));
 }

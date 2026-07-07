@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -84,7 +82,7 @@ public sealed class TableCaptionTests
 
         Assert.True(cap.h > 0, $"caption height should be > 0 but was {cap.h}");
         // A bottom caption does not move the rows...
-        Assert.True(System.Math.Abs(cell.y - cellNoCap) <= 2,
+        Assert.True(Math.Abs(cell.y - cellNoCap) <= 2,
             $"bottom caption should not move the cell (was {cellNoCap}, now {cell.y})");
         // ...and sits at/below the cell's bottom edge.
         Assert.True(cap.y >= cell.y + cell.h - 2,

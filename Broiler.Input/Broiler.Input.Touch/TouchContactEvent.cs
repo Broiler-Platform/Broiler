@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Touch;
 
 public readonly record struct TouchContactEvent(

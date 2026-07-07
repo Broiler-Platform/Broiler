@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Media.Audio;
-using Broiler.Media.Audio.Managed;
 
 namespace Broiler.Media.Audio.Managed.Tests;
 

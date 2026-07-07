@@ -2,7 +2,6 @@ using System;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Media.Video;
 
 namespace Broiler.Media.Video.MediaFoundation;
 

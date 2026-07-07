@@ -1,7 +1,3 @@
-using Broiler.HtmlBridge;
-using Broiler.JavaScript.Engine;
-using Xunit;
-
 namespace Broiler.Cli.Tests;
 
 /// <summary>
@@ -29,5 +25,5 @@ public sealed class QuirksBodyFillTests
     [InlineData("", true)]
     [InlineData("<html><body></body></html>", true)]
     public void IsQuirksHtml_MatchesDoctype(string html, bool expectedQuirks)
-        => Assert.Equal(expectedQuirks, Broiler.Layout.DocumentModeContext.IsQuirksHtml(html));
+        => Assert.Equal(expectedQuirks, Layout.DocumentModeContext.IsQuirksHtml(html));
 }

@@ -279,7 +279,7 @@ internal static partial class Program
             {
                 using var bitmap = HtmlRender.RenderToImageWithStyleSet(
                     BenchmarkSamples.HtmlDocument, 1024, 768, baseUrl: "https://example.test/");
-                _ = bitmap.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100);
+                _ = bitmap.Encode(Graphics.BImageEncodeFormat.Png, 100);
             }),
             MeasureNanosecondsPerOperation("css.parse", "Parse the CSS Phase 0 stylesheet with the renderer parser", 12, 100, () =>
             {

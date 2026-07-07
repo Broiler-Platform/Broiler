@@ -1,6 +1,4 @@
-using System.Drawing;
 using System.Text.Json;
-using Broiler.Cli;
 using Broiler.HTML.Image;
 using BColor = Broiler.Graphics.BColor;
 

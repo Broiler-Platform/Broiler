@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 

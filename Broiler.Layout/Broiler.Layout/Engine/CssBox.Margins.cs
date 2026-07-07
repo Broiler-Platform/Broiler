@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -23,6 +20,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         bool trimBlockStart = false;
         bool trimBlockEnd = false;
+
         foreach (var token in MarginTrim.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
         {
             switch (token.ToLowerInvariant())
@@ -31,9 +29,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     trimBlockStart = true;
                     trimBlockEnd = true;
                     break;
+
                 case "block-start":
                     trimBlockStart = true;
                     break;
+
                 case "block-end":
                     trimBlockEnd = true;
                     break;
@@ -45,6 +45,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         CssBox first = null;
         CssBox last = null;
+
         foreach (var child in Boxes)
         {
             if (child.Display == CssConstants.None
@@ -60,6 +61,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         if (trimBlockStart && first != null)
             first.MarginTop = "0";
+
         if (trimBlockEnd && last != null)
             last.MarginBottom = "0";
     }
@@ -81,6 +83,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 double maxNeg = Math.Min(ActualMarginTop, 0);
                 CssBoxHelper.CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
                 double collapsed = maxPos + maxNeg; // maxNeg <= 0
+
                 // Subtract the portion of the collapsed margin already
                 // consumed when positioning the empty box itself (its
                 // CollapsedMarginTop was recorded during its own layout).
@@ -106,8 +109,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 double minNeg = Math.Min(
                     Math.Min(prevMb, 0),
                     Math.Min(ActualMarginTop, 0));
+
                 value = maxPos + minNeg;
             }
+
             CollapsedMarginTop = value;
         }
         else if (_parentBox != null && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
@@ -129,10 +134,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 && _parentBox.ParentBox.ParentBox != null)
             {
                 double propagation = ActualMarginTop - parentEffective;
+
                 _parentBox.Location = new PointF(
                     _parentBox.Location.X,
                     _parentBox.Location.Y + (float)propagation);
                 _parentBox.CollapsedMarginTop = ActualMarginTop;
+
                 value = 0;
             }
             else
@@ -244,8 +251,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // calculation.  Undo the relative offset so the parent
             // measures the child's normal-flow bottom.
             double childBottom = child.ActualBottom;
+
             if (child.Position == CssConstants.Relative)
                 childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
+
             maxChildBottom = Math.Max(maxChildBottom, childBottom);
             lastInFlowChild = child;
         }
@@ -257,6 +266,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (isBfc)
         {
             double maxFloatDesc = maxChildBottom;
+
             FindMaxDescendantFloatBottom(this, ref maxFloatDesc);
             maxChildBottom = Math.Max(maxChildBottom, maxFloatDesc);
         }
@@ -275,15 +285,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             || (Height.Contains('%')
                 && (ContainingBlock == null || ContainingBlock.Height == CssConstants.Auto
                     || string.IsNullOrEmpty(ContainingBlock.Height)));
+
         bool collapseThrough = lastInFlowChild != null
             && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1
             && autoHeight
             && lastInFlowChild.Float == CssConstants.None
             && lastInFlowChild.Display != CssConstants.Inline
             && lastInFlowChild.Display != CssConstants.InlineBlock;
+
         if (!collapseThrough && lastInFlowChild != null)
             maxChildBottom += lastInFlowChild.ActualMarginBottom;
+
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
     }
-
 }

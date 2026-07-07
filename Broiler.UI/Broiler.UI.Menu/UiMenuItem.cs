@@ -26,5 +26,5 @@ public sealed class UiMenuItem
 
     public bool IsChecked { get; set; }
 
-    public IList<UiMenuItem> Children { get; } = new List<UiMenuItem>();
+    public IList<UiMenuItem> Children { get; } = [];
 }

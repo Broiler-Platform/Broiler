@@ -2,7 +2,6 @@ using System;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
-using Broiler.UI.CheckBox;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.CheckBox.Standard;

@@ -9,7 +9,7 @@ namespace Broiler.Documents.Rtf;
 /// </summary>
 internal sealed class RtfFontTable
 {
-    private readonly Dictionary<int, Entry> _fonts = new();
+    private readonly Dictionary<int, Entry> _fonts = [];
 
     public void Set(int index, string name, int charset) => _fonts[index] = new Entry(name, charset);
 

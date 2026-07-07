@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -64,12 +62,12 @@ public sealed class GridRtlTests
           + ".absolute{position:absolute;top:0;left:0;width:100%;height:100%;}"
           + ".six{grid-row:-5/5;grid-column:-5/5;}";
         (string col, string row, int x, int y, int w, int h)[] cases =
-        {
+        [
             ("auto / 1", "auto / 1", 615, 0, 215, 115),
             ("auto / 2", "auto / 2", 415, 0, 415, 265),
             ("3 / auto", "3 / auto", 0, 515, 115, 115),
             ("2 / 4",    "2 / 4",    15, 265, 400, 300),
-        };
+        ];
         foreach (var c in cases)
         {
             string html = "<!DOCTYPE html><html><head><style>" + style + "</style></head><body style=\"margin:0\"><div class=\"grid\">"

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 
 namespace Broiler.HtmlBridge;
@@ -24,7 +22,7 @@ public sealed partial class DomBridge
     // directly (offset / client box); scroll and bounding-client-rect checks are not
     // yet covered.
     private static readonly (string Attribute, string Property)[] CheckLayoutAttributeMap =
-    {
+    [
         ("data-offset-x", "offset-x"),
         ("data-offset-y", "offset-y"),
         ("data-expected-width", "width"),
@@ -33,7 +31,7 @@ public sealed partial class DomBridge
         ("data-expected-client-height", "client-height"),
         ("data-total-x", "total-x"),
         ("data-total-y", "total-y"),
-    };
+    ];
 
     /// <summary>
     /// Evaluates the <c>data-offset-*</c> / <c>data-expected-*</c> /
@@ -104,7 +102,7 @@ public sealed partial class DomBridge
         else if (!string.IsNullOrEmpty(element.ClassName))
         {
             var firstClass = element.ClassName
-                .Split(' ', System.StringSplitOptions.RemoveEmptyEntries)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .FirstOrDefault();
             if (firstClass is not null)
                 builder.Append('.').Append(firstClass);

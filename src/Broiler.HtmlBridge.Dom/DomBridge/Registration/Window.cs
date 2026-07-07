@@ -1,15 +1,7 @@
-using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
-using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
-using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
@@ -185,7 +177,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue(
             (KeyString)"languages",
-            new JSArray(new JSValue[] { new JSString("en-US"), new JSString("en") }),
+            new JSArray([new JSString("en-US"), new JSString("en")]),
             JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue(
             (KeyString)"cookieEnabled",

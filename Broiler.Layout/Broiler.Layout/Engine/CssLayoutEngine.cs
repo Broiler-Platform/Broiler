@@ -1,9 +1,5 @@
+using Broiler.CSS;
 using System.Drawing;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssMetrics = Broiler.CSS.CssMetrics;
-using CssValueParser = Broiler.CSS.CssLengthParser;
-using CssLength = Broiler.CSS.CssLength;
-using CssUnit = Broiler.CSS.CssUnit;
 
 
 namespace Broiler.Layout.Engine;
@@ -22,6 +18,7 @@ internal static class CssLayoutEngine
             if (b.Position == CssConstants.Absolute || b.Position == CssConstants.Fixed)
                 return true;
         }
+
         return false;
     }
 
@@ -53,9 +50,12 @@ internal static class CssLayoutEngine
     internal static bool TryResolveDefiniteImageLength(string value, double em, out double px)
     {
         px = 0;
+
         if (string.IsNullOrWhiteSpace(value))
             return false;
+
         string t = value.Trim();
+
         // Only a numeric length (or calc()) is a definite tag size. Reject every
         // keyword size — auto, none, min/max/fit-content, stretch,
         // fill-available, … — which resolves against layout, not to a fixed px
@@ -65,12 +65,17 @@ internal static class CssLayoutEngine
         char c0 = t[0];
         bool looksNumeric = char.IsDigit(c0) || c0 == '+' || c0 == '-' || c0 == '.';
         bool isCalc = t.StartsWith("calc(", StringComparison.OrdinalIgnoreCase);
-        if (!(looksNumeric || isCalc) || t.EndsWith("%", StringComparison.Ordinal))
+
+        if (!(looksNumeric || isCalc) || t.EndsWith('%'))
             return false;
-        double v = CssValueParser.ParseLength(t, 0, em);
+
+        double v = CssLengthParser.ParseLength(t, 0, em);
+
         if (double.IsNaN(v) || double.IsInfinity(v) || v < 0)
             return false;
+
         px = v;
+
         return true;
     }
 
@@ -168,9 +173,11 @@ internal static class CssLayoutEngine
         bool hasCssAspectRatio =
             CssBox.TryParseAspectRatio(imageWord.OwnerBox.AspectRatio, out double cssAspectRatio)
             && cssAspectRatio > 0;
+
         if (hasCssAspectRatio)
         {
             bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
+
             if (widthDriven)
                 imageWord.Height = imageWord.Width / cssAspectRatio;
             else if (hasImageTagHeight && !hasImageTagWidth)
@@ -206,6 +213,7 @@ internal static class CssLayoutEngine
                 : minWidth.IsPercentage
                     ? minWidth.Number * imageWord.OwnerBox.ContainingBlock.Size.Width
                     : -1;
+
             if (minWidthVal > 0 && imageWord.Width < minWidthVal)
             {
                 if (image != null && !hasImageTagHeight && image.Value.HasIntrinsicRatio)
@@ -213,6 +221,7 @@ internal static class CssLayoutEngine
                     double ratio = minWidthVal / imageWord.Width;
                     imageWord.Height *= ratio;
                 }
+
                 imageWord.Width = minWidthVal;
             }
         }
@@ -225,6 +234,7 @@ internal static class CssLayoutEngine
                 : maxHeight.IsPercentage
                     ? maxHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
                     : -1;
+
             if (maxHeightVal > 0 && imageWord.Height > maxHeightVal)
             {
                 if (image != null && !hasImageTagWidth && image.Value.HasIntrinsicRatio)
@@ -244,6 +254,7 @@ internal static class CssLayoutEngine
                 : minHeight.IsPercentage
                     ? minHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
                     : -1;
+
             if (minHeightVal > 0 && imageWord.Height < minHeightVal)
             {
                 if (image != null && !hasImageTagWidth && image.Value.HasIntrinsicRatio)
@@ -251,6 +262,7 @@ internal static class CssLayoutEngine
                     double ratio = minHeightVal / imageWord.Height;
                     imageWord.Width *= ratio;
                 }
+
                 imageWord.Height = minHeightVal;
             }
         }
@@ -302,6 +314,7 @@ internal static class CssLayoutEngine
         bool baseRtl = plaintext
             ? SeedPlaintextBaseRtl(blockBox)
             : blockBox.Direction == CssConstants.Rtl;
+
         foreach (var linebox in blockBox.LineBoxes)
         {
             bool lineRtl = baseRtl;
@@ -310,10 +323,12 @@ internal static class CssLayoutEngine
                 lineRtl = LineFirstStrongRtl(linebox) ?? baseRtl;
                 baseRtl = lineRtl;
             }
-            ApplyHorizontalAlignment(g, linebox, lineRtl);
+
+            ApplyHorizontalAlignment(linebox, lineRtl);
             ApplyRightToLeft(linebox, lineRtl);
             BubbleRectangles(blockBox, linebox);
-            ApplyVerticalAlignment(g, linebox);
+            ApplyVerticalAlignment(linebox);
+
             linebox.AssignRectanglesToBoxes();
         }
 
@@ -334,6 +349,7 @@ internal static class CssLayoutEngine
         // (plus padding/border).
         maxBottom = starty;
         double minTop = starty;
+
         foreach (var linebox in blockBox.LineBoxes)
         {
             foreach (var rect in linebox.Rectangles)
@@ -365,10 +381,13 @@ internal static class CssLayoutEngine
                         : blockBox.ActualFont.Height * PtToCssPx;
                     double marginBoxBottom = rect.Value.Bottom + rect.Key.ActualMarginBottom
                         + lineStrut * (1.0 - TypicalAscentRatio);
+
                     maxBottom = Math.Max(maxBottom, marginBoxBottom);
                 }
+
                 minTop = Math.Min(minTop, rect.Value.Top);
             }
+
             foreach (var word in linebox.Words)
             {
                 if (IsInAbsposSubtree(word.OwnerBox, blockBox))
@@ -392,6 +411,7 @@ internal static class CssLayoutEngine
                     double lineStrut = blockBox.ActualLineHeight > 0
                         ? blockBox.ActualLineHeight
                         : blockBox.ActualFont.Height * PtToCssPx;
+
                     maxBottom = Math.Max(maxBottom,
                         word.Bottom + lineStrut * (1.0 - TypicalAscentRatio));
                 }
@@ -426,6 +446,7 @@ internal static class CssLayoutEngine
                     maxBottom = Math.Max(maxBottom, lineTop + blockBox.ActualLineHeight);
             }
         }
+
         // CSS2.1 §10.8.1: The line box height is the distance between
         // the uppermost box top and the lowermost box bottom.  When
         // inline-level boxes overflow above the starting flow position
@@ -499,7 +520,9 @@ internal static class CssLayoutEngine
                     break;
                 }
             }
+
             if (hasInlineContent) break;
+
             foreach (var r in lb.Rectangles)
             {
                 if (!IsInAbsposSubtree(r.Key, blockBox))
@@ -508,8 +531,10 @@ internal static class CssLayoutEngine
                     break;
                 }
             }
+
             if (hasInlineContent) break;
         }
+
         if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight && hasInlineContent)
             maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
 
@@ -607,8 +632,10 @@ internal static class CssLayoutEngine
         {
             if (b.Position == CssConstants.Absolute || b.Position == CssConstants.Fixed)
                 continue;
+
             if (b.Display == CssConstants.None)
                 continue;
+
             b.OffsetTop(shift);
         }
     }
@@ -659,6 +686,7 @@ internal static class CssLayoutEngine
             if (b.Words.Count > 0)
             {
                 bool wrapNoWrapBox = false;
+
                 if (b.WhiteSpace == CssConstants.NoWrap && curx > startx)
                 {
                     var boxRight = curx;
@@ -683,6 +711,7 @@ internal static class CssLayoutEngine
                     double boxLineHeight = box.ActualLineHeight > 0
                         ? box.ActualLineHeight
                         : box.ActualFont.Height * PtToCssPx;
+
                     if (maxbottom - cury < boxLineHeight)
                         maxbottom += boxLineHeight - (maxbottom - cury);
 
@@ -695,6 +724,7 @@ internal static class CssLayoutEngine
                     if (word.IsImage)
                     {
                         strutHeight = blockbox.ActualLineHeight;
+
                         if (strutHeight <= 0)
                             strutHeight = blockbox.ActualFont.Height * PtToCssPx;
 
@@ -937,6 +967,7 @@ internal static class CssLayoutEngine
             if (child.Display == CssConstants.None
                 || child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             if (child.IsImage && child.IsInline)
                 return true;
         }
@@ -966,7 +997,7 @@ internal static class CssLayoutEngine
         double ibContentWidth;
         if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
         {
-            ibContentWidth = CssValueParser.ParseLength(b.Width, containerWidth, b.GetEmHeight());
+            ibContentWidth = CssLengthParser.ParseLength(b.Width, containerWidth, b.GetEmHeight());
             if (b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
             {
                 ibContentWidth -= b.ActualBorderLeftWidth + b.ActualBorderRightWidth
@@ -1002,11 +1033,12 @@ internal static class CssLayoutEngine
         // shrink-to-fit for auto-width inline-blocks).
         if (b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
         {
-            double minW = CssValueParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
+            double minW = CssLengthParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
             double minContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
                 ? minW - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
                     - b.ActualPaddingLeft - b.ActualPaddingRight
                 : minW;
+
             if (minContentW > ibContentWidth)
                 ibContentWidth = minContentW;
         }
@@ -1017,7 +1049,7 @@ internal static class CssLayoutEngine
         // exceeds max-width (CSS2.1 §10.4).
         if (b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
         {
-            double maxW = CssValueParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
+            double maxW = CssLengthParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
             double maxContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
                 ? maxW - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
                     - b.ActualPaddingLeft - b.ActualPaddingRight
@@ -1093,6 +1125,7 @@ internal static class CssLayoutEngine
                 double childMaxBottom = b.Location.Y;
                 foreach (var child in b.Boxes)
                     childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
+
                 b.ActualBottom = childMaxBottom;
             }
 
@@ -1129,14 +1162,17 @@ internal static class CssLayoutEngine
                 child.PerformLayout(g);
 
             double childMaxBottom = b.Location.Y;
+
             foreach (var child in b.Boxes)
                 childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
+
             b.ActualBottom = childMaxBottom;
         }
 
         // --- Compute height ---
         double ibHeight;
         bool heightIsPercent = !string.IsNullOrEmpty(b.Height) && b.Height.Contains('%');
+
         // A grid item's percentage block size resolves against its grid *area*
         // (the track), which is not known here — the track pass / PlaceItemInArea
         // sizes percentage/auto grid items to their area later. So measure an
@@ -1155,13 +1191,14 @@ internal static class CssLayoutEngine
             b.Position is not (CssConstants.Absolute or CssConstants.Fixed)
             && b.ParentBox != null
             && b.ParentBox.Display is "grid" or "inline-grid";
+
         if (heightIsPercent && isInFlowGridItem)
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
         }
         else if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
         {
-            double cssHeight = CssValueParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
+            double cssHeight = CssLengthParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
             ibHeight = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
                 ? cssHeight
                 : cssHeight
@@ -1176,7 +1213,7 @@ internal static class CssLayoutEngine
         // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.
         if (b.MinHeight != "0" && !string.IsNullOrEmpty(b.MinHeight))
         {
-            double minH = CssValueParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
+            double minH = CssLengthParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
             double minBoxH = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
                 ? minH
                 : minH
@@ -1202,8 +1239,8 @@ internal static class CssLayoutEngine
         // differs from the logical ibBoxWidth for non-square boxes.
         double physicalBoxWidth = ibBoxWidth;
         if (VerticalFlowPrototype.Enabled
-            && CssBox.IsVerticalWritingMode(b.WritingMode)
-            && (b.ParentBox == null || !CssBox.IsVerticalWritingMode(b.ParentBox.WritingMode)))
+            && CssBoxProperties.IsVerticalWritingMode(b.WritingMode)
+            && (b.ParentBox == null || !CssBoxProperties.IsVerticalWritingMode(b.ParentBox.WritingMode)))
         {
             b.ApplyVerticalWritingModeFlow();
             physicalBoxWidth = b.Size.Width;
@@ -1242,16 +1279,20 @@ internal static class CssLayoutEngine
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             if (child.IsBrElement)
             {
                 sawBr = true;
                 continue;
             }
+
             if (!child.IsInline && child.Float == CssConstants.None)
                 return false;
         }
+
         return sawBr;
     }
 
@@ -1261,8 +1302,10 @@ internal static class CssLayoutEngine
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             if (!child.IsInline)
                 return true;
         }
@@ -1277,6 +1320,7 @@ internal static class CssLayoutEngine
     private static void MeasureDescendantWords(ILayoutEnvironment g, CssBox box)
     {
         box.MeasureWordsSize(g);
+
         foreach (var child in box.Boxes)
             MeasureDescendantWords(g, child);
     }
@@ -1290,13 +1334,16 @@ internal static class CssLayoutEngine
         // positioned elements.
         if (box.Top != CssConstants.Auto && !string.IsNullOrEmpty(box.Top))
         {
-            double topOffset = CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+            double topOffset = CssLengthParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+
             if (!double.IsNaN(topOffset))
                 top += topOffset;
         }
+
         if (box.Left != CssConstants.Auto && !string.IsNullOrEmpty(box.Left))
         {
-            double leftOffset = CssValueParser.ParseLength(box.Left, box.Size.Width, box.GetEmHeight());
+            double leftOffset = CssLengthParser.ParseLength(box.Left, box.Size.Width, box.GetEmHeight());
+
             if (!double.IsNaN(leftOffset))
                 left += leftOffset;
         }
@@ -1350,7 +1397,7 @@ internal static class CssLayoutEngine
         }
     }
 
-    private static void ApplyHorizontalAlignment(ILayoutEnvironment g, CssLineBox lineBox, bool lineRtl)
+    private static void ApplyHorizontalAlignment(CssLineBox lineBox, bool lineRtl)
     {
         var box = lineBox.OwnerBox;
 
@@ -1359,7 +1406,7 @@ internal static class CssLayoutEngine
         // shorthand value 'justify-all' additionally sets the last line to justify
         // (a plain 'justify' leaves the last line 'start'-aligned).  Resolve the
         // per-line alignment keyword first, then map the logical values below.
-        bool isLastLine = lineBox.Equals(box.LineBoxes[box.LineBoxes.Count - 1]);
+        bool isLastLine = lineBox.Equals(box.LineBoxes[^1]);
         bool justifyAll = string.Equals(box.TextAlign, "justify-all", StringComparison.OrdinalIgnoreCase);
         string effectiveAlign = isLastLine
             ? ResolveTextAlignLast(box, justifyAll)
@@ -1389,17 +1436,20 @@ internal static class CssLayoutEngine
         switch (resolvedAlign)
         {
             case CssConstants.Right:
-                ApplyRightAlignment(g, lineBox);
+                ApplyRightAlignment(lineBox);
                 break;
+
             case CssConstants.Center:
-                ApplyCenterAlignment(g, lineBox);
+                ApplyCenterAlignment(lineBox);
                 break;
+
             case CssConstants.Justify:
                 // The caller only routes the last line here when text-align-last
                 // resolved to justify (justify-all or text-align-last:justify), so
                 // justify it too — no last-line skip needed at this point.
-                ApplyJustifyAlignment(g, lineBox);
+                ApplyJustifyAlignment(lineBox);
                 break;
+
             default:
                 break;
         }
@@ -1424,8 +1474,10 @@ internal static class CssLayoutEngine
         // auto:
         if (justifyAll)
             return CssConstants.Justify;
+
         if (string.Equals(box.TextAlign, CssConstants.Justify, StringComparison.OrdinalIgnoreCase))
             return "start"; // a justified block's last line stays ragged (start-aligned)
+
         return box.TextAlign; // every other value applies to the last line as well
     }
 
@@ -1441,16 +1493,20 @@ internal static class CssLayoutEngine
         foreach (CssRect word in line.Words)
         {
             string text = word.Text;
+
             if (string.IsNullOrEmpty(text))
                 continue;
+
             foreach (char c in text)
             {
                 if (IsRtlStrongChar(c))
                     return true;
+
                 if (IsLtrStrongChar(c))
                     return false;
             }
         }
+
         return null; // no strong character → inherit base direction
     }
 
@@ -1466,9 +1522,11 @@ internal static class CssLayoutEngine
     private static bool SeedPlaintextBaseRtl(CssBox blockBox)
     {
         var parent = blockBox.ParentBox;
+
         if (parent != null)
         {
             int index = parent.Boxes.IndexOf(blockBox);
+
             for (int i = index - 1; i >= 0; i--)
             {
                 bool? strong = LastStrongRtl(parent.Boxes[i]);
@@ -1476,6 +1534,7 @@ internal static class CssLayoutEngine
                     return strong.Value;
             }
         }
+
         return blockBox.Direction == CssConstants.Rtl;
     }
 
@@ -1498,10 +1557,12 @@ internal static class CssLayoutEngine
             string text = box.Words[i].Text;
             if (string.IsNullOrEmpty(text))
                 continue;
+
             for (int c = text.Length - 1; c >= 0; c--)
             {
                 if (IsRtlStrongChar(text[c]))
                     return true;
+
                 if (IsLtrStrongChar(text[c]))
                     return false;
             }
@@ -1551,7 +1612,7 @@ internal static class CssLayoutEngine
             return;
 
         double left = line.Words[0].Left;
-        double right = line.Words[line.Words.Count - 1].Right;
+        double right = line.Words[^1].Right;
 
         foreach (CssRect word in line.Words)
         {
@@ -1654,23 +1715,24 @@ internal static class CssLayoutEngine
             || box.Display is "inline-flex" or "inline-grid")
             return true;
 
-        if (box.Kind == BoxKind.Anonymous)
+        if (box.Kind != BoxKind.Anonymous)
+            return false;
+
+        for (int i = box.Boxes.Count - 1; i >= 0; i--)
         {
-            for (int i = box.Boxes.Count - 1; i >= 0; i--)
-            {
-                var c = box.Boxes[i];
-                if (c.Display == CssConstants.None
-                    || c.Position is CssConstants.Absolute or CssConstants.Fixed
-                    || c.Float != CssConstants.None)
-                    continue;
-                return EndsWithAtomicInlineBlock(c);
-            }
+            var c = box.Boxes[i];
+            if (c.Display == CssConstants.None
+                || c.Position is CssConstants.Absolute or CssConstants.Fixed
+                || c.Float != CssConstants.None)
+                continue;
+
+            return EndsWithAtomicInlineBlock(c);
         }
 
         return false;
     }
 
-    private static void ApplyVerticalAlignment(ILayoutEnvironment g, CssLineBox lineBox)
+    private static void ApplyVerticalAlignment(CssLineBox lineBox)
     {
         // CSS 2.1 §10.8: The baseline is where text sits, approximated as
         // the top of each box plus the font ascent. Most Latin fonts have
@@ -1684,8 +1746,7 @@ internal static class CssLayoutEngine
         var topBottomBoxes = new HashSet<CssBox>();
         foreach (var box in lineBox.Rectangles.Keys)
         {
-            if (box.VerticalAlign == CssConstants.Top
-                || box.VerticalAlign == CssConstants.Bottom)
+            if (box.VerticalAlign == CssConstants.Top || box.VerticalAlign == CssConstants.Bottom)
                 topBottomBoxes.Add(box);
         }
 
@@ -1720,7 +1781,6 @@ internal static class CssLayoutEngine
         }
 
         // --- Phase 1: Position all non-top/bottom boxes ---
-
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
@@ -1746,43 +1806,48 @@ internal static class CssLayoutEngine
             switch (box.VerticalAlign)
             {
                 case CssConstants.Sub:
-                    lineBox.SetBaseLine(g, box, baseline - boxAscent + lineBox.Rectangles[box].Height * .5f);
+                    lineBox.SetBaseLine(box, baseline - boxAscent + lineBox.Rectangles[box].Height * .5f);
                     break;
+
                 case CssConstants.Super:
-                    lineBox.SetBaseLine(g, box, baseline - boxAscent - lineBox.Rectangles[box].Height * .2f);
+                    lineBox.SetBaseLine(box, baseline - boxAscent - lineBox.Rectangles[box].Height * .2f);
                     break;
+
                 case CssConstants.TextTop:
                     // CSS 2.1 §10.8.1: Align the top of the box with the
                     // top of the parent element's content area (font top).
                     if (baseline > float.MinValue)
                     {
                         double parentContentTop = baseline - parentFontHeight * TypicalAscentRatio;
-                        lineBox.SetBaseLine(g, box, parentContentTop);
+                        lineBox.SetBaseLine(box, parentContentTop);
                     }
                     break;
+
                 case CssConstants.TextBottom:
                     // CSS 2.1 §10.8.1: Align the bottom of the box with the
                     // bottom of the parent element's content area (font bottom).
-                    if (baseline > float.MinValue && lineBox.Rectangles.ContainsKey(box))
+                    if (baseline > float.MinValue && lineBox.Rectangles.TryGetValue(box, out RectangleF value))
                     {
-                        double boxHeight = lineBox.Rectangles[box].Height;
+                        double boxHeight = value.Height;
                         double parentContentBottom = baseline + parentFontHeight * (1.0 - TypicalAscentRatio);
-                        lineBox.SetBaseLine(g, box, parentContentBottom - boxHeight);
+                        lineBox.SetBaseLine(box, parentContentBottom - boxHeight);
                     }
                     break;
+
                 case CssConstants.Middle:
                     // CSS 2.1 §10.8.1: Align the vertical midpoint of the box
                     // with the baseline plus half the x-height of the parent.
                     // x-height ≈ 0.5 × font height for Latin fonts; half of
                     // that is 0.25 × font height.
-                    if (lineBox.Rectangles.ContainsKey(box) && baseline > float.MinValue)
+                    if (lineBox.Rectangles.TryGetValue(box, out RectangleF value1) && baseline > float.MinValue)
                     {
-                        double boxHeight = lineBox.Rectangles[box].Height;
+                        double boxHeight = value1.Height;
                         double parentFont = (box.ParentBox?.ActualFont.Height ?? 0) * PtToCssPx;
                         double halfXHeight = parentFont * 0.25;
-                        lineBox.SetBaseLine(g, box, baseline + halfXHeight - boxHeight / 2);
+                        lineBox.SetBaseLine(box, baseline + halfXHeight - boxHeight / 2);
                     }
                     break;
+
                 default:
                     // CSS 2.1 §10.8.1: A <length> or <percentage> value
                     // raises (positive) or lowers (negative) the box by
@@ -1795,17 +1860,19 @@ internal static class CssLayoutEngine
                         double lineHeight = box.ActualLineHeight > 0
                             ? box.ActualLineHeight
                             : box.ActualFont.Height * PtToCssPx;
-                        double offset = CssValueParser.ParseLength(
+                        double offset = CssLengthParser.ParseLength(
                             box.VerticalAlign, lineHeight, box.GetEmHeight());
+
                         if (!double.IsNaN(offset) && offset != 0)
                         {
                             // Positive values move the box UP (raise).
-                            lineBox.SetBaseLine(g, box, baseline - boxAscent - offset);
+                            lineBox.SetBaseLine(box, baseline - boxAscent - offset);
                             break;
                         }
                     }
+
                     //case: baseline
-                    lineBox.SetBaseLine(g, box, baseline - boxAscent);
+                    lineBox.SetBaseLine(box, baseline - boxAscent);
                     break;
             }
         }
@@ -1817,6 +1884,7 @@ internal static class CssLayoutEngine
         {
             double finalTop = double.MaxValue;
             double finalBottom = double.MinValue;
+
             foreach (var kvp in lineBox.Rectangles)
             {
                 if (!topBottomBoxes.Contains(kvp.Key))
@@ -1844,21 +1912,21 @@ internal static class CssLayoutEngine
                 if (box.VerticalAlign == CssConstants.Top)
                 {
                     if (finalTop < double.MaxValue)
-                        lineBox.SetBaseLine(g, box, finalTop);
+                        lineBox.SetBaseLine(box, finalTop);
                 }
                 else // Bottom
                 {
-                    if (finalBottom > double.MinValue && lineBox.Rectangles.ContainsKey(box))
+                    if (finalBottom > double.MinValue && lineBox.Rectangles.TryGetValue(box, out RectangleF value))
                     {
-                        double boxHeight = lineBox.Rectangles[box].Height;
-                        lineBox.SetBaseLine(g, box, finalBottom - boxHeight);
+                        double boxHeight = value.Height;
+                        lineBox.SetBaseLine(box, finalBottom - boxHeight);
                     }
                 }
             }
         }
     }
 
-    private static void ApplyJustifyAlignment(ILayoutEnvironment g, CssLineBox lineBox)
+    private static void ApplyJustifyAlignment(CssLineBox lineBox)
     {
         // Whether the block's last line is justified is decided by the caller
         // (ApplyHorizontalAlignment): under a plain text-align:justify the last
@@ -1893,12 +1961,12 @@ internal static class CssLayoutEngine
             word.Left = curx;
             curx = word.Right + spacing;
 
-            if (stretch && word == lineBox.Words[lineBox.Words.Count - 1])
+            if (stretch && word == lineBox.Words[^1])
                 word.Left = lineBox.OwnerBox.ClientRight - word.Width;
         }
     }
 
-    private static void ApplyCenterAlignment(ILayoutEnvironment g, CssLineBox line)
+    private static void ApplyCenterAlignment(CssLineBox line)
     {
         if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
@@ -1911,7 +1979,7 @@ internal static class CssLayoutEngine
         double contentRight = 0;
         if (line.Words.Count > 0)
         {
-            CssRect lastWord = line.Words[line.Words.Count - 1];
+            CssRect lastWord = line.Words[^1];
             contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
         }
 
@@ -1937,7 +2005,7 @@ internal static class CssLayoutEngine
         }
     }
 
-    private static void ApplyRightAlignment(ILayoutEnvironment g, CssLineBox line)
+    private static void ApplyRightAlignment(CssLineBox line)
     {
         if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
@@ -1948,7 +2016,7 @@ internal static class CssLayoutEngine
         double contentRight = 0;
         if (line.Words.Count > 0)
         {
-            CssRect lastWord = line.Words[line.Words.Count - 1];
+            CssRect lastWord = line.Words[^1];
             contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
         }
 

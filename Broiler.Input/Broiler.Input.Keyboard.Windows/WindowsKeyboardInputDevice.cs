@@ -1,7 +1,5 @@
 using System;
 using System.Globalization;
-using Broiler.Input;
-using Broiler.Input.Keyboard;
 using Broiler.Input.Windows;
 
 namespace Broiler.Input.Keyboard.Windows;

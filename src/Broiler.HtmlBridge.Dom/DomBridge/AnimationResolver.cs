@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
@@ -75,7 +72,7 @@ public sealed partial class DomBridge
         foreach (var styleRule in keyframesRule.Rules.OfType<Broiler.CSS.CssStyleRule>())
         {
             var declarations = ParseDeclarations(
-                Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
+                CSS.CssSerializer.Serialize(styleRule.Declarations));
 
             foreach (var selector in styleRule.Selectors.Selectors)
             {
@@ -203,7 +200,7 @@ public sealed partial class DomBridge
                         continue;
 
                     var declarations = ParseDeclarations(
-                        Broiler.CSS.CssSerializer.Serialize(styleRule.Declarations));
+                        CSS.CssSerializer.Serialize(styleRule.Declarations));
                     foreach (var kv in declarations)
                     {
                         if (kv.Key.StartsWith("animation", StringComparison.OrdinalIgnoreCase))

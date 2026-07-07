@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Net.Http;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge.Logging;
@@ -167,7 +164,7 @@ public static class ImageDecoder
             {
                 var uri = new Uri(resolvedUrl);
                 var path = uri.LocalPath;
-                return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
+                return File.Exists(path) ? File.ReadAllBytes(path) : null;
             }
 
             // Synchronous HTTP fetch

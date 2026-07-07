@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Pen;
 
 public readonly record struct PenContactEvent(

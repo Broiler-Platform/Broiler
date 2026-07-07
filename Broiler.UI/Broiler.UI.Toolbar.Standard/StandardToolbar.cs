@@ -4,7 +4,6 @@ using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
 using Broiler.UI.Standard;
-using Broiler.UI.Toolbar;
 
 namespace Broiler.UI.Toolbar.Standard;
 

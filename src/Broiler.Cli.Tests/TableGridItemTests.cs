@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -33,7 +31,7 @@ public sealed class TableGridItemTests
         ctx.Eval("onload = function(){ document.getElementById('d').setAttribute('data-loaded','yes'); };");
         bridge.FireWindowLoadEvent();
         string html = bridge.SerializeToHtml();
-        int cut = html.IndexOf("<script", System.StringComparison.OrdinalIgnoreCase);
+        int cut = html.IndexOf("<script", StringComparison.OrdinalIgnoreCase);
         string body = cut >= 0 ? html.Substring(0, cut) : html;
         Assert.Contains("data-loaded=\"yes\"", body);
     }
@@ -53,7 +51,7 @@ public sealed class TableGridItemTests
         var by = bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)
             .ToDictionary(g => g.Key, g => g.ToDictionary(a => a.Property, a => a.Actual));
-        return by.TryGetValue("th#cell", out var m) ? m : new System.Collections.Generic.Dictionary<string, double>();
+        return by.TryGetValue("th#cell", out var m) ? m : [];
     }
 
     [Fact]

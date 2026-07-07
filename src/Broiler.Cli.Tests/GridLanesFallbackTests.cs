@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -31,7 +29,7 @@ public sealed class GridLanesFallbackTests
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();
         var failures = assertions
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

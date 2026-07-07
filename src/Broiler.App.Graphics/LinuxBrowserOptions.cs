@@ -1,5 +1,3 @@
-using System;
-
 namespace Broiler.App.Graphics;
 
 internal sealed record LinuxBrowserOptions(

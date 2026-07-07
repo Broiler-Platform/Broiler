@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Keyboard;
 
 public readonly record struct KeyboardKeyEvent(

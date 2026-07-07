@@ -12,7 +12,7 @@ public sealed class UiFactorySet
     {
         ArgumentNullException.ThrowIfNull(factories);
 
-        _factories = new Dictionary<Type, IUiElementFactory>();
+        _factories = [];
         foreach (IUiElementFactory factory in factories)
         {
             ArgumentNullException.ThrowIfNull(factory);

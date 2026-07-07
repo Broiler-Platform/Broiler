@@ -1,19 +1,12 @@
 using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
-using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 
@@ -1031,7 +1024,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationSetTimeout070Core(in Arguments a)
     {
-        var id = System.Threading.Interlocked.Increment(ref _timerIdCounter);
+        var id = Interlocked.Increment(ref _timerIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _timeoutCallbacks[id] = fn;
@@ -1056,7 +1049,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationSetInterval072Core(in Arguments a)
     {
-        var id = System.Threading.Interlocked.Increment(ref _timerIdCounter);
+        var id = Interlocked.Increment(ref _timerIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _intervalCallbacks[id] = fn;
@@ -1081,7 +1074,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a)
     {
-        var id = System.Threading.Interlocked.Increment(ref _rafIdCounter);
+        var id = Interlocked.Increment(ref _rafIdCounter);
         if (a.Length > 0 && a[0] is JSFunction fn)
         {
             _rafCallbacks[id] = fn;

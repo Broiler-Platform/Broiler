@@ -1,10 +1,7 @@
-using Broiler.Graphics;
-using System;
-using System.Collections.Generic;
+using Broiler.CSS;
 using System.Drawing;
 using System.Globalization;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -59,34 +56,30 @@ internal partial class CssBox
     private enum GridSizeKind { Fixed, Percent, Fr, Auto, MinContent, MaxContent, FitContent }
 
     /// <summary>One side (min or max) of a track sizing function.</summary>
-    private readonly struct GridSize
+    private readonly struct GridSize(CssBox.GridSizeKind kind, double value = 0, bool valueIsPercent = false)
     {
-        public readonly GridSizeKind Kind;
-        public readonly double Value; // px for Fixed, flex factor for Fr, limit for FitContent; else 0
-        public readonly bool ValueIsPercent; // FitContent only: the limit is a percentage magnitude
-        public GridSize(GridSizeKind kind, double value = 0, bool valueIsPercent = false)
-        { Kind = kind; Value = value; ValueIsPercent = valueIsPercent; }
+        public readonly GridSizeKind Kind = kind;
+        public readonly double Value = value; // px for Fixed, flex factor for Fr, limit for FitContent; else 0
+        public readonly bool ValueIsPercent = valueIsPercent; // FitContent only: the limit is a percentage magnitude
+
         public bool IsIntrinsic => Kind is GridSizeKind.Auto or GridSizeKind.MinContent
             or GridSizeKind.MaxContent or GridSizeKind.FitContent;
     }
 
     /// <summary>A track's <c>minmax(min, max)</c> sizing function.</summary>
-    private readonly struct GridTrackSpec
+    private readonly struct GridTrackSpec(CssBox.GridSize min, CssBox.GridSize max)
     {
-        public readonly GridSize Min;
-        public readonly GridSize Max;
-        public GridTrackSpec(GridSize min, GridSize max) { Min = min; Max = max; }
+        public readonly GridSize Min = min;
+        public readonly GridSize Max = max;
     }
 
     /// <summary>One grid item's span and content contributions along one axis.</summary>
-    private readonly struct AxisItem
+    private readonly struct AxisItem(int start, int span, double minContent, double maxContent)
     {
-        public readonly int Start;
-        public readonly int Span;
-        public readonly double MinContent;
-        public readonly double MaxContent;
-        public AxisItem(int start, int span, double minContent, double maxContent)
-        { Start = start; Span = span; MinContent = minContent; MaxContent = maxContent; }
+        public readonly int Start = start;
+        public readonly int Span = span;
+        public readonly double MinContent = minContent;
+        public readonly double MaxContent = maxContent;
     }
 
     /// <summary>
@@ -108,8 +101,10 @@ internal partial class CssBox
         // ordinary grid, whose column-driven layout would be degenerate there.
         bool subgridInvolved = StartsWithSubgrid(GridTemplateColumns)
             || StartsWithSubgrid(GridTemplateRows);
+
         if (contentWidth <= 0 && !subgridInvolved)
             return false;
+
         if (contentWidth < 0)
             contentWidth = 0;
 
@@ -157,10 +152,11 @@ internal partial class CssBox
         // subgrid axis contributes no explicit tracks (its `subgrid` computed to none).
         // A repeat(auto-fill, …) template is expanded to a concrete track list here.
         List<GridTrackSpec> colSpecs = colSubgrid ? FixedTrackSpecs(SubgridColumnSizes)
-            : colOrphanSubgrid ? new List<GridTrackSpec>()
+            : colOrphanSubgrid ? []
             : ParseTrackListMaybeAutoRepeat(GridTemplateColumns, em, contentWidth, autoRepeatColGap);
+
         List<GridTrackSpec> rowSpecs = rowSubgrid ? FixedTrackSpecs(SubgridRowSizes)
-            : rowOrphanSubgrid ? new List<GridTrackSpec>()
+            : rowOrphanSubgrid ? []
             : ParseTrackListMaybeAutoRepeat(GridTemplateRows, em, autoRepeatBlock, autoRepeatRowGap, autoRepeatBlockFromMin);
 
         // When one axis is a resolved subgrid (or an orphan subgrid resolved to
@@ -170,8 +166,9 @@ internal partial class CssBox
         // than declining.
         if (anySubgrid || anyOrphanSubgrid)
         {
-            if (colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns)) colSpecs = new List<GridTrackSpec>();
-            if (rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows)) rowSpecs = new List<GridTrackSpec>();
+            if (colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns)) colSpecs = [];
+            if (rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows)) rowSpecs = [];
+
             // A bare `auto` template is one explicit auto-sized track, but
             // ParseTrackList lumps it in with `none` (returns null so the general
             // path declines to the approximation). For a subgrid/standalone grid,
@@ -180,9 +177,10 @@ internal partial class CssBox
             // `grid-lanes > .subgrid { grid-template-rows: auto }` outer grids that
             // wrap a taller inner subgrid (WPT grid-subgridded-to-grid-lanes) need this.
             if (colSpecs == null && IsBareAutoTemplate(GridTemplateColumns))
-                colSpecs = new List<GridTrackSpec> { AutoTrackSpec };
+                colSpecs = [AutoTrackSpec];
+
             if (rowSpecs == null && IsBareAutoTemplate(GridTemplateRows))
-                rowSpecs = new List<GridTrackSpec> { AutoTrackSpec };
+                rowSpecs = [AutoTrackSpec];
         }
 
         // An axis with no explicit template (`none`/empty) but a `grid-auto-*`
@@ -195,11 +193,13 @@ internal partial class CssBox
         // fit-content, …) still parses to null and declines below.
         bool colImplicitOnly = colSpecs == null && IsNoneOrEmptyTemplate(GridTemplateColumns);
         bool rowImplicitOnly = rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows);
-        if (colImplicitOnly) colSpecs = new List<GridTrackSpec>();
-        if (rowImplicitOnly) rowSpecs = new List<GridTrackSpec>();
+
+        if (colImplicitOnly) colSpecs = [];
+        if (rowImplicitOnly) rowSpecs = [];
 
         if (colSpecs == null || rowSpecs == null)
             return false;
+
         // The implicit-only (`none` template + grid-auto-*) path is a newly enabled
         // takeover from the baseline-aware cross-axis approximation, so it declines
         // for the two shapes this bounded pass sizes worse than that approximation:
@@ -212,20 +212,23 @@ internal partial class CssBox
         //     from the measured height collapses or mis-stretches the item.
         // Grids with an explicit template on the affected axis keep going through
         // this pass exactly as before; only the implicit-only takeover is gated.
+
         if ((colImplicitOnly || rowImplicitOnly)
             && (GridUsesBaselineSelfAlignment() || !GridImplicitPathItemsAreSimple()))
             return false;
+
         // Implicit tracks are allowed to carry the whole axis for a subgrid, an
         // orphan subgrid, or an implicit-only (`none` template + grid-auto-*) axis;
         // the placed items below generate them. Any other empty axis is degenerate
         // and declines to the approximation.
-        bool implicitTracksAllowed =
-            anySubgrid || anyOrphanSubgrid || colImplicitOnly || rowImplicitOnly;
-        if (colSpecs.Count == 0 && rowSpecs.Count == 0
-            && !anyOrphanSubgrid && !(colImplicitOnly && rowImplicitOnly))
+        bool implicitTracksAllowed = anySubgrid || anyOrphanSubgrid || colImplicitOnly || rowImplicitOnly;
+
+        if (colSpecs.Count == 0 && rowSpecs.Count == 0 && !anyOrphanSubgrid && !(colImplicitOnly && rowImplicitOnly))
             return false;
+
         if (!implicitTracksAllowed && (colSpecs.Count == 0 || rowSpecs.Count == 0))
             return false;
+
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
 
@@ -238,16 +241,18 @@ internal partial class CssBox
         // auto-placement, but when the grid container is their containing block
         // (i.e. it is positioned) their grid area forms their containing block
         // (CSS Grid §9), which the abspos pass below resolves once tracks exist.
-        bool gridIsAbsposContainingBlock =
-            Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
+        bool gridIsAbsposContainingBlock = Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
         var placements = new List<GridPlacement>();
         List<CssBox> absposItems = null;
+
         var colNames = ParseLineNames(GridTemplateColumns);
         var rowNames = ParseLineNames(GridTemplateRows);
+
         foreach (var child in Boxes)
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             // CSS Grid §4: every in-flow child becomes a grid item, EXCEPT a
             // contiguous run of collapsible white space that is not contained in
             // a non-anonymous box — such an anonymous box "is not rendered (just
@@ -258,21 +263,25 @@ internal partial class CssBox
             // grid-lanes subgrid reftests gained spurious rows).
             if (IsCollapsibleWhitespaceItem(child))
                 continue;
+
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
             {
                 if (gridIsAbsposContainingBlock)
-                    (absposItems ??= new List<CssBox>()).Add(child);
+                    (absposItems ??= []).Add(child);
+
                 continue;
             }
 
             var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count, rowNames);
             var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count, colNames);
+
             // Decline rather than lay out an implausibly large grid. A negative
             // start references a leading implicit track (normalised below), so bound
             // its magnitude too.
             if (rowSpan > MaxGridLine || colSpan > MaxGridLine
                 || Math.Abs(rowStart ?? 0) > MaxGridLine || Math.Abs(colStart ?? 0) > MaxGridLine)
                 return false;
+
             placements.Add(new GridPlacement
             {
                 Item = child,
@@ -282,8 +291,11 @@ internal partial class CssBox
                 ColSpan = colSpan,
             });
         }
+
         if (placements.Count == 0)
             return false;
+
+        int explicitRowStart;
 
         // CSS Grid §8.3: a definite line that resolves before the explicit grid
         // (a negative index here) references a *leading* implicit track. Normalise
@@ -292,33 +304,35 @@ internal partial class CssBox
         // explicitRowStart. leading == 0 for every grid without a before-grid line,
         // so those are byte-identical to before. Auto-placement into leading tracks
         // is out of scope, so decline when an auto-placed item coexists with them.
-        int explicitColStart = 0, explicitRowStart = 0;
+        int explicitColStart;
+        int minCol = 0, minRow = 0;
+
+        foreach (var p in placements)
         {
-            int minCol = 0, minRow = 0;
+            if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
+            if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
+        }
+
+        explicitColStart = -minCol;
+        explicitRowStart = -minRow;
+
+        if (explicitColStart > 0 || explicitRowStart > 0)
+        {
             foreach (var p in placements)
+                if (!p.ColStart.HasValue || !p.RowStart.HasValue)
+                    return false;
+
+            for (int i = 0; i < placements.Count; i++)
             {
-                if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
-                if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
-            }
-            explicitColStart = -minCol;
-            explicitRowStart = -minRow;
-            if (explicitColStart > 0 || explicitRowStart > 0)
-            {
-                foreach (var p in placements)
-                    if (!p.ColStart.HasValue || !p.RowStart.HasValue)
-                        return false;
-                for (int i = 0; i < placements.Count; i++)
-                {
-                    var p = placements[i];
-                    p.ColStart += explicitColStart;
-                    p.RowStart += explicitRowStart;
-                    placements[i] = p;
-                }
+                var p = placements[i];
+                p.ColStart += explicitColStart;
+                p.RowStart += explicitRowStart;
+                placements[i] = p;
             }
         }
 
         bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
-        bool dense = (GridAutoFlow ?? "").IndexOf("dense", StringComparison.OrdinalIgnoreCase) >= 0;
+        bool dense = (GridAutoFlow ?? "").Contains("dense", StringComparison.OrdinalIgnoreCase);
 
         PlaceItems(placements, colSpecs.Count + explicitColStart, rowSpecs.Count + explicitRowStart, flowRow, dense);
 
@@ -329,8 +343,10 @@ internal partial class CssBox
             maxColEnd = Math.Max(maxColEnd, p.PlacedCol + p.ColSpan);
             maxRowEnd = Math.Max(maxRowEnd, p.PlacedRow + p.RowSpan);
         }
+
         if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
             return false;
+
         // The explicit tracks occupy [explicitColStart, explicitColStart+count); any
         // leading implicit tracks precede them, so the axis is at least that wide.
         int colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count);
@@ -349,13 +365,15 @@ internal partial class CssBox
             double marginX = p.Item.ActualMarginLeft + p.Item.ActualMarginRight;
             colItems.Add(new AxisItem(p.PlacedCol, p.ColSpan, minW + marginX, maxW + marginX));
         }
+
         // CSS Grid §11.7: the default (normal) / explicit stretch content
         // distribution grows auto tracks to fill the container; a packing/spacing
         // justify-content leaves them at content size and positions them instead.
         bool stretchCols = IsStretchContentDistribution(JustifyContent);
         double[] colSizes = ResolveTrackSizes(colSpecs, implicitCol, colCount,
-            contentWidth, definite: true, colGap, contentWidth, em, colItems, stretchCols,
+            contentWidth, definite: true, colGap, contentWidth, colItems, stretchCols,
             explicitStart: explicitColStart);
+
         if (colSizes == null)
             return false;
 
@@ -374,10 +392,12 @@ internal partial class CssBox
             : ResolveGridGap(RowGap, rowBasis, em);
 
         var rowItems = new List<AxisItem>(placements.Count);
+
         foreach (var p in placements)
         {
             double colWidth = TrackSpan(colSizes, p.PlacedCol, p.ColSpan, colGap);
-            GridItemInlineContribution(p.Item, out double _, out double maxW);
+            GridItemInlineContribution(p.Item, out _, out double maxW);
+
             double marginX = p.Item.ActualMarginLeft + p.Item.ActualMarginRight;
             // The item was measured at the container width; if its resolved column
             // area is narrower than that max-content width, its measured height is
@@ -401,12 +421,14 @@ internal partial class CssBox
                 && TryGetSubgridRowContributions(p.Item, p.RowSpan) is { } perRow)
             {
                 double perRowMargin = marginY / p.RowSpan;
+
                 for (int t = 0; t < p.RowSpan; t++)
                 {
                     double th = perRow[t] + perRowMargin;
                     if (th < 0) th = 0;
                     rowItems.Add(new AxisItem(p.PlacedRow + t, 1, th, th));
                 }
+
                 continue;
             }
 
@@ -416,13 +438,15 @@ internal partial class CssBox
             // of that stale zero (WPT css-grid/nested-grid-item-block-size-001).
             double replacedH = GridReplacedItemDefiniteBorderBoxHeight(p.Item);
             double h = (replacedH > 0 ? replacedH : p.Item.ActualBottom - p.Item.Location.Y) + marginY;
+
             if (h < 0) h = 0;
             rowItems.Add(new AxisItem(p.PlacedRow, p.RowSpan, h, h));
         }
         bool stretchRows = IsStretchContentDistribution(AlignContent);
         double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
-            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems, stretchRows,
+            rowBasis, rowDefinite, rowGap, rowBasis, rowItems, stretchRows,
             explicitStart: explicitRowStart);
+
         if (rowSizes == null)
             return false;
 
@@ -445,10 +469,8 @@ internal partial class CssBox
         // for an indefinite height, when a percentage row shrank below the locked
         // intrinsic height above.
         double rowContainerSize = rowDefinite ? definiteHeight : intrinsicRowHeight;
-        double[] colStartEdge = BuildTrackEdgesAligned(colSizes, colGap, contentWidth,
-            JustifyContent, out double[] colEndEdge);
-        double[] rowStartEdge = BuildTrackEdgesAligned(rowSizes, rowGap, rowContainerSize,
-            AlignContent, out double[] rowEndEdge);
+        double[] colStartEdge = BuildTrackEdgesAligned(colSizes, colGap, contentWidth, JustifyContent, out double[] colEndEdge);
+        double[] rowStartEdge = BuildTrackEdgesAligned(rowSizes, rowGap, rowContainerSize, AlignContent, out double[] rowEndEdge);
 
         double contentLeft = Location.X + ActualBorderLeftWidth + ActualPaddingLeft;
         double contentTop = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
@@ -466,6 +488,7 @@ internal partial class CssBox
             double areaRight = rtl ? contentLeft + contentWidth - ltrLeft : contentLeft + ltrRight;
             double areaTop = contentTop + rowStartEdge[p.PlacedRow];
             double areaBottom = contentTop + rowEndEdge[p.PlacedRow + p.RowSpan - 1];
+
             PlaceItemInArea(p.Item, areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
 
             // CSS Grid L2 §7.3: a subgrid item, now sized to its grid area, takes
@@ -483,12 +506,15 @@ internal partial class CssBox
         // grid-template-rows track contributes even when unoccupied, so a 4-track
         // template with items in only the first 3 rows still sizes to all four.
         double gridHeight = rowSizes.Length > 0 ? rowEndEdge[rowSizes.Length - 1] : 0;
+
         // §7.2.1: an indefinite-height grid keeps its intrinsic block size even
         // after percentage rows resolved (shrank) against it, leaving trailing space.
         if (!rowDefinite && intrinsicRowHeight > gridHeight)
             gridHeight = intrinsicRowHeight;
+
         double borderBoxHeight = ActualPaddingTop + ActualPaddingBottom
             + ActualBorderTopWidth + ActualBorderBottomWidth + gridHeight;
+
         ActualBottom = Location.Y + borderBoxHeight;
         ActualRight = CalculateActualRight();
         Size = new SizeF(Size.Width, (float)borderBoxHeight);
@@ -518,7 +544,7 @@ internal partial class CssBox
     private static void GridItemInlineContribution(CssBox item, out double min, out double max)
     {
         string w = item.Width;
-        if (!string.IsNullOrEmpty(w) && w.EndsWith("%", StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(w) && w.EndsWith('%'))
             item.GetContentMinMaxWidth(out min, out max);
         else
             item.GetMinMaxWidth(out min, out max);
@@ -528,14 +554,18 @@ internal partial class CssBox
     private static double TrackSpan(double[] sizes, int start, int span, double gap)
     {
         double total = 0;
+
         for (int i = 0; i < span; i++)
         {
             int t = start + i;
+
             if (t >= 0 && t < sizes.Length)
                 total += sizes[t];
         }
+
         if (span > 1)
             total += (span - 1) * gap;
+
         return total;
     }
 
@@ -545,8 +575,7 @@ internal partial class CssBox
     /// <c>grid-auto-flow: row</c> (major = row, minor = column) and
     /// <c>column</c> (major = column, minor = row).
     /// </summary>
-    private static void PlaceItems(List<GridPlacement> items, int explicitCols, int explicitRows,
-        bool flowRow, bool dense)
+    private static void PlaceItems(List<GridPlacement> items, int explicitCols, int explicitRows, bool flowRow, bool dense)
     {
         // Map (row, col) <-> (major, minor) for the active flow direction.
         int MajorStart(GridPlacement p) => (flowRow ? p.RowStart : p.ColStart) ?? -1;
@@ -563,31 +592,42 @@ internal partial class CssBox
         {
             if (major < 0 || minor < 0)
                 return false;
+
             for (int a = 0; a < majorSpan; a++)
+            {
                 for (int i = 0; i < minorSpan; i++)
                 {
                     int row = flowRow ? major + a : minor + i;
                     int col = flowRow ? minor + i : major + a;
+
                     if (occupied.Contains(Key(row, col)))
                         return false;
                 }
+            }
+
             return true;
         }
+
         void Mark(int major, int minor, int majorSpan, int minorSpan)
         {
             for (int a = 0; a < majorSpan; a++)
+            {
                 for (int i = 0; i < minorSpan; i++)
                 {
                     int row = flowRow ? major + a : minor + i;
                     int col = flowRow ? minor + i : major + a;
                     occupied.Add(Key(row, col));
                 }
+            }
         }
+
         void Commit(int index, int major, int minor)
         {
             var p = items[index];
+
             p.PlacedRow = flowRow ? major : minor;
             p.PlacedCol = flowRow ? minor : major;
+
             items[index] = p;
             Mark(major, minor, MajorSpan(p), MinorSpan(p));
         }
@@ -598,10 +638,13 @@ internal partial class CssBox
         for (int i = 0; i < items.Count; i++)
         {
             var p = items[i];
+
             if (!MinorAuto(p))
                 minorCount = Math.Max(minorCount, MinorStart(p) + MinorSpan(p));
+
             minorCount = Math.Max(minorCount, MinorSpan(p));
         }
+
         if (minorCount < 1) minorCount = 1;
 
         // Phase 1 — items definite in both axes.
@@ -617,10 +660,13 @@ internal partial class CssBox
         for (int i = 0; i < items.Count; i++)
         {
             var p = items[i];
+
             if (MajorAuto(p) || !MinorAuto(p))
                 continue;
+
             int major = MajorStart(p);
             int minor;
+
             if (dense)
             {
                 minor = 0;
@@ -630,15 +676,19 @@ internal partial class CssBox
                 if (p2CursorMajor != major) { p2CursorMajor = major; p2CursorMinor = 0; }
                 minor = p2CursorMinor;
             }
+
             while (!Fits(major, minor, MajorSpan(p), MinorSpan(p)))
                 minor++;
+
             Commit(i, major, minor);
+
             if (!dense) p2CursorMinor = minor + MinorSpan(p);
         }
 
         // Phase 4 — remaining items (auto major), in document order, sharing one
         // auto-placement cursor.
         int cursorMajor = 0, cursorMinor = 0;
+
         for (int i = 0; i < items.Count; i++)
         {
             var p = items[i];
@@ -656,10 +706,13 @@ internal partial class CssBox
                 int minor = MinorStart(p);
                 if (!dense && minor < cursorMinor)
                     cursorMajor++;
+
                 cursorMinor = minor;
+
                 int major = cursorMajor;
                 while (!Fits(major, minor, MajorSpan(p), MinorSpan(p)))
                     major++;
+
                 Commit(i, major, minor);
                 cursorMajor = major; // cursorMinor already equals the item's minor
             }
@@ -676,10 +729,13 @@ internal partial class CssBox
                         major++;
                         continue;
                     }
+
                     if (Fits(major, minor, MajorSpan(p), MinorSpan(p)))
                         break;
+
                     minor++;
                 }
+
                 Commit(i, major, minor);
                 if (!dense) { cursorMajor = major; cursorMinor = minor + MinorSpan(p); }
             }
@@ -703,24 +759,23 @@ internal partial class CssBox
         // baseline align-self/justify-self (self-start, center, baseline, …) keeps
         // the item at its content size and positions it in the area instead — a
         // percentage size always fills, resolving against the area regardless.
-        bool widthIsPercent = !string.IsNullOrEmpty(item.Width)
-            && item.Width.EndsWith("%", StringComparison.Ordinal);
-        bool heightIsPercent = !string.IsNullOrEmpty(item.Height)
-            && item.Height.EndsWith("%", StringComparison.Ordinal);
-        bool widthFills = FillsArea(item.Width)
-            && (widthIsPercent || SelfAlignmentStretches(item.JustifySelf, JustifyItems));
-        bool heightFills = FillsArea(item.Height)
-            && (heightIsPercent || SelfAlignmentStretches(item.AlignSelf, AlignItems));
+        bool widthIsPercent = !string.IsNullOrEmpty(item.Width) && item.Width.EndsWith('%');
+        bool heightIsPercent = !string.IsNullOrEmpty(item.Height) && item.Height.EndsWith('%');
+
+        bool widthFills = FillsArea(item.Width) && (widthIsPercent || SelfAlignmentStretches(item.JustifySelf, JustifyItems));
+        bool heightFills = FillsArea(item.Height) && (heightIsPercent || SelfAlignmentStretches(item.AlignSelf, AlignItems));
 
         double targetLeft = areaLeft + marginL;
         double targetTop = areaTop + marginT;
 
         double newWidth = item.Size.Width;
+
         if (widthFills)
         {
             double w = areaWidth - marginL - marginR;
             if (w > 0) newWidth = w;
         }
+
         double newHeight = item.Size.Height;
         // A replaced item with a definite block-size measured its height onto its
         // image word, so item.Size.Height is a stale 0 here; use the definite
@@ -741,6 +796,7 @@ internal partial class CssBox
             if (free > 0.5)
                 targetLeft += GridAxisAlignmentOffset(item.JustifySelf, JustifyItems, free, item.Direction == "rtl");
         }
+
         if (!heightFills)
         {
             double free = (areaHeight - marginT - marginB) - newHeight;
@@ -750,8 +806,10 @@ internal partial class CssBox
 
         double dx = targetLeft - item.Location.X;
         double dy = targetTop - item.Location.Y;
+
         if (Math.Abs(dx) > 0.01)
             item.OffsetLeft(dx);
+
         if (Math.Abs(dy) > 0.01)
             item.OffsetTop(dy);
 
@@ -798,6 +856,7 @@ internal partial class CssBox
             var (rowStartLine, rowEndLine) = ParseAbsposGridLines(item.GridRow, explicitRows, explicitRowStart, rowNames);
             var (left, right) = ResolveAbsposAxis(colStartLine, colEndLine, colStartEdge, colEndEdge,
                 colCount, contentLeft, padLeft, padRight);
+
             // rtl: the inline (column) axis runs right→left, so mirror the resolved
             // area around the containing block's padding box (CSS Grid §9.2).
             if (rtl)
@@ -805,8 +864,8 @@ internal partial class CssBox
                 double m = padLeft + padRight;
                 (left, right) = (m - right, m - left);
             }
-            var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge,
-                rowCount, contentTop, padTop, padBottom);
+
+            var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge, rowCount, contentTop, padTop, padBottom);
             PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);
         }
     }
@@ -828,14 +887,16 @@ internal partial class CssBox
     {
         string v = (value ?? "").Trim();
         int slash = v.IndexOf('/');
-        string startTok = slash < 0 ? v : v.Substring(0, slash).Trim();
-        string endTok = slash < 0 ? "" : v.Substring(slash + 1).Trim();
+
+        string startTok = slash < 0 ? v : v[..slash].Trim();
+        string endTok = slash < 0 ? "" : v[(slash + 1)..].Trim();
 
         int? Line(string tok)
         {
             if (string.IsNullOrEmpty(tok) || tok.Equals("auto", StringComparison.OrdinalIgnoreCase)
                 || tok.StartsWith("span", StringComparison.OrdinalIgnoreCase))
                 return null;                    // auto / span -> padding edge (§9.2)
+
             if (int.TryParse(tok, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
             {
                 int b = line >= 1
@@ -843,21 +904,25 @@ internal partial class CssBox
                     : explicitTracks + 1 + line; // negative -> back from the last line
                 return b + explicitStart;        // into the leading-shifted coordinate
             }
+
             // Named line: resolve against the template's line-name map, else auto.
             if (names != null)
             {
                 int space = tok.IndexOf(' ');
                 int nth = 1;
                 string name = tok;
-                if (space > 0 && int.TryParse(tok.Substring(0, space).Trim(),
+
+                if (space > 0 && int.TryParse(tok[..space].Trim(),
                         NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
                 {
                     nth = parsedNth;
-                    name = tok.Substring(space + 1).Trim();
+                    name = tok[(space + 1)..].Trim();
                 }
+
                 if (names.TryGetValue(name, out var lines) && lines.Count > 0)
                     return lines[Math.Min(nth, lines.Count) - 1] + explicitStart;
             }
+
             return null;                         // unresolved named line -> auto
         }
 
@@ -906,8 +971,11 @@ internal partial class CssBox
         double? right = ParseAbsposInset(item.Right, areaWidth, em);
         double width = ResolveAbsposSize(item.Width, areaWidth, em, item.Size.Width,
             left, right, marginL, marginR, out bool widthAuto);
+
         if (!widthAuto) width = item.ResolveSpecifiedWidthToBorderBox(width);
+
         double x;
+
         if (left.HasValue) x = areaLeft + left.Value + marginL;
         else if (right.HasValue) x = areaLeft + areaWidth - right.Value - marginR - width;
         else x = areaLeft + marginL;
@@ -917,16 +985,21 @@ internal partial class CssBox
         double? bottom = ParseAbsposInset(item.Bottom, areaHeight, em);
         double height = ResolveAbsposSize(item.Height, areaHeight, em, item.Size.Height,
             top, bottom, marginT, marginB, out bool heightAuto);
+
         if (!heightAuto) height = item.ResolveSpecifiedHeightToBorderBox(height);
+
         double y;
+
         if (top.HasValue) y = areaTop + top.Value + marginT;
         else if (bottom.HasValue) y = areaTop + areaHeight - bottom.Value - marginB - height;
         else y = areaTop + marginT;
 
         double dx = x - item.Location.X;
         double dy = y - item.Location.Y;
+
         if (Math.Abs(dx) > 0.01) item.OffsetLeft(dx);
         if (Math.Abs(dy) > 0.01) item.OffsetTop(dy);
+
         item.Size = new SizeF((float)Math.Max(0, width), (float)Math.Max(0, height));
         item.ActualRight = item.Location.X + item.Size.Width;
         item.ActualBottom = item.Location.Y + item.Size.Height;
@@ -940,7 +1013,8 @@ internal partial class CssBox
     {
         if (string.IsNullOrEmpty(value) || value == CssConstants.Auto)
             return null;
-        return CssValueParser.ParseLength(value, basis, em);
+
+        return CssLengthParser.ParseLength(value, basis, em);
     }
 
     /// <summary>
@@ -957,14 +1031,17 @@ internal partial class CssBox
             && !IsIntrinsicWidthKeyword(size))
         {
             wasAuto = false;
-            return CssValueParser.ParseLength(size, areaSize, em);
+            return CssLengthParser.ParseLength(size, areaSize, em);
         }
+
         wasAuto = true;
+
         if (startInset.HasValue && endInset.HasValue)
         {
             double gap = areaSize - startInset.Value - endInset.Value - marginStart - marginEnd;
             return gap > 0 ? gap : 0;
         }
+
         return measured;
     }
 
@@ -976,14 +1053,16 @@ internal partial class CssBox
     /// own grid layout so its children flow into those tracks. A no-op unless the
     /// item is itself a grid container declaring <c>subgrid</c> on an axis.
     /// </summary>
-    private void LayoutSubgridItem(GridPlacement p, double[] colSizes, double[] rowSizes,
-        double colGap, double rowGap)
+    private static void LayoutSubgridItem(GridPlacement p, double[] colSizes, double[] rowSizes, double colGap, double rowGap)
     {
         var item = p.Item;
+
         if (item.Display is not ("grid" or "inline-grid"))
             return;
+
         bool colSub = StartsWithSubgrid(item.GridTemplateColumns);
         bool rowSub = StartsWithSubgrid(item.GridTemplateRows);
+
         if (!colSub && !rowSub)
             return;
 
@@ -992,11 +1071,13 @@ internal partial class CssBox
             item.SubgridColumnSizes = SliceTrackSizes(colSizes, p.PlacedCol, p.ColSpan);
             item.SubgridColumnGap = colGap;
         }
+
         if (rowSub)
         {
             item.SubgridRowSizes = SliceTrackSizes(rowSizes, p.PlacedRow, p.RowSpan);
             item.SubgridRowGap = rowGap;
         }
+
         item.TryApplyGridTrackLayout();
     }
 
@@ -1010,31 +1091,40 @@ internal partial class CssBox
     /// existing conservative path. The subgrid's children have already been laid
     /// out (its standalone/orphan pass), so their measured heights are available.
     /// </summary>
-    private double[] TryGetSubgridRowContributions(CssBox subgrid, int parentSpan)
+    private static double[] TryGetSubgridRowContributions(CssBox subgrid, int parentSpan)
     {
         if (parentSpan <= 0)
             return null;
+
         var contrib = new double[parentSpan];
         bool any = false;
+
         foreach (var child in subgrid.Boxes)
         {
             if (child.Display == CssConstants.None || IsCollapsibleWhitespaceItem(child))
                 continue;
+
             if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             var (rowStart, rowSpan) = ParseGridLine(child.GridRow, parentSpan);
             if (!rowStart.HasValue || rowSpan != 1)
                 return null;
+
             int idx = rowStart.Value;
             if (idx < 0 || idx >= parentSpan)
                 return null;
+
             double marginY = child.ActualMarginTop + child.ActualMarginBottom;
             double h = (child.ActualBottom - child.Location.Y) + marginY;
+
             if (h < 0) h = 0;
             if (h > contrib[idx])
                 contrib[idx] = h;
+
             any = true;
         }
+
         return any ? contrib : null;
     }
 
@@ -1044,8 +1134,10 @@ internal partial class CssBox
     {
         int n = Math.Max(0, Math.Min(span, sizes.Length - start));
         var slice = new double[n];
+
         for (int i = 0; i < n; i++)
             slice[i] = sizes[start + i];
+
         return slice;
     }
 
@@ -1069,6 +1161,7 @@ internal partial class CssBox
     {
         if (string.IsNullOrWhiteSpace(template))
             return false;
+
         string t = template.TrimStart();
         return t.StartsWith("subgrid", StringComparison.OrdinalIgnoreCase)
             && (t.Length == 7 || (!char.IsLetterOrDigit(t[7]) && t[7] != '-'));
@@ -1092,12 +1185,14 @@ internal partial class CssBox
     {
         if (sizes == null)
             return null;
+
         var specs = new List<GridTrackSpec>(sizes.Length);
         foreach (var s in sizes)
         {
             var g = new GridSize(GridSizeKind.Fixed, s);
             specs.Add(new GridTrackSpec(g, g));
         }
+
         return specs;
     }
 
@@ -1110,7 +1205,8 @@ internal partial class CssBox
     {
         if (string.IsNullOrEmpty(size) || size == CssConstants.Auto)
             return true;
-        return size.EndsWith("%", StringComparison.Ordinal);
+
+        return size.EndsWith('%');
     }
 
     /// <summary>
@@ -1124,24 +1220,27 @@ internal partial class CssBox
     {
         if (MentionsBaseline(AlignItems) || MentionsBaseline(JustifyItems))
             return true;
+
         foreach (var child in Boxes)
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
+
             if (MentionsBaseline(child.AlignSelf) || MentionsBaseline(child.JustifySelf))
                 return true;
         }
+
         return false;
     }
 
     /// <summary>True when an alignment value is (or ends with) the
     /// <c>baseline</c> keyword — covering <c>baseline</c>, <c>first baseline</c>,
     /// and <c>last baseline</c>.</summary>
-    private static bool MentionsBaseline(string value)
-        => !string.IsNullOrEmpty(value)
-            && value.IndexOf("baseline", StringComparison.OrdinalIgnoreCase) >= 0;
+    private static bool MentionsBaseline(string value) => !string.IsNullOrEmpty(value)
+            && value.Contains("baseline", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// True when every in-flow item of this grid is a plain box whose used block
@@ -1160,13 +1259,17 @@ internal partial class CssBox
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
+
             if (child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                 or CssConstants.Table or CssConstants.InlineTable)
                 return false;
+
             bool isImg = child.IsImage
                 || (child.HtmlTag != null && child.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase));
+
             if (isImg)
             {
                 // A replaced image whose block-size (height) is a definite length
@@ -1180,8 +1283,10 @@ internal partial class CssBox
                 // column, which this bounded pass measures once and cannot re-solve.
                 if (!GridReplacedItemHasDefiniteBlockSize(child))
                     return false;
+
                 continue;
             }
+
             if (child.HtmlTag != null)
             {
                 string tag = child.HtmlTag.Name;
@@ -1191,9 +1296,11 @@ internal partial class CssBox
                     || tag.Equals("textarea", StringComparison.OrdinalIgnoreCase))
                     return false;
             }
+
             if (!string.IsNullOrEmpty(child.Overflow) && child.Overflow != CssConstants.Visible)
                 return false;
         }
+
         return true;
     }
 
@@ -1227,13 +1334,16 @@ internal partial class CssBox
     private bool TryComputeGridIntrinsicContentWidth(bool useMax, out double contentWidth)
     {
         contentWidth = 0;
+
         if (Display is not ("grid" or "inline-grid"))
             return false;
+
         // Vertical writing modes lay the grid out in a logical frame and rotate it,
         // so the physical-width axis (rows) must be applied through the rotation —
         // out of scope here; a vertical grid keeps its existing sizing.
         if (IsVerticalWritingMode(WritingMode))
             return false;
+
         double em = GetEmHeight();
         var specs = ParseTrackList(GridTemplateColumns, em);
         if (specs == null || specs.Count == 0 || specs.Count > MaxGridLine)
@@ -1245,11 +1355,14 @@ internal partial class CssBox
             GridSize side = useMax ? spec.Max : spec.Min;
             if (side.Kind != GridSizeKind.Fixed)
                 return false;                 // needs the real track pass
+
             sum += Math.Max(0, side.Value);
         }
+
         double gap = ResolveGridGap(ColumnGap, 0, em);
         sum += gap * (specs.Count - 1);
         contentWidth = sum;
+
         return true;
     }
 
@@ -1266,14 +1379,16 @@ internal partial class CssBox
     /// </summary>
     private static double GridReplacedItemDefiniteBorderBoxHeight(CssBox item)
     {
-        if (!item.IsImage
-            && !(item.HtmlTag != null && item.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase)))
+        if (!item.IsImage && !(item.HtmlTag != null && item.HtmlTag.Name.Equals("img", StringComparison.OrdinalIgnoreCase)))
             return 0;
+
         if (!CssLayoutEngine.TryResolveDefiniteImageLength(item.Height, item.GetEmHeight(), out double h))
             return 0;
+
         if (!item.UsesBorderBoxSizing)
             h += item.ActualPaddingTop + item.ActualPaddingBottom
                 + item.ActualBorderTopWidth + item.ActualBorderBottomWidth;
+
         return h > 0 ? h : 0;
     }
 
@@ -1302,36 +1417,47 @@ internal partial class CssBox
     private void AlignGridRowBaselines(List<GridPlacement> placements)
     {
         Dictionary<int, List<CssBox>> byRow = null;
+
         foreach (var p in placements)
         {
             if (!ResolvesToFirstBaseline(p.Item.AlignSelf, AlignItems))
                 continue;
-            (byRow ??= new Dictionary<int, List<CssBox>>())
-                .TryGetValue(p.PlacedRow, out var list);
-            if (list == null) byRow[p.PlacedRow] = list = new List<CssBox>();
+
+            (byRow ??= []).TryGetValue(p.PlacedRow, out var list);
+
+            if (list == null)
+                byRow[p.PlacedRow] = list = [];
+
             list.Add(p.Item);
         }
+
         if (byRow == null)
             return;
+
         foreach (var group in byRow.Values)
         {
             if (group.Count < 2)
                 continue;
+
             double shared = double.MinValue;
             var baselines = new double[group.Count];
+
             for (int i = 0; i < group.Count; i++)
             {
                 baselines[i] = GridItemFirstBaselineY(group[i]);
-                if (baselines[i] > shared) shared = baselines[i];
+                if (baselines[i] > shared)
+                    shared = baselines[i];
             }
+
             for (int i = 0; i < group.Count; i++)
             {
                 double shift = shared - baselines[i];
-                if (shift > 0.5)
-                {
-                    group[i].OffsetTop(shift);
-                    group[i].ActualBottom += shift;
-                }
+
+                if (shift <= 0.5)
+                    continue;
+
+                group[i].OffsetTop(shift);
+                group[i].ActualBottom += shift;
             }
         }
     }
@@ -1352,9 +1478,12 @@ internal partial class CssBox
         string v = self;
         if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
             v = items;
+
         v = (v ?? "").Trim().ToLowerInvariant();
-        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
-        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+
+        if (v.StartsWith("safe ")) v = v[5..].Trim();
+        else if (v.StartsWith("unsafe ")) v = v[7..].Trim();
+
         return v == "baseline" || v == "first baseline" || v == "first-baseline";
     }
 
@@ -1363,9 +1492,12 @@ internal partial class CssBox
         string v = self;
         if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
             v = items;
+
         v = (v ?? "").Trim().ToLowerInvariant();
-        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
-        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+
+        if (v.StartsWith("safe ")) v = v[5..].Trim();
+        else if (v.StartsWith("unsafe ")) v = v[7..].Trim();
+
         return string.IsNullOrEmpty(v) || v == "normal" || v == "stretch";
     }
 
@@ -1374,18 +1506,19 @@ internal partial class CssBox
         string v = self;
         if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
             v = items;
+
         v = (v ?? "").Trim().ToLowerInvariant();
-        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
-        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
-        switch (v)
+
+        if (v.StartsWith("safe ")) v = v[5..].Trim();
+        else if (v.StartsWith("unsafe ")) v = v[7..].Trim();
+
+        return v switch
         {
-            case "center": return free / 2;
-            case "end":
-            case "flex-end":
-            case "self-end": return rtl ? 0 : free;
-            case "right": return free;
-            default: return rtl ? free : 0; // start / normal / stretch already handled
-        }
+            "center" => free / 2,
+            "end" or "flex-end" or "self-end" => rtl ? 0 : free,
+            "right" => free,
+            _ => rtl ? free : 0,// start / normal / stretch already handled
+        };
     }
 
     // ─────────────────────────── Track-list parsing ───────────────────────────
@@ -1401,11 +1534,12 @@ internal partial class CssBox
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
+
         string v = value.Trim();
         if (v.Equals("none", StringComparison.OrdinalIgnoreCase)
             || v.Equals("auto", StringComparison.OrdinalIgnoreCase)
-            || v.IndexOf("subgrid", StringComparison.OrdinalIgnoreCase) >= 0
-            || v.IndexOf("masonry", StringComparison.OrdinalIgnoreCase) >= 0)
+            || v.Contains("subgrid", StringComparison.OrdinalIgnoreCase)
+            || v.Contains("masonry", StringComparison.OrdinalIgnoreCase))
             return null;
 
         var specs = new List<GridTrackSpec>();
@@ -1419,12 +1553,13 @@ internal partial class CssBox
     /// unchanged; an auto-repeat that cannot be resolved (non-fixed repeated tracks,
     /// <c>auto-fit</c>, or combined with subgrid) returns <c>null</c> to decline.
     /// </summary>
-    private List<GridTrackSpec> ParseTrackListMaybeAutoRepeat(string value, double em,
+    private static List<GridTrackSpec> ParseTrackListMaybeAutoRepeat(string value, double em,
         double availableSize, double gap, bool fillMinimum = false)
     {
         var expanded = ExpandAutoRepeatTrackList(value, em, availableSize, gap, fillMinimum, out bool hasAutoRepeat);
         if (hasAutoRepeat)
             return expanded;               // resolved list, or null to decline
+
         return ParseTrackList(value, em);  // no auto-repeat — ordinary parse
     }
 
@@ -1440,13 +1575,15 @@ internal partial class CssBox
     /// unmodelled), non-fixed repeated tracks, or a repeated block that would exceed
     /// <see cref="MaxGridLine"/> tracks.
     /// </summary>
-    private List<GridTrackSpec> ExpandAutoRepeatTrackList(string value, double em,
+    private static List<GridTrackSpec> ExpandAutoRepeatTrackList(string value, double em,
         double availableSize, double gap, bool fillMinimum, out bool hasAutoRepeat)
     {
         hasAutoRepeat = false;
         if (string.IsNullOrWhiteSpace(value))
             return null;
+
         string v = value.Trim();
+
         // Fast path: auto-fill/auto-fit as a repeat count must spell the keyword, so
         // its absence proves there is no auto-repeat (this method is only reached off
         // the non-subgrid track-parsing path).
@@ -1471,6 +1608,7 @@ internal partial class CssBox
                 i = close + 1;
                 continue;
             }
+
             int start = i, paren = 0;
             while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
             {
@@ -1478,7 +1616,8 @@ internal partial class CssBox
                 else if (v[i] == ')') paren--;
                 i++;
             }
-            string token = v.Substring(start, i - start);
+
+            string token = v[start..i];
             if (token.Length == 0) continue;
 
             // Only a repeat() whose *count* argument is auto-fill/auto-fit is an
@@ -1490,15 +1629,16 @@ internal partial class CssBox
                 hasAutoRepeat = true;       // empty-track collapsing unmodelled → decline
                 return null;
             }
+
             if (autoKind == "auto-fill")
             {
                 if (seenAuto)
                     return null;            // at most one auto-repeat per track list
                 seenAuto = true;
-                string inner = token.Substring(7, token.Length - 8);
+                string inner = token[7..^1];
                 int comma = inner.IndexOf(',');
                 if (comma < 0) return null;
-                if (!ParseTrackTokens(inner.Substring(comma + 1), auto, depth: 1, em))
+                if (!ParseTrackTokens(inner[(comma + 1)..], auto, depth: 1, em))
                     return null;
             }
             else
@@ -1511,6 +1651,7 @@ internal partial class CssBox
 
         if (!seenAuto || auto.Count == 0)
             return null;                    // keyword was only a line name → not auto-repeat
+
         hasAutoRepeat = true;
 
         // Every track in the repeated block must have a definite (fixed) size — the
@@ -1521,7 +1662,9 @@ internal partial class CssBox
             if (!TryFixedTrackSize(s, out double px)) return null;
             sumAuto += px;
         }
+
         double sumFixed = 0;
+
         foreach (var s in before) sumFixed += TryFixedTrackSize(s, out double px) ? px : 0;
         foreach (var s in after) sumFixed += TryFixedTrackSize(s, out double px) ? px : 0;
 
@@ -1543,17 +1686,21 @@ internal partial class CssBox
                 ? (kf > 1 ? (int)Math.Ceiling(kf - 1e-6) : 1)
                 : (kf >= 1 ? (int)Math.Floor(kf + 1e-6) : 1);
         }
+
         if (k < 1) k = 1;
+
         // Bound the expansion so a tiny track in a large area cannot allocate a
         // pathological number of tracks.
-        long total = (long)nFixed + (long)k * nAuto;
+        long total = nFixed + (long)k * nAuto;
         if (total > MaxGridLine)
             return null;
 
         var result = new List<GridTrackSpec>(before.Count + k * nAuto + after.Count);
         result.AddRange(before);
+
         for (int r = 0; r < k; r++)
             result.AddRange(auto);
+
         result.AddRange(after);
         return result;
     }
@@ -1566,15 +1713,19 @@ internal partial class CssBox
     /// </summary>
     private static string AutoRepeatCountKind(string token)
     {
-        if (!token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase)
-            || !token.EndsWith(")", StringComparison.Ordinal))
+        if (!token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) || !token.EndsWith(')'))
             return null;
-        string inner = token.Substring(7, token.Length - 8);
+
+        string inner = token[7..^1];
         int comma = inner.IndexOf(',');
+        
         if (comma < 0) return null;
-        string count = inner.Substring(0, comma).Trim();
+        
+        string count = inner[..comma].Trim();
+        
         if (count.Equals("auto-fill", StringComparison.OrdinalIgnoreCase)) return "auto-fill";
         if (count.Equals("auto-fit", StringComparison.OrdinalIgnoreCase)) return "auto-fit";
+        
         return null;
     }
 
@@ -1588,7 +1739,9 @@ internal partial class CssBox
     {
         if (spec.Max.Kind == GridSizeKind.Fixed) { px = Math.Max(0, spec.Max.Value); return true; }
         if (spec.Min.Kind == GridSizeKind.Fixed) { px = Math.Max(0, spec.Min.Value); return true; }
+        
         px = 0;
+        
         return false;
     }
 
@@ -1611,9 +1764,9 @@ internal partial class CssBox
         double h = hasDefinite ? dh : 0;
         if (!string.IsNullOrEmpty(MinHeight) && MinHeight != "0"
             && !MinHeight.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
-            && !MinHeight.EndsWith("%", StringComparison.Ordinal))
+            && !MinHeight.EndsWith('%'))
         {
-            double mh = CssValueParser.ParseLength(MinHeight, 0, em);
+            double mh = CssLengthParser.ParseLength(MinHeight, 0, em);
             if (!double.IsNaN(mh) && !double.IsInfinity(mh) && mh > 0)
             {
                 if (UsesBorderBoxSizing)
@@ -1654,36 +1807,47 @@ internal partial class CssBox
             // Read one token, respecting parentheses (repeat(...)/minmax(...)).
             int start = i;
             int paren = 0;
+            
             while (i < n && (paren > 0 || !char.IsWhiteSpace(v[i])))
             {
                 if (v[i] == '(') paren++;
                 else if (v[i] == ')') paren--;
                 i++;
             }
-            string token = v.Substring(start, i - start);
+            
+            string token = v[start..i];
             if (token.Length == 0) continue;
 
-            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
+            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(')'))
             {
-                string inner = token.Substring(7, token.Length - 8);
+                string inner = token[7..^1];
                 int comma = inner.IndexOf(',');
+                
                 if (comma < 0) return false;
-                string countStr = inner.Substring(0, comma).Trim();
+                
+                string countStr = inner[..comma].Trim();
+                
                 if (!int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
                     || count < 1 || count > 1000)
                     return false; // auto-fill / auto-fit / bad count — decline
+                
                 var repeated = new List<GridTrackSpec>();
-                if (!ParseTrackTokens(inner.Substring(comma + 1), repeated, depth + 1, em))
+                
+                if (!ParseTrackTokens(inner[(comma + 1)..], repeated, depth + 1, em))
                     return false;
+                
                 for (int r = 0; r < count; r++)
                     specs.AddRange(repeated);
+                
                 continue;
             }
 
             if (!TryParseTrackSpec(token, em, out GridTrackSpec spec))
                 return false;
+            
             specs.Add(spec);
         }
+        
         return specs.Count > 0;
     }
 
@@ -1692,55 +1856,69 @@ internal partial class CssBox
     {
         spec = default;
         string t = token.Trim();
+        
         if (t.Length == 0)
             return false;
 
-        if (t.StartsWith("minmax(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(")"))
+        if (t.StartsWith("minmax(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(')'))
         {
-            string inner = t.Substring(7, t.Length - 8);
+            string inner = t[7..^1];
             int comma = SplitTopLevelComma(inner);
+
             if (comma < 0) return false;
-            if (!TryParseGridSize(inner.Substring(0, comma).Trim(), allowFr: false, em, out GridSize min))
+
+            if (!TryParseGridSize(inner[..comma].Trim(), allowFr: false, em, out GridSize min))
                 return false;
-            if (!TryParseGridSize(inner.Substring(comma + 1).Trim(), allowFr: true, em, out GridSize max))
+
+            if (!TryParseGridSize(inner[(comma + 1)..].Trim(), allowFr: true, em, out GridSize max))
                 return false;
+
             spec = new GridTrackSpec(min, max);
             return true;
         }
 
         // fit-content(<length-percentage>): modelled as minmax(auto, fit-content(L)).
         // The track's used size is max(min-content, min(L, max-content)) (§7.2.3).
-        if (t.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(")"))
+        if (t.StartsWith("fit-content(", StringComparison.OrdinalIgnoreCase) && t.EndsWith(')'))
         {
-            string inner = t.Substring(12, t.Length - 13).Trim();
-            if (inner.EndsWith("%", StringComparison.Ordinal))
+            string inner = t[12..^1].Trim();
+
+            if (inner.EndsWith('%'))
             {
-                if (!double.TryParse(inner.Substring(0, inner.Length - 1),
+                if (!double.TryParse(inner.AsSpan(0, inner.Length - 1),
                         NumberStyles.Float, CultureInfo.InvariantCulture, out double pct) || pct < 0)
                     return false;
+
                 spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto),
                     new GridSize(GridSizeKind.FitContent, pct, valueIsPercent: true));
+
                 return true;
             }
-            double limit = CssValueParser.ParseLength(inner, 0, em);
+
+            double limit = CssLengthParser.ParseLength(inner, 0, em);
+
             if (double.IsNaN(limit) || double.IsInfinity(limit) || limit < 0)
                 return false;
+
             spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto),
                 new GridSize(GridSizeKind.FitContent, limit));
+
             return true;
         }
 
         // Any other functional notation is out of scope.
-        if (t.IndexOf('(') >= 0)
+        if (t.Contains('('))
             return false;
 
         if (!TryParseGridSize(t, allowFr: true, em, out GridSize size))
             return false;
+
         // A standalone <flex> implies an automatic minimum: minmax(auto, <flex>).
         if (size.Kind == GridSizeKind.Fr)
             spec = new GridTrackSpec(new GridSize(GridSizeKind.Auto), size);
         else
             spec = new GridTrackSpec(size, size);
+
         return true;
     }
 
@@ -1750,27 +1928,32 @@ internal partial class CssBox
         string t = token.Trim().ToLowerInvariant();
         if (t.Length == 0)
             return false;
+
         switch (t)
         {
             case "auto": size = new GridSize(GridSizeKind.Auto); return true;
             case "min-content": size = new GridSize(GridSizeKind.MinContent); return true;
             case "max-content": size = new GridSize(GridSizeKind.MaxContent); return true;
         }
+
         if (t.EndsWith("fr", StringComparison.Ordinal))
         {
             if (!allowFr) return false;
-            if (double.TryParse(t.Substring(0, t.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out double fr)
+
+            if (double.TryParse(t.AsSpan(0, t.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out double fr)
                 && fr >= 0)
             {
                 size = new GridSize(GridSizeKind.Fr, fr);
                 return true;
             }
+
             return false;
         }
-        if (t.EndsWith("%", StringComparison.Ordinal))
+
+        if (t.EndsWith('%'))
         {
             // Percentage magnitude; resolved against the axis basis at sizing time.
-            if (double.TryParse(t.Substring(0, t.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double pct)
+            if (double.TryParse(t.AsSpan(0, t.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double pct)
                 && pct >= 0)
             {
                 size = new GridSize(GridSizeKind.Percent, pct);
@@ -1778,13 +1961,17 @@ internal partial class CssBox
             }
             return false;
         }
-        if (t.IndexOf('(') >= 0)
+
+        if (t.Contains('('))
             return false;
+
         // A <length>. Resolve em-relative and absolute units to pixels now (the
         // percent basis is irrelevant for a non-percentage length).
-        double px = CssValueParser.ParseLength(t, 0, em);
+        double px = CssLengthParser.ParseLength(t, 0, em);
+
         if (double.IsNaN(px) || double.IsInfinity(px) || px < 0)
             return false;
+
         size = new GridSize(GridSizeKind.Fixed, px);
         return true;
     }
@@ -1803,11 +1990,12 @@ internal partial class CssBox
     }
 
     /// <summary>Grid gap: <c>normal</c>/empty computes to 0 (unlike multicol).</summary>
-    private double ResolveGridGap(string gap, double percentBasis, double em)
+    private static double ResolveGridGap(string gap, double percentBasis, double em)
     {
         if (string.IsNullOrEmpty(gap) || gap == "normal")
             return 0;
-        double v = CssValueParser.ParseLength(gap, percentBasis, em);
+
+        double v = CssLengthParser.ParseLength(gap, percentBasis, em);
         return v > 0 ? v : 0;
     }
 
@@ -1819,6 +2007,7 @@ internal partial class CssBox
             if (TryParseTrackSpec(first, em, out GridTrackSpec spec))
                 return spec;
         }
+
         // Default grid-auto-rows/columns is 'auto'.
         return new GridTrackSpec(new GridSize(GridSizeKind.Auto), new GridSize(GridSizeKind.Auto));
     }
@@ -1826,13 +2015,15 @@ internal partial class CssBox
     private static string FirstToken(string v)
     {
         int i = 0, paren = 0;
+
         while (i < v.Length && (paren > 0 || !char.IsWhiteSpace(v[i])))
         {
             if (v[i] == '(') paren++;
             else if (v[i] == ')') paren--;
             i++;
         }
-        return v.Substring(0, i);
+
+        return v[..i];
     }
 
     /// <summary>
@@ -1847,13 +2038,16 @@ internal partial class CssBox
         {
             int t = start + i;
             GridTrackSpec s = t < rowSpecs.Count ? rowSpecs[t] : implicitRow;
+
             if (s.Max.IsIntrinsic || s.Min.IsIntrinsic)
                 return true;
+
             // A percentage row against an indefinite height resolves to 'auto',
             // so it too is content-sized from the measured height.
             if (!rowDefinite && (s.Max.Kind == GridSizeKind.Percent || s.Min.Kind == GridSizeKind.Percent))
                 return true;
         }
+
         return false;
     }
 
@@ -1867,16 +2061,22 @@ internal partial class CssBox
     private bool TryGetDefiniteContentHeight(double em, out double contentHeight)
     {
         contentHeight = 0;
+
         if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto
-            || Height.EndsWith("%", StringComparison.Ordinal))
+            || Height.EndsWith('%'))
             return false;
-        double h = CssValueParser.ParseLength(Height, 0, em);
+
+        double h = CssLengthParser.ParseLength(Height, 0, em);
+
         if (double.IsNaN(h) || double.IsInfinity(h) || h <= 0)
             return false;
+
         if (UsesBorderBoxSizing)
             h -= ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+
         if (h <= 0)
             return false;
+
         contentHeight = h;
         return true;
     }
@@ -1886,8 +2086,10 @@ internal partial class CssBox
     private static double SumTrackSizes(double[] sizes, double gap)
     {
         if (sizes == null || sizes.Length == 0) return 0;
+
         double total = 0;
         foreach (double s in sizes) total += s;
+
         total += (sizes.Length - 1) * gap;
         return total > 0 ? total : 0;
     }
@@ -1906,6 +2108,7 @@ internal partial class CssBox
         for (int t = 0; t < sizes.Length; t++)
         {
             GridTrackSpec spec = t < specs.Count ? specs[t] : implicitSpec;
+
             if (spec.Min.Kind == GridSizeKind.Percent && spec.Max.Kind == GridSizeKind.Percent
                 && spec.Min.Value == spec.Max.Value)
             {
@@ -1926,8 +2129,8 @@ internal partial class CssBox
     /// <c>null</c> to decline (a percentage against an indefinite basis, or a
     /// negative/degenerate result).
     /// </summary>
-    private double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
-        int count, double containerSize, bool definite, double gap, double percentBasis, double em,
+    private static double[] ResolveTrackSizes(List<GridTrackSpec> explicitSpecs, GridTrackSpec implicitSpec,
+        int count, double containerSize, bool definite, double gap, double percentBasis,
         List<AxisItem> items, bool stretchAutoTracks = false, int explicitStart = 0)
     {
         if (count < 1) return null;
@@ -1946,11 +2149,13 @@ internal partial class CssBox
             // leading (before) and trailing (after) tracks use the implicit spec.
             int e = t - explicitStart;
             GridTrackSpec spec = e >= 0 && e < explicitSpecs.Count ? explicitSpecs[e] : implicitSpec;
+
             // Resolve percentages against the axis basis: a percentage against a
             // definite basis is a fixed length; against an indefinite one it
             // behaves as 'auto' (CSS Grid §7.2.1 / §11.5).
             (GridSizeKind minK, double minPx) = ResolveEffective(spec.Min, percentBasis, definite);
             (GridSizeKind maxK, double maxPx) = ResolveEffective(spec.Max, percentBasis, definite);
+
             minKind[t] = minK;
             maxKind[t] = maxK;
 
@@ -1976,16 +2181,20 @@ internal partial class CssBox
         // Resolve intrinsic track sizes from single-span item contributions.
         double[] contentBase = new double[count]; // desired base (min-content)
         double[] contentGrow = new double[count]; // desired growth (max-content)
+
         foreach (var it in items)
         {
             if (it.Span != 1) continue;
             int t = it.Start;
+
             if (t < 0 || t >= count) continue;
+
             if (minKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
             {
                 double c = minKind[t] == GridSizeKind.MaxContent ? it.MaxContent : it.MinContent;
                 contentBase[t] = Math.Max(contentBase[t], c);
             }
+
             if (maxKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent
                 or GridSizeKind.MaxContent or GridSizeKind.FitContent)
             {
@@ -1999,14 +2208,16 @@ internal partial class CssBox
         foreach (var it in items)
         {
             if (it.Span <= 1) continue;
-            DistributeSpanContribution(it, minKind, contentBase, count, gap, useMax: false, it.MinContent);
-            DistributeSpanContribution(it, maxKind, contentGrow, count, gap, useMax: true, it.MaxContent);
+
+            DistributeSpanContribution(it, minKind, contentBase, count, gap, it.MinContent);
+            DistributeSpanContribution(it, maxKind, contentGrow, count, gap, it.MaxContent);
         }
 
         for (int t = 0; t < count; t++)
         {
             if (minKind[t] is GridSizeKind.Auto or GridSizeKind.MinContent or GridSizeKind.MaxContent)
                 baseSize[t] = Math.Max(baseSize[t], contentBase[t]);
+
             if (maxKind[t] == GridSizeKind.FitContent)
             {
                 // fit-content(L) = max(min-content, min(L, max-content)) (§7.2.3).
@@ -2015,6 +2226,7 @@ internal partial class CssBox
                 // final size — it neither flexes (fr) nor stretches.
                 double maxContent = Math.Max(baseSize[t], contentGrow[t]);
                 double size = Math.Max(baseSize[t], Math.Min(fitLimit[t], maxContent));
+
                 baseSize[t] = size;
                 growth[t] = size;
             }
@@ -2025,6 +2237,7 @@ internal partial class CssBox
                 // An intrinsic-max track grows to its max-content contribution.
                 baseSize[t] = Math.Max(baseSize[t], g);
             }
+
             if (growth[t] < baseSize[t]) growth[t] = baseSize[t];
         }
 
@@ -2033,15 +2246,22 @@ internal partial class CssBox
 
         // Distribute leftover space to flexible (fr) tracks.
         double sumFr = 0;
+
         for (int t = 0; t < count; t++) if (isFr[t]) sumFr += frFactor[t];
+
         if (sumFr > 0 && definite && containerSize > 0)
         {
             double nonFr = 0;
+
             for (int t = 0; t < count; t++) if (!isFr[t]) nonFr += sizes[t];
+
             double totalGap = (count - 1) * gap;
             double free = containerSize - nonFr - totalGap;
+
             if (free < 0) free = 0;
+
             double frUnit = free / sumFr;
+
             for (int t = 0; t < count; t++)
                 if (isFr[t]) sizes[t] = Math.Max(sizes[t], frFactor[t] * frUnit);
         }
@@ -2055,6 +2275,7 @@ internal partial class CssBox
             double used = 0;
             for (int t = 0; t < count; t++) used += sizes[t];
             double free = containerSize - used - (count - 1) * gap;
+
             if (free > 0.5)
             {
                 int autoCount = 0;
@@ -2073,14 +2294,16 @@ internal partial class CssBox
             if (double.IsNaN(sizes[t]) || double.IsInfinity(sizes[t]) || sizes[t] < 0)
                 return null;
         }
+
         return sizes;
     }
 
     private static void DistributeSpanContribution(AxisItem it, GridSizeKind[] kinds, double[] target,
-        int count, double gap, bool useMax, double contribution)
+        int count, double gap, double contribution)
     {
         var intrinsic = new List<int>();
         double covered = 0;
+
         for (int i = 0; i < it.Span; i++)
         {
             int t = it.Start + i;
@@ -2090,11 +2313,16 @@ internal partial class CssBox
                 or GridSizeKind.MaxContent or GridSizeKind.FitContent)
                 intrinsic.Add(t);
         }
+
         if (intrinsic.Count == 0) return;
+
         double gapsInSpan = (it.Span - 1) * gap;
         double need = contribution - covered - gapsInSpan;
+
         if (need <= 0) return;
+
         double share = need / intrinsic.Count;
+
         foreach (int t in intrinsic)
             target[t] += share;
     }
@@ -2111,12 +2339,15 @@ internal partial class CssBox
         {
             case GridSizeKind.Fixed:
                 return (GridSizeKind.Fixed, size.Value);
+
             case GridSizeKind.Percent:
                 return definite && basis > 0
                     ? (GridSizeKind.Fixed, basis * size.Value / 100.0)
                     : (GridSizeKind.Auto, 0);
+
             case GridSizeKind.Fr:
                 return (GridSizeKind.Fr, size.Value);
+
             case GridSizeKind.FitContent:
                 // The fit-content limit: a length passes through; a percentage
                 // resolves against the axis basis, or — against an indefinite basis —
@@ -2127,6 +2358,7 @@ internal partial class CssBox
                 return definite && basis > 0
                     ? (GridSizeKind.FitContent, basis * size.Value / 100.0)
                     : (GridSizeKind.MaxContent, 0);
+
             default:
                 return (size.Kind, 0);
         }
@@ -2140,8 +2372,11 @@ internal partial class CssBox
     {
         int count = Math.Max(sizes.Length, 1);
         var startEdge = new double[count];
+
         endEdge = new double[count];
+
         double cursor = 0;
+
         for (int i = 0; i < count; i++)
         {
             double size = i < sizes.Length ? sizes[i] : 0;
@@ -2149,6 +2384,7 @@ internal partial class CssBox
             endEdge[i] = cursor + size;
             cursor += size + gap;
         }
+
         return startEdge;
     }
 
@@ -2183,6 +2419,7 @@ internal partial class CssBox
             endEdge[i] = cursor + size;
             cursor += size + between;
         }
+
         return startEdge;
     }
 
@@ -2212,24 +2449,30 @@ internal partial class CssBox
     {
         leading = 0;
         between = gap;
+
         string v = (value ?? "").Trim().ToLowerInvariant();
-        if (v.StartsWith("safe ")) v = v.Substring(5).Trim();
-        else if (v.StartsWith("unsafe ")) v = v.Substring(7).Trim();
+
+        if (v.StartsWith("safe ")) v = v[5..].Trim();
+        else if (v.StartsWith("unsafe ")) v = v[7..].Trim();
+
         switch (v)
         {
             case "center":
                 leading = free / 2;
                 break;
+
             case "end":
             case "flex-end":
             case "right":
                 leading = free;
                 break;
+
             case "space-between":
                 // ≥2 tracks share the free space between them; a single track packs
                 // at the start.
                 if (count > 1) between = gap + free / (count - 1);
                 break;
+
             case "space-around":
                 // Free space as equal gaps around every track (half at each end).
                 {
@@ -2238,6 +2481,7 @@ internal partial class CssBox
                     leading = unit / 2;
                 }
                 break;
+
             case "space-evenly":
                 // Free space as equal gaps between and outside every track.
                 {
@@ -2246,6 +2490,7 @@ internal partial class CssBox
                     leading = unit;
                 }
                 break;
+
             default:
                 // start / flex-start / left / normal / stretch / baseline → pack start.
                 break;
@@ -2268,6 +2513,7 @@ internal partial class CssBox
     {
         if (string.IsNullOrWhiteSpace(value))
             return (null, 1);
+
         string v = value.Trim();
         if (v.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return (null, 1);
@@ -2276,8 +2522,8 @@ internal partial class CssBox
         if (slash < 0)
             return ParseSingleGridLine(v, explicitTracks, names);
 
-        var (startLine, startSpan) = ParseSingleGridLine(v.Substring(0, slash).Trim(), explicitTracks, names);
-        var (endLine, endSpan) = ParseSingleGridLine(v.Substring(slash + 1).Trim(), explicitTracks, names);
+        var (startLine, startSpan) = ParseSingleGridLine(v[..slash].Trim(), explicitTracks, names);
+        var (endLine, endSpan) = ParseSingleGridLine(v[(slash + 1)..].Trim(), explicitTracks, names);
 
         if (startLine.HasValue && endLine.HasValue)
         {
@@ -2285,14 +2531,17 @@ internal partial class CssBox
             int span = b - a;
             return span >= 1 ? (a, span) : (a, 1);
         }
+
         if (startLine.HasValue)
             return (startLine, Math.Max(1, endSpan)); // start / span n
+
         if (endLine.HasValue)
         {
             int span = Math.Max(1, startSpan);        // span n / end
             int start = endLine.Value - span;
             return start >= 0 ? (start, span) : (null, span);
         }
+
         return (null, 1);
     }
 
@@ -2301,17 +2550,20 @@ internal partial class CssBox
     {
         if (string.IsNullOrEmpty(token) || token.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return (null, 1);
+
         if (token.StartsWith("span", StringComparison.OrdinalIgnoreCase))
         {
-            string rest = token.Substring(4).Trim();
+            string rest = token[4..].Trim();
             if (int.TryParse(rest, NumberStyles.Integer, CultureInfo.InvariantCulture, out int s) && s >= 1)
                 return (null, s);
             return (null, 1);
         }
+
         if (int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out int line))
         {
             if (line >= 1)
                 return (line - 1, 1);         // 1-based line -> 0-based track boundary
+
             if (line <= -1 && explicitTracks >= 0)
             {
                 // Negative line -N counts back from the last explicit line: the grid
@@ -2322,6 +2574,7 @@ internal partial class CssBox
                 int boundary = explicitTracks + 1 + line;
                 return (boundary, 1);
             }
+
             return (null, 1);                 // line 0 -> auto
         }
 
@@ -2332,15 +2585,18 @@ internal partial class CssBox
             int space = token.IndexOf(' ');
             int nth = 1;
             string name = token;
-            if (space > 0 && int.TryParse(token.Substring(0, space).Trim(),
+
+            if (space > 0 && int.TryParse(token[..space].Trim(),
                     NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedNth) && parsedNth >= 1)
             {
                 nth = parsedNth;
-                name = token.Substring(space + 1).Trim();
+                name = token[(space + 1)..].Trim();
             }
+
             if (names.TryGetValue(name, out var lines) && lines.Count > 0)
                 return (lines[Math.Min(nth, lines.Count) - 1], 1);
         }
+
         return (null, 1);                     // unresolved named line -> auto
     }
 
@@ -2355,11 +2611,13 @@ internal partial class CssBox
     private static Dictionary<string, List<int>> ParseLineNames(string template)
     {
         var result = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+
         if (!string.IsNullOrWhiteSpace(template))
         {
             int line = 0;
             CollectLineNames(template, result, ref line, depth: 0);
         }
+
         return result;
     }
 
@@ -2367,6 +2625,7 @@ internal partial class CssBox
     {
         if (depth > 4) return;
         int i = 0, n = v.Length;
+
         while (i < n)
         {
             while (i < n && char.IsWhiteSpace(v[i])) i++;
@@ -2376,13 +2635,15 @@ internal partial class CssBox
             {
                 int close = v.IndexOf(']', i);
                 if (close < 0) return;
+
                 foreach (var name in v.Substring(i + 1, close - i - 1)
                              .Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
                 {
                     if (!result.TryGetValue(name, out var list))
-                        result[name] = list = new List<int>();
+                        result[name] = list = [];
                     if (!list.Contains(line)) list.Add(line);
                 }
+
                 i = close + 1;
                 continue;
             }
@@ -2394,21 +2655,24 @@ internal partial class CssBox
                 else if (v[i] == ')') paren--;
                 i++;
             }
-            string token = v.Substring(start, i - start);
+
+            string token = v[start..i];
             if (token.Length == 0) continue;
 
-            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
+            if (token.StartsWith("repeat(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(')'))
             {
-                string inner = token.Substring(7, token.Length - 8);
+                string inner = token[7..^1];
                 int comma = inner.IndexOf(',');
+
                 if (comma < 0) return;
-                if (int.TryParse(inner.Substring(0, comma).Trim(),
+                if (int.TryParse(inner[..comma].Trim(),
                         NumberStyles.Integer, CultureInfo.InvariantCulture, out int count)
                     && count >= 1 && count <= 1000)
                     for (int r = 0; r < count; r++)
-                        CollectLineNames(inner.Substring(comma + 1), result, ref line, depth + 1);
+                        CollectLineNames(inner[(comma + 1)..], result, ref line, depth + 1);
                 else
                     return;              // auto-fill/auto-fit — line count unknown
+
                 continue;
             }
 

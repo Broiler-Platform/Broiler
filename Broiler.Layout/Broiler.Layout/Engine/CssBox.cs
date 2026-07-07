@@ -1,9 +1,8 @@
+using Broiler.CSS;
 using Broiler.Graphics;
-﻿using System.Drawing;
+using System.Drawing;
 using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -52,7 +51,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal void AddSplitFragment(CssBox fragment)
     {
-        SplitFragments ??= new List<CssBox>();
+        SplitFragments ??= [];
         SplitFragments.Add(fragment);
     }
 
@@ -102,6 +101,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             var layers = new object?[_backgroundImageLoadHandlers.Count];
             bool hasImage = false;
+
             for (int i = 0; i < _backgroundImageLoadHandlers.Count; i++)
             {
                 var image = _backgroundImageLoadHandlers[i]?.Image;
@@ -154,8 +154,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         get
         {
             var root = this;
+
             while (root._parentBox != null)
                 root = root._parentBox;
+
             root._documentQuirksMode ??= DocumentModeContext.CurrentQuirksMode;
             return root._documentQuirksMode.Value;
         }
@@ -206,10 +208,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     public bool IsBrElement => HtmlTag != null && HtmlTag.Name.Equals("br", StringComparison.InvariantCultureIgnoreCase);
+
     public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock
         || Display == "inline-flex" || Display == "inline-grid") && !IsBrElement;
+    
     public bool IsBlock => Display == CssConstants.Block || Display == "flex"
         || Display == "grid";
+    
     public virtual bool IsClickable
     {
         get
@@ -278,8 +283,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     internal List<CssLineBox> LineBoxes { get; } = [];
+
     internal Dictionary<CssLineBox, RectangleF> Rectangles { get; } = [];
+
     internal List<CssRect> Words { get; } = [];
+
     internal CssRect FirstWord => Words[0];
 
     internal CssLineBox FirstHostingLineBox { get; set; }
@@ -306,6 +314,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             if (isVerticalRoot)
                 PushVerticalFrameLayout();
+
             try
             {
                 PerformLayoutImp(g);
@@ -476,8 +485,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     protected override PointF GetActualLocation(string X, string Y)
     {
         var vpSize = LayoutEnvironment.ViewportSize;
-        var left = CssValueParser.ParseLength(X, vpSize.Width, GetEmHeight(), null);
-        var top = CssValueParser.ParseLength(Y, vpSize.Height, GetEmHeight(), null);
+        var left = CssLengthParser.ParseLength(X, vpSize.Width, GetEmHeight(), null);
+        var top = CssLengthParser.ParseLength(Y, vpSize.Height, GetEmHeight(), null);
 
         return new PointF((float)left, (float)top);
     }

@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -22,13 +19,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         _backgroundImagesInitialized = true;
         var layers = SplitBackgroundImageLayers(BackgroundImage);
+        
         if (layers.Count == 0)
             return;
 
         _backgroundImageLoadHandlers = new List<ILayoutImageLoader?>(layers.Count);
+        
         foreach (var layer in layers)
         {
             var src = TryExtractBackgroundImageUrl(layer);
+            
             if (string.IsNullOrEmpty(src))
             {
                 _backgroundImageLoadHandlers.Add(null);
@@ -36,6 +36,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
 
             var imageLoadHandler = LayoutEnvironment.CreateImageLoader(OnImageLoadComplete);
+            
             _backgroundImageLoadHandlers.Add(imageLoadHandler);
             imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
         }
@@ -44,11 +45,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private static List<string> SplitBackgroundImageLayers(string backgroundImage)
     {
         var layers = new List<string>();
+        
         if (string.IsNullOrWhiteSpace(backgroundImage))
             return layers;
 
         int depth = 0;
         int start = 0;
+        
         for (int i = 0; i < backgroundImage.Length; i++)
         {
             switch (backgroundImage[i])
@@ -56,10 +59,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 case '(':
                     depth++;
                     break;
+                
                 case ')':
                     if (depth > 0)
                         depth--;
                     break;
+                
                 case ',' when depth == 0:
                     layers.Add(backgroundImage[start..i].Trim());
                     start = i + 1;
@@ -77,13 +82,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             return null;
 
         layer = layer.Trim();
+        
         if (!layer.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
             return layer.Contains('(') ? null : layer;
 
-        if (!layer.EndsWith(")", StringComparison.Ordinal))
+        if (!layer.EndsWith(')'))
             return null;
 
-        var src = layer.Substring(4, layer.Length - 5).Trim();
+        var src = layer[4..^1].Trim();
         if (src.Length >= 2 &&
             ((src[0] == '\'' && src[^1] == '\'') ||
              (src[0] == '"' && src[^1] == '"')))
@@ -99,5 +105,4 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (image != null && async)
             LayoutEnvironment.RequestRefresh(false);
     }
-
 }

@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -22,22 +19,35 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         bool allSameCell = true;
         string firstRow = null, firstCol = null;
+
         foreach (var child in Boxes)
         {
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
+
             if (child.Display == CssConstants.None)
                 continue;
+
             var cr = child.GridRow;
             var cc = child.GridColumn;
+
             // Items without explicit grid placement use auto.
-            if (string.IsNullOrEmpty(cr) || cr == "auto"
-                || string.IsNullOrEmpty(cc) || cc == "auto")
-            { allSameCell = false; break; }
+            if (string.IsNullOrEmpty(cr) || cr == "auto" || string.IsNullOrEmpty(cc) || cc == "auto")
+            {
+                allSameCell = false;
+                break;
+            }
+
             if (firstRow == null)
-            { firstRow = cr; firstCol = cc; }
+            {
+                firstRow = cr;
+                firstCol = cc;
+            }
             else if (cr != firstRow || cc != firstCol)
-            { allSameCell = false; break; }
+            {
+                allSameCell = false;
+                break;
+            }
         }
 
         if (!allSameCell || firstRow == null)
@@ -48,25 +58,33 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double columnWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
             - ActualBorderLeftWidth - ActualBorderRightWidth;
         double maxBottom = cellTop;
+
         foreach (var child in Boxes)
         {
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
+
             if (child.Display == CssConstants.None)
                 continue;
+
             // CSS Grid Level 1 §6.1: an auto-width grid item with the default
             // (stretch) justify-self fills its column — the same rule the
             // multi-row auto-placement path applies. Same-cell items are still
             // stretched to the container's content width so they paint as the
             // full-width blue bars the check-layout grid reftests expect.
             StretchGridItemToColumnWidth(child, columnWidth);
+
             double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
             double dy = cellTop + child.ActualMarginTop - child.Location.Y;
+
             if (Math.Abs(dx) > 0.1)
                 child.OffsetLeft(dx);
+
             if (Math.Abs(dy) > 0.1)
                 child.OffsetTop(dy);
+
             double childBottom = child.ActualBottom + child.ActualMarginBottom;
+
             if (childBottom > maxBottom)
                 maxBottom = childBottom;
         }
@@ -99,25 +117,29 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         double em = GetEmHeight();
         List<GridTrackSpec> rowSpecs = ParseTrackList(GridTemplateRows, em);
+
         if (rowSpecs == null || rowSpecs.Count == 0 || rowSpecs.Count > MaxGridLine)
             return false;
 
         var (rowStartN, rowSpan) = ParseGridLine(GridRowOfFirstInFlowItem(), rowSpecs.Count);
         int rowStart = rowStartN ?? 0;
+
         if (rowStart < 0 || rowSpan < 1 || rowStart + rowSpan > MaxGridLine)
             return false;
 
         // Tallest same-cell item's margin-box height feeds the occupied track's
         // content contribution.
         double contentH = 0;
+
         foreach (var child in Boxes)
         {
-            if (child.Position is CssConstants.Absolute or CssConstants.Fixed
-                || child.Display == CssConstants.None)
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed || child.Display == CssConstants.None)
                 continue;
-            double h = (child.ActualBottom - child.Location.Y)
-                + child.ActualMarginTop + child.ActualMarginBottom;
-            if (h > contentH) contentH = h;
+
+            double h = (child.ActualBottom - child.Location.Y) + child.ActualMarginTop + child.ActualMarginBottom;
+
+            if (h > contentH)
+                contentH = h;
         }
 
         int rowCount = Math.Max(rowSpecs.Count, rowStart + rowSpan);
@@ -126,9 +148,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double rowBasis = rowDefinite ? definiteHeight : 0;
         double rowGap = ResolveGridGap(RowGap, rowBasis, em);
 
-        var rowItems = new List<AxisItem> { new AxisItem(rowStart, rowSpan, contentH, contentH) };
+        var rowItems = new List<AxisItem> { new(rowStart, rowSpan, contentH, contentH) };
         double[] rowSizes = ResolveTrackSizes(rowSpecs, implicitRow, rowCount,
-            rowBasis, rowDefinite, rowGap, rowBasis, em, rowItems);
+            rowBasis, rowDefinite, rowGap, rowBasis, rowItems);
+
         if (rowSizes == null)
             return false;
 
@@ -136,6 +159,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // sized as 'auto' for the intrinsic height above, then resolved against
         // that intrinsic height for layout while the container keeps it.
         double intrinsic = SumTrackSizes(rowSizes, rowGap);
+
         if (!rowDefinite)
             ResolvePercentRowTracksAgainstIntrinsic(rowSpecs, implicitRow, rowSizes, intrinsic);
 
@@ -146,9 +170,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         foreach (var child in Boxes)
         {
-            if (child.Position is CssConstants.Absolute or CssConstants.Fixed
-                || child.Display == CssConstants.None)
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed || child.Display == CssConstants.None)
                 continue;
+
             PlaceItemInArea(child, cellLeft, areaTop, columnWidth, areaHeight);
         }
 
@@ -158,6 +182,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double gridContentHeight = rowDefinite ? definiteHeight : intrinsic;
         ActualBottom = Location.Y + ActualBorderTopWidth + ActualPaddingTop
             + gridContentHeight + ActualPaddingBottom + ActualBorderBottomWidth;
+
         return true;
     }
 
@@ -167,11 +192,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         foreach (var child in Boxes)
         {
-            if (child.Position is CssConstants.Absolute or CssConstants.Fixed
-                || child.Display == CssConstants.None)
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed || child.Display == CssConstants.None)
                 continue;
+
             return child.GridRow;
         }
+
         return null;
     }
 
@@ -183,14 +209,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// fill the column the same way. Returns whether the item's justify-self
     /// resolved to stretch (so the caller can skip a redundant justify offset).
     /// </summary>
-    private bool StretchGridItemToColumnWidth(CssBox child, double columnWidth)
-        => StretchGridItemToColumnWidth(child, columnWidth, out _);
+    private bool StretchGridItemToColumnWidth(CssBox child, double columnWidth) => StretchGridItemToColumnWidth(child, columnWidth, out _);
 
     private bool StretchGridItemToColumnWidth(CssBox child, double columnWidth, out string resolvedJustify)
     {
-        bool isAutoWidth = child.Width == CssConstants.Auto
-            || string.IsNullOrEmpty(child.Width);
+        bool isAutoWidth = child.Width == CssConstants.Auto || string.IsNullOrEmpty(child.Width);
         string js = child.JustifySelf?.Trim().ToLowerInvariant();
+
         // CSS Box Alignment §6.2: 'justify-self: auto' resolves to the grid
         // container's 'justify-items' (the intermediate display: contents
         // ancestor, having no box, does not contribute).
@@ -201,16 +226,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 ? "normal"
                 : ji;
         }
+
         bool isStretch = js == "normal" || js == "stretch";
 
         if (isStretch && isAutoWidth)
         {
-            double targetWidth = columnWidth
-                - child.ActualMarginLeft - child.ActualMarginRight;
+            double targetWidth = columnWidth - child.ActualMarginLeft - child.ActualMarginRight;
+
             if (targetWidth > 0 && Math.Abs(child.Size.Width - targetWidth) > 0.5)
             {
                 child.Size = new SizeF((float)targetWidth, child.Size.Height);
                 child.ActualRight = child.Location.X + targetWidth;
+
                 // The inline layout path (CreateLineBoxes) recorded per-line-box
                 // rectangles the paint walker uses for the item's own
                 // background/border; leaving them would paint the item at its
@@ -225,11 +252,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // that algorithm with the filled width made definite so the
                 // columns (and their centered cell content) span the column
                 // instead of hugging the content (WPT table-grid-item-dynamic-002).
-                if ((child.Display == CssConstants.Table || child.Display == CssConstants.InlineTable)
-                    && child.LayoutEnvironment != null)
+                if ((child.Display == CssConstants.Table || child.Display == CssConstants.InlineTable) && child.LayoutEnvironment != null)
                 {
                     string savedWidth = child.Width;
                     float savedX = child.Location.X, savedY = child.Location.Y;
+                    
                     // Make the filled width definite and re-run the box's own
                     // layout (not just the table algorithm) so the §10.7 min-height
                     // clamp still applies — a bare table-engine call would drop the
@@ -237,6 +264,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     child.Width = targetWidth.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "px";
                     child.PerformLayout(child.LayoutEnvironment);
                     child.Width = savedWidth;
+
                     // PerformLayout may reposition the box; the caller offsets it
                     // into its cell next, so restore the pre-relayout origin.
                     child.OffsetLeft(savedX - child.Location.X);
@@ -246,6 +274,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 }
             }
         }
+
         resolvedJustify = js;
         return isStretch;
     }
@@ -260,8 +289,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // Prefer the real definite-track pass; it declines (returns false) unless
         // the container declares fixed explicit templates, in which case the
         // single-column approximation below runs unchanged.
+
         if (TryApplyGridTrackLayout())
             return;
+
         if (!ApplyGridStacking())
             ApplyGridAutoPlacement();
     }
@@ -279,13 +310,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
         double columnWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
             - ActualBorderLeftWidth - ActualBorderRightWidth;
-        if (columnWidth <= 0) return;
+
+        if (columnWidth <= 0) 
+            return;
 
         double currentY = cellTop;
+        
         foreach (var child in Boxes)
         {
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
+
             if (child.Display == CssConstants.None)
                 continue;
 
@@ -296,8 +331,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // Move child to the start of the current row.
             double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
             double dy = currentY + child.ActualMarginTop - child.Location.Y;
+
             if (Math.Abs(dx) > 0.1)
                 child.OffsetLeft(dx);
+
             if (Math.Abs(dy) > 0.1)
                 child.OffsetTop(dy);
 
@@ -305,34 +342,42 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // item within its grid cell (column width).
             double boxWidth = child.ActualRight - child.Location.X;
             double freeSpace = columnWidth - boxWidth;
+
             if (freeSpace > 0.5 && !isStretch)
             {
                 bool isElementRtl = child.Direction == "rtl";
                 bool isContainerRtl = Direction == "rtl";
 
                 double justifyDx = 0;
+
                 switch (js)
                 {
                     case "center":
                         justifyDx = freeSpace / 2;
                         break;
+
                     case "end":
                     case "flex-end":
                         justifyDx = isContainerRtl ? 0 : freeSpace;
                         break;
+
                     case "self-end":
                         justifyDx = isElementRtl ? 0 : freeSpace;
                         break;
+
                     case "right":
                         justifyDx = freeSpace;
                         break;
+
                     case "start":
                     case "flex-start":
                         justifyDx = isContainerRtl ? freeSpace : 0;
                         break;
+
                     case "self-start":
                         justifyDx = isElementRtl ? freeSpace : 0;
                         break;
+
                     case "left":
                         justifyDx = 0;
                         break;
@@ -344,7 +389,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             currentY = child.ActualBottom + child.ActualMarginBottom;
         }
+
         ActualBottom = currentY + ActualPaddingBottom + ActualBorderBottomWidth;
     }
-
 }

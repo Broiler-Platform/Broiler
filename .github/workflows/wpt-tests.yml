@@ -75,7 +75,7 @@ jobs:
       shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
       rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Resolve plan
         id: resolve
@@ -115,11 +115,11 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache WPT checkout
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.WPT_CHECKOUT_DIR }}
           key: wpt-checkout-${{ env.CACHE_EPOCH }}
@@ -142,32 +142,32 @@ jobs:
     env:
       BROILER_WPT_TIMEOUT_SECONDS: ${{ github.event.inputs.test_timeout_seconds || '30' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
             10.0.x
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Restore WPT checkout
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.WPT_CHECKOUT_DIR }}
           key: wpt-checkout-${{ env.CACHE_EPOCH }}
 
       - name: Cache shard references
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.REFERENCE_DIR }}
           key: wpt-refs-${{ env.CACHE_EPOCH }}-shard-${{ matrix.shard-index }}
@@ -227,7 +227,7 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: wpt-shard-${{ matrix.shard-index }}
@@ -239,14 +239,14 @@ jobs:
     if: always() && needs.run.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Download shard results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: wpt-shard-*
           path: shard-results
@@ -274,7 +274,7 @@ jobs:
             cat wpt-merged/issue.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: wpt-merged
@@ -282,7 +282,7 @@ jobs:
 
       - name: Create GitHub issue for the most common failures
         if: steps.merge.outputs.create_issue == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           FAILED_COUNT: ${{ steps.merge.outputs.failed_count }}
           INCOMPLETE_SHARD_COUNT: ${{ steps.merge.outputs.incomplete_shard_count }}
@@ -308,7 +308,7 @@ jobs:
 
       - name: Create GitHub issue for the biggest problems
         if: steps.merge.outputs.create_biggest_issue == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           BIGGEST_PROBLEM_COUNT: ${{ steps.merge.outputs.biggest_problem_count }}
         with:
@@ -350,16 +350,16 @@ jobs:
       && (needs.run.result == 'success' || needs.run.result == 'failure')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.ref_name }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Download shard results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: wpt-shard-*
           path: shard-results

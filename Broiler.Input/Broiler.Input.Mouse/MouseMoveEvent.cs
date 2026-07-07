@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Mouse;
 
 public readonly record struct MouseMoveEvent(

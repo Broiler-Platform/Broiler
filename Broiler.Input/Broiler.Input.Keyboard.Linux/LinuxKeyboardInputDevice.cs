@@ -1,8 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using System.Threading;
-using Broiler.Input;
-using Broiler.Input.Keyboard;
 using Broiler.Input.Linux;
 
 namespace Broiler.Input.Keyboard.Linux;

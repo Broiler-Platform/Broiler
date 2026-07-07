@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -63,11 +61,11 @@ public sealed class NestedGridItemBlockSizeTests
         // matching the block-flow reference in size and top-left placement.
         Assert.True(reference.h > 100, $"reference image height collapsed: {reference.h}");
         Assert.True(test.h > 100, $"nested-grid image height collapsed to {test.h} (expected ~{reference.h})");
-        Assert.True(System.Math.Abs(test.h - reference.h) <= 1.0,
+        Assert.True(Math.Abs(test.h - reference.h) <= 1.0,
             $"nested-grid image height {test.h} != block-flow reference {reference.h}");
-        Assert.True(System.Math.Abs(test.w - reference.w) <= 1.0,
+        Assert.True(Math.Abs(test.w - reference.w) <= 1.0,
             $"nested-grid image width {test.w} != block-flow reference {reference.w}");
-        Assert.True(System.Math.Abs(test.x) <= 1.0, $"nested-grid image x-offset {test.x} (expected 0)");
-        Assert.True(System.Math.Abs(test.y) <= 1.0, $"nested-grid image y-offset {test.y} (expected 0)");
+        Assert.True(Math.Abs(test.x) <= 1.0, $"nested-grid image x-offset {test.x} (expected 0)");
+        Assert.True(Math.Abs(test.y) <= 1.0, $"nested-grid image y-offset {test.y} (expected 0)");
     }
 }

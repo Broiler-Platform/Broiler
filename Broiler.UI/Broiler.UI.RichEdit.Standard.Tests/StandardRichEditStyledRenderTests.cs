@@ -140,7 +140,7 @@ public sealed class StandardRichEditStyledRenderTests
         BRenderList list = scene.Session.RenderFrame();
 
         string[] texts = DrawnRuns(list).Select(r => r.Text).ToArray();
-        Assert.Equal(new[] { "one", "two" }, texts);
+        Assert.Equal(["one", "two"], texts);
         scene.Session.Dispose();
     }
 }

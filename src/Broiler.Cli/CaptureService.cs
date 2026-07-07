@@ -331,8 +331,8 @@ public class CaptureService
         html = HtmlPostProcessor.Process(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
-            ? Broiler.Graphics.BImageEncodeFormat.Jpeg
-            : Broiler.Graphics.BImageEncodeFormat.Png;
+            ? Graphics.BImageEncodeFormat.Jpeg
+            : Graphics.BImageEncodeFormat.Png;
 
         // Extract fragment identifier (e.g. "#top") for anchor-based rendering.
         string? fragment = uri.Fragment;

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Broiler.Layout;
 
 /// <summary>
@@ -15,9 +17,9 @@ namespace Broiler.Layout;
 /// root the first time it reads it, so it survives a re-layout pass that may run
 /// on a different thread.
 /// </summary>
-public static class DocumentModeContext
+public static partial class DocumentModeContext
 {
-    [System.ThreadStatic]
+    [ThreadStatic]
     private static bool _quirksMode;
 
     /// <summary>The quirks-mode flag of the document currently being laid out.</summary>
@@ -36,10 +38,12 @@ public static class DocumentModeContext
     {
         if (string.IsNullOrEmpty(html))
             return true;
-        var match = System.Text.RegularExpressions.Regex.Match(
-            html, @"<!doctype\s+([^\s>]+)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        var match = QuirksRegex().Match(html);
         return !(match.Success
-            && match.Groups[1].Value.Equals("html", System.StringComparison.OrdinalIgnoreCase));
+            && match.Groups[1].Value.Equals("html", StringComparison.OrdinalIgnoreCase));
     }
+
+    [GeneratedRegex(@"<!doctype\s+([^\s>]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex QuirksRegex();
 }

@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Xml.Linq;
-using Broiler.UI.Toolbar;
 using Broiler.UI.Toolbar.Standard;
 
 namespace Broiler.UI.Toolbar.Tests;

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -28,12 +28,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broiler.Documents\Broiler.Documents\Broiler.Documents.csproj" />
     <ProjectReference Include="..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
+    <ProjectReference Include="..\Broiler.Documents\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" />
     <ProjectReference Include="..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
     <ProjectReference Include="..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
     <ProjectReference Include="..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
     <ProjectReference Include="..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
     <ProjectReference Include="..\Broiler.Input\Broiler.Input.Text\Broiler.Input.Text.csproj" />
+    <ProjectReference Include="..\Broiler.UI\Broiler.UI.FileDialog.Standard\Broiler.UI.FileDialog.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI\Broiler.UI.Label.Standard\Broiler.UI.Label.Standard.csproj" />

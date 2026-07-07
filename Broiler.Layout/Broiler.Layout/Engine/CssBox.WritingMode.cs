@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -67,8 +64,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // inline axis out left→right as usual; flip it about the box's inline
         // extent (its physical height = the pre-rotation frame width) so the
         // run reads bottom→top. Every other vertical mode keeps inline top→bottom.
-        bool sidewaysLr = string.Equals(WritingMode?.Trim(), "sideways-lr",
-            StringComparison.OrdinalIgnoreCase);
+        bool sidewaysLr = string.Equals(WritingMode?.Trim(), "sideways-lr", StringComparison.OrdinalIgnoreCase);
         double logicalInlineExtent = Size.Width;
 
         // Where the rotated root's border-box sits horizontally depends on whether
@@ -124,6 +120,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 - cb.ActualPaddingRight - cb.ActualBorderRightWidth;
             double desiredRootRight = cbContentRight - ActualMarginRight;
             double currentRootRight = rootX + logicalBlockExtent;
+
             blockOffset = desiredRootRight - currentRootRight;
         }
 
@@ -151,6 +148,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             double physLeft = mirror
                 ? blockExtent - logicalTop - logicalHeight
                 : logicalTop;
+
             box.Location = new PointF(rootX + (float)(blockOffset + physLeft), rootY + (float)logicalLeft);
         }
         else if (blockOffset != 0)
@@ -163,6 +161,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         // Per-line rectangles cached on the box itself (inline backgrounds).
         var boxRectKeys = new List<CssLineBox>(box.Rectangles.Keys);
+
         foreach (var k in boxRectKeys)
             box.Rectangles[k] = RotateRect(box.Rectangles[k], rootX, rootY, blockExtent, mirror, blockOffset);
 
@@ -170,6 +169,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         foreach (var line in box.LineBoxes)
         {
             var rotatedWords = new List<CssRect>(line.Words.Count);
+
             foreach (var word in line.Words)
             {
                 // Column X = the line's block offset (lines advance left→right
@@ -198,6 +198,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (text != null && text.Length > 1 && !word.IsLineBreak)
                 {
                     double advance = word.Width / text.Length;
+
                     for (int i = 0; i < text.Length; i++)
                     {
                         var glyph = new CssRectWord(word.OwnerBox, text[i].ToString(), false, false)
@@ -207,6 +208,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                             Width = advance,
                             Height = word.Height,
                         };
+
                         rotatedWords.Add(glyph);
                     }
                 }
@@ -222,6 +224,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             line.Words.AddRange(rotatedWords);
 
             var keys = new List<CssBox>(line.Rectangles.Keys);
+
             foreach (var k in keys)
                 line.Rectangles[k] = RotateRect(line.Rectangles[k], rootX, rootY, blockExtent, mirror, blockOffset);
         }
@@ -230,6 +233,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             if (child.Display == CssConstants.None)
                 continue;
+
             // Out-of-flow descendants are excluded from the rotation: an
             // absolutely/fixed-positioned box is placed in *physical* space by
             // the abspos self-alignment (which is already writing-mode aware and,
@@ -240,6 +244,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // container began rotating its abspos children).
             if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
             TransformVerticalSubtree(child, rootX, rootY, blockExtent, mirror, blockOffset,
                 sidewaysLr, inlineExtent, isRoot: false);
         }
@@ -250,6 +255,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double logicalLeft = r.X - rootX;
         double logicalTop = r.Y - rootY;
         double physLeft = mirror ? blockExtent - logicalTop - r.Height : logicalTop;
+
         return new RectangleF(
             rootX + (float)(blockOffset + physLeft),
             rootY + (float)logicalLeft,

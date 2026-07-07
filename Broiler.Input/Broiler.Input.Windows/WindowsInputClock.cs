@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Broiler.Input;
 
 namespace Broiler.Input.Windows;
 

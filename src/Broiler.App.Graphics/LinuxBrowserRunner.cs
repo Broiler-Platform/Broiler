@@ -1,18 +1,10 @@
-using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
-using System.IO;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-using Broiler.App.Rendering;
 using Broiler.Graphics;
 using Broiler.Graphics.Linux;
 using Broiler.Graphics.Linux.OpenGL;
-using Broiler.HTML.Graphics;
-using Broiler.HtmlBridge;
-using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
+using Broiler.Writer;
 
 namespace Broiler.App.Graphics;
 
@@ -39,7 +31,7 @@ internal static class LinuxBrowserRunner
         long renderTicks = 0;
         int renderedFrames = 0;
         BFrameContext lastFrameContext = BFrameContext.Default;
-        BRenderList? lastRenderList = null;
+        var postedActions = new ConcurrentQueue<Action>();
 
         using LinuxOpenGlRenderer renderer = new();
         BSurfaceDescriptor descriptor = BSurfaceDescriptor.Default(new BSize(options.Width, options.Height));
@@ -48,8 +40,30 @@ internal static class LinuxBrowserRunner
             : renderer.CreateSurface(descriptor);
 
         LinuxOpenGlX11WindowSurface? x11Window = surface as LinuxOpenGlX11WindowSurface;
-        using BrowserPage page = new();
-        await page.LoadAsync(options.InitialUrl, cancellationToken).ConfigureAwait(false);
+        bool canUseEvdev = x11Window is not null;
+
+        using BrowserUiHost host = new(
+            () => surface.Size,
+            () => surface.DpiScale,
+            static () => { },
+            renderList =>
+            {
+                lastFrameContext = new BFrameContext(BrowserPalette.Canvas, frameIndex++, RenderOptions);
+                renderer.Render(surface, renderList, lastFrameContext);
+            },
+            action =>
+            {
+                postedActions.Enqueue(action);
+                return true;
+            });
+        using BrowserApp app = new(host, () => renderer, options.InitialUrl, static _ => { });
+
+        await using LinuxWriterInputCoordinator input = new(
+            canUseEvdev,
+            Console.WriteLine,
+            externalPointer: x11Window is not null,
+            applicationName: "Broiler Browser");
+        await input.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         DateTimeOffset start = DateTimeOffset.UtcNow;
         DateTimeOffset nextAnimationUpdate = DateTimeOffset.MinValue;
@@ -62,59 +76,91 @@ internal static class LinuxBrowserRunner
             if (x11Window is not null)
             {
                 processedWindowEvents = x11Window.ProcessPendingEvents();
+                await input.SetActiveAsync(x11Window.IsFocused, cancellationToken).ConfigureAwait(false);
                 if (!surface.Size.Equals(lastSurfaceSize))
                 {
-                    page.MarkLayoutDirty();
+                    app.Invalidate();
                     lastSurfaceSize = surface.Size;
                 }
             }
 
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            if (page.HasPendingWork && now >= nextAnimationUpdate)
+            input.SetViewport(host.ViewportSize);
+            if (x11Window is not null && x11Window.TryGetPointerPosition(out int pointerX, out int pointerY, out _))
             {
-                page.StepAnimation();
+                double scale = host.Scale <= 0 ? 1.0 : host.Scale;
+                input.SetExternalPointer(pointerX / scale, pointerY / scale);
+            }
+
+            int posted = DrainPostedActions(postedActions);
+            int inputEvents = input.Drain(app.Dispatch);
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (app.HasPendingWork && now >= nextAnimationUpdate)
+            {
+                app.StepAnimation();
                 nextAnimationUpdate = now + AnimationInterval;
             }
 
-            if (page.IsInvalidated || processedWindowEvents)
+            if (host.IsInvalidated || processedWindowEvents || posted > 0 || inputEvents > 0)
             {
                 Stopwatch stopwatch = Stopwatch.StartNew();
-                BRenderList? renderList = page.BuildRenderList(renderer, surface.Size);
-                if (renderList is not null)
-                {
-                    lastFrameContext = new BFrameContext(page.ResolveClearColor(), frameIndex++, RenderOptions);
-                    renderer.Render(surface, renderList, lastFrameContext);
-                    lastRenderList = renderList;
-                    renderedFrames++;
-                }
-
+                app.RenderFrame();
                 stopwatch.Stop();
                 renderTicks += stopwatch.ElapsedTicks;
-                page.ClearInvalidated();
+                renderedFrames++;
             }
 
-            if (!options.OpenWindow)
+            if (!options.OpenWindow && !ShouldContinueOffscreen(app, host, postedActions, start, options.DurationMilliseconds))
                 break;
 
-            if (!options.RunUntilClose &&
+            if (options.OpenWindow &&
+                !options.RunUntilClose &&
                 (DateTimeOffset.UtcNow - start).TotalMilliseconds >= options.DurationMilliseconds)
             {
                 break;
             }
         }
-        while ((x11Window is null || !x11Window.IsCloseRequested) &&
+        while (!input.QuitRequested &&
+               (x11Window is null || !x11Window.IsCloseRequested) &&
                await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
 
+        await input.SetActiveAsync(false, cancellationToken).ConfigureAwait(false);
         using BBitmap bitmap = ReadSurface(surface);
         Console.WriteLine("Browser presentation:");
         Console.WriteLine("  presentation: " + PresentationState(surface));
         Console.WriteLine("  diagnostic: " + SurfaceDiagnostic(surface));
-        Console.WriteLine("  page: " + page.Status);
+        Console.WriteLine("  page: " + app.Status);
         Console.WriteLine("  bitmap: " + bitmap.Width.ToString(CultureInfo.InvariantCulture) + "x" + bitmap.Height.ToString(CultureInfo.InvariantCulture));
         Console.WriteLine("  render-time: " + FormatMilliseconds(renderTicks) + " ms total across " + renderedFrames.ToString(CultureInfo.InvariantCulture) + " frame(s)");
-        SaveArtifacts(options, surface, bitmap, lastRenderList, lastFrameContext);
+        Console.WriteLine("  input: " + InputSummary(input.Snapshot));
+        SaveArtifacts(options, surface, bitmap, host.LastRenderList, lastFrameContext);
         Console.WriteLine();
         return 0;
+    }
+
+    private static int DrainPostedActions(ConcurrentQueue<Action> actions)
+    {
+        int count = 0;
+        while (actions.TryDequeue(out Action? action))
+        {
+            action();
+            count++;
+        }
+
+        return count;
+    }
+
+    private static bool ShouldContinueOffscreen(
+        BrowserApp app,
+        BrowserUiHost host,
+        ConcurrentQueue<Action> postedActions,
+        DateTimeOffset start,
+        int durationMilliseconds)
+    {
+        if ((DateTimeOffset.UtcNow - start).TotalMilliseconds >= durationMilliseconds)
+            return false;
+
+        return app.IsBusy || app.HasPendingWork || host.IsInvalidated || !postedActions.IsEmpty;
     }
 
     private static BBitmap ReadSurface(IBroilerSurface surface) =>
@@ -168,6 +214,25 @@ internal static class LinuxBrowserRunner
         Console.WriteLine("  artifact: " + backendPath);
     }
 
+    private static string InputSummary(LinuxWriterInputSnapshot input)
+    {
+        if (!input.Enabled)
+            return "disabled";
+        if (!input.Initialized)
+            return "requested but not opened";
+
+        string keyboard = input.KeyboardDevice ?? "none";
+        string mouse = input.MouseDevice ?? "none";
+        return "active=" + input.Active.ToString(CultureInfo.InvariantCulture) +
+            ", keyboard=" + keyboard +
+            ", mouse=" + mouse +
+            ", keys=" + input.KeyEvents.ToString(CultureInfo.InvariantCulture) +
+            ", text=" + input.TextEvents.ToString(CultureInfo.InvariantCulture) +
+            ", moves=" + input.MouseMoveEvents.ToString(CultureInfo.InvariantCulture) +
+            ", buttons=" + input.MouseButtonEvents.ToString(CultureInfo.InvariantCulture) +
+            ", wheels=" + input.MouseWheelEvents.ToString(CultureInfo.InvariantCulture);
+    }
+
     private static string FormatMilliseconds(long ticks) =>
         (ticks * 1000.0 / Stopwatch.Frequency).ToString("0.###", CultureInfo.InvariantCulture);
 
@@ -192,214 +257,5 @@ internal static class LinuxBrowserRunner
         }
 
         Console.WriteLine();
-    }
-
-    private sealed class BrowserPage : IDisposable
-    {
-        private const string WelcomePage = """
-<html>
-<body style="font-family: Segoe UI, Arial, sans-serif; margin: 40px; color: #263238;">
-  <h1>Broiler Browser Preview</h1>
-  <p>This Linux preview host renders through Broiler.Graphics OpenGL.</p>
-  <p>Pass --url &lt;url&gt; to load an HTTP(S) or local HTML page.</p>
-</body>
-</html>
-""";
-
-        private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
-        private HtmlGraphicsRenderList? _renderList;
-        private InteractiveSession? _session;
-        private bool _layoutDirty = true;
-        private bool _renderDirty = true;
-        private float _contentHeight;
-        private float _scrollY;
-        private BSize _lastLayoutSize;
-
-        public bool IsInvalidated { get; private set; } = true;
-
-        public bool HasPendingWork => _session?.HasPendingWork == true;
-
-        public string Status { get; private set; } = "about:blank";
-
-        public async Task LoadAsync(string? url, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrWhiteSpace(url) || string.Equals(url, "about:blank", StringComparison.OrdinalIgnoreCase))
-            {
-                Status = "about:blank";
-                ReplaceContainer(CreateContentContainer(WelcomePage, string.Empty));
-                return;
-            }
-
-            string normalisedInput = NormalizeInput(url);
-            Console.WriteLine("Loading " + normalisedInput + "...");
-            try
-            {
-                using var pipeline = new RenderingPipeline(
-                    new PageLoader(new HttpClient()),
-                    new ScriptEngine());
-
-                var (normalisedUrl, content) = await pipeline.LoadPageAsync(normalisedInput, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string html = HtmlPostProcessor.Process(content.Html);
-                InteractiveSession? session = null;
-                try
-                {
-                    session = pipeline.ExecuteScriptsInteractive(content);
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (session is not null)
-                    {
-                        string initial = session.CurrentHtml();
-                        if (!string.IsNullOrWhiteSpace(initial))
-                            html = HtmlPostProcessor.Process(initial);
-
-                        if (!session.HasPendingWork)
-                        {
-                            session.Dispose();
-                            session = null;
-                        }
-                    }
-
-                    ReplaceContainer(CreateContentContainer(html, normalisedUrl));
-                    _session = session;
-                    Status = normalisedUrl;
-                }
-                catch
-                {
-                    session?.Dispose();
-                    throw;
-                }
-            }
-            catch (Exception ex)
-            {
-                Status = "error: " + ex.Message;
-                ReplaceContainer(CreateContentContainer(
-                    "<html><body><h1>Error</h1><p>" + System.Net.WebUtility.HtmlEncode(ex.Message) + "</p></body></html>",
-                    string.Empty));
-            }
-        }
-
-        public void StepAnimation()
-        {
-            if (_session is null || !_session.HasPendingWork)
-                return;
-
-            string? html = _session.Step();
-            if (!string.IsNullOrWhiteSpace(html))
-                ReplaceContainer(CreateContentContainer(HtmlPostProcessor.Process(html), _container.BaseUrl));
-
-            if (!_session.HasPendingWork)
-            {
-                _session.Dispose();
-                _session = null;
-            }
-        }
-
-        public void MarkLayoutDirty()
-        {
-            _layoutDirty = true;
-            _renderDirty = true;
-            IsInvalidated = true;
-        }
-
-        public void ClearInvalidated() => IsInvalidated = false;
-
-        public BColor ResolveClearColor()
-        {
-            BColor background = _container.GetRootBackgroundColor();
-            return !background.IsEmpty && background.A > 0
-                ? new BColor(background.R, background.G, background.B, background.A)
-                : BColor.White;
-        }
-
-        public BRenderList? BuildRenderList(IBroilerRenderer renderer, BSize size)
-        {
-            if (size.IsEmpty)
-                return null;
-
-            float viewportWidth = (float)size.Width;
-            float viewportHeight = (float)size.Height;
-            if (_layoutDirty || !size.Equals(_lastLayoutSize))
-            {
-                _container.Location = PointF.Empty;
-                _container.MaxSize = new SizeF(viewportWidth, viewportHeight);
-                _container.PerformLayout(new RectangleF(0, 0, viewportWidth, viewportHeight));
-                _contentHeight = _container.ActualSize.Height;
-                _layoutDirty = false;
-                _renderDirty = true;
-                _lastLayoutSize = size;
-            }
-
-            ClampScroll(viewportHeight);
-
-            if (_renderDirty || _renderList is null)
-            {
-                _container.ScrollOffset = new PointF(0, -_scrollY);
-                DisposeRenderList();
-                _renderList = HtmlGraphicsRenderListBuilder.Build(
-                    renderer,
-                    _container.CreateDisplayList(),
-                    new RectangleF(0, 0, viewportWidth, viewportHeight));
-                _renderDirty = false;
-            }
-
-            return _renderList.RenderList;
-        }
-
-        public void Dispose()
-        {
-            _session?.Dispose();
-            DisposeRenderList();
-            _container.Dispose();
-        }
-
-        private void ClampScroll(float viewportHeight)
-        {
-            float maxScroll = Math.Max(0, _contentHeight - viewportHeight);
-            float clamped = Math.Clamp(_scrollY, 0, maxScroll);
-            if (clamped != _scrollY)
-            {
-                _scrollY = clamped;
-                _renderDirty = true;
-            }
-        }
-
-        private void ReplaceContainer(HtmlContainer container)
-        {
-            DisposeRenderList();
-            _container.Dispose();
-            _container = container;
-            _scrollY = 0;
-            MarkLayoutDirty();
-        }
-
-        private void DisposeRenderList()
-        {
-            HtmlGraphicsRenderList? renderList = _renderList;
-            _renderList = null;
-            renderList?.Dispose();
-        }
-
-        private static HtmlContainer CreateContentContainer(string html, string baseUrl)
-        {
-            HtmlContainer container = new()
-            {
-                AvoidAsyncImagesLoading = true,
-                AvoidImagesLateLoading = true,
-                BaseUrl = baseUrl,
-            };
-            container.SetHtmlWithStyleSet(html, baseUrl: baseUrl);
-            return container;
-        }
-
-        private static string NormalizeInput(string input)
-        {
-            input = input.Trim();
-            if (File.Exists(input))
-                return new Uri(Path.GetFullPath(input)).AbsoluteUri;
-
-            return input;
-        }
     }
 }

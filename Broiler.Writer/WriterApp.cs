@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using Broiler.Documents;
 using Broiler.Documents.Model;
+using Broiler.Documents.Rtf;
 using Broiler.Graphics;
-using Broiler.Input.Keyboard;
 using Broiler.UI;
+using Broiler.UI.Dialog;
+using Broiler.UI.FileDialog;
+using Broiler.UI.FileDialog.Standard;
 using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
 using Broiler.UI.Menu;
@@ -21,11 +26,14 @@ internal sealed class WriterApp : IDisposable
     private readonly WriterUiHost _host;
     private readonly Action _requestClose;
     private readonly UiSession _session;
+    private readonly StandardWindow _rootWindow;
     private readonly StandardRichEdit _editor;
     private readonly StandardMenu _menu;
     private readonly StandardLabel _title;
     private readonly StandardLabel _status;
     private readonly List<(UiMenuItem Item, RichEditCommand Command)> _richEditMenuItems = [];
+    private string? _currentDocumentPath;
+    private string _lastDirectory = Environment.CurrentDirectory;
     private string _lastAction = "Ready";
 
     public WriterApp(WriterUiHost host, Action requestClose)
@@ -63,7 +71,7 @@ internal sealed class WriterApp : IDisposable
             Trimming = UiTextTrimming.CharacterEllipsis,
         };
 
-        var root = new StandardWindow
+        _rootWindow = new StandardWindow
         {
             Title = "Broiler Writer",
             Background = WriterPalette.Canvas,
@@ -71,10 +79,10 @@ internal sealed class WriterApp : IDisposable
             ActiveBorderColor = WriterPalette.Accent,
             BorderThickness = 1,
         };
-        root.AddChild(new WriterContent(_menu, _title, _editor, _status));
+        _rootWindow.AddChild(new WriterContent(_menu, _title, _editor, _status));
 
         SeedDocument();
-        _session.AddRoot(root);
+        _session.AddRoot(_rootWindow);
         _session.SetFocus(_editor);
 
         _editor.SelectionChanged += (_, _) => RefreshUi();
@@ -112,6 +120,9 @@ internal sealed class WriterApp : IDisposable
     {
         var dispatcher = new StandardCommandDispatcher();
         dispatcher.Add(new StandardCommand("file.new", NewDocument));
+        dispatcher.Add(new StandardCommand("file.open", ShowOpenDialog));
+        dispatcher.Add(new StandardCommand("file.save", SaveDocument));
+        dispatcher.Add(new StandardCommand("file.save-as", ShowSaveDialog));
         dispatcher.Add(new StandardCommand("file.exit", _requestClose));
         AddRichEditCommand(dispatcher, "edit.undo", RichEditCommand.Undo);
         AddRichEditCommand(dispatcher, "edit.redo", RichEditCommand.Redo);
@@ -134,6 +145,9 @@ internal sealed class WriterApp : IDisposable
 
         var file = new UiMenuItem("file", "File") { AccessKey = 'F' };
         file.Children.Add(new UiMenuItem("new", "New document") { CommandName = "file.new", AccessKey = 'N' });
+        file.Children.Add(new UiMenuItem("open", "Open RTF...") { CommandName = "file.open", AccessKey = 'O' });
+        file.Children.Add(new UiMenuItem("save", "Save") { CommandName = "file.save", AccessKey = 'S' });
+        file.Children.Add(new UiMenuItem("save-as", "Save RTF as...") { CommandName = "file.save-as", AccessKey = 'A' });
         file.Children.Add(new UiMenuItem("exit", "Exit") { CommandName = "file.exit", AccessKey = 'X' });
 
         var edit = new UiMenuItem("edit", "Edit") { AccessKey = 'E' };
@@ -209,9 +223,114 @@ internal sealed class WriterApp : IDisposable
 
     private void NewDocument()
     {
+        _currentDocumentPath = null;
         _editor.SetPlainText(string.Empty);
         _title.Text = "Untitled document";
         _lastAction = "New document";
+        _session.SetFocus(_editor);
+        RefreshUi();
+    }
+
+    private void ShowOpenDialog()
+    {
+        var dialog = new StandardFileDialog
+        {
+            Mode = UiFileDialogMode.Open,
+            CurrentDirectory = GetDialogDirectory(),
+            FileName = _currentDocumentPath is null ? string.Empty : Path.GetFileName(_currentDocumentPath),
+            FileNameFilter = "*.rtf",
+            DefaultExtension = ".rtf",
+        };
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
+                OpenDocument(e.Result.Value);
+        };
+
+        dialog.ShowOpenModal(_rootWindow, GetDialogPlacement());
+        _lastAction = "Open RTF";
+        RefreshUi();
+    }
+
+    private void SaveDocument()
+    {
+        if (string.IsNullOrWhiteSpace(_currentDocumentPath))
+        {
+            ShowSaveDialog();
+            return;
+        }
+
+        SaveDocumentAs(_currentDocumentPath);
+    }
+
+    private void ShowSaveDialog()
+    {
+        string fileName = _currentDocumentPath is null ? "Untitled.rtf" : Path.GetFileName(_currentDocumentPath);
+        var dialog = new StandardFileDialog
+        {
+            Mode = UiFileDialogMode.Save,
+            CurrentDirectory = GetDialogDirectory(),
+            FileName = fileName,
+            FileNameFilter = "*.rtf",
+            DefaultExtension = ".rtf",
+        };
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
+                SaveDocumentAs(e.Result.Value);
+        };
+
+        dialog.ShowSaveModal(_rootWindow, GetDialogPlacement());
+        _lastAction = "Save RTF as";
+        RefreshUi();
+    }
+
+    private void OpenDocument(string path)
+    {
+        try
+        {
+            string fullPath = ResolveRtfPath(path);
+            byte[] bytes = File.ReadAllBytes(fullPath);
+            DocumentReadResult result = RtfReader.Read(bytes);
+            _currentDocumentPath = fullPath;
+            _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
+            _title.Text = Path.GetFileName(fullPath);
+            _lastAction = result.Diagnostics.Count == 0
+                ? "Opened " + Path.GetFileName(fullPath)
+                : "Opened " + Path.GetFileName(fullPath) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
+            _editor.Document = result.Document;
+            _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
+            _session.SetFocus(_editor);
+        }
+        catch (Exception ex) when (IsFileOperationException(ex))
+        {
+            _lastAction = "Open failed: " + ex.Message;
+        }
+
+        RefreshUi();
+    }
+
+    private void SaveDocumentAs(string path)
+    {
+        try
+        {
+            string fullPath = ResolveRtfPath(path);
+            string? directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            byte[] bytes = RtfWriter.WriteToArray(_editor.Document);
+            File.WriteAllBytes(fullPath, bytes);
+            _currentDocumentPath = fullPath;
+            _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
+            _title.Text = Path.GetFileName(fullPath);
+            _lastAction = "Saved " + Path.GetFileName(fullPath);
+        }
+        catch (Exception ex) when (IsFileOperationException(ex))
+        {
+            _lastAction = "Save failed: " + ex.Message;
+        }
+
         _session.SetFocus(_editor);
         RefreshUi();
     }
@@ -237,6 +356,37 @@ internal sealed class WriterApp : IDisposable
         _editor.Selection = RichTextRange.Caret(_editor.Document.End);
         _lastAction = "Ready";
     }
+
+    private BRect GetDialogPlacement()
+    {
+        BSize viewport = _host.ViewportSize;
+        const double width = 520;
+        const double height = 250;
+        double x = Math.Max(12, (viewport.Width - width) / 2);
+        double y = Math.Max(42, (viewport.Height - height) / 2);
+        return new BRect(x, y, Math.Min(width, Math.Max(280, viewport.Width - 24)), Math.Min(height, Math.Max(180, viewport.Height - 64)));
+    }
+
+    private string GetDialogDirectory()
+    {
+        if (!string.IsNullOrWhiteSpace(_currentDocumentPath))
+        {
+            string? directory = Path.GetDirectoryName(_currentDocumentPath);
+            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                return directory;
+        }
+
+        return Directory.Exists(_lastDirectory) ? _lastDirectory : Environment.CurrentDirectory;
+    }
+
+    private static string ResolveRtfPath(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        return Path.HasExtension(fullPath) ? fullPath : fullPath + ".rtf";
+    }
+
+    private static bool IsFileOperationException(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException;
 
     private void RefreshUi()
     {

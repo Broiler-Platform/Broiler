@@ -1,9 +1,8 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
+using Broiler.CSS;
 using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using System.Text;
+using System.Globalization;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -12,6 +11,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     public void SetGeneratedTextContent(string text)
     {
         CssBox textBox = null;
+
         foreach (CssBox child in Boxes)
         {
             if (child.HtmlTag == null)
@@ -41,6 +41,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // (REPLACEMENT CHARACTER) so it remains visible.
         var textSpan = _text.Span;
         bool hasControl = false;
+
         for (int i = 0; i < textSpan.Length; i++)
         {
             char c = textSpan[i];
@@ -51,9 +52,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 break;
             }
         }
+
         if (hasControl)
         {
-            var sb = new System.Text.StringBuilder(textSpan.Length);
+            var sb = new StringBuilder(textSpan.Length);
+
             for (int i = 0; i < textSpan.Length; i++)
             {
                 char c = textSpan[i];
@@ -63,6 +66,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     || (!char.IsControl(c) && (c < '\u007F' || c > '\u009F')))
                     sb.Append(c);
             }
+
             _text = sb.ToString().AsMemory();
         }
 
@@ -85,6 +89,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         var transform = TextTransformer.For(TextTransform);
 
         textSpan = _text.Span;
+
         while (startIdx < textSpan.Length)
         {
             while (startIdx < textSpan.Length && textSpan[startIdx] == '\r')
@@ -122,7 +127,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     }
                     else
                     {
-                        Words.Add(new CssRectWord(this, WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
+                        Words.Add(new CssRectWord(this, WebUtility.HtmlDecode(_text[startIdx..endIdx].ToString()), false, false));
                     }
                 }
             }
@@ -140,7 +145,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (endIdx > startIdx)
                 {
-                    var runText = WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString());
+                    var runText = WebUtility.HtmlDecode(_text[startIdx..endIdx].ToString());
                     if (transform != null)
                         runText = transform.Transform(runText);
 
@@ -152,11 +157,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         int charLen = (i + 1 < runText.Length
                             && char.IsHighSurrogate(runText[i])
                             && char.IsLowSurrogate(runText[i + 1])) ? 2 : 1;
+
                         Words.Add(new CssRectWord(
                             this,
                             runText.Substring(i, charLen),
                             hasSpaceBefore: i == 0 && leadingSpace,
                             hasSpaceAfter: i + charLen >= runText.Length && trailingSpace));
+
                         i += charLen;
                     }
                 }
@@ -171,6 +178,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
                 {
                     endIdx++;
+
                     if (endIdx < textSpan.Length &&
                         char.IsHighSurrogate(textSpan[endIdx - 1]) &&
                         char.IsLowSurrogate(textSpan[endIdx]))
@@ -184,7 +192,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
                     var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
 
-                    var wordText = WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString());
+                    var wordText = WebUtility.HtmlDecode(_text[startIdx..endIdx].ToString());
+
                     if (transform != null)
                         wordText = transform.Transform(wordText);
 
@@ -246,6 +255,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 return null;
 
             bool capitalize = false, upper = false, lower = false, fullWidth = false, fullSizeKana = false;
+
             foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
             {
                 switch (token.ToLowerInvariant())
@@ -255,7 +265,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     case "lowercase": lower = true; break;
                     case "full-width": fullWidth = true; break;
                     case "full-size-kana": fullSizeKana = true; break;
-                    // none / math-auto / inherit / initial / unrecognized: no glyph change.
+                        // none / math-auto / inherit / initial / unrecognized: no glyph change.
                 }
             }
 
@@ -277,6 +287,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // spec; guard order here defensively). String-based Upper/Lower handles
             // one-to-many mappings such as ß → SS.
             string s = text;
+
             if (_upper)
                 s = s.ToUpperInvariant();
             else if (_lower)
@@ -292,7 +303,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         private string Capitalize(string s)
         {
-            var sb = new System.Text.StringBuilder(s.Length);
+            var sb = new StringBuilder(s.Length);
+
             foreach (char c in s)
             {
                 if (IsMidWord(c))
@@ -320,24 +332,30 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             if (c == '\'' || c == '’')
                 return true;
-            var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            return cat is System.Globalization.UnicodeCategory.NonSpacingMark
-                or System.Globalization.UnicodeCategory.SpacingCombiningMark
-                or System.Globalization.UnicodeCategory.EnclosingMark;
+
+            var cat = CharUnicodeInfo.GetUnicodeCategory(c);
+            return cat is UnicodeCategory.NonSpacingMark
+                or UnicodeCategory.SpacingCombiningMark
+                or UnicodeCategory.EnclosingMark;
         }
 
         private string MapWidth(string s)
         {
-            var sb = new System.Text.StringBuilder(s.Length);
+            var sb = new StringBuilder(s.Length);
+
             foreach (char c in s)
             {
                 char m = c;
+
                 if (_fullSizeKana)
                     m = ToFullSizeKana(m);
+
                 if (_fullWidth)
                     m = ToFullWidth(m);
+
                 sb.Append(m);
             }
+
             return sb.ToString();
         }
 
@@ -350,15 +368,31 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         private static char ToFullSizeKana(char c) => c switch
         {
             // Hiragana
-            'ぁ' => 'あ', 'ぃ' => 'い', 'ぅ' => 'う',
-            'ぇ' => 'え', 'ぉ' => 'お', 'っ' => 'つ',
-            'ゃ' => 'や', 'ゅ' => 'ゆ', 'ょ' => 'よ',
-            'ゎ' => 'わ', 'ゕ' => 'か', 'ゖ' => 'け',
+            'ぁ' => 'あ',
+            'ぃ' => 'い',
+            'ぅ' => 'う',
+            'ぇ' => 'え',
+            'ぉ' => 'お',
+            'っ' => 'つ',
+            'ゃ' => 'や',
+            'ゅ' => 'ゆ',
+            'ょ' => 'よ',
+            'ゎ' => 'わ',
+            'ゕ' => 'か',
+            'ゖ' => 'け',
             // Katakana
-            'ァ' => 'ア', 'ィ' => 'イ', 'ゥ' => 'ウ',
-            'ェ' => 'エ', 'ォ' => 'オ', 'ッ' => 'ツ',
-            'ャ' => 'ヤ', 'ュ' => 'ユ', 'ョ' => 'ヨ',
-            'ヮ' => 'ワ', 'ヵ' => 'カ', 'ヶ' => 'ケ',
+            'ァ' => 'ア',
+            'ィ' => 'イ',
+            'ゥ' => 'ウ',
+            'ェ' => 'エ',
+            'ォ' => 'オ',
+            'ッ' => 'ツ',
+            'ャ' => 'ヤ',
+            'ュ' => 'ユ',
+            'ョ' => 'ヨ',
+            'ヮ' => 'ワ',
+            'ヵ' => 'カ',
+            'ヶ' => 'ケ',
             _ => c,
         };
     }
@@ -395,6 +429,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private void EnsureDescendantWordsMeasured(ILayoutEnvironment g)
     {
         var stack = new Stack<CssBox>();
+
         foreach (var child in Boxes)
             stack.Push(child);
 
@@ -402,6 +437,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             var box = stack.Pop();
             box.MeasureWordsSize(g);
+
             foreach (var child in box.Boxes)
                 stack.Push(child);
         }
@@ -410,8 +446,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     internal void InvalidateFontDependentSubtree()
     {
         InvalidateFontDependentValues();
+
         foreach (var child in Boxes)
             child.InvalidateFontDependentSubtree();
     }
-
 }

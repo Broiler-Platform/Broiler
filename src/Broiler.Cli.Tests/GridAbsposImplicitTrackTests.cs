@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -37,7 +35,7 @@ public sealed class GridAbsposImplicitTrackTests
     private sealed record Case(string Col, string Row, int X, int Y, int W, int H);
 
     private static readonly Case[] Cases =
-    {
+    [
         new("auto / 1", "auto / 1", 0, 0, 215, 115),
         new("auto / 2", "auto / 2", 0, 0, 415, 265),
         new("3 / auto", "3 / auto", 715, 515, 115, 115),
@@ -46,7 +44,7 @@ public sealed class GridAbsposImplicitTrackTests
         new("-4 / 2", "-4 / 2", 115, 65, 300, 200),
         new("3 / 4", "3 / 4", 715, 515, 100, 50),
         new("2 / 4", "2 / 4", 415, 265, 400, 300),
-    };
+    ];
 
     [Fact]
     public void AbsposItems_ResolveAgainstImplicitExtendedGrid()
@@ -69,7 +67,7 @@ public sealed class GridAbsposImplicitTrackTests
 
         var assertions = bridge.EvaluateCheckLayoutAssertions().ToList();
         var failures = assertions
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -83,8 +80,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return ContainingBlock;
     }
 
-    private bool IsInitialContainingBlock(CssBox cb) =>
-        cb.ParentBox == null && LayoutEnvironment != null;
+    private bool IsInitialContainingBlock(CssBox cb) => cb.ParentBox == null && LayoutEnvironment != null;
 
     private void GetAbsoluteContainingBlockPaddingBox(CssBox cb,
         out double cbPadLeft,
@@ -146,9 +142,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             && cb.Height != CssConstants.Auto && !string.IsNullOrEmpty(cb.Height)
             && !cb.Height.Contains('%'))
         {
-            double cssHeight = CssValueParser.ParseLength(cb.Height, 0, cb.GetEmHeight());
+            double cssHeight = CssLengthParser.ParseLength(cb.Height, 0, cb.GetEmHeight());
             double borderBoxHeight = cb.ResolveSpecifiedHeightToBorderBox(cssHeight);
             double candidate = borderBoxHeight - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+
             if (candidate > cbPadHeight)
                 cbPadHeight = candidate;
         }
@@ -186,10 +183,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 if (child.Size.Width <= 0 && child.Size.Height <= 0)
                     continue;
+
                 float left = child.Location.X;
                 float top = child.Location.Y;
                 float right = left + child.Size.Width;
                 float bottom = (float)child.ActualBottom;
+
                 if (bottom <= top) bottom = top + child.Size.Height;
 
                 if (left < minX) minX = left;
@@ -228,8 +227,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// (not inline-block/inline-table etc.) whose containing-block extent
     /// must be computed from its line-box rectangles per CSS2.1 §10.1.
     /// </summary>
-    private static bool IsInlineContainingBlock(CssBox cb) =>
-        cb.Display == CssConstants.Inline;
+    private static bool IsInlineContainingBlock(CssBox cb) => cb.Display == CssConstants.Inline;
 
     /// <summary>
     /// Returns true when <see cref="Height"/> is a percentage that resolves
@@ -267,8 +265,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (ContainingBlock.HasDefiniteAspectRatioBlockHeight())
             return false;
 
-        return ContainingBlock.Height == CssConstants.Auto
-            || string.IsNullOrEmpty(ContainingBlock.Height);
+        return ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height);
     }
 
     /// <summary>CSS Sizing 4 §4: <c>true</c> when this box's block (height) axis is
@@ -323,7 +320,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (flowCb != null && flowCb.Height != CssConstants.Auto && !string.IsNullOrEmpty(flowCb.Height)
             && !flowCb.Height.Contains('%'))
         {
-            double cssHeight = CssValueParser.ParseLength(flowCb.Height, 0, flowCb.GetEmHeight());
+            double cssHeight = CssLengthParser.ParseLength(flowCb.Height, 0, flowCb.GetEmHeight());
+
             if (cssHeight > 0)
                 return flowCb.ResolveSpecifiedHeightToBorderBox(cssHeight);
         }

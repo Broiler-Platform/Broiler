@@ -1,8 +1,5 @@
 using Broiler.Layout.Engine;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Text;
 using CssConstants = Broiler.CSS.CssConstants;
 
@@ -93,7 +90,7 @@ internal static class FragmentTreeBuilder
         List<RectangleF>? inlineRects = null;
         if (box.Rectangles.Count > 0)
         {
-            inlineRects = new List<RectangleF>(box.Rectangles.Values);
+            inlineRects = [.. box.Rectangles.Values];
         }
 
         // CssBox.Size.Height is never set for block-level boxes during layout;
@@ -194,7 +191,7 @@ internal static class FragmentTreeBuilder
 
             if (IsOutOfFlowPositioned(word.OwnerBox, lineBox.OwnerBox))
             {
-                positionedInlines ??= new List<InlineFragment>();
+                positionedInlines ??= [];
                 positionedInlines.Add(inlineFragment);
             }
             else

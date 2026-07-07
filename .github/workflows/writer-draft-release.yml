@@ -40,14 +40,14 @@ jobs:
 
     steps:
       - name: Checkout selected branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.branch }}
           submodules: recursive
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -138,14 +138,14 @@ jobs:
             -Force
 
       - name: Upload self-contained artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Windows-self-contained
           path: ${{ runner.temp }}/publish/windows-self-contained/Broiler.Writer.exe
           if-no-files-found: error
 
       - name: Upload framework-dependent artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Windows-framework-dependent
           path: ${{ runner.temp }}/publish/windows-framework-dependent/Broiler.Writer.exe
@@ -192,14 +192,14 @@ jobs:
 
     steps:
       - name: Checkout selected branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.branch }}
           submodules: recursive
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -309,14 +309,14 @@ jobs:
           tar -czf (Join-Path $assetDir 'Broiler-Writer-Linux-framework-dependent.tar.gz') -C $frameworkDependentDir $env:APP_NAME
 
       - name: Upload self-contained artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Linux-self-contained
           path: ${{ runner.temp }}/release-assets/Broiler-Writer-Linux-self-contained.tar.gz
           if-no-files-found: error
 
       - name: Upload framework-dependent artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Linux-framework-dependent
           path: ${{ runner.temp }}/release-assets/Broiler-Writer-Linux-framework-dependent.tar.gz

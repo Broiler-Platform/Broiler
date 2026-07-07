@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Broiler.Graphics;
+using Broiler.Input.Mouse;
 using Broiler.UI.Window;
 
 namespace Broiler.UI.Dialog;
@@ -12,6 +13,9 @@ public abstract class UiDialog : UiWindow
     private UiDialogResult _completedResult = UiDialogResult.None;
     private UiElement? _restoreFocusElement;
     private UiSession? _presentationSession;
+    private BPoint _moveStartPointer;
+    private BRect _moveStartPlacement;
+    private bool _isMoving;
     private bool _isPresented;
     private bool _isResultCompleted;
 
@@ -71,6 +75,16 @@ public abstract class UiDialog : UiWindow
         };
     }
 
+    protected override bool OnInput(UiInputEvent input)
+    {
+        if (HandleMoveInput(input))
+            return true;
+
+        return base.OnInput(input);
+    }
+
+    protected virtual bool HitTestMoveGrip(BPoint position) => false;
+
     protected override void OnDetached()
     {
         if (!_isResultCompleted)
@@ -114,6 +128,97 @@ public abstract class UiDialog : UiWindow
         return _resultSource.Task;
     }
 
+    private bool HandleMoveInput(UiInputEvent input)
+    {
+        if (input.Kind == UiInputEventKind.PointerMove)
+        {
+            if (!_isMoving)
+                return false;
+
+            MoveTo(input.Position);
+            return true;
+        }
+
+        if (input.Kind != UiInputEventKind.PointerButton || input.MouseButton != MouseButton.Left)
+            return false;
+
+        if (input.MouseButtonTransition == MouseButtonTransition.Down)
+        {
+            if (!HitTestMoveGrip(input.Position))
+                return false;
+
+            BeginMove(input.Position);
+            return true;
+        }
+
+        if (input.MouseButtonTransition == MouseButtonTransition.Up && _isMoving)
+        {
+            EndMove();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void BeginMove(BPoint pointer)
+    {
+        Activate();
+        Session?.SetFocus(this);
+        Session?.CaptureInput(this);
+        _isMoving = true;
+        _moveStartPointer = pointer;
+        _moveStartPlacement = ResolveCurrentPlacement();
+    }
+
+    private void MoveTo(BPoint pointer)
+    {
+        double dx = pointer.X - _moveStartPointer.X;
+        double dy = pointer.Y - _moveStartPointer.Y;
+        SetPlacement(CoerceMovePlacement(new BRect(
+            _moveStartPlacement.X + dx,
+            _moveStartPlacement.Y + dy,
+            _moveStartPlacement.Width,
+            _moveStartPlacement.Height)));
+    }
+
+    private void EndMove()
+    {
+        _isMoving = false;
+        if (Session?.CapturedElement == this)
+            Session.ReleaseInputCapture(this);
+    }
+
+    private BRect ResolveCurrentPlacement()
+    {
+        if (!Placement.IsEmpty)
+            return Placement;
+
+        if (Owner is not null && !Bounds.IsEmpty)
+        {
+            return new BRect(
+                Bounds.Left - Owner.Bounds.Left,
+                Bounds.Top - Owner.Bounds.Top,
+                Bounds.Width,
+                Bounds.Height);
+        }
+
+        return Bounds;
+    }
+
+    private BRect CoerceMovePlacement(BRect placement)
+    {
+        if (Owner is null || Owner.Bounds.IsEmpty || placement.IsEmpty)
+            return placement;
+
+        double maxX = Math.Max(0, Owner.Bounds.Width - placement.Width);
+        double maxY = Math.Max(0, Owner.Bounds.Height - placement.Height);
+        return new BRect(
+            Math.Clamp(placement.X, 0, maxX),
+            Math.Clamp(placement.Y, 0, maxY),
+            placement.Width,
+            placement.Height);
+    }
+
     private void HandleClosed(object? sender, UiWindowClosedEventArgs e)
     {
         UiDialogResult result = _pendingResult ?? UiDialogResult.Closed(e.Reason);
@@ -126,6 +231,7 @@ public abstract class UiDialog : UiWindow
         if (_isResultCompleted)
             return;
 
+        _isMoving = false;
         _isPresented = false;
         _isResultCompleted = true;
         _completedResult = result;

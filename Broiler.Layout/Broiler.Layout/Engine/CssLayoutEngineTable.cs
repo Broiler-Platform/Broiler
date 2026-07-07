@@ -1,8 +1,5 @@
+using Broiler.CSS;
 using System.Drawing;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
-using CssLength = Broiler.CSS.CssLength;
-using CssUnit = Broiler.CSS.CssUnit;
 
 
 namespace Broiler.Layout.Engine;
@@ -131,30 +128,36 @@ internal sealed class CssLayoutEngineTable
                 case CssConstants.TableCaption:
                     _captions.Add(box);
                     break;
+
                 case CssConstants.TableRow:
                     _bodyrows.Add(box);
                     break;
+
                 case CssConstants.TableRowGroup:
                     foreach (CssBox childBox in box.Boxes)
                         if (childBox.Display == CssConstants.TableRow)
                             _bodyrows.Add(childBox);
                     break;
+                
                 case CssConstants.TableHeaderGroup:
                     if (_headerBox != null)
                         _bodyrows.Add(box);
                     else
                         _headerBox = box;
                     break;
+                
                 case CssConstants.TableFooterGroup:
                     if (_footerBox != null)
                         _bodyrows.Add(box);
                     else
                         _footerBox = box;
                     break;
+                
                 case CssConstants.TableColumn:
                     for (int i = 0; i < GetSpan(box); i++)
                         _columns.Add(box);
                     break;
+                
                 case CssConstants.TableColumnGroup:
                     if (box.Boxes.Count == 0)
                     {
@@ -200,6 +203,7 @@ internal sealed class CssLayoutEngineTable
     private void GenerateAnonymousTableRows(Uri baseUrl)
     {
         bool needsWrapping = false;
+        
         foreach (var box in _tableBox.Boxes)
         {
             if (!IsProperTableChild(box.Display))
@@ -233,7 +237,7 @@ internal sealed class CssLayoutEngineTable
             }
             else
             {
-                pendingNonRow ??= new List<CssBox>();
+                pendingNonRow ??= [];
                 pendingNonRow.Add(child);
             }
         }
@@ -267,6 +271,7 @@ internal sealed class CssLayoutEngineTable
         // Create the anonymous row. The CssBox(parent, tag) constructor
         // automatically adds the new box to parent.Boxes.
         var anonRow = new CssBox(_tableBox, null, baseUrl) { Display = CssConstants.TableRow };
+        
         foreach (var child in children)
         {
             if (child.Display == CssConstants.TableCell)
@@ -406,7 +411,7 @@ internal sealed class CssLayoutEngineTable
                         }
                     }
 
-                    double len = CssValueParser.ParseLength(cell.Width, availCellSpace, cell.GetEmHeight());
+                    double len = CssLengthParser.ParseLength(cell.Width, availCellSpace, cell.GetEmHeight());
 
                     if (len <= 0) //If some width specified
                     {
@@ -430,8 +435,10 @@ internal sealed class CssLayoutEngineTable
     private static int GetColumnSpanCount(CssBox row)
     {
         int count = 0;
+        
         foreach (CssBox cell in row.Boxes)
             count += GetColSpan(cell);
+        
         return count;
     }
 
@@ -459,6 +466,7 @@ internal sealed class CssLayoutEngineTable
             if (numOfNans < _columnWidths.Length)
             {
                 orgColWidths = new double[_columnWidths.Length];
+                
                 for (int i = 0; i < _columnWidths.Length; i++)
                     orgColWidths[i] = _columnWidths[i];
             }
@@ -466,7 +474,7 @@ internal sealed class CssLayoutEngineTable
             if (numOfNans > 0)
             {
                 // Determine the max width for each column
-                GetColumnsMinMaxWidthByContent(true, out double[] minFullWidths, out double[] maxFullWidths);
+                GetColumnsMinMaxWidthByContent(true, out _, out double[] maxFullWidths);
 
                 // set the columns that can fulfill by the max width in a loop because it changes the nanWidth
                 int oldNumOfNans;
@@ -546,6 +554,7 @@ internal sealed class CssLayoutEngineTable
     {
         int curCol = 0;
         var widthSum = GetWidthSum();
+        
         while (widthSum > GetAvailableTableWidth() && CanReduceWidth())
         {
             while (!CanReduceWidth(curCol))
@@ -619,14 +628,17 @@ internal sealed class CssLayoutEngineTable
             for (int a = 0; a < 15 && maxWidth > widthSum + 0.1; a++) // limit iteration so bug won't create infinite loop
             {
                 int nonMaxedColumns = 0;
+        
                 for (int i = 0; i < _columnWidths.Length; i++)
                     if (_columnWidths[i] + 1 < maxFullWidths[i])
                         nonMaxedColumns++;
+                
                 if (nonMaxedColumns == 0)
                     nonMaxedColumns = _columnWidths.Length;
 
                 bool hit = false;
                 double minIncrement = (maxWidth - widthSum) / nonMaxedColumns;
+                
                 for (int i = 0; i < _columnWidths.Length; i++)
                 {
                     if (_columnWidths[i] + 0.1 < maxFullWidths[i])
@@ -863,11 +875,13 @@ internal sealed class CssLayoutEngineTable
         // stale/zero container width and wrapping every word onto its own line.
         string savedWidth = caption.Width;
         bool pinWidth = string.IsNullOrEmpty(caption.Width) || caption.Width == CssConstants.Auto;
+
         if (pinWidth)
             caption.Width = contentWidth.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "px";
 
         double targetX = x + caption.ActualMarginLeft;
         double targetY = y + caption.ActualMarginTop;
+
         caption.Location = new PointF((float)targetX, (float)targetY);
         caption.Size = new SizeF((float)contentWidth, 0f);
         caption.PerformLayout(g);
@@ -881,8 +895,10 @@ internal sealed class CssLayoutEngineTable
         // with OffsetLeft/OffsetTop, mirroring the grid item placement path.
         double dx = targetX - caption.Location.X;
         double dy = targetY - caption.Location.Y;
+
         if (Math.Abs(dx) > 0.01)
             caption.OffsetLeft(dx);
+
         if (Math.Abs(dy) > 0.01)
             caption.OffsetTop(dy);
 
@@ -900,12 +916,15 @@ internal sealed class CssLayoutEngineTable
         double total = 0;
         double x = _tableBox.ClientLeft;
         double top = _tableBox.ClientTop;
+
         foreach (var caption in _captions)
         {
             if (IsBottomCaption(caption))
                 continue;
+
             total += LayoutCaption(g, caption, x, top + total, width);
         }
+
         return total;
     }
 
@@ -918,12 +937,15 @@ internal sealed class CssLayoutEngineTable
     {
         double x = _tableBox.ClientLeft;
         double y = tableBottom;
+
         foreach (var caption in _captions)
         {
             if (!IsBottomCaption(caption))
                 continue;
+
             y += LayoutCaption(g, caption, x, y, width);
         }
+
         return y;
     }
 
@@ -956,11 +978,12 @@ internal sealed class CssLayoutEngineTable
         // bottom border/spacing is added by the caller).
         if (!string.IsNullOrEmpty(_tableBox.Height) && _tableBox.Height != CssConstants.Auto)
         {
-            double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, em);
+            double specHeight = CssLengthParser.ParseLength(_tableBox.Height, cbHeight, em);
             if (!double.IsNaN(specHeight) && specHeight > 0)
             {
                 double specBottom = _tableBox.Location.Y + specHeight
                     - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
+
                 if (specBottom > target)
                     target = specBottom;
             }
@@ -974,11 +997,12 @@ internal sealed class CssLayoutEngineTable
         // table has a tall min-height (WPT table-grid-item-dynamic-002).
         if (!string.IsNullOrEmpty(_tableBox.MinHeight) && _tableBox.MinHeight != "0")
         {
-            double minH = CssValueParser.ParseLength(_tableBox.MinHeight, cbHeight, em);
+            double minH = CssLengthParser.ParseLength(_tableBox.MinHeight, cbHeight, em);
             if (!double.IsNaN(minH) && minH > 0)
             {
                 double minBottom = rowAreaTop + minH
                     - _tableBox.ActualBorderTopWidth - _tableBox.ActualBorderBottomWidth;
+
                 if (minBottom > target)
                     target = minBottom;
             }
@@ -990,6 +1014,7 @@ internal sealed class CssLayoutEngineTable
 
         double perRow = surplus / rowBounds.Count;
         double shift = 0;
+
         foreach (var (row, top, bottom) in rowBounds)
         {
             foreach (var cell in row.Boxes)
@@ -1001,19 +1026,23 @@ internal sealed class CssLayoutEngineTable
                     cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
                     continue;
                 }
+
                 cell.Location = new PointF(cell.Location.X, (float)(cell.Location.Y + shift));
+
                 double newBottom = bottom + shift + perRow;
                 cell.ActualBottom = newBottom;
                 cell.Size = new SizeF(cell.Size.Width, (float)(newBottom - cell.Location.Y));
+
                 CssLayoutEngine.ApplyCellVerticalAlignment(g, cell);
             }
+
             shift += perRow;
         }
 
         return naturalBottom + surplus;
     }
 
-    private double GetSpannedMinWidth(CssBox row, CssBox cell, int realcolindex, int colspan)
+    private double GetSpannedMinWidth(CssBox row, int realcolindex, int colspan)
     {
         double w = 0f;
 
@@ -1056,6 +1085,7 @@ internal sealed class CssLayoutEngineTable
         bool bNone = b.Width <= 0.01 || string.IsNullOrEmpty(b.Style) || string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
         if (aNone && bNone)
             return new EdgeBorder(CssConstants.None, 0, string.Empty);
+
         if (aNone) return b;
         if (bNone) return a;
 
@@ -1064,6 +1094,7 @@ internal sealed class CssLayoutEngineTable
 
         int ra = BorderStyleRank.GetValueOrDefault(a.Style, 0);
         int rb = BorderStyleRank.GetValueOrDefault(b.Style, 0);
+
         if (ra != rb)
             return ra > rb ? a : b;
 
@@ -1085,6 +1116,7 @@ internal sealed class CssLayoutEngineTable
     {
         if (!string.Equals(_tableBox.BorderCollapse, CssConstants.Collapse, StringComparison.OrdinalIgnoreCase))
             return;
+
         if (_allRows.Count == 0)
             return;
 
@@ -1105,11 +1137,14 @@ internal sealed class CssLayoutEngineTable
             {
                 if (cell.Display != CssConstants.TableCell)
                     continue;
+
                 int col = GetCellRealColumnIndex(row, cell);
                 int span = GetColSpan(cell);
+
                 for (int k = 0; k < span; k++)
                     cols[col + k] = cell;
             }
+
             grid.Add(cols);
         }
 
@@ -1117,17 +1152,21 @@ internal sealed class CssLayoutEngineTable
         foreach (var cols in grid)
         {
             if (cols.Count == 0) continue;
+
             int maxCol = 0;
             foreach (var c in cols.Keys) if (c > maxCol) maxCol = c;
+
             for (int c = 0; c < maxCol; c++)
             {
                 if (!cols.TryGetValue(c, out var left) || !cols.TryGetValue(c + 1, out var right) || ReferenceEquals(left, right))
                     continue;
+
                 var leftEdge = new EdgeBorder(left.BorderRightStyle, left.ActualBorderRightWidth, left.BorderRightColor);
                 var rightEdge = new EdgeBorder(right.BorderLeftStyle, right.ActualBorderLeftWidth, right.BorderLeftColor);
                 var winner = rtl
                     ? ResolveCollapsedEdge(rightEdge, leftEdge)
                     : ResolveCollapsedEdge(leftEdge, rightEdge);
+
                 ApplyEdge(left, "right", winner);
                 SuppressEdge(right, "left");
             }
@@ -1140,9 +1179,11 @@ internal sealed class CssLayoutEngineTable
             {
                 if (!grid[r + 1].TryGetValue(col, out var bottom) || ReferenceEquals(top, bottom))
                     continue;
+
                 var winner = ResolveCollapsedEdge(
                     new EdgeBorder(top.BorderBottomStyle, top.ActualBorderBottomWidth, top.BorderBottomColor),
                     new EdgeBorder(bottom.BorderTopStyle, bottom.ActualBorderTopWidth, bottom.BorderTopColor));
+
                 ApplyEdge(top, "bottom", winner);
                 SuppressEdge(bottom, "top");
             }
@@ -1181,6 +1222,7 @@ internal sealed class CssLayoutEngineTable
     {
         if (!done.Add((cell, side)))
             return;
+
         EdgeBorder cellEdge = side switch
         {
             "top" => new EdgeBorder(cell.BorderTopStyle, cell.ActualBorderTopWidth, cell.BorderTopColor),
@@ -1188,6 +1230,7 @@ internal sealed class CssLayoutEngineTable
             "left" => new EdgeBorder(cell.BorderLeftStyle, cell.ActualBorderLeftWidth, cell.BorderLeftColor),
             _ => new EdgeBorder(cell.BorderRightStyle, cell.ActualBorderRightWidth, cell.BorderRightColor),
         };
+
         // Cell first: §17.6.2.1 origin priority favours the cell over the table
         // on an exact width/style tie.
         ApplyEdge(cell, side, ResolveCollapsedEdge(cellEdge, tableEdge));
@@ -1199,11 +1242,13 @@ internal sealed class CssLayoutEngineTable
         bool paints = b.Width > 0.01
             && !string.Equals(b.Style, CssConstants.Hidden, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(b.Style, CssConstants.None, StringComparison.OrdinalIgnoreCase);
+
         if (!paints)
         {
             SuppressEdge(cell, side);
             return;
         }
+
         string w = b.Width.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
         switch (side)
         {
@@ -1292,10 +1337,10 @@ internal sealed class CssLayoutEngineTable
         string h = row.Height;
         if (string.IsNullOrEmpty(h)
             || h == CssConstants.Auto
-            || h.EndsWith("%", StringComparison.Ordinal))
+            || h.EndsWith('%'))
             return 0;
 
-        double v = CssValueParser.ParseLength(h, 0, row.GetEmHeight());
+        double v = CssLengthParser.ParseLength(h, 0, row.GetEmHeight());
         return double.IsNaN(v) || v < 0 ? 0 : v;
     }
 
@@ -1337,6 +1382,7 @@ internal sealed class CssLayoutEngineTable
 
                 cell.ActualBottom = bottom;
                 cell.Size = new SizeF(cell.Size.Width, (float)(bottom - cell.Location.Y));
+
                 CssLayoutEngine.ApplyCellContentAlignment(g, cell);
                 finalizedSpanCells.Add(cell);
             }
@@ -1381,7 +1427,7 @@ internal sealed class CssLayoutEngineTable
         if (tblen.Number > 0)
         {
             _widthSpecified = true;
-            return CssValueParser.ParseLength(_tableBox.Width, _tableBox.ParentBox.AvailableWidth, _tableBox.GetEmHeight());
+            return CssLengthParser.ParseLength(_tableBox.Width, _tableBox.ParentBox.AvailableWidth, _tableBox.GetEmHeight());
         }
         else
         {
@@ -1395,7 +1441,7 @@ internal sealed class CssLayoutEngineTable
         if (tblen.Number > 0)
         {
             _widthSpecified = true;
-            return CssValueParser.ParseLength(_tableBox.MaxWidth, _tableBox.ParentBox.AvailableWidth, _tableBox.GetEmHeight());
+            return CssLengthParser.ParseLength(_tableBox.MaxWidth, _tableBox.ParentBox.AvailableWidth, _tableBox.GetEmHeight());
         }
         else
         {
@@ -1421,8 +1467,8 @@ internal sealed class CssLayoutEngineTable
                 row.Boxes[i].GetMinMaxWidth(out double minWidth, out double maxWidth);
 
                 var colSpan = GetColSpan(row.Boxes[i]);
-                minWidth = minWidth / colSpan;
-                maxWidth = maxWidth / colSpan;
+                minWidth /= colSpan;
+                maxWidth /= colSpan;
 
                 for (int j = 0; j < colSpan; j++)
                 {
@@ -1463,7 +1509,7 @@ internal sealed class CssLayoutEngineTable
 
     private static int GetSpan(CssBox b)
     {
-        double f = CssValueParser.ParseNumber(b.GetAttribute("span"), 1);
+        double f = CssLengthParser.ParseNumber(b.GetAttribute("span"), 1);
         return Math.Max(1, Convert.ToInt32(f));
     }
 
@@ -1481,7 +1527,7 @@ internal sealed class CssLayoutEngineTable
                 int colspan = GetColSpan(cell);
                 int col = GetCellRealColumnIndex(row, cell);
                 int affectcol = Math.Min(col + colspan, _columnMinWidths.Length) - 1;
-                double spannedwidth = GetSpannedMinWidth(row, cell, col, colspan) + (colspan - 1) * GetHorizontalSpacing();
+                double spannedwidth = GetSpannedMinWidth(row, col, colspan) + (colspan - 1) * GetHorizontalSpacing();
 
                 _columnMinWidths[affectcol] = Math.Max(_columnMinWidths[affectcol], cell.GetMinimumWidth() - spannedwidth);
             }

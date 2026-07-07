@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Xml.Linq;
-using Broiler.UI;
 
 namespace Broiler.UI.RichEdit.Tests;
 
@@ -41,7 +40,7 @@ public sealed class RichEditArchitectureTests
             .Where(static type => type.IsSubclassOf(typeof(UiElement)))
             .ToArray();
 
-        Assert.Equal(new[] { typeof(UiRichEdit) }, controls);
+        Assert.Equal([typeof(UiRichEdit)], controls);
         Assert.True(typeof(UiRichEdit).IsAbstract);
         Assert.Equal(typeof(UiElement), typeof(UiRichEdit).BaseType);
     }

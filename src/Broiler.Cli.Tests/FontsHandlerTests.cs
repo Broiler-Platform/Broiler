@@ -1,7 +1,5 @@
 
 using Broiler.Graphics;
-using Broiler.HTML.Adapters;
-using Broiler.HTML.Rendering.Handlers;
 
 namespace Broiler.Cli.Tests;
 

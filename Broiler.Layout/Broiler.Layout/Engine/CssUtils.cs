@@ -1,22 +1,19 @@
-﻿using System.Text.RegularExpressions;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+﻿using Broiler.CSS;
+using System.Text.RegularExpressions;
 
 
 namespace Broiler.Layout.Engine;
 
-internal static class CssUtils
+internal static partial class CssUtils
 {
-    private static readonly Regex LengthAttrFunctionPattern = new(
-        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LengthAttrFunctionPattern = LengthAttrRegex();
 
     public static double WhiteSpace(ILayoutEnvironment g, CssBoxProperties box)
     {
         double w = g.GetWhitespaceWidth(box.ActualFont);
 
         if (!(string.IsNullOrEmpty(box.WordSpacing) || box.WordSpacing == CssConstants.Normal))
-            w += CssValueParser.ParseLength(box.WordSpacing, 0, box.GetEmHeight(), true);
+            w += CssLengthParser.ParseLength(box.WordSpacing, 0, box.GetEmHeight(), true);
 
         return w;
     }
@@ -696,30 +693,34 @@ internal static class CssUtils
     private static void ApplyGridShorthand(CssBox cssBox, string value, bool resetAutoTracks)
     {
         string v = value.Trim();
+
         if (v.Equals("none", StringComparison.OrdinalIgnoreCase))
         {
             cssBox.GridTemplateRows = "none";
             cssBox.GridTemplateColumns = "none";
+        
             if (resetAutoTracks) ResetGridAutoTracks(cssBox);
             return;
         }
 
         // The auto-flow and template-areas (<string>) forms are out of scope:
         // leave every longhand as the cascade already set it.
-        if (v.IndexOf("auto-flow", StringComparison.OrdinalIgnoreCase) >= 0
+        if (v.Contains("auto-flow", StringComparison.OrdinalIgnoreCase)
             || v.Contains('"') || v.Contains('\''))
             return;
 
         int slash = TopLevelSlashIndex(v);
         if (slash < 0)
             return;
-        string rows = v.Substring(0, slash).Trim();
-        string cols = v.Substring(slash + 1).Trim();
+        
+        string rows = v[..slash].Trim();
+        string cols = v[(slash + 1)..].Trim();
         if (rows.Length == 0 || cols.Length == 0)
             return;
 
         cssBox.GridTemplateRows = rows;
         cssBox.GridTemplateColumns = cols;
+        
         if (resetAutoTracks) ResetGridAutoTracks(cssBox);
     }
 
@@ -745,7 +746,9 @@ internal static class CssUtils
         string cs = parts.Length > 1 ? parts[1].Trim() : Mirror(rs);
         string re = parts.Length > 2 ? parts[2].Trim() : Mirror(rs);
         string ce = parts.Length > 3 ? parts[3].Trim() : Mirror(cs);
+        
         if (rs.Length == 0) rs = "auto";
+        
         cssBox.GridRow = CombineGridLine(rs, re);
         cssBox.GridColumn = CombineGridLine(cs, ce);
 
@@ -761,9 +764,9 @@ internal static class CssUtils
     {
         string cur = isRow ? cssBox.GridRow : cssBox.GridColumn;
         int slash = cur?.IndexOf('/') ?? -1;
-        string start = slash >= 0 ? cur.Substring(0, slash).Trim()
+        string start = slash >= 0 ? cur[..slash].Trim()
                      : string.IsNullOrWhiteSpace(cur) ? "auto" : cur.Trim();
-        string end = slash >= 0 ? cur.Substring(slash + 1).Trim() : "auto";
+        string end = slash >= 0 ? cur[(slash + 1)..].Trim() : "auto";
         if (isStart) start = value.Trim(); else end = value.Trim();
         string combined = CombineGridLine(start, end);
         if (isRow) cssBox.GridRow = combined; else cssBox.GridColumn = combined;
@@ -783,6 +786,7 @@ internal static class CssUtils
         if (s.Length == 0 || s.Equals("auto", StringComparison.OrdinalIgnoreCase)
             || s.StartsWith("span", StringComparison.OrdinalIgnoreCase))
             return false;
+        
         char c = s[0];
         return !(char.IsDigit(c) || c == '-' || c == '+' || c == '.');
     }
@@ -818,6 +822,7 @@ internal static class CssUtils
 
         string a = parts[0].ToLowerInvariant(), b = parts[1].ToLowerInvariant();
         string outside, inside;
+        
         if (Array.IndexOf(DisplayOutsideKeywords, a) >= 0) { outside = a; inside = b; }
         else if (Array.IndexOf(DisplayOutsideKeywords, b) >= 0) { outside = b; inside = a; }
         else return v; // not a recognized two-value form; leave for the caller
@@ -870,11 +875,13 @@ internal static class CssUtils
                     if (collapse != null) return v; // malformed; leave untouched
                     collapse = token;
                     break;
+
                 case "wrap":
                 case "nowrap":
                     if (wrap != null) return v;
                     wrap = token;
                     break;
+
                 default:
                     return v; // not a recognized modern token; leave as-is
             }
@@ -974,7 +981,7 @@ internal static class CssUtils
             {
                 style ??= part;
             }
-            else if (lower is "thin" or "medium" or "thick" || CssValueParser.IsValidLength(part))
+            else if (lower is "thin" or "medium" or "thick" || CssLengthParser.IsValidLength(part))
             {
                 width ??= part;
             }
@@ -1132,13 +1139,13 @@ internal static class CssUtils
                 var attributeValue = cssBox.GetAttribute(attrName, string.Empty).Trim();
 
                 if (!string.IsNullOrEmpty(attributeValue) &&
-                    CssValueParser.IsValidLength(attributeValue))
+                    CssLengthParser.IsValidLength(attributeValue))
                 {
                     return attributeValue;
                 }
 
                 if (!string.IsNullOrEmpty(fallback) &&
-                    CssValueParser.IsValidLength(fallback))
+                    CssLengthParser.IsValidLength(fallback))
                 {
                     return fallback;
                 }
@@ -1146,4 +1153,7 @@ internal static class CssUtils
                 return string.Empty;
             });
     }
+
+    [GeneratedRegex(@"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex LengthAttrRegex();
 }

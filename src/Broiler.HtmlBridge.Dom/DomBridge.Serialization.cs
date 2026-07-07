@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
-using System.Text;
-using Broiler.HTML.Dom.Utils;
 using SharedHtmlSerializer = Broiler.Dom.Html.HtmlSerializer;
 using Broiler.Dom.Html;
 
@@ -545,7 +540,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = System.Text.RegularExpressions.Regex.Replace(
+        element.Attributes[attributeName] = Regex.Replace(
             value,
             @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
             match => ScaleSvgNumericMatch(match, usedZoom));
@@ -556,7 +551,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = System.Text.RegularExpressions.Regex.Replace(
+        element.Attributes[attributeName] = Regex.Replace(
             value,
             @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
             match => ScaleSvgNumericMatch(match, usedZoom));
@@ -660,7 +655,7 @@ public sealed partial class DomBridge
         if (!specified.TryGetValue("font", out var fontShorthand) || string.IsNullOrWhiteSpace(fontShorthand))
             return false;
 
-        var sizeMatch = System.Text.RegularExpressions.Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
+        var sizeMatch = Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
         if (!sizeMatch.Success ||
             !double.TryParse(sizeMatch.Groups[1].Value,
                 System.Globalization.NumberStyles.Float,
@@ -758,7 +753,7 @@ public sealed partial class DomBridge
         if (TryScaleLengthToken(trimmed, factor, out scaled))
             return true;
 
-        var parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = trimmed.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length is 2 or 3 or 4)
         {
             var scaledParts = new string[parts.Length];

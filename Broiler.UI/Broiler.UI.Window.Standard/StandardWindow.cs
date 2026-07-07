@@ -1,6 +1,5 @@
 using System;
 using Broiler.Graphics;
-using Broiler.UI.Window;
 
 namespace Broiler.UI.Window.Standard;
 

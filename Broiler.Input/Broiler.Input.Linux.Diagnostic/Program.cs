@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Input;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Keyboard.Linux;
-using Broiler.Input.Linux;
 using Broiler.Input.Mouse;
 using Broiler.Input.Mouse.Linux;
 

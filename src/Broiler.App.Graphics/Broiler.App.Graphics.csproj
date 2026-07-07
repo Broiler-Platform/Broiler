@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -22,16 +22,21 @@
     <Compile Remove="BrowserWindow.cs" />
     <Compile Remove="Phase3UiPreviewWindow.cs" />
     <Compile Remove="Phase4ToolbarPreviewWindow.cs" />
+    <Compile Include="..\..\Broiler.Writer\LinuxWriterInputCoordinator.cs" Link="LinuxBrowserInputCoordinator.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
     <Compile Remove="Program.Linux.cs" />
     <Compile Remove="LinuxBrowserOptions.cs" />
     <Compile Remove="LinuxBrowserRunner.cs" />
+    <Compile Remove="LinuxBrowserInputCoordinator.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Panel.Standard\Broiler.UI.Panel.Standard.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Label.Standard\Broiler.UI.Label.Standard.csproj" />
@@ -48,6 +53,9 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Linux\Broiler.Input.Linux.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj" />
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" />
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" />
   </ItemGroup>

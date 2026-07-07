@@ -43,7 +43,7 @@ public sealed class ModelArchitectureTests
             .Where(name => name.StartsWith("Broiler.", StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(new[] { "Broiler.Graphics" }, referenced);
+        Assert.Equal(["Broiler.Graphics"], referenced);
     }
 
     private static string ModelProjectPath() =>

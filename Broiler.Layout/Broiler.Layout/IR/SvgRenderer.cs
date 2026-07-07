@@ -1,6 +1,4 @@
 #nullable disable
-using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -12,7 +10,7 @@ namespace Broiler.Layout.IR;
 /// Converts simplified SVG markup into <see cref="DisplayItem"/> entries
 /// that can be rendered by <see cref="RGraphicsRasterBackend"/>.
 /// </summary>
-internal static class SvgRenderer
+internal static partial class SvgRenderer
 {
     /// <summary>
     /// Parses SVG XML content and returns display items positioned within
@@ -37,13 +35,13 @@ internal static class SvgRenderer
         // to fit, then centre in the viewport.
         float sx = 1f, sy = 1f, tx = 0f, ty = 0f;
         var pathStartsById = new Dictionary<string, PointF>(StringComparer.OrdinalIgnoreCase);
-        var svgMatch = Regex.Match(svgXml, @"<svg\s+([^>]*?)\/?>", RegexOptions.IgnoreCase);
+        var svgMatch = ParseRegex().Match(svgXml);
         if (svgMatch.Success)
         {
             var svgAttrs = ParseAttributes(svgMatch.Groups[1].Value);
             if (svgAttrs.TryGetValue("viewBox", out var vb))
             {
-                var parts = vb.Split(new[] { ' ', ',', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = vb.Split([' ', ',', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 4 &&
                     float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbX) &&
                     float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbY) &&
@@ -63,7 +61,7 @@ internal static class SvgRenderer
             }
         }
 
-        foreach (Match m in Regex.Matches(svgXml, @"<path\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        foreach (Match m in ParseSvgRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             if (!attrs.TryGetValue("id", out var id) || !attrs.TryGetValue("d", out var pathData))
@@ -75,7 +73,7 @@ internal static class SvgRenderer
         }
 
         // <rect ... /> or <rect ...></rect>
-        foreach (Match m in Regex.Matches(svgXml, @"<rect\s+([^/>]*)/?>" , RegexOptions.IgnoreCase))
+        foreach (Match m in ParseRectRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgRectItem
@@ -92,7 +90,7 @@ internal static class SvgRenderer
         }
 
         // <circle ... />
-        foreach (Match m in Regex.Matches(svgXml, @"<circle\s+([^/>]*)/?>" , RegexOptions.IgnoreCase))
+        foreach (Match m in ParseCircleRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             float r = GetFloat(attrs, "r");
@@ -110,7 +108,7 @@ internal static class SvgRenderer
         }
 
         // <ellipse ... />
-        foreach (Match m in Regex.Matches(svgXml, @"<ellipse\s+([^/>]*)/?>" , RegexOptions.IgnoreCase))
+        foreach (Match m in ParseEllipseRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgEllipseItem
@@ -127,7 +125,7 @@ internal static class SvgRenderer
         }
 
         // <line ... />
-        foreach (Match m in Regex.Matches(svgXml, @"<line\s+([^/>]*)/?>" , RegexOptions.IgnoreCase))
+        foreach (Match m in ParseLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgLineItem
@@ -142,7 +140,7 @@ internal static class SvgRenderer
             });
         }
 
-        foreach (Match m in Regex.Matches(svgXml, @"<polygon\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        foreach (Match m in ParsePolygonRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgPolygonItem
@@ -155,7 +153,7 @@ internal static class SvgRenderer
             });
         }
 
-        foreach (Match m in Regex.Matches(svgXml, @"<polyline\s+([^/>]*)/?>", RegexOptions.IgnoreCase))
+        foreach (Match m in ParsePolyLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             items.Add(new DrawSvgPolylineItem
@@ -169,13 +167,14 @@ internal static class SvgRenderer
         }
 
         // <text ...>content</text>
-        foreach (Match m in Regex.Matches(svgXml, @"<text\s+([^>]*)>\s*<textpath\s+([^>]*)>(.*?)</textpath>\s*</text>",
-            RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        foreach (Match m in ParseTextRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             var textPathAttrs = ParseAttributes(m.Groups[2].Value);
-            if (!textPathAttrs.TryGetValue("href", out var href) || !href.StartsWith("#", StringComparison.Ordinal))
+            
+            if (!textPathAttrs.TryGetValue("href", out var href) || !href.StartsWith('#'))
                 continue;
+            
             if (!pathStartsById.TryGetValue(href[1..], out var start))
                 continue;
 
@@ -187,14 +186,13 @@ internal static class SvgRenderer
                 FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
                 Fill = GetColor(attrs, "fill", BColor.Black),
-                Text = Regex.Replace(m.Groups[3].Value, "<.*?>", string.Empty).Trim(),
+                Text = DrawSvgTextRegex().Replace(m.Groups[3].Value, string.Empty).Trim(),
             });
         }
 
-        foreach (Match m in Regex.Matches(svgXml, @"<text\s+([^>]*)>(.*?)</text>" ,
-            RegexOptions.IgnoreCase | RegexOptions.Singleline))
+        foreach (Match m in ParseText2RegEx().Matches(svgXml))
         {
-            if (Regex.IsMatch(m.Groups[2].Value, @"<\s*textpath\b", RegexOptions.IgnoreCase))
+            if (ParseTextPathRegex().IsMatch(m.Groups[2].Value))
                 continue;
 
             var attrs = ParseAttributes(m.Groups[1].Value);
@@ -213,7 +211,7 @@ internal static class SvgRenderer
 
     private static PointF? TryGetPathStart(string pathData)
     {
-        var match = Regex.Match(pathData, @"M\s*(?<x>-?\d*\.?\d+)\s*,?\s*(?<y>-?\d*\.?\d+)", RegexOptions.IgnoreCase);
+        var match = ParsePathRegEx().Match(pathData);
         if (!match.Success ||
             !float.TryParse(match.Groups["x"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
             !float.TryParse(match.Groups["y"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
@@ -227,7 +225,7 @@ internal static class SvgRenderer
     private static List<PointF> ParsePoints(string value, float sx, float sy, float tx, float ty)
     {
         var points = new List<PointF>();
-        var numbers = Regex.Matches(value, @"-?\d*\.?\d+(?:[eE][+-]?\d+)?");
+        var numbers = ParsePointRegex().Matches(value);
         for (var i = 0; i + 1 < numbers.Count; i += 2)
         {
             if (!float.TryParse(numbers[i].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
@@ -245,7 +243,7 @@ internal static class SvgRenderer
     private static Dictionary<string, string> ParseAttributes(string attrStr)
     {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (Match m in Regex.Matches(attrStr, @"([\w\-]+)\s*=\s*""([^""]*)"""))
+        foreach (Match m in ParseAttrRegex().Matches(attrStr))
         {
             dict[m.Groups[1].Value] = m.Groups[2].Value;
         }
@@ -266,9 +264,9 @@ internal static class SvgRenderer
             return BColor.Empty;
 
         // rgba(r, g, b, a)
-        if (val.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(")"))
+        if (val.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(')'))
         {
-            string inner = val.Substring(5, val.Length - 6);
+            string inner = val[5..^1];
             var parts = inner.Split(',');
             if (parts.Length == 4
                 && int.TryParse(parts[0].Trim(), out int r)
@@ -285,9 +283,9 @@ internal static class SvgRenderer
         }
 
         // rgb(r, g, b)
-        if (val.StartsWith("rgb(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(")"))
+        if (val.StartsWith("rgb(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(')'))
         {
-            string inner = val.Substring(4, val.Length - 5);
+            string inner = val[4..^1];
             var parts = inner.Split(',');
             if (parts.Length == 3
                 && int.TryParse(parts[0].Trim(), out int r)
@@ -335,4 +333,49 @@ internal static class SvgRenderer
             : new BColor((byte)((v >> 24) & 0xFF), (byte)((v >> 16) & 0xFF), (byte)((v >> 8) & 0xFF), (byte)(v & 0xFF));
         return true;
     }
+
+    [GeneratedRegex(@"<svg\s+([^>]*?)\/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseRegex();
+    
+    [GeneratedRegex(@"<path\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseSvgRegex();
+
+    [GeneratedRegex(@"<rect\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseRectRegex();
+
+    [GeneratedRegex(@"<circle\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseCircleRegex();
+
+    [GeneratedRegex(@"<line\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseLineRegex();
+
+    [GeneratedRegex(@"<ellipse\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseEllipseRegex();
+
+    [GeneratedRegex(@"<polygon\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParsePolygonRegex();
+
+    [GeneratedRegex(@"<polyline\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ParsePolyLineRegex();
+
+    [GeneratedRegex(@"<text\s+([^>]*)>\s*<textpath\s+([^>]*)>(.*?)</textpath>\s*</text>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex ParseTextRegex();
+
+    [GeneratedRegex("<.*?>")]
+    private static partial Regex DrawSvgTextRegex();
+
+    [GeneratedRegex(@"M\s*(?<x>-?\d*\.?\d+)\s*,?\s*(?<y>-?\d*\.?\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex ParsePathRegEx();
+
+    [GeneratedRegex(@"<text\s+([^>]*)>(.*?)</text>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex ParseText2RegEx();
+
+    [GeneratedRegex(@"<\s*textpath\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ParseTextPathRegex();
+
+    [GeneratedRegex(@"([\w\-]+)\s*=\s*""([^""]*)""")]
+    private static partial Regex ParseAttrRegex();
+
+    [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
+    private static partial Regex ParsePointRegex();
 }

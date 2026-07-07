@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Broiler.Media;
-using Broiler.Media.Image;
 using Gfx = Broiler.Graphics;
 using Spec = Broiler.Media.Image.Managed.Tests.PngFormatBuilder.ApngFrameSpec;
 

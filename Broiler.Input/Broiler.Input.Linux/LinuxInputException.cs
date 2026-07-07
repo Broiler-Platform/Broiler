@@ -1,5 +1,4 @@
 using System;
-using Broiler.Input;
 
 namespace Broiler.Input.Linux;
 

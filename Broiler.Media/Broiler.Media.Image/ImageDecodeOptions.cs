@@ -1,5 +1,3 @@
-using Broiler.Media;
-
 namespace Broiler.Media.Image;
 
 public sealed class ImageDecodeOptions

@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -78,6 +76,6 @@ public sealed class GridIntrinsicWidthTests
         double autoFill = ContainerWidth(Base + "float:left;grid-template-columns:repeat(auto-fill,100px);");
         Assert.True(autoFill < 150, $"auto-fill grid must decline the fixed-track shortcut (got {autoFill})");
         double mixed = ContainerWidth(Base + "width:max-content;grid-template-columns:100px auto;");
-        Assert.True(System.Math.Abs(mixed - 100) > 0.5, $"fixed+auto template must decline the shortcut (got {mixed})");
+        Assert.True(Math.Abs(mixed - 100) > 0.5, $"fixed+auto template must decline the shortcut (got {mixed})");
     }
 }

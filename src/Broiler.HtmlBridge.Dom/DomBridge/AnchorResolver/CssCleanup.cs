@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
@@ -52,14 +48,14 @@ public sealed partial class DomBridge
     /// or <c>anchor-size(</c> are also stripped (matched separately).
     /// </summary>
     private static readonly string[] UnsupportedPropertyNames =
-    {
+    [
         "anchor-name",
         "position-area",
         "position-anchor",
         "position-try-fallbacks",
         "position-try",
         "position-visibility",
-    };
+    ];
     private static string RemoveUnsupportedCssRules(string css)
     {
         // 1. Remove @position-try at-rules entirely.

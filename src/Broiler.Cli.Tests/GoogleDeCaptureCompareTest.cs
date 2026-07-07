@@ -1,5 +1,4 @@
 using Broiler.HTML.Image;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Broiler.Cli.Tests;
@@ -184,7 +183,7 @@ input{font-family:inherit}
 
         int center = (left + right) / 2;
         int viewportCenter = bmp.Width / 2;
-        int offset = System.Math.Abs(center - viewportCenter);
+        int offset = Math.Abs(center - viewportCenter);
         _output.WriteLine($"Button center: {center}, viewport center: {viewportCenter}, offset: {offset}");
 
         Assert.True(offset < 80,

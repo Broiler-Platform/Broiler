@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -8,7 +5,6 @@ using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
-using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
@@ -378,9 +374,9 @@ public sealed partial class DomBridge
         try
         {
             if (cloneOptions == null || cloneOptions.IsNullOrUndefined)
-                return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+                return JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
 
-            return Broiler.JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value, cloneOptions));
+            return JavaScript.Globals.JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value, cloneOptions));
         }
         catch (JSException)
         {

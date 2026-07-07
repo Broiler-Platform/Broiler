@@ -16,6 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.FileDialog.Standard\Broiler.UI.FileDialog.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
   </ItemGroup>
 
@@ -24,4 +26,3 @@
   </ItemGroup>
 
 </Project>
-

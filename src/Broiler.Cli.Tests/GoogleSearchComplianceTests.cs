@@ -1,4 +1,3 @@
-using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;

@@ -2,7 +2,6 @@ using System;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
-using Broiler.UI.Dialog;
 using Broiler.UI.Standard;
 using Broiler.UI.Window;
 
@@ -90,13 +89,19 @@ public sealed class StandardDialog : UiDialog
 
     protected override bool OnInput(UiInputEvent input)
     {
+        if (base.OnInput(input))
+            return true;
+
         if (input.Kind == UiInputEventKind.PointerButton)
             return HandlePointerButton(input);
         if (input.Kind == UiInputEventKind.KeyboardKey)
             return HandleKeyboard(input);
 
-        return base.OnInput(input);
+        return false;
     }
+
+    protected override bool HitTestMoveGrip(BPoint position) =>
+        new BRect(Bounds.Left, Bounds.Top, Bounds.Width, Math.Min(TitleBarHeight, Bounds.Height)).Contains(position);
 
     private bool HandlePointerButton(UiInputEvent input)
     {

@@ -1,5 +1,3 @@
-using System;
-
 namespace Broiler.Layout.IR;
 
 /// <summary>

@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 
-using Broiler.Media.Image.Managed;
-
 namespace Broiler.Media.Image.Managed.Tests;
 
 /// <summary>

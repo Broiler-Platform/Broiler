@@ -41,7 +41,7 @@ try {
         Console.WriteLine("=== END HTML ===");
         
         // Print each line
-        var lines = result.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        var lines = result.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         Console.WriteLine($"=== FOUND {lines.Length} LINES ===");
         foreach(var line in lines)
         {

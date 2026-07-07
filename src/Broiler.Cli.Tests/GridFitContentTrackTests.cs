@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -32,7 +30,7 @@ public sealed class GridFitContentTrackTests
             + "grid-template-columns:min-content max-content fit-content(60px) fit-content(30px);}"
             + ".c span{display:inline-block;width:40px;height:20px;}";
 
-        (int x, int w)[] cols = { (0, 40), (40, 80), (120, 60), (180, 40) };
+        (int x, int w)[] cols = [(0, 40), (40, 80), (120, 60), (180, 40)];
         var body = new System.Text.StringBuilder();
         for (int i = 0; i < cols.Length; i++)
             body.Append($"<div class=\"c\" style=\"grid-column:{i + 1};grid-row:1;\" ")
@@ -46,7 +44,7 @@ public sealed class GridFitContentTrackTests
         bridge.Attach(context, html, "file:///grid-fit-content.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

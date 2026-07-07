@@ -19,7 +19,7 @@ public sealed class WindowsRawInputRegistrationCoordinator
     private const uint RidevDevNotify = 0x00002000;
 
     private readonly object _gate = new();
-    private readonly Dictionary<RegistrationKey, WindowsRawInputRegistrationLease> _leases = new();
+    private readonly Dictionary<RegistrationKey, WindowsRawInputRegistrationLease> _leases = [];
 
     public WindowsRawInputRegistrationLease RegisterKeyboard(
         IntPtr targetWindow,

@@ -41,7 +41,7 @@ public sealed class StandardRichEditArchitectureTests
             .Where(static type => typeof(UiElement).IsAssignableFrom(type) && !type.IsAbstract)
             .ToArray();
 
-        Assert.Equal(new[] { typeof(StandardRichEdit) }, controls);
+        Assert.Equal([typeof(StandardRichEdit)], controls);
         Assert.True(typeof(StandardRichEdit).IsSealed);
         Assert.Equal(typeof(UiRichEdit), typeof(StandardRichEdit).BaseType);
     }

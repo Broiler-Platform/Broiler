@@ -110,7 +110,7 @@ public class TestRunnerModel : PageModel
     }
 
     private static string BitmapToBase64(BBitmap bitmap) =>
-        Convert.ToBase64String(bitmap.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
+        Convert.ToBase64String(bitmap.Encode(Graphics.BImageEncodeFormat.Png, 100));
 
     private string AcidDirectory =>
         Path.GetFullPath(Path.Combine(_env.ContentRootPath, "..", "..", "acid"));

@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
-using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+using Broiler.CSS;
+using System.Drawing;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -69,9 +66,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private static string StripSafeUnsafe(string value)
     {
         if (value.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
-            return value.Substring(5).Trim();
+            return value[5..].Trim();
+
         if (value.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
-            return value.Substring(7).Trim();
+            return value[7..].Trim();
+
         return value;
     }
 
@@ -99,57 +98,31 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         string a = alignment;
         bool hasKeyword = false;
         bool isSafe = true;
+
         if (a.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
         {
-            a = a.Substring(5).Trim();
+            a = a[5..].Trim();
             hasKeyword = true;
             isSafe = true;
         }
         else if (a.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
         {
-            a = a.Substring(7).Trim();
+            a = a[7..].Trim();
             hasKeyword = true;
             isSafe = false;
         }
 
-        double dx;
-        switch (a)
+        var dx = a switch
         {
-            case "center":
-                dx = freeSpace / 2;
-                break;
-            case "end":
-            case "flex-end":
-            // No baseline-sharing group for a lone abspos box → last-baseline
-            // aligns to the end edge (CSS Align §9, baseline self-alignment).
-            case "last baseline":
-            case "last-baseline":
-                dx = isRtl ? 0 : freeSpace;
-                break;
-            case "self-end":
-                dx = selfHigh ? 0 : freeSpace;
-                break;
-            case "right":
-                dx = freeSpace;
-                break;
-            case "start":
-            case "flex-start":
-            // first-baseline → start edge (no baseline group).
-            case "baseline":
-            case "first baseline":
-            case "first-baseline":
-                dx = isRtl ? freeSpace : 0;
-                break;
-            case "self-start":
-                dx = selfHigh ? freeSpace : 0;
-                break;
-            case "left":
-                dx = 0;
-                break;
-            default:
-                dx = 0; // fallback: start-aligned
-                break;
-        }
+            "center" => freeSpace / 2,
+            "end" or "flex-end" or "last baseline" or "last-baseline" => isRtl ? 0 : freeSpace,
+            "self-end" => selfHigh ? 0 : freeSpace,
+            "right" => freeSpace,
+            "start" or "flex-start" or "baseline" or "first baseline" or "first-baseline" => isRtl ? freeSpace : 0,
+            "self-start" => selfHigh ? freeSpace : 0,
+            "left" => 0,
+            _ => 0,// fallback: start-aligned
+        };
 
         // Explicit safe/unsafe: preserve the legacy single-box behaviour.
         if (hasKeyword)
@@ -177,6 +150,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         pos = startIsLow
             ? Math.Max(lo, Math.Min(pos, hi))
             : Math.Min(hi, Math.Max(pos, lo));
+
         return pos - imcbStart;
     }
 

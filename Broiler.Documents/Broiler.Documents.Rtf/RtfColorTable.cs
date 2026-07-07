@@ -10,7 +10,7 @@ namespace Broiler.Documents.Rtf;
 /// </summary>
 internal sealed class RtfColorTable
 {
-    private readonly List<BColor> _colors = new();
+    private readonly List<BColor> _colors = [];
 
     public int Count => _colors.Count;
 

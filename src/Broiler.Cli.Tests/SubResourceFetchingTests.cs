@@ -96,7 +96,7 @@ document.getElementById('out').textContent = r.join('|');
         var tmpDir = Path.Combine(Path.GetTempPath(), "broiler_test_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmpDir);
         // Create a fake PNG file (just needs to exist with .png extension)
-        File.WriteAllBytes(Path.Combine(tmpDir, "test.png"), new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+        File.WriteAllBytes(Path.Combine(tmpDir, "test.png"), [0x89, 0x50, 0x4E, 0x47]);
         try
         {
             var pageUrl = new Uri(Path.Combine(tmpDir, "page.html")).AbsoluteUri;

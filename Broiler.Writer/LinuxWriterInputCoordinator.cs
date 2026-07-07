@@ -20,6 +20,7 @@ internal sealed class LinuxWriterInputCoordinator : IAsyncDisposable
 {
     private readonly bool _enabled;
     private readonly bool _externalPointer;
+    private readonly string _applicationName;
     private readonly Action<string> _log;
     private readonly ConcurrentQueue<UiInputEvent> _pending = new();
     private readonly object _gate = new();
@@ -46,11 +47,12 @@ internal sealed class LinuxWriterInputCoordinator : IAsyncDisposable
     private string? _mouseSummary;
     private bool _quitRequested;
 
-    public LinuxWriterInputCoordinator(bool enabled, Action<string> log, bool externalPointer = false)
+    public LinuxWriterInputCoordinator(bool enabled, Action<string> log, bool externalPointer = false, string applicationName = "Broiler Writer")
     {
         _enabled = enabled;
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _externalPointer = externalPointer;
+        _applicationName = string.IsNullOrWhiteSpace(applicationName) ? "application" : applicationName;
     }
 
     public bool QuitRequested
@@ -191,7 +193,7 @@ internal sealed class LinuxWriterInputCoordinator : IAsyncDisposable
         lock (_gate)
             _initialized = true;
 
-        _log("evdev input opened. Events run only while the X11 window is focused; Escape exits Broiler Writer.");
+        _log("evdev input opened. Events run only while the X11 window is focused; Escape exits " + _applicationName + ".");
     }
 
     public async ValueTask SetActiveAsync(bool active, CancellationToken cancellationToken = default)

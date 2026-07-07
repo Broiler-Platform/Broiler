@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Text;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;

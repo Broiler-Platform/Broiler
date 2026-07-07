@@ -11,7 +11,6 @@ using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
 using Broiler.UI.Panel;
 using Broiler.UI.Panel.Standard;
-using Broiler.UI.RichEdit;
 using Broiler.UI.RichEdit.Standard;
 using Broiler.UI.Standard;
 using Broiler.UI.Window.Standard;

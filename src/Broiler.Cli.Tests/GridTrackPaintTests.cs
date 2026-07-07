@@ -21,7 +21,7 @@ namespace Broiler.Cli.Tests;
 public sealed class GridTrackPaintTests
 {
     private static bool Near(BColor c, int r, int g, int b) =>
-        System.Math.Abs(c.R - r) <= 6 && System.Math.Abs(c.G - g) <= 6 && System.Math.Abs(c.B - b) <= 6;
+        Math.Abs(c.R - r) <= 6 && Math.Abs(c.G - g) <= 6 && Math.Abs(c.B - b) <= 6;
 
     private static string Describe(BColor c) => $"rgb({c.R},{c.G},{c.B})";
 

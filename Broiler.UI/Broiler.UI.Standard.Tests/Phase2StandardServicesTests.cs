@@ -5,8 +5,6 @@ using Broiler.Input.Mouse;
 using Broiler.Input.Pen;
 using Broiler.Input.Text;
 using Broiler.Input.Touch;
-using Broiler.UI;
-using Broiler.UI.Standard;
 
 namespace Broiler.UI.Standard.Tests;
 

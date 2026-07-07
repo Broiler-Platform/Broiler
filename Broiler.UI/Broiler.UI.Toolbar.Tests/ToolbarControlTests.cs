@@ -3,7 +3,6 @@ using Broiler.Input;
 using Broiler.Input.Keyboard;
 using Broiler.UI.Button.Standard;
 using Broiler.UI.Standard;
-using Broiler.UI.Toolbar;
 using Broiler.UI.Toolbar.Standard;
 
 namespace Broiler.UI.Toolbar.Tests;

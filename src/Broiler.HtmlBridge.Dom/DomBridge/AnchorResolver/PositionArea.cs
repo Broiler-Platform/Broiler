@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
 
@@ -83,7 +79,7 @@ public sealed partial class DomBridge
                     string? rawInset = cssProps.GetValueOrDefault("inset");
                     if (rawInset != null)
                     {
-                        var insetParts = rawInset.Split(new[] { ' ', '\t' },
+                        var insetParts = rawInset.Split([' ', '\t'],
                             StringSplitOptions.RemoveEmptyEntries);
                         if (insetParts.Length > 0)
                         {
@@ -138,7 +134,7 @@ public sealed partial class DomBridge
                     string? marginShorthand = cssProps.GetValueOrDefault("margin");
                     if (marginShorthand != null)
                     {
-                        var mp = marginShorthand.Split(new[] { ' ', '\t' },
+                        var mp = marginShorthand.Split([' ', '\t'],
                             StringSplitOptions.RemoveEmptyEntries);
                         if (mp.Length > 0)
                         {
@@ -162,7 +158,7 @@ public sealed partial class DomBridge
                     string? padShorthand = cssProps.GetValueOrDefault("padding");
                     if (padShorthand != null)
                     {
-                        var pp = padShorthand.Split(new[] { ' ', '\t' },
+                        var pp = padShorthand.Split([' ', '\t'],
                             StringSplitOptions.RemoveEmptyEntries);
                         if (pp.Length > 0)
                         {
@@ -293,7 +289,7 @@ public sealed partial class DomBridge
                         string? borderShort = cssProps.GetValueOrDefault("border");
                         if (borderShort != null)
                         {
-                            var borderParts = borderShort.Split(new[] { ' ', '\t' },
+                            var borderParts = borderShort.Split([' ', '\t'],
                                 StringSplitOptions.RemoveEmptyEntries);
                             foreach (var bp in borderParts)
                             {

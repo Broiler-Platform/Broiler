@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Input;
-using Broiler.Input.Keyboard;
 using Broiler.Input.Windows;
 
 namespace Broiler.Input.Keyboard.Windows;

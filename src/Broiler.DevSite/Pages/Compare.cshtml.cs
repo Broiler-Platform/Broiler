@@ -66,5 +66,5 @@ public class CompareModel : PageModel
     }
 
     private static string BitmapToBase64(BBitmap bitmap) =>
-        Convert.ToBase64String(bitmap.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
+        Convert.ToBase64String(bitmap.Encode(Graphics.BImageEncodeFormat.Png, 100));
 }

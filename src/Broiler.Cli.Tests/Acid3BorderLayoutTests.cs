@@ -1,5 +1,4 @@
 using Broiler.HTML.Image;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Broiler.Cli.Tests;

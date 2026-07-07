@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
 
@@ -27,7 +23,7 @@ public sealed partial class DomBridge
                     if (_anchorCandidates != null)
                     {
                         if (!_anchorCandidates.TryGetValue(anchorName, out var list))
-                            _anchorCandidates[anchorName] = list = new List<AnchorInfo>();
+                            _anchorCandidates[anchorName] = list = [];
                         list.Add(info);
                     }
                 }

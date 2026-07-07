@@ -1,5 +1,4 @@
 using System;
-using Broiler.UI.Label;
 
 namespace Broiler.UI.Label.Standard;
 

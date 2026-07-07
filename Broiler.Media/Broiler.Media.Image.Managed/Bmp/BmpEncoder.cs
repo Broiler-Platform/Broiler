@@ -1,8 +1,6 @@
 using System;
 using System.Buffers.Binary;
 
-using Broiler.Media.Image;
-
 namespace Broiler.Media.Image.Managed;
 
 /// <summary>

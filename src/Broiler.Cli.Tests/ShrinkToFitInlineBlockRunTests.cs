@@ -1,7 +1,5 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -47,7 +45,7 @@ public sealed class ShrinkToFitInlineBlockRunTests
         bridge.Attach(context, html, "file:///shrink-to-fit-inline-block-run.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

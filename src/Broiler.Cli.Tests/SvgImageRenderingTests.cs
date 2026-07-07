@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
@@ -106,7 +104,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""50"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
         Assert.Equal(200, bitmap.Height);
@@ -130,7 +128,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // Center of the circle (50,50) should be blue.
@@ -151,7 +149,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""80"" height=""60""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // The green rect should be visible at the top-left.
@@ -168,7 +166,7 @@ public class SvgImageRenderingTests
 
         var html = $@"<!DOCTYPE html><html><body><img src=""{svgDataUri}""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
     }
@@ -238,7 +236,7 @@ public class SvgImageRenderingTests
         var pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
         var html = $@"<!DOCTYPE html><html><body><img src=""data:image/png;base64,{pngBase64}"" width=""1"" height=""1""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
     }
@@ -256,7 +254,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
 
@@ -281,7 +279,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
                    $@"<img src=""{svgDataUri}"" width=""200"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 300, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(300, bitmap.Width);
     }
@@ -303,7 +301,7 @@ public class SvgImageRenderingTests
                    $@"<img src=""{redSvg}"" width=""50"" height=""50""/>" +
                    $@"<img src=""{blueSvg}"" width=""50"" height=""50""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 200, 200);
         Assert.NotNull(bitmap);
 
         // First image area should be red
@@ -330,7 +328,7 @@ public class SvgImageRenderingTests
 </body>
 </html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 1024, 768);
 
         var interiorPixel = bitmap.GetPixel(100, 100);
         Assert.True(interiorPixel.G > 200,
@@ -350,7 +348,7 @@ public class SvgImageRenderingTests
         var html = $@"<!DOCTYPE html><html><body style=""margin:0;background:#123456"">" +
                    $@"<img src=""{svgDataUri}"" width=""40"" height=""30""/></body></html>";
 
-        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImageWithStyleSet(html, 80, 60);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 80, 60);
 
         var pixel = bitmap.GetPixel(10, 10);
         Assert.InRange(pixel.R, 0x10, 0x14);

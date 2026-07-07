@@ -70,8 +70,8 @@ public sealed class CssExtractionPhaseZeroTests
     {
         const string css = ".card { color: red; margin: 1px 2px; }";
 
-        var styleSet = Broiler.HTML.Image.HtmlRender.ParseStyleSet(css, combineWithDefault: false);
-        var shared = Broiler.HTML.Image.HtmlRender.ParseStyleSheetModel(css, combineWithDefault: false);
+        var styleSet = HTML.Image.HtmlRender.ParseStyleSet(css, combineWithDefault: false);
+        var shared = HTML.Image.HtmlRender.ParseStyleSheetModel(css, combineWithDefault: false);
 
         Assert.Equal(CssSerializer.Serialize(styleSet.StyleSheet), CssSerializer.Serialize(shared));
         Assert.NotNull(typeof(Broiler.HTML.Image.HtmlRender).GetMethod("ParseStyleSet", [typeof(string), typeof(bool)]));

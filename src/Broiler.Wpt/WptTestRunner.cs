@@ -744,14 +744,14 @@ internal sealed class WptTestRunner
     /// and <c>test-plan/</c> holds specification documentation.
     /// </summary>
     private static readonly string[] NonTestDirSegments =
-    {
+    [
         "/reference/", "\\reference\\",
         "/references/", "\\references\\",
         "/reftest/", "\\reftest\\",
         "/resources/", "\\resources\\",
         "/support/", "\\support\\",
         "/test-plan/", "\\test-plan\\",
-    };
+    ];
 
     /// <summary>
     /// Recursively discovers all test files under <paramref name="wptRoot"/>,

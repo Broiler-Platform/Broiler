@@ -1,7 +1,5 @@
 using System;
 
-using Broiler.Media.Image;
-
 namespace Broiler.Media.Image.Managed;
 
 /// <summary>

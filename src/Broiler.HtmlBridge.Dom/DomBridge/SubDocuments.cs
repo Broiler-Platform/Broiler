@@ -1,13 +1,7 @@
-using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
-using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
@@ -756,7 +750,7 @@ public sealed partial class DomBridge
         {
             var uri = new Uri(fileUrl);
             var path = uri.LocalPath;
-            if (!System.IO.File.Exists(path))
+            if (!File.Exists(path))
                 return (null, string.Empty); // File not found → empty document (not a fetch failure)
 
             // For binary content types (images, fonts, etc.) return null content with MIME type
@@ -769,7 +763,7 @@ public sealed partial class DomBridge
                 return (null, extensionMime);
             }
 
-            var content = System.IO.File.ReadAllText(path);
+            var content = File.ReadAllText(path);
             return (content, extensionMime);
         }
         catch
@@ -799,8 +793,8 @@ public sealed partial class DomBridge
         // Only handle relative URLs (no scheme)
         if (filename.Contains("://")) return (null, string.Empty);
 
-        var localPath = System.IO.Path.Combine(_localBasePath, filename);
-        if (!System.IO.File.Exists(localPath))
+        var localPath = Path.Combine(_localBasePath, filename);
+        if (!File.Exists(localPath))
             return (null, string.Empty);
 
         // For binary content types (images, fonts, etc.) return null content with MIME type
@@ -815,7 +809,7 @@ public sealed partial class DomBridge
 
         try
         {
-            var content = System.IO.File.ReadAllText(localPath);
+            var content = File.ReadAllText(localPath);
 
             // Detect content type from content when extension is generic
             var detectedMime = extensionMime;

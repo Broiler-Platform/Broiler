@@ -1,5 +1,4 @@
 using System;
-using Broiler.UI.Slider;
 
 namespace Broiler.UI.Slider.Standard;
 

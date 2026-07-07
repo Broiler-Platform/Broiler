@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Broiler.Input;
 using Broiler.Input.Linux;
 
 namespace Broiler.Input.Keyboard.Linux;

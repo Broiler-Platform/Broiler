@@ -1,19 +1,10 @@
 using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
-using System.Text.RegularExpressions;
-using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
-using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
-using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.HtmlBridge;
@@ -652,7 +643,7 @@ public sealed partial class DomBridge
         rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
         rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
         rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
-        return rectData.Width > 0 || rectData.Height > 0 || isViewportElement ? new JSArray(new JSValue[] { rect }) : new JSArray();
+        return rectData.Width > 0 || rectData.Height > 0 || isViewportElement ? new JSArray([rect]) : new JSArray();
     }
 
 
@@ -715,7 +706,7 @@ public sealed partial class DomBridge
         double vbX = 0, vbY = 0, vbW = 0, vbH = 0;
         if (element.Attributes.TryGetValue("viewBox", out var vb) && !string.IsNullOrWhiteSpace(vb))
         {
-            var parts = vb.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = vb.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 4)
             {
                 double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbX);

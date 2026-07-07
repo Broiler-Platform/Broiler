@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace Broiler.HtmlBridge;
@@ -68,7 +66,7 @@ public sealed partial class DomBridge
             if (combinedText.Length > 0)
             {
                 var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(combinedText);
-                scope.Engine.AddStyleSheet(sheet, Broiler.CSS.Dom.CssOrigin.Author);
+                scope.Engine.AddStyleSheet(sheet, CSS.Dom.CssOrigin.Author);
             }
 
             scope.StyleSheetHash = hash;

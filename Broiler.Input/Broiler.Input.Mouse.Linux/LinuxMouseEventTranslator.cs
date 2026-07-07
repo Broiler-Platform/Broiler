@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Broiler.Input;
 using Broiler.Input.Linux;
-using Broiler.Input.Mouse;
 
 namespace Broiler.Input.Mouse.Linux;
 

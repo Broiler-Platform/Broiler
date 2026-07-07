@@ -6,8 +6,6 @@ using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.Media.Video;
-using Broiler.Media.Video.MediaFoundation;
 
 namespace Broiler.Media.Video.MediaFoundation.Tests;
 

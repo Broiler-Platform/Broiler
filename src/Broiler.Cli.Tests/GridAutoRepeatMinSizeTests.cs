@@ -1,8 +1,5 @@
-using System.Collections.Generic;
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -52,7 +49,7 @@ public sealed class GridAutoRepeatMinSizeTests
     // the definite-size floor count (2 cols / 3 rows), so its item lands at (100,100)
     // in a 300×200 box — every other case fills the min-size and lands at (200,150).
     private static readonly Case[] Cases =
-    {
+    [
         new("g1", "grid", "", 300, 200, 200, 150),
         new("g2", "grid", "width:200px;height:100px;", 300, 200, 200, 150),
         new("g3", "grid", "width:min-content;height:min-content;", 300, 200, 200, 150),
@@ -65,7 +62,7 @@ public sealed class GridAutoRepeatMinSizeTests
         new("g10", "grid border borderBox", "width:200px;height:100px;", 300, 200, 100, 100),
         new("g11", "grid border borderBox", "width:min-content;height:min-content;", 320, 220, 200, 150),
         new("g12", "grid border borderBox", "width:max-content;height:max-content;", 320, 220, 200, 150),
-    };
+    ];
 
     [Fact]
     public void ShrinkToFitAutoFillGrid_HonoursMinSizeAndIntrinsicWidthKeywords()
@@ -84,7 +81,7 @@ public sealed class GridAutoRepeatMinSizeTests
         bridge.Attach(context, html, "file:///grid-auto-repeat-min-size-001.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

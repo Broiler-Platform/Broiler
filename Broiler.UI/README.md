@@ -8,8 +8,8 @@ This component is currently at Phase 7 of
 dialogs and host-service parity. It defines the platform-neutral root, shared
 Standard infrastructure, and type-specific control pairs through Window, Panel,
 Label, Button, Edit, CheckBox, RadioButton, ToggleButton, Slider, ProgressBar,
-ImageView, ScrollView, ListView, ComboBox, TabView, Menu, Tooltip, Dialog, and
-Toolbar.
+ImageView, ScrollView, ListView, ComboBox, TabView, Menu, Tooltip, Dialog,
+FileDialog, and Toolbar.
 
 ## Projects
 
@@ -52,6 +52,8 @@ Broiler.UI.Tooltip
 Broiler.UI.Tooltip.Standard
 Broiler.UI.Dialog
 Broiler.UI.Dialog.Standard
+Broiler.UI.FileDialog
+Broiler.UI.FileDialog.Standard
 Broiler.UI.Toolbar
 Broiler.UI.Toolbar.Standard
 Broiler.UI.Win32.Demo

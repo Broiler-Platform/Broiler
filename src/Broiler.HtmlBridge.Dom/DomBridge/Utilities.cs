@@ -1,10 +1,6 @@
 using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
@@ -153,7 +149,7 @@ public sealed partial class DomBridge
         var hIndex = path.IndexOf('#');
         if (hIndex >= 0) path = path.Substring(0, hIndex);
 
-        var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+        var ext = Path.GetExtension(path).ToLowerInvariant();
         return ext switch
         {
             ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".ico" or ".svg" => true,
@@ -178,7 +174,7 @@ public sealed partial class DomBridge
         var hIndex = path.IndexOf('#');
         if (hIndex >= 0) path = path.Substring(0, hIndex);
 
-        var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+        var ext = Path.GetExtension(path).ToLowerInvariant();
         return ext switch
         {
             ".html" or ".htm" => "text/html",
@@ -238,7 +234,7 @@ public sealed partial class DomBridge
         {
             var decoded = Uri.UnescapeDataString(payload);
             // Strip whitespace (RFC 2045 allows folding)
-            decoded = System.Text.RegularExpressions.Regex.Replace(decoded, @"\s", string.Empty);
+            decoded = Regex.Replace(decoded, @"\s", string.Empty);
             try
             {
                 var bytes = Convert.FromBase64String(decoded);

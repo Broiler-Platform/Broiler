@@ -233,7 +233,7 @@ document.getElementById('result').textContent = d.style.getPropertyValue('conten
         // "AQID" is base64 for bytes [1, 2, 3]
         var bytes = ImageDecoder.DecodeDataUri("data:image/png;base64,AQID");
         Assert.NotNull(bytes);
-        Assert.Equal(new byte[] { 1, 2, 3 }, bytes);
+        Assert.Equal([1, 2, 3], bytes);
     }
 
     [Fact]

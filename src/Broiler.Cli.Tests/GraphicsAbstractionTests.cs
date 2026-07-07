@@ -1,14 +1,11 @@
 using BColor = Broiler.Graphics.BColor;
 using BBitmap = Broiler.HTML.Image.BBitmap;
 using BCanvas = Broiler.HTML.Image.BCanvas;
-using Broiler.Cli;
-using Broiler.Graphics;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
 using Broiler.Dom.Html;
 using Broiler.Layout.IR;
-using Broiler.HTML.Core.IR;
 using System.Drawing;
 using RectangleF = System.Drawing.RectangleF;
 
@@ -81,7 +78,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFileWithStyleSet(string.Empty, 2, 2, outputPath, Broiler.Graphics.BImageEncodeFormat.Jpeg, backgroundColor: BColor.White);
+            HtmlRender.RenderToFileWithStyleSet(string.Empty, 2, 2, outputPath, Graphics.BImageEncodeFormat.Jpeg, backgroundColor: BColor.White);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 2);
@@ -102,7 +99,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFileAutoSizedWithStyleSet("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: Broiler.Graphics.BImageEncodeFormat.Png);
+            HtmlRender.RenderToFileAutoSizedWithStyleSet("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: Graphics.BImageEncodeFormat.Png);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 8);
@@ -349,7 +346,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 128));
 
         using var copy = source.Copy();
-        using var roundTripped = BBitmap.Decode(copy.Encode(Broiler.Graphics.BImageEncodeFormat.Png));
+        using var roundTripped = BBitmap.Decode(copy.Encode(Graphics.BImageEncodeFormat.Png));
 
         Assert.Equal(source.GetPixel(0, 0), roundTripped.GetPixel(0, 0));
         Assert.Equal(source.GetPixel(1, 0), roundTripped.GetPixel(1, 0));
@@ -363,7 +360,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 2);
         source.Clear(new BColor(220, 30, 40, 255));
 
-        using var roundTripped = BBitmap.Decode(source.Encode(Broiler.Graphics.BImageEncodeFormat.Jpeg, 100));
+        using var roundTripped = BBitmap.Decode(source.Encode(Graphics.BImageEncodeFormat.Jpeg, 100));
 
         Assert.Equal(source.Width, roundTripped.Width);
         Assert.Equal(source.Height, roundTripped.Height);
@@ -385,7 +382,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
 
         using var loaded = Assert.IsType<ImageAdapter>(
-            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png))));
+            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(Graphics.BImageEncodeFormat.Png))));
         using var target = new BBitmap(4, 4);
         using var graphics = Assert.IsType<GraphicsAdapter>(target.OpenGraphics(new RectangleF(0, 0, 4, 4)));
 
@@ -1022,7 +1019,7 @@ public class GraphicsAbstractionTests
 
         path.Start(1, 2);
         path.LineTo(3, 4);
-        path.ArcTo(5, 6, 2, Broiler.Graphics.Corner.TopRight);
+        path.ArcTo(5, 6, 2, Graphics.Corner.TopRight);
 
         Assert.False(path.HasMaterializedPath);
         Assert.Empty(pathCompat.Calls);
@@ -1438,7 +1435,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(Graphics.BImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
@@ -1490,7 +1487,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(Broiler.Graphics.BImageEncodeFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(Graphics.BImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
@@ -1628,7 +1625,7 @@ public class GraphicsAbstractionTests
         pen.Width = 1;
         using var path = graphics.GetGraphicsPath();
         path.Start(1, 4);
-        path.ArcTo(4, 1, 3, Broiler.Graphics.Corner.TopLeft);
+        path.ArcTo(4, 1, 3, Graphics.Corner.TopLeft);
         path.LineTo(5, 1);
 
         graphics.DrawPath(pen, path);

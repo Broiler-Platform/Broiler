@@ -1,8 +1,4 @@
 using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
@@ -158,7 +154,7 @@ public sealed partial class DomBridge
         return new Broiler.CSS.CssParser()
             .ParseStyleSheet(cssText)
             .Rules
-            .Select(Broiler.CSS.CssSerializer.Serialize)
+            .Select(CSS.CssSerializer.Serialize)
             .ToList();
     }
 
@@ -233,7 +229,7 @@ public sealed partial class DomBridge
         .ToList();
 
     private static JSObject BuildCssKeyframeRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject parentRule) =>
-        BuildCssKeyframeRuleObject(Broiler.CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+        BuildCssKeyframeRuleObject(CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
 
     private static JSObject BuildCssKeyframeRuleObject(string ruleText, JSObject parentStyleSheet, JSObject parentRule)
     {
@@ -296,7 +292,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static JSObject BuildCssRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject? parentRule = null) =>
         BuildCssRuleObject(
-            Broiler.CSS.CssSerializer.Serialize(rule),
+            CSS.CssSerializer.Serialize(rule),
             parentStyleSheet,
             parentRule,
             // Drive the nested @media/@keyframes/@supports/@layer rule objects from the
@@ -599,7 +595,7 @@ public sealed partial class DomBridge
             string? prefix = null;
             var namespaceUri = string.Empty;
 
-            var parts = namespaceBody.Split(new[] { ' ', '\t', '\r', '\n' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            var parts = namespaceBody.Split([' ', '\t', '\r', '\n'], 2, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 2)
             {
                 prefix = parts[0];

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using Broiler.Graphics;
 using Broiler.UI.Button.Standard;
-using Broiler.UI.CheckBox;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.Edit.Standard;
 using Broiler.UI.Label;

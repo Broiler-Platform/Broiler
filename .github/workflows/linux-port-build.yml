@@ -32,12 +32,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -67,7 +67,7 @@ jobs:
             -p:EnableCompressionInSingleFile=true
 
       - name: Upload Linux demo artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: broiler-graphics-linux-demo-linux-x64
           path: ${{ runner.temp }}/broiler-graphics-linux-demo
@@ -84,7 +84,7 @@ jobs:
             -p:EnableCompressionInSingleFile=true
 
       - name: Upload Linux UI demo artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: broiler-ui-linux-demo-linux-x64
           path: ${{ runner.temp }}/broiler-ui-linux-demo
@@ -101,7 +101,7 @@ jobs:
             -p:EnableCompressionInSingleFile=true
 
       - name: Upload Linux input diagnostic artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: broiler-input-linux-diagnostic-linux-x64
           path: ${{ runner.temp }}/broiler-input-linux-diagnostic

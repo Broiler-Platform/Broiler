@@ -1,16 +1,10 @@
-using Broiler.JavaScript.BuiltIns.Null;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
-using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 
 namespace Broiler.HtmlBridge;
@@ -222,7 +216,7 @@ public sealed partial class DomBridge
         if (replacedElementLength > 0)
             return replacedElementLength;
 
-        return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+        return EstimateAutoContentExtent(element, vertical, []);
     }
 
     private static double ResolveReplacedElementAttributeExtent(DomElement element, bool vertical)
@@ -957,7 +951,7 @@ public sealed partial class DomBridge
             element.Attributes.TryGetValue("viewBox", out var viewBox) &&
             !string.IsNullOrWhiteSpace(viewBox))
         {
-            var parts = viewBox.Split(new[] { ' ', ',', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = viewBox.Split([' ', ',', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 4 &&
                 double.TryParse(parts[vertical ? 3 : 2], System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out var viewBoxLength))
@@ -999,7 +993,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(transform))
             return 1;
 
-        var match = System.Text.RegularExpressions.Regex.Match(transform, @"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase);
+        var match = Regex.Match(transform, @"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase);
         if (match.Success &&
             double.TryParse(match.Groups["value"].Value, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out double scale))
@@ -1018,7 +1012,7 @@ public sealed partial class DomBridge
 
         double translateX = 0;
         double translateY = 0;
-        foreach (Match match in System.Text.RegularExpressions.Regex.Matches(
+        foreach (Match match in Regex.Matches(
                      transform,
                      @"translate\(\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[,\s]+(?<y>[-+]?[0-9]*\.?[0-9]+))?\s*\)",
                      RegexOptions.IgnoreCase))
@@ -1249,7 +1243,7 @@ public sealed partial class DomBridge
             return false;
         }
 
-        var moveMatch = System.Text.RegularExpressions.Regex.Match(
+        var moveMatch = Regex.Match(
             pathData,
             @"[Mm]\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[\s,]+(?<y>[-+]?[0-9]*\.?[0-9]+))",
             RegexOptions.CultureInvariant);
@@ -1530,7 +1524,7 @@ public sealed partial class DomBridge
 
         if (string.Equals(effectiveBehavior, "smooth", StringComparison.OrdinalIgnoreCase))
         {
-            var token = System.Threading.Interlocked.Increment(ref _frameActionIdCounter);
+            var token = Interlocked.Increment(ref _frameActionIdCounter);
             _smoothScrollTokens[element] = token;
             QueueFrameAction(() =>
             {
@@ -1567,7 +1561,7 @@ public sealed partial class DomBridge
 
     private void QueueFrameAction(Action callback)
     {
-        _frameActions[System.Threading.Interlocked.Increment(ref _frameActionIdCounter)] = callback;
+        _frameActions[Interlocked.Increment(ref _frameActionIdCounter)] = callback;
     }
 
     private void CancelSmoothScroll(DomElement element)

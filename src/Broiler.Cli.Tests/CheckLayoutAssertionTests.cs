@@ -1,4 +1,3 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
 
@@ -58,9 +57,9 @@ public sealed class CheckLayoutAssertionTests
 
         var byProperty = bridge.EvaluateCheckLayoutAssertions().ToDictionary(a => a.Property);
 
-        Assert.True(System.Math.Abs(120 - byProperty["width"].Actual) <= 1.0,
+        Assert.True(Math.Abs(120 - byProperty["width"].Actual) <= 1.0,
             $"offsetWidth expected ~120, got {byProperty["width"].Actual}");
-        Assert.True(System.Math.Abs(30 - byProperty["height"].Actual) <= 1.0,
+        Assert.True(Math.Abs(30 - byProperty["height"].Actual) <= 1.0,
             $"offsetHeight expected ~30, got {byProperty["height"].Actual}");
     }
 

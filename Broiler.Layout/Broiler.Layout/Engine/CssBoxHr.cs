@@ -1,6 +1,5 @@
-﻿using System.Drawing;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+﻿using Broiler.CSS;
+using System.Drawing;
 
 
 namespace Broiler.Layout.Engine;
@@ -20,6 +19,7 @@ internal sealed class CssBoxHr : CssBox
         double left = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ActualMarginLeft + ContainingBlock.ActualBorderLeftWidth;
         double marginCollapse = MarginTopCollapse(prevSibling);
         double top = (prevSibling == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + (prevSibling != null ? prevSibling.ActualBottom + prevSibling.ActualBorderBottomWidth : 0);
+
         Location = new PointF((float)left, (float)top);
         ActualBottom = top;
 
@@ -32,7 +32,7 @@ internal sealed class CssBoxHr : CssBox
 
         //Check width if not auto
         if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
-            width = CssValueParser.ParseLength(Width, width, GetEmHeight());
+            width = CssLengthParser.ParseLength(Width, width, GetEmHeight());
 
         if (width < minwidth || width >= 9999)
             width = minwidth;

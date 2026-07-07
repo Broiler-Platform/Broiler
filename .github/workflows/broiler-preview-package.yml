@@ -30,14 +30,14 @@ jobs:
 
     steps:
       - name: Checkout selected branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.branch }}
           submodules: recursive
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -188,14 +188,14 @@ jobs:
           }
 
       - name: Upload Win32 framework-dependent BPP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BPP-Win32-framework-dependent
           path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent.*
           if-no-files-found: error
 
       - name: Upload Win32 self-contained BPP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BPP-Win32-self-contained
           path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained.*
@@ -208,14 +208,14 @@ jobs:
 
     steps:
       - name: Checkout selected branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.branch }}
           submodules: recursive
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -383,14 +383,14 @@ jobs:
           }
 
       - name: Upload Linux framework-dependent BPP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BPP-Linux-framework-dependent
           path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent.tar.*
           if-no-files-found: error
 
       - name: Upload Linux self-contained BPP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BPP-Linux-self-contained
           path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.*
@@ -406,13 +406,13 @@ jobs:
 
     steps:
       - name: Checkout selected branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
 
       - name: Download package assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: BPP-*
           path: ${{ runner.temp }}/release-assets

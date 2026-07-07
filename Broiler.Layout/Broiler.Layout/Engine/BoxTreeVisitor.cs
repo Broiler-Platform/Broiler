@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 namespace Broiler.Layout.Engine;
 
 /// <summary>
@@ -44,14 +42,17 @@ internal abstract class BoxTreeVisitor
     public static List<CssBox> Flatten(CssBox root)
     {
         ArgumentNullException.ThrowIfNull(root);
+        
         var result = new List<CssBox>();
         FlattenCore(root, result);
+        
         return result;
     }
 
     private static void FlattenCore(CssBox box, List<CssBox> result)
     {
         result.Add(box);
+        
         foreach (var child in box.Boxes)
             FlattenCore(child, result);
     }

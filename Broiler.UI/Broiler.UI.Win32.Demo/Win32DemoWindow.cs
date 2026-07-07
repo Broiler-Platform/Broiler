@@ -15,7 +15,6 @@ using Broiler.UI.Button.Standard;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.ComboBox;
 using Broiler.UI.ComboBox.Standard;
-using Broiler.UI.Dialog;
 using Broiler.UI.Dialog.Standard;
 using Broiler.UI.Edit.Standard;
 using Broiler.UI.ImageView;

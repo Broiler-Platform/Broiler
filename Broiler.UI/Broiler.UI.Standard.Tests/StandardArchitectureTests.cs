@@ -1,7 +1,5 @@
 using System.Xml.Linq;
 using System.Reflection;
-using Broiler.UI;
-using Broiler.UI.Standard;
 
 namespace Broiler.UI.Standard.Tests;
 

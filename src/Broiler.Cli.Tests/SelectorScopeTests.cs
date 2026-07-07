@@ -1,5 +1,3 @@
-using Broiler.Cli;
-
 namespace Broiler.Cli.Tests;
 
 public class SelectorScopeTests

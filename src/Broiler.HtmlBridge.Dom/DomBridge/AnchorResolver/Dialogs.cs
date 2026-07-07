@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text.RegularExpressions;
-
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
@@ -134,10 +128,10 @@ public sealed partial class DomBridge
     /// moved by <c>position-try-fallbacks</c>).
     /// </summary>
     private static readonly string[] BackdropGeometryProps =
-    {
+    [
         "width", "height", "left", "right", "top", "bottom",
         "position", "position-anchor", "position-try-fallbacks", "position-try",
-    };
+    ];
 
     /// <summary>
     /// Overlays author-declared <c>::backdrop</c> geometry / fallback

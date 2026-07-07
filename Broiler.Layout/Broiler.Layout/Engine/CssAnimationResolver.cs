@@ -1,9 +1,6 @@
 #nullable disable
-using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Broiler.CSS;
 using Broiler.Graphics;
@@ -19,7 +16,7 @@ namespace Broiler.Layout.Engine;
 internal static class CssAnimationResolver
 {
     private const double WptSnapshotFrameRateHz = 60.0;
-    private static readonly ConditionalWeakTable<CssStyleSheet, IReadOnlyDictionary<string, AnimationRule>> RuleCache = new();
+    private static readonly ConditionalWeakTable<CssStyleSheet, IReadOnlyDictionary<string, AnimationRule>> RuleCache = [];
 
     private sealed record AnimationStop(double Offset, Dictionary<string, string> Properties);
     private sealed record AnimationRule(IReadOnlyList<AnimationStop> Stops);
@@ -32,11 +29,12 @@ internal static class CssAnimationResolver
     public static void ResolveAnimations(CssBox box, CssStyleSheet styleSheet)
     {
         string animName = box.AnimationName;
-        if (string.IsNullOrEmpty(animName) ||
-            animName.Equals("none", StringComparison.OrdinalIgnoreCase))
+
+        if (string.IsNullOrEmpty(animName) || animName.Equals("none", StringComparison.OrdinalIgnoreCase))
             return;
 
         var rules = RuleCache.GetValue(styleSheet, BuildAnimationRules);
+
         if (!rules.TryGetValue(animName, out var rule) || rule.Stops.Count == 0)
             return;
 
@@ -50,11 +48,13 @@ internal static class CssAnimationResolver
         // post-load Chromium screenshot taken by the non-JS WPT runner.
         const double snapshotLeadSeconds = 1.0 / WptSnapshotFrameRateHz;
         double elapsedSeconds = snapshotLeadSeconds - delaySeconds;
+
         if (elapsedSeconds < 0)
             elapsedSeconds = 0;
 
         // Compute the raw progress (0.0 to 1.0)
         double progress;
+
         if (durationSeconds <= 0)
         {
             // Zero or negative duration means the animation completes instantly.
@@ -76,15 +76,14 @@ internal static class CssAnimationResolver
     private static IReadOnlyDictionary<string, AnimationRule> BuildAnimationRules(CssStyleSheet styleSheet)
     {
         var result = new Dictionary<string, AnimationRule>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var atRule in styleSheet.Rules.OfType<CssAtRule>())
         {
-            if (atRule.Name is not ("keyframes" or "-webkit-keyframes") ||
-                string.IsNullOrWhiteSpace(atRule.Prelude))
-            {
+            if (atRule.Name is not ("keyframes" or "-webkit-keyframes") || string.IsNullOrWhiteSpace(atRule.Prelude))
                 continue;
-            }
 
             var stops = new List<AnimationStop>();
+
             foreach (var styleRule in atRule.Rules.OfType<CssStyleRule>())
             {
                 var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -98,8 +97,7 @@ internal static class CssAnimationResolver
                 }
             }
 
-            result[Unquote(atRule.Prelude.Trim())] = new AnimationRule(
-                stops.OrderBy(static stop => stop.Offset).ToArray());
+            result[Unquote(atRule.Prelude.Trim())] = new AnimationRule([.. stops.OrderBy(static stop => stop.Offset)]);
         }
 
         return result;
@@ -129,8 +127,9 @@ internal static class CssAnimationResolver
         return false;
     }
 
-    private static string Unquote(string value) =>
-        value.Length >= 2 && ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\''))
+    private static string Unquote(string value) => 
+        value.Length >= 2 && 
+        ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\''))
             ? value[1..^1]
             : value;
 
@@ -146,14 +145,12 @@ internal static class CssAnimationResolver
 
         if (value.EndsWith("ms"))
         {
-            if (double.TryParse(value.AsSpan(0, value.Length - 2),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out double ms))
+            if (double.TryParse(value.AsSpan(0, value.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out double ms))
                 return ms / 1000.0;
         }
-        else if (value.EndsWith("s"))
+        else if (value.EndsWith('s'))
         {
-            if (double.TryParse(value.AsSpan(0, value.Length - 1),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out double s))
+            if (double.TryParse(value.AsSpan(0, value.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double s))
                 return s;
         }
 
@@ -191,11 +188,13 @@ internal static class CssAnimationResolver
         // Extract the parameters from "cubic-bezier(x1, y1, x2, y2)"
         int start = value.IndexOf('(');
         int end = value.LastIndexOf(')');
+        
         if (start < 0 || end <= start)
             return progress;
 
         var paramsStr = value.Substring(start + 1, end - start - 1);
         var parts = paramsStr.Split(',', StringSplitOptions.TrimEntries);
+        
         if (parts.Length != 4)
             return progress;
 
@@ -222,14 +221,17 @@ internal static class CssAnimationResolver
 
         // Solve for t where bezierX(t) = x using Newton-Raphson
         double t = x; // initial guess
+
         for (int i = 0; i < 20; i++)
         {
             double xt = BezierComponent(t, x1, x2);
             double dx = xt - x;
+
             if (Math.Abs(dx) < 1e-7)
                 break;
 
             double dxdt = BezierDerivative(t, x1, x2);
+
             if (Math.Abs(dxdt) < 1e-7)
                 break;
 
@@ -271,9 +273,12 @@ internal static class CssAnimationResolver
     {
         // Collect all animatable property names across all stops
         var propertyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var stop in rule.Stops)
+        {
             foreach (var key in stop.Properties.Keys)
                 propertyNames.Add(key);
+        }
 
         foreach (var propName in propertyNames)
         {
@@ -284,6 +289,7 @@ internal static class CssAnimationResolver
             for (int i = 0; i < rule.Stops.Count; i++)
             {
                 var stop = rule.Stops[i];
+                
                 if (!stop.Properties.ContainsKey(propName))
                     continue;
 
@@ -393,11 +399,13 @@ internal static class CssAnimationResolver
         {
             int paren = value.IndexOf('(');
             int end = value.IndexOf(')');
+
             if (paren >= 0 && end > paren)
             {
                 var inner = value.Substring(paren + 1, end - paren - 1);
                 // Support both comma and space separators
-                var parts = inner.Split(new[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var parts = inner.Split([',', ' ', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                
                 if (parts.Length >= 3)
                 {
                     if (int.TryParse(parts[0], out int r) &&
@@ -405,11 +413,13 @@ internal static class CssAnimationResolver
                         int.TryParse(parts[2], out int b))
                     {
                         int a = 255;
+                        
                         if (parts.Length >= 4)
                         {
                             if (double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double alpha))
                                 a = (int)Math.Round(alpha <= 1.0 ? alpha * 255 : alpha);
                         }
+                        
                         color = BColor.FromArgb(a, r, g, b);
                         return true;
                     }
@@ -420,26 +430,31 @@ internal static class CssAnimationResolver
         // Try hex: #RGB, #RRGGBB, #RRGGBBAA
         if (value.StartsWith('#'))
         {
-            string hex = value.Substring(1);
+            string hex = value[1..];
+            
             if (hex.Length == 3)
             {
                 int r = Convert.ToInt32(new string(hex[0], 2), 16);
                 int g = Convert.ToInt32(new string(hex[1], 2), 16);
                 int b = Convert.ToInt32(new string(hex[2], 2), 16);
+                
                 color = BColor.FromArgb(255, r, g, b);
                 return true;
             }
+            
             if (hex.Length == 6)
             {
-                int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                int r = Convert.ToInt32(hex[..2], 16);
                 int g = Convert.ToInt32(hex.Substring(2, 2), 16);
                 int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+                
                 color = BColor.FromArgb(255, r, g, b);
                 return true;
             }
+            
             if (hex.Length == 8)
             {
-                int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                int r = Convert.ToInt32(hex[..2], 16);
                 int g = Convert.ToInt32(hex.Substring(2, 2), 16);
                 int b = Convert.ToInt32(hex.Substring(4, 2), 16);
                 int a = Convert.ToInt32(hex.Substring(6, 2), 16);
@@ -458,6 +473,7 @@ internal static class CssAnimationResolver
         try
         {
             var named = BColor.FromName(value);
+
             if (!named.IsEmpty)
             {
                 color = named;

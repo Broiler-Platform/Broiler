@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Broiler.Cli;
 using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;

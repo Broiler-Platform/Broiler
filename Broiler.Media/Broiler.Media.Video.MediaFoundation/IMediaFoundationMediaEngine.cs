@@ -1,5 +1,4 @@
 using System;
-using Broiler.Media.Video;
 
 namespace Broiler.Media.Video.MediaFoundation;
 

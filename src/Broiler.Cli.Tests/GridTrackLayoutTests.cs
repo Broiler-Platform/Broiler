@@ -1,9 +1,6 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Broiler.HtmlBridge;
 using Broiler.JavaScript.Engine;
-using Xunit;
 
 namespace Broiler.Cli.Tests;
 
@@ -41,7 +38,7 @@ public sealed class GridTrackLayoutTests
     // One entry per <div class="grid ..."> block, in document order, with the
     // expected offset/size the WPT test asserts for each child.
     private static readonly (bool ColumnFlow, Item[] Items)[] Containers =
-    {
+    [
         (false, new[]
         {
             new Item("firstRowSecondColumn", 50, 0, 100, 50),
@@ -114,7 +111,7 @@ public sealed class GridTrackLayoutTests
             new Item("autoRowFirstColumn", 0, 0, 50, 50),
             new Item("autoRowAutoColumn", 150, 50, 150, 100),
         }),
-    };
+    ];
 
     private static string BuildHtml()
     {
@@ -158,7 +155,7 @@ public sealed class GridTrackLayoutTests
         var assertions = bridge.EvaluateCheckLayoutAssertions();
 
         var failures = assertions
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 
@@ -197,7 +194,7 @@ public sealed class GridTrackLayoutTests
             .ToDictionary(a => a.Element + "/" + a.Property, a => a);
 
         var failures = byKey.Values
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 
@@ -216,7 +213,7 @@ public sealed class GridTrackLayoutTests
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();
         var failures = assertions
-            .Where(a => System.Math.Abs(a.Expected - a.Actual) > 0.5)
+            .Where(a => Math.Abs(a.Expected - a.Actual) > 0.5)
             .Select(a => $"{a.Element} {a.Property}: expected {a.Expected}, got {a.Actual:0.##}")
             .ToList();
 

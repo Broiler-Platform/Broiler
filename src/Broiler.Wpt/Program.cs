@@ -236,7 +236,7 @@ public class Program
         // separate render path and are not captured here (the engine hook still
         // reports them for any consumer that calls GetComputedStyle).
         var droppedDeclarations = new DroppedDeclarationCollector();
-        Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected = droppedDeclarations.Record;
+        CSS.Dom.CssEngineDiagnostics.DeclarationRejected = droppedDeclarations.Record;
 
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
         var discoveredTests = WptTestRunner
@@ -430,7 +430,7 @@ public class Program
         }
 
         // The aggregate is complete; stop collecting and snapshot the top entries.
-        Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected = null;
+        CSS.Dom.CssEngineDiagnostics.DeclarationRejected = null;
         var topDropped = droppedDeclarations.Top(TopBucketLimit);
         var topExceptionSignatures = ExceptionSignature.Buckets(failures, TopBucketLimit);
 

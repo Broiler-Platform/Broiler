@@ -2,11 +2,7 @@ using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
@@ -50,13 +46,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
     private readonly HashSet<DomElement> _knownNodes =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly List<(JSObject Observer, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
     private readonly DomElement _documentNode;
-    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = new();
+    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -88,19 +84,19 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<JSObject, Dictionary<string, List<EventListenerRegistration>>> _eventTargetListeners =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, DomElement> _subWindowContainers =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, JSObject> _messagePortPeers =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<JSObject> _closedMessagePorts =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<JSObject> _startedMessagePorts =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, List<JSObject>> _queuedMessagePortEvents =
-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        new(ReferenceEqualityComparer.Instance);
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -701,8 +697,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // the document) reads it while sizing the root/body boxes for the
         // quirks-mode fill-viewport behaviour. Every WPT render runs through this
         // parse before laying out, so the flag is set for the render that matters.
-        Broiler.Layout.DocumentModeContext.CurrentQuirksMode =
-            Broiler.Layout.DocumentModeContext.IsQuirksHtml(html);
+        Layout.DocumentModeContext.CurrentQuirksMode =
+            Layout.DocumentModeContext.IsQuirksHtml(html);
 
         // Use WHATWG-aligned tokeniser & tree builder
         var builder = new HtmlTreeBuilder();
@@ -838,7 +834,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             {
                 // Report the raw value (without the synthetic " !important" suffix) so
                 // inline drops aggregate identically to the engine's stylesheet drops.
-                Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, declaration.Value.Text);
+                CSS.Dom.CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, declaration.Value.Text);
             }
         }
         return result;

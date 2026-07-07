@@ -1,5 +1,4 @@
 using System;
-using Broiler.UI.Panel;
 
 namespace Broiler.UI.Panel.Standard;
 

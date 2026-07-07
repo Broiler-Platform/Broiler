@@ -13,6 +13,8 @@ runtime assembly.
 |---|---|
 | `Broiler.UI.Dialog` | `UiDialog` abstraction over `UiWindow` with modal/modeless presentation, asynchronous result completion, and focus/capture restoration |
 | `Broiler.UI.Dialog.Standard` | Broiler-drawn `StandardDialog` chrome with title bar, content arrangement, Escape cancel, Enter accept, and managed owned-window placement |
+| `Broiler.UI.FileDialog` | `UiFileDialog` abstraction for tiny open/save workflows that return the selected full path through `UiDialogResult.Value`, including optional filename filters and default extensions |
+| `Broiler.UI.FileDialog.Standard` | Broiler-drawn `StandardFileDialog` with one filename edit, one files list, one directories list, a current-directory line, Up, and OK/Cancel buttons |
 
 ## Core Host Ports
 
@@ -48,6 +50,9 @@ and keyboard input outside the modal subtree is routed back to the dialog.
 
 `StandardDialog` renders with `Broiler.Graphics` render-list commands and
 consumes `Broiler.Input` keyboard/mouse events routed through `UiInputEvent`.
+`UiDialog` also centralizes classic title-bar dragging by updating owned-window
+placement while pointer capture is held; standard dialog implementations define
+their title-bar hit area as the move grip.
 
 ## Edit, IME, and Accessibility Evidence
 
@@ -89,6 +94,9 @@ The Phase 7 tests prove:
   and password redaction;
 - cursor, drag/drop, accessibility, and system-settings host ports are neutral;
 - Dialog projects keep the approved `Dialog -> Window` abstraction edge; and
+- FileDialog projects keep the same neutral dialog boundary while exercising
+  real `System.IO` file/directory listing, filtering, parent navigation, and
+  default-extension behavior; and
 - Phase 7 runtime assemblies expose no native handle, Windows, Direct2D, COM,
   or UI Automation surface.
 

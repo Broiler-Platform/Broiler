@@ -1,9 +1,6 @@
-using Broiler.Graphics;
-﻿using System.Drawing;
+using Broiler.CSS;
 using System.Globalization;
-using System.Net;
-using CssConstants = Broiler.CSS.CssConstants;
-using CssValueParser = Broiler.CSS.CssLengthParser;
+
 
 namespace Broiler.Layout.Engine;
 
@@ -26,7 +23,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// length against the containing block.</summary>
     private static bool IsIntrinsicSizingWidthKeyword(string value)
     {
-        if (string.IsNullOrEmpty(value)) return false;
+        if (string.IsNullOrEmpty(value))
+            return false;
+
         string v = value.Trim();
         return v.Equals("min-content", StringComparison.OrdinalIgnoreCase)
             || v.Equals("max-content", StringComparison.OrdinalIgnoreCase)
@@ -72,13 +71,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight)
             && !(MaxHeight.Contains('%') && cbIndefinite))
         {
-            double maxH = CssValueParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
+            double maxH = CssLengthParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
             if (specifiedHeight > maxH) specifiedHeight = maxH;
         }
         if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight)
             && !(MinHeight.Contains('%') && cbIndefinite))
         {
-            double minH = CssValueParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
+            double minH = CssLengthParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
             if (specifiedHeight < minH) specifiedHeight = minH;
         }
         return specifiedHeight;
@@ -316,22 +315,26 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     internal static bool TryParseAspectRatio(string value, out double ratio)
     {
         ratio = 0;
+
         if (string.IsNullOrWhiteSpace(value))
             return false;
+
         double w = double.NaN, h = 1;
+
         foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
         {
             if (token.Equals("auto", StringComparison.OrdinalIgnoreCase)
                 || token.Equals("none", StringComparison.OrdinalIgnoreCase))
                 continue;
+
             int slash = token.IndexOf('/');
             if (slash >= 0)
             {
                 if (!double.TryParse(token[..slash].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out w))
                     return false;
+
                 string rest = token[(slash + 1)..].Trim();
-                if (rest.Length > 0
-                    && !double.TryParse(rest, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
+                if (rest.Length > 0 && !double.TryParse(rest, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
                     return false;
             }
             else if (double.IsNaN(w))
@@ -348,6 +351,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
         if (double.IsNaN(w) || !(w > 0) || !(h > 0))
             return false;
+
         ratio = w / h;
         return true;
     }
@@ -371,7 +375,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private static bool IsPercentageWidth(string width) =>
         !string.IsNullOrEmpty(width)
-        && width.EndsWith("%", StringComparison.Ordinal)
+        && width.EndsWith('%')
         && !width.Contains('(');
 
     /// <summary>
@@ -387,6 +391,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         double available = availableContentWidth - ActualMarginLeft - ActualMarginRight;
         double content;
+        
         if (string.Equals(keyword, "min-content", StringComparison.OrdinalIgnoreCase))
         {
             content = ComputeIntrinsicInlineSize(useMin: true);
@@ -399,6 +404,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             double max = ComputeIntrinsicInlineSize(useMin: false);
             double min = ComputeIntrinsicInlineSize(useMin: true);
+
             content = Math.Min(Math.Max(min, available), max);
         }
 
@@ -439,6 +445,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
 
             childWidth += child.ActualMarginLeft + child.ActualMarginRight;
+
             if (!double.IsNaN(childWidth))
                 maxLineWidth = Math.Max(maxLineWidth, childWidth);
         }
@@ -459,16 +466,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             return Size.Width;
 
         double maxRight = 0;
+
         foreach (var child in Boxes)
         {
-            if (child.Display == CssConstants.None) continue;
+            if (child.Display == CssConstants.None) 
+                continue;
+            
             double childRight = (child.Location.X - Location.X)
                                 + child.Size.Width
                                 + child.ActualMarginRight;
             maxRight = Math.Max(maxRight, childRight);
         }
 
-        if (maxRight <= 0) return Size.Width;
+        if (maxRight <= 0) 
+            return Size.Width;
 
         return maxRight + ActualPaddingRight + ActualBorderRightWidth;
     }
@@ -489,12 +500,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         double maxBottom = 0;
+        
         foreach (var child in Boxes)
         {
-            if (child.Display == CssConstants.None) continue;
+            if (child.Display == CssConstants.None) 
+                continue;
+            
             double childBottom = (child.Location.Y - Location.Y)
                                  + (child.ActualBottom - child.Location.Y)
                                  + child.ActualMarginBottom;
+            
             maxBottom = Math.Max(maxBottom, childBottom);
         }
 
@@ -532,9 +547,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 || child.Position == CssConstants.Fixed
                 || (child.Overflow != null && child.Overflow != CssConstants.Visible)
                 || (child.AlignContent != null && child.AlignContent != "normal");
+
             if (!childIsBfc)
                 FindMaxDescendantFloatBottom(child, ref maxBottom);
         }
     }
-
 }

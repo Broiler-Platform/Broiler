@@ -1,5 +1,3 @@
-using Broiler.Input;
-
 namespace Broiler.Input.Text;
 
 public readonly record struct TextInputEvent(
