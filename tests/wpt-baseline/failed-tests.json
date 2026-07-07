@@ -5,84 +5,41 @@
     "skipped": 0,
     "total": 16186
   },
-  "shardCount": 8,
+  "shardCount": 0,
   "problemLimit": 10,
-  "incompleteShards": [],
+  "incompleteShards": [
+    {
+      "shardIndex": 7,
+      "exitCode": 1
+    }
+  ],
   "topProblems": [
     {
-      "key": "Timeout",
-      "label": "Timeout",
-      "category": "Timeout",
+      "key": "ShardProcessError",
+      "label": "Shard process failure",
+      "category": "ShardProcessError",
       "subCategory": null,
-      "count": 28,
-      "examples": [
-        "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
-        "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html",
-        "encoding/legacy-mb-korean/euc-kr/euckr_chars-korean.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:MissingContent",
-      "label": "PixelMismatch / MissingContent",
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent",
       "count": 1,
       "examples": [
-        "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html"
+        "shard 7 (exit 1)"
       ]
     }
   ],
-  "topFailingDirectories": [
-    [
-      "encoding/legacy-mb-japanese",
-      13
-    ],
-    [
-      "encoding/legacy-mb-korean",
-      10
-    ],
-    [
-      "encoding/legacy-mb-tchinese",
-      6
-    ]
-  ],
-  "failuresByCategory": [
-    [
-      "Timeout",
-      28
-    ],
-    [
-      "PixelMismatch",
-      1
-    ]
-  ],
+  "topFailingDirectories": [],
+  "failuresByCategory": [],
   "droppedDeclarations": [],
   "exceptionSignatures": [],
-  "failureFamilies": [
-    {
-      "family": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_{N}-{N}.html",
-      "count": 2,
-      "categories": {
-        "Timeout": 2
-      },
-      "examples": [
-        "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_5601-1989.html",
-        "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_5601-1987.html"
-      ]
-    }
-  ],
+  "failureFamilies": [],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
   "biggestProblems": [
     {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 61.864725748697914,
+      "kind": "IncompleteShards",
+      "tier": 0,
+      "severity": 1,
       "impact": 1,
-      "matchPercent": 38.135274251302086,
-      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
-      "title": "38.1% match \u2014 encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
-      "detail": "Rendered output matches the reference by only 38.1% (PixelMismatch / MissingContent)."
+      "title": "1 shard(s) did not complete",
+      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 7 (exit 1)."
     }
   ],
   "results": [
