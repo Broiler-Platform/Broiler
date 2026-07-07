@@ -70,6 +70,35 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.Contains("color: red", serialized);
     }
 
+    [Fact]
+    public void Modern_WhiteSpace_Shorthand_Is_Not_Dropped()
+    {
+        // CSS Text 4: white-space is a shorthand for white-space-collapse and
+        // text-wrap-mode. The modern longhand-style values must survive the
+        // bridge's IsAcceptableCssValue filter (issue #1272), while a truly
+        // bogus keyword is still dropped and reported.
+        var rejected = RunWithDiagnostics(
+            "document.getElementById('t').setAttribute('style', "
+            + "'white-space: break-spaces nowrap; --x: 1; white-space: x-bogus');");
+
+        Assert.DoesNotContain(rejected, e => e.Property == "white-space" && e.Value == "break-spaces nowrap");
+        Assert.Contains(("white-space", "x-bogus"), rejected);
+    }
+
+    [Fact]
+    public void Modern_WhiteSpace_Value_Survives_Serialization()
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, Html, "file:///inline-drop.html");
+        context.Eval(
+            "document.getElementById('t').setAttribute('style', 'white-space: preserve-breaks');");
+
+        var serialized = bridge.SerializeToHtml();
+
+        Assert.Contains("preserve-breaks", serialized);
+    }
+
     private static List<(string Property, string Value)> RunWithDiagnostics(string script)
     {
         using var context = new JSContext();

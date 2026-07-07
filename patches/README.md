@@ -67,6 +67,37 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   `DomBridge.IsAcceptableCssValue`) was updated in the same commit, so JS-set
   `element.style.textTransform` accepts the full grammar on CI regardless.
 
+- **0007-css-white-space-shorthand.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — makes `IsAcceptableDeclarationValue`
+  validate the **full** CSS Text 4 §3 `white-space` shorthand grammar
+  (`normal | pre | nowrap | pre-wrap | pre-line |
+  <'white-space-collapse'> || <'text-wrap-mode'>`) via a new `IsWhiteSpaceValue`
+  helper. `white-space` is a shorthand for `white-space-collapse`
+  (`collapse | preserve | preserve-breaks | preserve-spaces | break-spaces`) and
+  `text-wrap-mode` (`wrap | nowrap`). The validator previously accepted only the
+  legacy single keywords plus `break-spaces`, so it dropped the modern single
+  keywords and the two-longhand form — `white-space: preserve-breaks` (152 drops
+  in issue #1272), `white-space: preserve-breaks nowrap` (120) and
+  `white-space: break-spaces nowrap` (120) — as invalid, discarding the whole
+  declaration and falling back to a stale cascade value. (The genuinely invalid
+  `white-space: balance` / `balance preserve` — `balance` is a `text-wrap-style`
+  value, not a `white-space` one — stay correctly dropped.)
+  **No active CI fallback for the new values — they stay dropped until the patch
+  lands.** Unlike patch 0006, the modern shorthand keywords are **not** accepted by
+  the pinned validator, so the render cascade (`SharedRendererCascade` →
+  `CssUtils.SetPropertyValue`) never receives them on CI until a maintainer applies
+  this patch and bumps the pointer. The companion **main-repo** pieces are in place
+  and inert-but-ready: `Broiler.Layout` `CssUtils.NormalizeWhiteSpaceValue`
+  (guarded by `WhiteSpaceNormalizationTests`) folds a shorthand value onto the
+  legacy keyword the engine keys off — `preserve-breaks`→`pre-line`,
+  `preserve`→`pre-wrap`, the two-value `collapse|preserve|… × wrap|nowrap` combos,
+  and `break-spaces` passthrough — so the values light up as soon as they stop
+  being dropped, and it is a no-op for the values the pinned validator already
+  accepts. The companion CSSOM-side validator (main-repo
+  `DomBridge.IsAcceptableCssValue`, guarded by `InlineStyleDropDiagnosticsTests`)
+  was updated in the same parent commit, so JS-set `element.style.whiteSpace`
+  accepts the full grammar on CI regardless.
+
 ## Applied / obsolete
 
 - **0004-css-expand-margin-padding-shorthand-cascade.patch** → `Broiler.CSS`
