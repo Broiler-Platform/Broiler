@@ -98,6 +98,33 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   was updated in the same parent commit, so JS-set `element.style.whiteSpace`
   accepts the full grammar on CI regardless.
 
+- **0008-css-font-shorthand-slash-whitespace.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — makes `ExpandFontShorthand` parse
+  the `font` shorthand's `<size> [ / <line-height> ]?` component when the slash
+  carries surrounding white space (`50px / 1 Ahem`, `50px /1 Ahem`, `50px/ 1 Ahem`).
+  `SplitCssValues` tokenizes on white space, so a spaced slash became its own token
+  (or glued to only one side); the size classifier then read `50px` as a size with
+  no line-height and folded `/ 1 <family>` into font-family — an unmatchable family
+  string, so the element silently fell back to the default font (e.g. Ahem never
+  loaded, glyph advance ½ the intended, `ch` widths and wrapping all wrong). A new
+  `NormalizeFontSlashTokens` glues the slash back onto the size token first, so
+  every spacing expands to the same longhands (guard
+  `CssStyleEngineTests.Font_Shorthand_Expands_With_Whitespace_Around_LineHeight_Slash`,
+  4 spacings). This blocks the `css/css-text` Ahem reftests that declare
+  `font: <size> / <line-height> Ahem` (the whole `line-break/line-break-anywhere-*`
+  family and many others) — with the family dropped, Ahem's fixed-metric glyphs
+  are replaced by a proportional fallback and no `Nch`/green-square geometry matches.
+  **No active CI fallback — the values stay wrong until the patch lands.** Font
+  shorthand expansion lives entirely in the `Broiler.CSS` engine
+  (`CssStyleEngine.ExpandFontShorthand`, run inside `GetCascadedStyle`); the render
+  cascade (`SharedRendererCascade` → `CssUtils.SetPropertyValue`) only ever sees the
+  already-expanded longhands, so there is no parent-repo layer to reproduce the fix.
+  The companion **main-repo** `line-break: anywhere` and CSS `ch`-unit fixes
+  (`Broiler.Layout`, cluster 38) are live on CI now and cover any test whose font
+  parses correctly (an unspaced `font: 50px/1 Ahem` plus `line-break:anywhere` /
+  `ch` widths passes on CI without this patch); only the spaced-slash tests wait on
+  it.
+
 ## Applied / obsolete
 
 - **0004-css-expand-margin-padding-shorthand-cascade.patch** → `Broiler.CSS`
