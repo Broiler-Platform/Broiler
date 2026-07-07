@@ -21,6 +21,29 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0010-css-backgrounds-root-gradient-propagation.patch** → `Broiler.HTML`
+  (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs` +
+  `Source/Broiler.HTML.Image/BCanvas.cs`) — fixes a root `<html>` background
+  **gradient** with a margin (issue #1284's `background-margin-root`,
+  `-transformed-root`, `-will-change-root`, ~6 % match) rendering as a single
+  gradient stretched over the whole viewport instead of an element-sized tile
+  repeated across the canvas. Two independent root causes: (1) `EmitGradientLayers`
+  sized the `auto` tile from the **paint area** (`fillRect`), but for a
+  canvas-propagated root background the paint area is the whole viewport while the
+  background **positioning area** stays the source element's box (CSS Backgrounds
+  §3.9) — now the tile is sized from the positioning area, then repeated over the
+  viewport (ordinary element backgrounds are unchanged: there the two areas
+  coincide). (2) `GetGradientEndpoints` used `max(W, H)` for the gradient-line
+  half-length, which over-extends the line on a non-square tile and compresses the
+  visible colour run to the middle of the gradient — now uses the CSS Images 3
+  §3.4.2 length `abs(W·sin A) + abs(H·cos A)` (square tiles unchanged). With both,
+  the three tests match the Chromium references **pixel-for-pixel (6 % → 100 %)**;
+  0 regressions across the vendored css-backgrounds/css-align/css-anchor-position/
+  CSS2 subsets (byte-identical failure sets) and the graphics parity suite.
+  **No active CI fallback:** both fixes live entirely in the `Broiler.HTML` paint
+  layer (there is no main-repo paint path to mirror them into), so the three tests
+  wait on this patch being applied and the pointer bumped.
+
 - **0005-broiler-html-block-inside-inline-oor.patch** → `Broiler.HTML`
   (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`) — fixes an
   `ArgumentOutOfRangeException` (`box.Boxes[1]` index out of range) in
