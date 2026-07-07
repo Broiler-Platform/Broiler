@@ -4,8 +4,14 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.ImageView.Standard;
 
-public sealed class StandardImageView : UiImageView
+public sealed class StandardImageView : UiImageView, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        PlaceholderBackground = theme.SurfaceAlt;
+        PlaceholderBorder = theme.Border;
+    }
+
     public BColor PlaceholderBackground { get; set; } = StandardControlPaint.SurfaceAlt;
 
     public BColor PlaceholderBorder { get; set; } = StandardControlPaint.Border;

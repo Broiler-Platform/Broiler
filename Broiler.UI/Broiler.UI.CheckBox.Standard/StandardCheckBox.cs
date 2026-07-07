@@ -6,8 +6,17 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.CheckBox.Standard;
 
-public sealed class StandardCheckBox : UiCheckBox
+public sealed class StandardCheckBox : UiCheckBox, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Foreground = theme.Text;
+        BorderColor = theme.BorderStrong;
+        Accent = theme.Accent;
+        DisabledForeground = theme.TextDisabled;
+        FocusRing = theme.FocusRing;
+    }
+
     private bool _isPressed;
 
     public BColor Background { get; set; } = BColor.Transparent;

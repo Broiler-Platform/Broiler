@@ -67,10 +67,12 @@ test('root-relative resources resolve against the WPT root, like a real server',
         fs.mkdirSync(path.join(root, 'fonts'), { recursive: true });
         const gridCss = path.join(root, 'css', 'support', 'grid.css');
         const ahem = path.join(root, 'fonts', 'ahem.css');
+        const spacedFont = path.join(root, 'fonts', 'ahem space.css');
         const testDoc = path.join(root, 'css', 'css-grid', 'test.html');
         const relResource = path.join(root, 'css', 'css-grid', 'ref.png');
         fs.writeFileSync(gridCss, '.grid{display:grid}');
         fs.writeFileSync(ahem, '@font-face{}');
+        fs.writeFileSync(spacedFont, '@font-face{}');
         fs.writeFileSync(testDoc, '<html></html>');
         fs.writeFileSync(relResource, 'x');
 
@@ -81,6 +83,9 @@ test('root-relative resources resolve against the WPT root, like a real server',
         assert.equal(
             resolveRootRelativeResource(root, 'file:///fonts/ahem.css?v=2'),
             ahem);
+        assert.equal(
+            resolveRootRelativeResource(root, 'file:///fonts/ahem%20space.css'),
+            spacedFont);
 
         // The test document and any path that resolves on disk as-is → null,
         // so Chromium loads it directly rather than being re-served.
@@ -90,6 +95,8 @@ test('root-relative resources resolve against the WPT root, like a real server',
         // Missing resources and ../ escapes → null (Chromium 404s them).
         assert.equal(resolveRootRelativeResource(root, 'file:///css/support/missing.css'), null);
         assert.equal(resolveRootRelativeResource(root, 'file:///../../etc/passwd'), null);
+        assert.equal(resolveRootRelativeResource(root, 'file:///css/support/%zz.css'), null);
+        assert.equal(resolveRootRelativeResource(root, 'file:///css/support/%FF.css'), null);
 
         // Non-file schemes are never intercepted.
         assert.equal(resolveRootRelativeResource(root, 'https://example.test/x.css'), null);

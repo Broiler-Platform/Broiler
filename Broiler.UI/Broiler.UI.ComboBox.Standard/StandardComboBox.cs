@@ -6,8 +6,18 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.ComboBox.Standard;
 
-public sealed class StandardComboBox : UiComboBox
+public sealed class StandardComboBox : UiComboBox, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        BorderColor = theme.Border;
+        SelectedBackground = theme.AccentSoft;
+        PopupBackground = theme.Surface;
+        FocusRing = theme.FocusRing;
+    }
+
     private int _highlightedIndex = -1;
     private int _openSelectedIndex = -1;
     private UiElement? _focusBeforeOpen;

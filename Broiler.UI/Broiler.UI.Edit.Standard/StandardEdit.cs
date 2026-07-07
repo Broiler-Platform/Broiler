@@ -8,8 +8,19 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Edit.Standard;
 
-public sealed class StandardEdit : UiEdit
+public sealed class StandardEdit : UiEdit, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        PlaceholderForeground = theme.TextDisabled;
+        BorderColor = theme.Border;
+        FocusRing = theme.FocusRing;
+        SelectionBackground = theme.AccentSoft;
+        CaretColor = theme.Text;
+    }
+
     private readonly List<string> _undoStack = [];
     private double _horizontalScrollOffset;
     private string _compositionText = string.Empty;

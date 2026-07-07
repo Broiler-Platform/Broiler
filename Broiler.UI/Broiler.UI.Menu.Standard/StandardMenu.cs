@@ -8,8 +8,17 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Menu.Standard;
 
-public sealed class StandardMenu : UiMenu
+public sealed class StandardMenu : UiMenu, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        PopupBackground = theme.Surface;
+        Foreground = theme.Text;
+        DisabledForeground = theme.TextDisabled;
+        SelectedBackground = theme.AccentSoft;
+        BorderColor = theme.Border;
+    }
+
     private readonly List<BRect> _topLevelBounds = [];
     private UiElement? _focusBeforeOpen;
 

@@ -7,8 +7,17 @@ using Broiler.UI.Window;
 
 namespace Broiler.UI.Dialog.Standard;
 
-public sealed class StandardDialog : UiDialog
+public sealed class StandardDialog : UiDialog, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        TitleBarBackground = theme.SurfaceAlt;
+        TitleForeground = theme.Text;
+        BorderColor = theme.Border;
+        ActiveBorderColor = theme.Accent;
+    }
+
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
     public BColor TitleBarBackground { get; set; } = BColor.FromArgb(0xFF, 0xF2, 0xF6, 0xFB);

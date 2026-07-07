@@ -1,49 +1,52 @@
 # Broiler.Documents
 
-Broiler.Documents is the planned document-format codec component for Broiler.
-It reads and writes rich-text interchange formats — **RTF first**, then
-HTML/Markdown/DOCX — to and from Broiler's rich-text document model.
+Broiler.Documents is Broiler's document-format codec component. It reads and
+writes rich-text interchange formats to and from the UI-free
+`Broiler.Documents.Model` rich-text document model.
 
-A document format is not new data: its decoded form is the rich-text document
-model that RichEdit Phases 1-4 already built. This component is therefore a
-*codec* layer over that model, mirroring how `Broiler.Media` decodes binary media
-formats to and from typed buffers. It is **not** part of `Broiler.Media` (a
-document is not a `MediaKind`) and **not** part of `Broiler.DOM` (RTF is not a DOM
-tree; DOM is the dependency of the later HTML *codec*).
+The component mirrors the `Broiler.Media` pattern: applications explicitly
+compose a `DocumentCodecCatalog`, codecs probe bounded byte prefixes, and reads
+return best-effort `RichTextDocument` values plus diagnostics for skipped or
+approximated constructs. There is no hidden global codec registration.
 
-This folder currently contains the **Phase 0** charter and ADRs only — no runtime
-assembly yet. See the roadmap at
-`../docs/roadmap/broiler-documents-component.md`.
+## Runtime Projects
 
-## Component constraints
+- `Broiler.Documents.Model` - platform-neutral rich-text document model,
+  promoted out of `Broiler.UI.RichEdit`; depends only on `Broiler.Graphics`.
+- `Broiler.Documents` - codec contract, catalog, descriptors, source hints,
+  read/write options, limits, diagnostics, and probe results.
+- `Broiler.Documents.Rtf` - RTF reader/writer for the documented first-release
+  subset.
+- `Broiler.Documents.Docx` - DOCX reader/writer for a safe Open XML
+  WordprocessingML subset.
+- `Broiler.Documents.Html` - HTML document/fragment codec over
+  `Broiler.Dom` and `Broiler.Dom.Html`.
+- `Broiler.Documents.Markdown` - Markdown codec for a safe CommonMark-oriented
+  subset.
+
+Matching headless test projects live beside each runtime project.
+
+## Component Constraints
 
 - Target .NET 10 only.
 - Do not add third-party runtime dependencies.
 - Keep abstraction assemblies platform-neutral, safe-code compatible,
   trimming-friendly, and AOT-friendly.
-- Put any OS-dependent code in OS-specific implementation projects only (none is
-  expected for RTF).
-- Do not add hidden global codec registration or module-initializer side effects;
-  codecs are registered explicitly into a `DocumentCodecCatalog`.
+- Put any OS-dependent code in OS-specific implementation projects only.
+- Do not add hidden global codec registration or module-initializer side effects.
 - `Broiler.Documents.Model` and `Broiler.Documents` must not reference
   `Broiler.UI`, `Broiler.DOM`, `Broiler.Input`, or any `*.Windows` assembly.
+- Format codecs may depend on their format engines: the HTML codec references
+  `Broiler.Dom` and `Broiler.Dom.Html`; RTF and DOCX have no DOM/UI dependency.
 
-## Planned runtime projects
+## Supported Subsets
 
-- `Broiler.Documents.Model` — the platform-neutral rich-text document model,
-  promoted out of `Broiler.UI.RichEdit` (ADR 0002); depends only on
-  `Broiler.Graphics`.
-- `Broiler.Documents` — codec contract, catalog, signature probe, format
-  descriptors, read/write options, limits, diagnostics (ADR 0003).
-- `Broiler.Documents.Rtf` — the first codec (RTF reader + writer).
-- `Broiler.Documents.Html` *(later)* — HTML fragment codec; references
-  `Broiler.DOM` / `Broiler.Dom.Html`.
-- `Broiler.Documents.Markdown` *(later, optional)* — CommonMark subset codec.
+- [RTF conformance](docs/rtf-conformance.md)
+- [DOCX conformance](docs/docx-conformance.md)
+- [HTML conformance](docs/html-conformance.md)
+- [Markdown conformance](docs/markdown-conformance.md)
 
-Matching dependency-free console test projects live beside each runtime project
-(the `Broiler.Media` pattern).
-
-## Phase 0 contents
+## Records
 
 - [Phase 0 Record](docs/phase-0.md)
 - [ADR Index](docs/adr/README.md)

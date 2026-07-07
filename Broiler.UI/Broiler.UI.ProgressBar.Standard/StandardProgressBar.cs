@@ -4,8 +4,15 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.ProgressBar.Standard;
 
-public sealed class StandardProgressBar : UiProgressBar
+public sealed class StandardProgressBar : UiProgressBar, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        FillColor = theme.Accent;
+        TrackColor = theme.SurfaceDisabled;
+        ValueTextColor = theme.OnAccent;
+    }
+
     private static readonly BSize DefaultHorizontalSize = new(160, 16);
 
     public BColor TrackColor { get; set; } = BColor.FromArgb(0xFF, 0xE6, 0xEA, 0xF0);

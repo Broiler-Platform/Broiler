@@ -6,8 +6,23 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Button.Standard;
 
-public sealed class StandardButton : UiButton
+public sealed class StandardButton : UiButton, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        BorderColor = theme.Border;
+        DisabledForeground = theme.TextDisabled;
+        PressedBackground = theme.AccentPressed;
+        HoverBackground = theme.AccentHover;
+        FocusRing = theme.FocusRing;
+        PrimaryBackground = theme.Accent;
+        PrimaryForeground = theme.OnAccent;
+        SecondaryHoverBackground = theme.AccentSoft;
+        SecondaryPressedBackground = theme.SurfaceDisabled;
+    }
+
     private bool _isPressed;
     private bool _isHovering;
 

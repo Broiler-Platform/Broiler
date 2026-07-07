@@ -120,7 +120,7 @@ public class Program
         {
             if (output is null)
             {
-                Console.Error.WriteLine("Error: '--convert-doc' requires '--output <file.txt|file.rtf>'.");
+                Console.Error.WriteLine("Error: '--convert-doc' requires '--output <file.txt|file.rtf|file.docx|file.html|file.md>'.");
                 return 1;
             }
 
@@ -314,6 +314,7 @@ public class Program
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>] [--preserve-layout]");
+        Console.WriteLine("Usage: Broiler.Cli --convert-doc <RTF|DOCX|HTML|MARKDOWN> --output <FILE.txt|FILE.rtf|FILE.docx|FILE.html|FILE.md>");
         Console.WriteLine("Usage: Broiler.Cli --url <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --capture-image <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --test-engines");
@@ -321,6 +322,7 @@ public class Program
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --convert-pdf <PDF>    Convert a PDF file via the external Broiler.Pdf app");
+        Console.WriteLine("  --convert-doc <FILE>   Convert RTF/DOCX/HTML/Markdown to TXT, RTF, DOCX, HTML, or Markdown through Broiler.Documents");
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
         Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");

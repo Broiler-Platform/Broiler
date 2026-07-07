@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <Authors>Broiler contributors</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageTags>broiler;documents;rich-text;codec;rtf;docx;html;markdown</PackageTags>
+  </PropertyGroup>
+</Project>

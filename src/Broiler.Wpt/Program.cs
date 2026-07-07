@@ -207,7 +207,7 @@ public class Program
 
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
-        Console.WriteLine($"Timeout       : {runTestTimeout.TotalSeconds:0.###} second(s)");
+        Console.WriteLine($"Timeout       : {FormatSeconds(runTestTimeout)} second(s)");
         Console.WriteLine($"Mode          : {(nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests")}");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
@@ -366,7 +366,7 @@ public class Program
             "— only these were pixel-compared against a reference");
         Console.WriteLine(
             $"Skipped          : {skipped}  — not compared and not counted as passed " +
-            "(no reference image / manual / unsupported media)");
+            "(no reference image / manual / unsupported media / unsupported variants)");
         if (missingReferenceSkipCount > 0)
             Console.WriteLine(
                 $"                   of which {missingReferenceSkipCount} had no reference image " +
@@ -639,7 +639,7 @@ public class Program
         TimeSpan timeout,
         int workerThreadId)
     {
-        var message = $"Test timed out after {timeout.TotalSeconds:0.###} second(s): {testPath}";
+        var message = $"Test timed out after {FormatSeconds(timeout)} second(s): {testPath}";
         var invocationStackTrace = new StackTrace(skipFrames: 2, fNeedFileInfo: true).ToString();
         var stackTrace = new StringBuilder()
             .AppendLine("=== Timeout diagnostics ===")
@@ -662,6 +662,9 @@ public class Program
             StackTrace = stackTrace,
         };
     }
+
+    private static string FormatSeconds(TimeSpan value) =>
+        value.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Serialises the full test results to a structured JSON file for

@@ -20,6 +20,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj" />
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Docx\Broiler.Documents.Docx.csproj" />
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
     <ProjectReference Include="..\Broiler.Cli\Broiler.Cli.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image.Compat\Broiler.HTML.Image.Compat.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Orchestration\Broiler.HTML.Orchestration.csproj" />

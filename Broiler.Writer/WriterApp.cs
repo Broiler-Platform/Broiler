@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Broiler.Documents;
+using Broiler.Documents.Docx;
+using Broiler.Documents.Html;
+using Broiler.Documents.Markdown;
 using Broiler.Documents.Model;
 using Broiler.Documents.Rtf;
 using Broiler.Graphics;
@@ -31,10 +34,35 @@ internal sealed class WriterApp : IDisposable
     private readonly StandardMenu _menu;
     private readonly StandardLabel _title;
     private readonly StandardLabel _status;
+    private readonly DocumentCodecCatalog _documentCatalog = new(new DocumentCodec[]
+    {
+        new RtfDocumentCodec(),
+        new DocxDocumentCodec(),
+        new HtmlDocumentCodec(),
+        new MarkdownDocumentCodec(),
+    });
     private readonly List<(UiMenuItem Item, RichEditCommand Command)> _richEditMenuItems = [];
     private string? _currentDocumentPath;
     private string _lastDirectory = Environment.CurrentDirectory;
     private string _lastAction = "Ready";
+
+    private const string DefaultDocumentExtension = ".rtf";
+    private static readonly BSize FileDialogPreferredSize = new(560, 292);
+    private static readonly UiFileDialogFilter[] OpenDocumentFileFilters =
+    [
+        new("All supported documents", "*.rtf;*.docx;*.html;*.htm;*.md;*.markdown", DefaultDocumentExtension),
+        new("Rich Text Format (*.rtf)", "*.rtf", ".rtf"),
+        new("Word Document (*.docx)", "*.docx", ".docx"),
+        new("HTML (*.html, *.htm)", "*.html;*.htm", ".html"),
+        new("Markdown (*.md, *.markdown)", "*.md;*.markdown", ".md"),
+    ];
+    private static readonly UiFileDialogFilter[] SaveDocumentFileFilters =
+    [
+        new("Rich Text Format (*.rtf)", "*.rtf", ".rtf"),
+        new("Word Document (*.docx)", "*.docx", ".docx"),
+        new("HTML (*.html)", "*.html;*.htm", ".html"),
+        new("Markdown (*.md)", "*.md;*.markdown", ".md"),
+    ];
 
     public WriterApp(WriterUiHost host, Action requestClose)
     {
@@ -145,9 +173,9 @@ internal sealed class WriterApp : IDisposable
 
         var file = new UiMenuItem("file", "File") { AccessKey = 'F' };
         file.Children.Add(new UiMenuItem("new", "New document") { CommandName = "file.new", AccessKey = 'N' });
-        file.Children.Add(new UiMenuItem("open", "Open RTF...") { CommandName = "file.open", AccessKey = 'O' });
+        file.Children.Add(new UiMenuItem("open", "Open...") { CommandName = "file.open", AccessKey = 'O' });
         file.Children.Add(new UiMenuItem("save", "Save") { CommandName = "file.save", AccessKey = 'S' });
-        file.Children.Add(new UiMenuItem("save-as", "Save RTF as...") { CommandName = "file.save-as", AccessKey = 'A' });
+        file.Children.Add(new UiMenuItem("save-as", "Save as...") { CommandName = "file.save-as", AccessKey = 'A' });
         file.Children.Add(new UiMenuItem("exit", "Exit") { CommandName = "file.exit", AccessKey = 'X' });
 
         var edit = new UiMenuItem("edit", "Edit") { AccessKey = 'E' };
@@ -238,9 +266,9 @@ internal sealed class WriterApp : IDisposable
             Mode = UiFileDialogMode.Open,
             CurrentDirectory = GetDialogDirectory(),
             FileName = _currentDocumentPath is null ? string.Empty : Path.GetFileName(_currentDocumentPath),
-            FileNameFilter = "*.rtf",
-            DefaultExtension = ".rtf",
+            PreferredSize = FileDialogPreferredSize,
         };
+        dialog.SetFileTypeFilters(OpenDocumentFileFilters);
         dialog.ResultCompleted += (_, e) =>
         {
             if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
@@ -248,7 +276,7 @@ internal sealed class WriterApp : IDisposable
         };
 
         dialog.ShowOpenModal(_rootWindow, GetDialogPlacement());
-        _lastAction = "Open RTF";
+        _lastAction = "Open document";
         RefreshUi();
     }
 
@@ -265,15 +293,22 @@ internal sealed class WriterApp : IDisposable
 
     private void ShowSaveDialog()
     {
-        string fileName = _currentDocumentPath is null ? "Untitled.rtf" : Path.GetFileName(_currentDocumentPath);
+        string fileName = _currentDocumentPath is null
+            ? "Untitled"
+            : Path.GetFileNameWithoutExtension(_currentDocumentPath);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = "Untitled";
+
         var dialog = new StandardFileDialog
         {
             Mode = UiFileDialogMode.Save,
             CurrentDirectory = GetDialogDirectory(),
             FileName = fileName,
-            FileNameFilter = "*.rtf",
-            DefaultExtension = ".rtf",
+            PreferredSize = FileDialogPreferredSize,
         };
+        dialog.SetFileTypeFilters(
+            SaveDocumentFileFilters,
+            GetFileTypeFilterIndex(SaveDocumentFileFilters, _currentDocumentPath));
         dialog.ResultCompleted += (_, e) =>
         {
             if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
@@ -281,7 +316,7 @@ internal sealed class WriterApp : IDisposable
         };
 
         dialog.ShowSaveModal(_rootWindow, GetDialogPlacement());
-        _lastAction = "Save RTF as";
+        _lastAction = "Save document as";
         RefreshUi();
     }
 
@@ -289,9 +324,9 @@ internal sealed class WriterApp : IDisposable
     {
         try
         {
-            string fullPath = ResolveRtfPath(path);
+            string fullPath = ResolveDocumentPath(path);
             byte[] bytes = File.ReadAllBytes(fullPath);
-            DocumentReadResult result = RtfReader.Read(bytes);
+            DocumentReadResult result = ReadDocument(fullPath, bytes);
             _currentDocumentPath = fullPath;
             _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
             _title.Text = Path.GetFileName(fullPath);
@@ -314,17 +349,19 @@ internal sealed class WriterApp : IDisposable
     {
         try
         {
-            string fullPath = ResolveRtfPath(path);
+            string fullPath = ResolveDocumentPath(path);
             string? directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(directory))
                 Directory.CreateDirectory(directory);
 
-            byte[] bytes = RtfWriter.WriteToArray(_editor.Document);
+            DocumentWriteResult result = WriteDocument(fullPath, _editor.Document, out byte[] bytes);
             File.WriteAllBytes(fullPath, bytes);
             _currentDocumentPath = fullPath;
             _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
             _title.Text = Path.GetFileName(fullPath);
-            _lastAction = "Saved " + Path.GetFileName(fullPath);
+            _lastAction = result.Diagnostics.Count == 0
+                ? "Saved " + Path.GetFileName(fullPath)
+                : "Saved " + Path.GetFileName(fullPath) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
         }
         catch (Exception ex) when (IsFileOperationException(ex))
         {
@@ -360,8 +397,8 @@ internal sealed class WriterApp : IDisposable
     private BRect GetDialogPlacement()
     {
         BSize viewport = _host.ViewportSize;
-        const double width = 520;
-        const double height = 250;
+        double width = FileDialogPreferredSize.Width;
+        double height = FileDialogPreferredSize.Height;
         double x = Math.Max(12, (viewport.Width - width) / 2);
         double y = Math.Max(42, (viewport.Height - height) / 2);
         return new BRect(x, y, Math.Min(width, Math.Max(280, viewport.Width - 24)), Math.Min(height, Math.Max(180, viewport.Height - 64)));
@@ -379,10 +416,74 @@ internal sealed class WriterApp : IDisposable
         return Directory.Exists(_lastDirectory) ? _lastDirectory : Environment.CurrentDirectory;
     }
 
-    private static string ResolveRtfPath(string path)
+    private static int GetFileTypeFilterIndex(IReadOnlyList<UiFileDialogFilter> filters, string? path)
+    {
+        string extension = Path.GetExtension(path ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(extension))
+            return 0;
+
+        for (int i = 0; i < filters.Count; i++)
+        {
+            if (FilterIncludesExtension(filters[i], extension))
+                return i;
+        }
+
+        return 0;
+    }
+
+    private static bool FilterIncludesExtension(UiFileDialogFilter filter, string extension)
+    {
+        foreach (string pattern in filter.Pattern.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (StringComparer.Ordinal.Equals(pattern, "*") || StringComparer.Ordinal.Equals(pattern, "*.*"))
+                return true;
+
+            if (pattern.StartsWith("*.", StringComparison.Ordinal) &&
+                string.Equals(pattern[1..], extension, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private string ResolveDocumentPath(string path)
     {
         string fullPath = Path.GetFullPath(path);
-        return Path.HasExtension(fullPath) ? fullPath : fullPath + ".rtf";
+        return Path.HasExtension(fullPath) ? fullPath : fullPath + DefaultDocumentExtension;
+    }
+
+    private DocumentReadResult ReadDocument(string fullPath, byte[] bytes)
+    {
+        using var probeStream = new MemoryStream(bytes, writable: false);
+        DocumentCodecMatch? match = _documentCatalog.Select(
+            probeStream,
+            new DocumentSourceHints(fileName: fullPath));
+
+        if (match is null || !match.Codec.CanRead)
+            throw new NotSupportedException("No readable document codec recognized '" + Path.GetExtension(fullPath) + "'.");
+
+        using var readStream = new MemoryStream(bytes, writable: false);
+        return match.Codec.Read(readStream);
+    }
+
+    private static DocumentWriteResult WriteDocument(
+        string fullPath,
+        RichTextDocument document,
+        out byte[] bytes)
+    {
+        string extension = Path.GetExtension(fullPath).ToLowerInvariant();
+        using var stream = new MemoryStream();
+        DocumentWriteResult result = extension switch
+        {
+            ".rtf" => RtfWriter.Write(document, stream),
+            ".docx" => DocxWriter.Write(document, stream),
+            ".html" or ".htm" => HtmlWriter.Write(document, stream),
+            ".md" or ".markdown" => MarkdownWriter.Write(document, stream),
+            _ => throw new NotSupportedException("Unsupported save format '" + extension + "'. Use .rtf, .docx, .html, or .md."),
+        };
+
+        bytes = stream.ToArray();
+        return result;
     }
 
     private static bool IsFileOperationException(Exception ex) =>

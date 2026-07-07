@@ -20,6 +20,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -139,6 +140,15 @@ function isWptHarnessScript(requestPath) {
     return lower.includes('testharness') || lower.includes('check-layout');
 }
 
+function decodeFileUrlPath(requestUrl) {
+    const encodedPath = requestUrl.replace(/^file:\/\//i, '').split(/[?#]/)[0];
+    try {
+        return decodeURIComponent(encodedPath);
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Resolve a file:// request URL to the on-disk resource the reference generator
  * should serve for it, or `null` when Chromium should be left to load (or 404)
@@ -164,7 +174,10 @@ function resolveRootRelativeResource(baseDir, requestUrl) {
     if (!/^file:\/\//i.test(requestUrl)) {
         return null;
     }
-    const rawPath = decodeURIComponent(requestUrl.replace(/^file:\/\//i, '').split(/[?#]/)[0]);
+    const rawPath = decodeFileUrlPath(requestUrl);
+    if (rawPath === null) {
+        return null;
+    }
     // Keep the reference in lock-step with the runner, which stubs (never loads)
     // the WPT harness scripts. Serving them here would render a results table
     // Broiler's stubbed render lacks — a guaranteed MissingContent mismatch.
@@ -372,7 +385,7 @@ async function main(args = process.argv.slice(2)) {
 
             try {
                 ensureDir(outPath);
-                const fileUrl = 'file://' + testFile;
+                const fileUrl = pathToFileURL(testFile).href;
                 await page.goto(fileUrl, {
                     waitUntil: 'load',
                     timeout: PAGE_LOAD_TIMEOUT,

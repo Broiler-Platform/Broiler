@@ -42,6 +42,7 @@ internal enum SkipReason
     None,
     MissingReferenceImage,
     UnsupportedMediaPlayback,
+    UnsupportedWptVariant,
 
     /// <summary>
     /// A WPT <em>manual</em> test (filename ends in <c>-manual</c>). These
@@ -1090,6 +1091,7 @@ internal sealed class WptTestRunner
     private static readonly Regex RelHelpPattern = new(@"\brel\s*=\s*[""']?\s*help\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelMatchPattern = new(@"\brel\s*=\s*[""']?\s*match\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameAssertPattern = new(@"\bname\s*=\s*[""']?\s*assert\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex NameVariantPattern = new(@"\bname\s*=\s*[""']?\s*variant\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex HrefValuePattern = new(@"\bhref\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex ContentValuePattern = new(@"\bcontent\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -1128,6 +1130,24 @@ internal sealed class WptTestRunner
         return new TestMetadata(
             helpLinks.Count > 0 ? helpLinks : null,
             assertions.Count > 0 ? string.Join(" / ", assertions) : null);
+    }
+
+    /// <summary>
+    /// WPT variant files are templates that the WPT server expands into one or
+    /// more query-specific tests (for example <c>test.html?1-1000</c>). Broiler's
+    /// pixel runner currently executes only the base file URL, so running these
+    /// directly can exercise all subtests at once and compare against the wrong
+    /// reference. Treat them as unsupported until the runner models variants.
+    /// </summary>
+    internal static bool IsWptVariantTest(string html)
+    {
+        foreach (Match meta in MetaTagPattern.Matches(html))
+        {
+            if (NameVariantPattern.IsMatch(meta.Value))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1298,6 +1318,19 @@ internal sealed class WptTestRunner
         // What the test claims to verify (spec links + assertion); attached to
         // failures so triage can read intent without opening the file (#9).
         var metadata = ExtractTestMetadata(html);
+
+        if (IsWptVariantTest(html))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.UnsupportedWptVariant,
+                Message = "WPT variant test; Broiler's pixel runner does not expand query-specific variants yet.",
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
+            };
+        }
 
         // Skip tests that require media playback (video/audio streams)
         // which Broiler cannot decode.

@@ -1,10 +1,18 @@
 using System;
 using Broiler.Graphics;
+using Broiler.UI.Standard;
 
 namespace Broiler.UI.Window.Standard;
 
-public sealed class StandardWindow : UiWindow
+public sealed class StandardWindow : UiWindow, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        BorderColor = theme.Border;
+        ActiveBorderColor = theme.Accent;
+    }
+
     public BColor Background { get; set; } = BColor.White;
 
     public BColor BorderColor { get; set; } = BColor.FromArgb(0xFF, 0x66, 0x66, 0x66);

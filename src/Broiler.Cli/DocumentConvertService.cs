@@ -1,14 +1,18 @@
 using System.Text;
 using Broiler.Documents;
+using Broiler.Documents.Docx;
+using Broiler.Documents.Html;
+using Broiler.Documents.Markdown;
 using Broiler.Documents.Rtf;
 
 namespace Broiler.Cli;
 
 /// <summary>
 /// Headless document-format conversion through the Broiler.Documents codec catalog.
-/// Reads a document (currently RTF, selected by signature/extension) and writes
-/// plain text (<c>.txt</c>) or normalized RTF (<c>.rtf</c>). The conversion path has
-/// no UI dependency.
+/// Reads a document (selected by signature/extension) and writes plain text
+/// (<c>.txt</c>), normalized RTF (<c>.rtf</c>), deterministic HTML
+/// (<c>.html</c>), Markdown (<c>.md</c>), or DOCX (<c>.docx</c>). The
+/// conversion path has no UI dependency.
 /// </summary>
 public static class DocumentConvertService
 {
@@ -20,7 +24,13 @@ public static class DocumentConvertService
             return 1;
         }
 
-        var catalog = new DocumentCodecCatalog(new DocumentCodec[] { new RtfDocumentCodec() });
+        var catalog = new DocumentCodecCatalog(new DocumentCodec[]
+        {
+            new RtfDocumentCodec(),
+            new DocxDocumentCodec(),
+            new HtmlDocumentCodec(),
+            new MarkdownDocumentCodec(),
+        });
         byte[] input = File.ReadAllBytes(inputPath);
         var hints = new DocumentSourceHints(fileName: inputPath);
 
@@ -48,8 +58,19 @@ public static class DocumentConvertService
             case ".rtf":
                 output = RtfWriter.WriteToArray(read.Document);
                 break;
+            case ".docx":
+                output = DocxWriter.WriteToArray(read.Document);
+                break;
+            case ".html":
+            case ".htm":
+                output = HtmlWriter.WriteToArray(read.Document);
+                break;
+            case ".md":
+            case ".markdown":
+                output = MarkdownWriter.WriteToArray(read.Document);
+                break;
             default:
-                Console.Error.WriteLine($"Error: unsupported output format '{extension}'. Use .txt or .rtf.");
+                Console.Error.WriteLine($"Error: unsupported output format '{extension}'. Use .txt, .rtf, .docx, .html, or .md.");
                 return 1;
         }
 

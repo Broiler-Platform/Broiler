@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Broiler.Graphics;
 using Broiler.UI.Dialog;
@@ -14,6 +16,8 @@ public abstract class UiFileDialog : UiDialog
     private string _fileName = string.Empty;
     private string _defaultExtension = string.Empty;
     private string _fileNameFilter = "*";
+    private UiFileDialogFilter[] _fileTypeFilters = [];
+    private int _selectedFileTypeFilterIndex = -1;
 
     public UiFileDialogMode Mode
     {
@@ -94,10 +98,48 @@ public abstract class UiFileDialog : UiDialog
         }
     }
 
+    public IReadOnlyList<UiFileDialogFilter> FileTypeFilters => _fileTypeFilters;
+
+    public int SelectedFileTypeFilterIndex
+    {
+        get => _selectedFileTypeFilterIndex;
+        set
+        {
+            ThrowIfDisposed();
+            int normalized = NormalizeSelectedFilterIndex(value);
+            if (_selectedFileTypeFilterIndex == normalized)
+                return;
+
+            _selectedFileTypeFilterIndex = normalized;
+            ApplySelectedFileTypeFilter();
+            OnSelectedFileTypeFilterChanged();
+            Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        }
+    }
+
+    public UiFileDialogFilter? SelectedFileTypeFilter =>
+        _selectedFileTypeFilterIndex >= 0 && _selectedFileTypeFilterIndex < _fileTypeFilters.Length
+            ? _fileTypeFilters[_selectedFileTypeFilterIndex]
+            : null;
+
     public string SelectedPath =>
         string.IsNullOrWhiteSpace(FileName)
             ? CurrentDirectory
             : Path.GetFullPath(Path.Combine(CurrentDirectory, ApplyDefaultExtension(FileName)));
+
+    public void SetFileTypeFilters(IEnumerable<UiFileDialogFilter>? filters, int selectedIndex = 0)
+    {
+        ThrowIfDisposed();
+        _fileTypeFilters = filters?.ToArray() ?? [];
+        if (_fileTypeFilters.Any(static filter => filter is null))
+            throw new ArgumentException("File dialog filters cannot contain null values.", nameof(filters));
+
+        _selectedFileTypeFilterIndex = NormalizeSelectedFilterIndex(selectedIndex);
+        ApplySelectedFileTypeFilter();
+        OnFileTypeFiltersChanged();
+        OnSelectedFileTypeFilterChanged();
+        Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+    }
 
     public string ApplyDefaultExtension(string fileName)
     {
@@ -139,6 +181,32 @@ public abstract class UiFileDialog : UiDialog
 
     protected virtual void OnFileNameFilterChanged()
     {
+    }
+
+    protected virtual void OnFileTypeFiltersChanged()
+    {
+    }
+
+    protected virtual void OnSelectedFileTypeFilterChanged()
+    {
+    }
+
+    private void ApplySelectedFileTypeFilter()
+    {
+        UiFileDialogFilter? filter = SelectedFileTypeFilter;
+        if (filter is null)
+            return;
+
+        FileNameFilter = filter.Pattern;
+        DefaultExtension = filter.DefaultExtension;
+    }
+
+    private int NormalizeSelectedFilterIndex(int index)
+    {
+        if (_fileTypeFilters.Length == 0)
+            return -1;
+
+        return Math.Clamp(index, 0, _fileTypeFilters.Length - 1);
     }
 
     private static string NormalizeDirectory(string? directory)

@@ -19,8 +19,19 @@ namespace Broiler.UI.RichEdit.Standard;
 /// through the <see cref="UiRichEdit"/> command surface and its single undo model.
 /// No native control or OS API is used.
 /// </summary>
-public sealed class StandardRichEdit : UiRichEdit
+public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        PlaceholderForeground = theme.TextDisabled;
+        BorderColor = theme.Border;
+        FocusRing = theme.FocusRing;
+        SelectionBackground = theme.AccentSoft;
+        CaretColor = theme.Text;
+    }
+
     private readonly List<VisualLine> _lines = [];
     private RichTextDocument? _layoutDocument;
     private BFontStyle? _layoutFont;

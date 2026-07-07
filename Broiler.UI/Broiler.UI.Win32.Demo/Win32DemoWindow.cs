@@ -185,8 +185,22 @@ internal sealed class Win32DemoWindow : Direct2DWindow
     protected override void OnMouseWheel(BMouseWheelEventArgs e) =>
         Dispatch(_legacyInput.FromMouseWheel(e));
 
-    protected override void OnKeyDown(BKeyEventArgs e) =>
+    protected override void OnKeyDown(BKeyEventArgs e)
+    {
+        // Ctrl+D toggles light/dark live across the whole session, demonstrating
+        // render-time re-theming via StandardThemeController.
+        if (e.Control && e.VirtualKey == 0x44)
+        {
+            StandardThemeTokens next = StandardControlPaint.Theme.IsDark
+                ? StandardThemeTokens.Light
+                : StandardThemeTokens.Dark;
+            StandardThemeController.Apply(_session, next);
+            Invalidate();
+            return;
+        }
+
         Dispatch(_legacyInput.FromKey(e, KeyboardKeyTransition.Down));
+    }
 
     protected override void OnKeyUp(BKeyEventArgs e) =>
         Dispatch(_legacyInput.FromKey(e, KeyboardKeyTransition.Up));
@@ -2154,24 +2168,28 @@ internal sealed class Win32DemoWindow : Direct2DWindow
         private readonly record struct SectionHeading(string Text, BPoint Location);
     }
 
+    // Demo chrome colors are single-sourced from the active theme so the whole
+    // window (not just the hosted controls) honors --dark / --high-contrast.
     private static class DemoColors
     {
-        public static readonly BColor Canvas = BColor.FromArgb(0xFF, 0xFB, 0xFD, 0xFF);
-        public static readonly BColor Sidebar = BColor.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
-        public static readonly BColor Panel = BColor.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
-        public static readonly BColor Inset = BColor.FromArgb(0xFF, 0xF1, 0xF5, 0xF9);
-        public static readonly BColor StatusPanel = BColor.FromArgb(0xFF, 0xF1, 0xFA, 0xF5);
-        public static readonly BColor StatusBorder = BColor.FromArgb(0xFF, 0xC6, 0xE6, 0xD7);
-        public static readonly BColor StatusIcon = BColor.FromArgb(0xFF, 0x0C, 0x7C, 0x59);
-        public static readonly BColor StatusIconBack = BColor.FromArgb(0xFF, 0xE1, 0xF5, 0xEC);
-        public static readonly BColor Border = BColor.FromArgb(0xFF, 0xD5, 0xDE, 0xEA);
-        public static readonly BColor Shadow = BColor.FromArgb(0x18, 0x24, 0x3B, 0x5A);
-        public static readonly BColor Accent = BColor.FromArgb(0xFF, 0x0B, 0x6F, 0xD8);
-        public static readonly BColor NavSelected = BColor.FromArgb(0xFF, 0xEB, 0xF3, 0xFF);
-        public static readonly BColor SidebarIcon = BColor.FromArgb(0xFF, 0x4F, 0x60, 0x76);
-        public static readonly BColor SidebarMuted = BColor.FromArgb(0xFF, 0x6F, 0x7E, 0x93);
-        public static readonly BColor Title = BColor.FromArgb(0xFF, 0x12, 0x22, 0x38);
-        public static readonly BColor Text = BColor.FromArgb(0xFF, 0x24, 0x33, 0x48);
-        public static readonly BColor MutedText = BColor.FromArgb(0xFF, 0x5B, 0x6B, 0x82);
+        private static StandardThemeTokens Theme => StandardControlPaint.Theme;
+
+        public static BColor Canvas => Theme.SurfaceAlt;
+        public static BColor Sidebar => Theme.Surface;
+        public static BColor Panel => Theme.Surface;
+        public static BColor Inset => Theme.SurfaceDisabled;
+        public static BColor StatusPanel => Theme.SurfaceAlt;
+        public static BColor StatusBorder => Theme.Border;
+        public static BColor StatusIcon => Theme.Success;
+        public static BColor StatusIconBack => Theme.SurfaceDisabled;
+        public static BColor Border => Theme.Border;
+        public static BColor Shadow => BColor.FromArgb(0x18, 0x24, 0x3B, 0x5A);
+        public static BColor Accent => Theme.Accent;
+        public static BColor NavSelected => Theme.AccentSoft;
+        public static BColor SidebarIcon => Theme.TextMuted;
+        public static BColor SidebarMuted => Theme.TextMuted;
+        public static BColor Title => Theme.Text;
+        public static BColor Text => Theme.Text;
+        public static BColor MutedText => Theme.TextMuted;
     }
 }

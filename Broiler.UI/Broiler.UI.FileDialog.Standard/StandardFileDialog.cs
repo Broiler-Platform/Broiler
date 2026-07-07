@@ -19,6 +19,7 @@ public sealed class StandardFileDialog : UiFileDialog
     private readonly StandardListView _filesList;
     private readonly StandardListView _directoriesList;
     private readonly StandardButton _upButton;
+    private readonly StandardButton _formatButton;
     private readonly StandardButton _okButton;
     private readonly StandardButton _cancelButton;
     private readonly Dictionary<string, string> _filePaths = [];
@@ -58,6 +59,14 @@ public sealed class StandardFileDialog : UiFileDialog
             PaddingX = 8,
             PaddingY = 5,
         };
+        _formatButton = new StandardButton
+        {
+            Text = "Format",
+            PreferredSize = new BSize(388, 28),
+            CornerRadius = 0,
+            PaddingX = 8,
+            PaddingY = 5,
+        };
         _okButton = new StandardButton
         {
             Text = "Open",
@@ -81,6 +90,7 @@ public sealed class StandardFileDialog : UiFileDialog
         _directoriesList.SelectionChanged += (_, e) => NavigateToDirectory(e.NewItemId);
         _fileNameEdit.Submitted += (_, _) => AcceptSelection();
         _upButton.Clicked += (_, _) => NavigateUp();
+        _formatButton.Clicked += (_, _) => CycleFileTypeFilter();
         _okButton.Clicked += (_, _) => AcceptSelection();
         _cancelButton.Clicked += (_, _) => Cancel();
 
@@ -88,9 +98,11 @@ public sealed class StandardFileDialog : UiFileDialog
         AddChild(_directoriesList);
         AddChild(_fileNameEdit);
         AddChild(_upButton);
+        AddChild(_formatButton);
         AddChild(_okButton);
         AddChild(_cancelButton);
 
+        SyncFormatButton();
         Refresh();
     }
 
@@ -125,6 +137,8 @@ public sealed class StandardFileDialog : UiFileDialog
     public StandardListView DirectoriesList => _directoriesList;
 
     public StandardButton UpButton => _upButton;
+
+    public StandardButton FormatButton => _formatButton;
 
     public StandardButton OkButton => _okButton;
 
@@ -190,6 +204,16 @@ public sealed class StandardFileDialog : UiFileDialog
             RefreshDirectoryEntries();
     }
 
+    protected override void OnFileTypeFiltersChanged()
+    {
+        SyncFormatButton();
+    }
+
+    protected override void OnSelectedFileTypeFilterChanged()
+    {
+        SyncFormatButton();
+    }
+
     protected override BSize MeasureCore(BSize availableSize)
     {
         BSize clientAvailable = new(
@@ -213,18 +237,26 @@ public sealed class StandardFileDialog : UiFileDialog
         double buttonWidth = Math.Min(84, Math.Max(64, client.Width * 0.16));
         double buttonHeight = 28;
         double editHeight = 28;
+        bool showFormatSelector = FileTypeFilters.Count > 0;
+        double formatHeight = showFormatSelector ? 28 : 0;
+        double formatGap = showFormatSelector ? Gap : 0;
         double pathHeight = Math.Min(PathRowHeight, Math.Max(0, client.Height));
         double rightX = Math.Max(client.Left, client.Right - buttonWidth);
         double listAreaWidth = Math.Max(0, rightX - client.Left - Gap);
         double listTop = client.Top + pathHeight + Gap;
-        double listHeight = Math.Max(0, client.Height - pathHeight - Gap - editHeight - Gap);
+        double listHeight = Math.Max(0, client.Height - pathHeight - Gap - editHeight - formatGap - formatHeight - Gap);
+        double fileNameTop = listTop + listHeight + Gap;
+        double formatTop = fileNameTop + editHeight + formatGap;
         double fileWidth = Math.Max(0, (listAreaWidth - Gap) / 2);
         double directoryWidth = Math.Max(0, listAreaWidth - fileWidth - Gap);
 
         _pathBounds = new BRect(client.Left, client.Top, listAreaWidth, pathHeight);
         _filesList.Arrange(new BRect(client.Left, listTop, fileWidth, listHeight));
         _directoriesList.Arrange(new BRect(client.Left + fileWidth + Gap, listTop, directoryWidth, listHeight));
-        _fileNameEdit.Arrange(new BRect(client.Left, listTop + listHeight + Gap, listAreaWidth, editHeight));
+        _fileNameEdit.Arrange(new BRect(client.Left, fileNameTop, listAreaWidth, editHeight));
+        _formatButton.Arrange(showFormatSelector
+            ? new BRect(client.Left, formatTop, listAreaWidth, formatHeight)
+            : new BRect(client.Left, client.Bottom, 0, 0));
         _upButton.Arrange(new BRect(rightX, client.Top, buttonWidth, buttonHeight));
         _okButton.Arrange(new BRect(rightX, listTop, buttonWidth, buttonHeight));
         _cancelButton.Arrange(new BRect(rightX, listTop + buttonHeight + Gap, buttonWidth, buttonHeight));
@@ -323,6 +355,14 @@ public sealed class StandardFileDialog : UiFileDialog
         CurrentDirectory = path;
     }
 
+    private void CycleFileTypeFilter()
+    {
+        if (FileTypeFilters.Count < 2)
+            return;
+
+        SelectedFileTypeFilterIndex = (SelectedFileTypeFilterIndex + 1) % FileTypeFilters.Count;
+    }
+
     private void SyncFileNameEdit()
     {
         _syncingFileName = true;
@@ -345,6 +385,13 @@ public sealed class StandardFileDialog : UiFileDialog
             .FirstOrDefault();
 
         _filesList.SelectedItemId = selected;
+    }
+
+    private void SyncFormatButton()
+    {
+        UiFileDialogFilter? filter = SelectedFileTypeFilter;
+        _formatButton.Text = filter is null ? "Format" : "Format: " + filter.Name;
+        _formatButton.IsEnabled = FileTypeFilters.Count > 1;
     }
 
     private bool HandlePointerButton(UiInputEvent input)

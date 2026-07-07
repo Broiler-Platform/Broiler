@@ -3,25 +3,56 @@ using Broiler.Graphics;
 
 namespace Broiler.UI.Standard;
 
+/// <summary>
+/// Shared drawing helpers plus the resolved semantic palette that standard
+/// controls paint with. The color and radius members are single-sourced from the
+/// active <see cref="StandardThemeTokens"/> set, so applying a different theme
+/// (e.g. <see cref="StandardThemeTokens.Dark"/>) re-colors every control that
+/// reads these roles.
+/// </summary>
+/// <remarks>
+/// Phase A applies the palette as a process-wide default that controls read when
+/// constructed; call <see cref="ApplyTheme"/> during host startup, before the
+/// control tree is built. Per-session, render-time theme resolution (so a running
+/// session can switch themes live) is a later phase and layers on top of
+/// <see cref="StandardThemeResolver"/>.
+/// </remarks>
 public static class StandardControlPaint
 {
-    public static readonly BColor Surface = BColor.White;
-    public static readonly BColor SurfaceAlt = BColor.FromArgb(0xFF, 0xF8, 0xFA, 0xFD);
-    public static readonly BColor SurfaceDisabled = BColor.FromArgb(0xFF, 0xF1, 0xF4, 0xF8);
-    public static readonly BColor Border = BColor.FromArgb(0xFF, 0xC9, 0xD4, 0xE1);
-    public static readonly BColor BorderStrong = BColor.FromArgb(0xFF, 0x8D, 0xA0, 0xB6);
-    public static readonly BColor Text = BColor.FromArgb(0xFF, 0x14, 0x24, 0x3A);
-    public static readonly BColor TextMuted = BColor.FromArgb(0xFF, 0x5B, 0x6B, 0x82);
-    public static readonly BColor TextDisabled = BColor.FromArgb(0xFF, 0x93, 0x9E, 0xAD);
-    public static readonly BColor Accent = BColor.FromArgb(0xFF, 0x0B, 0x6F, 0xD8);
-    public static readonly BColor AccentHover = BColor.FromArgb(0xFF, 0x0A, 0x61, 0xBE);
-    public static readonly BColor AccentPressed = BColor.FromArgb(0xFF, 0x08, 0x4C, 0x98);
-    public static readonly BColor AccentSoft = BColor.FromArgb(0xFF, 0xE7, 0xF0, 0xFF);
-    public static readonly BColor Focus = BColor.FromArgb(0xFF, 0x0B, 0x6F, 0xD8);
+    private static StandardThemeTokens _theme = StandardThemeTokens.Light;
 
-    public const double ControlRadius = 6;
-    public const double SmallRadius = 4;
-    public const double PillRadius = 999;
+    /// <summary>The active palette that the role accessors below resolve against.</summary>
+    public static StandardThemeTokens Theme => _theme;
+
+    /// <summary>
+    /// Selects the active palette. Apply before building the control tree; controls
+    /// capture these role colors when constructed.
+    /// </summary>
+    public static void ApplyTheme(StandardThemeTokens theme) =>
+        _theme = theme ?? throw new ArgumentNullException(nameof(theme));
+
+    public static BColor Surface => _theme.Surface;
+    public static BColor SurfaceAlt => _theme.SurfaceAlt;
+    public static BColor SurfaceDisabled => _theme.SurfaceDisabled;
+    public static BColor Border => _theme.Border;
+    public static BColor BorderStrong => _theme.BorderStrong;
+    public static BColor Text => _theme.Text;
+    public static BColor TextMuted => _theme.TextMuted;
+    public static BColor TextDisabled => _theme.TextDisabled;
+    public static BColor Accent => _theme.Accent;
+    public static BColor AccentHover => _theme.AccentHover;
+    public static BColor AccentPressed => _theme.AccentPressed;
+    public static BColor AccentSoft => _theme.AccentSoft;
+    public static BColor OnAccent => _theme.OnAccent;
+    public static BColor Focus => _theme.FocusRing;
+    public static BColor Success => _theme.Success;
+    public static BColor Warning => _theme.Warning;
+    public static BColor Danger => _theme.Danger;
+    public static BColor Info => _theme.Info;
+
+    public static double ControlRadius => _theme.ControlRadius;
+    public static double SmallRadius => _theme.SmallRadius;
+    public static double PillRadius => _theme.PillRadius;
 
     public static void FillRounded(BRenderList renderList, BRect rect, BColor color, double radius)
     {

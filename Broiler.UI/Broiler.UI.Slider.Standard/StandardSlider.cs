@@ -6,8 +6,19 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Slider.Standard;
 
-public sealed class StandardSlider : UiSlider
+public sealed class StandardSlider : UiSlider, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        FillColor = theme.Accent;
+        TrackColor = theme.SurfaceDisabled;
+        BorderColor = theme.BorderStrong;
+        DisabledColor = theme.TextDisabled;
+        FocusRing = theme.FocusRing;
+        // Keep the thumb light on both themes so it reads against the track.
+        ThumbColor = theme.IsDark ? theme.Text : theme.Surface;
+    }
+
     private static readonly BSize DefaultHorizontalSize = new(160, 32);
 
     private bool _isDragging;

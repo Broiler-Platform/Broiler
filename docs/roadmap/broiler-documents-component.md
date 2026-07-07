@@ -1,7 +1,7 @@
 # Broiler Document Formats (RTF) Roadmap
 
-**Status:** Phases 0-5 complete (2026-07-05); Path A. RTF reads/writes (lossless round-trip, hardened); rich RTF clipboard adapter + headless CLI convert shipped; additional formats/packaging is Phase 6
-**Date:** 2026-07-05
+**Status:** Phases 0-6 complete (2026-07-07); Path A. RTF reads/writes (lossless round-trip, hardened); rich RTF clipboard adapter + headless CLI convert shipped; HTML + Markdown codecs and packaging shipped; DOCX remains future optional scope
+**Date:** 2026-07-07
 **Scope:** Roadmap for reading and writing rich-text document interchange
 formats — RTF first, then HTML/Markdown/DOCX — in Broiler. This document
 contains no implementation.
@@ -516,6 +516,13 @@ construction (reads through the safe `RtfReader` policy).
 
 ### Phase 6 — Additional formats and packaging
 
+**Status:** Complete (2026-07-07). `Broiler.Documents.Html` was added as the
+second codec over the same `DocumentCodec` contract, with no catalog changes.
+Package metadata now applies to the Documents component, the new projects are in
+`Broiler.slnx`, and HTML/Markdown subset and limit documentation is published.
+Markdown was added after the first Phase 6 pass as the optional peer codec. See
+the delivery table below.
+
 **Objective:** Prove the catalog generalizes and make it consumable.
 
 Tasks:
@@ -531,6 +538,26 @@ Exit gate:
 
 - a second codec (HTML) works through the same contract with no catalog changes;
 - packages are independently consumable; the supported subset is documented.
+
+Delivery:
+
+| Phase 6 task | Implementation |
+|---|---|
+| Add `Broiler.Documents.Html` | New runtime project references `Broiler.Documents`, `Broiler.Documents.Model`, `Broiler.Dom`, and `Broiler.Dom.Html`; `HtmlDocumentCodec` probes HTML documents/fragments, reads through `HtmlDocumentParser`, writes deterministic UTF-8 HTML through `HtmlSerializer`, and maps the current model subset (paragraphs, soft breaks, inline styles, links, paragraph spacing/alignment, list reads) |
+| Add `Broiler.Documents.Markdown` | New dependency-free runtime project references only `Broiler.Documents` + `Broiler.Documents.Model`; `MarkdownDocumentCodec` probes conservatively (block markers / inline markers / `.md` hints), reads a CommonMark-oriented subset, and writes deterministic UTF-8 Markdown |
+| Prove catalog generalizes | `HtmlDocumentCodecProbeTests` registers `RtfDocumentCodec` + `HtmlDocumentCodec` in the unchanged `DocumentCodecCatalog` and selects HTML by content signature; no global registration or catalog API changes |
+| Prove Markdown peer codec | `MarkdownDocumentCodecProbeTests` registers RTF + HTML + Markdown in the unchanged `DocumentCodecCatalog` and selects Markdown by block syntax; no global registration or catalog API changes |
+| CLI consumer | `Broiler.Cli --convert-doc` catalog now includes RTF + HTML + Markdown and writes `.txt`, `.rtf`, `.html`/`.htm`, or `.md`/`.markdown`; focused tests cover HTML -> RTF, RTF -> HTML, Markdown -> RTF, and HTML -> Markdown conversions |
+| Register projects + package metadata | `Broiler.Documents.Html`/`.Tests` and `Broiler.Documents.Markdown`/`.Tests` are registered in `/Dependencies/Documents/` in `Broiler.slnx`; `Broiler.Documents/Directory.Build.props` supplies shared package authors/license/tags for runtime packages |
+| Architecture gates | `HtmlArchitectureTests` and `MarkdownArchitectureTests` assert `net10.0`, no package refs, intended project references, no UI/Input/Windows references, and no module initializers |
+| Supported subset docs | `Broiler.Documents/docs/html-conformance.md` and `Broiler.Documents/docs/markdown-conformance.md` document probes, reader/writer mappings, skipped or degraded constructs, security policy, enforced limits, and known limitations |
+| Optional DOCX | Not implemented; left as future optional scope |
+
+Exit-gate status: HTML and Markdown work as peer codecs through the existing
+catalog contract with no catalog changes, and the component is consumable through
+runtime package metadata plus solution registration. The supported HTML and
+Markdown subsets are documented in `docs/html-conformance.md` and
+`docs/markdown-conformance.md`.
 
 ## 10. Suggested first MVP
 

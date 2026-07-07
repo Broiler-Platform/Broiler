@@ -7,8 +7,21 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.ToggleButton.Standard;
 
-public sealed class StandardToggleButton : UiToggleButton
+public sealed class StandardToggleButton : UiToggleButton, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        CheckedBackground = theme.AccentSoft;
+        IndeterminateBackground = theme.AccentSoft;
+        Foreground = theme.Accent;
+        BorderColor = theme.Border;
+        DisabledForeground = theme.TextDisabled;
+        HoverBackground = theme.SurfaceAlt;
+        PressedBackground = theme.AccentSoft;
+        FocusRing = theme.FocusRing;
+    }
+
     private bool _isPressed;
     private bool _isHovering;
 

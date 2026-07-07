@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
 using Broiler.Graphics;
+using Broiler.UI.Standard;
 
 namespace Broiler.UI.Label.Standard;
 
-public sealed class StandardLabel : UiLabel
+public sealed class StandardLabel : UiLabel, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Foreground = theme.Text;
+    }
+
     protected override BSize MeasureCore(BSize availableSize)
     {
         IReadOnlyList<LabelLine> lines = BuildLines(availableSize.Width);

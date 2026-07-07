@@ -23,8 +23,11 @@
     <ProjectReference Include="..\Broiler.HtmlBridge.Dom\Broiler.HtmlBridge.Dom.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Rendering\Broiler.HtmlBridge.Rendering.csproj" />
     <!-- Bridge component connecting HTML rendering with JavaScript execution -->
-    <!-- Headless document-format conversion (RTF); no UI dependency -->
+    <!-- Headless document-format conversion (RTF/DOCX/HTML/Markdown); no UI dependency -->
     <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents\Broiler.Documents.csproj" />
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Docx\Broiler.Documents.Docx.csproj" />
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Html\Broiler.Documents.Html.csproj" />
+    <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Markdown\Broiler.Documents.Markdown.csproj" />
     <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
     <ProjectReference Include="..\..\Broiler.Documents\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" />
   </ItemGroup>

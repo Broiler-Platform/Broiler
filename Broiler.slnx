@@ -27,6 +27,12 @@
     <Project Path="Broiler.Media/Broiler.Media/Broiler.Media.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Documents/">
+    <Project Path="Broiler.Documents/Broiler.Documents.Docx.Tests/Broiler.Documents.Docx.Tests.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Docx/Broiler.Documents.Docx.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Html.Tests/Broiler.Documents.Html.Tests.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Html/Broiler.Documents.Html.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Markdown.Tests/Broiler.Documents.Markdown.Tests.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Markdown/Broiler.Documents.Markdown.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Model.Tests/Broiler.Documents.Model.Tests.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Model/Broiler.Documents.Model.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Rtf.Tests/Broiler.Documents.Rtf.Tests.csproj" />

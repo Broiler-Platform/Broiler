@@ -7,8 +7,15 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Toolbar.Standard;
 
-public sealed class StandardToolbar : UiToolbar
+public sealed class StandardToolbar : UiToolbar, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.SurfaceAlt;
+        BorderColor = theme.Border;
+        SeparatorColor = theme.BorderStrong;
+    }
+
     public BColor Background { get; set; } = StandardControlPaint.SurfaceAlt;
 
     public BColor BorderColor { get; set; } = StandardControlPaint.Border;

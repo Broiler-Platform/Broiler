@@ -4,8 +4,15 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Tooltip.Standard;
 
-public sealed class StandardTooltip : UiTooltip
+public sealed class StandardTooltip : UiTooltip, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        BorderColor = theme.Border;
+    }
+
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
     public BColor Foreground { get; set; } = StandardControlPaint.Text;

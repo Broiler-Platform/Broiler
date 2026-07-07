@@ -7,8 +7,17 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.ListView.Standard;
 
-public sealed class StandardListView : UiListView
+public sealed class StandardListView : UiListView, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        Foreground = theme.Text;
+        SelectedBackground = theme.AccentSoft;
+        FocusRing = theme.FocusRing;
+        BorderColor = theme.Border;
+    }
+
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
     public BColor Foreground { get; set; } = StandardControlPaint.Text;

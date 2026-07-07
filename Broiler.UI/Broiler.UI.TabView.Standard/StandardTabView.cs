@@ -6,8 +6,17 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.TabView.Standard;
 
-public sealed class StandardTabView : UiTabView
+public sealed class StandardTabView : UiTabView, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Background = theme.Surface;
+        SelectedHeaderBackground = theme.Surface;
+        Foreground = theme.Text;
+        BorderColor = theme.Border;
+        FocusRing = theme.FocusRing;
+    }
+
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
     public BColor HeaderBackground { get; set; } = BColor.Transparent;

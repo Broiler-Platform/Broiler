@@ -171,6 +171,38 @@ public class WptTestRunnerTests : IDisposable
         Assert.False(WptTestRunner.RequiresJavaScript("<html><body>static</body></html>"));
     }
 
+    [Theory]
+    [InlineData("<meta name=\"variant\" content=\"?1-1000\">")]
+    [InlineData("<meta content='?1-last' name='variant'>")]
+    [InlineData("<meta name=variant content=?1-last>")]
+    public void IsWptVariantTest_Detects_MetaVariant(string markup)
+    {
+        Assert.True(WptTestRunner.IsWptVariantTest(markup));
+        Assert.False(WptTestRunner.IsWptVariantTest("<meta name=\"assert\" content=\"visual\">"));
+    }
+
+    [Fact]
+    public void RunTest_Skips_WptVariant_Before_Reference_And_Script_Work()
+    {
+        var testFile = Path.Combine(_tempDir, "variant.html");
+        File.WriteAllText(testFile, """
+            <!DOCTYPE html>
+            <meta name="variant" content="?1-1000">
+            <link rel="help" href="https://encoding.spec.whatwg.org/">
+            <meta name="assert" content="Variant assertions are expanded by the WPT server.">
+            <script>throw new Error("would execute if variants were not skipped");</script>
+            <body>variant</body>
+            """);
+
+        var result = new WptTestRunner().RunTest(testFile, Path.Combine(_tempDir, "references"), _tempDir);
+
+        Assert.True(result.Skipped);
+        Assert.Equal(SkipReason.UnsupportedWptVariant, result.SkipReason);
+        Assert.Contains("variant", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["https://encoding.spec.whatwg.org/"], result.HelpLinks);
+        Assert.Equal("Variant assertions are expanded by the WPT server.", result.Assertion);
+    }
+
     [Fact]
     public void RunTest_Returns_Skipped_When_No_Reference_Image()
     {
@@ -4570,7 +4602,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Timeout       : 0.05 second(s)", output);
         Assert.Contains("[FAIL] [Timeout]", output);
         Assert.Contains("Test timed out after 0.05 second(s)", output);
-        Assert.Contains("Results: 0 passed, 1 failed, 0 skipped", output);
+        Assert.Contains("Total discovered : 1  (= 0 passed + 1 failed + 0 skipped)", output);
         Assert.Contains("Failed tests:", output);
         Assert.Contains("slow.html", output);
         Assert.Contains("[Timeout] — 1 failure(s)", output);

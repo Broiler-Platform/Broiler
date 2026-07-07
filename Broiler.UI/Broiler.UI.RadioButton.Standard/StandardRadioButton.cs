@@ -6,8 +6,17 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.RadioButton.Standard;
 
-public sealed class StandardRadioButton : UiRadioButton
+public sealed class StandardRadioButton : UiRadioButton, IStandardThemedControl
 {
+    public void ApplyTheme(StandardThemeTokens theme)
+    {
+        Foreground = theme.Text;
+        BorderColor = theme.BorderStrong;
+        Accent = theme.Accent;
+        DisabledForeground = theme.TextDisabled;
+        FocusRing = theme.FocusRing;
+    }
+
     private bool _isPressed;
 
     public BColor Background { get; set; } = BColor.Transparent;
