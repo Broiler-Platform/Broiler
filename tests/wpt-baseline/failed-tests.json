@@ -72,14 +72,6 @@
   ],
   "droppedDeclarations": [
     [
-      "text-transform: full-size-kana",
-      1295
-    ],
-    [
-      "text-transform: math-auto",
-      235
-    ],
-    [
       "white-space: preserve-breaks",
       152
     ],
@@ -104,11 +96,11 @@
       10
     ],
     [
-      "text-transform: capitalize full-width",
-      2
+      "text-align: inline-end",
+      5
     ],
     [
-      "text-transform: full-width full-size-kana lowercase",
+      "white-space: balance preserve",
       2
     ]
   ],
@@ -176,9 +168,9 @@
     },
     {
       "family": "css/css-text/word-space-transform/word-space-transform-{N}.html",
-      "count": 23,
+      "count": 24,
       "categories": {
-        "PixelMismatch": 23
+        "PixelMismatch": 24
       },
       "examples": [
         "css/css-text/word-space-transform/word-space-transform-011.html",
@@ -93623,13 +93615,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/text-transform/text-transform-tailoring-002a.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/text-transform/text-transform-tailoring-003.html",
       "passed": false,
       "skipped": false,
@@ -95864,6 +95849,13 @@
     },
     {
       "relativeTestPath": "css/css-text/word-space-transform/word-space-transform-008.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/word-space-transform/word-space-transform-009.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
