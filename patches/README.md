@@ -125,6 +125,37 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   `ch` widths passes on CI without this patch); only the spaced-slash tests wait on
   it.
 
+- **0009-css-text-align-last-justify-all.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`, `CssStyleEngine.Computed.cs`) — makes
+  `IsAcceptableDeclarationValue` accept the CSS Text 4 §text-align shorthand value
+  `justify-all` (previously dropped as invalid — 30 drops in issue #1276) and
+  validate the `text-align-last` longhand (`auto | start | end | left | right |
+  center | justify | match-parent`), and adds `text-align-last` to the engine's
+  inherited-property set so `getComputedStyle` resolves it on descendants. `text-align:
+  justify-all` justifies the last line as well as the earlier ones; `text-align-last`
+  governs the last line's alignment independently.
+  **Active CI fallback — `text-align-last` yes, `justify-all` no.** `text-align-last`
+  is **not** blocked by the pinned validator: it survives the cascade through
+  `IsAcceptableDeclarationValue`'s default-accept path, so the companion **main-repo**
+  `Broiler.Layout` implementation (`CssLayoutEngine.ApplyHorizontalAlignment` /
+  `ResolveTextAlignLast`, the `CssBoxProperties.TextAlignLast` property, and the
+  `CssUtils` get/set plumbing; guarded by `TextAlignLastTests`) applies it on CI
+  **now** — covering the `text-align/text-align-last-*` family. `text-align:
+  justify-all`, by contrast, is dropped by the pinned validator before the render
+  cascade sees it (`SharedRendererCascade` → `CssUtils.SetPropertyValue` never
+  receives `justify-all`), and there is no parent-repo layer to reproduce that drop,
+  so `justify-all` stays dropped until a maintainer applies this patch and bumps the
+  pointer. The layout already handles a stored `text-align:justify-all` (it lights up
+  the moment the value stops being dropped); the shared last-line-justification path
+  is exercised on CI today via `text-align-last:justify`
+  (`TextAlignLastTests.TextAlignLastJustify_StretchesTheLastLine`). The companion
+  CSSOM-side validator (main-repo `DomBridge.IsAcceptableCssValue`) was updated in the
+  same parent commit, so JS-set `element.style.textAlign = "justify-all"` and
+  `element.style.textAlignLast` are accepted on CI regardless. Guards
+  `CssStyleEngineTests.TextAlign_Accepts_JustifyAll_And_Standard_Values`,
+  `TextAlignLast_Accepts_Standard_Values`, `TextAlignLast_Drops_Invalid_Value`,
+  `TextAlignLast_Is_Inherited` (travel with the patch).
+
 ## Applied / obsolete
 
 - **0004-css-expand-margin-padding-shorthand-cascade.patch** → `Broiler.CSS`

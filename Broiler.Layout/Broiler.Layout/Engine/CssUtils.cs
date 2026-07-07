@@ -98,6 +98,7 @@ internal static class CssUtils
             "vertical-align" => cssBox.VerticalAlign,
             "text-indent" => cssBox.TextIndent,
             "text-align" => cssBox.TextAlign,
+            "text-align-last" => cssBox.TextAlignLast,
             "text-decoration" => cssBox.TextDecoration,
             "text-decoration-line" => cssBox.TextDecoration,
             "text-decoration-style" => cssBox.TextDecorationStyle,
@@ -580,6 +581,9 @@ internal static class CssUtils
                 break;
             case "text-align":
                 cssBox.TextAlign = value;
+                break;
+            case "text-align-last":
+                cssBox.TextAlignLast = value;
                 break;
             case "text-decoration":
                 ApplyTextDecorationShorthand(cssBox, value);
