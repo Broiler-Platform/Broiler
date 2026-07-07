@@ -33,7 +33,7 @@ env:
 
 jobs:
   prepare-writer-draft-release:
-    name: Prepare Broiler Writer Draft Release (${{ github.event.inputs.target_platform }})
+    name: Prepare Broiler Writer Draft Release (Windows)
     if: ${{ github.event.inputs.target_platform == 'Windows' }}
     runs-on: windows-latest
     timeout-minutes: 90
@@ -185,7 +185,7 @@ jobs:
             --notes-file $bodyPath
 
   prepare-writer-linux-draft-release:
-    name: Prepare Broiler Writer Draft Release (${{ github.event.inputs.target_platform }})
+    name: Prepare Broiler Writer Draft Release (Linux)
     if: ${{ github.event.inputs.target_platform == 'Linux' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90

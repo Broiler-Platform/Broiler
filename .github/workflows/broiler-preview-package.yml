@@ -1,0 +1,479 @@
+name: Prepare Broiler Preview Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to checkout recursively and package from.
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: broiler-preview-package-${{ github.event.inputs.branch }}
+  cancel-in-progress: false
+
+env:
+  BROWSER_PROJECT_PATH: src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
+  WRITER_PROJECT_PATH: Broiler.Writer/Broiler.Writer.csproj
+  CONFIGURATION: Release
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  build-windows-preview-package:
+    name: Build BPP Win32 Packages
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore Windows runtime graphs
+        shell: pwsh
+        run: |
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64
+
+      - name: Build Windows targets
+        shell: pwsh
+        run: |
+          dotnet build $env:BROWSER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --no-restore
+
+          dotnet build $env:WRITER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --no-restore
+
+      - name: Publish Windows framework-dependent apps
+        shell: pwsh
+        run: |
+          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent\browser'
+          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent\writer'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained false `
+            --no-restore `
+            --output $browserOutput `
+            -p:PublishSingleFile=true `
+            -p:UseAppHost=true
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained false `
+            --no-restore `
+            --output $writerOutput `
+            -p:PublishSingleFile=true `
+            -p:UseAppHost=true
+
+      - name: Publish Windows self-contained apps
+        shell: pwsh
+        run: |
+          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained\browser'
+          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained\writer'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $browserOutput `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --framework net10.0-windows `
+            --configuration $env:CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $writerOutput `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Package Windows assets
+        shell: pwsh
+        run: |
+          function Copy-AppPublish {
+            param(
+              [Parameter(Mandatory=$true)][string]$Source,
+              [Parameter(Mandatory=$true)][string]$Destination,
+              [Parameter(Mandatory=$true)][string]$OriginalBaseName,
+              [Parameter(Mandatory=$true)][string]$PackageBaseName,
+              [Parameter(Mandatory=$true)][string]$ExecutableExtension
+            )
+
+            New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+            Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
+              Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
+            }
+
+            $originalExecutable = Join-Path $Destination ($OriginalBaseName + $ExecutableExtension)
+            $packageExecutable = Join-Path $Destination ($PackageBaseName + $ExecutableExtension)
+            if ($originalExecutable -ne $packageExecutable -and (Test-Path -LiteralPath $originalExecutable)) {
+              Move-Item -LiteralPath $originalExecutable -Destination $packageExecutable -Force
+            }
+
+            foreach ($suffix in @('.pdb', '.deps.json', '.runtimeconfig.json')) {
+              $originalFile = Join-Path $Destination ($OriginalBaseName + $suffix)
+              $packageFile = Join-Path $Destination ($PackageBaseName + $suffix)
+              if ($originalFile -ne $packageFile -and (Test-Path -LiteralPath $originalFile)) {
+                Move-Item -LiteralPath $originalFile -Destination $packageFile -Force
+              }
+            }
+
+            if (-not (Test-Path -LiteralPath $packageExecutable)) {
+              throw "Expected packaged executable was not produced: $packageExecutable"
+            }
+          }
+
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+
+          foreach ($variant in @('framework-dependent', 'self-contained')) {
+            $packageName = "BPP-Win32-$variant"
+            $packageRoot = Join-Path $env:RUNNER_TEMP "packages\$packageName"
+            Remove-Item -LiteralPath $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+            Copy-AppPublish `
+              -Source (Join-Path $env:RUNNER_TEMP "publish\windows-$variant\browser") `
+              -Destination (Join-Path $packageRoot 'Broiler.Browser') `
+              -OriginalBaseName 'Broiler.Graphics.Browser' `
+              -PackageBaseName 'Broiler.Browser' `
+              -ExecutableExtension '.exe'
+
+            Copy-AppPublish `
+              -Source (Join-Path $env:RUNNER_TEMP "publish\windows-$variant\writer") `
+              -Destination (Join-Path $packageRoot 'Broiler.Writer') `
+              -OriginalBaseName 'Broiler.Writer' `
+              -PackageBaseName 'Broiler.Writer' `
+              -ExecutableExtension '.exe'
+
+            Compress-Archive `
+              -LiteralPath $packageRoot `
+              -DestinationPath (Join-Path $assetDir "$packageName.zip") `
+              -Force
+          }
+
+      - name: Upload Win32 framework-dependent BPP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BPP-Win32-framework-dependent
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent.zip
+          if-no-files-found: error
+
+      - name: Upload Win32 self-contained BPP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BPP-Win32-self-contained
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained.zip
+          if-no-files-found: error
+
+  build-linux-preview-package:
+    name: Build BPP Linux Packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore Linux runtime graphs
+        shell: pwsh
+        run: |
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64
+
+      - name: Build Linux targets
+        shell: pwsh
+        run: |
+          dotnet build $env:BROWSER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --no-restore
+
+          dotnet build $env:WRITER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --no-restore
+
+      - name: Run Linux offscreen smoke tests
+        shell: pwsh
+        run: |
+          dotnet run `
+            --project $env:BROWSER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --no-build `
+            -- `
+            --offscreen `
+            --duration-ms=1
+
+          dotnet run `
+            --project $env:WRITER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --no-build `
+            -- `
+            --offscreen `
+            --duration-ms=1
+
+      - name: Publish Linux framework-dependent apps
+        shell: pwsh
+        run: |
+          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-framework-dependent/browser'
+          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-framework-dependent/writer'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained false `
+            --no-restore `
+            --output $browserOutput `
+            -p:PublishSingleFile=true `
+            -p:UseAppHost=true
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained false `
+            --no-restore `
+            --output $writerOutput `
+            -p:PublishSingleFile=true `
+            -p:UseAppHost=true
+
+      - name: Publish Linux self-contained apps
+        shell: pwsh
+        run: |
+          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-self-contained/browser'
+          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-self-contained/writer'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $browserOutput `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --framework net10.0 `
+            --configuration $env:CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained true `
+            --no-restore `
+            --output $writerOutput `
+            -p:PublishSingleFile=true `
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Package Linux assets
+        shell: pwsh
+        run: |
+          function Copy-AppPublish {
+            param(
+              [Parameter(Mandatory=$true)][string]$Source,
+              [Parameter(Mandatory=$true)][string]$Destination,
+              [Parameter(Mandatory=$true)][string]$OriginalBaseName,
+              [Parameter(Mandatory=$true)][string]$PackageBaseName,
+              [Parameter(Mandatory=$true)][string]$ExecutableExtension
+            )
+
+            New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+            Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
+              Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
+            }
+
+            $originalExecutable = Join-Path $Destination ($OriginalBaseName + $ExecutableExtension)
+            $packageExecutable = Join-Path $Destination ($PackageBaseName + $ExecutableExtension)
+            if ($originalExecutable -ne $packageExecutable -and (Test-Path -LiteralPath $originalExecutable)) {
+              Move-Item -LiteralPath $originalExecutable -Destination $packageExecutable -Force
+            }
+
+            foreach ($suffix in @('.pdb', '.deps.json', '.runtimeconfig.json')) {
+              $originalFile = Join-Path $Destination ($OriginalBaseName + $suffix)
+              $packageFile = Join-Path $Destination ($PackageBaseName + $suffix)
+              if ($originalFile -ne $packageFile -and (Test-Path -LiteralPath $originalFile)) {
+                Move-Item -LiteralPath $originalFile -Destination $packageFile -Force
+              }
+            }
+
+            if (-not (Test-Path -LiteralPath $packageExecutable)) {
+              throw "Expected packaged executable was not produced: $packageExecutable"
+            }
+
+            chmod +x $packageExecutable
+          }
+
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $packageParent | Out-Null
+
+          foreach ($variant in @('framework-dependent', 'self-contained')) {
+            $packageName = "BPP-Linux-$variant"
+            $packageRoot = Join-Path $packageParent $packageName
+            Remove-Item -LiteralPath $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+            Copy-AppPublish `
+              -Source (Join-Path $env:RUNNER_TEMP "publish/linux-$variant/browser") `
+              -Destination (Join-Path $packageRoot 'Broiler.Browser') `
+              -OriginalBaseName 'Broiler.Graphics.Browser' `
+              -PackageBaseName 'Broiler.Browser' `
+              -ExecutableExtension ''
+
+            Copy-AppPublish `
+              -Source (Join-Path $env:RUNNER_TEMP "publish/linux-$variant/writer") `
+              -Destination (Join-Path $packageRoot 'Broiler.Writer') `
+              -OriginalBaseName 'Broiler.Writer' `
+              -PackageBaseName 'Broiler.Writer' `
+              -ExecutableExtension ''
+
+            tar -czf (Join-Path $assetDir "$packageName.tar.gz") -C $packageParent $packageName
+          }
+
+      - name: Upload Linux framework-dependent BPP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BPP-Linux-framework-dependent
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent.tar.gz
+          if-no-files-found: error
+
+      - name: Upload Linux self-contained BPP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BPP-Linux-self-contained
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.gz
+          if-no-files-found: error
+
+  create-preview-package-release:
+    name: Create BPP Draft Release
+    runs-on: ubuntu-24.04
+    needs:
+      - build-windows-preview-package
+      - build-linux-preview-package
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Download package assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: BPP-*
+          path: ${{ runner.temp }}/release-assets
+          merge-multiple: true
+
+      - name: Resolve release metadata
+        id: metadata
+        shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          $branchSlug = $env:RELEASE_BRANCH -replace '[^A-Za-z0-9._-]+', '-'
+          $branchSlug = $branchSlug.Trim('-')
+          if ([string]::IsNullOrWhiteSpace($branchSlug)) {
+            $branchSlug = 'branch'
+          }
+
+          $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+          $shortSha = (git rev-parse --short HEAD).Trim()
+          $tagName = "broiler-preview-package-$branchSlug-$stamp-$env:GITHUB_RUN_NUMBER"
+          $releaseTitle = "Broiler Preview Package draft ($env:RELEASE_BRANCH @ $shortSha)"
+
+          "tag_name=$tagName" >> $env:GITHUB_OUTPUT
+          "release_title=$releaseTitle" >> $env:GITHUB_OUTPUT
+          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+          TAG_NAME: ${{ steps.metadata.outputs.tag_name }}
+          RELEASE_TITLE: ${{ steps.metadata.outputs.release_title }}
+          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+        run: |
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $windowsFrameworkDependent = Join-Path $assetDir 'BPP-Win32-framework-dependent.zip'
+          $windowsSelfContained = Join-Path $assetDir 'BPP-Win32-self-contained.zip'
+          $linuxFrameworkDependent = Join-Path $assetDir 'BPP-Linux-framework-dependent.tar.gz'
+          $linuxSelfContained = Join-Path $assetDir 'BPP-Linux-self-contained.tar.gz'
+
+          foreach ($asset in @($windowsFrameworkDependent, $windowsSelfContained, $linuxFrameworkDependent, $linuxSelfContained)) {
+            if (-not (Test-Path -LiteralPath $asset)) {
+              throw "Missing expected BPP asset: $asset"
+            }
+          }
+
+          $body = @"
+          Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.
+
+          Each package contains Broiler.Browser and Broiler.Writer.
+
+          Assets:
+          - BPP-Win32-framework-dependent.zip
+          - BPP-Win32-self-contained.zip
+          - BPP-Linux-framework-dependent.tar.gz
+          - BPP-Linux-self-contained.tar.gz
+          "@
+
+          $bodyPath = Join-Path $env:RUNNER_TEMP 'broiler-preview-package-notes.md'
+          Set-Content -LiteralPath $bodyPath -Value $body -Encoding UTF8
+
+          gh release create $env:TAG_NAME `
+            $windowsFrameworkDependent `
+            $windowsSelfContained `
+            $linuxFrameworkDependent `
+            $linuxSelfContained `
+            --draft `
+            --target $env:RELEASE_BRANCH `
+            --title $env:RELEASE_TITLE `
+            --notes-file $bodyPath

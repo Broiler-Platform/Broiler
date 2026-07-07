@@ -1,19 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <RootNamespace>Broiler.App.Graphics</RootNamespace>
     <AssemblyName>Broiler.Graphics.Browser</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <OutputType>WinExe</OutputType>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Preview UI is built entirely on Broiler.Graphics (Win32 + Direct2D); no WPF. -->
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <Compile Remove="Program.cs" />
+    <Compile Remove="BrowserWindow.cs" />
+    <Compile Remove="Phase3UiPreviewWindow.cs" />
+    <Compile Remove="Phase4ToolbarPreviewWindow.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <Compile Remove="Program.Linux.cs" />
+    <Compile Remove="LinuxBrowserOptions.cs" />
+    <Compile Remove="LinuxBrowserRunner.cs" />
+  </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Panel.Standard\Broiler.UI.Panel.Standard.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\Broiler.UI.Label.Standard\Broiler.UI.Label.Standard.csproj" />
@@ -27,6 +45,15 @@
     <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Scripting\Broiler.HtmlBridge.Scripting.csproj" />
     <!-- Bridge component connecting HTML rendering with JavaScript execution -->
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
   </ItemGroup>
 
   <!-- Platform-neutral pieces shared with the WPF app (Broiler.App). Linked rather than

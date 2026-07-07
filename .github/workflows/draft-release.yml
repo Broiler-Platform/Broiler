@@ -82,6 +82,7 @@ jobs:
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained'
           dotnet publish $env:PROJECT_PATH `
+            --framework net10.0-windows `
             --configuration $env:CONFIGURATION `
             --runtime win-x64 `
             --self-contained true `
@@ -103,6 +104,7 @@ jobs:
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent'
           dotnet publish $env:PROJECT_PATH `
+            --framework net10.0-windows `
             --configuration $env:CONFIGURATION `
             --runtime win-x64 `
             --self-contained false `
