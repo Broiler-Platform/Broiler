@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16318,
+    "failed": 16323,
     "skipped": 0,
-    "total": 16318
+    "total": 16323
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,11 +14,11 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 939,
+      "count": 579,
       "examples": [
-        "css/css-text/hyphens/hyphenate-character-001.html",
-        "css/css-text/hyphens/hyphenate-limit-chars-001.html",
-        "css/css-text/hyphens/hyphens-shaping-001.html"
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-008.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-026.xht",
+        "css/css-writing-modes/available-size-020.html"
       ]
     },
     {
@@ -26,23 +26,11 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 77,
+      "count": 281,
       "examples": [
-        "css/css-text/hyphens/hyphens-none-014.html",
-        "css/css-text/line-breaking/line-breaking-atomic-002.html",
-        "css/css-text/line-breaking/line-breaking-atomic-020.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ColorShift",
-      "label": "PixelMismatch / ColorShift",
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift",
-      "count": 13,
-      "examples": [
-        "css/css-text/i18n/css3-text-line-break-baspglwj-127.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-122.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-131.html"
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-027.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-041.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-049.xht"
       ]
     },
     {
@@ -50,178 +38,191 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 5,
+      "count": 20,
       "examples": [
-        "css/css-text/white-space/text-wrap-balance-float-006.html",
-        "css/css-text/white-space/pre-float-001.html",
-        "css/css-text/hanging-punctuation/hanging-punctuation-block-bound-001.html"
+        "css/css-writing-modes/box-offsets-rel-pos-vrl-004.xht",
+        "css/css-writing-modes/line-box-direction-htb-001.xht",
+        "css/css-writing-modes/sizing-orthogonal-percentage-margin-007.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ColorShift",
+      "label": "PixelMismatch / ColorShift",
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift",
+      "count": 6,
+      "examples": [
+        "css/css-writing-modes/abs-pos-vlr-padding-001.html",
+        "css/css-writing-modes/writing-mode-vertical-lr-002.xht",
+        "css/css-writing-modes/abs-pos-border-offset-002.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
-      "css/css-text",
-      1034
+      "css/css-writing-modes",
+      886
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1034
+      886
     ]
   ],
   "droppedDeclarations": [
     [
       "display: -webkit-box",
-      45
-    ],
-    [
-      "text-align: justify-all",
-      30
-    ],
-    [
-      "white-space: balance",
-      10
-    ],
-    [
-      "text-align: inline-end",
-      5
-    ],
-    [
-      "white-space: balance preserve",
-      2
-    ],
-    [
-      "text-align: auto",
       2
     ]
   ],
   "exceptionSignatures": [],
   "failureFamilies": [
     {
-      "family": "css/css-text/i18n/css{N}-text-line-break-baspglwj-{N}.html",
-      "count": 113,
+      "family": "css/css-writing-modes/abs-pos-non-replaced-vrl-{N}.xht",
+      "count": 92,
       "categories": {
-        "PixelMismatch": 113
+        "PixelMismatch": 92
       },
       "examples": [
-        "css/css-text/i18n/css3-text-line-break-baspglwj-008.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-022.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-035.html"
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-012.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-056.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-070.xht"
       ]
     },
     {
-      "family": "css/css-text/i18n/css{N}-text-line-break-opclns-{N}.html",
-      "count": 91,
+      "family": "css/css-writing-modes/abs-pos-non-replaced-vlr-{N}.xht",
+      "count": 86,
       "categories": {
-        "PixelMismatch": 91
+        "PixelMismatch": 86
       },
       "examples": [
-        "css/css-text/i18n/css3-text-line-break-opclns-100.html",
-        "css/css-text/i18n/css3-text-line-break-opclns-108.html",
-        "css/css-text/i18n/css3-text-line-break-opclns-113.html"
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-027.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-041.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-049.xht"
       ]
     },
     {
-      "family": "css/css-text/text-transform/text-transform-upperlower-{N}.html",
-      "count": 44,
+      "family": "css/css-writing-modes/wm-propagation-body-{N}.html",
+      "count": 15,
       "categories": {
-        "PixelMismatch": 44
+        "PixelMismatch": 15
       },
       "examples": [
-        "css/css-text/text-transform/text-transform-upperlower-004.html",
-        "css/css-text/text-transform/text-transform-upperlower-017.html",
-        "css/css-text/text-transform/text-transform-upperlower-026.html"
+        "css/css-writing-modes/wm-propagation-body-047.html",
+        "css/css-writing-modes/wm-propagation-body-051.html",
+        "css/css-writing-modes/wm-propagation-body-045.html"
       ]
     },
     {
-      "family": "css/css-text/line-breaking/line-breaking-atomic-{N}.html",
-      "count": 25,
-      "categories": {
-        "PixelMismatch": 25
-      },
-      "examples": [
-        "css/css-text/line-breaking/line-breaking-atomic-002.html",
-        "css/css-text/line-breaking/line-breaking-atomic-015.html",
-        "css/css-text/line-breaking/line-breaking-atomic-020.html"
-      ]
-    },
-    {
-      "family": "css/css-text/shaping/shaping-{N}.html",
-      "count": 24,
-      "categories": {
-        "PixelMismatch": 24
-      },
-      "examples": [
-        "css/css-text/shaping/shaping-004.html",
-        "css/css-text/shaping/shaping-017.html",
-        "css/css-text/shaping/shaping-001.html"
-      ]
-    },
-    {
-      "family": "css/css-text/word-space-transform/word-space-transform-{N}.html",
-      "count": 24,
-      "categories": {
-        "PixelMismatch": 24
-      },
-      "examples": [
-        "css/css-text/word-space-transform/word-space-transform-011.html",
-        "css/css-text/word-space-transform/word-space-transform-019.html",
-        "css/css-text/word-space-transform/word-space-transform-024.html"
-      ]
-    },
-    {
-      "family": "css/css-text/text-transform/text-transform-capitalize-{N}.html",
-      "count": 19,
-      "categories": {
-        "PixelMismatch": 19
-      },
-      "examples": [
-        "css/css-text/text-transform/text-transform-capitalize-005.html",
-        "css/css-text/text-transform/text-transform-capitalize-030.html",
-        "css/css-text/text-transform/text-transform-capitalize-026.html"
-      ]
-    },
-    {
-      "family": "css/css-text/white-space/seg-break-transformation-{N}.tentative.html",
-      "count": 19,
-      "categories": {
-        "PixelMismatch": 19
-      },
-      "examples": [
-        "css/css-text/white-space/seg-break-transformation-007.tentative.html",
-        "css/css-text/white-space/seg-break-transformation-014.tentative.html",
-        "css/css-text/white-space/seg-break-transformation-006.tentative.html"
-      ]
-    },
-    {
-      "family": "css/css-text/text-align/text-align-last-{N}.html",
+      "family": "css/css-writing-modes/sizing-orthog-htb-in-vlr-{N}.xht",
       "count": 14,
       "categories": {
         "PixelMismatch": 14
       },
       "examples": [
-        "css/css-text/text-align/text-align-last-001.html",
-        "css/css-text/text-align/text-align-last-009.html",
-        "css/css-text/text-align/text-align-last-004.html"
+        "css/css-writing-modes/sizing-orthog-htb-in-vlr-004.xht",
+        "css/css-writing-modes/sizing-orthog-htb-in-vlr-013.xht",
+        "css/css-writing-modes/sizing-orthog-htb-in-vlr-022.xht"
       ]
     },
     {
-      "family": "css/css-text/white-space/ws-break-spaces-applies-to-{N}.html",
+      "family": "css/css-writing-modes/sizing-orthog-htb-in-vrl-{N}.xht",
       "count": 14,
       "categories": {
         "PixelMismatch": 14
       },
       "examples": [
-        "css/css-text/white-space/ws-break-spaces-applies-to-001.html",
-        "css/css-text/white-space/ws-break-spaces-applies-to-009.html",
-        "css/css-text/white-space/ws-break-spaces-applies-to-013.html"
+        "css/css-writing-modes/sizing-orthog-htb-in-vrl-004.xht",
+        "css/css-writing-modes/sizing-orthog-htb-in-vrl-013.xht",
+        "css/css-writing-modes/sizing-orthog-htb-in-vrl-022.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/abs-pos-non-replaced-icb-vlr-{N}.xht",
+      "count": 12,
+      "categories": {
+        "PixelMismatch": 12
+      },
+      "examples": [
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vlr-007.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vlr-021.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vlr-029.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-{N}.xht",
+      "count": 12,
+      "categories": {
+        "PixelMismatch": 12
+      },
+      "examples": [
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-008.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-026.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-icb-vrl-010.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/block-flow-direction-slr-{N}.xht",
+      "count": 12,
+      "categories": {
+        "PixelMismatch": 12
+      },
+      "examples": [
+        "css/css-writing-modes/block-flow-direction-slr-048.xht",
+        "css/css-writing-modes/block-flow-direction-slr-066.xht",
+        "css/css-writing-modes/block-flow-direction-slr-047.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/block-flow-direction-srl-{N}.xht",
+      "count": 11,
+      "categories": {
+        "PixelMismatch": 11
+      },
+      "examples": [
+        "css/css-writing-modes/block-flow-direction-srl-057.xht",
+        "css/css-writing-modes/block-flow-direction-srl-061.xht",
+        "css/css-writing-modes/block-flow-direction-srl-046.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/block-flow-direction-vlr-{N}.xht",
+      "count": 11,
+      "categories": {
+        "PixelMismatch": 11
+      },
+      "examples": [
+        "css/css-writing-modes/block-flow-direction-vlr-016.xht",
+        "css/css-writing-modes/block-flow-direction-vlr-020.xht",
+        "css/css-writing-modes/block-flow-direction-vlr-003.xht"
       ]
     }
   ],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
-  "biggestProblems": [],
+  "biggestProblems": [
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 86.78436279296875,
+      "impact": 1,
+      "matchPercent": 13.21563720703125,
+      "relativeTestPath": "css/css-writing-modes/block-flow-direction-vlr-020.xht",
+      "title": "13.2% match \u2014 css/css-writing-modes/block-flow-direction-vlr-020.xht",
+      "detail": "Rendered output matches the reference by only 13.2% (PixelMismatch / MissingContent)."
+    },
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 86.6851806640625,
+      "impact": 1,
+      "matchPercent": 13.3148193359375,
+      "relativeTestPath": "css/css-writing-modes/block-flow-direction-slr-060.xht",
+      "title": "13.3% match \u2014 css/css-writing-modes/block-flow-direction-slr-060.xht",
+      "detail": "Rendered output matches the reference by only 13.3% (PixelMismatch / MissingContent)."
+    }
+  ],
   "results": [
     {
       "relativeTestPath": "css/CSS2/abspos/abspos-containing-block-initial-001.xht",
@@ -105699,7 +105700,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-writing-modes/abs-pos-vlr-padding-001.html",
@@ -105856,6 +105857,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-writing-modes/bidi-embed-011.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-writing-modes/bidi-isolate-005.html",
       "passed": false,
       "skipped": false,
@@ -105864,6 +105872,13 @@
     },
     {
       "relativeTestPath": "css/css-writing-modes/bidi-isolate-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/bidi-isolate-011.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -105934,6 +105949,13 @@
     },
     {
       "relativeTestPath": "css/css-writing-modes/bidi-normal-006.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/bidi-normal-011.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -106353,7 +106375,49 @@
       "subCategory": "LayoutShift"
     },
     {
+      "relativeTestPath": "css/css-writing-modes/block-override-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/block-override-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/block-override-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-writing-modes/block-override-004.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/block-override-isolate-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/block-override-isolate-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-writing-modes/block-override-isolate-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -106533,20 +106597,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-writing-modes/caption-side-vlr-003.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-writing-modes/caption-side-vlr-005.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-writing-modes/caption-side-vrl-002.xht",
@@ -107015,7 +107065,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-writing-modes/forms/checkbox-appearance-native-vertical-lr-baseline.optional.html",
@@ -108887,13 +108937,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-writing-modes/sizing-orthog-vlr-in-htb-020.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-writing-modes/sizing-orthog-vlr-in-htb-022.xht",
       "passed": false,
       "skipped": false,
@@ -108951,13 +108994,6 @@
     },
     {
       "relativeTestPath": "css/css-writing-modes/sizing-orthog-vrl-in-htb-019.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-writing-modes/sizing-orthog-vrl-in-htb-020.xht",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
