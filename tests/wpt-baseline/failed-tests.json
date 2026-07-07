@@ -1,45 +1,74 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16162,
+    "failed": 16183,
     "skipped": 0,
-    "total": 16162
+    "total": 16183
   },
-  "shardCount": 2,
+  "shardCount": 7,
   "problemLimit": 10,
-  "incompleteShards": [],
+  "incompleteShards": [
+    {
+      "shardIndex": 3,
+      "exitCode": 1
+    }
+  ],
   "topProblems": [
     {
       "key": "Timeout",
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 11,
+      "count": 25,
       "examples": [
         "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
-        "encoding/legacy-mb-japanese/shift_jis/sjis-decode-sjis.html",
-        "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html"
+        "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html",
+        "encoding/legacy-mb-korean/euc-kr/euckr_chars-korean.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:MissingContent",
+      "label": "PixelMismatch / MissingContent",
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent",
+      "count": 1,
+      "examples": [
+        "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html"
+      ]
+    },
+    {
+      "key": "ShardProcessError",
+      "label": "Shard process failure",
+      "category": "ShardProcessError",
+      "subCategory": null,
+      "count": 1,
+      "examples": [
+        "shard 3 (exit 1)"
       ]
     }
   ],
   "topFailingDirectories": [
     [
       "encoding/legacy-mb-japanese",
-      4
+      12
     ],
     [
       "encoding/legacy-mb-korean",
-      4
+      9
     ],
     [
       "encoding/legacy-mb-tchinese",
-      3
+      5
     ]
   ],
   "failuresByCategory": [
     [
       "Timeout",
-      11
+      25
+    ],
+    [
+      "PixelMismatch",
+      1
     ]
   ],
   "droppedDeclarations": [],
@@ -47,7 +76,26 @@
   "failureFamilies": [],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
-  "biggestProblems": [],
+  "biggestProblems": [
+    {
+      "kind": "IncompleteShards",
+      "tier": 0,
+      "severity": 1,
+      "impact": 1,
+      "title": "1 shard(s) did not complete",
+      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 3 (exit 1)."
+    },
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 61.864725748697914,
+      "impact": 1,
+      "matchPercent": 38.135274251302086,
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
+      "title": "38.1% match \u2014 encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
+      "detail": "Rendered output matches the reference by only 38.1% (PixelMismatch / MissingContent)."
+    }
+  ],
   "results": [
     {
       "relativeTestPath": "css/CSS2/abspos/abspos-containing-block-initial-001.xht",
@@ -113092,7 +113140,31 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-cseucpkdfmtjapanese.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
       "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/iso-2022-jp/iso2022jp_chars-csiso2022jp.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/iso-2022-jp/iso2022jp_chars.html",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
@@ -113110,7 +113182,43 @@
       "category": "Timeout"
     },
     {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-csshiftjis.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms932.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-shift-jis.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-windows-31j.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-x-sjis.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars.html",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
@@ -113128,7 +113236,49 @@
       "category": "Timeout"
     },
     {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-cseuckr.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-csksc56011987.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-iso-ir-149.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-korean.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_5601-1987.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ksc5601.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ksc_5601.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-windows-949.html",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
@@ -113152,10 +113302,35 @@
       "category": "Timeout"
     },
     {
-      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-big5-hkscs.html",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-cn-big5.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-x-x-big5.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     }
   ]
 }
