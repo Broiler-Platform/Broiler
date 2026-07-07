@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16367,
+    "failed": 16318,
     "skipped": 0,
-    "total": 16367
+    "total": 16318
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 965,
+      "count": 939,
       "examples": [
         "css/css-text/hyphens/hyphenate-character-001.html",
         "css/css-text/hyphens/hyphenate-limit-chars-001.html",
@@ -26,11 +26,11 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 101,
+      "count": 77,
       "examples": [
         "css/css-text/hyphens/hyphens-none-014.html",
-        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-004.html",
-        "css/css-text/line-breaking/line-breaking-atomic-002.html"
+        "css/css-text/line-breaking/line-breaking-atomic-002.html",
+        "css/css-text/line-breaking/line-breaking-atomic-020.html"
       ]
     },
     {
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 12,
+      "count": 13,
       "examples": [
         "css/css-text/i18n/css3-text-line-break-baspglwj-127.html",
         "css/css-text/i18n/css3-text-line-break-baspglwj-122.html",
@@ -61,13 +61,13 @@
   "topFailingDirectories": [
     [
       "css/css-text",
-      1083
+      1034
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1083
+      1034
     ]
   ],
   "droppedDeclarations": [
@@ -195,27 +195,27 @@
       ]
     },
     {
-      "family": "css/css-text/word-break/word-break-break-all-{N}.html",
-      "count": 18,
+      "family": "css/css-text/text-align/text-align-last-{N}.html",
+      "count": 14,
       "categories": {
-        "PixelMismatch": 18
+        "PixelMismatch": 14
       },
       "examples": [
-        "css/css-text/word-break/word-break-break-all-006.html",
-        "css/css-text/word-break/word-break-break-all-003.html",
-        "css/css-text/word-break/word-break-break-all-021.html"
+        "css/css-text/text-align/text-align-last-001.html",
+        "css/css-text/text-align/text-align-last-009.html",
+        "css/css-text/text-align/text-align-last-004.html"
       ]
     },
     {
-      "family": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-{N}.html",
-      "count": 15,
+      "family": "css/css-text/white-space/ws-break-spaces-applies-to-{N}.html",
+      "count": 14,
       "categories": {
-        "PixelMismatch": 15
+        "PixelMismatch": 14
       },
       "examples": [
-        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-004.html",
-        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-001.html",
-        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-009.html"
+        "css/css-text/white-space/ws-break-spaces-applies-to-001.html",
+        "css/css-text/white-space/ws-break-spaces-applies-to-009.html",
+        "css/css-text/white-space/ws-break-spaces-applies-to-013.html"
       ]
     }
   ],
@@ -88714,13 +88714,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/hyphens/hyphens-manual-inline-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/hyphens/hyphens-manual-inline-012.html",
       "passed": false,
       "skipped": false,
@@ -88792,20 +88785,6 @@
     },
     {
       "relativeTestPath": "css/css-text/hyphens/hyphens-span-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/hyphens/hyphens-vs-float-clearance-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/hyphens/hyphens-vs-float-clearance-002.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -91073,63 +91052,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-text/line-break/line-break-anywhere-and-white-space-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-and-white-space-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-and-white-space-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-and-white-space-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-and-white-space-009.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -91143,55 +91066,6 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-010.html",
       "passed": false,
       "skipped": false,
@@ -91199,46 +91073,11 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-012.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-013.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-016.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-text/line-break/line-break-loose-011.xht",
@@ -91885,21 +91724,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-anywhere-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-anywhere-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-anywhere-inline-002.tentative.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -91934,13 +91759,6 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-break-word-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-cluster-001.html",
       "passed": false,
       "skipped": false,
@@ -91949,13 +91767,6 @@
     },
     {
       "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-cluster-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/overflow-wrap/overflow-wrap-min-content-size-008.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -93992,55 +93803,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-before-first-ideographic-char-017.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/break-spaces-newline-011.html",
       "passed": false,
       "skipped": false,
@@ -94088,13 +93850,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/break-spaces-with-ideographic-space-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-text/white-space/break-spaces-with-ideographic-space-007.html",
@@ -94181,20 +93936,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/eol-spaces-bidi-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/eol-spaces-bidi-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/full-width-leading-spaces-002.html",
       "passed": false,
       "skipped": false,
@@ -94228,13 +93969,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/hanging-whitespace-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-text/white-space/line-edge-white-space-collapse-001.html",
@@ -94454,13 +94188,6 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/pre-wrap-leading-spaces-017.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/seg-break-transformation-000.tentative.html",
       "passed": false,
       "skipped": false,
@@ -94633,7 +94360,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/white-space/text-wrap-balance-before-after-001.html",
@@ -95238,20 +94965,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/white-space-pre-wrap-trailing-spaces-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/white-space-pre-wrap-trailing-spaces-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/white-space-pre-wrap-trailing-spaces-021.html",
       "passed": false,
       "skipped": false,
@@ -95525,42 +95238,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-017.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-018.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-text/word-break/word-break-break-all-020.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-021.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-022.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-030.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -95589,20 +95267,6 @@
     },
     {
       "relativeTestPath": "css/css-text/word-break/word-break-break-all-inline-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-inline-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-break-all-inline-009.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -95684,13 +95348,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/word-break/word-break-min-content-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-text/word-break/word-break-normal-001.html",
