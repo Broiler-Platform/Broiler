@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16275,
+    "failed": 16367,
     "skipped": 0,
-    "total": 16275
+    "total": 16367
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,23 +14,11 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 871,
+      "count": 965,
       "examples": [
-        "css/css-grid/abspos/grid-abspos-staticpos-align-self-002.html",
-        "css/css-grid/abspos/grid-abspos-staticpos-justify-self-rtl-002.html",
-        "css/css-grid/abspos/grid-abspos-staticpos-justify-self-vertWM-001.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 130,
-      "examples": [
-        "css/css-grid/abspos/positioned-grid-items-010.html",
-        "css/css-grid/alignment/grid-alignment-implies-size-change-009.html",
-        "css/css-grid/alignment/grid-column-axis-alignment-positioned-items-014.html"
+        "css/css-text/hyphens/hyphenate-character-001.html",
+        "css/css-text/hyphens/hyphenate-limit-chars-001.html",
+        "css/css-text/hyphens/hyphens-shaping-001.html"
       ]
     },
     {
@@ -38,11 +26,11 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 123,
+      "count": 101,
       "examples": [
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-010.html",
-        "css/css-grid/alignment/replaced-alignment-with-aspect-ratio-002.html",
-        "css/css-grid/grid-items/grid-inline-z-axis-ordering-002.html"
+        "css/css-text/hyphens/hyphens-none-014.html",
+        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-004.html",
+        "css/css-text/line-breaking/line-breaking-atomic-002.html"
       ]
     },
     {
@@ -50,217 +38,206 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 78,
+      "count": 12,
       "examples": [
-        "css/css-grid/alignment/grid-alignment-implies-size-change-016.html",
-        "css/css-grid/alignment/grid-alignment-implies-size-change-034.html",
-        "css/css-grid/grid-lanes/alignment/column-fill-reverse-justify-items-indefinite-size-002.html"
+        "css/css-text/i18n/css3-text-line-break-baspglwj-127.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-122.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-131.html"
       ]
     },
     {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
+      "key": "PixelMismatch:LayoutShift",
+      "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 3,
+      "subCategory": "LayoutShift",
+      "count": 5,
       "examples": [
-        "css/css-grid/grid-lanes/tentative/intrinsic-sizing/grid-lanes-baseline-alignment-affects-intrinsic-size-010.html",
-        "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/line-names/column-line-names-005.html",
-        "css/css-grid/nested-grid-item-block-size-001.html"
+        "css/css-text/white-space/text-wrap-balance-float-006.html",
+        "css/css-text/white-space/pre-float-001.html",
+        "css/css-text/hanging-punctuation/hanging-punctuation-block-bound-001.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
-      "css/css-grid",
-      1205
+      "css/css-text",
+      1083
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1205
+      1083
     ]
   ],
   "droppedDeclarations": [
     [
-      "display: inline grid-lanes",
-      7704
+      "text-transform: full-size-kana",
+      1295
     ],
     [
-      "display: grid-lanes",
-      6590
+      "text-transform: math-auto",
+      235
     ],
     [
-      "display: inline-grid-lanes",
-      768
+      "white-space: preserve-breaks",
+      152
+    ],
+    [
+      "white-space: break-spaces nowrap",
+      120
+    ],
+    [
+      "white-space: preserve-breaks nowrap",
+      120
     ],
     [
       "display: -webkit-box",
-      216
+      45
     ],
     [
-      "position: -webkit-sticky",
-      144
+      "text-align: justify-all",
+      25
+    ],
+    [
+      "white-space: balance",
+      10
+    ],
+    [
+      "text-transform: capitalize full-width",
+      2
+    ],
+    [
+      "text-transform: full-width full-size-kana lowercase",
+      2
     ]
   ],
   "exceptionSignatures": [],
   "failureFamilies": [
     {
-      "family": "css/css-grid/alignment/grid-alignment-implies-size-change-{N}.html",
-      "count": 22,
+      "family": "css/css-text/i18n/css{N}-text-line-break-baspglwj-{N}.html",
+      "count": 113,
       "categories": {
-        "PixelMismatch": 22
+        "PixelMismatch": 113
       },
       "examples": [
-        "css/css-grid/alignment/grid-alignment-implies-size-change-009.html",
-        "css/css-grid/alignment/grid-alignment-implies-size-change-016.html",
-        "css/css-grid/alignment/grid-alignment-implies-size-change-027.html"
+        "css/css-text/i18n/css3-text-line-break-baspglwj-008.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-022.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-035.html"
       ]
     },
     {
-      "family": "css/css-grid/abspos/positioned-grid-items-{N}.html",
-      "count": 21,
+      "family": "css/css-text/i18n/css{N}-text-line-break-opclns-{N}.html",
+      "count": 91,
       "categories": {
-        "PixelMismatch": 21
+        "PixelMismatch": 91
       },
       "examples": [
-        "css/css-grid/abspos/positioned-grid-items-003.html",
-        "css/css-grid/abspos/positioned-grid-items-010.html",
-        "css/css-grid/abspos/positioned-grid-items-025.html"
+        "css/css-text/i18n/css3-text-line-break-opclns-100.html",
+        "css/css-text/i18n/css3-text-line-break-opclns-108.html",
+        "css/css-text/i18n/css3-text-line-break-opclns-113.html"
       ]
     },
     {
-      "family": "css/css-grid/abspos/orthogonal-positioned-grid-items-{N}.html",
-      "count": 17,
+      "family": "css/css-text/text-transform/text-transform-upperlower-{N}.html",
+      "count": 44,
       "categories": {
-        "PixelMismatch": 17
+        "PixelMismatch": 44
       },
       "examples": [
-        "css/css-grid/abspos/orthogonal-positioned-grid-items-007.html",
-        "css/css-grid/abspos/orthogonal-positioned-grid-items-014.html",
-        "css/css-grid/abspos/orthogonal-positioned-grid-items-002.html"
+        "css/css-text/text-transform/text-transform-upperlower-004.html",
+        "css/css-text/text-transform/text-transform-upperlower-017.html",
+        "css/css-text/text-transform/text-transform-upperlower-026.html"
       ]
     },
     {
-      "family": "css/css-grid/alignment/grid-column-axis-alignment-positioned-items-{N}.html",
-      "count": 17,
+      "family": "css/css-text/line-breaking/line-breaking-atomic-{N}.html",
+      "count": 25,
       "categories": {
-        "PixelMismatch": 17
+        "PixelMismatch": 25
       },
       "examples": [
-        "css/css-grid/alignment/grid-column-axis-alignment-positioned-items-007.html",
-        "css/css-grid/alignment/grid-column-axis-alignment-positioned-items-014.html",
-        "css/css-grid/alignment/grid-column-axis-alignment-positioned-items-002.html"
+        "css/css-text/line-breaking/line-breaking-atomic-002.html",
+        "css/css-text/line-breaking/line-breaking-atomic-015.html",
+        "css/css-text/line-breaking/line-breaking-atomic-020.html"
       ]
     },
     {
-      "family": "css/css-grid/alignment/grid-row-axis-alignment-positioned-items-{N}.html",
-      "count": 17,
+      "family": "css/css-text/shaping/shaping-{N}.html",
+      "count": 24,
       "categories": {
-        "PixelMismatch": 17
+        "PixelMismatch": 24
       },
       "examples": [
-        "css/css-grid/alignment/grid-row-axis-alignment-positioned-items-003.html",
-        "css/css-grid/alignment/grid-row-axis-alignment-positioned-items-010.html",
-        "css/css-grid/alignment/grid-row-axis-alignment-positioned-items-006.html"
+        "css/css-text/shaping/shaping-004.html",
+        "css/css-text/shaping/shaping-017.html",
+        "css/css-text/shaping/shaping-001.html"
       ]
     },
     {
-      "family": "css/css-grid/abspos/orthogonal-positioned-grid-descendants-{N}.html",
-      "count": 16,
+      "family": "css/css-text/word-space-transform/word-space-transform-{N}.html",
+      "count": 23,
       "categories": {
-        "PixelMismatch": 16
+        "PixelMismatch": 23
       },
       "examples": [
-        "css/css-grid/abspos/orthogonal-positioned-grid-descendants-007.html",
-        "css/css-grid/abspos/orthogonal-positioned-grid-descendants-014.html",
-        "css/css-grid/abspos/orthogonal-positioned-grid-descendants-002.html"
+        "css/css-text/word-space-transform/word-space-transform-011.html",
+        "css/css-text/word-space-transform/word-space-transform-019.html",
+        "css/css-text/word-space-transform/word-space-transform-024.html"
       ]
     },
     {
-      "family": "css/css-grid/abspos/positioned-grid-descendants-{N}.html",
-      "count": 16,
+      "family": "css/css-text/text-transform/text-transform-capitalize-{N}.html",
+      "count": 19,
       "categories": {
-        "PixelMismatch": 16
+        "PixelMismatch": 19
       },
       "examples": [
-        "css/css-grid/abspos/positioned-grid-descendants-003.html",
-        "css/css-grid/abspos/positioned-grid-descendants-010.html",
-        "css/css-grid/abspos/positioned-grid-descendants-006.html"
+        "css/css-text/text-transform/text-transform-capitalize-005.html",
+        "css/css-text/text-transform/text-transform-capitalize-030.html",
+        "css/css-text/text-transform/text-transform-capitalize-026.html"
       ]
     },
     {
-      "family": "css/css-grid/alignment/grid-self-alignment-positioned-items-with-margin-border-padding-{N}.html",
-      "count": 16,
+      "family": "css/css-text/white-space/seg-break-transformation-{N}.tentative.html",
+      "count": 19,
       "categories": {
-        "PixelMismatch": 16
+        "PixelMismatch": 19
       },
       "examples": [
-        "css/css-grid/alignment/grid-self-alignment-positioned-items-with-margin-border-padding-002.html",
-        "css/css-grid/alignment/grid-self-alignment-positioned-items-with-margin-border-padding-015.html",
-        "css/css-grid/alignment/grid-self-alignment-positioned-items-with-margin-border-padding-007.html"
+        "css/css-text/white-space/seg-break-transformation-007.tentative.html",
+        "css/css-text/white-space/seg-break-transformation-014.tentative.html",
+        "css/css-text/white-space/seg-break-transformation-006.tentative.html"
       ]
     },
     {
-      "family": "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-{N}.html",
-      "count": 16,
+      "family": "css/css-text/word-break/word-break-break-all-{N}.html",
+      "count": 18,
       "categories": {
-        "PixelMismatch": 16
+        "PixelMismatch": 18
       },
       "examples": [
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-003.html",
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-010.html",
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-lr-006.html"
+        "css/css-text/word-break/word-break-break-all-006.html",
+        "css/css-text/word-break/word-break-break-all-003.html",
+        "css/css-text/word-break/word-break-break-all-021.html"
       ]
     },
     {
-      "family": "css/css-grid/alignment/grid-self-alignment-stretch-vertical-rl-{N}.html",
-      "count": 16,
+      "family": "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-{N}.html",
+      "count": 15,
       "categories": {
-        "PixelMismatch": 16
+        "PixelMismatch": 15
       },
       "examples": [
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-rl-003.html",
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-rl-010.html",
-        "css/css-grid/alignment/grid-self-alignment-stretch-vertical-rl-006.html"
+        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-004.html",
+        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-001.html",
+        "css/css-text/line-break/line-break-anywhere-overrides-uax-behavior-009.html"
       ]
     }
   ],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
-  "biggestProblems": [
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 99.19560750325522,
-      "impact": 1,
-      "matchPercent": 0.804392496744788,
-      "relativeTestPath": "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-003.html",
-      "title": "0.8% match \u2014 css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-003.html",
-      "detail": "Rendered output matches the reference by only 0.8% (PixelMismatch / LayoutShift)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 94.44681803385416,
-      "impact": 1,
-      "matchPercent": 5.5531819661458375,
-      "relativeTestPath": "css/css-grid/subgrid/orthogonal-writing-mode-006.html",
-      "title": "5.6% match \u2014 css/css-grid/subgrid/orthogonal-writing-mode-006.html",
-      "detail": "Rendered output matches the reference by only 5.6% (PixelMismatch / MissingContent)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 88.93597920735678,
-      "impact": 1,
-      "matchPercent": 11.064020792643225,
-      "relativeTestPath": "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-001.html",
-      "title": "11.1% match \u2014 css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-001.html",
-      "detail": "Rendered output matches the reference by only 11.1% (PixelMismatch / ColorShift)."
-    }
-  ],
+  "biggestProblems": [],
   "results": [
     {
       "relativeTestPath": "css/CSS2/abspos/abspos-containing-block-initial-001.xht",
@@ -88568,7 +88545,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-text/hanging-punctuation/hanging-punctuation-first-001.xht",
@@ -88607,6 +88584,13 @@
     },
     {
       "relativeTestPath": "css/css-text/hanging-punctuation/hanging-punctuation-force-end-001.xht",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/hanging-punctuation/hanging-punctuation-inline-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -89100,7 +89084,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-030.html",
@@ -89646,77 +89630,77 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-121.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-122.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-123.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-124.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-125.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-126.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-127.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-128.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-130.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-baspglwj-131.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-004.html",
@@ -89726,7 +89710,630 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-100.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-101.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-102.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-103.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-104.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-105.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-106.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-107.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-108.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-109.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-110.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-111.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-112.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-113.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-114.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-117.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-119.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-122.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-123.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-125.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-126.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-127.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-128.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-129.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-130.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-131.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-132.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-133.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-134.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-135.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-136.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-137.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-138.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-139.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-140.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-141.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-142.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-143.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-144.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-145.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-146.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-147.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-148.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-149.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-150.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-151.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-152.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-153.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-155.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-156.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-157.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-158.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-159.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-160.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-161.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-162.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-163.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-164.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-165.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-166.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-167.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-168.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-169.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-170.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-171.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-200.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-201.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-202.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-203.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-204.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-205.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-206.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-207.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-208.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-209.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-210.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-211.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-212.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-213.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-214.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-215.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-217.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-218.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-219.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-220.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-221.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-222.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-223.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-225.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/i18n/css3-text-line-break-opclns-226.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -90420,6 +91027,13 @@
     },
     {
       "relativeTestPath": "css/css-text/letter-spacing/letter-spacing-cursive-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/letter-spacing/letter-spacing-cursive-002.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -92631,6 +93245,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-text/text-justify/text-justify-cjk-ideograph-extensions.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-text/text-justify/text-justify-inter-character-cursive.html",
       "passed": false,
       "skipped": false,
@@ -92904,6 +93525,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-text/text-transform/text-transform-fullwidth-005.xht",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-text/text-transform/text-transform-fullwidth-008.html",
       "passed": false,
       "skipped": false,
@@ -92989,6 +93617,13 @@
     },
     {
       "relativeTestPath": "css/css-text/text-transform/text-transform-tailoring-002.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/text-transform/text-transform-tailoring-002a.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -93255,6 +93890,13 @@
     },
     {
       "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-035.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-038.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -93588,13 +94230,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/full-width-leading-spaces-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-text/white-space/full-width-leading-spaces-005.html",
@@ -93933,6 +94568,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-text/white-space/seg-break-transformation-012.tentative.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-text/white-space/seg-break-transformation-014.tentative.html",
       "passed": false,
       "skipped": false,
@@ -94045,6 +94687,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-text/white-space/text-wrap-balance-float-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-text/white-space/text-wrap-balance-float-004.html",
       "passed": false,
       "skipped": false,
@@ -94063,7 +94712,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-text/white-space/text-wrap-balance-line-clamp-002.html",
@@ -94213,20 +94862,6 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/trailing-ideographic-space-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/trailing-ideographic-space-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/trailing-ideographic-space-003.html",
       "passed": false,
       "skipped": false,
@@ -94332,28 +94967,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/white-space/trailing-other-space-separators-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/white-space/trailing-other-space-separators-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/trailing-other-space-separators-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/white-space/trailing-other-space-separators-004.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -95229,6 +95843,13 @@
     },
     {
       "relativeTestPath": "css/css-text/word-break/word-break-normal-zh-000.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-text/word-space-transform/word-space-transform-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
