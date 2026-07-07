@@ -125,7 +125,7 @@ jobs:
               [Parameter(Mandatory=$true)][string]$Destination,
               [Parameter(Mandatory=$true)][string]$OriginalBaseName,
               [Parameter(Mandatory=$true)][string]$PackageBaseName,
-              [Parameter(Mandatory=$true)][string]$ExecutableExtension
+              [Parameter(Mandatory=$true)][AllowEmptyString()][string]$ExecutableExtension
             )
 
             New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -319,7 +319,7 @@ jobs:
               [Parameter(Mandatory=$true)][string]$Destination,
               [Parameter(Mandatory=$true)][string]$OriginalBaseName,
               [Parameter(Mandatory=$true)][string]$PackageBaseName,
-              [Parameter(Mandatory=$true)][string]$ExecutableExtension
+              [Parameter(Mandatory=$true)][AllowEmptyString()][string]$ExecutableExtension
             )
 
             New-Item -ItemType Directory -Force -Path $Destination | Out-Null
