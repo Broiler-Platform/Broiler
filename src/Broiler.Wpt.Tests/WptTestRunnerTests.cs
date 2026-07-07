@@ -5185,6 +5185,54 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void RunTest_Passes_Reftest_Against_Reference_Golden_When_Test_Golden_Is_Wrong()
+    {
+        // Reftest golden fallback: the committed golden is a Chromium screenshot of
+        // the *test* file. When the reference-generating Chromium fails the reftest
+        // (its test screenshot disagrees with its own reference screenshot — e.g. it
+        // lacks the tested feature), that golden is wrong. Broiler's render (full
+        // red) matches the *reference* file's committed golden, so the reftest must
+        // pass even though the test golden is a wrong solid-blue image.
+        var testFile = Path.Combine(_tempDir, "box.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><head><link rel=""match"" href=""box-ref.html""></head><body style=""margin:0;background:red""></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "refs-fallback");
+        Directory.CreateDirectory(refDir);
+        // Wrong test golden (Chromium failed its own reftest) …
+        CreateSolidReferencePng(Path.Combine(refDir, "box.png"), new BColor(0, 0, 255, 255));
+        // … but the reference file's golden is correct and Broiler matches it.
+        CreateSolidReferencePng(Path.Combine(refDir, "box-ref.png"), new BColor(255, 0, 0, 255));
+
+        var runner = new WptTestRunner();
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.True(result.Passed, $"expected pass via reference-golden fallback; message: {result.Message}");
+    }
+
+    [Fact]
+    public void RunTest_Reftest_Fallback_Does_Not_Pass_When_Broiler_Matches_Neither_Golden()
+    {
+        // Broiler's render (red) matches neither the committed test golden (blue) nor
+        // the reference golden (green) → a genuine mismatch. The fallback must not
+        // rescue it, so it can never mask a real Broiler rendering bug.
+        var testFile = Path.Combine(_tempDir, "redbox2.html");
+        File.WriteAllText(testFile,
+            @"<!DOCTYPE html><html><head><link rel=""match"" href=""redbox2-ref.html""></head><body style=""margin:0;background:red""></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "refs-fallback-neg");
+        Directory.CreateDirectory(refDir);
+        CreateSolidReferencePng(Path.Combine(refDir, "redbox2.png"), new BColor(0, 0, 255, 255));
+        CreateSolidReferencePng(Path.Combine(refDir, "redbox2-ref.png"), new BColor(0, 128, 0, 255));
+
+        var runner = new WptTestRunner();
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.False(result.Passed);
+        Assert.Equal(FailureCategory.PixelMismatch, result.Category);
+    }
+
+    [Fact]
     public void RunTest_Does_Not_Flag_Suspect_Reference_For_A_Genuine_Mismatch()
     {
         // Broiler's render (red) differs from BOTH the committed PNG (blue) and the

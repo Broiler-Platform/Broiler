@@ -1147,6 +1147,61 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Resolves the committed golden PNG for a reftest's <c>rel="match"</c>
+    /// reference file, mirroring how <see cref="RunTest"/> derives the test's
+    /// own golden path (relative to <paramref name="wptRoot"/> with a
+    /// <c>.png</c> extension under <paramref name="referenceDir"/>).
+    /// <para>
+    /// The committed golden is a Chromium screenshot of the <em>test</em> file.
+    /// When the reference-generating Chromium lacks a feature the test exercises
+    /// (e.g. <c>background-clip: border-area</c>) that screenshot is wrong, even
+    /// though the same Chromium renders the deliberately feature-simple
+    /// reference file correctly. Comparing Broiler's render against the
+    /// reference file's golden therefore recovers the authoritative rendering.
+    /// </para>
+    /// Returns <see langword="true"/> and sets <paramref name="referenceGoldenPath"/>
+    /// only when a <c>rel="match"</c> href resolves to a reference file whose
+    /// golden PNG exists on disk. Never throws.
+    /// </summary>
+    private static bool TryResolveReferenceGoldenPath(
+        string html, string testPath, string? wptRoot, string referenceDir,
+        out string referenceGoldenPath)
+    {
+        referenceGoldenPath = string.Empty;
+        try
+        {
+            var href = ExtractMatchHref(html);
+            if (string.IsNullOrWhiteSpace(href))
+                return false;
+
+            href = href.Split('#', '?')[0].Trim();
+            if (href.Length == 0)
+                return false;
+
+            string refPath = href.StartsWith("/", StringComparison.Ordinal) && wptRoot != null
+                ? Path.GetFullPath(Path.Combine(wptRoot, href.TrimStart('/')))
+                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testPath)!, href));
+
+            string refRelative = wptRoot is not null
+                ? Path.GetRelativePath(wptRoot, refPath)
+                : Path.GetFileName(refPath);
+
+            string goldenPath = Path.Combine(
+                referenceDir, Path.ChangeExtension(refRelative, ".png"));
+
+            if (!File.Exists(goldenPath))
+                return false;
+
+            referenceGoldenPath = goldenPath;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Reference sanity check (diagnostic #14). When a test fails its committed
     /// reference-PNG comparison, render the test's own <c>rel="match"</c> reference
     /// HTML and compare it to the already-computed test render. If Broiler matches
@@ -1460,6 +1515,40 @@ internal sealed class WptTestRunner
                         MatchPercent = matchPct,
                         LayoutAssertionFailures = layoutAssertionFailures,
                     };
+                }
+
+                // Reftest golden fallback: the committed golden is a Chromium
+                // screenshot of the *test* file. When the reference-generating
+                // Chromium lacks a feature the test exercises (e.g.
+                // background-clip: border-area), that screenshot is wrong, yet the
+                // same Chromium renders the feature-simple rel=match *reference*
+                // file correctly. Compare against the reference's committed golden;
+                // a match there means Broiler agrees with the authoritative
+                // rendering and the reftest passes. Only reached on a failing
+                // comparison, so it can add passes but never mask a real Broiler
+                // bug (a wrong render matches neither golden).
+                if (TryResolveReferenceGoldenPath(html, testPath, wptRoot, referenceDir, out var refGoldenPath))
+                {
+                    try
+                    {
+                        using var refGolden = HTML.Image.BBitmap.Decode(refGoldenPath);
+                        using var refDiff = PixelDiffRunner.Compare(rendered, refGolden);
+                        if (refDiff.IsMatch)
+                        {
+                            return new WptTestResult
+                            {
+                                TestPath = testPath,
+                                Passed = true,
+                                MatchPercent = (1.0 - refDiff.DiffRatio) * 100,
+                                LayoutAssertionFailures = layoutAssertionFailures,
+                            };
+                        }
+                    }
+                    catch
+                    {
+                        // Best-effort: a missing/undecodable reference golden
+                        // falls through to the normal mismatch reporting below.
+                    }
                 }
 
                 // Classify the mismatch to provide actionable diagnostics.
