@@ -5,238 +5,41 @@
     "skipped": 0,
     "total": 16151
   },
-  "shardCount": 8,
+  "shardCount": 0,
   "problemLimit": 10,
-  "incompleteShards": [],
+  "incompleteShards": [
+    {
+      "shardIndex": 2,
+      "exitCode": 1
+    }
+  ],
   "topProblems": [
     {
-      "key": "PixelMismatch:MissingContent",
-      "label": "PixelMismatch / MissingContent",
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent",
-      "count": 252,
+      "key": "ShardProcessError",
+      "label": "Shard process failure",
+      "category": "ShardProcessError",
+      "subCategory": null,
+      "count": 1,
       "examples": [
-        "css/css-backgrounds/animations/border-image-slice-interpolation.html",
-        "css/css-backgrounds/background-attachment-local-scrolling.htm",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-color-2.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ReferenceOverlayExposed",
-      "label": "PixelMismatch / ReferenceOverlayExposed",
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed",
-      "count": 61,
-      "examples": [
-        "css/css-backgrounds/background-size-007.html",
-        "css/css-backgrounds/background-size/background-size-cover-svg.html",
-        "css/css-backgrounds/border-image-slice-001.xht"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ColorShift",
-      "label": "PixelMismatch / ColorShift",
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift",
-      "count": 26,
-      "examples": [
-        "css/css-backgrounds/animations/background-color-transition-colormix.html",
-        "css/css-backgrounds/background-repeat-space-1a.html",
-        "css/css-backgrounds/background-repeat-space-4.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 25,
-      "examples": [
-        "css/css-backgrounds/animations/background-color-animation-with-blur.html",
-        "css/css-backgrounds/animations/two-background-color-animation-diff-length3.html",
-        "css/css-backgrounds/background-size-043.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 2,
-      "examples": [
-        "css/css-backgrounds/animations/background-color-animation-fallback-replace.html",
-        "css/css-backgrounds/animations/background-color-animation-half-opaque.html"
+        "shard 2 (exit 1)"
       ]
     }
   ],
-  "topFailingDirectories": [
-    [
-      "css/css-backgrounds",
-      366
-    ]
-  ],
-  "failuresByCategory": [
-    [
-      "PixelMismatch",
-      366
-    ]
-  ],
+  "topFailingDirectories": [],
+  "failuresByCategory": [],
   "droppedDeclarations": [],
   "exceptionSignatures": [],
-  "failureFamilies": [
-    {
-      "family": "css/css-backgrounds/background-size-{N}.html",
-      "count": 16,
-      "categories": {
-        "PixelMismatch": 16
-      },
-      "examples": [
-        "css/css-backgrounds/background-size-007.html",
-        "css/css-backgrounds/background-size-029.html",
-        "css/css-backgrounds/background-size-043.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-radius-{N}.xht",
-      "count": 11,
-      "categories": {
-        "PixelMismatch": 11
-      },
-      "examples": [
-        "css/css-backgrounds/border-radius-005.xht",
-        "css/css-backgrounds/border-radius-002.xht",
-        "css/css-backgrounds/border-radius-011.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-bottom-left-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-bottom-left-radius-014.xht",
-        "css/css-backgrounds/border-bottom-left-radius-004.xht",
-        "css/css-backgrounds/border-bottom-left-radius-013.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-bottom-right-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-bottom-right-radius-004.xht",
-        "css/css-backgrounds/border-bottom-right-radius-013.xht",
-        "css/css-backgrounds/border-bottom-right-radius-014.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-top-left-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-top-left-radius-010.xht",
-        "css/css-backgrounds/border-top-left-radius-001.xht",
-        "css/css-backgrounds/border-top-left-radius-002.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-top-right-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-top-right-radius-010.xht",
-        "css/css-backgrounds/border-top-right-radius-011.xht",
-        "css/css-backgrounds/border-top-right-radius-005.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-image-{N}.html",
-      "count": 7,
-      "categories": {
-        "PixelMismatch": 7
-      },
-      "examples": [
-        "css/css-backgrounds/border-image-004.html",
-        "css/css-backgrounds/border-image-003.html",
-        "css/css-backgrounds/border-image-006.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-{N}.html",
-      "count": 6,
-      "categories": {
-        "PixelMismatch": 6
-      },
-      "examples": [
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-5.html",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-2.html",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-4.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/background-repeat-space-{N}.html",
-      "count": 5,
-      "categories": {
-        "PixelMismatch": 5
-      },
-      "examples": [
-        "css/css-backgrounds/background-repeat-space-4.html",
-        "css/css-backgrounds/background-repeat-space-6.html",
-        "css/css-backgrounds/background-repeat-space-3.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-image-image-type-{N}.htm",
-      "count": 5,
-      "categories": {
-        "PixelMismatch": 5
-      },
-      "examples": [
-        "css/css-backgrounds/border-image-image-type-001.htm",
-        "css/css-backgrounds/border-image-image-type-003.htm",
-        "css/css-backgrounds/border-image-image-type-002.htm"
-      ]
-    }
-  ],
+  "failureFamilies": [],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
   "biggestProblems": [
     {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 100.0,
+      "kind": "IncompleteShards",
+      "tier": 0,
+      "severity": 1,
       "impact": 1,
-      "matchPercent": 0.0,
-      "relativeTestPath": "css/css-backgrounds/background-image-shared-stylesheet.html",
-      "title": "0.0% match \u2014 css/css-backgrounds/background-image-shared-stylesheet.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 91.08772277832031,
-      "impact": 1,
-      "matchPercent": 8.912277221679688,
-      "relativeTestPath": "css/css-backgrounds/background-clip/clip-border-area-on-body-not-propagated-to-root.html",
-      "title": "8.9% match \u2014 css/css-backgrounds/background-clip/clip-border-area-on-body-not-propagated-to-root.html",
-      "detail": "Rendered output matches the reference by only 8.9% (PixelMismatch / MissingContent)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 77.47662862141928,
-      "impact": 1,
-      "matchPercent": 22.523371378580727,
-      "relativeTestPath": "css/css-backgrounds/animations/box-shadow-interpolation.html",
-      "title": "22.5% match \u2014 css/css-backgrounds/animations/box-shadow-interpolation.html",
-      "detail": "Rendered output matches the reference by only 22.5% (PixelMismatch / MissingContent)."
+      "title": "1 shard(s) did not complete",
+      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 2 (exit 1)."
     }
   ],
   "results": [
