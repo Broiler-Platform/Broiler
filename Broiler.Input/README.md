@@ -20,11 +20,16 @@ Broiler.Input.Windows
 Broiler.Input.Camera
 Broiler.Input.Camera.Windows
 Broiler.Input.Keyboard
+Broiler.Input.Keyboard.Linux
 Broiler.Input.Keyboard.Windows
 Broiler.Input.Legacy
+Broiler.Input.Linux.Diagnostic
+Broiler.Input.Linux
+Broiler.Input.Linux.Tests
 Broiler.Input.Microphone
 Broiler.Input.Microphone.Windows
 Broiler.Input.Mouse
+Broiler.Input.Mouse.Linux
 Broiler.Input.Mouse.Windows
 Broiler.Input.Pen
 Broiler.Input.Text
@@ -47,6 +52,10 @@ Broiler.Input.Camera.Windows -> Broiler.Input.Camera -> Broiler.Input
 Broiler.Input.Camera.Windows -> Broiler.Input.Windows -> Broiler.Input
 Broiler.Input.Microphone.Windows -> Broiler.Input.Microphone -> Broiler.Input
 Broiler.Input.Microphone.Windows -> Broiler.Input.Windows -> Broiler.Input
+Broiler.Input.Keyboard.Linux -> Broiler.Input.Keyboard -> Broiler.Input
+Broiler.Input.Keyboard.Linux -> Broiler.Input.Linux -> Broiler.Input
+Broiler.Input.Mouse.Linux -> Broiler.Input.Mouse -> Broiler.Input
+Broiler.Input.Mouse.Linux -> Broiler.Input.Linux -> Broiler.Input
 Broiler.Input.Pen -> Broiler.Input
 Broiler.Input.Text -> Broiler.Input
 Broiler.Input.Touch -> Broiler.Input
@@ -74,6 +83,13 @@ calls use `LibraryImport` or `DllImport` against .NET runtime interop:
   `MFGetAttributeRatio`;
 - `MFEnumDeviceSources`; and
 - `MFCreateSourceReaderFromMediaSource`.
+
+Linux-specific calls use `DllImport` against libc for direct evdev delivery:
+
+- `open` with `O_RDONLY`, `O_CLOEXEC`, and `O_NONBLOCK`;
+- `read`;
+- `poll`; and
+- `ioctl` for best-effort `EVIOCSCLOCKID`.
 
 ## Phase 0 Scope
 
@@ -124,3 +140,25 @@ prove latest-frame preview behavior, explicit loss-sensitive overflow, frame
 lease ownership, preview adapter behavior without a Graphics reference, and
 assembly isolation. Hardware camera checks are documented separately under
 `docs/phase5` and remain opt-in.
+
+## Linux Follow-Up
+
+The Linux second-platform plan adds `Broiler.Input.Linux`,
+`Broiler.Input.Keyboard.Linux`, and `Broiler.Input.Mouse.Linux` around direct
+`/dev/input/event*` (`evdev`) reads for the first keyboard/mouse slice. The
+initial Linux scope is key transitions, mouse relative movement, buttons, wheel,
+hot-plug, permission diagnostics, and deterministic disposal; layout-aware text
+input and IME are deferred.
+
+Phase 2 evdev MVP is present: sysfs capability filtering, direct event-device
+open/read/poll, 64-bit `input_event` parsing, keyboard key transition mapping,
+mouse relative movement/buttons/wheel mapping, refresh-based add/remove
+observation, raw-input acknowledgement, synthetic parser/translator tests, and
+the `Broiler.Input.Linux.Diagnostic` console tool.
+
+Phase 7 hardening adds a clearer diagnostic summary for Linux input preview
+runs: native dependency status, event-device permission counts, sanitized
+keyboard/mouse event names, and explicit raw-input streaming acknowledgement.
+See [Linux preview hardening notes](../docs/roadmap/linux-preview-hardening.md).
+
+See [Linux second-OS roadmap](../docs/roadmap/linux-graphics-input-roadmap.md).

@@ -54,6 +54,8 @@ Broiler.UI.Dialog
 Broiler.UI.Dialog.Standard
 Broiler.UI.Toolbar
 Broiler.UI.Toolbar.Standard
+Broiler.UI.Win32.Demo
+Broiler.UI.Linux.Demo
 Broiler.UI.Tests
 Broiler.UI.Standard.Tests
 Broiler.UI.Toolbar.Tests
@@ -153,12 +155,27 @@ Broiler.UI standard controls draw through the platform-neutral
 other native UI backend. Windows applications compose the selected Graphics
 backend outside Broiler.UI.
 
+## Linux demo
+
+`Broiler.UI.Linux.Demo` is the Linux sibling of `Broiler.UI.Win32.Demo`. It
+hosts standard controls through `Broiler.Graphics.Linux.OpenGL` and can bridge
+first-round keyboard/mouse input from evdev when an X11 window has focus.
+Windows-only camera and microphone previews remain intentionally outside this
+Linux first pass.
+
+```bash
+dotnet run --project Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release
+dotnet run --project Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release -- --window --input --interactive
+dotnet publish Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishSingleFile=true
+```
+
 ## Validation
 
 ```powershell
 dotnet test Broiler.UI\Broiler.UI.slnx
 dotnet build Broiler.Input\Broiler.Input.slnx
 dotnet run --project Broiler.Graphics\Broiler.Graphics.Tests\Broiler.Graphics.Tests.csproj
+dotnet build Broiler.UI\Broiler.UI.Linux.Demo\Broiler.UI.Linux.Demo.csproj -c Release
 ```
 
 The test projects use the `Broiler.Graphics` submodule only for

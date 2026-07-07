@@ -3,13 +3,17 @@
     <Project Path="Broiler.Input.Camera/Broiler.Input.Camera.csproj" />
     <Project Path="Broiler.Input.Camera.Windows/Broiler.Input.Camera.Windows.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.csproj" />
+    <Project Path="Broiler.Input.Linux.Diagnostic/Broiler.Input.Linux.Diagnostic.csproj" />
+    <Project Path="Broiler.Input.Linux/Broiler.Input.Linux.csproj" />
     <Project Path="Broiler.Input.Windows/Broiler.Input.Windows.csproj" />
     <Project Path="Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj" />
+    <Project Path="Broiler.Input.Keyboard.Linux/Broiler.Input.Keyboard.Linux.csproj" />
     <Project Path="Broiler.Input.Keyboard.Windows/Broiler.Input.Keyboard.Windows.csproj" />
     <Project Path="Broiler.Input.Legacy/Broiler.Input.Legacy.csproj" />
     <Project Path="Broiler.Input.Microphone/Broiler.Input.Microphone.csproj" />
     <Project Path="Broiler.Input.Microphone.Windows/Broiler.Input.Microphone.Windows.csproj" />
     <Project Path="Broiler.Input.Mouse/Broiler.Input.Mouse.csproj" />
+    <Project Path="Broiler.Input.Mouse.Linux/Broiler.Input.Mouse.Linux.csproj" />
     <Project Path="Broiler.Input.Mouse.Windows/Broiler.Input.Mouse.Windows.csproj" />
     <Project Path="Broiler.Input.Pen/Broiler.Input.Pen.csproj" />
     <Project Path="Broiler.Input.Text/Broiler.Input.Text.csproj" />
@@ -18,5 +22,6 @@
   <Folder Name="/tests/">
     <Project Path="Broiler.Input.Testing/Broiler.Input.Testing.csproj" />
     <Project Path="Broiler.Input.Contract.Tests/Broiler.Input.Contract.Tests.csproj" />
+    <Project Path="Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj" />
   </Folder>
 </Solution>

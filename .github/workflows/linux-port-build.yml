@@ -1,0 +1,108 @@
+name: Linux Phase 7 Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/linux-port-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/**'
+      - 'docs/roadmap/linux-*.md'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/linux-port-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/**'
+      - 'docs/roadmap/linux-*.md'
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  CONFIGURATION: Release
+
+jobs:
+  linux-phase7:
+    name: Build Linux input, UI, and hardening previews
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build Graphics Linux tests
+        run: dotnet build Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj --configuration "$CONFIGURATION"
+
+      - name: Run Graphics Linux tests
+        run: dotnet run --project Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj --configuration "$CONFIGURATION" --no-build
+
+      - name: Build Input Linux tests
+        run: dotnet build Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj --configuration "$CONFIGURATION"
+
+      - name: Run Input Linux tests
+        run: dotnet run --project Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj --configuration "$CONFIGURATION" --no-build
+
+      - name: Build Input Linux diagnostic
+        run: dotnet build Broiler.Input/Broiler.Input.Linux.Diagnostic/Broiler.Input.Linux.Diagnostic.csproj --configuration "$CONFIGURATION"
+
+      - name: Publish self-contained Linux demo
+        run: |
+          dotnet publish Broiler.Graphics/Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output "$RUNNER_TEMP/broiler-graphics-linux-demo" \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Upload Linux demo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: broiler-graphics-linux-demo-linux-x64
+          path: ${{ runner.temp }}/broiler-graphics-linux-demo
+          if-no-files-found: error
+
+      - name: Publish self-contained Linux UI demo
+        run: |
+          dotnet publish Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output "$RUNNER_TEMP/broiler-ui-linux-demo" \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Upload Linux UI demo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: broiler-ui-linux-demo-linux-x64
+          path: ${{ runner.temp }}/broiler-ui-linux-demo
+          if-no-files-found: error
+
+      - name: Publish self-contained Linux input diagnostic
+        run: |
+          dotnet publish Broiler.Input/Broiler.Input.Linux.Diagnostic/Broiler.Input.Linux.Diagnostic.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output "$RUNNER_TEMP/broiler-input-linux-diagnostic" \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Upload Linux input diagnostic artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: broiler-input-linux-diagnostic-linux-x64
+          path: ${{ runner.temp }}/broiler-input-linux-diagnostic
+          if-no-files-found: error

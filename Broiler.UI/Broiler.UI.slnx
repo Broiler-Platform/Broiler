@@ -57,6 +57,7 @@
   </Folder>
   <Folder Name="/demos/">
     <Project Path="Broiler.UI.Win32.Demo/Broiler.UI.Win32.Demo.csproj" />
+    <Project Path="Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj" />
     <Project Path="Broiler.UI.RichEdit.Win32.Demo/Broiler.UI.RichEdit.Win32.Demo.csproj" />
   </Folder>
   <Folder Name="/tests/">

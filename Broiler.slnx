@@ -3,6 +3,11 @@
     <Project Path="Broiler.DOM/Broiler.Dom.Html/Broiler.Dom.Html.csproj" />
     <Project Path="Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj" />
     <Project Path="Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux/Broiler.Graphics.Linux.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.OpenGL/Broiler.Graphics.Linux.OpenGL.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.Vulkan/Broiler.Graphics.Linux.Vulkan.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj" />
     <Project Path="Broiler.JS/Broiler.DateTime/src/Broiler.DateTime/Broiler.DateTime.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Media/">
@@ -74,6 +79,7 @@
     <Project Path="Broiler.UI/Broiler.UI.RichEdit.Standard/Broiler.UI.RichEdit.Standard.csproj" />
     <Project Path="Broiler.UI/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj" />
     <Project Path="Broiler.UI/Broiler.UI.Win32.Demo/Broiler.UI.Win32.Demo.csproj" />
+    <Project Path="Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj" />
     <Project Path="Broiler.UI/Broiler.UI.RichEdit.Win32.Demo/Broiler.UI.RichEdit.Win32.Demo.csproj" />
     <Project Path="Broiler.UI/Broiler.UI.Phase0.Tests/Broiler.UI.Phase0.Tests.csproj" />
     <Project Path="Broiler.UI/Broiler.UI.Phase3.Tests/Broiler.UI.Phase3.Tests.csproj" />
@@ -90,15 +96,20 @@
   </Folder>
   <Folder Name="/Dependencies/Input/">
     <Project Path="Broiler.Input/Broiler.Input/Broiler.Input.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Linux.Diagnostic/Broiler.Input.Linux.Diagnostic.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Linux/Broiler.Input.Linux.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Windows/Broiler.Input.Windows.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Keyboard.Linux/Broiler.Input.Keyboard.Linux.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Keyboard.Windows/Broiler.Input.Keyboard.Windows.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Mouse.Linux/Broiler.Input.Mouse.Linux.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Mouse.Windows/Broiler.Input.Mouse.Windows.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj" />
     <Project Path="Broiler.Input/Broiler.Input.Testing/Broiler.Input.Testing.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj" />
   </Folder>
   <Folder Name="/Dependencies/CSS/">
     <Project Path="Broiler.CSS/Broiler.CSS.Dom/Broiler.CSS.Dom.csproj" />
