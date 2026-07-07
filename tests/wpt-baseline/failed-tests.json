@@ -72,24 +72,12 @@
   ],
   "droppedDeclarations": [
     [
-      "white-space: preserve-breaks",
-      152
-    ],
-    [
-      "white-space: break-spaces nowrap",
-      120
-    ],
-    [
-      "white-space: preserve-breaks nowrap",
-      120
-    ],
-    [
       "display: -webkit-box",
       45
     ],
     [
       "text-align: justify-all",
-      25
+      30
     ],
     [
       "white-space: balance",
@@ -101,6 +89,10 @@
     ],
     [
       "white-space: balance preserve",
+      2
+    ],
+    [
+      "text-align: auto",
       2
     ]
   ],
