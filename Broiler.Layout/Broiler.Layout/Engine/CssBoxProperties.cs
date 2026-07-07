@@ -947,6 +947,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FramePadding('T');
+
             if (double.IsNaN(_actualPaddingTop))
                 _actualPaddingTop = ParseLengthWithLineHeight(PaddingTop, Size.Width);
 
@@ -958,6 +961,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FramePadding('L');
+
             if (double.IsNaN(_actualPaddingLeft))
                 _actualPaddingLeft = ParseLengthWithLineHeight(PaddingLeft, Size.Width);
 
@@ -969,6 +975,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FramePadding('B');
+
             if (double.IsNaN(_actualPaddingBottom))
                 _actualPaddingBottom = ParseLengthWithLineHeight(PaddingBottom, Size.Width);
 
@@ -980,6 +989,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FramePadding('R');
+
             if (double.IsNaN(_actualPaddingRight))
                 _actualPaddingRight = ParseLengthWithLineHeight(PaddingRight, Size.Width);
 
@@ -1080,6 +1092,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FrameBorderWidth('T');
+
             if (double.IsNaN(_actualBorderTopWidth))
             {
                 _actualBorderTopWidth = CssValueParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight());
@@ -1096,6 +1111,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FrameBorderWidth('L');
+
             if (double.IsNaN(_actualBorderLeftWidth))
             {
                 _actualBorderLeftWidth = CssValueParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight());
@@ -1112,6 +1130,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FrameBorderWidth('B');
+
             if (double.IsNaN(_actualBorderBottomWidth))
             {
                 _actualBorderBottomWidth = CssValueParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight());
@@ -1128,6 +1149,9 @@ internal abstract class CssBoxProperties
     {
         get
         {
+            if (UsesLogicalFrameInsets())
+                return FrameBorderWidth('R');
+
             if (double.IsNaN(_actualBorderRightWidth))
             {
                 _actualBorderRightWidth = CssValueParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight());
@@ -1301,6 +1325,92 @@ internal abstract class CssBoxProperties
     {
         var normalized = writingMode?.Trim().ToLowerInvariant();
         return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
+    }
+
+    /// <summary>
+    /// PROTOTYPE (BROILER_VERTICAL_FLOW): a mirrored vertical writing mode
+    /// (<c>vertical-rl</c> / <c>sideways-rl</c>) runs its block flow right→left,
+    /// so the post-layout rotation (<see cref="CssBox.ApplyVerticalWritingModeFlow"/>)
+    /// flips the block axis. Mirrors that transform's own <c>mirror</c> flag.
+    /// </summary>
+    private bool IsMirroredVerticalWritingMode()
+    {
+        var normalized = WritingMode?.Trim().ToLowerInvariant();
+        return normalized is "vertical-rl" or "sideways-rl";
+    }
+
+    // PROTOTYPE (BROILER_VERTICAL_FLOW): depth of the logical (horizontal) frame
+    // layout currently in progress for a vertical-writing-mode rotation root.
+    // Non-zero only between a rotation root entering PerformLayout and its
+    // post-layout ApplyVerticalWritingModeFlow, i.e. while its subtree is laid
+    // out in the swapped frame — the window in which a transposed box's physical
+    // border/padding insets must be read as LOGICAL (frame) insets so they land
+    // on the correct axis after rotation. Cleared for the later paint pass, which
+    // reads the box's authored PHYSICAL borders (writing-mode never rotates a
+    // box's own borders). ThreadStatic so an unrelated document laid out on
+    // another thread is unaffected; layout on a given thread is synchronous.
+    [ThreadStatic] private static int _verticalFrameLayoutDepth;
+
+    internal static bool InVerticalFrameLayout => _verticalFrameLayoutDepth > 0;
+    internal static void PushVerticalFrameLayout() => _verticalFrameLayoutDepth++;
+    internal static void PopVerticalFrameLayout() => _verticalFrameLayoutDepth--;
+
+    /// <summary>
+    /// PROTOTYPE (BROILER_VERTICAL_FLOW): whether this box's physical border and
+    /// padding insets must be remapped onto the logical (frame) axes for the
+    /// in-progress vertical-flow frame layout. True only for a transposed
+    /// vertical-writing-mode box while its rotation root's subtree is being laid
+    /// out. The physical→frame edge mapping (see <see cref="FrameBorderWidth"/> /
+    /// <see cref="FramePadding"/>) makes a box's authored border-top/bottom
+    /// contribute to its <em>inline</em> (post-rotation vertical) extent and its
+    /// border-left/right to its <em>block</em> (post-rotation horizontal) extent,
+    /// rather than the frame reading them un-rotated (which inflated the block
+    /// extent by the inline-axis borders — a table-caption's blue box rendered
+    /// ~2.3× too wide).
+    /// </summary>
+    private bool UsesLogicalFrameInsets() =>
+        InVerticalFrameLayout
+        && IsVerticalWritingMode(WritingMode)
+        && WillBeVerticalTransposed();
+
+    private double RawActualBorderWidth(string widthValue, string styleValue)
+    {
+        if (string.IsNullOrEmpty(styleValue) || styleValue == CssConstants.None)
+            return 0f;
+        return CssValueParser.GetActualBorderWidth(widthValue, GetEmHeight());
+    }
+
+    // Frame edges are the logical (horizontal-tb LTR) frame's physical edges;
+    // each maps to the authored physical side that must land there so the
+    // post-layout rotation places it on the correct physical edge. Block-axis
+    // edges (frame top/bottom) flip for a mirrored (rl) writing mode; inline-axis
+    // edges (frame left/right, from the box's physical top/bottom) do not.
+    private double FrameBorderWidth(char frameEdge)
+    {
+        bool mirror = IsMirroredVerticalWritingMode();
+        return frameEdge switch
+        {
+            'T' => mirror ? RawActualBorderWidth(BorderRightWidth, BorderRightStyle)
+                          : RawActualBorderWidth(BorderLeftWidth, BorderLeftStyle),
+            'B' => mirror ? RawActualBorderWidth(BorderLeftWidth, BorderLeftStyle)
+                          : RawActualBorderWidth(BorderRightWidth, BorderRightStyle),
+            'L' => RawActualBorderWidth(BorderTopWidth, BorderTopStyle),
+            'R' => RawActualBorderWidth(BorderBottomWidth, BorderBottomStyle),
+            _ => 0f,
+        };
+    }
+
+    private double FramePadding(char frameEdge)
+    {
+        bool mirror = IsMirroredVerticalWritingMode();
+        return frameEdge switch
+        {
+            'T' => ParseLengthWithLineHeight(mirror ? PaddingRight : PaddingLeft, Size.Width),
+            'B' => ParseLengthWithLineHeight(mirror ? PaddingLeft : PaddingRight, Size.Width),
+            'L' => ParseLengthWithLineHeight(PaddingTop, Size.Width),
+            'R' => ParseLengthWithLineHeight(PaddingBottom, Size.Width),
+            _ => 0f,
+        };
     }
 
     private double ParseCornerRadius(string radius)

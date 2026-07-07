@@ -382,13 +382,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             //   - list-item boxes
             //   - table cells (display:table-cell)
             //   - table boxes (display:table)
+            //   - table captions (display:table-caption)
             // Inline-block establishes a BFC (§9.4.1), so its block-level
-            // children must use it as their containing block.
+            // children must use it as their containing block.  A table caption
+            // is a block container that establishes an independent BFC
+            // (CSS2.1 §17.4), so its in-flow children resolve their width and
+            // position against the caption's content box, not a further-up
+            // ancestor — critical when the caption is sized/rotated by its own
+            // writing mode (its children must inherit its inline size, not the
+            // viewport's).
             while (!box.IsBlock
                    && box.Display != CssConstants.InlineBlock
                    && box.Display != CssConstants.ListItem
                    && box.Display != CssConstants.Table
                    && box.Display != CssConstants.TableCell
+                   && box.Display != CssConstants.TableCaption
                    && box.ParentBox != null)
             {
                 box = box.ParentBox;
@@ -730,14 +738,34 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         try
         {
-            PerformLayoutImp(g);
-
-            // PROTOTYPE (BROILER_VERTICAL_FLOW): once a vertical-writing-mode
-            // root and its whole subtree have been laid out in the logical
-            // (horizontal) frame, rotate the result into physical space.
-            if (VerticalFlowPrototype.Enabled
+            // PROTOTYPE (BROILER_VERTICAL_FLOW): a vertical-writing-mode rotation
+            // root lays its whole subtree out in a logical (horizontal) frame.
+            // While that frame layout runs, a transposed box's physical
+            // border/padding insets are read as LOGICAL (frame) insets so they
+            // land on the correct axis after the rotation swaps width↔height
+            // (PushVerticalFrameLayout / UsesLogicalFrameInsets). The flag is
+            // cleared before the rotation and the later paint pass, which read
+            // the box's authored physical borders.
+            bool isVerticalRoot = VerticalFlowPrototype.Enabled
                 && IsVerticalWritingMode(WritingMode)
-                && (ParentBox == null || !IsVerticalWritingMode(ParentBox.WritingMode)))
+                && (ParentBox == null || !IsVerticalWritingMode(ParentBox.WritingMode));
+
+            if (isVerticalRoot)
+                PushVerticalFrameLayout();
+            try
+            {
+                PerformLayoutImp(g);
+            }
+            finally
+            {
+                if (isVerticalRoot)
+                    PopVerticalFrameLayout();
+            }
+
+            // Once a vertical-writing-mode root and its whole subtree have been
+            // laid out in the logical (horizontal) frame, rotate the result into
+            // physical space.
+            if (isVerticalRoot)
             {
                 ApplyVerticalWritingModeFlow();
             }
@@ -768,6 +796,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         float rootY = Location.Y;
         double logicalBlockExtent = ActualBottom - Location.Y;
         bool mirror = WritingMode is "vertical-rl" or "sideways-rl";
+
+        // sideways-lr is the one vertical mode whose inline axis runs
+        // bottom→top (CSS Writing Modes 4 §3.1): its block flow is left→right
+        // like vertical-lr (so it is NOT `mirror`), but the first inline
+        // position sits at the *bottom* and later characters stack upward, and
+        // its glyphs face the opposite way (rotated 90° counter-clockwise —
+        // handled at paint in FragmentTreeBuilder). The logical frame laid the
+        // inline axis out left→right as usual; flip it about the box's inline
+        // extent (its physical height = the pre-rotation frame width) so the
+        // run reads bottom→top. Every other vertical mode keeps inline top→bottom.
+        bool sidewaysLr = string.Equals(WritingMode?.Trim(), "sideways-lr",
+            StringComparison.OrdinalIgnoreCase);
+        double logicalInlineExtent = Size.Width;
 
         // Where the rotated root's border-box sits horizontally depends on whether
         // its writing mode is the *principal* (viewport) writing mode or a local
@@ -825,11 +866,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             blockOffset = desiredRootRight - currentRootRight;
         }
 
-        TransformVerticalSubtree(this, rootX, rootY, logicalBlockExtent, mirror, blockOffset, isRoot: true);
+        TransformVerticalSubtree(this, rootX, rootY, logicalBlockExtent, mirror, blockOffset,
+            sidewaysLr, logicalInlineExtent, isRoot: true);
     }
 
     private static void TransformVerticalSubtree(
-        CssBox box, float rootX, float rootY, double blockExtent, bool mirror, double blockOffset, bool isRoot)
+        CssBox box, float rootX, float rootY, double blockExtent, bool mirror, double blockOffset,
+        bool sidewaysLr, double inlineExtent, bool isRoot)
     {
         // --- Box border-box: Location + Size ---
         // logical (x,y) measured from root origin → physical (y,x): the inline
@@ -870,11 +913,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 // Column X = the line's block offset (lines advance left→right
                 // for vertical-lr, right→left for vertical-rl).  Column Y top =
-                // the word's inline offset (the inline axis runs top→bottom).
+                // the word's inline offset (the inline axis runs top→bottom,
+                // except sideways-lr which runs bottom→top — see InlineTop).
                 double wLeft = word.Left - rootX;
                 double wTop = word.Top - rootY;
                 double colX = rootX + blockOffset + (mirror ? blockExtent - wTop - word.Height : wTop);
-                double colTop = rootY + wLeft;
+
+                // Map an inline offset+size onto the physical Y of a cell's top.
+                // Normal vertical modes: inline runs top→bottom (Y = origin +
+                // offset). sideways-lr: inline runs bottom→top, so flip the cell
+                // about the box's inline extent.
+                double InlineTop(double inlineOffset, double inlineSize) => sidewaysLr
+                    ? rootY + inlineExtent - inlineOffset - inlineSize
+                    : rootY + inlineOffset;
 
                 // Stage 3: decompose a multi-glyph run into per-glyph cells
                 // stacked along the inline (vertical) axis.  Each glyph advances
@@ -891,7 +942,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         var glyph = new CssRectWord(word.OwnerBox, text[i].ToString(), false, false)
                         {
                             Left = colX,
-                            Top = colTop + i * advance,
+                            Top = InlineTop(wLeft + i * advance, advance),
                             Width = advance,
                             Height = word.Height,
                         };
@@ -901,7 +952,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 else
                 {
                     word.Left = colX;
-                    word.Top = colTop;
+                    word.Top = InlineTop(wLeft, word.Width);
                     rotatedWords.Add(word);
                 }
             }
@@ -928,7 +979,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // container began rotating its abspos children).
             if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
-            TransformVerticalSubtree(child, rootX, rootY, blockExtent, mirror, blockOffset, isRoot: false);
+            TransformVerticalSubtree(child, rootX, rootY, blockExtent, mirror, blockOffset,
+                sidewaysLr, inlineExtent, isRoot: false);
         }
     }
 

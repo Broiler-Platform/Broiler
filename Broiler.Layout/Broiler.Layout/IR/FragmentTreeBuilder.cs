@@ -160,11 +160,18 @@ internal static class FragmentTreeBuilder
             // PROTOTYPE Stage 2 (BROILER_VERTICAL_FLOW): in a vertical writing
             // mode, text-orientation:mixed rotates the run 90° clockwise.  The
             // layout transform already stacked glyphs down the column; rotating
-            // each glyph completes the sideways orientation.
-            float glyphRotation = VerticalFlowPrototype.Enabled
-                && CssBoxProperties.IsVerticalWritingMode(word.OwnerBox.WritingMode)
-                ? 90f
-                : 0f;
+            // each glyph completes the sideways orientation. sideways-lr is the
+            // exception: its glyphs face the other way (90° counter-clockwise),
+            // matching its bottom→top inline flow (CSS Writing Modes 4 §5.1).
+            float glyphRotation = 0f;
+            if (VerticalFlowPrototype.Enabled
+                && CssBoxProperties.IsVerticalWritingMode(word.OwnerBox.WritingMode))
+            {
+                glyphRotation = string.Equals(word.OwnerBox.WritingMode?.Trim(), "sideways-lr",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? -90f
+                    : 90f;
+            }
 
             var inlineFragment = new InlineFragment
             {
