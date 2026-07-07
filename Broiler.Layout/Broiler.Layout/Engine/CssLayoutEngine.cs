@@ -1354,6 +1354,17 @@ internal static class CssLayoutEngine
     {
         var box = lineBox.OwnerBox;
 
+        // CSS Text 4 §text-align / §text-align-last: text-align governs every line;
+        // the *last* line of the block is instead governed by text-align-last.  The
+        // shorthand value 'justify-all' additionally sets the last line to justify
+        // (a plain 'justify' leaves the last line 'start'-aligned).  Resolve the
+        // per-line alignment keyword first, then map the logical values below.
+        bool isLastLine = lineBox.Equals(box.LineBoxes[box.LineBoxes.Count - 1]);
+        bool justifyAll = string.Equals(box.TextAlign, "justify-all", StringComparison.OrdinalIgnoreCase);
+        string effectiveAlign = isLastLine
+            ? ResolveTextAlignLast(box, justifyAll)
+            : (justifyAll ? CssConstants.Justify : box.TextAlign);
+
         // Resolve the logical 'start'/'end' keywords (and the initial value, which
         // is 'start') against the line's base direction.  In a left-to-right base,
         // start=left and end=right; in a right-to-left base they swap.  Physical
@@ -1362,7 +1373,7 @@ internal static class CssLayoutEngine
         // is what keeps right-to-left lines aligned to the right edge and, without
         // it, an RTL box left its 'start'-aligned text on the left (CSS Text
         // §text-align).
-        string resolvedAlign = box.TextAlign switch
+        string resolvedAlign = effectiveAlign switch
         {
             null or "" or "start" => lineRtl ? CssConstants.Right : CssConstants.Left,
             "end" => lineRtl ? CssConstants.Left : CssConstants.Right,
@@ -1372,7 +1383,7 @@ internal static class CssLayoutEngine
             "-webkit-left" => CssConstants.Left,
             "-webkit-right" => CssConstants.Right,
             "-webkit-center" => CssConstants.Center,
-            _ => box.TextAlign
+            _ => effectiveAlign
         };
 
         switch (resolvedAlign)
@@ -1384,11 +1395,38 @@ internal static class CssLayoutEngine
                 ApplyCenterAlignment(g, lineBox);
                 break;
             case CssConstants.Justify:
+                // The caller only routes the last line here when text-align-last
+                // resolved to justify (justify-all or text-align-last:justify), so
+                // justify it too — no last-line skip needed at this point.
                 ApplyJustifyAlignment(g, lineBox);
                 break;
             default:
                 break;
         }
+    }
+
+    /// <summary>
+    /// Resolves the effective alignment keyword for a block's <b>last</b> line per
+    /// CSS Text 4 §text-align-last.  An explicit <c>text-align-last</c> value wins;
+    /// the initial <c>auto</c> follows <c>text-align</c>, except that a plain
+    /// <c>justify</c> text-align leaves the last line <c>start</c>-aligned (ragged)
+    /// unless the shorthand value was <c>justify-all</c>, which justifies it too.
+    /// </summary>
+    private static string ResolveTextAlignLast(CssBox box, bool justifyAll)
+    {
+        string last = box.TextAlignLast;
+        if (!string.IsNullOrEmpty(last)
+            && !string.Equals(last, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return last;
+        }
+
+        // auto:
+        if (justifyAll)
+            return CssConstants.Justify;
+        if (string.Equals(box.TextAlign, CssConstants.Justify, StringComparison.OrdinalIgnoreCase))
+            return "start"; // a justified block's last line stays ragged (start-aligned)
+        return box.TextAlign; // every other value applies to the last line as well
     }
 
     /// <summary>
@@ -1822,9 +1860,11 @@ internal static class CssLayoutEngine
 
     private static void ApplyJustifyAlignment(ILayoutEnvironment g, CssLineBox lineBox)
     {
-        if (lineBox.Equals(lineBox.OwnerBox.LineBoxes[lineBox.OwnerBox.LineBoxes.Count - 1]))
-            return;
-
+        // Whether the block's last line is justified is decided by the caller
+        // (ApplyHorizontalAlignment): under a plain text-align:justify the last
+        // line is routed to 'start' and never reaches here, so this method
+        // unconditionally stretches whatever line it is given.  A single-word line
+        // has nothing to stretch and is left flush at the line start below.
         double indent = lineBox.Equals(lineBox.OwnerBox.LineBoxes[0]) ? lineBox.OwnerBox.ActualTextIndent : 0f;
         double textSum = 0f;
         double words = 0f;
@@ -1843,12 +1883,17 @@ internal static class CssLayoutEngine
         double spacing = (availWidth - textSum) / words; //Spacing that will be used
         double curx = lineBox.OwnerBox.ClientLeft + indent;
 
+        // A line with a single word (common on a justify-all / text-align-last:justify
+        // last line) has no inter-word gaps to stretch: it stays flush at the start
+        // edge rather than being pushed to the right edge.
+        bool stretch = lineBox.Words.Count > 1;
+
         foreach (CssRect word in lineBox.Words)
         {
             word.Left = curx;
             curx = word.Right + spacing;
 
-            if (word == lineBox.Words[lineBox.Words.Count - 1])
+            if (stretch && word == lineBox.Words[lineBox.Words.Count - 1])
                 word.Left = lineBox.OwnerBox.ClientRight - word.Width;
         }
     }

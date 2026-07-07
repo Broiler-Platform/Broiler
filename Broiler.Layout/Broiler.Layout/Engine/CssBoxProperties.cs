@@ -581,6 +581,12 @@ internal abstract class CssBoxProperties
     }
 
     public string TextAlign { get; set; } = string.Empty;
+
+    // CSS Text 4 §text-align-last: alignment of the block's last line (and lines
+    // ending in a forced break).  Inherited; initial 'auto' (follows text-align,
+    // except a justified block leaves its last line start-aligned).
+    public string TextAlignLast { get; set; } = string.Empty;
+
     public string TextDecoration { get; set; } = string.Empty;
     public string TextDecorationStyle { get; set; } = "solid";
     public string TextDecorationColor
@@ -1805,6 +1811,7 @@ internal abstract class CssBoxProperties
         Visibility = p.Visibility;
         _textIndent = p._textIndent;
         TextAlign = p.TextAlign;
+        TextAlignLast = p.TextAlignLast;
         FontFamily = p.FontFamily;
         FontFeatureSettings = p.FontFeatureSettings;
         FontVariantAlternates = p.FontVariantAlternates;

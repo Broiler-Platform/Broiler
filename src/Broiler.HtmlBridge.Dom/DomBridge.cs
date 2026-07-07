@@ -920,8 +920,16 @@ public sealed partial class DomBridge : IDomBridgeRuntime
                 return true;
 
             case "text-align":
+                // CSS Text 4: text-align is a shorthand; 'justify-all' additionally
+                // justifies the last line.  The -webkit-{left,right,center} legacy
+                // keywords are non-standard but widely supported.
                 return v is "left" or "right" or "center" or "justify"
-                    or "start" or "end";
+                    or "start" or "end" or "justify-all" or "match-parent"
+                    or "-webkit-left" or "-webkit-right" or "-webkit-center";
+
+            case "text-align-last":
+                return v is "auto" or "start" or "end" or "left" or "right"
+                    or "center" or "justify" or "match-parent";
 
             case "text-decoration-style":
                 return v is "solid" or "double" or "dotted" or "dashed" or "wavy";
