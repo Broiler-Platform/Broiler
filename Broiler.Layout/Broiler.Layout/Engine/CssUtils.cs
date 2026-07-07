@@ -595,6 +595,9 @@ internal static class CssUtils
             case "white-space":
                 cssBox.WhiteSpace = value;
                 break;
+            case "text-transform":
+                cssBox.TextTransform = value;
+                break;
             case "word-break":
                 cssBox.WordBreak = value;
                 break;

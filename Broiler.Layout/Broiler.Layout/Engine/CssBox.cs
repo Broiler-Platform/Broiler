@@ -1004,6 +1004,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         bool preserveSpaces = WhiteSpace == CssConstants.Pre || WhiteSpace == CssConstants.PreWrap;
         bool respoctNewline = preserveSpaces || WhiteSpace == CssConstants.PreLine;
 
+        // CSS Text 3 §2.1: apply text-transform (case mapping / full-width /
+        // full-size-kana) as each word's text is materialized.  Null when the
+        // computed value produces no glyph change (none / math-auto / unset).
+        var transform = TextTransformer.For(TextTransform);
+
         textSpan = _text.Span;
         while (startIdx < textSpan.Length)
         {
@@ -1020,6 +1025,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             if (endIdx > startIdx)
             {
+                // A collapsible/preserved white-space run is a word boundary for
+                // the `capitalize` transform regardless of whether it is emitted.
+                transform?.Break();
+
                 if (preserveSpaces)
                 {
                     // CSS2.1 §16.6: For pre-wrap, emit each space as a
@@ -1065,7 +1074,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
                     var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
 
-                    Words.Add(new CssRectWord(this, WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString()), hasSpaceBefore, hasSpaceAfter));
+                    var wordText = WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString());
+                    if (transform != null)
+                        wordText = transform.Transform(wordText);
+
+                    Words.Add(new CssRectWord(this, wordText, hasSpaceBefore, hasSpaceAfter));
                 }
             }
 
@@ -1074,12 +1087,170 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 endIdx++;
 
+                // A forced line break is also a word boundary for `capitalize`.
+                transform?.Break();
+
                 if (respoctNewline)
                     Words.Add(new CssRectWord(this, "\n", false, false));
             }
 
             startIdx = endIdx;
         }
+    }
+
+    /// <summary>
+    /// Applies CSS Text 3 §2.1 <c>text-transform</c> to successive words of a box.
+    /// Case transforms (<c>uppercase</c>/<c>lowercase</c>/<c>capitalize</c>) and the
+    /// width transforms (<c>full-width</c>, <c>full-size-kana</c>) can combine. The
+    /// <c>capitalize</c> transform titlecases the first letter of each word, so the
+    /// instance carries the "at a word boundary" state across the box's words;
+    /// <see cref="Break"/> marks an intervening white-space run or forced break.
+    /// </summary>
+    private sealed class TextTransformer
+    {
+        private readonly bool _capitalize;
+        private readonly bool _upper;
+        private readonly bool _lower;
+        private readonly bool _fullWidth;
+        private readonly bool _fullSizeKana;
+        private bool _atWordStart = true;
+
+        private TextTransformer(bool capitalize, bool upper, bool lower, bool fullWidth, bool fullSizeKana)
+        {
+            _capitalize = capitalize;
+            _upper = upper;
+            _lower = lower;
+            _fullWidth = fullWidth;
+            _fullSizeKana = fullSizeKana;
+        }
+
+        /// <summary>
+        /// Builds a transformer for the computed <c>text-transform</c> value, or
+        /// returns <c>null</c> when no keyword changes glyphs (<c>none</c>,
+        /// <c>math-auto</c> — element-scoped MathML italicization not modelled here —
+        /// or the CSS-wide keywords).
+        /// </summary>
+        public static TextTransformer For(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            bool capitalize = false, upper = false, lower = false, fullWidth = false, fullSizeKana = false;
+            foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+            {
+                switch (token.ToLowerInvariant())
+                {
+                    case "capitalize": capitalize = true; break;
+                    case "uppercase": upper = true; break;
+                    case "lowercase": lower = true; break;
+                    case "full-width": fullWidth = true; break;
+                    case "full-size-kana": fullSizeKana = true; break;
+                    // none / math-auto / inherit / initial / unrecognized: no glyph change.
+                }
+            }
+
+            if (!capitalize && !upper && !lower && !fullWidth && !fullSizeKana)
+                return null;
+
+            return new TextTransformer(capitalize, upper, lower, fullWidth, fullSizeKana);
+        }
+
+        /// <summary>Marks a word boundary between two transformed words.</summary>
+        public void Break() => _atWordStart = true;
+
+        public string Transform(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Case mapping first (uppercase/lowercase/capitalize are exclusive per
+            // spec; guard order here defensively). String-based Upper/Lower handles
+            // one-to-many mappings such as ß → SS.
+            string s = text;
+            if (_upper)
+                s = s.ToUpperInvariant();
+            else if (_lower)
+                s = s.ToLowerInvariant();
+            else if (_capitalize)
+                s = Capitalize(s);
+
+            if (_fullWidth || _fullSizeKana)
+                s = MapWidth(s);
+
+            return s;
+        }
+
+        private string Capitalize(string s)
+        {
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                if (IsMidWord(c))
+                {
+                    // Apostrophes and combining marks stay inside the word (so
+                    // "can't" → "Can't", not "Can'T") without changing the state.
+                    sb.Append(c);
+                }
+                else if (char.IsLetterOrDigit(c))
+                {
+                    sb.Append(_atWordStart && char.IsLetter(c) ? char.ToUpperInvariant(c) : c);
+                    _atWordStart = false;
+                }
+                else
+                {
+                    // White space, hyphens and other punctuation start a new word.
+                    sb.Append(c);
+                    _atWordStart = true;
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static bool IsMidWord(char c)
+        {
+            if (c == '\'' || c == '’')
+                return true;
+            var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+            return cat is System.Globalization.UnicodeCategory.NonSpacingMark
+                or System.Globalization.UnicodeCategory.SpacingCombiningMark
+                or System.Globalization.UnicodeCategory.EnclosingMark;
+        }
+
+        private string MapWidth(string s)
+        {
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                char m = c;
+                if (_fullSizeKana)
+                    m = ToFullSizeKana(m);
+                if (_fullWidth)
+                    m = ToFullWidth(m);
+                sb.Append(m);
+            }
+            return sb.ToString();
+        }
+
+        // U+0021..U+007E → the fullwidth forms U+FF01..U+FF5E. The ASCII space is
+        // left as U+0020 so white-space processing is unaffected.
+        private static char ToFullWidth(char c)
+            => c >= '!' && c <= '~' ? (char)(c - 0x0021 + 0xFF01) : c;
+
+        // Small (sutegana) kana → their full-size equivalents (CSS Text 3 §2.1.1).
+        private static char ToFullSizeKana(char c) => c switch
+        {
+            // Hiragana
+            'ぁ' => 'あ', 'ぃ' => 'い', 'ぅ' => 'う',
+            'ぇ' => 'え', 'ぉ' => 'お', 'っ' => 'つ',
+            'ゃ' => 'や', 'ゅ' => 'ゆ', 'ょ' => 'よ',
+            'ゎ' => 'わ', 'ゕ' => 'か', 'ゖ' => 'け',
+            // Katakana
+            'ァ' => 'ア', 'ィ' => 'イ', 'ゥ' => 'ウ',
+            'ェ' => 'エ', 'ォ' => 'オ', 'ッ' => 'ツ',
+            'ャ' => 'ヤ', 'ュ' => 'ユ', 'ョ' => 'ヨ',
+            'ヮ' => 'ワ', 'ヵ' => 'カ', 'ヶ' => 'ケ',
+            _ => c,
+        };
     }
 
     public virtual void Dispose()

@@ -44,6 +44,29 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   caught-and-logged behaviour (correction abandoned for the affected box) until a
   maintainer applies this patch and bumps the pointer; nothing crashes the run.
 
+- **0006-css-text-transform-grammar.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`) — makes `IsAcceptableDeclarationValue`
+  validate the **full** CSS Text 3 §2.1 `text-transform` grammar
+  (`none | [ [capitalize | uppercase | lowercase] || full-width || full-size-kana ]
+  | math-auto`) via a new `IsTextTransformValue` helper. The validator previously
+  accepted only the single keywords `none`/`capitalize`/`uppercase`/`lowercase`/
+  `full-width`, so it dropped valid **combinations** (`capitalize full-width`,
+  `full-width full-size-kana lowercase`) and the standalone `full-size-kana`
+  (1295 drops in issue #1270) / `math-auto` (235) values as invalid — discarding
+  the whole declaration and falling back to a stale cascade value.
+  **Active CI fallback for the primary win — none needed.** The single-keyword
+  values (`uppercase`/`lowercase`/`capitalize`/`full-width`) are **already** accepted
+  by the pinned validator, and the new main-repo `Broiler.Layout` implementation
+  (`CssBox.ParseToWords` → `TextTransformer`, guarded by `TextTransformTests`) applies
+  them on CI **now** — that covers the `text-transform-upperlower-*` and
+  `text-transform-capitalize-*` families directly. Only the multi-keyword
+  combinations and the standalone `full-size-kana`/`math-auto` remain dropped until
+  a maintainer applies this patch and bumps the pointer; the `TextTransformer` already
+  implements those transforms, so they light up as soon as the value stops being
+  dropped. The companion CSSOM-side validator (main-repo
+  `DomBridge.IsAcceptableCssValue`) was updated in the same commit, so JS-set
+  `element.style.textTransform` accepts the full grammar on CI regardless.
+
 ## Applied / obsolete
 
 - **0004-css-expand-margin-padding-shorthand-cascade.patch** → `Broiler.CSS`
