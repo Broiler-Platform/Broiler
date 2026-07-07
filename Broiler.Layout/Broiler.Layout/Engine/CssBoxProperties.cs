@@ -593,6 +593,14 @@ internal abstract class CssBoxProperties
         }
     }
     public string WhiteSpace { get; set; } = "normal";
+
+    /// <summary>
+    /// CSS Text 3 §2.1 <c>text-transform</c>. An inherited property applied to a
+    /// box's text when its words are parsed (see <see cref="CssBox.ParseToWords"/>).
+    /// The default <c>none</c> leaves text unchanged.
+    /// </summary>
+    public string TextTransform { get; set; } = "none";
+
     public string Visibility { get; set; } = "visible";
 
     public string WordSpacing
@@ -1768,6 +1776,7 @@ internal abstract class CssBoxProperties
         EmptyCells = p.EmptyCells;
         CaptionSide = p.CaptionSide;
         WhiteSpace = p.WhiteSpace;
+        TextTransform = p.TextTransform;
         Visibility = p.Visibility;
         _textIndent = p._textIndent;
         TextAlign = p.TextAlign;
