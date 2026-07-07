@@ -67,8 +67,7 @@ jobs:
       - name: Publish Windows framework-dependent apps
         shell: pwsh
         run: |
-          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent\browser'
-          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent\writer'
+          $output = Join-Path $env:RUNNER_TEMP 'packages\BPP-Win32-framework-dependent'
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0-windows `
@@ -76,8 +75,7 @@ jobs:
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
-            --output $browserOutput `
-            -p:PublishSingleFile=true `
+            --output $output `
             -p:UseAppHost=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
@@ -86,15 +84,13 @@ jobs:
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
-            --output $writerOutput `
-            -p:PublishSingleFile=true `
+            --output $output `
             -p:UseAppHost=true
 
       - name: Publish Windows self-contained apps
         shell: pwsh
         run: |
-          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained\browser'
-          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained\writer'
+          $output = Join-Path $env:RUNNER_TEMP 'packages\BPP-Win32-self-contained'
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0-windows `
@@ -102,9 +98,7 @@ jobs:
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output $browserOutput `
-            -p:PublishSingleFile=true `
-            -p:EnableCompressionInSingleFile=true
+            --output $output
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
@@ -112,39 +106,23 @@ jobs:
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output $writerOutput `
-            -p:PublishSingleFile=true `
-            -p:EnableCompressionInSingleFile=true
+            --output $output
 
       - name: Package Windows assets
         shell: pwsh
         run: |
-          function Copy-AppPublish {
+          function Rename-AppPublish {
             param(
-              [Parameter(Mandatory=$true)][string]$Source,
-              [Parameter(Mandatory=$true)][string]$Destination,
+              [Parameter(Mandatory=$true)][string]$Directory,
               [Parameter(Mandatory=$true)][string]$OriginalBaseName,
               [Parameter(Mandatory=$true)][string]$PackageBaseName,
               [Parameter(Mandatory=$true)][AllowEmptyString()][string]$ExecutableExtension
             )
 
-            New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-            Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
-              Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
-            }
-
-            $originalExecutable = Join-Path $Destination ($OriginalBaseName + $ExecutableExtension)
-            $packageExecutable = Join-Path $Destination ($PackageBaseName + $ExecutableExtension)
+            $originalExecutable = Join-Path $Directory ($OriginalBaseName + $ExecutableExtension)
+            $packageExecutable = Join-Path $Directory ($PackageBaseName + $ExecutableExtension)
             if ($originalExecutable -ne $packageExecutable -and (Test-Path -LiteralPath $originalExecutable)) {
               Move-Item -LiteralPath $originalExecutable -Destination $packageExecutable -Force
-            }
-
-            foreach ($suffix in @('.pdb', '.deps.json', '.runtimeconfig.json')) {
-              $originalFile = Join-Path $Destination ($OriginalBaseName + $suffix)
-              $packageFile = Join-Path $Destination ($PackageBaseName + $suffix)
-              if ($originalFile -ne $packageFile -and (Test-Path -LiteralPath $originalFile)) {
-                Move-Item -LiteralPath $originalFile -Destination $packageFile -Force
-              }
             }
 
             if (-not (Test-Path -LiteralPath $packageExecutable)) {
@@ -152,46 +130,75 @@ jobs:
             }
           }
 
+          function New-WindowsArchive {
+            param(
+              [Parameter(Mandatory=$true)][string]$PackageParent,
+              [Parameter(Mandatory=$true)][string]$PackageName,
+              [Parameter(Mandatory=$true)][string]$AssetDirectory
+            )
+
+            $sevenZip = Get-Command 7z -ErrorAction SilentlyContinue
+            if ($sevenZip -ne $null) {
+              $destination = Join-Path $AssetDirectory "$PackageName.7z"
+              Push-Location $PackageParent
+              try {
+                & $sevenZip.Source a -t7z $destination $PackageName
+                if ($LASTEXITCODE -ne 0) {
+                  throw "7z exited with code $LASTEXITCODE."
+                }
+              }
+              finally {
+                Pop-Location
+              }
+
+              return
+            }
+
+            Compress-Archive `
+              -LiteralPath (Join-Path $PackageParent $PackageName) `
+              -DestinationPath (Join-Path $AssetDirectory "$PackageName.zip") `
+              -Force
+          }
+
           $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $packageParent | Out-Null
 
           foreach ($variant in @('framework-dependent', 'self-contained')) {
             $packageName = "BPP-Win32-$variant"
-            $packageRoot = Join-Path $env:RUNNER_TEMP "packages\$packageName"
-            Remove-Item -LiteralPath $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $packageRoot = Join-Path $packageParent $packageName
 
-            Copy-AppPublish `
-              -Source (Join-Path $env:RUNNER_TEMP "publish\windows-$variant\browser") `
-              -Destination (Join-Path $packageRoot 'Broiler.Browser') `
+            Rename-AppPublish `
+              -Directory $packageRoot `
               -OriginalBaseName 'Broiler.Graphics.Browser' `
               -PackageBaseName 'Broiler.Browser' `
               -ExecutableExtension '.exe'
 
-            Copy-AppPublish `
-              -Source (Join-Path $env:RUNNER_TEMP "publish\windows-$variant\writer") `
-              -Destination (Join-Path $packageRoot 'Broiler.Writer') `
+            Rename-AppPublish `
+              -Directory $packageRoot `
               -OriginalBaseName 'Broiler.Writer' `
               -PackageBaseName 'Broiler.Writer' `
               -ExecutableExtension '.exe'
 
-            Compress-Archive `
-              -LiteralPath $packageRoot `
-              -DestinationPath (Join-Path $assetDir "$packageName.zip") `
-              -Force
+            New-WindowsArchive `
+              -PackageParent $packageParent `
+              -PackageName $packageName `
+              -AssetDirectory $assetDir
           }
 
       - name: Upload Win32 framework-dependent BPP
         uses: actions/upload-artifact@v4
         with:
           name: BPP-Win32-framework-dependent
-          path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent.zip
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent.*
           if-no-files-found: error
 
       - name: Upload Win32 self-contained BPP
         uses: actions/upload-artifact@v4
         with:
           name: BPP-Win32-self-contained
-          path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained.zip
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained.*
           if-no-files-found: error
 
   build-linux-preview-package:
@@ -261,8 +268,7 @@ jobs:
       - name: Publish Linux framework-dependent apps
         shell: pwsh
         run: |
-          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-framework-dependent/browser'
-          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-framework-dependent/writer'
+          $output = Join-Path $env:RUNNER_TEMP 'packages/BPP-Linux-framework-dependent'
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
@@ -270,8 +276,7 @@ jobs:
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `
-            --output $browserOutput `
-            -p:PublishSingleFile=true `
+            --output $output `
             -p:UseAppHost=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
@@ -280,15 +285,13 @@ jobs:
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `
-            --output $writerOutput `
-            -p:PublishSingleFile=true `
+            --output $output `
             -p:UseAppHost=true
 
       - name: Publish Linux self-contained apps
         shell: pwsh
         run: |
-          $browserOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-self-contained/browser'
-          $writerOutput = Join-Path $env:RUNNER_TEMP 'publish/linux-self-contained/writer'
+          $output = Join-Path $env:RUNNER_TEMP 'packages/BPP-Linux-self-contained'
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
@@ -296,9 +299,7 @@ jobs:
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
-            --output $browserOutput `
-            -p:PublishSingleFile=true `
-            -p:EnableCompressionInSingleFile=true
+            --output $output
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
@@ -306,39 +307,23 @@ jobs:
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
-            --output $writerOutput `
-            -p:PublishSingleFile=true `
-            -p:EnableCompressionInSingleFile=true
+            --output $output
 
       - name: Package Linux assets
         shell: pwsh
         run: |
-          function Copy-AppPublish {
+          function Rename-AppPublish {
             param(
-              [Parameter(Mandatory=$true)][string]$Source,
-              [Parameter(Mandatory=$true)][string]$Destination,
+              [Parameter(Mandatory=$true)][string]$Directory,
               [Parameter(Mandatory=$true)][string]$OriginalBaseName,
               [Parameter(Mandatory=$true)][string]$PackageBaseName,
               [Parameter(Mandatory=$true)][AllowEmptyString()][string]$ExecutableExtension
             )
 
-            New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-            Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
-              Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
-            }
-
-            $originalExecutable = Join-Path $Destination ($OriginalBaseName + $ExecutableExtension)
-            $packageExecutable = Join-Path $Destination ($PackageBaseName + $ExecutableExtension)
+            $originalExecutable = Join-Path $Directory ($OriginalBaseName + $ExecutableExtension)
+            $packageExecutable = Join-Path $Directory ($PackageBaseName + $ExecutableExtension)
             if ($originalExecutable -ne $packageExecutable -and (Test-Path -LiteralPath $originalExecutable)) {
               Move-Item -LiteralPath $originalExecutable -Destination $packageExecutable -Force
-            }
-
-            foreach ($suffix in @('.pdb', '.deps.json', '.runtimeconfig.json')) {
-              $originalFile = Join-Path $Destination ($OriginalBaseName + $suffix)
-              $packageFile = Join-Path $Destination ($PackageBaseName + $suffix)
-              if ($originalFile -ne $packageFile -and (Test-Path -LiteralPath $originalFile)) {
-                Move-Item -LiteralPath $originalFile -Destination $packageFile -Force
-              }
             }
 
             if (-not (Test-Path -LiteralPath $packageExecutable)) {
@@ -346,6 +331,28 @@ jobs:
             }
 
             chmod +x $packageExecutable
+          }
+
+          function New-LinuxArchive {
+            param(
+              [Parameter(Mandatory=$true)][string]$PackageParent,
+              [Parameter(Mandatory=$true)][string]$PackageName,
+              [Parameter(Mandatory=$true)][string]$AssetDirectory
+            )
+
+            if (Get-Command xz -ErrorAction SilentlyContinue) {
+              tar -cJf (Join-Path $AssetDirectory "$PackageName.tar.xz") -C $PackageParent $PackageName
+              if ($LASTEXITCODE -ne 0) {
+                throw "tar.xz packaging exited with code $LASTEXITCODE."
+              }
+
+              return
+            }
+
+            tar -czf (Join-Path $AssetDirectory "$PackageName.tar.gz") -C $PackageParent $PackageName
+            if ($LASTEXITCODE -ne 0) {
+              throw "tar.gz packaging exited with code $LASTEXITCODE."
+            }
           }
 
           $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
@@ -356,37 +363,37 @@ jobs:
           foreach ($variant in @('framework-dependent', 'self-contained')) {
             $packageName = "BPP-Linux-$variant"
             $packageRoot = Join-Path $packageParent $packageName
-            Remove-Item -LiteralPath $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
 
-            Copy-AppPublish `
-              -Source (Join-Path $env:RUNNER_TEMP "publish/linux-$variant/browser") `
-              -Destination (Join-Path $packageRoot 'Broiler.Browser') `
+            Rename-AppPublish `
+              -Directory $packageRoot `
               -OriginalBaseName 'Broiler.Graphics.Browser' `
               -PackageBaseName 'Broiler.Browser' `
               -ExecutableExtension ''
 
-            Copy-AppPublish `
-              -Source (Join-Path $env:RUNNER_TEMP "publish/linux-$variant/writer") `
-              -Destination (Join-Path $packageRoot 'Broiler.Writer') `
+            Rename-AppPublish `
+              -Directory $packageRoot `
               -OriginalBaseName 'Broiler.Writer' `
               -PackageBaseName 'Broiler.Writer' `
               -ExecutableExtension ''
 
-            tar -czf (Join-Path $assetDir "$packageName.tar.gz") -C $packageParent $packageName
+            New-LinuxArchive `
+              -PackageParent $packageParent `
+              -PackageName $packageName `
+              -AssetDirectory $assetDir
           }
 
       - name: Upload Linux framework-dependent BPP
         uses: actions/upload-artifact@v4
         with:
           name: BPP-Linux-framework-dependent
-          path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent.tar.gz
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent.tar.*
           if-no-files-found: error
 
       - name: Upload Linux self-contained BPP
         uses: actions/upload-artifact@v4
         with:
           name: BPP-Linux-self-contained
-          path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.gz
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.*
           if-no-files-found: error
 
   create-preview-package-release:
@@ -442,10 +449,27 @@ jobs:
           SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
         run: |
           $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
-          $windowsFrameworkDependent = Join-Path $assetDir 'BPP-Win32-framework-dependent.zip'
-          $windowsSelfContained = Join-Path $assetDir 'BPP-Win32-self-contained.zip'
-          $linuxFrameworkDependent = Join-Path $assetDir 'BPP-Linux-framework-dependent.tar.gz'
-          $linuxSelfContained = Join-Path $assetDir 'BPP-Linux-self-contained.tar.gz'
+
+          function Resolve-Asset {
+            param(
+              [Parameter(Mandatory=$true)][string]$BaseName,
+              [Parameter(Mandatory=$true)][string[]]$Extensions
+            )
+
+            foreach ($extension in $Extensions) {
+              $candidate = Join-Path $assetDir ($BaseName + $extension)
+              if (Test-Path -LiteralPath $candidate) {
+                return $candidate
+              }
+            }
+
+            throw "Missing expected BPP asset for $BaseName. Tried: $($Extensions -join ', ')"
+          }
+
+          $windowsFrameworkDependent = Resolve-Asset 'BPP-Win32-framework-dependent' @('.7z', '.zip')
+          $windowsSelfContained = Resolve-Asset 'BPP-Win32-self-contained' @('.7z', '.zip')
+          $linuxFrameworkDependent = Resolve-Asset 'BPP-Linux-framework-dependent' @('.tar.xz', '.tar.gz')
+          $linuxSelfContained = Resolve-Asset 'BPP-Linux-self-contained' @('.tar.xz', '.tar.gz')
 
           foreach ($asset in @($windowsFrameworkDependent, $windowsSelfContained, $linuxFrameworkDependent, $linuxSelfContained)) {
             if (-not (Test-Path -LiteralPath $asset)) {
@@ -453,16 +477,20 @@ jobs:
             }
           }
 
+          $assetList = @(
+            $windowsFrameworkDependent,
+            $windowsSelfContained,
+            $linuxFrameworkDependent,
+            $linuxSelfContained
+          ) | ForEach-Object { "- " + (Split-Path -Leaf $_) }
+
           $body = @"
           Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.
 
           Each package contains Broiler.Browser and Broiler.Writer.
 
           Assets:
-          - BPP-Win32-framework-dependent.zip
-          - BPP-Win32-self-contained.zip
-          - BPP-Linux-framework-dependent.tar.gz
-          - BPP-Linux-self-contained.tar.gz
+          $($assetList -join "`n")
           "@
 
           $bodyPath = Join-Path $env:RUNNER_TEMP 'broiler-preview-package-notes.md'
