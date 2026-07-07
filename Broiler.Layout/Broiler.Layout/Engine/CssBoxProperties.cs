@@ -610,6 +610,7 @@ internal abstract class CssBoxProperties
     }
 
     public string WordBreak { get; set; } = "normal";
+    public string LineBreak { get; set; } = "auto";
     public string Opacity { get; set; } = "1";
     public string ZIndex { get; set; } = CssConstants.Auto;
     public string BoxShadow { get; set; } = "none";
@@ -1562,6 +1563,15 @@ internal abstract class CssBoxProperties
 
     public double GetEmHeight() => ActualFont.Size * CssMetrics.PtToPx;
 
+    /// <summary>
+    /// The width of the "0" (ZERO, U+0030) glyph in this box's font — the CSS
+    /// definition of the <c>ch</c> unit (CSS Values 3 §5.1.1). Returns
+    /// <see cref="double.NaN"/> when no measuring environment is available yet,
+    /// so callers fall back to the font-relative approximation. Overridden by
+    /// <see cref="CssBox"/> to measure against the real font.
+    /// </summary>
+    protected virtual double GetChWidth() => double.NaN;
+
     protected double ParseLengthWithLineHeight(string length, double hundredPercent)
     {
         if (!string.IsNullOrWhiteSpace(length) &&
@@ -1569,6 +1579,21 @@ internal abstract class CssBoxProperties
             double.TryParse(length[..^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var rem))
         {
             return rem * GetRootEmHeight();
+        }
+
+        // CSS Values 3 §5.1.1: 1ch is the advance measure of the "0" glyph in the
+        // element's font. Resolve it from the real font metrics when a measuring
+        // environment is available (e.g. Ahem's "0" is a full 1em, not the 0.5em
+        // approximation the generic length parser uses). Fall back to the parser
+        // for calc()/unavailable-metrics cases.
+        if (!string.IsNullOrWhiteSpace(length)
+            && length.EndsWith("ch", StringComparison.OrdinalIgnoreCase)
+            && !length.EndsWith("rch", StringComparison.OrdinalIgnoreCase)
+            && double.TryParse(length[..^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var chCount))
+        {
+            double chWidth = GetChWidth();
+            if (!double.IsNaN(chWidth) && chWidth > 0)
+                return chCount * chWidth;
         }
 
         return CssValueParser.ParseLength(
@@ -1793,6 +1818,7 @@ internal abstract class CssBoxProperties
         ListStyle = p.ListStyle;
         _lineHeight = p._lineHeight;
         WordBreak = p.WordBreak;
+        LineBreak = p.LineBreak;
         Direction = p.Direction;
         WritingMode = p.WritingMode;
         TextShadow = p.TextShadow;

@@ -1004,6 +1004,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         bool preserveSpaces = WhiteSpace == CssConstants.Pre || WhiteSpace == CssConstants.PreWrap;
         bool respoctNewline = preserveSpaces || WhiteSpace == CssConstants.PreLine;
 
+        // CSS Text 3 §5.1/§5.4: both `word-break: break-all` and `line-break:
+        // anywhere` introduce a soft-wrap opportunity between every pair of
+        // typographic character units, so each character is materialized as its
+        // own word. `anywhere` additionally overrides the no-break behaviour of
+        // the WJ/ZW/GL/ZWJ classes (U+2060, U+FEFF, U+200B, NBSP, ZWJ); emitting
+        // one word per character already yields those break opportunities.
+        bool breakEveryChar = WordBreak == CssConstants.BreakAll
+            || string.Equals(LineBreak, "anywhere", StringComparison.OrdinalIgnoreCase);
+
         // CSS Text 3 §2.1: apply text-transform (case mapping / full-width /
         // full-size-kana) as each word's text is materialized.  Null when the
         // computed value produces no glyph change (none / math-auto / unset).
@@ -1051,14 +1060,49 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     }
                 }
             }
+            else if (breakEveryChar)
+            {
+                // `word-break: break-all` / `line-break: anywhere` want a soft-wrap
+                // opportunity between every typographic character unit. Gather the
+                // whole run up to the next collapsible white space and decode its
+                // HTML entities as one unit first — a single entity reference (e.g.
+                // &#xFEFF;) must not be split mid-reference — then emit one word per
+                // decoded code point (surrogate pairs stay intact).
+                endIdx = startIdx;
+                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]))
+                    endIdx++;
+
+                if (endIdx > startIdx)
+                {
+                    var runText = WebUtility.HtmlDecode(_text.Slice(startIdx, endIdx - startIdx).ToString());
+                    if (transform != null)
+                        runText = transform.Transform(runText);
+
+                    bool leadingSpace = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
+                    bool trailingSpace = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
+
+                    for (int i = 0; i < runText.Length;)
+                    {
+                        int charLen = (i + 1 < runText.Length
+                            && char.IsHighSurrogate(runText[i])
+                            && char.IsLowSurrogate(runText[i + 1])) ? 2 : 1;
+                        Words.Add(new CssRectWord(
+                            this,
+                            runText.Substring(i, charLen),
+                            hasSpaceBefore: i == 0 && leadingSpace,
+                            hasSpaceAfter: i + charLen >= runText.Length && trailingSpace));
+                        i += charLen;
+                    }
+                }
+            }
             else
             {
                 endIdx = startIdx;
 
-                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && WordBreak != CssConstants.BreakAll && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
+                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
                     endIdx++;
 
-                if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || WordBreak == CssConstants.BreakAll || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
+                if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
                 {
                     endIdx++;
                     if (endIdx < textSpan.Length &&
@@ -5652,6 +5696,22 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     protected override ILayoutFont GetCachedFont(string fontFamily, double fsize, LayoutFontStyle st, string fontFeatures) => LayoutEnvironment.GetFont(fontFamily, fsize, st, fontFeatures);
+
+    /// <summary>
+    /// Resolves the CSS <c>ch</c> unit by measuring the advance of the "0" glyph
+    /// in this box's font (CSS Values 3 §5.1.1). Returns <see cref="double.NaN"/>
+    /// when no layout environment is wired up yet so the caller can fall back to
+    /// the generic approximation.
+    /// </summary>
+    protected override double GetChWidth()
+    {
+        var env = LayoutEnvironment;
+        if (env is null)
+            return double.NaN;
+
+        double width = env.MeasureText(ActualFont, "0").Width;
+        return width > 0 ? width : double.NaN;
+    }
 
     protected override BColor GetActualColor(string colorStr) => LayoutEnvironment.ParseColor(colorStr);
 

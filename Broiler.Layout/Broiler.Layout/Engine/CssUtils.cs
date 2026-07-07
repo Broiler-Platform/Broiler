@@ -104,6 +104,7 @@ internal static class CssUtils
             "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
             "word-break" => cssBox.WordBreak,
+            "line-break" => cssBox.LineBreak,
             "visibility" => cssBox.Visibility,
             "word-spacing" => cssBox.WordSpacing,
             "font-family" => cssBox.FontFamily,
@@ -600,6 +601,9 @@ internal static class CssUtils
                 break;
             case "word-break":
                 cssBox.WordBreak = value;
+                break;
+            case "line-break":
+                cssBox.LineBreak = value;
                 break;
             case "visibility":
                 cssBox.Visibility = value;
