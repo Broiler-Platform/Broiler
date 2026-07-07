@@ -1,245 +1,53 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 16152,
+    "failed": 16162,
     "skipped": 0,
-    "total": 16152
+    "total": 16162
   },
-  "shardCount": 8,
+  "shardCount": 2,
   "problemLimit": 10,
   "incompleteShards": [],
   "topProblems": [
     {
-      "key": "PixelMismatch:MissingContent",
-      "label": "PixelMismatch / MissingContent",
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent",
-      "count": 252,
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 11,
       "examples": [
-        "css/css-backgrounds/animations/border-image-slice-interpolation.html",
-        "css/css-backgrounds/background-attachment-local-scrolling.htm",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-color-2.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ReferenceOverlayExposed",
-      "label": "PixelMismatch / ReferenceOverlayExposed",
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed",
-      "count": 62,
-      "examples": [
-        "css/css-backgrounds/background-size-007.html",
-        "css/css-backgrounds/background-size/background-size-cover-svg.html",
-        "css/css-backgrounds/border-image-slice-001.xht"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 25,
-      "examples": [
-        "css/css-backgrounds/animations/background-color-animation-with-blur.html",
-        "css/css-backgrounds/animations/two-background-color-animation-diff-length3.html",
-        "css/css-backgrounds/background-size-043.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ColorShift",
-      "label": "PixelMismatch / ColorShift",
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift",
-      "count": 23,
-      "examples": [
-        "css/css-backgrounds/animations/background-color-transition-colormix.html",
-        "css/css-backgrounds/background-repeat-space-1a.html",
-        "css/css-backgrounds/background-repeat-space-4.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 5,
-      "examples": [
-        "css/css-backgrounds/background-margin-root.html",
-        "css/css-backgrounds/background-margin-transformed-root.html",
-        "css/css-backgrounds/animations/background-color-animation-fallback-replace.html"
+        "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
+        "encoding/legacy-mb-japanese/shift_jis/sjis-decode-sjis.html",
+        "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html"
       ]
     }
   ],
   "topFailingDirectories": [
     [
-      "css/css-backgrounds",
-      367
+      "encoding/legacy-mb-japanese",
+      4
+    ],
+    [
+      "encoding/legacy-mb-korean",
+      4
+    ],
+    [
+      "encoding/legacy-mb-tchinese",
+      3
     ]
   ],
   "failuresByCategory": [
     [
-      "PixelMismatch",
-      367
+      "Timeout",
+      11
     ]
   ],
   "droppedDeclarations": [],
   "exceptionSignatures": [],
-  "failureFamilies": [
-    {
-      "family": "css/css-backgrounds/background-size-{N}.html",
-      "count": 16,
-      "categories": {
-        "PixelMismatch": 16
-      },
-      "examples": [
-        "css/css-backgrounds/background-size-007.html",
-        "css/css-backgrounds/background-size-029.html",
-        "css/css-backgrounds/background-size-043.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-radius-{N}.xht",
-      "count": 11,
-      "categories": {
-        "PixelMismatch": 11
-      },
-      "examples": [
-        "css/css-backgrounds/border-radius-005.xht",
-        "css/css-backgrounds/border-radius-002.xht",
-        "css/css-backgrounds/border-radius-011.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-bottom-left-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-bottom-left-radius-014.xht",
-        "css/css-backgrounds/border-bottom-left-radius-004.xht",
-        "css/css-backgrounds/border-bottom-left-radius-013.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-bottom-right-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-bottom-right-radius-004.xht",
-        "css/css-backgrounds/border-bottom-right-radius-013.xht",
-        "css/css-backgrounds/border-bottom-right-radius-014.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-top-left-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-top-left-radius-010.xht",
-        "css/css-backgrounds/border-top-left-radius-001.xht",
-        "css/css-backgrounds/border-top-left-radius-002.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-top-right-radius-{N}.xht",
-      "count": 9,
-      "categories": {
-        "PixelMismatch": 9
-      },
-      "examples": [
-        "css/css-backgrounds/border-top-right-radius-010.xht",
-        "css/css-backgrounds/border-top-right-radius-011.xht",
-        "css/css-backgrounds/border-top-right-radius-005.xht"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-image-{N}.html",
-      "count": 7,
-      "categories": {
-        "PixelMismatch": 7
-      },
-      "examples": [
-        "css/css-backgrounds/border-image-004.html",
-        "css/css-backgrounds/border-image-003.html",
-        "css/css-backgrounds/border-image-006.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-{N}.html",
-      "count": 6,
-      "categories": {
-        "PixelMismatch": 6
-      },
-      "examples": [
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-5.html",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-2.html",
-        "css/css-backgrounds/background-attachment-local/attachment-local-clipping-image-4.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/background-repeat-space-{N}.html",
-      "count": 5,
-      "categories": {
-        "PixelMismatch": 5
-      },
-      "examples": [
-        "css/css-backgrounds/background-repeat-space-4.html",
-        "css/css-backgrounds/background-repeat-space-6.html",
-        "css/css-backgrounds/background-repeat-space-3.html"
-      ]
-    },
-    {
-      "family": "css/css-backgrounds/border-image-image-type-{N}.htm",
-      "count": 5,
-      "categories": {
-        "PixelMismatch": 5
-      },
-      "examples": [
-        "css/css-backgrounds/border-image-image-type-001.htm",
-        "css/css-backgrounds/border-image-image-type-003.htm",
-        "css/css-backgrounds/border-image-image-type-002.htm"
-      ]
-    }
-  ],
+  "failureFamilies": [],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
-  "biggestProblems": [
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 100.0,
-      "impact": 1,
-      "matchPercent": 0.0,
-      "relativeTestPath": "css/css-backgrounds/background-image-shared-stylesheet.html",
-      "title": "0.0% match \u2014 css/css-backgrounds/background-image-shared-stylesheet.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 93.96146138509116,
-      "impact": 1,
-      "matchPercent": 6.03853861490885,
-      "relativeTestPath": "css/css-backgrounds/background-margin-root.html",
-      "title": "6.0% match \u2014 css/css-backgrounds/background-margin-root.html",
-      "detail": "Rendered output matches the reference by only 6.0% (PixelMismatch / SubpixelAntiAliasing)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 93.96146138509116,
-      "impact": 1,
-      "matchPercent": 6.03853861490885,
-      "relativeTestPath": "css/css-backgrounds/background-margin-transformed-root.html",
-      "title": "6.0% match \u2014 css/css-backgrounds/background-margin-transformed-root.html",
-      "detail": "Rendered output matches the reference by only 6.0% (PixelMismatch / SubpixelAntiAliasing)."
-    }
-  ],
+  "biggestProblems": [],
   "results": [
     {
       "relativeTestPath": "css/CSS2/abspos/abspos-containing-block-initial-001.xht",
@@ -31739,27 +31547,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-backgrounds/background-margin-root.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing"
-    },
-    {
-      "relativeTestPath": "css/css-backgrounds/background-margin-transformed-root.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing"
-    },
-    {
-      "relativeTestPath": "css/css-backgrounds/background-margin-will-change-root.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing"
-    },
-    {
       "relativeTestPath": "css/css-backgrounds/background-none-none-and-color.html",
       "passed": false,
       "skipped": false,
@@ -31802,6 +31589,20 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-backgrounds/background-repeat-round-1a.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "css/css-backgrounds/background-repeat-round-1b.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
+    },
+    {
       "relativeTestPath": "css/css-backgrounds/background-repeat-round-2.html",
       "passed": false,
       "skipped": false,
@@ -31827,7 +31628,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-backgrounds/background-repeat-space-1c.html",
@@ -113289,6 +113090,72 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis-decode-ms932.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis-decode-sjis.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr-decode-csksc56011987.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr-decode.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-korean.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5-decode-big5-hkscs.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5-decode-csbig5.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
+      "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
     }
   ]
 }
