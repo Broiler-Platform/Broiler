@@ -248,6 +248,16 @@ internal partial class CssBox
         {
             if (child.Display == CssConstants.None)
                 continue;
+            // CSS Grid §4: every in-flow child becomes a grid item, EXCEPT a
+            // contiguous run of collapsible white space that is not contained in
+            // a non-anonymous box — such an anonymous box "is not rendered (just
+            // as if it were display:none)" and must not occupy a track. Broiler's
+            // box tree keeps the inter-item white space between block-level grid
+            // items as anonymous whitespace-only boxes; left in, each auto-places
+            // into its own phantom track and inflates the grid (e.g. the
+            // grid-lanes subgrid reftests gained spurious rows).
+            if (IsCollapsibleWhitespaceItem(child))
+                continue;
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
             {
                 if (gridIsAbsposContainingBlock)
@@ -377,6 +387,29 @@ internal partial class CssBox
                 return false;
 
             double marginY = p.Item.ActualMarginTop + p.Item.ActualMarginBottom;
+
+            // CSS Grid L2 §7.3: a row-subgrid item spanning several of this grid's
+            // rows contributes its *own* per-track content sizes to those rows, not
+            // one lumped height distributed equally. Without this a subgrid over
+            // auto rows flattens differently-sized rows to the average (e.g. the
+            // row-subgrid-grid-gap reftest's 30/50/30 rows collapsed to
+            // 36.6/36.6/36.6). Expand into one AxisItem per spanned row when the
+            // subgrid's children resolve cleanly; otherwise fall through to the
+            // single lumped item below.
+            if (p.RowSpan > 1
+                && StartsWithSubgrid(p.Item.GridTemplateRows)
+                && TryGetSubgridRowContributions(p.Item, p.RowSpan) is { } perRow)
+            {
+                double perRowMargin = marginY / p.RowSpan;
+                for (int t = 0; t < p.RowSpan; t++)
+                {
+                    double th = perRow[t] + perRowMargin;
+                    if (th < 0) th = 0;
+                    rowItems.Add(new AxisItem(p.PlacedRow + t, 1, th, th));
+                }
+                continue;
+            }
+
             // A replaced item with a definite block-size records its height on its
             // image word (measured through the container line box), leaving the box
             // ActualBottom at 0; trust the definite block-size for the row instead
@@ -967,6 +1000,44 @@ internal partial class CssBox
         item.TryApplyGridTrackLayout();
     }
 
+    /// <summary>
+    /// CSS Grid L2 §7.3: the per-track block-axis content contributions a
+    /// row-subgrid makes to the <paramref name="parentSpan"/> parent rows it
+    /// spans — the max content height of the subgrid's children placed in each
+    /// subgridded row. Returns <c>null</c> to decline (keeping the caller's lumped
+    /// single-item sizing) unless every in-flow child is explicitly placed on a
+    /// single, in-range row, so auto-placement and multi-row spans stay on the
+    /// existing conservative path. The subgrid's children have already been laid
+    /// out (its standalone/orphan pass), so their measured heights are available.
+    /// </summary>
+    private double[] TryGetSubgridRowContributions(CssBox subgrid, int parentSpan)
+    {
+        if (parentSpan <= 0)
+            return null;
+        var contrib = new double[parentSpan];
+        bool any = false;
+        foreach (var child in subgrid.Boxes)
+        {
+            if (child.Display == CssConstants.None || IsCollapsibleWhitespaceItem(child))
+                continue;
+            if (child.Position is CssConstants.Absolute or CssConstants.Fixed)
+                continue;
+            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, parentSpan);
+            if (!rowStart.HasValue || rowSpan != 1)
+                return null;
+            int idx = rowStart.Value;
+            if (idx < 0 || idx >= parentSpan)
+                return null;
+            double marginY = child.ActualMarginTop + child.ActualMarginBottom;
+            double h = (child.ActualBottom - child.Location.Y) + marginY;
+            if (h < 0) h = 0;
+            if (h > contrib[idx])
+                contrib[idx] = h;
+            any = true;
+        }
+        return any ? contrib : null;
+    }
+
     /// <summary>The <paramref name="span"/> track sizes starting at <paramref name="start"/>
     /// (clamped to the available tracks).</summary>
     private static double[] SliceTrackSizes(double[] sizes, int start, int span)
@@ -977,6 +1048,21 @@ internal partial class CssBox
             slice[i] = sizes[start + i];
         return slice;
     }
+
+    /// <summary>
+    /// CSS Grid §4: an anonymous box holding only collapsible white space is not
+    /// rendered and generates no grid item. True only for an anonymous box (no
+    /// element), with no child boxes, whose text is entirely white space and
+    /// whose <c>white-space</c> would collapse it (i.e. not a <c>pre*</c> value
+    /// that preserves it).
+    /// </summary>
+    private static bool IsCollapsibleWhitespaceItem(CssBox child)
+        => child.HtmlTag == null
+           && child.Boxes.Count == 0
+           && child.WhiteSpace != CssConstants.Pre
+           && child.WhiteSpace != CssConstants.PreWrap
+           && child.WhiteSpace != CssConstants.PreLine
+           && child.Text.Span.IsWhiteSpace();
 
     /// <summary>True when a track template's first token is the <c>subgrid</c> keyword.</summary>
     private static bool StartsWithSubgrid(string template)

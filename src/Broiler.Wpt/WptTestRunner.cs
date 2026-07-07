@@ -1677,11 +1677,53 @@ internal sealed class WptTestRunner
     /// mechanism (which uses root-relative URLs that cannot be resolved for
     /// <c>file://</c> base URLs).
     /// </summary>
+    private static bool _genericFontsLoaded;
+
     private static void EnsureWptFontsLoaded(string wptRoot)
     {
         var ahemPath = Path.Combine(wptRoot, "fonts", "Ahem.ttf");
         if (File.Exists(ahemPath))
             HtmlRender.LoadFontFromFile(ahemPath, "Ahem");
+
+        EnsureGenericFontsLoaded();
+    }
+
+    // The reference generator's Chromium resolves the CSS generic families through
+    // fontconfig (monospace → DejaVu Sans Mono, serif → DejaVu Serif, sans-serif →
+    // DejaVu Sans). Broiler does not enumerate system fonts, so its generic-family
+    // fallback finds nothing and the backend renders a proportional default for
+    // `monospace` — text comes out far narrower than the reference (e.g. a
+    // monospace <th> at ~7px/char vs Chromium's ~9.6px). Register the same system
+    // fonts under the generic names so monospace text is actually fixed-width and
+    // matches the reference. First existing candidate wins; missing files are
+    // skipped so this is a no-op where the fonts are absent.
+    private static void EnsureGenericFontsLoaded()
+    {
+        if (_genericFontsLoaded)
+            return;
+        _genericFontsLoaded = true;
+
+        LoadFirstAvailableAs("monospace",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf");
+        LoadFirstAvailableAs("serif",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf");
+        LoadFirstAvailableAs("sans-serif",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf");
+    }
+
+    private static void LoadFirstAvailableAs(string cssName, params string[] candidatePaths)
+    {
+        foreach (var path in candidatePaths)
+        {
+            if (File.Exists(path))
+            {
+                HtmlRender.LoadFontFromFile(path, cssName);
+                return;
+            }
+        }
     }
 
     /// <summary>

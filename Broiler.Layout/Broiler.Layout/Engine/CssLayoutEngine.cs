@@ -1098,6 +1098,18 @@ internal static class CssLayoutEngine
 
             b.ApplyGridLayoutAfterInline();
         }
+        else if (b.Display == CssConstants.Table || b.Display == CssConstants.InlineTable)
+        {
+            // A table laid out through this atomic-inline path (an `inline-table`,
+            // or a `display:table` blockified into a flex/grid item, which
+            // ContainsInlinesOnly routes here) must run the table formatting
+            // algorithm — its row/row-group/cell/caption boxes have no standalone
+            // block layout. Without this the table's children were laid out
+            // individually as blocks, so the rows and cells (and their text) were
+            // never positioned and a `<table>` grid item rendered empty. (WPT
+            // css-grid/table-grid-item-dynamic-002.)
+            CssLayoutEngineTable.PerformLayout(g, b, b.BaseUrl);
+        }
         else if (LayoutBoxUtils.ContainsInlinesOnly(b) || InlineContentWithBrsOnly(b))
         {
             // Inline-block content that is inline runs interrupted only by <br>

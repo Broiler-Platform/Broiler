@@ -18,6 +18,12 @@ internal sealed class CssLayoutEngineTable
     private readonly List<CssBox> _columns = [];
     private readonly List<CssBox> _allRows = [];
 
+    // CSS2.1 §17.4.1: table-caption boxes are laid out as block boxes above
+    // (caption-side:top, the default) or below the table box, spanning the
+    // table's width. Broiler previously dropped them entirely, so caption text
+    // never rendered; collect them here to lay out in LayoutCells.
+    private readonly List<CssBox> _captions = [];
+
     private int _columnCount;
 
     private bool _widthSpecified;
@@ -123,6 +129,7 @@ internal sealed class CssLayoutEngineTable
             switch (box.Display)
             {
                 case CssConstants.TableCaption:
+                    _captions.Add(box);
                     break;
                 case CssConstants.TableRow:
                     _bodyrows.Add(box);
@@ -665,8 +672,15 @@ internal sealed class CssLayoutEngineTable
 
     private void LayoutCells(ILayoutEnvironment g)
     {
+        // CSS2.1 §17.4.1: lay out top-side captions above the cell grid. They
+        // span the table's used width and push the first row (and every later
+        // row) down by their combined height. Bottom-side captions are laid out
+        // after the rows (see below).
+        double captionWidth = GetWidthSum() + GetHorizontalSpacing() * (_columnCount + 1);
+        double topCaptionHeight = LayoutTopCaptions(g, captionWidth);
+
         double startx = Math.Max(_tableBox.ClientLeft + GetHorizontalSpacing(), 0);
-        double starty = Math.Max(_tableBox.ClientTop + GetVerticalSpacing(), 0);
+        double starty = Math.Max(_tableBox.ClientTop + topCaptionHeight + GetVerticalSpacing(), 0);
         double cury = starty;
         double maxRight = startx;
         double maxBottom = 0f;
@@ -799,11 +813,17 @@ internal sealed class CssLayoutEngineTable
 
         // CSS2.1 §17.5.3: when the table's specified height exceeds the height
         // the rows naturally occupy, distribute the surplus over the rows.
-        maxBottom = DistributeExtraTableHeight(g, rowBounds, maxBottom);
+        maxBottom = DistributeExtraTableHeight(g, rowBounds, maxBottom, starty);
 
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
         _tableBox.ActualBottom = Math.Max(maxBottom, starty) + GetVerticalSpacing() + _tableBox.ActualBorderBottomWidth;
+
+        // CSS2.1 §17.4.1: lay out bottom-side captions below the table box and
+        // extend the table's bottom to enclose them.
+        double bottomCaptionBottom = LayoutBottomCaptions(g, captionWidth, _tableBox.ActualBottom);
+        if (bottomCaptionBottom > _tableBox.ActualBottom)
+            _tableBox.ActualBottom = bottomCaptionBottom;
 
         // CSS2.1 §17.5.2: Update the table box's Size to match the
         // computed layout dimensions so background painting, overflow
@@ -812,6 +832,99 @@ internal sealed class CssLayoutEngineTable
         _tableBox.Size = new SizeF(
             (float)(_tableBox.ActualRight - _tableBox.Location.X),
             (float)(_tableBox.ActualBottom - _tableBox.Location.Y));
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.4.1: A caption's <c>caption-side</c> places it on the block
+    /// (top/bottom) side of the table. Broiler exposes it as a raw string
+    /// property (default <c>top</c>); only <c>bottom</c> moves it below.
+    /// </summary>
+    private static bool IsBottomCaption(CssBox caption) =>
+        string.Equals(caption.CaptionSide, CssConstants.Bottom, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Lay out a single caption as a block box of the table's used width and
+    /// return its outer (margin-box) height. The caption is positioned at
+    /// (<paramref name="x"/>, <paramref name="y"/>) at its content-box origin,
+    /// inside its own margins.
+    /// </summary>
+    private static double LayoutCaption(ILayoutEnvironment g, CssBox caption, double x, double y, double width)
+    {
+        double contentWidth = Math.Max(0,
+            width - caption.ActualMarginLeft - caption.ActualMarginRight
+                  - caption.ActualBorderLeftWidth - caption.ActualBorderRightWidth
+                  - caption.ActualPaddingLeft - caption.ActualPaddingRight);
+
+        // The caption is laid out as a block box whose width is the table's used
+        // width (CSS2.1 §17.4). PerformLayoutImp resolves a block's width from its
+        // containing block (the table box), whose Size.Width is not finalised
+        // until LayoutCells completes — so pin an explicit content-box width here
+        // (only when the author left it auto) to avoid the caption shrinking to a
+        // stale/zero container width and wrapping every word onto its own line.
+        string savedWidth = caption.Width;
+        bool pinWidth = string.IsNullOrEmpty(caption.Width) || caption.Width == CssConstants.Auto;
+        if (pinWidth)
+            caption.Width = contentWidth.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+        double targetX = x + caption.ActualMarginLeft;
+        double targetY = y + caption.ActualMarginTop;
+        caption.Location = new PointF((float)targetX, (float)targetY);
+        caption.Size = new SizeF((float)contentWidth, 0f);
+        caption.PerformLayout(g);
+
+        if (pinWidth)
+            caption.Width = savedWidth;
+
+        // PerformLayoutImp positions a block's content relative to a flow origin
+        // it recomputes, so the caption (and its line boxes) may not honour the
+        // provisional Location set above — snap the whole subtree to the target
+        // with OffsetLeft/OffsetTop, mirroring the grid item placement path.
+        double dx = targetX - caption.Location.X;
+        double dy = targetY - caption.Location.Y;
+        if (Math.Abs(dx) > 0.01)
+            caption.OffsetLeft(dx);
+        if (Math.Abs(dy) > 0.01)
+            caption.OffsetTop(dy);
+
+        return (caption.ActualBottom - caption.Location.Y)
+            + caption.ActualMarginTop + caption.ActualMarginBottom;
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.4.1: lay out all top-side captions stacked from the table's
+    /// content-box top, returning their combined height so the cell grid can be
+    /// offset below them.
+    /// </summary>
+    private double LayoutTopCaptions(ILayoutEnvironment g, double width)
+    {
+        double total = 0;
+        double x = _tableBox.ClientLeft;
+        double top = _tableBox.ClientTop;
+        foreach (var caption in _captions)
+        {
+            if (IsBottomCaption(caption))
+                continue;
+            total += LayoutCaption(g, caption, x, top + total, width);
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.4.1: lay out all bottom-side captions stacked below the table
+    /// box, returning the bottom edge of the last caption (or the incoming
+    /// <paramref name="tableBottom"/> when there are none).
+    /// </summary>
+    private double LayoutBottomCaptions(ILayoutEnvironment g, double width, double tableBottom)
+    {
+        double x = _tableBox.ClientLeft;
+        double y = tableBottom;
+        foreach (var caption in _captions)
+        {
+            if (!IsBottomCaption(caption))
+                continue;
+            y += LayoutCaption(g, caption, x, y, width);
+        }
+        return y;
     }
 
     /// <summary>
@@ -827,26 +940,51 @@ internal sealed class CssLayoutEngineTable
     /// </summary>
     private double DistributeExtraTableHeight(
         ILayoutEnvironment g, List<(CssBox Row, double Top, double Bottom)> rowBounds,
-        double naturalBottom)
+        double naturalBottom, double rowAreaTop)
     {
         if (rowBounds.Count == 0)
             return naturalBottom;
-        if (string.IsNullOrEmpty(_tableBox.Height) || _tableBox.Height == CssConstants.Auto)
-            return naturalBottom;
 
-        // Resolve the specified height against the containing block (percentages
-        // need a definite basis; fall back to no-op when unavailable).
         double cbHeight = _tableBox.ContainingBlock?.ActualHeight ?? 0;
-        double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, _tableBox.GetEmHeight());
-        if (double.IsNaN(specHeight) || specHeight <= 0)
-            return naturalBottom;
+        double em = _tableBox.GetEmHeight();
 
-        // Target bottom for the row area = table top + specified content height.
-        // ClientTop already includes the table's top border/padding; the bottom
-        // border/spacing is added by the caller, so target the row content box.
-        double specBottom = _tableBox.Location.Y + specHeight
-            - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
-        double surplus = specBottom - naturalBottom;
+        double target = naturalBottom;
+
+        // CSS2.1 §17.5.3: an explicit table 'height' greater than the content
+        // grows the rows. Target bottom for the row area = table top + specified
+        // content height (ClientTop already includes the top border/padding; the
+        // bottom border/spacing is added by the caller).
+        if (!string.IsNullOrEmpty(_tableBox.Height) && _tableBox.Height != CssConstants.Auto)
+        {
+            double specHeight = CssValueParser.ParseLength(_tableBox.Height, cbHeight, em);
+            if (!double.IsNaN(specHeight) && specHeight > 0)
+            {
+                double specBottom = _tableBox.Location.Y + specHeight
+                    - _tableBox.ActualBorderBottomWidth - _tableBox.ActualPaddingBottom - GetVerticalSpacing();
+                if (specBottom > target)
+                    target = specBottom;
+            }
+        }
+
+        // CSS2.1 §17.5.3 / §10.7: a 'min-height' greater than the content grows
+        // the rows the same way. In the table wrapper model min-height applies to
+        // the inner table box (the rows), *not* the caption, so measure it from
+        // the row-area top (below any top caption) rather than the table origin —
+        // this is what vertically centres a `vertical-align:middle` cell whose
+        // table has a tall min-height (WPT table-grid-item-dynamic-002).
+        if (!string.IsNullOrEmpty(_tableBox.MinHeight) && _tableBox.MinHeight != "0")
+        {
+            double minH = CssValueParser.ParseLength(_tableBox.MinHeight, cbHeight, em);
+            if (!double.IsNaN(minH) && minH > 0)
+            {
+                double minBottom = rowAreaTop + minH
+                    - _tableBox.ActualBorderTopWidth - _tableBox.ActualBorderBottomWidth;
+                if (minBottom > target)
+                    target = minBottom;
+            }
+        }
+
+        double surplus = target - naturalBottom;
         if (surplus <= 0.5)
             return naturalBottom;
 

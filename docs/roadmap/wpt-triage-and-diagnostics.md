@@ -719,6 +719,66 @@ element's default display):
    subgrid** track layout (cluster 28's tail); a `grid-auto-rows`-only shortcut would stack the children
    full-width and over-paint the grey, so it is not attempted here.
 
+Cluster 38 (issue [#1266](https://github.com/Broiler-Platform/Broiler/issues/1266), the "top-8 biggest
+problems" run) was triaged end-to-end this session against a local Chromium-reference pixel loop (sparse
+`css/css-grid` checkout + Playwright references + `Broiler.Wpt` compare, reproducing the issue's percent
+matches within noise). All eight are the hard tail and each needs a distinct, roadmap-scale feature — no
+single fix flips them:
+
+- **#6 `row-subgrid-grid-gap-012` — ✅ fixed this session (46% → 99.8%).** Two bugs: (1) the collapsible
+  white space between the `<span>`s was being turned into phantom grid items (two extra rows); dropping
+  anonymous whitespace-only items per §4 took it to ~96%. (2) The row-subgrid over the parent's auto rows
+  lumped its 30/50/30 content into one span and distributed it equally (36.6/36.6/36.6); giving the parent
+  per-track contributions from the subgrid's children (§7.3, `TryGetSubgridRowContributions`) sized the
+  rows correctly. Guards `GridWhitespaceItemTests`, `SubgridRowContributionTests`.
+- **#1/#3/#4 `column-subgrid-auto-fill-{003,001,008}`** — the deferred **multi-column named-line subgrid
+  track adoption** (cluster 28/29 tail): a subgrid item inheriting its parent's spanned tracks,
+  `repeat(auto-fill, [line-names])`, and `subgrid`-side gap. Broiler's single-column approximation
+  over/under-sizes the grey subgrid bands. Still open (the harder half of the cluster).
+- **#2 `subgrid/orthogonal-writing-mode-006`** — same subgrid feature across an orthogonal flow; Broiler
+  blows the fit-content outer grid up to the viewport.
+- **#5 `grid-lanes-quirks-fill-viewport` — ✅ mostly fixed this session (11.6% → 98.1%).** The quirks-mode
+  *body-fills-viewport* / *html-fills-viewport* behaviour (quirks.spec §"the body element fills the html
+  element quirk"). Broiler tracked no quirks/standards mode, so an auto-height body shrink-wrapped to
+  content. Added a **main-repo-only** quirks pipeline (no submodule change — `Broiler.DOM` is an unpushable
+  submodule and the main repo must compile against its pinned commit): a thread-local
+  `Broiler.Layout.DocumentModeContext` (mirroring `CssLengthParser`'s per-render viewport state) that
+  `DomBridge` sets from the doctype on parse — every WPT render parses through the bridge before laying
+  out — and which `CssBox` caches on the tree root and consults to grow an auto `<html>`/`<body>` to the
+  viewport / html content minus margins. The residual ~1.9% is the body's vertical position: Broiler adds
+  the child `<p>`'s top margin to the body position instead of collapsing it through (a general
+  parent/first-child margin-collapse behaviour, not the fill quirk). Guard `QuirksBodyFillTests`
+  (doctype→quirks detection; the fill itself is pixel-verified by the reftest — the check-layout harness
+  reports the body rect as the full viewport regardless of mode).
+- **#7 `alignment/grid-align-baseline-vertical`** — vertical-writing-mode grid **intrinsic (block-axis)
+  width** + **baseline self-alignment** (Workstream A's open tail): the `writing-mode:vertical-rl` grids
+  size their physical width to the viewport instead of shrink-wrapping their rows.
+- **#8 `table-grid-item-dynamic-002` — ✅ layout fixed this session (49% → 98.7%).** Four stacked bugs,
+  each spec-grounded: (a) table `<caption>` boxes were dropped (fixed earlier this session); (b) a bare
+  `onload = fn` never fired because `window` ≠ the global object in the JS engine — a bare assignment
+  lands on `globalThis.onload`, so `FireWindowLoadEvent` now checks both (this made the `min-height`
+  500→100 dynamic relayout take effect); (c) a `<table>` laid out as a grid/inline item had its rows/cells
+  laid out as bare blocks (the table formatting algorithm never ran) so cell text vanished — `FlowInlineBlock`
+  now routes `display:table` through `CssLayoutEngineTable`; (d) a stretched table grid item filled the
+  column but its cells stayed shrink-wrapped and its `min-height` did not grow the row (so the
+  middle-aligned `th` was not vertically centred) — the stretch path re-runs the table at the filled width,
+  and `DistributeExtraTableHeight` now honours `min-height` (measured from the row-area top, below the
+  caption). The residual ~1.3% is glyph-level: the test's `monospace` renders narrower in Broiler than in
+  the reference Chromium (the grey box matches pixel-for-pixel). Guards `TableGridItemTests`.
+
+**Fixed this session — table `<caption>` layout (CSS2.1 §17.4.1).** While root-causing #8 the table
+engine was found to match `display:table-caption` with a bare `case …: break;` — captions were collected
+nowhere and laid out never, so caption text/background rendered nowhere and the table height excluded
+them. `CssLayoutEngineTable` now collects captions and lays them out as block boxes of the table's used
+width: top-side captions (the default) stack above the cell grid and push the rows down; a
+`caption-side:bottom` caption stacks below (a new inherited `CaptionSide` property, wired through
+`CssUtils`). `display:table-caption` also gained a real block-layout path in `CssBox.PerformLayoutImp`
+(it fell through every branch and stayed 0-height). Guard `TableCaptionTests` (top pushes rows down by
+the caption height; bottom sits below without moving them); zero regressions across the vendored
+css-align/css-anchor-position/CSS2 subsets (102/38/13 byte-identical before/after) and the grid Cli.Tests.
+This is a general table-rendering correctness win but does **not** by itself flip #8, which still needs
+the grid non-simple-item and dynamic-reflow work above.
+
 Cluster 30 (issue [#1227](https://github.com/Broiler-Platform/Broiler/issues/1227), the "biggest
 problems" CSS Grid list — the `grid-items` tests at ~9 % match) was a **grid-item percentage-height**
 bug in the inline-block fallback. `css-grid/grid-items/whitespace-in-grid-item-001`'s `.item`

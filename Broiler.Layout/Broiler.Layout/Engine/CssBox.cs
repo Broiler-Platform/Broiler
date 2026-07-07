@@ -214,6 +214,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         set { _htmlContainer = value; }
     }
 
+    private bool? _documentQuirksMode;
+
+    /// <summary>
+    /// Whether the document being laid out is in quirks mode. Captured once —
+    /// from <see cref="Dom.DocumentModeContext"/>, which the HTML parser publishes
+    /// on the parse thread — onto the tree root the first time layout consults it,
+    /// then read from the root by every box. Caching on the root makes the value
+    /// survive re-layout passes (which may run on a different thread, where the
+    /// thread-local would have reset) without threading it through the box builder.
+    /// </summary>
+    internal bool DocumentQuirksMode
+    {
+        get
+        {
+            var root = this;
+            while (root._parentBox != null)
+                root = root._parentBox;
+            root._documentQuirksMode ??= DocumentModeContext.CurrentQuirksMode;
+            return root._documentQuirksMode.Value;
+        }
+    }
+
     /// <summary>
     /// Host-injected layout environment (see <see cref="ILayoutEnvironment"/>),
     /// resolved up the box tree like <see cref="ContainerInt"/>. Set on the root
@@ -1129,7 +1151,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // are laid out, so the trimmed margins collapse to nothing.
         ApplyMarginTrim();
 
-        if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell)
+        if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
         {
             // Because their width and height are set by CssTable
             if (Display != CssConstants.TableCell && Display != CssConstants.Table)
@@ -2172,6 +2194,40 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             && TryResolveAspectRatioBlockHeight(out double aspectRatioBorderBoxHeight))
         {
             ActualBottom = Location.Y + aspectRatioBorderBoxHeight;
+        }
+
+        // Quirks-mode "the body element fills the html element" / "the html
+        // element fills the viewport" quirks (https://quirks.spec.whatwg.org/):
+        // in quirks mode an auto-height root <html> fills the viewport (minus its
+        // margins) and an auto-height <body> fills the html element's content box
+        // (minus its own margins), instead of shrink-wrapping to content. Acts as
+        // a floor (content taller than the fill still overflows/scrolls).
+        if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+            && DocumentQuirksMode
+            && LayoutEnvironment != null
+            && Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            && Float == CssConstants.None
+            && HtmlTag != null)
+        {
+            double? fillBorderBoxHeight = null;
+            if (HtmlTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                fillBorderBoxHeight = LayoutEnvironment.ViewportSize.Height
+                    - ActualMarginTop - ActualMarginBottom;
+            }
+            else if (HtmlTag.Name.Equals("body", StringComparison.OrdinalIgnoreCase)
+                && ParentBox is { HtmlTag: { } parentTag }
+                && parentTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                var html = ParentBox;
+                double htmlContentHeight = LayoutEnvironment.ViewportSize.Height
+                    - html.ActualMarginTop - html.ActualMarginBottom
+                    - html.ActualBorderTopWidth - html.ActualBorderBottomWidth
+                    - html.ActualPaddingTop - html.ActualPaddingBottom;
+                fillBorderBoxHeight = htmlContentHeight - ActualMarginTop - ActualMarginBottom;
+            }
+            if (fillBorderBoxHeight is { } fillH && fillH > ActualBottom - Location.Y)
+                ActualBottom = Location.Y + fillH;
         }
 
         // CSS2.1 §10.7: Apply min-height / max-height constraints.
@@ -5120,6 +5176,33 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // pre-stretch inline width. Grid items are blockified, so clear
                 // the stale inline rects and let paint fall back to Location+Size.
                 child.RectanglesReset();
+
+                // A stretched table grid item is sized to the column width like
+                // any other stretched item, but — unlike a block — its cell grid
+                // was already shrink-wrapped to content by the table formatting
+                // algorithm and does not reflow from a bare Size change. Re-run
+                // that algorithm with the filled width made definite so the
+                // columns (and their centered cell content) span the column
+                // instead of hugging the content (WPT table-grid-item-dynamic-002).
+                if ((child.Display == CssConstants.Table || child.Display == CssConstants.InlineTable)
+                    && child.LayoutEnvironment != null)
+                {
+                    string savedWidth = child.Width;
+                    float savedX = child.Location.X, savedY = child.Location.Y;
+                    // Make the filled width definite and re-run the box's own
+                    // layout (not just the table algorithm) so the §10.7 min-height
+                    // clamp still applies — a bare table-engine call would drop the
+                    // table's min-height and collapse it to content height.
+                    child.Width = targetWidth.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "px";
+                    child.PerformLayout(child.LayoutEnvironment);
+                    child.Width = savedWidth;
+                    // PerformLayout may reposition the box; the caller offsets it
+                    // into its cell next, so restore the pre-relayout origin.
+                    child.OffsetLeft(savedX - child.Location.X);
+                    child.OffsetTop(savedY - child.Location.Y);
+                    child.Size = new SizeF((float)targetWidth, child.Size.Height);
+                    child.ActualRight = child.Location.X + targetWidth;
+                }
             }
         }
         resolvedJustify = js;
