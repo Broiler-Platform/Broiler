@@ -21,6 +21,32 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0011-broiler-html-frameset-track-overflow.patch** → `Broiler.HTML`
+  (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs` +
+  `Source/Broiler.HTML.Image/HtmlRender.cs`) — fixes the crash gating
+  `html/rendering/non-replaced-elements/the-frameset-and-frame-elements/`
+  `large-rows-percentage.html` and `large-rows-abssize.html` (issue #1302,
+  `HtmlRender.RenderToImageCore — Arithmetic operation resulted in an
+  overflow`). A frameset track given as a giant fixed or percentage length
+  (both tests use `rows="4294967227%,*"`) was passed straight through as the
+  frame's height percentage, so the frame resolved to billions of pixels;
+  rasterising that embedded document overflowed the Int32 RGBA buffer-size
+  multiply in `BBitmap`'s constructor (`checked(width * height * 4)`), throwing
+  and crashing the whole page render. `ParseFramesetSpec` now scales all tracks
+  down proportionally whenever they would exceed the frameset's area (the HTML
+  frameset algorithm shrinks oversized fixed/percentage tracks to fit, never
+  overflowing): for `rows="4294967227%,*"` the huge track becomes 100 % and the
+  `*` track 0 %, so the first frame fills the viewport and the second is
+  squeezed to nothing — the rendered 1024×768 output is uniformly green,
+  matching the WPT `reference/green-ref.html`. `CompositeEmbeddedDocuments` is
+  also hardened to skip any embedded box whose RGBA allocation would still
+  overflow Int32, so no pathological size can crash the render.
+  **No active CI fallback:** both the frameset track math (`DomParser`) and the
+  embedded-document rasterisation (`HtmlRender`) live entirely in the
+  `Broiler.HTML` submodule — there is no parent-repo layer to mirror them into —
+  so these two tests stay crashed until a maintainer applies this patch and
+  bumps the pointer.
+
 - **0010-css-backgrounds-root-gradient-propagation.patch** → `Broiler.HTML`
   (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs` +
   `Source/Broiler.HTML.Image/BCanvas.cs`) — fixes a root `<html>` background
