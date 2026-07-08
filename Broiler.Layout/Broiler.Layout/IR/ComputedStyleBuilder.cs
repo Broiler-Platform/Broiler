@@ -139,6 +139,7 @@ internal static class ComputedStyleBuilder
             BackgroundClip = box.BackgroundClip,
             ClipPath = box.ClipPath,
             Contain = box.Contain,
+            ContentVisibility = box.ContentVisibility,
             Transform = box.Transform,
 
             // Flex

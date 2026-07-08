@@ -25,12 +25,24 @@ internal static class FragmentTreeBuilder
             || (!string.IsNullOrEmpty(style.Transform)
             && !style.Transform.Equals("none", StringComparison.OrdinalIgnoreCase));
 
-        var children = new List<Fragment>(box.Boxes.Count);
-        foreach (var child in box.Boxes)
-            children.Add(BuildFragment(child, hasTransformAncestor));
+        // CSS Containment §4 (content-visibility: hidden): the element's
+        // contents are skipped — not painted — while the element's own box
+        // (background, border, box-model size) still renders. Build the box
+        // fragment with no child fragments and no line fragments so the whole
+        // subtree, including any promoted top-layer content nested under it
+        // (e.g. a modal <dialog> and its ::backdrop), is left unpainted.
+        bool contentHidden = string.Equals(
+            style.ContentVisibility, "hidden", StringComparison.OrdinalIgnoreCase);
+
+        var children = new List<Fragment>(contentHidden ? 0 : box.Boxes.Count);
+        if (!contentHidden)
+        {
+            foreach (var child in box.Boxes)
+                children.Add(BuildFragment(child, hasTransformAncestor));
+        }
 
         List<LineFragment>? lines = null;
-        if (box.LineBoxes.Count > 0)
+        if (!contentHidden && box.LineBoxes.Count > 0)
         {
             lines = new List<LineFragment>(box.LineBoxes.Count);
             foreach (var lineBox in box.LineBoxes)
