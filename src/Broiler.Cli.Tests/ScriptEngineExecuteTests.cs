@@ -1186,6 +1186,84 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void DomBridge_Popover_ShowPopover_Promotes_To_Top_Layer_With_Backdrop()
+    {
+        // HTML §popover: showPopover() puts the element in the top layer, so it
+        // is elevated above ordinary content (synthetic z-index) and generates a
+        // ::backdrop honouring the author `background-color` (WPT css-position
+        // overlay-transition-backdrop / replaced-object-backdrop).
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  [popover]::backdrop { background-color: rgb(1, 200, 3); }
+</style></head>
+<body><div id="pop" popover></div></body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        context.Eval("document.getElementById('pop').showPopover();");
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        // The popover is elevated into the synthetic top layer.
+        Assert.Contains("z-index: 2000000", result);
+        // A ::backdrop div was synthesized carrying the author background.
+        Assert.Contains("background-color: rgb(1, 200, 3)", result);
+    }
+
+    [Fact]
+    public void DomBridge_Popover_HidePopover_Removes_Top_Layer_Promotion()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  [popover]::backdrop { background-color: rgb(1, 200, 3); }
+</style></head>
+<body><div id="pop" popover></div></body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        // Shown then hidden with no overlay transition → leaves the top layer.
+        context.Eval("var p = document.getElementById('pop'); p.showPopover(); p.hidePopover();");
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.DoesNotContain("z-index: 2000000", result);
+    }
+
+    [Fact]
+    public void DomBridge_Popover_HidePopover_With_Overlay_Transition_Stays_In_Top_Layer()
+    {
+        // CSS Position §overlay: hiding while `overlay` transitions out with
+        // transition-behavior: allow-discrete keeps the popover in the top layer
+        // as it animates. A static snapshot is taken mid-transition, so it must
+        // still render (WPT overlay-transition-backdrop / -out-rendering).
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  [popover] {
+    transition: overlay 60s step-end;
+    transition-behavior: allow-discrete;
+  }
+</style></head>
+<body><div id="pop" popover></div></body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        context.Eval("var p = document.getElementById('pop'); p.showPopover(); p.hidePopover();");
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("z-index: 2000000", result);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
     {
         const string html = """

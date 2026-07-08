@@ -68,6 +68,7 @@ internal sealed class ElementRuntimeState
         Layout.Height.CopyTo(target.Layout.Height);
         Dialog.Modal.CopyTo(target.Dialog.Modal);
         Dialog.TopLayerOrder.CopyTo(target.Dialog.TopLayerOrder);
+        Dialog.PopoverOpen.CopyTo(target.Dialog.PopoverOpen);
         Shadow.Root.CopyTo(target.Shadow.Root);
         Shadow.Host.CopyTo(target.Shadow.Host);
         Shadow.Mode.CopyTo(target.Shadow.Mode);
@@ -111,6 +112,12 @@ internal sealed class DialogRuntimeState
 {
     public RuntimeValue<bool> Modal { get; } = new();
     public RuntimeValue<int> TopLayerOrder { get; } = new();
+
+    // Popover API (HTML §popover): set by showPopover(), cleared by
+    // hidePopover() — except when an `overlay` allow-discrete transition keeps
+    // the element in the top layer as it animates out, in which case it stays
+    // set so its ::backdrop still renders for the snapshot.
+    public RuntimeValue<bool> PopoverOpen { get; } = new();
 }
 
 internal sealed class ShadowRuntimeState

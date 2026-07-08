@@ -140,6 +140,7 @@ internal static class ComputedStyleBuilder
             ClipPath = box.ClipPath,
             Contain = box.Contain,
             ContentVisibility = box.ContentVisibility,
+            ColorScheme = box.ColorScheme,
             Transform = box.Transform,
 
             // Flex

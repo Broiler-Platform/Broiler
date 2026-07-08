@@ -378,7 +378,13 @@ internal sealed class WptTestRunner
   var __broilerPromiseTests = [];
   var __broilerWindowLoaded = false;
   if (typeof test === 'undefined') {
-    window.test = function(func, name) { try { func(); } catch(e) {} };
+    // Chromium-matching mode: the reference generator does not load
+    // testharness.js, so `test` is undefined there and the test body never
+    // runs before the screenshot. Some bodies mutate the DOM (e.g. toggling a
+    // class that changes color-scheme), which would advance our captured DOM
+    // past the reference point. Leave them un-run so the snapshot reflects the
+    // initial post-load state (mirrors the promise_test stub below).
+    window.test = function(func, name) {};
   }
   if (typeof async_test === 'undefined') {
     window.async_test = function(func, name) {

@@ -1,0 +1,153 @@
+From 648dd8fbfd47c1382df11013a14aedd453305425 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 8 Jul 2026 16:30:59 +0000
+Subject: [PATCH] Paint the canvas dark for a dark used color-scheme
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CSS Color Adjust §2.3: when the document root element's used color scheme
+is dark, the UA paints the canvas backdrop the dark colour (rgb(18,18,18))
+instead of white. Broiler ignored color-scheme, so a page with
+:root { color-scheme: dark } and no background rendered a white canvas
+where Chromium renders dark.
+
+Both canvas-background code paths now emit the dark backdrop when the
+root's used color scheme is dark (the color-scheme list offers dark but
+not light, against the reference environment's light preference):
+- PaintWalker.EmitCanvasBackground (Fragment/IR paint path) adds a dark
+  FillRect as the bottom layer.
+- HtmlContainerInt.GetRootBackgroundColor (HtmlContainer paint path)
+  returns the dark colour when nothing else propagates.
+A propagated root/body background still paints over it, so an explicit
+background wins; a fully-transparent root and body leave the dark backdrop
+showing.
+
+Reads ComputedStyle.ColorScheme / CssBox.ColorScheme, plumbed through
+Broiler.Layout.
+
+Fixes WPT css-color-adjust/rendering/dark-color-scheme
+color-scheme-root-background and
+color-scheme-color-initial-affected-by-color-scheme-property (0.0% match).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015HGrNqhEnwW8Q5RLGyuHiB
+---
+ .../HtmlContainerInt.cs                       | 33 +++++++++++++
+ .../IR/PaintWalker.CanvasBackground.cs        | 46 +++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index 6c5a19f..2e61375 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -195,9 +195,42 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+             }
+         }
+ 
++        // CSS Color Adjust §2.3: when the root's used color scheme is dark and no
++        // background propagated, the default canvas backdrop is the UA dark colour
++        // (rgb(18,18,18)) instead of white. Mirrors PaintWalker.EmitCanvasBackground.
++        if (htmlBox != null && UsesDarkColorScheme(htmlBox.ColorScheme))
++            return CanvasDarkBackdrop;
++
+         return BColor.Empty;
+     }
+ 
++    // CSS Color Adjust §2.3: the UA dark canvas backdrop colour Chromium paints
++    // for a dark used color scheme.
++    private static readonly BColor CanvasDarkBackdrop = BColor.FromArgb(255, 18, 18, 18);
++
++    /// <summary>
++    /// CSS Color Adjust §2.2–2.3: whether a <c>color-scheme</c> value resolves to
++    /// a dark used scheme against the reference environment's light preference —
++    /// i.e. the list offers <c>dark</c> but not <c>light</c> (a matching preferred
++    /// scheme, when present, wins). The <c>only</c> keyword does not change this.
++    /// </summary>
++    private static bool UsesDarkColorScheme(string? colorScheme)
++    {
++        if (string.IsNullOrWhiteSpace(colorScheme))
++            return false;
++
++        bool hasDark = false, hasLight = false;
++        foreach (var token in colorScheme.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
++        {
++            if (token.Equals("dark", StringComparison.OrdinalIgnoreCase))
++                hasDark = true;
++            else if (token.Equals("light", StringComparison.OrdinalIgnoreCase))
++                hasLight = true;
++        }
++
++        return hasDark && !hasLight;
++    }
++
+     private static CssBox? FindBodyBox(CssBox parent, int depth = 0)
+     {
+         if (depth > 3)
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+index 7ad7de5..a236057 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+@@ -44,6 +44,14 @@ internal static partial class PaintWalker
+     /// </summary>
+     private static Fragment? EmitCanvasBackground(Fragment root, RectangleF viewport, List<DisplayItem> items)
+     {
++        // CSS Color Adjust §2.3: when the document root's used color scheme is
++        // dark, the canvas is painted the UA dark backdrop colour instead of
++        // white. Emit it as the bottom layer so a propagated root/body
++        // background (found below) paints over it; a fully-transparent root and
++        // body leave the dark backdrop showing.
++        if (RootUsesDarkColorScheme(root))
++            items.Add(new FillRectItem { Bounds = viewport, Color = DarkCanvasColor });
++
+         // Find which element supplies the canvas background (color + image
+         // as a unit, per CSS2.1 §14.2).
+         var (canvasBg, colorSource, imgSource) = FindCanvasBackgroundAndImage(root);
+@@ -257,6 +265,44 @@ internal static partial class PaintWalker
+         return (BColor.Empty, null, null);
+     }
+ 
++    // CSS Color Adjust §2.3: the UA-defined dark canvas backdrop colour that
++    // Chromium paints for a dark used color scheme (rgb(18, 18, 18)).
++    private static readonly BColor DarkCanvasColor = BColor.FromArgb(255, 18, 18, 18);
++
++    /// <summary>
++    /// CSS Color Adjust §2.2–2.3: whether the document root element's used
++    /// color scheme is <c>dark</c>, which makes the canvas backdrop dark.
++    /// <para>
++    /// The reference environment prefers a <em>light</em> color scheme
++    /// (Playwright's default). The used scheme is the preferred one when the
++    /// element's <c>color-scheme</c> list includes it; otherwise the first
++    /// supported scheme in the list is used. So the canvas is dark exactly when
++    /// the list offers <c>dark</c> but not <c>light</c>. The <c>only</c> keyword
++    /// does not change this here (it forbids a UA override we do not perform).
++    /// </para>
++    /// </summary>
++    private static bool RootUsesDarkColorScheme(Fragment root)
++    {
++        // color-scheme governing the canvas is the document root element's
++        // (html). `root` may be the html fragment itself or a synthetic parent.
++        var html = FindFragmentByTag(root, "html") ?? FindFirstBlockChild(root) ?? root;
++
++        var scheme = html.Style.ColorScheme;
++        if (string.IsNullOrWhiteSpace(scheme))
++            return false;
++
++        bool hasDark = false, hasLight = false;
++        foreach (var token in scheme.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
++        {
++            if (token.Equals("dark", StringComparison.OrdinalIgnoreCase))
++                hasDark = true;
++            else if (token.Equals("light", StringComparison.OrdinalIgnoreCase))
++                hasLight = true;
++        }
++
++        return hasDark && !hasLight;
++    }
++
+     /// <summary>
+     /// Returns <see langword="true"/> when the given fragment's CSS properties
+     /// suppress background propagation to the canvas.  Per the CSS
+-- 
+2.43.0
+

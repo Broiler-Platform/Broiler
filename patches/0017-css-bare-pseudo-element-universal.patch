@@ -1,0 +1,93 @@
+From fcab2d46a3999b69117689234265025d42a10736 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 8 Jul 2026 17:07:54 +0000
+Subject: [PATCH] Match a bare ::backdrop (and other bare pseudo-elements) as
+ universal
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+TryStripPseudoElementSelector rejected a pseudo-element selector whose base
+compound was empty — a bare `::backdrop { … }` (equivalently `*::backdrop`)
+returned false and its declarations were dropped. Only qualified forms
+(`dialog::backdrop`, `.foo::backdrop`) matched, so an author bare
+`::backdrop { background: green }` fell back to the UA default.
+
+Treat an empty base selector as the universal `*` in both the `::` and the
+legacy single-colon branch, matching the pseudo-element of any originating
+element.
+
+Fixes bare ::backdrop rules used by WPT css-position tests; guarded by
+GetCascadedStyle_Matches_Bare_Pseudo_Element_As_Universal.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015HGrNqhEnwW8Q5RLGyuHiB
+---
+ Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs | 20 ++++++++++++++++++++
+ Broiler.CSS.Dom/CssStyleEngine.cs            | 12 ++++++++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+index 224b930..e46dc76 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+@@ -710,6 +710,26 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("blue", cascaded["color"]);
+     }
+ 
++    [Theory]
++    [InlineData("::backdrop")]
++    [InlineData("::before")]
++    [InlineData("::marker")]
++    public void GetCascadedStyle_Matches_Bare_Pseudo_Element_As_Universal(string pseudoElement)
++    {
++        // A bare pseudo-element selector (e.g. `::backdrop { … }`) is equivalent
++        // to `*::backdrop` and must match the pseudo-element of any element. The
++        // empty base selector was previously rejected, so author `::backdrop`
++        // rules (WPT css-position replaced-object-backdrop) were dropped.
++        var (_, _, body) = NewDocument();
++        var div = body.OwnerDocument.CreateElement("div");
++        body.AppendChild(div);
++
++        var engine = EngineWith($"{pseudoElement} {{ color: blue; }}");
++        var cascaded = engine.GetCascadedStyle(div, pseudoElement);
++
++        Assert.Equal("blue", cascaded["color"]);
++    }
++
+     [Fact]
+     public void GetCascadedStyle_Expands_MultiValue_Pseudo_Element_Borders()
+     {
+diff --git a/Broiler.CSS.Dom/CssStyleEngine.cs b/Broiler.CSS.Dom/CssStyleEngine.cs
+index fef4833..f747153 100644
+--- a/Broiler.CSS.Dom/CssStyleEngine.cs
++++ b/Broiler.CSS.Dom/CssStyleEngine.cs
+@@ -685,7 +685,13 @@ public sealed partial class CssStyleEngine
+                 return false;
+ 
+             baseSelector = selector[..doubleColonIndex].TrimEnd();
+-            return baseSelector.Length > 0;
++            // A bare pseudo-element selector (e.g. `::backdrop`) has an empty base
++            // and is equivalent to `*::backdrop`: it targets the pseudo-element of
++            // any originating element. Match it as the universal selector rather
++            // than rejecting it (which dropped author `::backdrop { … }` rules).
++            if (baseSelector.Length == 0)
++                baseSelector = "*";
++            return true;
+         }
+ 
+         var singleColonSuffix = ":" + normalized;
+@@ -693,7 +699,9 @@ public sealed partial class CssStyleEngine
+             return false;
+ 
+         baseSelector = selector[..^singleColonSuffix.Length].TrimEnd();
+-        return baseSelector.Length > 0;
++        if (baseSelector.Length == 0)
++            baseSelector = "*";
++        return true;
+     }
+ 
+     private static bool IsPropertyAllowedForPseudoElement(string? pseudoElement, string propertyName) =>
+-- 
+2.43.0
+

@@ -21,6 +21,106 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0017-css-bare-pseudo-element-universal.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.cs`, plus a test) — a correctness fix that
+  accompanies the popover/`::backdrop` work for the css-position overlay cluster
+  (issue #1311). `TryStripPseudoElementSelector` rejected a pseudo-element
+  selector whose base compound was empty: a bare `::backdrop { … }` (equivalently
+  `*::backdrop`) returned false and its declarations were dropped, so only
+  qualified forms (`dialog::backdrop`, `.foo::backdrop`) matched. The patch
+  treats an empty base as the universal `*`, so a bare `::backdrop`/`::before`/…
+  rule matches the pseudo-element of any element. Guard:
+  `GetCascadedStyle_Matches_Bare_Pseudo_Element_As_Universal` in
+  `CssStyleEngineTests`. **Not required for the four overlay tests that are fixed
+  now** — `overlay-transition-backdrop`, `overlay-transition-finished`,
+  `overlay-transition-out-rendering`, and `replaced-object-backdrop` all use
+  *qualified* `::backdrop` selectors, which the pinned `Broiler.CSS` already
+  matches, so they render green on CI from the main-repo popover support alone.
+  This patch additionally makes bare `::backdrop` (and other bare pseudo-element)
+  rules work once applied and the `Broiler.CSS` pointer is bumped; the pointer is
+  intentionally left unbumped (unpushed — `MaiRat/Broiler.CSS` is outside session
+  scope, 403). **Active CI fallback — none needed** (the qualified-selector path
+  the overlay tests use already works).
+
+- **0016-css-color-scheme-dark-canvas.patch** → `Broiler.HTML`
+  (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs` and
+  `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes two of the
+  `css-color-adjust` dark-color-scheme "biggest problems" (issue #1311:
+  `color-scheme-root-background` and
+  `color-scheme-color-initial-affected-by-color-scheme-property`, both 0% match).
+  CSS Color Adjust §2.3: when the document root element's used color scheme is
+  dark, the UA paints the canvas backdrop the dark colour (rgb(18, 18, 18))
+  rather than white. Broiler ignored `color-scheme`, so `:root { color-scheme:
+  dark }` with no background rendered a white canvas where Chromium renders dark.
+  Both canvas-background paths now emit the dark backdrop when the root's used
+  scheme is dark (the `color-scheme` list offers `dark` but not `light`, against
+  the reference environment's light preference): `PaintWalker.EmitCanvasBackground`
+  (the Fragment/IR paint path, which the WPT runner uses) adds a dark bottom
+  layer, and `HtmlContainerInt.GetRootBackgroundColor` (the HtmlContainer paint
+  path, which `HtmlRender.RenderToImageWithStyleSet` uses) returns the dark
+  colour when nothing else propagates. A propagated root/body background still
+  paints over it, and a fully-transparent root/body leaves the dark backdrop
+  showing. This consumes the new `ComputedStyle.ColorScheme`, plumbed through
+  `Broiler.Layout` (main repo: `CssBoxProperties`, `CssUtils`, `ComputedStyle`,
+  `ComputedStyleBuilder`). The second test also needed a main-repo WPT-runner
+  alignment (committed to the main repo, active immediately): the `test()`
+  testharness stub no longer runs its body — the reference generator never loads
+  testharness, so `test` is undefined there and the bodies (one of which toggles
+  a class that flips `color-scheme`) never run before the screenshot; running
+  them advanced Broiler's captured DOM past the reference point.
+  **Active CI fallback — none.** Canvas painting lives in the `Broiler.HTML`
+  orchestration layer, consumed by the parent as compiled submodule source with
+  no interception point (like patches 0008–0015). It activates on CI when this
+  patch is applied and the `Broiler.HTML` pointer is bumped; the pointer is
+  intentionally left unbumped (the change is committed to the submodule locally
+  only, unpushed because `MaiRat/Broiler.HTML` is outside session scope). The
+  `Broiler.Layout` plumbing and the runner stub change are in the main repo and
+  active immediately. Pixel-guard tests
+  (`Root_Color_Scheme_Dark_Paints_Dark_Canvas`,
+  `Root_Color_Scheme_Light_Keeps_White_Canvas`,
+  `Root_Color_Scheme_Dark_With_Background_Uses_Background`, written against
+  `HtmlRender.RenderToImageWithStyleSet` in `RootBackgroundTests`) are held back
+  from the main repo until the pointer is bumped — they assert the dark canvas,
+  which the pinned (unpatched) submodule does not yet paint, so committing them
+  now would red the main-repo suite on CI; apply them alongside the patch.
+  Verified end-to-end via `--render`: both tests render the dark canvas
+  rgb(18, 18, 18), matching the Chromium references generated with a light OS
+  preference; they were white before. A full run of the committed WPT suite
+  showed an identical 35-test failure set before and after the whole change (no
+  regressions).
+
+- **0015-css-env-substitution-function.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`,
+  `Broiler.CSS.Dom/CssStyleEngine.Supports.cs`, plus tests) — fixes the
+  `css-env/*` "biggest problems" cluster (issue #1311: `at-supports.tentative`,
+  `fallback-nested-var.tentative`, `unknown-env-names-override-previous.tentative`,
+  all at 0% match). The `env()` substitution function was never resolved: the
+  computed-value substitution phase scanned only for `var(`, so an `env()` left
+  as a literal function token reached the renderer (which painted
+  `background-color: env(unknown)` as black instead of leaving it invalid), and
+  `@supports (background-color: env(test))` evaluated false because `env(test)`
+  is not a valid `<color>`. The patch resolves `env()` alongside `var()` (CSS
+  Environment Variables §env): a UA-defined name (the safe-area insets, `0px` in
+  a headless desktop context) substitutes its value; any other name substitutes
+  its comma-separated fallback when present (which may itself contain
+  `var()`/`env()`), and is otherwise invalid at computed-value time — the
+  guaranteed-invalid value, which resets the referencing property to its initial
+  value rather than reviving an earlier cascaded declaration. `env()` is also
+  reported as supported declaration syntax by `@supports`. Guards:
+  `Env_Unknown_Name_Falls_Back_To_Provided_Default`,
+  `Env_Unknown_Name_Resolves_Nested_Var_Fallback`,
+  `Env_Unknown_Name_Without_Fallback_Is_Invalid_And_Overrides_Previous`, and
+  `Env_Reference_Is_A_Supported_Feature_Query` in `CssStyleEngineTests`.
+  **Active CI fallback — none.** `env()`/`var()` substitution lives entirely in
+  the `Broiler.CSS` computed-value layer, which the parent repo consumes as
+  compiled submodule source with no main-repo interception point (like patches
+  0008–0014). It activates on CI when this patch is applied and the `Broiler.CSS`
+  pointer is bumped; the pointer is intentionally left unbumped (the change is
+  committed to the submodule locally only, unpushed because `MaiRat/Broiler.CSS`
+  is outside session scope). Verified end-to-end via `--render`: the three tests
+  render green, green, and white (transparent → white canvas) respectively,
+  matching the Chromium references; they were white, black, and black before.
+
 - **0014-broiler-html-display-contents-root-canvas-background.patch** →
   `Broiler.HTML` (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs`,
   `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes the

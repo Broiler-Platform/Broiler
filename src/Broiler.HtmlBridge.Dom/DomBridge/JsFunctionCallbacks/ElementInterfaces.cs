@@ -324,6 +324,32 @@ public sealed partial class DomBridge
     }
 
 
+    // Popover API (HTML §popover): showPopover() promotes the element to the top
+    // layer (so its ::backdrop renders). Modeled with the same runtime flag +
+    // top-layer order the modal-dialog path uses.
+    private JSValue JsElementInterfacesShowPopoverCore(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    {
+        GetElementRuntimeState(element).Dialog.PopoverOpen.Set(true);
+        GetElementRuntimeState(element).Dialog.TopLayerOrder.Set(++bridge._topLayerCounter);
+        bridge.InvalidateStyleScope(element);
+        return JSUndefined.Value;
+    }
+
+
+    private JSValue JsElementInterfacesHidePopoverCore(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    {
+        // CSS Position §overlay: hiding a popover whose `overlay` is transitioned
+        // with `transition-behavior: allow-discrete` keeps it in the top layer for
+        // the duration of the transition. A static render snapshots mid-transition,
+        // so the popover (and its ::backdrop) must stay rendered — leave the flag
+        // set. Without such a transition, hidePopover() removes it immediately.
+        if (!bridge.PopoverKeepsOverlayOnHide(element))
+            GetElementRuntimeState(element).Dialog.PopoverOpen.Remove();
+        bridge.InvalidateStyleScope(element);
+        return JSUndefined.Value;
+    }
+
+
     private JSValue JsElementInterfacesClose032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         element.Attributes.Remove("open");
