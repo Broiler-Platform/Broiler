@@ -1,4 +1,5 @@
 using Broiler.HTML.Image;
+using Broiler.Media.Image;
 using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.DevSite.Services;
@@ -34,6 +35,6 @@ public sealed class RenderingService
     {
         using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet(
             html, elementId, width, height, backgroundColor: BColor.White);
-        return bitmap?.Encode(Graphics.BImageEncodeFormat.Png, 100);
+        return bitmap?.Encode(ImageEncodeFormat.Png, 100);
     }
 }

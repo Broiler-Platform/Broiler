@@ -3,6 +3,8 @@
   <PropertyGroup>
     <RootNamespace>Broiler.Media.Audio.Managed</RootNamespace>
     <AssemblyName>Broiler.Media.Audio.Managed</AssemblyName>
+    <Description>Managed, cross-platform audio decoding/encoding implementation for Broiler.Media.Audio.</Description>
+    <PackageTags>broiler;media;audio;managed</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

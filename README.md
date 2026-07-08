@@ -163,6 +163,31 @@ release commit rather than approving an AI-generated summary.
 
 Component READMEs disclose AI assistance and link to commit-scoped human review records.
 
+## NuGet packages
+
+The reusable component libraries are published as NuGet packages (the
+`Broiler.Writer` and browser applications are not). Packages are versioned in
+lockstep during the preview (currently `0.1.0-preview.1`, a prerelease) and are
+licensed under Apache-2.0.
+
+Install a component — for example the layout engine or the full UI toolkit:
+
+```bash
+dotnet add package Broiler.Layout --prerelease
+dotnet add package Broiler.UI.All --prerelease      # meta-package: the whole UI toolkit
+```
+
+Meta-packages `Broiler.Media.All`, `Broiler.Input.All`, and `Broiler.UI.All`
+pull in an entire family; individual packages (e.g. `Broiler.UI.Button`,
+`Broiler.Media.Image.Managed`) are available for a leaner dependency set.
+Platform-specific backends ship as their own packages (`*.Windows`, `*.Linux`,
+`Broiler.Media.Video.MediaFoundation`).
+
+Packaging is built from a single vendored `eng/Broiler.Packaging.props` per
+component; see [docs/roadmap/nuget-packaging-roadmap.md](docs/roadmap/nuget-packaging-roadmap.md)
+and [CHANGELOG.md](CHANGELOG.md). Public release is gated on the per-component
+`HUMAN_REVIEW.md` records.
+
 ## License
 
 Except where a file or third-party notice says otherwise, Broiler's current project work

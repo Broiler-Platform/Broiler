@@ -11,7 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
-    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
   </ItemGroup>
 
 </Project>

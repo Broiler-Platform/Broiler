@@ -1,21 +1,28 @@
 using System.Runtime.Versioning;
 using Broiler.Graphics;
 using Broiler.Graphics.Windows;
+using Broiler.Input;
 using Broiler.Input.Keyboard;
+using Broiler.Input.Keyboard.Windows;
+using Broiler.Input.Mouse;
+using Broiler.Input.Mouse.Windows;
+using Broiler.Input.Windows;
 using Broiler.UI;
-using Broiler.UI.Standard;
 
 namespace Broiler.App.Graphics;
 
 [SupportedOSPlatform("windows7.0")]
-internal sealed class BrowserWindow : Direct2DWindow
+internal sealed class BrowserWindow : Direct2DWindow, IWindowsInputHost
 {
     private readonly BrowserUiHost _host;
     private readonly BrowserApp _app;
-
-#pragma warning disable CS0618
-    private readonly StandardLegacyGraphicsInputAdapter _legacyInput = new("broiler-browser");
-#pragma warning restore CS0618
+    private readonly WindowsInputMessageDispatcher _inputDispatcher;
+    private readonly WindowsKeyboardProvider _keyboardProvider;
+    private readonly WindowsMouseProvider _mouseProvider;
+    private readonly WindowsKeyboardInputDevice _keyboard;
+    private readonly WindowsMouseInputDevice _mouse;
+    private readonly WindowsInputMessageSubscription[] _inputSubscriptions;
+    private int _hostThreadId = Environment.CurrentManagedThreadId;
 
     public BrowserWindow(string? initialUrl)
         : base(new BWindowOptions
@@ -34,6 +41,41 @@ internal sealed class BrowserWindow : Direct2DWindow
             static _ => { },
             PostToUiThread);
         _app = new BrowserApp(_host, () => Renderer, initialUrl, SetAnimationActive);
+        _inputDispatcher = new WindowsInputMessageDispatcher(this);
+        _keyboardProvider = new WindowsKeyboardProvider();
+        _mouseProvider = new WindowsMouseProvider();
+        _keyboard = OpenDefaultKeyboard(_keyboardProvider);
+        _mouse = OpenDefaultMouse(_mouseProvider);
+        _inputSubscriptions =
+        [
+            _inputDispatcher.AddSink(_keyboardProvider),
+            _inputDispatcher.AddSink(_mouseProvider),
+            _inputDispatcher.AddSink(_keyboard),
+            _inputDispatcher.AddSink(_mouse),
+        ];
+
+        _keyboard.KeyChanged += OnKeyboardKeyChanged;
+        _keyboard.TextInput += OnKeyboardTextInput;
+        _mouse.Moved += OnMouseMoved;
+        _mouse.ButtonChanged += OnMouseButtonChanged;
+        _mouse.WheelChanged += OnMouseWheelChanged;
+    }
+
+    public event Action<WindowsInputMessage>? MessageReceived;
+
+    public IntPtr MessageWindowHandle => RenderNativeHandle != IntPtr.Zero ? RenderNativeHandle : NativeHandle;
+
+    public bool IsOnHostThread => Environment.CurrentManagedThreadId == _hostThreadId;
+
+    public bool TryPost(Action callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        return PostToUiThread(callback);
+    }
+
+    protected override void OnCreated()
+    {
+        _hostThreadId = Environment.CurrentManagedThreadId;
     }
 
     protected override BRenderList? BuildRenderList(BSize clientSize) => _app.RenderFrame();
@@ -47,31 +89,27 @@ internal sealed class BrowserWindow : Direct2DWindow
 
     protected override void OnAnimationTick() => _app.StepAnimation();
 
-    protected override void OnPointerDown(BPointerEventArgs e) =>
-        Dispatch(_legacyInput.FromPointerButton(e));
-
-    protected override void OnPointerMove(BPointerEventArgs e) =>
-        Dispatch(_legacyInput.FromPointerMove(e));
-
-    protected override void OnPointerUp(BPointerEventArgs e) =>
-        Dispatch(_legacyInput.FromPointerButton(e));
-
-    protected override void OnMouseWheel(BMouseWheelEventArgs e) =>
-        Dispatch(_legacyInput.FromMouseWheel(e));
-
-    protected override void OnKeyDown(BKeyEventArgs e) =>
-        Dispatch(_legacyInput.FromKey(e, KeyboardKeyTransition.Down));
-
-    protected override void OnKeyUp(BKeyEventArgs e) =>
-        Dispatch(_legacyInput.FromKey(e, KeyboardKeyTransition.Up));
-
-    protected override void OnTextInput(BTextInputEventArgs e) =>
-        Dispatch(_legacyInput.FromText(e));
+    protected override void OnNativeWindowMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam) =>
+        MessageReceived?.Invoke(new WindowsInputMessage(hwnd, message, wParam, lParam));
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
+        {
+            _keyboard.KeyChanged -= OnKeyboardKeyChanged;
+            _keyboard.TextInput -= OnKeyboardTextInput;
+            _mouse.Moved -= OnMouseMoved;
+            _mouse.ButtonChanged -= OnMouseButtonChanged;
+            _mouse.WheelChanged -= OnMouseWheelChanged;
+
+            foreach (WindowsInputMessageSubscription subscription in _inputSubscriptions)
+                subscription.Dispose();
+
+            _inputDispatcher.Dispose();
+            _keyboard.Dispose();
+            _mouse.Dispose();
             _app.Dispose();
+        }
 
         base.Dispose(disposing);
     }
@@ -86,4 +124,47 @@ internal sealed class BrowserWindow : Direct2DWindow
             StopAnimationTimer();
     }
 
+    private void OnKeyboardKeyChanged(KeyboardKeyEvent input) =>
+        Dispatch(UiInputEvent.FromKeyboardKey(input));
+
+    private void OnKeyboardTextInput(KeyboardTextEvent input) =>
+        Dispatch(UiInputEvent.FromKeyboardText(input));
+
+    private void OnMouseMoved(MouseMoveEvent input) =>
+        Dispatch(UiInputEvent.FromMouseMove(input with { Position = ToClientDip(input.Position) }));
+
+    private void OnMouseButtonChanged(MouseButtonEvent input) =>
+        Dispatch(UiInputEvent.FromMouseButton(input with { Position = ToClientDip(input.Position) }));
+
+    private void OnMouseWheelChanged(MouseWheelEvent input) =>
+        Dispatch(UiInputEvent.FromMouseWheel(input with { Position = ToClientDip(input.Position) }));
+
+    private InputPoint ToClientDip(InputPoint point)
+    {
+        if (string.Equals(point.CoordinateSpace, "client-dip", StringComparison.Ordinal))
+            return point;
+
+        if (!string.Equals(point.CoordinateSpace, "client-pixels", StringComparison.Ordinal))
+            return point;
+
+        double scale = DpiScale;
+        if (scale <= 0 || double.IsNaN(scale) || double.IsInfinity(scale))
+            scale = 1;
+
+        return InputPoint.ClientDeviceIndependentPixels(point.X / scale, point.Y / scale);
+    }
+
+    private static WindowsKeyboardInputDevice OpenDefaultKeyboard(WindowsKeyboardProvider provider)
+    {
+        WindowsKeyboardInputDevice device = provider.OpenDefaultAsync(new KeyboardOpenOptions()).GetAwaiter().GetResult();
+        device.StartAsync().GetAwaiter().GetResult();
+        return device;
+    }
+
+    private static WindowsMouseInputDevice OpenDefaultMouse(WindowsMouseProvider provider)
+    {
+        WindowsMouseInputDevice device = provider.OpenDefaultAsync(new MouseOpenOptions()).GetAwaiter().GetResult();
+        device.StartAsync().GetAwaiter().GetResult();
+        return device;
+    }
 }

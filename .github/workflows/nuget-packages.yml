@@ -1,0 +1,129 @@
+name: NuGet Packages
+
+# Packs the Broiler component libraries into NuGet packages and (on a release
+# tag) publishes them. See docs/roadmap/nuget-packaging-roadmap.md.
+#
+#   * Any push / manual run  -> pack + upload artifact (no publish).
+#   * Tag  nuget-v*          -> pack, then publish to GitHub Packages (preview
+#                              feed) and attempt nuget.org (gated by human review).
+#   * Manual dispatch        -> choose the publish target explicitly.
+#
+# Submodule component packages (DOM/CSS/Graphics/HTML/JS) publish from their own
+# repos once patches 0011-0015 land and their pointers are bumped; this workflow
+# packs the in-tree components (Layout, Documents, Media, Input, UI) plus metas.
+
+on:
+  push:
+    tags:
+      - 'nuget-v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish target'
+        required: true
+        default: 'none'
+        type: choice
+        options: [none, github, nuget]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: nuget-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  NUGET_DIR: ${{ github.workspace }}/artifacts/nupkg
+
+jobs:
+  pack:
+    name: Pack
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Pack
+        shell: pwsh
+        run: ./scripts/pack-all.ps1 -Output $env:NUGET_DIR
+
+      - name: Upload packages artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuget-packages
+          path: |
+            ${{ env.NUGET_DIR }}/*.nupkg
+            ${{ env.NUGET_DIR }}/*.snupkg
+          if-no-files-found: error
+
+  publish-github:
+    name: Publish to GitHub Packages (preview)
+    runs-on: ubuntu-24.04
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/nuget-v') || github.event.inputs.publish == 'github'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: nuget-packages
+          path: nupkg
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Push to GitHub Packages
+        shell: pwsh
+        run: |
+          dotnet nuget push "nupkg/*.nupkg" `
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            --api-key "${{ secrets.GITHUB_TOKEN }}" `
+            --skip-duplicate
+
+  publish-nuget:
+    name: Publish to NuGet.org (gated)
+    runs-on: ubuntu-24.04
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/nuget-v') || github.event.inputs.publish == 'nuget'
+    environment: nuget-release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Human-review gate
+        shell: pwsh
+        run: ./scripts/check-publish-approval.ps1
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: nuget-packages
+          path: nupkg
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Push to NuGet.org
+        shell: pwsh
+        run: |
+          dotnet nuget push "nupkg/*.nupkg" `
+            --source "https://api.nuget.org/v3/index.json" `
+            --api-key "${{ secrets.NUGET_API_KEY }}" `
+            --skip-duplicate

@@ -1,5 +1,6 @@
 using Broiler.DevSite.Services;
 using Broiler.HTML.Image;
+using Broiler.Media.Image;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Broiler.DevSite.Pages;
@@ -66,5 +67,5 @@ public class CompareModel : PageModel
     }
 
     private static string BitmapToBase64(BBitmap bitmap) =>
-        Convert.ToBase64String(bitmap.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        Convert.ToBase64String(bitmap.Encode(ImageEncodeFormat.Png, 100));
 }

@@ -5,11 +5,16 @@ Date: 2026-07-03
 This inventory records the image-related public surface in `Broiler.Graphics`
 before media extraction. It is a Phase 0 baseline, not the target Media API.
 
+Implementation update: the Graphics codec facade and in-tree codec
+implementations listed here have since been removed from both `Broiler.Graphics`
+checkouts. Graphics image load/save helpers now route through
+`Broiler.Media.Image.Managed`.
+
 ## Public image codec/data types
 
 Source folder: `Broiler.Graphics/Broiler.Graphics/Imaging`.
 
-| Type | Current role | Phase target |
+| Type | Phase 0 role | Implemented target |
 | --- | --- | --- |
 | `BPixelBuffer` | Tightly packed RGBA8 decoded pixel buffer | Move/replace with `ImageBuffer` in `Broiler.Media.Image` |
 | `BImageFrame` | One composited image animation frame plus rational delay | Move/replace with `ImageFrame` in `Broiler.Media.Image` |
@@ -105,9 +110,10 @@ Source folder: `Broiler.Graphics/Broiler.Graphics/Imaging`.
 - `static BBitmap Decode(Stream stream)`
 - `static BBitmap Decode(string path)`
 
-## Codec implementation files
+## Removed codec implementation files
 
-Current managed codec implementation files:
+Graphics-owned managed codec implementation files removed during the Media
+handoff:
 
 - `BImageCodec.cs`
 - `IBImageCodec.cs`
@@ -130,9 +136,9 @@ Current managed codec implementation files:
 - `Jpeg/JpegOptimalHuffman.cs`
 - `Jpeg/JpegTables.cs`
 
-## Direct consumers found
+## Original direct consumers found
 
-Representative source references found with `rg`:
+Representative Phase 0 source references found with `rg` before migration:
 
 | Consumer | Current image dependency |
 | --- | --- |
@@ -152,6 +158,10 @@ Representative source references found with `rg`:
 | `src/Broiler.Engines.Baseline` | Encodes rendered images for baseline checks |
 | `src/Broiler.Cli.Tests` | Uses encode/decode, data URI images, output files, and pixel comparisons |
 
+Current implementation note: app-facing image encode/decode call sites use
+`Broiler.Media.Image.ImageEncodeFormat` and the managed Media codec catalog.
+Graphics renderers decode encoded image bytes through Media before upload.
+
 ## Project-reference notes
 
 - `Broiler.HTML/Source` projects that reference Graphics resolve to the aggregate
@@ -161,4 +171,3 @@ Representative source references found with `rg`:
   source copy.
 - Phase 1 should add Media projects only under the new root `Broiler.Media`
   component and should not cut existing consumers over.
-

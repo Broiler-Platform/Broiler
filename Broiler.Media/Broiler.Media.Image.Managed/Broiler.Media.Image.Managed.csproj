@@ -3,6 +3,8 @@
   <PropertyGroup>
     <RootNamespace>Broiler.Media.Image.Managed</RootNamespace>
     <AssemblyName>Broiler.Media.Image.Managed</AssemblyName>
+    <Description>Managed, cross-platform image codec implementation for Broiler.Media.Image.</Description>
+    <PackageTags>broiler;media;image;managed</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -12,6 +12,7 @@ using Broiler.CSS;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.Media.Image;
 
 namespace Broiler.Cli;
 
@@ -331,8 +332,8 @@ public class CaptureService
         html = HtmlPostProcessor.Process(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
-            ? Graphics.BImageEncodeFormat.Jpeg
-            : Graphics.BImageEncodeFormat.Png;
+            ? ImageEncodeFormat.Jpeg
+            : ImageEncodeFormat.Png;
 
         // Extract fragment identifier (e.g. "#top") for anchor-based rendering.
         string? fragment = uri.Fragment;
@@ -363,7 +364,7 @@ public class CaptureService
     /// viewport-sized region starting at the anchor's Y position.
     /// </summary>
     private static void RenderAtAnchor(string html, string elementId, ImageCaptureOptions options,
-        Broiler.Graphics.BImageEncodeFormat format)
+        ImageEncodeFormat format)
     {
         using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet(
             html,

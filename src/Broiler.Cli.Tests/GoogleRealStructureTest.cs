@@ -1,4 +1,5 @@
 using Broiler.HTML.Image;
+using Broiler.Media.Image;
 using Xunit.Abstractions;
 
 namespace Broiler.Cli.Tests;
@@ -45,7 +46,7 @@ public class GoogleRealStructureTest
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 200);
-        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_buttons.png"), bmp.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_buttons.png"), bmp.Encode(ImageEncodeFormat.Png, 100));
         
         // Analyze button area (y=30-100)
         int btnLeft = bmp.Width, btnRight = 0;
@@ -124,7 +125,7 @@ a{color:#4b11a8;text-decoration:none}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 600);
-        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_fullpage.png"), bmp.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_fullpage.png"), bmp.Encode(ImageEncodeFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (roughly y=200-350)
         int darkPixels = 0;
@@ -253,7 +254,7 @@ a{color:#4b11a8;text-decoration:none}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 120);
-        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"), bmp.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"), bmp.Encode(ImageEncodeFormat.Png, 100));
 
         int darkPixels = 0;
         for (int y = 0; y < bmp.Height; y++)
@@ -371,7 +372,7 @@ input{font-family:inherit}
 </body></html>";
 
         using var bmp = HtmlRender.RenderToImageWithStyleSet(html, 800, 200);
-        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_real_html.png"), bmp.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "google_real_html.png"), bmp.Encode(ImageEncodeFormat.Png, 100));
 
         // Check for dark (text) pixels in the button area (y=30-100)
         int darkInBtnArea = 0;

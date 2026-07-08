@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Gfx = Broiler.Graphics;
 using Spec = Broiler.Media.Image.Managed.Tests.PngFormatBuilder.ApngFrameSpec;
 
 namespace Broiler.Media.Image.Managed.Tests;
@@ -12,19 +11,25 @@ internal static class Program
     private const string ProgressiveGradientBase64 =
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDIBCQkJDAsMGA0NGDIhHCEyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv/CABEIAEAAYAMBIgACEQEDEQH/xABXAAEBAQAAAAAAAAAAAAAAAAADBgIQAQADAAAAAAAAAAAAAAAAAAABA2EBAQEBAQEAAAAAAAAAAAAAAAIEBQYBEQEBAQEBAAAAAAAAAAAAAAAAAgERQP/aAAwDAQACEQMRAAABhUZPCKMjoFGRUgjo6QR9qgUZHTPIyZ3DijI6BRkVIoyOkUZFQKMjpnkZM/hx26KgEdHSCOipBGR0CjIqZ5GTP4cUZFQKMjpFGRUijI6BRkVP/9oADAMBAAIRAxEAABAIELDfz704w8ABPDL37y8wIEL/2gAIAQEAAT8BitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRWitFaK0VorRW/9oACAECEQE/Aeuuuuuuuuuuuuuuuuuuuuuuuv/aAAgBAxEBPwGbTabTabTabTabTabTabTabTabTabTabTabTb/2gAIAQEAAT8QyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJkyZMmTJk/9oACAECEQE/EMMMMMMMMMMMMMMMMMMMMMMMMP/aAAgBAxEBPxD0f/8A/wD/AP8A/wD/AP/Z";
 
+    private const string LossyWebpOneByOneBase64 =
+        "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA";
+
     private static async Task<int> Main()
     {
         var tests = new List<(string Name, Func<ValueTask> Body)>
         {
-            ("Managed image provider exposes PNG, JPEG and BMP codecs", ProviderExposesCodecs),
+            ("Managed image provider exposes PNG, JPEG, BMP, GIF and WebP codecs", ProviderExposesCodecs),
             ("Catalog selects concrete managed codecs by signature", CatalogSelectsBySignature),
-            ("PNG encode bytes match Graphics baseline", PngEncodeMatchesGraphics),
-            ("BMP encode bytes match Graphics baseline", BmpEncodeMatchesGraphics),
-            ("JPEG encode bytes match Graphics baseline", JpegEncodeMatchesGraphics),
-            ("PNG grayscale, palette, tRNS and Adam7 decode match Graphics", PngVariantsDecodeLikeGraphics),
-            ("APNG blend/dispose/timing decode matches Graphics", ApngDecodeMatchesGraphics),
-            ("APNG encode bytes and decoded frames match Graphics", ApngEncodeMatchesGraphics),
-            ("Progressive JPEG fixture decodes like Graphics", ProgressiveJpegMatchesGraphics),
+            ("GIF fixtures decode and roundtrip", GifFixturesDecodeAndRoundTrip),
+            ("WebP lossless fixtures decode and roundtrip", WebpLosslessFixturesDecodeAndRoundTrip),
+            ("WebP lossy VP8 fixture decodes through runtime codec", WebpLossyVp8FixtureDecodes),
+            ("PNG encode is deterministic and roundtrips", PngEncodeRoundTrips),
+            ("BMP encode is deterministic and roundtrips", BmpEncodeRoundTrips),
+            ("JPEG encode is deterministic and decodes", JpegEncodeDecodes),
+            ("PNG grayscale, palette, tRNS and Adam7 fixtures decode", PngVariantsDecode),
+            ("APNG blend/dispose/timing fixtures decode", ApngFixturesDecode),
+            ("APNG encode bytes and decoded frames roundtrip", ApngEncodeRoundTrips),
+            ("Progressive JPEG fixture decodes", ProgressiveJpegDecodes),
             ("Malformed PNG CRC is rejected", MalformedPngRejected),
             ("Encoded input limit is enforced", EncodedInputLimitEnforced),
             ("Still codecs reject animated encode", StillCodecsRejectAnimatedEncode),
@@ -58,10 +63,12 @@ internal static class Program
     private static ValueTask ProviderExposesCodecs()
     {
         IReadOnlyList<ImageCodec> codecs = ManagedImageCodecs.CreateCodecs();
-        Assert.Equal(3, codecs.Count);
+        Assert.Equal(5, codecs.Count);
         Assert.True(codecs[0] is PngImageCodec, "PNG should be the first managed image codec.");
         Assert.True(codecs[1] is JpegImageCodec, "JPEG should be the second managed image codec.");
         Assert.True(codecs[2] is BmpImageCodec, "BMP should be the third managed image codec.");
+        Assert.True(codecs[3] is GifImageCodec, "GIF should be the fourth managed image codec.");
+        Assert.True(codecs[4] is WebpImageCodec, "WebP should be the fifth managed image codec.");
         return ValueTask.CompletedTask;
     }
 
@@ -72,47 +79,165 @@ internal static class Program
         byte[] png = new PngImageCodec().Encode(src);
         byte[] jpeg = new JpegImageCodec().Encode(src, quality: 90);
         byte[] bmp = new BmpImageCodec().Encode(src);
+        byte[] gif = new GifImageCodec().Encode(src);
+        byte[] webp = new WebpImageCodec().Encode(src);
 
         Assert.True((await SelectAsync(catalog, png).ConfigureAwait(false))?.Codec is PngImageCodec);
         Assert.True((await SelectAsync(catalog, jpeg).ConfigureAwait(false))?.Codec is JpegImageCodec);
         Assert.True((await SelectAsync(catalog, bmp).ConfigureAwait(false))?.Codec is BmpImageCodec);
+        Assert.True((await SelectAsync(catalog, gif).ConfigureAwait(false))?.Codec is GifImageCodec);
+        Assert.True((await SelectAsync(catalog, webp).ConfigureAwait(false))?.Codec is WebpImageCodec);
         Assert.True(await SelectAsync(catalog, [0, 1, 2, 3]).ConfigureAwait(false) is null);
     }
 
-    private static ValueTask PngEncodeMatchesGraphics()
+    private static ValueTask GifFixturesDecodeAndRoundTrip()
+    {
+        byte[] blackOneByOne =
+        [
+            0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+            0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF,
+            0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+            0x02, 0x02, 0x44, 0x01, 0x00, 0x3B,
+        ];
+        byte[] transparentOneByOne =
+        [
+            0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+            0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF,
+            0x21, 0xF9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00,
+            0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+            0x02, 0x02, 0x44, 0x01, 0x00, 0x3B,
+        ];
+
+        var codec = new GifImageCodec();
+        Assert.BytesEqual([0, 0, 0, 255], codec.Decode(blackOneByOne).Rgba, "GIF black fixture pixels");
+        Assert.BytesEqual([0, 0, 0, 0], codec.Decode(transparentOneByOne).Rgba, "GIF transparent fixture pixels");
+
+        ImageBuffer still = new(2, 2,
+        [
+            255, 0, 0, 255, 0, 255, 0, 255,
+            0, 0, 255, 255, 255, 255, 255, 255,
+        ]);
+        byte[] encodedStill = codec.Encode(still);
+        ImageBuffer decodedStill = codec.Decode(encodedStill);
+        Assert.Equal(2, decodedStill.Width, "GIF still width");
+        Assert.Equal(2, decodedStill.Height, "GIF still height");
+        Assert.BytesEqual(still.Rgba, decodedStill.Rgba, "GIF still roundtrip pixels");
+
+        ImageSequence animated = new(
+            [
+                new ImageFrame(FillImage(2, 2, 255, 0, 0, 255), 3, 100),
+                new ImageFrame(FillImage(2, 2, 0, 0, 255, 255), 7, 100),
+            ],
+            2,
+            2,
+            loopCount: 0);
+        ImageSequence decodedAnimation = codec.DecodeAnimation(codec.EncodeAnimation(animated));
+        Assert.True(decodedAnimation.IsAnimated, "GIF animation should decode as animated.");
+        Assert.Equal(0, decodedAnimation.LoopCount, "GIF animation loop count");
+        Assert.Equal(3, decodedAnimation.Frames[0].DelayNumerator, "GIF frame 0 delay");
+        Assert.Equal(7, decodedAnimation.Frames[1].DelayNumerator, "GIF frame 1 delay");
+        Assert.BytesEqual(animated.Frames[0].Pixels.Rgba, decodedAnimation.Frames[0].Pixels.Rgba, "GIF frame 0 pixels");
+        Assert.BytesEqual(animated.Frames[1].Pixels.Rgba, decodedAnimation.Frames[1].Pixels.Rgba, "GIF frame 1 pixels");
+        return ValueTask.CompletedTask;
+    }
+
+    private static async ValueTask WebpLosslessFixturesDecodeAndRoundTrip()
+    {
+        var codec = new WebpImageCodec();
+        ImageBuffer still = MakeGradient(8, 8);
+        byte[] encodedStill = codec.Encode(still);
+        Assert.True(WebpDecoder.IsWebp(encodedStill), "Encoded WebP should have a RIFF/WEBP signature.");
+        ImageBuffer decodedStill = codec.Decode(encodedStill);
+        Assert.Equal(still.Width, decodedStill.Width, "WebP still width");
+        Assert.Equal(still.Height, decodedStill.Height, "WebP still height");
+        Assert.BytesEqual(still.Rgba, decodedStill.Rgba, "WebP still roundtrip pixels");
+
+        using var output = new MemoryStream();
+        await codec.EncodeAsync(ImageSequence.Static(still), output, new ImageEncodeOptions(ImageEncodeFormat.WebP)).ConfigureAwait(false);
+        Assert.BytesEqual(encodedStill, output.ToArray(), "WebP async encode bytes");
+
+        ImageSequence animated = new(
+            [
+                new ImageFrame(FillImage(3, 2, 255, 32, 16, 255), 1, 10),
+                new ImageFrame(FillImage(3, 2, 16, 32, 255, 128), 7, 100),
+            ],
+            3,
+            2,
+            loopCount: 2);
+        ImageSequence decodedAnimation = codec.DecodeAnimation(codec.EncodeAnimation(animated));
+        Assert.True(decodedAnimation.IsAnimated, "WebP animation should decode as animated.");
+        Assert.Equal(2, decodedAnimation.LoopCount, "WebP animation loop count");
+        Assert.Equal(100, decodedAnimation.Frames[0].DelayNumerator, "WebP frame 0 delay ms");
+        Assert.Equal(1000, decodedAnimation.Frames[0].DelayDenominator, "WebP frame 0 delay denominator");
+        Assert.Equal(70, decodedAnimation.Frames[1].DelayNumerator, "WebP frame 1 delay ms");
+        Assert.BytesEqual(animated.Frames[0].Pixels.Rgba, decodedAnimation.Frames[0].Pixels.Rgba, "WebP frame 0 pixels");
+        Assert.BytesEqual(animated.Frames[1].Pixels.Rgba, decodedAnimation.Frames[1].Pixels.Rgba, "WebP frame 1 pixels");
+    }
+
+    private static async ValueTask WebpLossyVp8FixtureDecodes()
+    {
+        byte[] webp = Convert.FromBase64String(LossyWebpOneByOneBase64);
+        var catalog = new MediaCodecCatalog(ManagedImageCodecs.CreateCodecs());
+        Assert.True((await SelectAsync(catalog, webp).ConfigureAwait(false))?.Codec is WebpImageCodec);
+
+        var codec = new WebpImageCodec();
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Throws<NotSupportedException>(() => codec.Decode(webp));
+            return;
+        }
+
+        ImageBuffer decoded = codec.Decode(webp);
+        Assert.Equal(1, decoded.Width, "lossy WebP fixture width");
+        Assert.Equal(1, decoded.Height, "lossy WebP fixture height");
+        Assert.Equal(4, decoded.Rgba.Length, "lossy WebP fixture pixel byte length");
+        Assert.Equal(255, decoded.Rgba[3], "lossy WebP fixture alpha");
+    }
+
+    private static ValueTask PngEncodeRoundTrips()
     {
         ImageBuffer src = MakeGradient(37, 19);
-        byte[] media = new PngImageCodec().Encode(src);
-        byte[] graphics = Gfx.ManagedImageCodec.Instance.Encode(ToGraphics(src), Gfx.BImageEncodeFormat.Png);
+        var codec = new PngImageCodec();
+        byte[] first = codec.Encode(src);
+        byte[] second = codec.Encode(src);
 
-        Assert.BytesEqual(graphics, media, "PNG encoder bytes should match the Graphics baseline.");
-        CompareStillDecode(media);
+        Assert.BytesEqual(first, second, "PNG encoder should be deterministic.");
+        ComparePixels(src, codec.Decode(first));
+        CompareStillDecode(first, src);
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask BmpEncodeMatchesGraphics()
+    private static ValueTask BmpEncodeRoundTrips()
     {
         ImageBuffer src = MakeGradient(40, 24);
-        byte[] media = new BmpImageCodec().Encode(src);
-        byte[] graphics = Gfx.ManagedImageCodec.Instance.Encode(ToGraphics(src), Gfx.BImageEncodeFormat.Bmp);
+        var codec = new BmpImageCodec();
+        byte[] first = codec.Encode(src);
+        byte[] second = codec.Encode(src);
 
-        Assert.BytesEqual(graphics, media, "BMP encoder bytes should match the Graphics baseline.");
-        CompareStillDecode(media);
+        Assert.BytesEqual(first, second, "BMP encoder should be deterministic.");
+        ComparePixels(src, codec.Decode(first));
+        CompareStillDecode(first, src);
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask JpegEncodeMatchesGraphics()
+    private static ValueTask JpegEncodeDecodes()
     {
         ImageBuffer src = MakeGradient(64, 48);
-        byte[] media = new JpegImageCodec().Encode(src, quality: 90);
-        byte[] graphics = Gfx.ManagedImageCodec.Instance.Encode(ToGraphics(src), Gfx.BImageEncodeFormat.Jpeg, quality: 90);
+        var codec = new JpegImageCodec();
+        byte[] first = codec.Encode(src, quality: 90);
+        byte[] second = codec.Encode(src, quality: 90);
 
-        Assert.BytesEqual(graphics, media, "JPEG encoder bytes should match the Graphics baseline.");
-        CompareStillDecode(media);
+        Assert.BytesEqual(first, second, "JPEG encoder should be deterministic.");
+        ImageBuffer decoded = codec.Decode(first);
+        Assert.Equal(src.Width, decoded.Width, "JPEG width");
+        Assert.Equal(src.Height, decoded.Height, "JPEG height");
+        CompareStillDecode(first);
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask PngVariantsDecodeLikeGraphics()
+    private static ValueTask PngVariantsDecode()
     {
         var fixtures = new List<byte[]>
         {
@@ -128,12 +253,19 @@ internal static class Program
         fixtures.Add(PngFormatBuilder.BuildInterlacedRgba(adam7.Width, adam7.Height, adam7.Rgba));
 
         foreach (byte[] fixture in fixtures)
-            CompareStillDecode(fixture);
+        {
+            ImageSequence sequence = DecodeStillViaCatalog(fixture);
+            Assert.False(sequence.IsAnimated, "PNG variant should decode as a still image.");
+            Assert.True(sequence.Width > 0, "PNG variant width");
+            Assert.True(sequence.Height > 0, "PNG variant height");
+        }
+
+        CompareStillDecode(fixtures[^1], adam7);
 
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask ApngDecodeMatchesGraphics()
+    private static ValueTask ApngFixturesDecode()
     {
         var cases = new List<IReadOnlyList<Spec>>
         {
@@ -162,28 +294,36 @@ internal static class Program
         };
 
         foreach (IReadOnlyList<Spec> frames in cases)
-            CompareAnimationDecode(PngFormatBuilder.BuildApng(4, 4, numPlays: 5, frames));
+        {
+            ImageSequence sequence = new PngImageCodec().DecodeAnimation(PngFormatBuilder.BuildApng(4, 4, numPlays: 5, frames));
+            Assert.Equal(4, sequence.Width, "APNG width");
+            Assert.Equal(4, sequence.Height, "APNG height");
+            Assert.Equal(5, sequence.LoopCount, "APNG loop count");
+            Assert.Equal(frames.Count, sequence.Frames.Count, "APNG frame count");
+        }
 
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask ApngEncodeMatchesGraphics()
+    private static ValueTask ApngEncodeRoundTrips()
     {
         ImageSequence mediaSequence = MakeSequence(6, 5, loop: 3, (1, 10), (2, 10), (5, 100));
-        Gfx.BImageSequence graphicsSequence = ToGraphics(mediaSequence);
+        var codec = new PngImageCodec();
+        byte[] first = codec.EncodeAnimation(mediaSequence);
+        byte[] second = codec.EncodeAnimation(mediaSequence);
 
-        byte[] media = new PngImageCodec().EncodeAnimation(mediaSequence);
-        byte[] graphics = Gfx.ManagedImageCodec.Instance.EncodeAnimation(graphicsSequence);
-
-        Assert.BytesEqual(graphics, media, "APNG encoder bytes should match the Graphics baseline.");
-        CompareAnimationDecode(media);
+        Assert.BytesEqual(first, second, "APNG encoder should be deterministic.");
+        CompareSequences(mediaSequence, codec.DecodeAnimation(first));
         return ValueTask.CompletedTask;
     }
 
-    private static ValueTask ProgressiveJpegMatchesGraphics()
+    private static ValueTask ProgressiveJpegDecodes()
     {
         byte[] jpeg = Convert.FromBase64String(ProgressiveGradientBase64);
-        CompareStillDecode(jpeg);
+        ImageSequence sequence = DecodeStillViaCatalog(jpeg);
+        Assert.False(sequence.IsAnimated, "Progressive JPEG should decode as a still image.");
+        Assert.True(sequence.Width > 0, "Progressive JPEG width");
+        Assert.True(sequence.Height > 0, "Progressive JPEG height");
         return ValueTask.CompletedTask;
     }
 
@@ -236,42 +376,43 @@ internal static class Program
         return await catalog.SelectAsync(MediaKind.Image, input).ConfigureAwait(false);
     }
 
-    private static void CompareStillDecode(byte[] encoded)
+    private static void CompareStillDecode(byte[] encoded, ImageBuffer? expected = null)
     {
-        Gfx.BPixelBuffer oldPixels = Gfx.ManagedImageCodec.Instance.Decode(encoded);
+        ImageSequence sequence = DecodeStillViaCatalog(encoded);
 
+        Assert.False(sequence.IsAnimated, "Still decode should produce a single frame.");
+        if (expected is not null)
+            ComparePixels(expected, sequence.FirstFrame);
+    }
+
+    private static ImageSequence DecodeStillViaCatalog(byte[] encoded)
+    {
         var catalog = new MediaCodecCatalog(ManagedImageCodecs.CreateCodecs());
         using var input = new MediaInput(new MemoryStream(encoded), leaveOpen: false);
         ImageCodec codec = (ImageCodec)catalog.SelectAsync(MediaKind.Image, input).AsTask().GetAwaiter().GetResult()!.Codec;
 
         using var decodeInput = new MediaInput(new MemoryStream(encoded), leaveOpen: false);
-        ImageSequence sequence = codec.DecodeAsync(decodeInput).AsTask().GetAwaiter().GetResult();
-
-        Assert.False(sequence.IsAnimated, "Still decode should produce a single frame.");
-        ComparePixels(oldPixels, sequence.FirstFrame);
+        return codec.DecodeAsync(decodeInput).AsTask().GetAwaiter().GetResult();
     }
 
-    private static void CompareAnimationDecode(byte[] encoded)
+    private static void CompareSequences(ImageSequence expected, ImageSequence actual)
     {
-        Gfx.BImageSequence oldSequence = Gfx.ManagedImageCodec.Instance.DecodeAnimation(encoded);
-        ImageSequence newSequence = new PngImageCodec().DecodeAnimation(encoded);
+        Assert.Equal(expected.Width, actual.Width, "animation width");
+        Assert.Equal(expected.Height, actual.Height, "animation height");
+        Assert.Equal(expected.LoopCount, actual.LoopCount, "animation loop count");
+        Assert.Equal(expected.Frames.Count, actual.Frames.Count, "animation frame count");
 
-        Assert.Equal(oldSequence.Width, newSequence.Width, "animation width");
-        Assert.Equal(oldSequence.Height, newSequence.Height, "animation height");
-        Assert.Equal(oldSequence.LoopCount, newSequence.LoopCount, "animation loop count");
-        Assert.Equal(oldSequence.Frames.Count, newSequence.Frames.Count, "animation frame count");
-
-        for (int i = 0; i < oldSequence.Frames.Count; i++)
+        for (int i = 0; i < expected.Frames.Count; i++)
         {
-            Gfx.BImageFrame oldFrame = oldSequence.Frames[i];
-            ImageFrame newFrame = newSequence.Frames[i];
-            Assert.Equal(oldFrame.DelayNumerator, newFrame.DelayNumerator, $"frame {i} delay numerator");
-            Assert.Equal(oldFrame.DelayDenominator, newFrame.DelayDenominator, $"frame {i} delay denominator");
-            ComparePixels(oldFrame.Pixels, newFrame.Pixels);
+            ImageFrame expectedFrame = expected.Frames[i];
+            ImageFrame actualFrame = actual.Frames[i];
+            Assert.Equal(expectedFrame.DelayNumerator, actualFrame.DelayNumerator, $"frame {i} delay numerator");
+            Assert.Equal(expectedFrame.DelayDenominator, actualFrame.DelayDenominator, $"frame {i} delay denominator");
+            ComparePixels(expectedFrame.Pixels, actualFrame.Pixels);
         }
     }
 
-    private static void ComparePixels(Gfx.BPixelBuffer expected, ImageBuffer actual)
+    private static void ComparePixels(ImageBuffer expected, ImageBuffer actual)
     {
         Assert.Equal(expected.Width, actual.Width, "width");
         Assert.Equal(expected.Height, actual.Height, "height");
@@ -315,18 +456,6 @@ internal static class Program
         return new ImageSequence(frames, width, height, loop);
     }
 
-    private static Gfx.BPixelBuffer ToGraphics(ImageBuffer buffer) =>
-        new(buffer.Width, buffer.Height, (byte[])buffer.Rgba.Clone());
-
-    private static Gfx.BImageSequence ToGraphics(ImageSequence sequence)
-    {
-        var frames = new List<Gfx.BImageFrame>(sequence.Frames.Count);
-        foreach (ImageFrame frame in sequence.Frames)
-            frames.Add(new Gfx.BImageFrame(ToGraphics(frame.Pixels), frame.DelayNumerator, frame.DelayDenominator));
-
-        return new Gfx.BImageSequence(frames, sequence.Width, sequence.Height, sequence.LoopCount);
-    }
-
     private static byte[] Fill(int width, int height, byte r, byte g, byte b, byte a)
     {
         byte[] rgba = new byte[width * height * 4];
@@ -340,6 +469,9 @@ internal static class Program
 
         return rgba;
     }
+
+    private static ImageBuffer FillImage(int width, int height, byte r, byte g, byte b, byte a) =>
+        new(width, height, Fill(width, height, r, g, b, a));
 
     private static string FindMediaRoot()
     {

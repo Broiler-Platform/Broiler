@@ -149,6 +149,45 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
   `--render`: the test renders fully green (0,128,0), matching
   `display-contents-root-background-ref.html`, and was white before.
 
+### NuGet packaging (0011–0015) — `0.1.0-preview.1`
+
+These five patches wire each submodule into the suite-wide NuGet packaging
+(Phase 3 of `docs/roadmap/nuget-packaging-roadmap.md`). Each adds the same two
+things: a vendored `eng/Broiler.Packaging.props` (+ `eng/icon.png`) carrying the
+shared metadata — Apache-2.0, icon, README, symbols, SourceLink, XML docs, and
+convention-based `IsPackable` (everything packs except `*.Tests`/`*.Demo`/
+`*.Diagnostic`/`*.Benchmark(s)`/`*.DataTool`/`*.Generator`) — and a
+`Directory.Build.props` that imports it (chaining to a parent
+`Directory.Build.props` when built in-tree). Each patch contains a **binary**
+`icon.png`, so apply with `git am` (not `git apply` without `--binary`). Applying
+these and bumping the pointers is what aligns cross-submodule dependency versions
+onto `0.1.0-preview.1` (until then, e.g. `Broiler.CSS.Dom → Broiler.Dom` resolves
+to a stale `1.0.0`).
+
+- **0011-broiler-dom-nuget-packaging.patch** → `Broiler.DOM` — packs `Broiler.Dom`
+  and `Broiler.Dom.Html`.
+- **0012-broiler-css-nuget-packaging.patch** → `Broiler.CSS` — packs `Broiler.CSS`
+  and `Broiler.CSS.Dom`. Its `Directory.Build.props` also marks the **nested
+  `Broiler.DOM` checkout** `IsPackable=false` so it doesn't emit a duplicate
+  `Broiler.Dom` package (that ships from the `Broiler.DOM` submodule).
+- **0013-broiler-graphics-nuget-packaging.patch** → `Broiler.Graphics` — packs the
+  core plus the `Direct2D`/`Linux`/`Linux.OpenGL`/`Linux.Vulkan` backends
+  (demos/tests excluded).
+- **0014-broiler-html-nuget-packaging.patch** → `Broiler.HTML` — packs
+  `Broiler.HTML.{Core,Dom,Graphics,Image,Image.Compat,Orchestration}` and packs
+  `THIRD_PARTY_NOTICES.md` (HTML Renderer, BSD-3). Marks the **nested
+  `Broiler.Graphics` checkout** `IsPackable=false` to avoid duplicate
+  `Broiler.Graphics.*` ids (`Broiler.HTML.Graphics` is a different project and
+  still ships).
+- **0015-broiler-js-nuget-packaging.patch** → `Broiler.JS` — packs the engine and
+  `Broiler.DateTime`/`Broiler.Regex`/Unicode libraries and packs
+  `THIRD_PARTY_NOTICES.md` (Yantra JS, Apache-2.0). Its `Directory.Build.props`
+  additionally excludes the build-time-only `Broiler.JavaScript.JSClassGenerator`
+  (Roslyn analyzer), `JIntPerfTests`, and `LogParser`.
+  > **Open item:** the JS submodule has 60 projects; the exact public publish set
+  > (which `Broiler.JavaScript.*`, `Unicode*` libraries ship vs. stay internal)
+  > needs a maintainer's confirmation before public release.
+
 - **0013-css-supports-feature-query-evaluation.patch** → `Broiler.CSS`
   (`Broiler.CSS.Dom/SupportsConditionSyntax.cs`,
   `Broiler.CSS.Dom/CssStyleEngine.Supports.cs` [new],

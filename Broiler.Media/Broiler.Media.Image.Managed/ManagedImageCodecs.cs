@@ -9,6 +9,8 @@ public static class ManagedImageCodecs
         new PngImageCodec(),
         new JpegImageCodec(),
         new BmpImageCodec(),
+        new GifImageCodec(),
+        new WebpImageCodec(),
     ];
 }
 

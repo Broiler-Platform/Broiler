@@ -376,42 +376,6 @@
     </Project>
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="Broiler.UI.Phase0.Tests/Broiler.UI.Phase0.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI.Phase3.Tests/Broiler.UI.Phase3.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI.Phase4.Tests/Broiler.UI.Phase4.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI.Phase5.Tests/Broiler.UI.Phase5.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI.Phase6.Tests/Broiler.UI.Phase6.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI.Phase7.Tests/Broiler.UI.Phase7.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
     <Project Path="Broiler.UI.Tests/Broiler.UI.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />

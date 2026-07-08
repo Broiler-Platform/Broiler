@@ -4,6 +4,7 @@ using BCanvas = Broiler.HTML.Image.BCanvas;
 using Broiler.HTML.Adapters;
 using Broiler.HTML.Image;
 using Broiler.HTML.Image.Adapters;
+using Broiler.Media.Image;
 using Broiler.Dom.Html;
 using Broiler.Layout.IR;
 using System.Drawing;
@@ -78,7 +79,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFileWithStyleSet(string.Empty, 2, 2, outputPath, Graphics.BImageEncodeFormat.Jpeg, backgroundColor: BColor.White);
+            HtmlRender.RenderToFileWithStyleSet(string.Empty, 2, 2, outputPath, ImageEncodeFormat.Jpeg, backgroundColor: BColor.White);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 2);
@@ -99,7 +100,7 @@ public class GraphicsAbstractionTests
 
         try
         {
-            HtmlRender.RenderToFileAutoSizedWithStyleSet("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: Graphics.BImageEncodeFormat.Png);
+            HtmlRender.RenderToFileAutoSizedWithStyleSet("<html><body>test</body></html>", outputPath, maxWidth: 200, maxHeight: 200, format: ImageEncodeFormat.Png);
 
             var bytes = File.ReadAllBytes(outputPath);
             Assert.True(bytes.Length > 8);
@@ -346,7 +347,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 128));
 
         using var copy = source.Copy();
-        using var roundTripped = BBitmap.Decode(copy.Encode(Graphics.BImageEncodeFormat.Png));
+        using var roundTripped = BBitmap.Decode(copy.Encode(ImageEncodeFormat.Png));
 
         Assert.Equal(source.GetPixel(0, 0), roundTripped.GetPixel(0, 0));
         Assert.Equal(source.GetPixel(1, 0), roundTripped.GetPixel(1, 0));
@@ -360,7 +361,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 2);
         source.Clear(new BColor(220, 30, 40, 255));
 
-        using var roundTripped = BBitmap.Decode(source.Encode(Graphics.BImageEncodeFormat.Jpeg, 100));
+        using var roundTripped = BBitmap.Decode(source.Encode(ImageEncodeFormat.Jpeg, 100));
 
         Assert.Equal(source.Width, roundTripped.Width);
         Assert.Equal(source.Height, roundTripped.Height);
@@ -382,7 +383,7 @@ public class GraphicsAbstractionTests
         source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
 
         using var loaded = Assert.IsType<ImageAdapter>(
-            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(Graphics.BImageEncodeFormat.Png))));
+            StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(ImageEncodeFormat.Png))));
         using var target = new BBitmap(4, 4);
         using var graphics = Assert.IsType<GraphicsAdapter>(target.OpenGraphics(new RectangleF(0, 0, 4, 4)));
 
@@ -1435,7 +1436,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(ImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
@@ -1487,7 +1488,7 @@ public class GraphicsAbstractionTests
         using var source = new BBitmap(2, 1);
         source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
         source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
-        string pngBase64 = Convert.ToBase64String(source.Encode(Graphics.BImageEncodeFormat.Png, 100));
+        string pngBase64 = Convert.ToBase64String(source.Encode(ImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;

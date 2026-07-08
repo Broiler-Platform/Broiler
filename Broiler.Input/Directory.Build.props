@@ -1,4 +1,8 @@
-<Project>
+﻿<Project>
+
+  <!-- Broiler NuGet packaging metadata (vendored; do not edit by hand). -->
+  <Import Project="$(MSBuildThisFileDirectory)eng\Broiler.Packaging.props" />
+
   <PropertyGroup>
     <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Debug-Windows'">Debug</BroilerBaseConfiguration>
     <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Release-Linux' Or '$(Configuration)' == 'Release-Windows'">Release</BroilerBaseConfiguration>
@@ -27,3 +31,4 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 </Project>
+
