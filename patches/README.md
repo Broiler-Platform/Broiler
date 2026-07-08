@@ -21,6 +21,34 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0014-broiler-html-display-contents-root-canvas-background.patch** →
+  `Broiler.HTML` (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs`,
+  `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes the
+  `css/css-display/display-contents-root-background.html` "biggest problems"
+  entry (issue #1308, 0% match / MissingContent). CSS Display §2.5 blockifies
+  the document root element, so `:root { display: contents }` still generates a
+  principal box whose background propagates to the canvas (CSS Backgrounds
+  §2.11.1 / CSS2.1 §14.2). The canvas-propagation cascade treated the root's
+  `display: contents` like any other element's — suppressing propagation — so
+  `:root { display: contents; background-image: url(green.png) }` left the
+  viewport the default white instead of green. The patch adds an
+  `isRootElement` flag to both propagation suppressors (`PaintWalker`'s image+
+  color path and `HtmlContainerInt.GetRootBackgroundColor`'s color path): on the
+  root element `display: contents` no longer suppresses (it is blockified),
+  while a non-root element (e.g. `body`) with `display: contents` still
+  generates no box and does not propagate, and `display: none` on the root
+  continues to suppress. Guard: `Root_Display_Contents_Is_Blockified_And_Propagates`
+  and `Body_Display_Contents_Does_Not_Propagate` in `RootBackgroundTests`.
+  **Active CI fallback — none.** Canvas background propagation lives entirely in
+  the `Broiler.HTML` orchestration layer, which the parent repo consumes as
+  compiled submodule source with no interception point (like patches
+  0008–0013). It activates on CI when this patch is applied and the
+  `Broiler.HTML` pointer is bumped; the pointer is intentionally left unbumped
+  (the change is committed to the submodule locally only, unpushed because
+  `MaiRat/Broiler.HTML` is outside session scope). Verified end-to-end via
+  `--render`: the test renders fully green (0,128,0), matching
+  `display-contents-root-background-ref.html`, and was white before.
+
 - **0013-css-supports-feature-query-evaluation.patch** → `Broiler.CSS`
   (`Broiler.CSS.Dom/SupportsConditionSyntax.cs`,
   `Broiler.CSS.Dom/CssStyleEngine.Supports.cs` [new],
