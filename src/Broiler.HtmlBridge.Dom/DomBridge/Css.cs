@@ -8,6 +8,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Scripting;
 
 namespace Broiler.HtmlBridge;
 
@@ -931,6 +932,50 @@ public sealed partial class DomBridge
     /// pre-Phase-6), and the serialized live model once <c>insertRule</c>/<c>deleteRule</c>
     /// has mutated it — so script CSSOM mutations are observed downstream.
     /// </summary>
+    /// <summary>
+    /// Enforces the Content Security Policy <c>style-src</c> family on the parsed
+    /// DOM so blocked inline styles do not render: an inline <c>style="…"</c>
+    /// attribute blocked by <c>style-src-attr</c> (→ <c>style-src</c> →
+    /// <c>default-src</c>) is stripped, and a <c>&lt;style&gt;</c> element blocked
+    /// by <c>style-src-elem</c> (same fallback chain) is removed. Only the style
+    /// directives are consulted — script/event-handler enforcement is intentionally
+    /// left to the script pipeline — so this is safe to call on any parsed document.
+    /// </summary>
+    public void ApplyStyleContentSecurityPolicy(ContentSecurityPolicy? csp)
+    {
+        if (csp == null || DocumentElement == null)
+            return;
+
+        ApplyStyleCsp(DocumentElement, csp, blockStyleAttribute: !csp.AllowsInlineStyleAttribute());
+    }
+
+    private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
+    {
+        if (!element.IsTextNode)
+        {
+            if (element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
+            {
+                var nonce = element.Attributes.TryGetValue("nonce", out var n) ? n : null;
+                if (!csp.AllowsInlineStyleElement(nonce, GetStyleElementCssText(element)))
+                {
+                    element.Remove();
+                    return;
+                }
+            }
+
+            if (blockStyleAttribute && element.Attributes.ContainsKey("style"))
+            {
+                element.Attributes.Remove("style");
+                element.Style.Clear();
+                InvalidateStyleScope(element);
+            }
+        }
+
+        // Snapshot: a blocked <style> child removes itself from this collection.
+        foreach (var child in element.Children.ToArray())
+            ApplyStyleCsp(child, csp, blockStyleAttribute);
+    }
+
     private string GetStyleElementCssText(DomElement styleEl)
     {
         var rules = EnsureStyleSheetRulesCurrent(styleEl);

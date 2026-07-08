@@ -11,7 +11,9 @@ namespace Broiler.HtmlBridge.Scripting;
 /// pipeline. The currently honored directives are <c>default-src</c>,
 /// <c>script-src</c>, <c>script-src-elem</c>, and <c>script-src-attr</c>
 /// for inline-script, external-script, inline event-handler, and
-/// <c>eval()</c> gating. The currently honored source expressions are
+/// <c>eval()</c> gating, plus <c>style-src</c>, <c>style-src-elem</c>, and
+/// <c>style-src-attr</c> for gating inline <c>&lt;style&gt;</c> elements and
+/// inline <c>style="…"</c> attributes. The currently honored source expressions are
 /// <c>'none'</c>, <c>'self'</c>, <c>'unsafe-inline'</c>,
 /// <c>'unsafe-eval'</c>, <c>'strict-dynamic'</c>, nonce sources, hash
 /// sources, wildcard <c>*</c>, scheme sources such as <c>https:</c>, and
@@ -30,6 +32,9 @@ public sealed class ContentSecurityPolicy
     private readonly HashSet<string> _scriptSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcElemTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcAttrTokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _styleSrcTokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _styleSrcElemTokens = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _styleSrcAttrTokens = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Whether <c>eval()</c> and similar dynamic code execution is allowed.
@@ -52,6 +57,9 @@ public sealed class ContentSecurityPolicy
         _scriptSrcTokens.Clear();
         _scriptSrcElemTokens.Clear();
         _scriptSrcAttrTokens.Clear();
+        _styleSrcTokens.Clear();
+        _styleSrcElemTokens.Clear();
+        _styleSrcAttrTokens.Clear();
         AllowsEval = true;
         StrictDynamic = false;
 
@@ -74,6 +82,12 @@ public sealed class ContentSecurityPolicy
                 target = _scriptSrcElemTokens;
             else if (string.Equals(tokens[0], "script-src-attr", StringComparison.OrdinalIgnoreCase))
                 target = _scriptSrcAttrTokens;
+            else if (string.Equals(tokens[0], "style-src", StringComparison.OrdinalIgnoreCase))
+                target = _styleSrcTokens;
+            else if (string.Equals(tokens[0], "style-src-elem", StringComparison.OrdinalIgnoreCase))
+                target = _styleSrcElemTokens;
+            else if (string.Equals(tokens[0], "style-src-attr", StringComparison.OrdinalIgnoreCase))
+                target = _styleSrcAttrTokens;
 
             if (target == null)
                 continue;
@@ -136,6 +150,69 @@ public sealed class ContentSecurityPolicy
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Returns whether an inline <c>style="…"</c> attribute is allowed under the
+    /// effective style-attribute directive (<c>style-src-attr</c>, falling back
+    /// to <c>style-src</c> then <c>default-src</c>). Style attributes cannot carry
+    /// a nonce, so only <c>'unsafe-inline'</c> (or the absence of any applicable
+    /// directive) permits them.
+    /// </summary>
+    public bool AllowsInlineStyleAttribute()
+    {
+        var sources = GetEffectiveStyleAttributeSources();
+        if (sources.Count == 0)
+            return true;
+
+        if (IsNoneOnly(sources))
+            return false;
+
+        return sources.Contains("'unsafe-inline'");
+    }
+
+    /// <summary>
+    /// Returns whether an inline <c>&lt;style&gt;</c> element is allowed under the
+    /// effective style-element directive (<c>style-src-elem</c>, falling back to
+    /// <c>style-src</c> then <c>default-src</c>). Honors <c>'unsafe-inline'</c>,
+    /// nonce sources, and hash sources.
+    /// </summary>
+    public bool AllowsInlineStyleElement(string? nonce = null, string? styleText = null)
+    {
+        var sources = GetEffectiveStyleElementSources();
+        if (sources.Count == 0)
+            return true;
+
+        if (IsNoneOnly(sources))
+            return false;
+
+        if (!string.IsNullOrEmpty(nonce) && MatchesNonce(sources, nonce))
+            return true;
+
+        if (!string.IsNullOrEmpty(styleText) && MatchesHash(sources, styleText))
+            return true;
+
+        return sources.Contains("'unsafe-inline'");
+    }
+
+    /// <summary>
+    /// Returns whether this policy could block some inline style — a style
+    /// attribute or a plain (nonce-less/hash-less) <c>&lt;style&gt;</c> element.
+    /// Lets a caller skip building a DOM purely to enforce styles when the policy
+    /// permits them all.
+    /// </summary>
+    public bool AffectsStyles()
+    {
+        if (!AllowsInlineStyleAttribute())
+            return true;
+
+        var elementSources = GetEffectiveStyleElementSources();
+        if (elementSources.Count == 0)
+            return false;
+        if (IsNoneOnly(elementSources))
+            return true;
+
+        return !elementSources.Contains("'unsafe-inline'");
     }
 
     /// <summary>
@@ -247,6 +324,24 @@ public sealed class ContentSecurityPolicy
             return _scriptSrcAttrTokens;
         if (_scriptSrcTokens.Count > 0)
             return _scriptSrcTokens;
+        return _defaultSrcTokens;
+    }
+
+    private HashSet<string> GetEffectiveStyleElementSources()
+    {
+        if (_styleSrcElemTokens.Count > 0)
+            return _styleSrcElemTokens;
+        if (_styleSrcTokens.Count > 0)
+            return _styleSrcTokens;
+        return _defaultSrcTokens;
+    }
+
+    private HashSet<string> GetEffectiveStyleAttributeSources()
+    {
+        if (_styleSrcAttrTokens.Count > 0)
+            return _styleSrcAttrTokens;
+        if (_styleSrcTokens.Count > 0)
+            return _styleSrcTokens;
         return _defaultSrcTokens;
     }
 

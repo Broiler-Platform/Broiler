@@ -346,4 +346,95 @@ public class ContentSecurityPolicyTests
         Assert.Contains("data-csp=\"blocked\"", result);
         Assert.DoesNotContain(">after<", result);
     }
+
+    // --- style-src family (issue #1302 CSP style-src* WPT tests) ----------
+
+    [Fact]
+    public void StyleSrcAttr_None_Strips_Inline_Style_Attribute()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy"
+                content="style-src-attr 'none'; style-src 'unsafe-inline';"></head>
+            <body style="background: green"></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.DoesNotContain("background: green", result);
+        Assert.DoesNotContain("style=", result);
+    }
+
+    [Fact]
+    public void StyleSrcElem_None_Removes_Style_Element()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy"
+                content="style-src-elem 'none'; style-src 'unsafe-inline';"></head>
+            <body><style>body {background: green;}</style></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.DoesNotContain("background: green", result);
+        Assert.DoesNotContain("<style", result);
+    }
+
+    [Fact]
+    public void StyleSrcElem_Allowed_Attr_Blocked_Keeps_Element_Strips_Attribute()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy"
+                content="style-src-elem 'unsafe-inline'; style-src-attr 'none';"></head>
+            <body style="background: green"><style>body {background: blue;}</style></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        // The style attribute is blocked; the <style> element survives.
+        Assert.DoesNotContain("background: green", result);
+        Assert.Contains("background: blue", result);
+        Assert.Contains("<style", result);
+    }
+
+    [Fact]
+    public void StyleSrc_UnsafeInline_Keeps_Inline_Style_Attribute()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy"
+                content="style-src 'unsafe-inline';"></head>
+            <body style="background: green"></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.Contains("background: green", result);
+    }
+
+    [Fact]
+    public void No_Csp_Keeps_Inline_Styles()
+    {
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <body style="background: green"><style>p {color: red;}</style></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.Contains("background: green", result);
+        Assert.Contains("<style", result);
+    }
 }
