@@ -40,6 +40,7 @@ const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const DEFAULT_CONCURRENCY = 8;
 const ALL_SHARDS = -1;              // --shard-index sentinel meaning "all shards"
+const DEFAULT_BROWSER_RESTART_LIMIT = 3;
 
 /**
  * Deterministic shard index in [0, shardCount) for a forward-slash relative
@@ -230,6 +231,25 @@ function ensureDir(filePath) {
     fs.mkdirSync(dir, { recursive: true });
 }
 
+function parsePositiveIntegerEnv(name, fallback) {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') {
+        return fallback;
+    }
+
+    if (!/^[1-9][0-9]*$/.test(raw)) {
+        return fallback;
+    }
+
+    const value = Number.parseInt(raw, 10);
+    return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function isBrowserClosedError(error) {
+    const message = String(error && error.message ? error.message : error);
+    return /browser (?:has been )?closed|target page, context or browser has been closed|browser disconnected/i.test(message);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -318,13 +338,46 @@ async function main(args = process.argv.slice(2)) {
 
     console.log(`Launching Chromium (concurrency=${concurrency}) …`);
     const { chromium } = require('playwright');
-    const browser = await chromium.launch({
-        headless: true,
-        ...(process.env.BROILER_CHROMIUM_PATH ? { executablePath: process.env.BROILER_CHROMIUM_PATH } : {}),
-        // Allow file:// pages to load other file:// resources (e.g. SVG images
-        // referenced via <img src="support/...">) which Chrome blocks by default.
-        args: ['--allow-file-access-from-files'],
-    });
+    async function launchBrowser() {
+        return chromium.launch({
+            headless: true,
+            ...(process.env.BROILER_CHROMIUM_PATH ? { executablePath: process.env.BROILER_CHROMIUM_PATH } : {}),
+            // Allow file:// pages to load other file:// resources (e.g. SVG images
+            // referenced via <img src="support/...">) which Chrome blocks by default.
+            args: ['--allow-file-access-from-files'],
+        });
+    }
+
+    let browser = await launchBrowser();
+    let browserRestartPromise = null;
+    let browserRestartCount = 0;
+    const browserRestartLimit = parsePositiveIntegerEnv(
+        'BROILER_WPT_REFERENCE_BROWSER_RESTARTS',
+        DEFAULT_BROWSER_RESTART_LIMIT);
+
+    async function restartBrowser(reason) {
+        if (browserRestartPromise !== null) {
+            await browserRestartPromise;
+            return;
+        }
+
+        browserRestartPromise = (async () => {
+            browserRestartCount++;
+            if (browserRestartCount > browserRestartLimit) {
+                throw new Error(`Chromium closed too many times while generating WPT references (limit ${browserRestartLimit}). Last failure: ${reason}`);
+            }
+
+            console.error(`  ⚠ Restarting Chromium after browser closure (${browserRestartCount}/${browserRestartLimit}): ${reason}`);
+            try { await browser.close(); } catch { /* browser already gone */ }
+            browser = await launchBrowser();
+        })();
+
+        try {
+            await browserRestartPromise;
+        } finally {
+            browserRestartPromise = null;
+        }
+    }
 
     // WPT tests reference their support resources — fonts, shared stylesheets,
     // images, harness scripts — via *root-relative* URLs such as /fonts/ahem.css,
@@ -365,10 +418,29 @@ async function main(args = process.argv.slice(2)) {
     // Create a fresh context + page, registering the resource route.  Used both
     // for a worker's initial page and to recover after a renderer crash.
     async function newRenderTarget() {
-        const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
-        await context.route(/^file:\/\//i, fileRouteHandler);
-        const page = await context.newPage();
-        return { context, page };
+        if (browserRestartPromise !== null) {
+            await browserRestartPromise;
+        }
+        if (!browser.isConnected()) {
+            await restartBrowser('browser disconnected before creating a render context');
+        }
+
+        try {
+            const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
+            await context.route(/^file:\/\//i, fileRouteHandler);
+            const page = await context.newPage();
+            return { context, page };
+        } catch (err) {
+            if (!isBrowserClosedError(err)) {
+                throw err;
+            }
+
+            await restartBrowser(err.message || err);
+            const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
+            await context.route(/^file:\/\//i, fileRouteHandler);
+            const page = await context.newPage();
+            return { context, page };
+        }
     }
 
     // Worker function — processes one file at a time from the queue.
@@ -400,21 +472,15 @@ async function main(args = process.argv.slice(2)) {
                 }
                 errors++;
 
-                // A renderer crash leaves `page` permanently dead: every
-                // subsequent goto on it throws "Page crashed", so a single
-                // crashing test would cascade into hundreds of false failures
-                // for unrelated files this worker later picks up.  Rebuild the
-                // context+page so the worker recovers and keeps going.
-                const crashed = page.isClosed() ||
-                    /crash|Target (?:closed|page).*closed|browser has been closed/i.test(String(err && err.message));
-                if (crashed) {
-                    try { await context.close(); } catch { /* already gone */ }
-                    try {
-                        ({ context, page } = await newRenderTarget());
-                    } catch (rebuildErr) {
-                        console.error(`  ⚠ Failed to recover worker after crash: ${rebuildErr.message || rebuildErr}`);
-                        break;   // browser itself is unusable; let other workers finish.
-                    }
+                // Rebuild the render target after every failed navigation or
+                // screenshot. Timeouts can leave a page stuck in recursive
+                // loading, and renderer crashes leave it permanently dead.
+                try { await context.close(); } catch { /* already gone */ }
+                try {
+                    ({ context, page } = await newRenderTarget());
+                } catch (rebuildErr) {
+                    console.error(`  ⚠ Failed to recover worker after render failure: ${rebuildErr.message || rebuildErr}`);
+                    break;   // fail the shard below instead of silently draining half of it.
                 }
             }
 
@@ -439,11 +505,15 @@ async function main(args = process.argv.slice(2)) {
     }
     await Promise.all(workers);
 
-    await browser.close();
+    try { await browser.close(); } catch { /* may already be closed */ }
 
     console.log();
     console.log(`Reference generation complete: ${completed} files, ${errors} errors`);
     console.log(`Output: ${outputDir}`);
+
+    if (completed !== total) {
+        throw new Error(`Reference generation stopped early: completed ${completed}/${total} files. Chromium likely closed while workers still had queued tests.`);
+    }
 }
 
 module.exports = {
@@ -453,6 +523,8 @@ module.exports = {
     isNonTestFile,
     isWptHarnessScript,
     main,
+    isBrowserClosedError,
+    parsePositiveIntegerEnv,
     requiresJavaScript,
     resolveRootRelativeResource,
     shardIndexForPath,

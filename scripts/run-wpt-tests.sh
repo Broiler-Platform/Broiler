@@ -35,6 +35,8 @@ RERUN_JSON=""
 RERUN_KIND=""
 SKIP_REFERENCE_GENERATION=false
 NON_JS=false
+PLAYWRIGHT_INSTALL_RETRIES="${BROILER_PLAYWRIGHT_INSTALL_RETRIES:-5}"
+PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS="${BROILER_PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS:-15}"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -124,6 +126,53 @@ if [[ "$NON_JS" == "true" ]]; then
     NON_JS_ARGS=(--non-js)
 fi
 
+if ! [[ "$PLAYWRIGHT_INSTALL_RETRIES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Error: BROILER_PLAYWRIGHT_INSTALL_RETRIES must be a positive integer." >&2
+    exit 1
+fi
+
+if ! [[ "$PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS" =~ ^[0-9]+$ ]]; then
+    echo "Error: BROILER_PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS must be a non-negative integer." >&2
+    exit 1
+fi
+
+run_with_retries_tail() {
+    local description="$1"
+    local max_attempts="$2"
+    local delay_seconds="$3"
+    local success_tail_lines="$4"
+    local failure_tail_lines="$5"
+    shift 5
+
+    local attempt=1
+    local status=0
+    local log_file
+    log_file="$(mktemp)"
+
+    while (( attempt <= max_attempts )); do
+        if "$@" >"$log_file" 2>&1; then
+            tail -n "$success_tail_lines" "$log_file" || true
+            rm -f "$log_file"
+            return 0
+        fi
+
+        status=$?
+        echo "  $description failed on attempt $attempt/$max_attempts (exit $status)." >&2
+        tail -n "$failure_tail_lines" "$log_file" >&2 || true
+
+        if (( attempt == max_attempts )); then
+            echo "  $description failed after $max_attempts attempt(s)." >&2
+            rm -f "$log_file"
+            return "$status"
+        fi
+
+        echo "  Retrying $description in ${delay_seconds}s..." >&2
+        sleep "$delay_seconds"
+        attempt=$((attempt + 1))
+        delay_seconds=$((delay_seconds * 2))
+    done
+}
+
 mkdir -p "$OUTPUT_DIR"
 
 LOGFILE="$OUTPUT_DIR/wpt-results.log"
@@ -187,7 +236,14 @@ elif command -v npx &>/dev/null; then
         echo "No package-lock.json found; using npm install instead of npm ci"
         npm install 2>&1 | tail -10
     fi
-    npx playwright install --with-deps chromium 2>&1 | tail -10
+    echo "  Installing Playwright Chromium (up to $PLAYWRIGHT_INSTALL_RETRIES attempt(s))"
+    run_with_retries_tail \
+        "Playwright Chromium install" \
+        "$PLAYWRIGHT_INSTALL_RETRIES" \
+        "$PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS" \
+        10 \
+        40 \
+        npx playwright install --with-deps chromium
 
     # Set NODE_PATH so require('playwright') resolves from the local
     # node_modules installed above (Node.js resolves modules relative to

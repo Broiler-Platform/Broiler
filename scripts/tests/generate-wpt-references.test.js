@@ -10,8 +10,10 @@ const {
     contentTypeForExtension,
     createBrowserContextOptions,
     discoverTests,
+    isBrowserClosedError,
     isNonTestFile,
     isWptHarnessScript,
+    parsePositiveIntegerEnv,
     requiresJavaScript,
     resolveRootRelativeResource,
     shardIndexForPath,
@@ -141,4 +143,44 @@ test('content type is inferred from the file extension', () => {
     assert.equal(contentTypeForExtension('.ttf'), 'font/truetype');
     assert.equal(contentTypeForExtension('.png'), 'image/png');
     assert.equal(contentTypeForExtension('.unknown'), 'application/octet-stream');
+});
+
+test('browser-closed Playwright errors are detected for Chromium relaunch', () => {
+    assert.equal(
+        isBrowserClosedError(new Error('browser.newContext: Target page, context or browser has been closed')),
+        true);
+    assert.equal(
+        isBrowserClosedError(new Error('Browser disconnected while creating a context')),
+        true);
+    assert.equal(
+        isBrowserClosedError(new Error('page.goto: Timeout 10000ms exceeded')),
+        false);
+});
+
+test('positive integer env parsing falls back for invalid values', () => {
+    const name = 'BROILER_TEST_POSITIVE_INTEGER';
+    const original = process.env[name];
+
+    try {
+        delete process.env[name];
+        assert.equal(parsePositiveIntegerEnv(name, 3), 3);
+
+        process.env[name] = '7';
+        assert.equal(parsePositiveIntegerEnv(name, 3), 7);
+
+        process.env[name] = '0';
+        assert.equal(parsePositiveIntegerEnv(name, 3), 3);
+
+        process.env[name] = 'not-a-number';
+        assert.equal(parsePositiveIntegerEnv(name, 3), 3);
+
+        process.env[name] = '7x';
+        assert.equal(parsePositiveIntegerEnv(name, 3), 3);
+    } finally {
+        if (original === undefined) {
+            delete process.env[name];
+        } else {
+            process.env[name] = original;
+        }
+    }
 });
