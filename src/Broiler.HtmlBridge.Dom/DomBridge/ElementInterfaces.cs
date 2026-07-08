@@ -230,6 +230,21 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // Popover API (HTML §popover) — showPopover()/hidePopover() are exposed on
+        // any element carrying the global `popover` attribute, not tied to a tag.
+        if (element.Attributes.ContainsKey("popover"))
+        {
+            obj.FastAddValue(
+                (KeyString)"showPopover",
+                new JSFunction((in Arguments _) => JsElementInterfacesShowPopoverCore(bridge, element, in _), "showPopover", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"hidePopover",
+                new JSFunction((in Arguments _) => JsElementInterfacesHidePopoverCore(bridge, element, in _), "hidePopover", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
         // HTMLSelectElement interface
         if (tag == "select")
         {

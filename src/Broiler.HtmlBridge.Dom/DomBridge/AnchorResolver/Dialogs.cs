@@ -37,6 +37,50 @@ public sealed partial class DomBridge
             el.Style["position"] = "fixed";
         }
     }
+
+    /// <summary>
+    /// Applies UA top-layer positioning to open popovers (HTML §popover): a
+    /// popover is laid out in the top layer as a fixed-position box, so give one
+    /// with no explicit position <c>position: fixed</c> anchored at the viewport
+    /// origin. Later-shown popovers keep their source order, so they paint over
+    /// earlier ones — matching the top-layer stacking these overlay tests probe.
+    /// </summary>
+    // Base z-index for the synthetic top layer. The real top layer sits above
+    // every painted stacking context (CSS Position §top-layer); Broiler has no
+    // dedicated top-layer paint pass, so approximate it with a very large
+    // z-index offset by each element's top-layer order, keeping open popovers
+    // above ordinary positioned content and correctly ordered amongst themselves
+    // (a later-shown popover paints over an earlier one). Kept below int.MaxValue
+    // so the counter has headroom.
+    private const int TopLayerZIndexBase = 2_000_000_000;
+
+    private void ApplyPopoverUAPositioning(DomElement root)
+    {
+        foreach (var el in Elements)
+        {
+            if (!(GetElementRuntimeState(el).Dialog.PopoverOpen.TryGet(out var open) && open is true))
+                continue;
+
+            var props = GetComputedProps(el);
+            bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
+                (pos == "fixed" || pos == "absolute");
+
+            if (!alreadyPositioned)
+            {
+                el.Style["position"] = "fixed";
+                if (!el.Style.ContainsKey("top") && !props.ContainsKey("top"))
+                    el.Style["top"] = "0";
+                if (!el.Style.ContainsKey("left") && !props.ContainsKey("left"))
+                    el.Style["left"] = "0";
+            }
+
+            // Elevate into the synthetic top layer, ordered by show order, so the
+            // popover paints above non-top-layer content (e.g. a plain
+            // position:fixed sibling) and later popovers paint over earlier ones.
+            int order = GetElementRuntimeState(el).Dialog.TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
+            el.Style["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
     // -----------------------------------------------------------------
     // Dialog backdrop insertion
     // -----------------------------------------------------------------
@@ -46,15 +90,20 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
-        var modals = new List<(DomElement dialog, DomElement parent)>();
+        var modals = new List<(DomElement dialog, DomElement parent, bool isPopover)>();
         FindModalDialogs(root, modals);
+        FindOpenPopovers(root, modals);
 
-        foreach (var (dialog, parent) in modals)
+        foreach (var (dialog, parent, isPopover) in modals)
         {
-            // Collect ::backdrop CSS properties for this dialog element.
-            // Look for selectors ending with "::backdrop" that would match
-            // the dialog (e.g. "dialog::backdrop", "#target::backdrop").
-            var backdropBg = GetBackdropBackground(dialog);
+            // Collect ::backdrop CSS properties for this element. Look for
+            // selectors ending with "::backdrop" that would match it (e.g.
+            // "dialog::backdrop", "[popover]::backdrop", "#target::backdrop").
+            // A modal dialog's ::backdrop defaults to the UA dimming scrim; a
+            // popover's ::backdrop defaults to transparent (no scrim) — either
+            // is overridden by an author `background`/`background-color`.
+            var backdropBg = GetBackdropBackground(
+                dialog, isPopover ? "transparent" : "rgb(229, 229, 229)");
 
             // Insert a backdrop div BEFORE the dialog.
             // Use 'position: fixed' with explicit pixel viewport dimensions
@@ -95,6 +144,14 @@ public sealed partial class DomBridge
             {
                 ResolvePositionTryFallbacksTree(backdrop, anchorRegistry, positionTryRules);
             }
+
+            // The white-box UA defaults below (display:block, border, padding,
+            // white background) are the modal <dialog> appearance. Popovers do
+            // not share them — their box styling comes entirely from author CSS —
+            // so skip this block for popovers (their ::backdrop was still emitted
+            // above).
+            if (isPopover)
+                continue;
 
             // Ensure the dialog has UA default styles.
             // Check both inline styles and CSS rules before applying defaults.
@@ -164,11 +221,11 @@ public sealed partial class DomBridge
     /// pseudo-element by checking CSS rules for <c>::backdrop</c> selectors
     /// that match the given dialog element.
     /// </summary>
-    private string GetBackdropBackground(DomElement dialog)
+    private string GetBackdropBackground(DomElement dialog, string defaultBg = "rgb(229, 229, 229)")
     {
-        // Default backdrop color: pre-composited rgba(0,0,0,0.1) over white.
-        // Alpha-blending: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
-        const string defaultBg = "rgb(229, 229, 229)";
+        // Default modal-dialog backdrop color: pre-composited rgba(0,0,0,0.1) over
+        // white (255*(1-0.1) + 0*0.1 = 229.5 ≈ 229). Callers pass "transparent"
+        // for popovers, whose ::backdrop has no UA scrim.
 
         var declarations = GetSyncedScopedEngine(dialog)
             .GetCascadedDeclaredValues(dialog, "::backdrop");
@@ -223,7 +280,7 @@ public sealed partial class DomBridge
 
         return anchorOrder < targetOrder;
     }
-    private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement)> results)
+    private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement, bool)> results)
     {
         if (string.Equals(element.TagName, "dialog", StringComparison.OrdinalIgnoreCase) &&
             element.Attributes.ContainsKey("open") &&
@@ -231,7 +288,7 @@ public sealed partial class DomBridge
             isModal is bool modal && modal &&
             element.Parent != null)
         {
-            results.Add((element, element.Parent));
+            results.Add((element, element.Parent, false));
         }
 
         // Snapshot before recursing: the live child list can be mutated mid-walk
@@ -239,5 +296,52 @@ public sealed partial class DomBridge
         // tolerates that — same idiom as the other anchor-resolver tree walks.
         foreach (var child in SnapshotChildren(element))
             FindModalDialogs(child, results);
+    }
+
+    // Popover API (HTML §popover): an element whose showPopover() ran (and whose
+    // hidePopover() did not tear it down — see PopoverKeepsOverlayOnHide) is in
+    // the top layer and generates a ::backdrop, just like a modal dialog.
+    private static void FindOpenPopovers(DomElement element, List<(DomElement, DomElement, bool)> results)
+    {
+        if (element.Parent != null &&
+            GetElementRuntimeState(element).Dialog.PopoverOpen.TryGet(out var open) &&
+            open is true)
+        {
+            results.Add((element, element.Parent, true));
+        }
+
+        foreach (var child in SnapshotChildren(element))
+            FindOpenPopovers(child, results);
+    }
+
+    // CSS Position §overlay: whether hiding this popover leaves it in the top
+    // layer because its `overlay` is being transitioned out with
+    // `transition-behavior: allow-discrete`. A static render snapshots
+    // mid-transition, so such a popover (and its ::backdrop) stays rendered.
+    private bool PopoverKeepsOverlayOnHide(DomElement element)
+    {
+        var props = GetComputedProps(element);
+
+        // allow-discrete is required for a discrete property like `overlay` to
+        // participate in a transition at all. It lives on transition-behavior;
+        // tolerate it also appearing folded into a `transition` shorthand.
+        string behavior =
+            props.GetValueOrDefault("transition-behavior", string.Empty) + " " +
+            props.GetValueOrDefault("transition", string.Empty);
+        if (behavior.IndexOf("allow-discrete", StringComparison.OrdinalIgnoreCase) < 0)
+            return false;
+
+        // The transitioned property list must include `overlay` (or `all`).
+        string transitioned =
+            props.GetValueOrDefault("transition-property", string.Empty) + " " +
+            props.GetValueOrDefault("transition", string.Empty);
+        foreach (var token in transitioned.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.Equals("overlay", StringComparison.OrdinalIgnoreCase) ||
+                token.Equals("all", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 }

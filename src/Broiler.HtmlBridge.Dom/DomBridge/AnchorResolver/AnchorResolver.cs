@@ -25,6 +25,7 @@ public sealed partial class DomBridge
         // 0. Apply UA default position:fixed to modal dialogs before anchor
         //    resolution, since browsers treat top-layer elements as fixed.
         ApplyDialogUAPositioning(DocumentElement);
+        ApplyPopoverUAPositioning(DocumentElement);
 
         // 1. Build an anchor registry from CSS rules with anchor-name.
         var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);

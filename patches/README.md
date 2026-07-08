@@ -21,6 +21,27 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0017-css-bare-pseudo-element-universal.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.cs`, plus a test) — a correctness fix that
+  accompanies the popover/`::backdrop` work for the css-position overlay cluster
+  (issue #1311). `TryStripPseudoElementSelector` rejected a pseudo-element
+  selector whose base compound was empty: a bare `::backdrop { … }` (equivalently
+  `*::backdrop`) returned false and its declarations were dropped, so only
+  qualified forms (`dialog::backdrop`, `.foo::backdrop`) matched. The patch
+  treats an empty base as the universal `*`, so a bare `::backdrop`/`::before`/…
+  rule matches the pseudo-element of any element. Guard:
+  `GetCascadedStyle_Matches_Bare_Pseudo_Element_As_Universal` in
+  `CssStyleEngineTests`. **Not required for the four overlay tests that are fixed
+  now** — `overlay-transition-backdrop`, `overlay-transition-finished`,
+  `overlay-transition-out-rendering`, and `replaced-object-backdrop` all use
+  *qualified* `::backdrop` selectors, which the pinned `Broiler.CSS` already
+  matches, so they render green on CI from the main-repo popover support alone.
+  This patch additionally makes bare `::backdrop` (and other bare pseudo-element)
+  rules work once applied and the `Broiler.CSS` pointer is bumped; the pointer is
+  intentionally left unbumped (unpushed — `MaiRat/Broiler.CSS` is outside session
+  scope, 403). **Active CI fallback — none needed** (the qualified-selector path
+  the overlay tests use already works).
+
 - **0016-css-color-scheme-dark-canvas.patch** → `Broiler.HTML`
   (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs` and
   `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes two of the
