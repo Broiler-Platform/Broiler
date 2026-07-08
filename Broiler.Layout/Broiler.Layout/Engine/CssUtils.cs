@@ -141,6 +141,7 @@ internal static partial class CssUtils
             "grid-auto-columns" => cssBox.GridAutoColumns,
             "contain" => cssBox.Contain,
             "content-visibility" => cssBox.ContentVisibility,
+            "color-scheme" => cssBox.ColorScheme,
             _ => null,
         };
     }
@@ -377,6 +378,9 @@ internal static partial class CssUtils
                 break;
             case "content-visibility":
                 cssBox.ContentVisibility = value;
+                break;
+            case "color-scheme":
+                cssBox.ColorScheme = value;
                 break;
             case "columns":
                 // CSS Multi-column §3: 'columns' is a shorthand for

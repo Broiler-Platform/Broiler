@@ -755,6 +755,16 @@ internal abstract partial class CssBoxProperties
     public string Contain { get; set; } = "none";
 
     /// <summary>
+    /// CSS Color Adjust Module Level 1: the <c>color-scheme</c> property.
+    /// A space-separated list of the color schemes the element can render in
+    /// (<c>normal</c>, <c>light</c>, <c>dark</c>, optionally prefixed by
+    /// <c>only</c>). Used by canvas background painting (CSS Color Adjust
+    /// §2.3): when the root's used color scheme is <c>dark</c>, the canvas is
+    /// painted the UA dark backdrop colour rather than white.
+    /// </summary>
+    public string ColorScheme { get; set; } = "normal";
+
+    /// <summary>
     /// CSS Containment Module Level 2: the <c>content-visibility</c> property.
     /// Values: <c>visible</c> (default), <c>hidden</c>, <c>auto</c>.
     /// <c>hidden</c> skips the element's contents (they are not painted and are

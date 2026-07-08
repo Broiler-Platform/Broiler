@@ -21,6 +21,53 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0016-css-color-scheme-dark-canvas.patch** → `Broiler.HTML`
+  (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs` and
+  `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes two of the
+  `css-color-adjust` dark-color-scheme "biggest problems" (issue #1311:
+  `color-scheme-root-background` and
+  `color-scheme-color-initial-affected-by-color-scheme-property`, both 0% match).
+  CSS Color Adjust §2.3: when the document root element's used color scheme is
+  dark, the UA paints the canvas backdrop the dark colour (rgb(18, 18, 18))
+  rather than white. Broiler ignored `color-scheme`, so `:root { color-scheme:
+  dark }` with no background rendered a white canvas where Chromium renders dark.
+  Both canvas-background paths now emit the dark backdrop when the root's used
+  scheme is dark (the `color-scheme` list offers `dark` but not `light`, against
+  the reference environment's light preference): `PaintWalker.EmitCanvasBackground`
+  (the Fragment/IR paint path, which the WPT runner uses) adds a dark bottom
+  layer, and `HtmlContainerInt.GetRootBackgroundColor` (the HtmlContainer paint
+  path, which `HtmlRender.RenderToImageWithStyleSet` uses) returns the dark
+  colour when nothing else propagates. A propagated root/body background still
+  paints over it, and a fully-transparent root/body leaves the dark backdrop
+  showing. This consumes the new `ComputedStyle.ColorScheme`, plumbed through
+  `Broiler.Layout` (main repo: `CssBoxProperties`, `CssUtils`, `ComputedStyle`,
+  `ComputedStyleBuilder`). The second test also needed a main-repo WPT-runner
+  alignment (committed to the main repo, active immediately): the `test()`
+  testharness stub no longer runs its body — the reference generator never loads
+  testharness, so `test` is undefined there and the bodies (one of which toggles
+  a class that flips `color-scheme`) never run before the screenshot; running
+  them advanced Broiler's captured DOM past the reference point.
+  **Active CI fallback — none.** Canvas painting lives in the `Broiler.HTML`
+  orchestration layer, consumed by the parent as compiled submodule source with
+  no interception point (like patches 0008–0015). It activates on CI when this
+  patch is applied and the `Broiler.HTML` pointer is bumped; the pointer is
+  intentionally left unbumped (the change is committed to the submodule locally
+  only, unpushed because `MaiRat/Broiler.HTML` is outside session scope). The
+  `Broiler.Layout` plumbing and the runner stub change are in the main repo and
+  active immediately. Pixel-guard tests
+  (`Root_Color_Scheme_Dark_Paints_Dark_Canvas`,
+  `Root_Color_Scheme_Light_Keeps_White_Canvas`,
+  `Root_Color_Scheme_Dark_With_Background_Uses_Background`, written against
+  `HtmlRender.RenderToImageWithStyleSet` in `RootBackgroundTests`) are held back
+  from the main repo until the pointer is bumped — they assert the dark canvas,
+  which the pinned (unpatched) submodule does not yet paint, so committing them
+  now would red the main-repo suite on CI; apply them alongside the patch.
+  Verified end-to-end via `--render`: both tests render the dark canvas
+  rgb(18, 18, 18), matching the Chromium references generated with a light OS
+  preference; they were white before. A full run of the committed WPT suite
+  showed an identical 35-test failure set before and after the whole change (no
+  regressions).
+
 - **0015-css-env-substitution-function.patch** → `Broiler.CSS`
   (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`,
   `Broiler.CSS.Dom/CssStyleEngine.Supports.cs`, plus tests) — fixes the

@@ -151,6 +151,14 @@ public sealed class ComputedStyle
     public string Contain { get; init; } = "none";
 
     /// <summary>
+    /// CSS Color Adjust Module Level 1: the <c>color-scheme</c> property.
+    /// Used by canvas background painting (CSS Color Adjust §2.3): when the
+    /// root's used color scheme is <c>dark</c>, the canvas is painted the UA
+    /// dark backdrop colour instead of white.
+    /// </summary>
+    public string ColorScheme { get; init; } = "normal";
+
+    /// <summary>
     /// CSS Containment Module Level 2: the <c>content-visibility</c> property.
     /// <c>hidden</c> makes the fragment builder skip the element's contents so
     /// they are not painted, while the element's own box still renders.
