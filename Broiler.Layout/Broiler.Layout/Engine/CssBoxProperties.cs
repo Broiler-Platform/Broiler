@@ -753,6 +753,15 @@ internal abstract partial class CssBoxProperties
     /// background propagation.
     /// </summary>
     public string Contain { get; set; } = "none";
+
+    /// <summary>
+    /// CSS Containment Module Level 2: the <c>content-visibility</c> property.
+    /// Values: <c>visible</c> (default), <c>hidden</c>, <c>auto</c>.
+    /// <c>hidden</c> skips the element's contents (they are not painted and are
+    /// subject to layout/size containment), while the element's own box —
+    /// background, border, and box-model size — still renders.
+    /// </summary>
+    public string ContentVisibility { get; set; } = "visible";
     public string Transform { get; set; } = "none";
     public string FlexDirection { get; set; } = "row";
     public string FlexGrow { get; set; } = "0";

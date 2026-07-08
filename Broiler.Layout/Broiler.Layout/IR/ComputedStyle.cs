@@ -149,6 +149,13 @@ public sealed class ComputedStyle
     /// Used for background propagation suppression when value includes <c>paint</c>.
     /// </summary>
     public string Contain { get; init; } = "none";
+
+    /// <summary>
+    /// CSS Containment Module Level 2: the <c>content-visibility</c> property.
+    /// <c>hidden</c> makes the fragment builder skip the element's contents so
+    /// they are not painted, while the element's own box still renders.
+    /// </summary>
+    public string ContentVisibility { get; init; } = "visible";
     public string Transform { get; init; } = "none";
 
     // --- Flex ---

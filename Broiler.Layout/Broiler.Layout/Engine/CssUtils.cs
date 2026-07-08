@@ -140,6 +140,7 @@ internal static partial class CssUtils
             "grid-auto-rows" => cssBox.GridAutoRows,
             "grid-auto-columns" => cssBox.GridAutoColumns,
             "contain" => cssBox.Contain,
+            "content-visibility" => cssBox.ContentVisibility,
             _ => null,
         };
     }
@@ -373,6 +374,9 @@ internal static partial class CssUtils
                 break;
             case "contain":
                 cssBox.Contain = value;
+                break;
+            case "content-visibility":
+                cssBox.ContentVisibility = value;
                 break;
             case "columns":
                 // CSS Multi-column §3: 'columns' is a shorthand for
