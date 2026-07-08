@@ -21,6 +21,40 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0013-css-supports-feature-query-evaluation.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/SupportsConditionSyntax.cs`,
+  `Broiler.CSS.Dom/CssStyleEngine.Supports.cs` [new],
+  `Broiler.CSS.Dom/CssStyleEngine.cs`, plus tests) — fixes the
+  `css-conditional/css-supports-*` "biggest problems" cluster (issue #1305:
+  `-005`, `-009`, `-010`, `-020`, `-030`, all at 0% match). An `@supports` rule
+  applied its contents whenever the condition merely **parsed** as a valid
+  `<supports-condition>` — every well-formed feature query was assumed supported —
+  so rules gated on a *failing* condition wrongly applied: an invalid value
+  (`color: rainbow`), an unknown property (`unknown: green`), or a
+  `<general-enclosed>` block (`(not (…) or (…))`) all turned the page red instead
+  of leaving it green. The patch makes `SupportsConditionSyntax` return a
+  tri-state (`Invalid`/`False`/`True`): a feature query is resolved through a
+  support oracle, a `<general-enclosed>` group evaluates to **false** (so
+  `not (@page)` is true), and `and`/`or`/`not` fold the results per the grammar.
+  The oracle (`CssStyleEngine.IsFeatureQuerySupported`) accepts a query only when
+  the property is a recognised CSS property **and** the value is valid for it —
+  including a real `<color>` check (a full CSS named-color + system-color +
+  color-function set) that rejects `rainbow`. Optimism is preserved for real
+  properties Broiler may not fully render, so shipped feature queries stay true
+  and match the Chromium-generated references. Guard: the
+  `Supports_Rule_Applies_Only_When_Condition_Evaluates_True` theory (the full
+  css-supports family truth table) in `CssStyleEngineTests`.
+  **Active CI fallback — none.** `@supports` gating lives entirely in the
+  `Broiler.CSS` engine (`CssStyleEngine.CollectFromRules`); the parent repo
+  consumes it as compiled submodule source with no interception point, so — like
+  patches 0008/0009 — there is no main-repo path to mirror the fix. It activates
+  on CI when this patch is applied and the `Broiler.CSS` pointer is bumped; the
+  pointer is intentionally left unbumped (the change is committed to the submodule
+  locally only, unpushed because `MaiRat/Broiler.CSS` is outside session scope).
+  Verified end-to-end via `--render`: css-supports-005/020/030 render
+  byte-identical to an all-green baseline (were red), while a supported query and
+  `not (@page)` still apply.
+
 - **0012-broiler-dom-iterative-html-serializer.patch** → `Broiler.DOM`
   (`Broiler.Dom.Html/HtmlSerializer.cs`) — fixes the crash gating
   `shadow-dom/build-deep-detached-shadow-then-append-text.html` (issue #1302,
