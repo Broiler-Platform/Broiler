@@ -281,22 +281,42 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             if (el.IsTextNode || string.IsNullOrEmpty(el.Id))
                 continue;
             // Only register if the global doesn't already exist
-            // (user-defined globals take precedence).
+            // (user-defined globals take precedence — a `var`/`function` or a
+            // lexical `const`/`let`/`class` with the same name shadows the named
+            // element, per HTML "named access on the Window object"). The JS
+            // engine reports the result as a JSBoolean whose ToString() is the
+            // lowercase "true"/"false"; comparing against C#'s "True" never
+            // matched, so this skip was a no-op and a same-named read-only
+            // global lexical made the assignment below throw
+            // "Cannot assign to read only variable", crashing the whole render.
             try
             {
                 var existing = context.Eval(
                     $"typeof {el.Id} !== 'undefined'");
-                if (existing?.ToString() == "True")
+                if (existing != null && existing.BooleanValue)
                     continue;
             }
             catch
             {
-                // If the id isn't a valid JS identifier, skip it.
+                // If the id isn't a valid JS identifier, or resolving it throws
+                // (e.g. a lexical binding still in its temporal dead zone), leave
+                // the existing binding untouched.
                 continue;
             }
 
-            var jsObj = ToJSObject(el);
-            context[el.Id] = jsObj;
+            // Defensive: even past the guard, assigning could hit a read-only
+            // binding in an edge case; a named-element convenience global must
+            // never crash script execution.
+            try
+            {
+                var jsObj = ToJSObject(el);
+                context[el.Id] = jsObj;
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.RegisterNamedElementGlobals",
+                    $"Could not register named element global '{el.Id}': {ex.Message}", ex);
+            }
         }
     }
 

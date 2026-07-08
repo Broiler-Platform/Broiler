@@ -1,0 +1,227 @@
+From 8f2b2742ceec063bd97b15965e4bee3148b35c3d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 8 Jul 2026 11:05:12 +0000
+Subject: [PATCH] Serialize HTML iteratively so deep DOM trees don't crash
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+HtmlSerializer.Append recursed once per DOM level and threw
+"Maximum HTML serialization depth (1024) exceeded" past its depth cap —
+a legitimately deep tree (e.g. WPT shadow-dom/build-deep-detached-shadow-
+then-append-text.html, ~999 nested shadow hosts -> ~2000 serialized
+levels) crashed the whole render. The cap existed only to stop the
+recursion overflowing the .NET call stack.
+
+Rewrite Append to walk an explicit heap stack instead of recursing:
+each element pushes a deferred close-tag marker then its children (in
+reverse, so they emit in document order). Output is byte-for-byte
+identical for ordinary trees. Depth is still tracked and bounded by
+MaximumDepth (raised to 100000 now that it guards heap growth / cycles
+rather than stack frames), so a runaway structure is still bounded but
+real content no longer hits the cap.
+---
+ Broiler.Dom.Html/HtmlSerializer.cs | 161 ++++++++++++++++++-----------
+ 1 file changed, 103 insertions(+), 58 deletions(-)
+
+diff --git a/Broiler.Dom.Html/HtmlSerializer.cs b/Broiler.Dom.Html/HtmlSerializer.cs
+index 0e538dd..121b7cd 100644
+--- a/Broiler.Dom.Html/HtmlSerializer.cs
++++ b/Broiler.Dom.Html/HtmlSerializer.cs
+@@ -24,7 +24,7 @@ public sealed record HtmlSerializationAdapter<TNode>(
+ 
+ public sealed record HtmlSerializationOptions(
+     bool IncludeHtmlDoctype = false,
+-    int MaximumDepth = 1024,
++    int MaximumDepth = 100_000,
+     bool EncodeTextNodes = true,
+     bool NewLineAfterDoctype = false);
+ 
+@@ -74,82 +74,127 @@ public static class HtmlSerializer
+ 
+     public static string Encode(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+ 
++    // A pending unit of serialization work. Either a node to open (Closing is
++    // null) or a literal close-tag string to append once a node's children have
++    // all been written. Kept on an explicit heap stack so serialization does not
++    // recurse on the .NET call stack: a legitimately deep DOM (e.g. hundreds of
++    // nested shadow hosts, WPT shadow-dom/build-deep-detached-shadow-then-append-
++    // text.html) would otherwise overflow the stack. Depth is still tracked so a
++    // runaway/cyclic structure is bounded by MaximumDepth instead of exhausting
++    // memory.
++    private readonly struct PendingNode<TNode>(TNode node, string? closing, int depth)
++    {
++        public readonly TNode Node = node;
++        public readonly string? Closing = closing;
++        public readonly int Depth = depth;
++    }
++
+     private static void Append<TNode>(
+-        TNode node,
++        TNode root,
+         HtmlSerializationAdapter<TNode> adapter,
+         HtmlSerializationOptions options,
+         StringBuilder builder,
+         int depth)
+     {
+-        if (depth > options.MaximumDepth)
+-            throw new InvalidOperationException($"Maximum HTML serialization depth ({options.MaximumDepth}) exceeded.");
++        var stack = new Stack<PendingNode<TNode>>();
++        stack.Push(new PendingNode<TNode>(root, null, depth));
+ 
+-        var kind = adapter.GetKind(node);
+-        if (kind == HtmlSerializationNodeKind.Text)
++        while (stack.Count > 0)
+         {
+-            var text = adapter.GetText(node) ?? string.Empty;
+-            builder.Append(options.EncodeTextNodes ? Encode(text) : text);
+-            return;
+-        }
++            var pending = stack.Pop();
++            if (pending.Closing is not null)
++            {
++                builder.Append(pending.Closing);
++                continue;
++            }
+ 
+-        if (kind == HtmlSerializationNodeKind.Comment)
+-        {
+-            builder.Append("<!--").Append(adapter.GetText(node) ?? string.Empty).Append("-->");
+-            return;
+-        }
++            var node = pending.Node;
++            var nodeDepth = pending.Depth;
++            if (nodeDepth > options.MaximumDepth)
++                throw new InvalidOperationException($"Maximum HTML serialization depth ({options.MaximumDepth}) exceeded.");
+ 
+-        if (kind is HtmlSerializationNodeKind.Fragment or HtmlSerializationNodeKind.DocumentRoot)
+-        {
+-            foreach (var child in adapter.GetChildren(node))
+-                Append(child, adapter, options, builder, depth + 1);
+-            return;
+-        }
++            var kind = adapter.GetKind(node);
++            if (kind == HtmlSerializationNodeKind.Text)
++            {
++                var textData = adapter.GetText(node) ?? string.Empty;
++                builder.Append(options.EncodeTextNodes ? Encode(textData) : textData);
++                continue;
++            }
+ 
+-        if (kind == HtmlSerializationNodeKind.DocumentType)
+-        {
+-            var name = adapter.GetName(node);
+-            builder.Append("<!DOCTYPE ").Append(string.IsNullOrWhiteSpace(name) ? "html" : name).Append('>');
+-            return;
+-        }
++            if (kind == HtmlSerializationNodeKind.Comment)
++            {
++                builder.Append("<!--").Append(adapter.GetText(node) ?? string.Empty).Append("-->");
++                continue;
++            }
+ 
+-        var tagName = adapter.GetName(node).ToLowerInvariant();
+-        builder.Append('<').Append(tagName);
+-        foreach (var (name, value) in adapter.GetAttributes(node))
+-            builder.Append(' ').Append(name).Append("=\"").Append(Encode(value)).Append('"');
++            if (kind is HtmlSerializationNodeKind.Fragment or HtmlSerializationNodeKind.DocumentRoot)
++            {
++                PushChildren(stack, adapter.GetChildren(node), nodeDepth + 1);
++                continue;
++            }
+ 
+-        var styles = adapter.GetStyles(node).ToArray();
+-        if (styles.Length > 0)
+-        {
+-            builder.Append(" style=\"");
+-            for (var index = 0; index < styles.Length; index++)
++            if (kind == HtmlSerializationNodeKind.DocumentType)
+             {
+-                if (index > 0)
+-                    builder.Append("; ");
+-                builder.Append(styles[index].Key).Append(": ").Append(Encode(styles[index].Value));
++                var name = adapter.GetName(node);
++                builder.Append("<!DOCTYPE ").Append(string.IsNullOrWhiteSpace(name) ? "html" : name).Append('>');
++                continue;
+             }
+-            builder.Append('"');
+-        }
+ 
+-        builder.Append('>');
+-        if (VoidElements.Contains(tagName))
+-            return;
++            var tagName = adapter.GetName(node).ToLowerInvariant();
++            builder.Append('<').Append(tagName);
++            foreach (var (name, value) in adapter.GetAttributes(node))
++                builder.Append(' ').Append(name).Append("=\"").Append(Encode(value)).Append('"');
+ 
+-        var children = adapter.GetChildren(node).ToArray();
+-        if (children.Length > 0)
+-        {
+-            foreach (var child in children)
+-                Append(child, adapter, options, builder, depth + 1);
+-        }
+-        else if (adapter.GetText(node) is { Length: > 0 } text)
+-        {
+-            builder.Append(tagName is "script" or "style" ? text : Encode(text));
+-        }
+-        else if (adapter.GetRawInnerHtml(node) is { Length: > 0 } rawInnerHtml)
+-        {
+-            builder.Append(rawInnerHtml);
++            var styles = adapter.GetStyles(node).ToArray();
++            if (styles.Length > 0)
++            {
++                builder.Append(" style=\"");
++                for (var index = 0; index < styles.Length; index++)
++                {
++                    if (index > 0)
++                        builder.Append("; ");
++                    builder.Append(styles[index].Key).Append(": ").Append(Encode(styles[index].Value));
++                }
++                builder.Append('"');
++            }
++
++            builder.Append('>');
++            if (VoidElements.Contains(tagName))
++                continue;
++
++            var children = adapter.GetChildren(node).ToArray();
++            if (children.Length > 0)
++            {
++                // Defer the close tag until after every child is written, then
++                // push the children so they pop (and serialize) in document order.
++                stack.Push(new PendingNode<TNode>(default!, $"</{tagName}>", nodeDepth));
++                for (var index = children.Length - 1; index >= 0; index--)
++                    stack.Push(new PendingNode<TNode>(children[index], null, nodeDepth + 1));
++                continue;
++            }
++
++            if (adapter.GetText(node) is { Length: > 0 } text)
++            {
++                builder.Append(tagName is "script" or "style" ? text : Encode(text));
++            }
++            else if (adapter.GetRawInnerHtml(node) is { Length: > 0 } rawInnerHtml)
++            {
++                builder.Append(rawInnerHtml);
++            }
++
++            builder.Append("</").Append(tagName).Append('>');
+         }
++    }
+ 
+-        builder.Append("</").Append(tagName).Append('>');
++    private static void PushChildren<TNode>(
++        Stack<PendingNode<TNode>> stack,
++        IEnumerable<TNode> children,
++        int depth)
++    {
++        // Reverse so the first child pops first (document order).
++        var buffer = children as IReadOnlyList<TNode> ?? children.ToArray();
++        for (var index = buffer.Count - 1; index >= 0; index--)
++            stack.Push(new PendingNode<TNode>(buffer[index], null, depth));
+     }
+ 
+     private static readonly HtmlSerializationAdapter<DomNode> CanonicalAdapter = new(
+-- 
+2.43.0
+

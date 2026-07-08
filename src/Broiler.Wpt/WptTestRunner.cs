@@ -2014,6 +2014,14 @@ internal sealed class WptTestRunner
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
         bridge.Attach(context, html, url);
+
+        // Enforce the CSP style-src family (style-src / -elem / -attr) on the
+        // parsed DOM before scripts run, so an inline style attribute or <style>
+        // element blocked by the page's policy neither applies nor renders
+        // (WPT content-security-policy/style-src*). Only style directives are
+        // consulted, so this does not change script/event-handler behaviour.
+        bridge.ApplyStyleContentSecurityPolicy(ContentSecurityPolicy.FromHtml(html));
+
         try { context.Eval("window.queueMicrotask = queueMicrotask;"); } catch { /* best-effort */ }
 
         // Register DOM elements with IDs as globals (HTML5 named access).

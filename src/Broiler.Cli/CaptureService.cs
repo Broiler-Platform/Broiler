@@ -487,7 +487,10 @@ public class CaptureService
                 scripts.Add(scriptContent);
         }
 
-        if (scripts.Count == 0 && deferredScripts.Count == 0)
+        // No scripts to run: normally the raw HTML passes through untouched, but
+        // a CSP style-src policy that blocks inline styles still has to be applied
+        // to the rendered output, so fall through to build and re-serialize the DOM.
+        if (scripts.Count == 0 && deferredScripts.Count == 0 && (csp == null || !csp.AffectsStyles()))
             return html;
 
         var microTasks = new MicroTaskQueue();
@@ -497,6 +500,10 @@ public class CaptureService
         bridge.Csp = csp;
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         bridge.Attach(context, html, url);
+
+        // Enforce the CSP style-src family on the parsed DOM so blocked inline
+        // style attributes / <style> elements neither apply nor render.
+        bridge.ApplyStyleContentSecurityPolicy(csp);
 
         // Set local base path for sub-resource resolution (e.g. iframe src)
         if (!string.IsNullOrEmpty(localResourceBasePath))
