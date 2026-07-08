@@ -15,7 +15,7 @@ public sealed partial class DomBridge
     //  DOM → HTML serialisation
     // ------------------------------------------------------------------
 
-    private const int MaxSerializationDepth = 1024;
+    private const int MaxSerializationDepth = 100_000;
     private const double ZoomSerializationEpsilon = 0.0001;
     private const double DefaultProgressLikeTrackLengthPx = 120;
     private readonly Dictionary<DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];

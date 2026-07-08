@@ -21,6 +21,32 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0012-broiler-dom-iterative-html-serializer.patch** → `Broiler.DOM`
+  (`Broiler.Dom.Html/HtmlSerializer.cs`) — fixes the crash gating
+  `shadow-dom/build-deep-detached-shadow-then-append-text.html` (issue #1302,
+  `HtmlSerializer.Append[TNode] — Maximum HTML serialization depth (1024)
+  exceeded`). `Append` recursed once per DOM level, so a legitimately deep tree
+  (the test builds ~999 nested shadow hosts → ~2000 serialized levels) blew past
+  the 1024 cap and threw, crashing the whole render. The cap existed only to
+  stop the recursion overflowing the .NET call stack. The patch rewrites `Append`
+  to walk an explicit heap stack (each element pushes a deferred close-tag marker
+  then its children in reverse, emitting in document order) — byte-for-byte
+  identical output for ordinary trees, verified by
+  `HtmlSerializerIterativeTests.Serialize_ProducesCorrectlyNestedAndOrderedOutput`
+  — and raises the default `MaximumDepth` to 100000 now that the bound guards
+  heap growth / cycles rather than stack frames.
+  **Active CI fallback — yes.** The renderer serializes through the **main-repo**
+  `DomBridge` (`SerializeToHtml` / the render-document adapter), which passes its
+  own `MaxSerializationDepth`; that constant was raised 1024 → 100000 in the same
+  parent commit, so the test renders on CI **now** without waiting on this patch.
+  It is safe with the still-recursive pinned serializer because ~2000 recursive
+  frames stay well within the 1MB stack (verified: the test renders, and deeper
+  script-built chains hit the 30 s WPT timeout — a graceful failure — long before
+  any overflow). Once a maintainer applies this patch and bumps the pointer, the
+  recursion (and any residual stack-overflow risk at extreme depths) is gone
+  entirely. Guards: `HtmlSerializerIterativeTests` (exact-output equivalence +
+  a 2000-level chain serializing without throwing).
+
 - **0011-broiler-html-frameset-track-overflow.patch** → `Broiler.HTML`
   (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs` +
   `Source/Broiler.HTML.Image/HtmlRender.cs`) — fixes the crash gating
