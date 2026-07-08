@@ -1,0 +1,835 @@
+From b5ddaa331188af4fa0fec70bcf879854d7be58d6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 8 Jul 2026 13:01:05 +0000
+Subject: [PATCH] Evaluate @supports feature queries instead of assuming
+ support
+
+An @supports rule was applied whenever its condition parsed as a valid
+<supports-condition>, treating every well-formed feature query as supported.
+That wrongly applied rules gated on unsupported queries: an invalid value
+(color: rainbow), an unknown property (unknown: green), or a <general-enclosed>
+block, all of which must evaluate to false (WPT css-conditional css-supports-005,
+009, 010, 020, 030).
+
+Replace the optimistic gate with a real evaluation. SupportsConditionSyntax now
+returns a tri-state (Invalid/False/True): a feature query is resolved through a
+support oracle, a <general-enclosed> group evaluates to false (so not (@page) is
+true), and and/or/not fold the results per the grammar. CssStyleEngine's oracle
+(IsFeatureQuerySupported) accepts a query only when the property is recognised and
+the value is valid for it, including a real <color> check that rejects rainbow.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01TaHAU6QPbKQc9hj1xBBdRR
+---
+ Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs |  49 ++-
+ Broiler.CSS.Dom/CssStyleEngine.Supports.cs   | 344 +++++++++++++++++++
+ Broiler.CSS.Dom/CssStyleEngine.cs            |  25 +-
+ Broiler.CSS.Dom/SupportsConditionSyntax.cs   | 232 ++++++++++---
+ 4 files changed, 592 insertions(+), 58 deletions(-)
+ create mode 100644 Broiler.CSS.Dom/CssStyleEngine.Supports.cs
+
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+index 0d3f6c7..af61d72 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+@@ -848,13 +848,60 @@ public sealed class CssStyleEngineTests
+         var div = body.OwnerDocument.CreateElement("div");
+         body.AppendChild(div);
+ 
+-        // A well-formed feature query is assumed supported, so the inner rule applies.
++        // A well-formed, supported feature query evaluates true, so the inner rule applies.
+         var engine = EngineWith(
+             "div { color: red; } @supports (color: green) { div { color: green; } }");
+ 
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
++    // ── @supports condition *evaluation* (truth) ───────────────────────────
++    // A valid condition applies its rules only when it evaluates to true. These
++    // mirror the WPT css-conditional/css-supports-* family: an unsupported feature
++    // query (unknown property, invalid value) and a <general-enclosed> block are
++    // false, and boolean combinators (and/or/not) fold those results. `true` means
++    // the inner rule must win (condition evaluates true); `false` means it must not.
++    [Theory]
++    [InlineData("(color: green)", true)]                                   // 001
++    [InlineData("((color: green))", true)]                                 // 003 nested condition
++    [InlineData("(color: green !important)", true)]                        // 004 !important ignored
++    [InlineData("(color: rainbow)", false)]                                // 005 invalid <color>
++    [InlineData("(color: rainbow) or (color: green)", true)]               // 006
++    [InlineData("(color: green) or (color: rainbow)", true)]               // 007
++    [InlineData("(color: green) and (color: blue)", true)]                 // 008
++    [InlineData("(color: rainbow) and (color: blue)", false)]             // 009
++    [InlineData("(color: blue) and (color: rainbow)", false)]            // 010
++    [InlineData("(color: rainbow) or (color: iridescent) or (color: green)", true)] // 011
++    [InlineData("(color: red) and (color: green) and (color: blue)", true)]         // 012
++    [InlineData("(color: green) and (color: green) or (color: green)", false)] // 013 mixed and/or
++    [InlineData("(color: green) or (color: green) and (color: green)", false)] // 014 mixed or/and
++    [InlineData("not (color: rainbow)", true)]                             // 016
++    [InlineData("not not (color: green)", false)]                          // 017 invalid
++    [InlineData("not (not (color: green))", true)]                         // 018
++    [InlineData("not (color: rainbow) and not (color: iridescent)", false)] // 019 invalid
++    [InlineData("(unknown: green)", false)]                                // 020 unknown property
++    [InlineData("(unknown: green) or (color: green)", true)]               // 021
++    [InlineData("(unknown:) or (color: green)", true)]                     // 022 empty value
++    [InlineData("(unknown) or (color: green)", true)]                      // 023 general-enclosed
++    [InlineData("(color:) or (color: green)", true)]                       // 031 empty value
++    [InlineData("not (color: rainbow) or (color: green)", false)]          // 029 mixed not/or
++    [InlineData("(not (color: rainbow) or (color: green))", false)]        // 030 general-enclosed
++    [InlineData("not (@page)", true)]                                      // 032 not(general-enclosed)
++    [InlineData("an-extension(of some kind) or (color: green)", true)]     // 036 unknown fn or true
++    [InlineData("(color: green) or an-extension(that is [unbalanced)", false)] // 037 unbalanced
++    [InlineData("not(unknown: unknown)", false)]                           // 038 not( is a function
++    [InlineData("(color: green) or(color: blue)", false)]                  // 039 or( is a function
++    [InlineData("not ()", true)]                                           // 040 not(empty)
++    public void Supports_Rule_Applies_Only_When_Condition_Evaluates_True(string condition, bool shouldApply)
++    {
++        var (_, html, _) = NewDocument();
++        var engine = EngineWith(
++            $"html {{ color: green; }} @supports {condition} {{ html {{ color: red; }} }}");
++
++        var expected = shouldApply ? "red" : "green";
++        Assert.Equal(expected, engine.GetComputedStyle(html).GetPropertyValue("color"));
++    }
++
+     // CSS Text 4 §text-align / §text-align-last (issue #1276): the value validator
+     // must accept 'justify-all' for text-align and the text-align-last keywords, so
+     // the declaration survives the cascade and reaches the renderer instead of being
+diff --git a/Broiler.CSS.Dom/CssStyleEngine.Supports.cs b/Broiler.CSS.Dom/CssStyleEngine.Supports.cs
+new file mode 100644
+index 0000000..89971a7
+--- /dev/null
++++ b/Broiler.CSS.Dom/CssStyleEngine.Supports.cs
+@@ -0,0 +1,344 @@
++using System;
++using System.Collections.Generic;
++
++namespace Broiler.CSS.Dom;
++
++// @supports feature-query support oracle.
++//
++// An @supports feature query "( property: value )" is *true* only when a
++// reference browser would understand the declaration. Broiler previously
++// evaluated feature queries optimistically (any well-formed query was assumed
++// supported), which made genuinely-unsupported queries — an unknown property
++// ("unknown: green"), an invalid value ("color: rainbow"), or a
++// <general-enclosed> block — wrongly apply their rules (WPT css-conditional
++// css-supports-005/009/010/020/030, "valid syntax but a failing condition must
++// not apply").
++//
++// The oracle models what the reference (Chromium) browser that generates the WPT
++// references supports, NOT what Broiler's layout engine implements — the two agree
++// on the negative cases these tests probe (neither supports "color: rainbow" or an
++// "unknown" property) while staying optimistic for real properties Broiler may not
++// yet fully render, so switching @supports to real evaluation matches the
++// reference without regressing feature queries for shipped CSS features.
++public sealed partial class CssStyleEngine
++{
++    /// <summary>
++    /// Resolves an <c>@supports</c> feature query <c>(property: value)</c>: returns
++    /// <c>true</c> only when the property is a recognised CSS property and the value
++    /// is acceptable for it. Unknown properties, empty values, and values that fail
++    /// property-specific validation (a bare word that is not a <c>&lt;color&gt;</c>,
++    /// an invalid keyword, …) are unsupported.
++    /// </summary>
++    internal static bool IsFeatureQuerySupported(string property, string value)
++    {
++        property = property.Trim().ToLowerInvariant();
++        // A feature query may carry !important; it does not affect whether the
++        // underlying declaration is supported, so strip it before validating.
++        value = StripImportantFlag(value).Trim();
++        if (value.Length == 0)
++            return false;
++
++        // Custom properties (and the var() that references them) are always a
++        // supported declaration per CSS Properties & Values.
++        if (property.StartsWith("--", StringComparison.Ordinal))
++            return true;
++        if (value.Contains("var(", StringComparison.OrdinalIgnoreCase))
++            return true;
++
++        if (!IsKnownCssProperty(property))
++            return false;
++
++        // Reuse the cascade's value validator for the properties it models with a
++        // closed value set (display, position, border-style, …). It intentionally
++        // default-accepts values for properties it does not model, so it is a
++        // necessary-but-not-sufficient gate.
++        if (!IsAcceptableDeclarationValue(property, value))
++            return false;
++
++        // The cascade validator only rejects vendor-prefixed junk for <color>
++        // properties, so "color: rainbow" slips through it. @supports needs a real
++        // <color> check.
++        if (IsColorProperty(property) && !IsColorValue(value))
++            return false;
++
++        return true;
++    }
++
++    private static string StripImportantFlag(string value)
++    {
++        var trimmed = value.TrimEnd();
++        const string important = "!important";
++        // Tolerate whitespace between '!' and 'important' is uncommon in feature
++        // queries; match the canonical form (optionally spaced before '!').
++        if (trimmed.EndsWith(important, StringComparison.OrdinalIgnoreCase))
++            return trimmed[..^important.Length];
++        return value;
++    }
++
++    private static bool IsColorProperty(string property) => property switch
++    {
++        "color" or "background-color" or "border-color"
++            or "border-top-color" or "border-right-color"
++            or "border-bottom-color" or "border-left-color"
++            or "border-block-color" or "border-inline-color"
++            or "border-block-start-color" or "border-block-end-color"
++            or "border-inline-start-color" or "border-inline-end-color"
++            or "outline-color" or "text-decoration-color"
++            or "column-rule-color" or "caret-color"
++            or "text-emphasis-color" or "-webkit-text-fill-color"
++            or "-webkit-text-stroke-color" or "flood-color"
++            or "lighting-color" or "stop-color" or "fill" or "stroke" => true,
++        _ => false,
++    };
++
++    /// <summary>
++    /// True when <paramref name="value"/> is a valid CSS <c>&lt;color&gt;</c>: a
++    /// named color, a hex color, a color function (rgb/hsl/hwb/lab/lch/oklab/oklch/
++    /// color/color-mix/light-dark/…), <c>currentcolor</c>/<c>transparent</c>, a
++    /// system color, or a CSS-wide keyword. A bare identifier that is not one of
++    /// these (e.g. <c>rainbow</c>) is not a color.
++    /// </summary>
++    private static bool IsColorValue(string value)
++    {
++        var v = value.Trim().ToLowerInvariant();
++        if (v.Length == 0)
++            return false;
++
++        if (v is "inherit" or "initial" or "unset" or "revert" or "revert-layer")
++            return true;
++        if (v is "currentcolor" or "transparent")
++            return true;
++        if (v[0] == '#')
++            return true;
++
++        int paren = v.IndexOf('(');
++        if (paren > 0)
++        {
++            var fn = v[..paren];
++            return ColorFunctions.Contains(fn);
++        }
++
++        return NamedColors.Contains(v) || SystemColors.Contains(v);
++    }
++
++    private static bool IsKnownCssProperty(string property)
++    {
++        if (property.StartsWith("--", StringComparison.Ordinal))
++            return true;
++        // Optimistically accept vendor-prefixed properties: reference browsers ship
++        // many, and Broiler's cascade already treats them leniently.
++        if (property.StartsWith("-webkit-", StringComparison.Ordinal) ||
++            property.StartsWith("-moz-", StringComparison.Ordinal) ||
++            property.StartsWith("-ms-", StringComparison.Ordinal) ||
++            property.StartsWith("-o-", StringComparison.Ordinal))
++        {
++            return true;
++        }
++        return KnownProperties.Contains(property);
++    }
++
++    private static readonly HashSet<string> ColorFunctions = new(StringComparer.OrdinalIgnoreCase)
++    {
++        "rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch",
++        "color", "color-mix", "light-dark", "device-cmyk",
++    };
++
++    // The CSS Color 4 named colors (the extended set, including "rebeccapurple")
++    // plus the CSS-wide "transparent"/"currentcolor" handled above. Used to decide
++    // whether an @supports (color: <ident>) query names a real color.
++    private static readonly HashSet<string> NamedColors = new(StringComparer.OrdinalIgnoreCase)
++    {
++        "aliceblue", "antiquewhite", "aqua", "aquamarine", "azure", "beige",
++        "bisque", "black", "blanchedalmond", "blue", "blueviolet", "brown",
++        "burlywood", "cadetblue", "chartreuse", "chocolate", "coral",
++        "cornflowerblue", "cornsilk", "crimson", "cyan", "darkblue", "darkcyan",
++        "darkgoldenrod", "darkgray", "darkgreen", "darkgrey", "darkkhaki",
++        "darkmagenta", "darkolivegreen", "darkorange", "darkorchid", "darkred",
++        "darksalmon", "darkseagreen", "darkslateblue", "darkslategray",
++        "darkslategrey", "darkturquoise", "darkviolet", "deeppink", "deepskyblue",
++        "dimgray", "dimgrey", "dodgerblue", "firebrick", "floralwhite",
++        "forestgreen", "fuchsia", "gainsboro", "ghostwhite", "gold", "goldenrod",
++        "gray", "green", "greenyellow", "grey", "honeydew", "hotpink", "indianred",
++        "indigo", "ivory", "khaki", "lavender", "lavenderblush", "lawngreen",
++        "lemonchiffon", "lightblue", "lightcoral", "lightcyan",
++        "lightgoldenrodyellow", "lightgray", "lightgreen", "lightgrey",
++        "lightpink", "lightsalmon", "lightseagreen", "lightskyblue",
++        "lightslategray", "lightslategrey", "lightsteelblue", "lightyellow",
++        "lime", "limegreen", "linen", "magenta", "maroon", "mediumaquamarine",
++        "mediumblue", "mediumorchid", "mediumpurple", "mediumseagreen",
++        "mediumslateblue", "mediumspringgreen", "mediumturquoise",
++        "mediumvioletred", "midnightblue", "mintcream", "mistyrose", "moccasin",
++        "navajowhite", "navy", "oldlace", "olive", "olivedrab", "orange",
++        "orangered", "orchid", "palegoldenrod", "palegreen", "paleturquoise",
++        "palevioletred", "papayawhip", "peachpuff", "peru", "pink", "plum",
++        "powderblue", "purple", "rebeccapurple", "red", "rosybrown", "royalblue",
++        "saddlebrown", "salmon", "sandybrown", "seagreen", "seashell", "sienna",
++        "silver", "skyblue", "slateblue", "slategray", "slategrey", "snow",
++        "springgreen", "steelblue", "tan", "teal", "thistle", "tomato",
++        "turquoise", "violet", "wheat", "white", "whitesmoke", "yellow",
++        "yellowgreen",
++    };
++
++    // CSS Color 4 system colors (used as <color> keywords, e.g. Canvas, ButtonText).
++    private static readonly HashSet<string> SystemColors = new(StringComparer.OrdinalIgnoreCase)
++    {
++        "canvas", "canvastext", "linktext", "visitedtext", "activetext",
++        "buttonface", "buttontext", "buttonborder", "field", "fieldtext",
++        "highlight", "highlighttext", "selecteditem", "selecteditemtext",
++        "mark", "marktext", "graytext", "accentcolor", "accentcolortext",
++        // Deprecated but still recognised system-color keywords.
++        "activeborder", "activecaption", "appworkspace", "background",
++        "buttonhighlight", "buttonshadow", "captiontext", "inactiveborder",
++        "inactivecaption", "inactivecaptiontext", "infobackground", "infotext",
++        "menu", "menutext", "scrollbar", "threeddarkshadow", "threedface",
++        "threedhighlight", "threedlightshadow", "threedshadow", "window",
++        "windowframe", "windowtext",
++    };
++
++    // A recognised-CSS-property allow-list for @supports. It is deliberately broad —
++    // it models the properties a reference browser recognises (so real feature
++    // queries stay true), and exists only to reject genuinely-unknown property names
++    // such as "unknown". Custom ("--*") and vendor-prefixed properties are accepted
++    // by IsKnownCssProperty without appearing here.
++    private static readonly HashSet<string> KnownProperties = new(StringComparer.OrdinalIgnoreCase)
++    {
++        // Boxes / positioning
++        "display", "position", "top", "right", "bottom", "left", "inset",
++        "inset-block", "inset-inline", "inset-block-start", "inset-block-end",
++        "inset-inline-start", "inset-inline-end", "float", "clear", "z-index",
++        "visibility", "box-sizing", "aspect-ratio", "contain", "contain-intrinsic-size",
++        "contain-intrinsic-width", "contain-intrinsic-height",
++        "contain-intrinsic-block-size", "contain-intrinsic-inline-size",
++        "content-visibility", "container", "container-type", "container-name",
++        "isolation", "overflow", "overflow-x", "overflow-y", "overflow-block",
++        "overflow-inline", "overflow-clip-margin", "overflow-anchor", "overscroll-behavior",
++        "overscroll-behavior-x", "overscroll-behavior-y", "overscroll-behavior-block",
++        "overscroll-behavior-inline", "resize",
++        // Sizing
++        "width", "height", "min-width", "min-height", "max-width", "max-height",
++        "block-size", "inline-size", "min-block-size", "min-inline-size",
++        "max-block-size", "max-inline-size",
++        // Margins / padding / borders
++        "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
++        "margin-block", "margin-inline", "margin-block-start", "margin-block-end",
++        "margin-inline-start", "margin-inline-end", "margin-trim",
++        "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
++        "padding-block", "padding-inline", "padding-block-start", "padding-block-end",
++        "padding-inline-start", "padding-inline-end",
++        "border", "border-width", "border-style", "border-color",
++        "border-top", "border-right", "border-bottom", "border-left",
++        "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
++        "border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
++        "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
++        "border-block", "border-inline", "border-block-width", "border-inline-width",
++        "border-block-style", "border-inline-style", "border-block-color", "border-inline-color",
++        "border-block-start", "border-block-end", "border-inline-start", "border-inline-end",
++        "border-block-start-width", "border-block-end-width",
++        "border-inline-start-width", "border-inline-end-width",
++        "border-block-start-style", "border-block-end-style",
++        "border-inline-start-style", "border-inline-end-style",
++        "border-block-start-color", "border-block-end-color",
++        "border-inline-start-color", "border-inline-end-color",
++        "border-radius", "border-top-left-radius", "border-top-right-radius",
++        "border-bottom-left-radius", "border-bottom-right-radius",
++        "border-start-start-radius", "border-start-end-radius",
++        "border-end-start-radius", "border-end-end-radius",
++        "border-image", "border-image-source", "border-image-slice",
++        "border-image-width", "border-image-outset", "border-image-repeat",
++        "border-collapse", "border-spacing",
++        "outline", "outline-width", "outline-style", "outline-color", "outline-offset",
++        "box-shadow", "box-decoration-break",
++        // Backgrounds
++        "background", "background-color", "background-image", "background-repeat",
++        "background-position", "background-position-x", "background-position-y",
++        "background-size", "background-origin", "background-clip", "background-attachment",
++        "background-blend-mode",
++        // Color / visual
++        "color", "color-scheme", "opacity", "mix-blend-mode", "accent-color",
++        "caret-color", "print-color-adjust", "forced-color-adjust",
++        // Fonts / text
++        "font", "font-family", "font-size", "font-style", "font-weight",
++        "font-variant", "font-variant-caps", "font-variant-numeric",
++        "font-variant-ligatures", "font-variant-east-asian", "font-variant-alternates",
++        "font-variant-position", "font-variant-emoji", "font-feature-settings",
++        "font-variation-settings", "font-kerning", "font-stretch", "font-size-adjust",
++        "font-synthesis", "font-optical-sizing", "font-language-override",
++        "line-height", "letter-spacing", "word-spacing", "text-align", "text-align-last",
++        "text-indent", "text-transform", "text-decoration", "text-decoration-line",
++        "text-decoration-style", "text-decoration-color", "text-decoration-thickness",
++        "text-decoration-skip-ink", "text-underline-offset", "text-underline-position",
++        "text-emphasis", "text-emphasis-style", "text-emphasis-color", "text-emphasis-position",
++        "text-shadow", "text-overflow", "text-justify", "text-orientation",
++        "text-combine-upright", "text-rendering", "text-wrap", "text-wrap-mode",
++        "text-wrap-style", "text-spacing-trim", "text-autospace",
++        "white-space", "white-space-collapse", "word-break", "word-wrap",
++        "overflow-wrap", "line-break", "hyphens", "hyphenate-character",
++        "hyphenate-limit-chars", "tab-size", "direction", "unicode-bidi",
++        "writing-mode", "vertical-align", "quotes", "hanging-punctuation",
++        "ruby-align", "ruby-position", "ruby-merge", "initial-letter",
++        // Lists / tables / content
++        "list-style", "list-style-type", "list-style-position", "list-style-image",
++        "counter-reset", "counter-increment", "counter-set", "content",
++        "table-layout", "empty-cells", "caption-side",
++        // Flexbox / grid / alignment
++        "flex", "flex-grow", "flex-shrink", "flex-basis", "flex-direction",
++        "flex-flow", "flex-wrap", "order",
++        "justify-content", "justify-items", "justify-self",
++        "align-content", "align-items", "align-self", "place-content",
++        "place-items", "place-self", "gap", "row-gap", "column-gap",
++        "grid", "grid-template", "grid-template-rows", "grid-template-columns",
++        "grid-template-areas", "grid-auto-rows", "grid-auto-columns", "grid-auto-flow",
++        "grid-row", "grid-column", "grid-area", "grid-row-start", "grid-row-end",
++        "grid-column-start", "grid-column-end", "grid-gap", "grid-row-gap", "grid-column-gap",
++        // Multicol
++        "columns", "column-count", "column-width", "column-rule", "column-rule-width",
++        "column-rule-style", "column-rule-color", "column-span", "column-fill",
++        // Transforms / transitions / animations
++        "transform", "transform-origin", "transform-box", "transform-style",
++        "translate", "rotate", "scale", "perspective", "perspective-origin",
++        "backface-visibility",
++        "transition", "transition-property", "transition-duration",
++        "transition-timing-function", "transition-delay", "transition-behavior",
++        "animation", "animation-name", "animation-duration", "animation-timing-function",
++        "animation-delay", "animation-iteration-count", "animation-direction",
++        "animation-fill-mode", "animation-play-state", "animation-composition",
++        "animation-timeline", "animation-range", "animation-range-start", "animation-range-end",
++        "will-change", "offset", "offset-path", "offset-distance", "offset-rotate",
++        "offset-anchor", "offset-position",
++        // Scrolling
++        "scroll-behavior", "scroll-margin", "scroll-margin-top", "scroll-margin-right",
++        "scroll-margin-bottom", "scroll-margin-left", "scroll-margin-block",
++        "scroll-margin-inline", "scroll-padding", "scroll-padding-top",
++        "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left",
++        "scroll-padding-block", "scroll-padding-inline", "scroll-snap-type",
++        "scroll-snap-align", "scroll-snap-stop", "scroll-timeline",
++        "scroll-timeline-name", "scroll-timeline-axis", "view-timeline",
++        "view-timeline-name", "view-timeline-axis", "view-timeline-inset",
++        // Effects / masking / clipping
++        "clip", "clip-path", "clip-rule", "mask", "mask-image", "mask-mode",
++        "mask-repeat", "mask-position", "mask-clip", "mask-origin", "mask-size",
++        "mask-composite", "mask-type", "mask-border", "filter", "backdrop-filter",
++        "shape-outside", "shape-margin", "shape-image-threshold", "shape-rendering",
++        "mix-blend-mode",
++        // Interaction / UI
++        "cursor", "pointer-events", "touch-action", "user-select", "user-modify",
++        "appearance", "caret", "field-sizing", "zoom",
++        // Anchor positioning
++        "anchor-name", "anchor-scope", "position-anchor", "position-area",
++        "position-try", "position-try-fallbacks", "position-try-order",
++        "position-visibility", "inset-area",
++        // Page / break
++        "page", "page-break-before", "page-break-after", "page-break-inside",
++        "break-before", "break-after", "break-inside", "orphans", "widows",
++        "box-orient",
++        // SVG presentation
++        "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width",
++        "stroke-opacity", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit",
++        "stroke-dasharray", "stroke-dashoffset", "stop-color", "stop-opacity",
++        "flood-color", "flood-opacity", "lighting-color", "color-interpolation",
++        "color-interpolation-filters", "dominant-baseline", "alignment-baseline",
++        "baseline-shift", "marker", "marker-start", "marker-mid", "marker-end",
++        "paint-order", "vector-effect", "d", "cx", "cy", "r", "rx", "ry", "x", "y",
++        "image-rendering", "object-fit", "object-position",
++    };
++}
+diff --git a/Broiler.CSS.Dom/CssStyleEngine.cs b/Broiler.CSS.Dom/CssStyleEngine.cs
+index 4f3219a..ed16f00 100644
+--- a/Broiler.CSS.Dom/CssStyleEngine.cs
++++ b/Broiler.CSS.Dom/CssStyleEngine.cs
+@@ -82,10 +82,11 @@ public sealed partial class CssStyleEngine
+ 
+     /// <summary>
+     /// Reports whether an <c>@supports</c> prelude is a grammatically valid
+-    /// <c>&lt;supports-condition&gt;</c>, using the same check that gates whether the
+-    /// rule's contents participate in the cascade. A malformed condition (for
+-    /// example a declaration missing its parentheses) is invalid and its rules do
+-    /// not apply.
++    /// <c>&lt;supports-condition&gt;</c>. A malformed condition (for example a
++    /// declaration missing its parentheses) is invalid and its rules do not apply.
++    /// Note this is grammatical validity only — whether the rule's contents
++    /// participate in the cascade additionally requires the condition to evaluate
++    /// to true (an unsupported feature query is valid syntax but false).
+     /// </summary>
+     public static bool IsValidSupportsCondition(string condition) =>
+         SupportsConditionSyntax.IsValidCondition(condition);
+@@ -480,14 +481,14 @@ public sealed partial class CssStyleEngine
+                     break;
+ 
+                 case CssAtRule atRule when atRule.Name.Equals("supports", StringComparison.OrdinalIgnoreCase):
+-                    // Feature detection is optimistic — we assume support for any well-formed
+-                    // feature query rather than modelling which properties/values Broiler
+-                    // actually implements. But an @supports rule whose condition does not match
+-                    // the <supports-condition> grammar (e.g. a declaration missing its required
+-                    // parentheses, or "and"/"or" mixed without grouping) has a false condition
+-                    // and MUST NOT apply its rules. Gate the descent on grammatical validity so
+-                    // those malformed conditions are correctly ignored.
+-                    if (SupportsConditionSyntax.IsValidCondition(atRule.Prelude))
++                    // An @supports rule applies its contents only when its condition both
++                    // parses as a <supports-condition> AND evaluates to true. A malformed
++                    // condition (a declaration missing its parentheses, "and"/"or" mixed
++                    // without grouping, …) is false; so is a well-formed but unsupported
++                    // feature query — an unknown property ("unknown: green"), an invalid value
++                    // ("color: rainbow"), or a <general-enclosed> block — resolved here through
++                    // the feature-support oracle (IsFeatureQuerySupported).
++                    if (SupportsConditionSyntax.EvaluatesTrue(atRule.Prelude, IsFeatureQuerySupported))
+                         CollectFromRules(atRule.Rules, origin, element, pseudoElement, winners, ref order);
+                     break;
+             }
+diff --git a/Broiler.CSS.Dom/SupportsConditionSyntax.cs b/Broiler.CSS.Dom/SupportsConditionSyntax.cs
+index 777bcf9..c6ab46b 100644
+--- a/Broiler.CSS.Dom/SupportsConditionSyntax.cs
++++ b/Broiler.CSS.Dom/SupportsConditionSyntax.cs
+@@ -3,19 +3,27 @@ using System;
+ namespace Broiler.CSS.Dom;
+ 
+ /// <summary>
+-/// Validates the prelude of an <c>@supports</c> rule against the CSS
+-/// <c>&lt;supports-condition&gt;</c> grammar
++/// Parses and <em>evaluates</em> the prelude of an <c>@supports</c> rule against
++/// the CSS <c>&lt;supports-condition&gt;</c> grammar
+ /// (<see href="https://drafts.csswg.org/css-conditional-3/#at-supports"/>).
+ ///
+-/// <para>Broiler evaluates the <em>truth</em> of a feature query optimistically
+-/// (any well-formed feature is assumed supported), so this type only decides
+-/// grammatical <em>validity</em>: a condition that does not parse has a false
+-/// result and its rules must not apply. That distinction is exactly what the WPT
+-/// <c>css-conditional</c> "invalid" tests exercise — e.g. a declaration missing
+-/// its parentheses (<c>@supports color: green</c>), <c>and</c>/<c>or</c> mixed at
+-/// one level without grouping, or <c>not not (…)</c>.</para>
++/// <para>Two questions are answered from the same parse:
++/// <list type="bullet">
++///   <item><see cref="IsValidCondition"/> — is the prelude a grammatically valid
++///   <c>&lt;supports-condition&gt;</c>? A condition that does not parse has a false
++///   result and its rules must not apply (the WPT "invalid syntax" tests: a
++///   declaration missing its parentheses, <c>and</c>/<c>or</c> mixed at one level
++///   without grouping, <c>not not (…)</c>, unbalanced brackets, …).</item>
++///   <item><see cref="EvaluatesTrue"/> — does a <em>valid</em> condition evaluate
++///   to <c>true</c>, so its rules apply? Feature queries (<c>( &lt;declaration&gt; )</c>)
++///   are resolved through a caller-supplied support oracle; a
++///   <c>&lt;general-enclosed&gt;</c> (any other balanced group, e.g. <c>(unknown)</c>,
++///   <c>(@page)</c>, <c>()</c>, or an unrecognised <c>function(…)</c>) evaluates to
++///   <c>false</c> per the grammar — which, importantly, makes <c>not (@page)</c>
++///   evaluate to <c>true</c>.</item>
++/// </list></para>
+ ///
+-/// <para>The grammar being checked:
++/// <para>The grammar being parsed:
+ /// <code>
+ /// &lt;supports-condition&gt;  = not &lt;supports-in-parens&gt;
+ ///                       | &lt;supports-in-parens&gt; [ and &lt;supports-in-parens&gt; ]*
+@@ -23,41 +31,68 @@ namespace Broiler.CSS.Dom;
+ /// &lt;supports-in-parens&gt; = ( &lt;supports-condition&gt; )
+ ///                       | ( &lt;declaration&gt; )                 -- a feature query
+ ///                       | &lt;general-enclosed&gt;               -- ( any-value? ) | ident( any-value? )
+-/// </code>
+-/// Feature queries and general-enclosed blocks are both accepted as valid
+-/// <c>&lt;supports-in-parens&gt;</c>, so any balanced parenthesised group counts as
+-/// valid unless it contains unmatched brackets. Only structurally malformed
+-/// conditions are rejected.</para>
++/// </code></para>
+ /// </summary>
+ internal static class SupportsConditionSyntax
+ {
++    /// <summary>Tri-state result of parsing a <c>&lt;supports-condition&gt;</c>:
++    /// <see cref="Invalid"/> means it does not match the grammar; otherwise it is a
++    /// valid condition whose boolean result is <see cref="False"/> or
++    /// <see cref="True"/>.</summary>
++    private enum Result
++    {
++        Invalid,
++        False,
++        True,
++    }
++
+     /// <summary>
+     /// Returns <c>true</c> when <paramref name="condition"/> is a grammatically
+-    /// valid <c>&lt;supports-condition&gt;</c>. An empty or null prelude, trailing
+-    /// junk, mismatched brackets, or an illegal combinator sequence all yield
++    /// valid <c>&lt;supports-condition&gt;</c>, independent of whether it evaluates
++    /// to true or false. An empty or null prelude, trailing junk, mismatched
++    /// brackets, or an illegal combinator sequence all yield <c>false</c>.
++    /// </summary>
++    public static bool IsValidCondition(string? condition) =>
++        Parse(condition, static (_, _) => true) != Result.Invalid;
++
++    /// <summary>
++    /// Returns <c>true</c> only when <paramref name="condition"/> is a valid
++    /// <c>&lt;supports-condition&gt;</c> that evaluates to <c>true</c> (so the
++    /// <c>@supports</c> rule's contents apply). Each feature query
++    /// <c>( property: value )</c> is resolved through <paramref name="featureSupported"/>;
++    /// a grammatically-invalid condition or one that evaluates false/unknown returns
+     /// <c>false</c>.
+     /// </summary>
+-    public static bool IsValidCondition(string? condition)
++    public static bool EvaluatesTrue(string? condition, Func<string, string, bool> featureSupported) =>
++        Parse(condition, featureSupported) == Result.True;
++
++    private static Result Parse(string? condition, Func<string, string, bool> featureSupported)
+     {
+         if (string.IsNullOrWhiteSpace(condition))
+-            return false;
++            return Result.Invalid;
+ 
+-        var parser = new Parser(condition);
+-        if (!parser.ParseCondition())
+-            return false;
++        var parser = new Parser(condition, featureSupported);
++        var result = parser.ParseCondition();
++        if (result == Result.Invalid)
++            return Result.Invalid;
+ 
+         parser.SkipWhitespace();
+-        return parser.AtEnd; // no trailing content is allowed after a complete condition
++        // No trailing content is allowed after a complete condition (e.g.
++        // "not (x) or (y)" leaves "or (y)" dangling — the `not` form does not
++        // continue with a combinator).
++        return parser.AtEnd ? result : Result.Invalid;
+     }
+ 
+     private ref struct Parser
+     {
+         private readonly ReadOnlySpan<char> _s;
++        private readonly Func<string, string, bool> _featureSupported;
+         private int _i;
+ 
+-        public Parser(ReadOnlySpan<char> s)
++        public Parser(ReadOnlySpan<char> s, Func<string, string, bool> featureSupported)
+         {
+             _s = s;
++            _featureSupported = featureSupported;
+             _i = 0;
+         }
+ 
+@@ -70,7 +105,7 @@ internal static class SupportsConditionSyntax
+         }
+ 
+         // <supports-condition>
+-        public bool ParseCondition()
++        public Result ParseCondition()
+         {
+             SkipWhitespace();
+ 
+@@ -78,12 +113,13 @@ internal static class SupportsConditionSyntax
+             if (TryMatchKeyword("not"))
+             {
+                 SkipWhitespace();
+-                return ParseInParens();
++                return Negate(ParseInParens());
+             }
+ 
+             // <supports-in-parens> [ (and|or) <supports-in-parens> ]*
+-            if (!ParseInParens())
+-                return false;
++            var acc = ParseInParens();
++            if (acc == Result.Invalid)
++                return Result.Invalid;
+ 
+             string? combinator = null;
+             while (true)
+@@ -104,22 +140,25 @@ internal static class SupportsConditionSyntax
+                 if (combinator is null)
+                     combinator = keyword;
+                 else if (combinator != keyword)
+-                    return false;
++                    return Result.Invalid;
+ 
+                 SkipWhitespace();
+-                if (!ParseInParens())
+-                    return false;
++                var next = ParseInParens();
++                if (next == Result.Invalid)
++                    return Result.Invalid;
++
++                acc = combinator == "and" ? And(acc, next) : Or(acc, next);
+             }
+ 
+-            return true;
++            return acc;
+         }
+ 
+         // <supports-in-parens>
+-        private bool ParseInParens()
++        private Result ParseInParens()
+         {
+             SkipWhitespace();
+             if (AtEnd)
+-                return false;
++                return Result.Invalid;
+ 
+             char c = _s[_i];
+ 
+@@ -134,28 +173,118 @@ internal static class SupportsConditionSyntax
+                     _i++;
+ 
+                 if (_i < _s.Length && _s[_i] == '(')
+-                    return ConsumeBalancedGroup();
++                {
++                    var name = _s[identStart.._i];
++                    if (!ConsumeBalancedGroup(out _, out _))
++                        return Result.Invalid;
++                    // A recognised boolean function (selector()/font-tech()/
++                    // font-format()) is treated as supported; every other
++                    // function is <general-enclosed> and evaluates to false.
++                    return IsSupportedFunction(name) ? Result.True : Result.False;
++                }
+ 
+                 _i = identStart;
+-                return false;
++                return Result.Invalid;
+             }
+ 
+             // ( <supports-condition> ) | ( <declaration> ) | ( any-value? )
+-            // All three collapse to "a balanced parenthesised group" for validity:
+-            // a malformed inner condition still parses as general-enclosed, unless
+-            // it contains unmatched brackets (rejected by ConsumeBalancedGroup).
+             if (c == '(')
+-                return ConsumeBalancedGroup();
++            {
++                if (!ConsumeBalancedGroup(out int innerStart, out int innerEnd))
++                    return Result.Invalid;
++                return EvaluateGroupContent(_s[innerStart..innerEnd]);
++            }
++
++            return Result.Invalid;
++        }
++
++        // Decides what a balanced parenthesised group's inner content is:
++        //   1. a nested <supports-condition> (recursed and required to consume all),
++        //   2. a feature query <declaration> (resolved via the support oracle), or
++        //   3. otherwise <general-enclosed>, which evaluates to false.
++        private readonly Result EvaluateGroupContent(ReadOnlySpan<char> inner)
++        {
++            // 1. Nested condition, e.g. "((color: green))" or "(not (color: green))".
++            //    An inner sequence that parses as a condition but is not fully
++            //    consumed (e.g. "not (a) or (b)") is not a valid nested condition —
++            //    it falls through to <general-enclosed> below.
++            var sub = new Parser(inner, _featureSupported);
++            var nested = sub.ParseCondition();
++            if (nested != Result.Invalid)
++            {
++                sub.SkipWhitespace();
++                if (sub.AtEnd)
++                    return nested;
++            }
++
++            // 2. Feature query: ( <property> : <value> ).
++            if (TryParseDeclaration(inner, out var property, out var value))
++                return _featureSupported(property, value) ? Result.True : Result.False;
+ 
+-            return false;
++            // 3. <general-enclosed> — a balanced group we do not otherwise understand.
++            return Result.False;
+         }
+ 
++        // A feature query's inner text is a declaration: <ident> : <non-empty value>.
++        // The property name must be a bare identifier (letters/digits/-/_, or a
++        // custom-property "--" prefix); anything else (e.g. "@page", "a b") is not a
++        // declaration and is left for <general-enclosed> handling.
++        private static bool TryParseDeclaration(ReadOnlySpan<char> inner, out string property, out string value)
++        {
++            property = string.Empty;
++            value = string.Empty;
++
++            int colon = inner.IndexOf(':');
++            if (colon <= 0)
++                return false;
++
++            var name = inner[..colon].Trim();
++            var val = inner[(colon + 1)..].Trim();
++            if (name.IsEmpty || val.IsEmpty || !IsPropertyName(name))
++                return false;
++
++            property = name.ToString();
++            value = val.ToString();
++            return true;
++        }
++
++        private static bool IsPropertyName(ReadOnlySpan<char> name)
++        {
++            if (!IsIdentStart(name[0]))
++                return false;
++            foreach (var ch in name)
++            {
++                if (!IsIdentChar(ch))
++                    return false;
++            }
++            return true;
++        }
++
++        private static Result Negate(Result r) => r switch
++        {
++            Result.True => Result.False,
++            Result.False => Result.True,
++            _ => Result.Invalid,
++        };
++
++        // Both operands are already known non-Invalid when these are called.
++        private static Result And(Result a, Result b) =>
++            a == Result.False || b == Result.False ? Result.False : Result.True;
++
++        private static Result Or(Result a, Result b) =>
++            a == Result.True || b == Result.True ? Result.True : Result.False;
++
+         // Consumes a bracket-balanced group beginning at the current '(' (or the
+-        // '(' of a function token). Returns false on any unmatched )/]/} or if the
++        // '(' of a function token). On success, sets innerStart/innerEnd to the
++        // span between the outermost '(' and its matching ')', advances past the
++        // ')', and returns true. Returns false on any unmatched )/]/} or if the
+         // input ends before the opening '(' is closed. String literals are skipped
+         // so brackets inside them do not affect nesting.
+-        private bool ConsumeBalancedGroup()
++        private bool ConsumeBalancedGroup(out int innerStart, out int innerEnd)
+         {
++            innerStart = _i + 1; // just past the opening '('
++            innerEnd = _i;
++
+             // Stack of expected closers, most-recent on top. Small and short-lived.
+             Span<char> stack = stackalloc char[64];
+             int depth = 0;
+@@ -185,9 +314,13 @@ internal static class SupportsConditionSyntax
+                     if (depth == 0 || stack[depth - 1] != c)
+                         return false; // unmatched or mismatched closer
+                     depth--;
+-                    _i++;
+                     if (depth == 0)
+-                        return true; // the opening '(' has been closed
++                    {
++                        innerEnd = _i; // the matching close of the outermost '('
++                        _i++;
++                        return true;
++                    }
++                    _i++;
+                     continue;
+                 }
+ 
+@@ -245,6 +378,15 @@ internal static class SupportsConditionSyntax
+             return true;
+         }
+ 
++        // CSS Conditional 4 recognises a handful of boolean functions besides the
++        // ( <declaration> ) feature query. selector()/font-tech()/font-format() are
++        // treated as supported (their argument is well-formed); every other function
++        // token is an unknown <general-enclosed> and evaluates to false.
++        private static bool IsSupportedFunction(ReadOnlySpan<char> name) =>
++            name.Equals("selector", StringComparison.OrdinalIgnoreCase) ||
++            name.Equals("font-tech", StringComparison.OrdinalIgnoreCase) ||
++            name.Equals("font-format", StringComparison.OrdinalIgnoreCase);
++
+         private static bool IsIdentStart(char c) =>
+             char.IsLetter(c) || c == '_' || c == '-' || c >= 0x80;
+ 
+-- 
+2.43.0
+
