@@ -9,6 +9,30 @@
   "problemLimit": 10,
   "incompleteShards": [
     {
+      "shardIndex": 0,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 1,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 3,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 4,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 5,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 6,
+      "exitCode": 1
+    },
+    {
       "shardIndex": 7,
       "exitCode": 1
     }
@@ -19,9 +43,11 @@
       "label": "Shard process failure",
       "category": "ShardProcessError",
       "subCategory": null,
-      "count": 1,
+      "count": 7,
       "examples": [
-        "shard 7 (exit 1)"
+        "shard 0 (exit 1)",
+        "shard 1 (exit 1)",
+        "shard 3 (exit 1)"
       ]
     }
   ],
@@ -36,10 +62,10 @@
     {
       "kind": "IncompleteShards",
       "tier": 0,
-      "severity": 1,
-      "impact": 1,
-      "title": "1 shard(s) did not complete",
-      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 7 (exit 1)."
+      "severity": 7,
+      "impact": 7,
+      "title": "7 shard(s) did not complete",
+      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 0 (exit 1), shard 1 (exit 1), shard 3 (exit 1), shard 4 (exit 1), shard 5 (exit 1), shard 6 (exit 1), shard 7 (exit 1)."
     }
   ],
   "results": [
