@@ -21,6 +21,38 @@ cd .. && git add <Submodule> && git commit -m "Bump <Submodule>: <summary>"
 
 ## Index
 
+- **0015-css-env-substitution-function.patch** → `Broiler.CSS`
+  (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`,
+  `Broiler.CSS.Dom/CssStyleEngine.Supports.cs`, plus tests) — fixes the
+  `css-env/*` "biggest problems" cluster (issue #1311: `at-supports.tentative`,
+  `fallback-nested-var.tentative`, `unknown-env-names-override-previous.tentative`,
+  all at 0% match). The `env()` substitution function was never resolved: the
+  computed-value substitution phase scanned only for `var(`, so an `env()` left
+  as a literal function token reached the renderer (which painted
+  `background-color: env(unknown)` as black instead of leaving it invalid), and
+  `@supports (background-color: env(test))` evaluated false because `env(test)`
+  is not a valid `<color>`. The patch resolves `env()` alongside `var()` (CSS
+  Environment Variables §env): a UA-defined name (the safe-area insets, `0px` in
+  a headless desktop context) substitutes its value; any other name substitutes
+  its comma-separated fallback when present (which may itself contain
+  `var()`/`env()`), and is otherwise invalid at computed-value time — the
+  guaranteed-invalid value, which resets the referencing property to its initial
+  value rather than reviving an earlier cascaded declaration. `env()` is also
+  reported as supported declaration syntax by `@supports`. Guards:
+  `Env_Unknown_Name_Falls_Back_To_Provided_Default`,
+  `Env_Unknown_Name_Resolves_Nested_Var_Fallback`,
+  `Env_Unknown_Name_Without_Fallback_Is_Invalid_And_Overrides_Previous`, and
+  `Env_Reference_Is_A_Supported_Feature_Query` in `CssStyleEngineTests`.
+  **Active CI fallback — none.** `env()`/`var()` substitution lives entirely in
+  the `Broiler.CSS` computed-value layer, which the parent repo consumes as
+  compiled submodule source with no main-repo interception point (like patches
+  0008–0014). It activates on CI when this patch is applied and the `Broiler.CSS`
+  pointer is bumped; the pointer is intentionally left unbumped (the change is
+  committed to the submodule locally only, unpushed because `MaiRat/Broiler.CSS`
+  is outside session scope). Verified end-to-end via `--render`: the three tests
+  render green, green, and white (transparent → white canvas) respectively,
+  matching the Chromium references; they were white, black, and black before.
+
 - **0014-broiler-html-display-contents-root-canvas-background.patch** →
   `Broiler.HTML` (`Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs`,
   `Broiler.HTML.Orchestration/HtmlContainerInt.cs`) — fixes the
