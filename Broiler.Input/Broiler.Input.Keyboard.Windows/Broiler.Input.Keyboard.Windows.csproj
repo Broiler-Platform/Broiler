@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,6 +10,10 @@
     <AssemblyName>Broiler.Input.Keyboard.Windows</AssemblyName>
     <PackageId>Broiler.Input.Keyboard.Windows</PackageId>
     <Description>Windows keyboard input provider and message translator for Broiler.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Windows;Release-Windows</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

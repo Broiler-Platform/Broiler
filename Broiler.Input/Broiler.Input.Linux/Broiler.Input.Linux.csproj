@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,6 +9,10 @@
     <AssemblyName>Broiler.Input.Linux</AssemblyName>
     <PackageId>Broiler.Input.Linux</PackageId>
     <Description>Shared Linux event-device, native dependency, and diagnostics support for Broiler input providers.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Linux;Release-Linux</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

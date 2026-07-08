@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,6 +8,11 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>Broiler.UI.Win32.Demo</RootNamespace>
     <AssemblyName>Broiler.UI.Win32.Demo</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Windows;Release-Windows</Configurations>
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>

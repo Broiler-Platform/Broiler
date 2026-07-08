@@ -24,7 +24,7 @@ concurrency:
 
 env:
   PROJECT_PATH: src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
-  CONFIGURATION: Release
+  CONFIGURATION: Release-Windows
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
@@ -75,7 +75,7 @@ jobs:
 
       - name: Restore Windows runtime graph
         shell: pwsh
-        run: dotnet restore $env:PROJECT_PATH --runtime win-x64
+        run: dotnet restore $env:PROJECT_PATH --runtime win-x64 -p:Configuration=$env:CONFIGURATION
 
       - name: Publish self-contained single exe
         shell: pwsh

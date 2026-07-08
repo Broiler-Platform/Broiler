@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.FontDialog.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.FontDialog.Standard</AssemblyName>
+    <PackageId>Broiler.UI.FontDialog.Standard</PackageId>
+    <Description>Simple standard platform-neutral Broiler font dialog implementation.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.UI.FontDialog\Broiler.UI.FontDialog.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Button.Standard\Broiler.UI.Button.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Edit.Standard\Broiler.UI.Edit.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.ToggleButton.Standard\Broiler.UI.ToggleButton.Standard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

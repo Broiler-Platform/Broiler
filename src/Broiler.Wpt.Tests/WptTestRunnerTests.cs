@@ -4562,6 +4562,43 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void TerminationDiagnostics_Include_Current_Test_And_Progress()
+    {
+        var currentPath = Path.Combine(
+            _tempDir,
+            "shadow-dom",
+            "focus",
+            "focus-pseudo-matches-on-shadow-host.html");
+        var snapshot = new Program.WptRunProgressSnapshot(
+            Completed: 7499,
+            TotalTests: 8124,
+            Passed: 7300,
+            Failed: 12,
+            Skipped: 187,
+            CurrentOrdinal: 7500,
+            CurrentDisplayPath: "shadow-dom/focus/focus-pseudo-matches-on-shadow-host.html",
+            CurrentTestPath: currentPath,
+            RunElapsed: TimeSpan.FromMinutes(24),
+            CurrentTestElapsed: TimeSpan.FromSeconds(31),
+            WorkerThreadId: 17,
+            WorkerProcessId: 12345);
+
+        var diagnostics = Program.CreateTerminationDiagnostics("SIGTERM", snapshot);
+
+        Assert.Contains("=== Termination diagnostics ===", diagnostics);
+        Assert.Contains("Reason: SIGTERM", diagnostics);
+        Assert.Contains("Progress: 7499/8124 completed (7300 passed, 12 failed, 187 skipped)", diagnostics);
+        Assert.Contains(
+            "Current test: (7500/8124) shadow-dom/focus/focus-pseudo-matches-on-shadow-host.html",
+            diagnostics);
+        Assert.Contains($"Current test path: {currentPath}", diagnostics);
+        Assert.Contains("Current test elapsed: 00:00:31", diagnostics);
+        Assert.Contains("Worker thread id: 17", diagnostics);
+        Assert.Contains("Worker process id: 12345", diagnostics);
+        Assert.Contains("Termination detection stack", diagnostics);
+    }
+
+    [Fact]
     public void Program_Records_Timeouts_In_Output_And_Summary()
     {
         var testDir = Path.Combine(_tempDir, "timeout-program");
@@ -5965,6 +6002,69 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(triageEl.TryGetProperty("topFailingDirectories", out _));
 
         Assert.True(resultsEl.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public void Program_Summary_Includes_Average_Match_Percent_For_All_Pixel_Compared_Tests()
+    {
+        var testDir = Path.Combine(_tempDir, "average-match");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "a.html"), "<html><body>A</body></html>");
+        File.WriteAllText(Path.Combine(testDir, "b.html"), "<html><body>B</body></html>");
+        File.WriteAllText(Path.Combine(testDir, "c.html"), "<html><body>C</body></html>");
+
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            var matchPercent = Path.GetFileNameWithoutExtension(testPath) switch
+            {
+                "a" => 50.0,
+                "b" => 50.0,
+                "c" => 100.0,
+                _ => throw new InvalidOperationException($"Unexpected test path: {testPath}"),
+            };
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = matchPercent >= 100.0,
+                MatchPercent = matchPercent,
+                Category = matchPercent >= 100.0 ? FailureCategory.None : FailureCategory.PixelMismatch,
+                Message = matchPercent >= 100.0 ? "Synthetic pass" : "Synthetic mismatch",
+            };
+        };
+
+        var jsonPath = Path.Combine(_tempDir, "average-match.json");
+        var markdownPath = Path.Combine(_tempDir, "average-match.md");
+        var originalOut = Console.Out;
+        var stdout = new StringWriter();
+        Console.SetOut(stdout);
+        try
+        {
+            var exitCode = Program.Main([
+                "--wpt-dir", testDir,
+                "--json-output", jsonPath,
+                "--markdown-output", markdownPath,
+            ]);
+
+            Assert.Equal(1, exitCode);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = stdout.ToString();
+        Assert.Contains("Compared         : 3", output);
+        Assert.Contains("Average match   : 66.67% across 3 pixel-compared test(s)", output);
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var summary = doc.RootElement.GetProperty("summary");
+        Assert.Equal(3, summary.GetProperty("compared").GetInt32());
+        Assert.Equal(3, summary.GetProperty("averageMatchCount").GetInt32());
+        Assert.Equal(66.66666666666667, summary.GetProperty("averageMatchPercent").GetDouble(), precision: 10);
+
+        var markdown = File.ReadAllText(markdownPath);
+        Assert.Contains("- Average match: 66.67% across 3 pixel-compared test(s)", markdown);
     }
 
     [Fact]

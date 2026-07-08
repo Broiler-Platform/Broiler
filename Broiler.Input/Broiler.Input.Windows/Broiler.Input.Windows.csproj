@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,6 +10,10 @@
     <AssemblyName>Broiler.Input.Windows</AssemblyName>
     <PackageId>Broiler.Input.Windows</PackageId>
     <Description>Shared Windows host, clock, and native lifetime support for Broiler input providers.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Windows;Release-Windows</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

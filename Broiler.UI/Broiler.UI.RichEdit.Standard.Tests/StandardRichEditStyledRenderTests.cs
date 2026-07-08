@@ -60,6 +60,43 @@ public sealed class StandardRichEditStyledRenderTests
     }
 
     [Fact]
+    public void Font_Command_Draws_Run_With_Selected_Font()
+    {
+        RichEditScene scene = WithSelectionAll("hello");
+        scene.Edit.ExecuteCommand(RichEditCommand.SetFont, new BFontStyle("Consolas", 22, BFontWeight.Bold, BFontSlant.Italic));
+
+        BRenderList list = scene.Session.RenderFrame();
+
+        Assert.Contains(
+            DrawnRuns(list),
+            r =>
+                r.Text == "hello" &&
+                r.Font.FamilyName == "Consolas" &&
+                r.Font.SizeInPixels == 22 &&
+                r.Font.Weight == BFontWeight.Bold &&
+                r.Font.Slant == BFontSlant.Italic);
+        scene.Session.Dispose();
+    }
+
+    [Fact]
+    public void Caret_After_Styled_Run_Uses_The_Run_Font_Advance()
+    {
+        BFontStyle font = new("Consolas", 22, BFontWeight.Bold, BFontSlant.Italic);
+        RichEditScene scene = WithSelectionAll("hello");
+        scene.Edit.ExecuteCommand(RichEditCommand.SetFont, font);
+        scene.Edit.Selection = RichTextRange.Caret(scene.Edit.Document.End);
+
+        BRenderList list = scene.Session.RenderFrame();
+        BRenderCommand.DrawText run = list.Commands.OfType<BRenderCommand.DrawText>().Single(c => c.Text.Text == "hello");
+        double expectedX = run.Origin.X + BTextMeasurer.MeasureAdvance("hello", font);
+
+        Assert.Contains(
+            Fills(list),
+            c => c.Color == scene.Edit.CaretColor && c.Rect.Width <= 2 && Math.Abs(c.Rect.Left - expectedX) < 0.01);
+        scene.Session.Dispose();
+    }
+
+    [Fact]
     public void Underline_Run_Draws_A_Thin_Rule_In_The_Text_Color()
     {
         RichEditScene scene = WithSelectionAll("hello");

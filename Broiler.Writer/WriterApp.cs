@@ -10,9 +10,11 @@ using Broiler.Documents.Model;
 using Broiler.Documents.Rtf;
 using Broiler.Graphics;
 using Broiler.UI;
+using Broiler.UI.Button.Standard;
 using Broiler.UI.Dialog;
 using Broiler.UI.FileDialog;
 using Broiler.UI.FileDialog.Standard;
+using Broiler.UI.FontDialog.Standard;
 using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
 using Broiler.UI.Menu;
@@ -20,6 +22,9 @@ using Broiler.UI.Menu.Standard;
 using Broiler.UI.RichEdit;
 using Broiler.UI.RichEdit.Standard;
 using Broiler.UI.Standard;
+using Broiler.UI.ToggleButton.Standard;
+using Broiler.UI.Toolbar;
+using Broiler.UI.Toolbar.Standard;
 using Broiler.UI.Window.Standard;
 
 namespace Broiler.Writer;
@@ -32,6 +37,7 @@ internal sealed class WriterApp : IDisposable
     private readonly StandardWindow _rootWindow;
     private readonly StandardRichEdit _editor;
     private readonly StandardMenu _menu;
+    private readonly StandardToolbar _toolbar;
     private readonly StandardLabel _title;
     private readonly StandardLabel _status;
     private readonly DocumentCodecCatalog _documentCatalog = new(new DocumentCodec[]
@@ -42,12 +48,17 @@ internal sealed class WriterApp : IDisposable
         new MarkdownDocumentCodec(),
     });
     private readonly List<(UiMenuItem Item, RichEditCommand Command)> _richEditMenuItems = [];
+    private readonly List<(StandardButton Button, RichEditCommand Command)> _toolbarActionButtons = [];
+    private readonly List<(StandardToggleButton Button, RichEditCommand Command)> _toolbarToggleButtons = [];
+    private UiMenuItem? _fontMenuItem;
+    private StandardButton? _fontToolbarButton;
     private string? _currentDocumentPath;
     private string _lastDirectory = Environment.CurrentDirectory;
     private string _lastAction = "Ready";
 
     private const string DefaultDocumentExtension = ".rtf";
     private static readonly BSize FileDialogPreferredSize = new(560, 292);
+    private static readonly BSize FontDialogPreferredSize = new(520, 322);
     private static readonly UiFileDialogFilter[] OpenDocumentFileFilters =
     [
         new("All supported documents", "*.rtf;*.docx;*.html;*.htm;*.md;*.markdown", DefaultDocumentExtension),
@@ -85,6 +96,7 @@ internal sealed class WriterApp : IDisposable
         };
 
         _menu = CreateMenu();
+        _toolbar = CreateToolbar();
         _title = new StandardLabel
         {
             Text = "Untitled document",
@@ -107,7 +119,7 @@ internal sealed class WriterApp : IDisposable
             ActiveBorderColor = WriterPalette.Accent,
             BorderThickness = 1,
         };
-        _rootWindow.AddChild(new WriterContent(_menu, _title, _editor, _status));
+        _rootWindow.AddChild(new WriterContent(_menu, _toolbar, _title, _editor, _status));
 
         SeedDocument();
         _session.AddRoot(_rootWindow);
@@ -152,6 +164,7 @@ internal sealed class WriterApp : IDisposable
         dispatcher.Add(new StandardCommand("file.save", SaveDocument));
         dispatcher.Add(new StandardCommand("file.save-as", ShowSaveDialog));
         dispatcher.Add(new StandardCommand("file.exit", _requestClose));
+        dispatcher.Add(new StandardCommand("format.font", ShowFontDialog, () => _editor.GetCommandState(RichEditCommand.SetFont).IsEnabled));
         AddRichEditCommand(dispatcher, "edit.undo", RichEditCommand.Undo);
         AddRichEditCommand(dispatcher, "edit.redo", RichEditCommand.Redo);
         AddRichEditCommand(dispatcher, "edit.cut", RichEditCommand.Cut);
@@ -187,6 +200,8 @@ internal sealed class WriterApp : IDisposable
         edit.Children.Add(RichEditItem("select-all", "Select all", "edit.select-all", RichEditCommand.SelectAll, 'A'));
 
         var format = new UiMenuItem("format", "Format") { AccessKey = 'O' };
+        _fontMenuItem = new UiMenuItem("font", "Font...") { CommandName = "format.font", AccessKey = 'F' };
+        format.Children.Add(_fontMenuItem);
         format.Children.Add(RichEditItem("bold", "Bold", "format.bold", RichEditCommand.Bold, 'B', checkable: true));
         format.Children.Add(RichEditItem("italic", "Italic", "format.italic", RichEditCommand.Italic, 'I', checkable: true));
         format.Children.Add(RichEditItem("underline", "Underline", "format.underline", RichEditCommand.Underline, 'U', checkable: true));
@@ -225,6 +240,137 @@ internal sealed class WriterApp : IDisposable
         menu.SetItems([file, edit, format, help]);
         return menu;
     }
+
+    private StandardToolbar CreateToolbar()
+    {
+        var toolbar = new StandardToolbar
+        {
+            Title = "Document toolbar",
+            PreferredSize = new BSize(0, 42),
+            Orientation = UiToolbarOrientation.Horizontal,
+            Padding = 5,
+            Spacing = 4,
+            Background = WriterPalette.ToolbarSurface,
+            BorderColor = WriterPalette.MenuRule,
+            SeparatorColor = WriterPalette.MenuRule,
+            CornerRadius = 0,
+        };
+
+        StandardButton newButton = ToolbarAction("New", 50, NewDocument);
+        StandardButton openButton = ToolbarAction("Open", 56, ShowOpenDialog);
+        StandardButton saveButton = ToolbarAction("Save", 54, SaveDocument);
+        StandardButton saveAsButton = ToolbarAction("Save As", 62, ShowSaveDialog);
+        StandardButton undoButton = ToolbarCommand("Undo", RichEditCommand.Undo, 52);
+        StandardButton redoButton = ToolbarCommand("Redo", RichEditCommand.Redo, 52);
+        StandardButton fontButton = ToolbarAction("Font...", 62, ShowFontDialog);
+        _fontToolbarButton = fontButton;
+        StandardToggleButton boldButton = ToolbarToggle("B", RichEditCommand.Bold, 34, BFontWeight.Bold);
+        StandardToggleButton italicButton = ToolbarToggle("I", RichEditCommand.Italic, 34, BFontWeight.Normal, BFontSlant.Italic);
+        StandardToggleButton underlineButton = ToolbarToggle("U", RichEditCommand.Underline, 34, BFontWeight.Normal);
+        StandardToggleButton strikeButton = ToolbarToggle("S", RichEditCommand.Strikethrough, 34, BFontWeight.Normal);
+        StandardButton clearButton = ToolbarCommand("Clear", RichEditCommand.ClearFormatting, 54);
+        StandardToggleButton leftButton = ToolbarToggle("Left", RichEditCommand.AlignLeft, 48, BFontWeight.Normal);
+        StandardToggleButton centerButton = ToolbarToggle("Center", RichEditCommand.AlignCenter, 54, BFontWeight.Normal);
+        StandardToggleButton rightButton = ToolbarToggle("Right", RichEditCommand.AlignRight, 48, BFontWeight.Normal);
+        StandardToggleButton bulletsButton = ToolbarToggle("Bullets", RichEditCommand.BulletList, 58, BFontWeight.Normal);
+        StandardToggleButton numberedButton = ToolbarToggle("Numbered", RichEditCommand.NumberedList, 70, BFontWeight.Normal);
+        StandardButton indentButton = ToolbarCommand("Indent", RichEditCommand.Indent, 58);
+        StandardButton outdentButton = ToolbarCommand("Outdent", RichEditCommand.Outdent, 64);
+
+        toolbar.AddChild(newButton);
+        toolbar.AddChild(openButton);
+        toolbar.AddChild(saveButton);
+        toolbar.AddChild(saveAsButton);
+        toolbar.AddChild(undoButton);
+        toolbar.AddChild(redoButton);
+        toolbar.AddChild(fontButton);
+        toolbar.AddChild(boldButton);
+        toolbar.AddChild(italicButton);
+        toolbar.AddChild(underlineButton);
+        toolbar.AddChild(strikeButton);
+        toolbar.AddChild(clearButton);
+        toolbar.AddChild(leftButton);
+        toolbar.AddChild(centerButton);
+        toolbar.AddChild(rightButton);
+        toolbar.AddChild(bulletsButton);
+        toolbar.AddChild(numberedButton);
+        toolbar.AddChild(indentButton);
+        toolbar.AddChild(outdentButton);
+
+        toolbar.SetSeparatorBefore(undoButton, true);
+        toolbar.SetSeparatorBefore(fontButton, true);
+        toolbar.SetSeparatorBefore(leftButton, true);
+        toolbar.SetSeparatorBefore(indentButton, true);
+
+        return toolbar;
+    }
+
+    private StandardButton ToolbarAction(string text, double width, Action action)
+    {
+        StandardButton button = CreateToolbarButton(text, width);
+        button.Clicked += (_, _) =>
+        {
+            action();
+            RefreshUi();
+        };
+        return button;
+    }
+
+    private StandardButton ToolbarCommand(string text, RichEditCommand command, double width)
+    {
+        StandardButton button = CreateToolbarButton(text, width);
+        button.Clicked += (_, _) => RunRichEditCommand(command);
+        _toolbarActionButtons.Add((button, command));
+        return button;
+    }
+
+    private StandardToggleButton ToolbarToggle(
+        string text,
+        RichEditCommand command,
+        double width,
+        BFontWeight weight,
+        BFontSlant slant = BFontSlant.Normal)
+    {
+        var button = new StandardToggleButton
+        {
+            Text = text,
+            PreferredSize = new BSize(width, 30),
+            Font = new BFontStyle("Segoe UI", 13, weight, slant),
+            PaddingX = 8,
+            PaddingY = 5,
+            Background = WriterPalette.ToolbarButton,
+            CheckedBackground = WriterPalette.ToolbarButtonActive,
+            IndeterminateBackground = WriterPalette.ToolbarButtonActive,
+            Foreground = WriterPalette.Title,
+            BorderColor = WriterPalette.ToolbarButtonBorder,
+            DisabledForeground = WriterPalette.Muted,
+            HoverBackground = WriterPalette.ToolbarButtonHover,
+            PressedBackground = WriterPalette.ToolbarButtonPressed,
+            FocusRing = WriterPalette.Accent,
+            CornerRadius = 5,
+        };
+        button.Clicked += (_, _) => RunRichEditCommand(command);
+        _toolbarToggleButtons.Add((button, command));
+        return button;
+    }
+
+    private static StandardButton CreateToolbarButton(string text, double width) =>
+        new()
+        {
+            Text = text,
+            PreferredSize = new BSize(width, 30),
+            Font = new BFontStyle("Segoe UI", 13),
+            PaddingX = 8,
+            PaddingY = 5,
+            Background = WriterPalette.ToolbarButton,
+            Foreground = WriterPalette.Title,
+            BorderColor = WriterPalette.ToolbarButtonBorder,
+            DisabledForeground = WriterPalette.Muted,
+            SecondaryHoverBackground = WriterPalette.ToolbarButtonHover,
+            SecondaryPressedBackground = WriterPalette.ToolbarButtonPressed,
+            FocusRing = WriterPalette.Accent,
+            CornerRadius = 5,
+        };
 
     private void AddRichEditCommand(StandardCommandDispatcher dispatcher, string name, RichEditCommand command) =>
         dispatcher.Add(new StandardCommand(name, () => RunRichEditCommand(command), () => _editor.GetCommandState(command).IsEnabled));
@@ -372,6 +518,44 @@ internal sealed class WriterApp : IDisposable
         RefreshUi();
     }
 
+    private void ShowFontDialog()
+    {
+        if (!_editor.GetCommandState(RichEditCommand.SetFont).IsEnabled)
+        {
+            _lastAction = "Font unavailable";
+            RefreshUi();
+            return;
+        }
+
+        var dialog = new StandardFontDialog
+        {
+            PreferredSize = FontDialogPreferredSize,
+            SelectedFont = CurrentEditorFont(),
+            SampleText = "Broiler Writer font preview",
+            TitleFont = new BFontStyle("Segoe UI", 14, BFontWeight.SemiBold),
+            LabelFont = new BFontStyle("Segoe UI", 13),
+        };
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted)
+                ApplySelectedFont(dialog.SelectedFont);
+        };
+
+        dialog.ShowFontModal(_rootWindow, GetFontDialogPlacement());
+        _lastAction = "Font dialog";
+        RefreshUi();
+    }
+
+    private void ApplySelectedFont(BFontStyle font)
+    {
+        bool ran = _editor.ExecuteCommand(RichEditCommand.SetFont, font);
+        _lastAction = ran
+            ? "Font: " + font.FamilyName + " " + font.SizeInPixels.ToString("0.###", CultureInfo.InvariantCulture)
+            : "Font unavailable";
+        _session.SetFocus(_editor);
+        RefreshUi();
+    }
+
     private void ShowAbout()
     {
         _lastAction = "Broiler Writer preview: Broiler.UI window, menu, and StandardRichEdit";
@@ -394,6 +578,18 @@ internal sealed class WriterApp : IDisposable
         _lastAction = "Ready";
     }
 
+    private BFontStyle CurrentEditorFont()
+    {
+        InlineStyle style = _editor.CaretInlineStyle;
+        return _editor.Font with
+        {
+            FamilyName = string.IsNullOrWhiteSpace(style.FontFamily) ? _editor.Font.FamilyName : style.FontFamily,
+            SizeInPixels = style.FontSize is > 0 ? style.FontSize.Value : _editor.Font.SizeInPixels,
+            Weight = style.Bold ? BFontWeight.Bold : _editor.Font.Weight,
+            Slant = style.Italic ? BFontSlant.Italic : _editor.Font.Slant,
+        };
+    }
+
     private BRect GetDialogPlacement()
     {
         BSize viewport = _host.ViewportSize;
@@ -402,6 +598,16 @@ internal sealed class WriterApp : IDisposable
         double x = Math.Max(12, (viewport.Width - width) / 2);
         double y = Math.Max(42, (viewport.Height - height) / 2);
         return new BRect(x, y, Math.Min(width, Math.Max(280, viewport.Width - 24)), Math.Min(height, Math.Max(180, viewport.Height - 64)));
+    }
+
+    private BRect GetFontDialogPlacement()
+    {
+        BSize viewport = _host.ViewportSize;
+        double width = FontDialogPreferredSize.Width;
+        double height = FontDialogPreferredSize.Height;
+        double x = Math.Max(12, (viewport.Width - width) / 2);
+        double y = Math.Max(72, (viewport.Height - height) / 2);
+        return new BRect(x, y, Math.Min(width, Math.Max(320, viewport.Width - 24)), Math.Min(height, Math.Max(220, viewport.Height - 84)));
     }
 
     private string GetDialogDirectory()
@@ -499,6 +705,22 @@ internal sealed class WriterApp : IDisposable
                 item.IsChecked = state.IsToggled;
         }
 
+        bool fontEnabled = _editor.GetCommandState(RichEditCommand.SetFont).IsEnabled;
+        if (_fontMenuItem is not null)
+            _fontMenuItem.IsEnabled = fontEnabled;
+        if (_fontToolbarButton is not null)
+            _fontToolbarButton.IsEnabled = fontEnabled;
+
+        foreach ((StandardButton button, RichEditCommand command) in _toolbarActionButtons)
+            button.IsEnabled = _editor.GetCommandState(command).IsEnabled;
+
+        foreach ((StandardToggleButton button, RichEditCommand command) in _toolbarToggleButtons)
+        {
+            RichEditCommandState state = _editor.GetCommandState(command);
+            button.IsEnabled = state.IsEnabled;
+            button.IsChecked = state.IsToggled;
+        }
+
         _status.Text = BuildStatus();
         _host.RequestInvalidate();
     }
@@ -522,6 +744,8 @@ internal sealed class WriterApp : IDisposable
         if (style.Italic) names.Add("italic");
         if (style.Underline) names.Add("underline");
         if (style.Strikethrough) names.Add("strike");
+        if (!string.IsNullOrWhiteSpace(style.FontFamily)) names.Add(style.FontFamily);
+        if (style.FontSize is > 0) names.Add(style.FontSize.Value.ToString("0.###", CultureInfo.InvariantCulture));
         return names.Count == 0 ? "plain" : string.Join(" + ", names);
     }
 
@@ -535,6 +759,7 @@ internal sealed class WriterApp : IDisposable
             RichEditCommand.AlignRight => "Align right",
             RichEditCommand.BulletList => "Bullet list",
             RichEditCommand.NumberedList => "Numbered list",
+            RichEditCommand.SetFont => "Font",
             _ => command.ToString(),
         };
 
@@ -542,23 +767,32 @@ internal sealed class WriterApp : IDisposable
     {
         private const double Margin = 24;
         private const double TitleTop = 18;
+        private const double ToolbarHeight = 42;
         private const double StatusHeight = 24;
         private const double MinWidth = 900;
         private const double MinHeight = 620;
 
         private readonly StandardMenu _menu;
+        private readonly StandardToolbar _toolbar;
         private readonly StandardLabel _title;
         private readonly StandardRichEdit _editor;
         private readonly StandardLabel _status;
 
-        public WriterContent(StandardMenu menu, StandardLabel title, StandardRichEdit editor, StandardLabel status)
+        public WriterContent(
+            StandardMenu menu,
+            StandardToolbar toolbar,
+            StandardLabel title,
+            StandardRichEdit editor,
+            StandardLabel status)
         {
             _menu = menu;
+            _toolbar = toolbar;
             _title = title;
             _editor = editor;
             _status = status;
 
             AddChild(_menu);
+            AddChild(_toolbar);
             AddChild(_title);
             AddChild(_editor);
             AddChild(_status);
@@ -571,8 +805,9 @@ internal sealed class WriterApp : IDisposable
             double contentWidth = Math.Max(0, width - (Margin * 2));
 
             _menu.Measure(new BSize(width, _menu.MenuBarHeight));
+            _toolbar.Measure(new BSize(width, ToolbarHeight));
             _title.Measure(new BSize(contentWidth, double.PositiveInfinity));
-            _editor.Measure(new BSize(contentWidth, Math.Max(240, height - 140)));
+            _editor.Measure(new BSize(contentWidth, Math.Max(240, height - 182)));
             _status.Measure(new BSize(contentWidth, StatusHeight));
 
             return new BSize(width, height);
@@ -581,9 +816,10 @@ internal sealed class WriterApp : IDisposable
         protected override void ArrangeCore(BRect finalRect)
         {
             _menu.Arrange(new BRect(finalRect.Left, finalRect.Top, finalRect.Width, _menu.MenuBarHeight));
+            _toolbar.Arrange(new BRect(finalRect.Left, finalRect.Top + _menu.MenuBarHeight, finalRect.Width, ToolbarHeight));
 
             double x = finalRect.Left + Margin;
-            double y = finalRect.Top + _menu.MenuBarHeight + TitleTop;
+            double y = finalRect.Top + _menu.MenuBarHeight + ToolbarHeight + TitleTop;
             double width = Math.Max(0, finalRect.Width - (Margin * 2));
 
             _title.Arrange(new BRect(x, y, width, _title.DesiredSize.Height));
@@ -600,6 +836,7 @@ internal sealed class WriterApp : IDisposable
             context.RenderList.FillRect(Bounds, WriterPalette.Canvas);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top, Bounds.Width, _menu.MenuBarHeight), WriterPalette.MenuSurface);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + _menu.MenuBarHeight, Bounds.Width, 1), WriterPalette.MenuRule);
+            context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + _menu.MenuBarHeight + ToolbarHeight, Bounds.Width, 1), WriterPalette.MenuRule);
             base.RenderCore(context);
         }
     }

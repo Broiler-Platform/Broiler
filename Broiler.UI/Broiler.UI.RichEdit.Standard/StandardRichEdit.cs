@@ -12,8 +12,8 @@ namespace Broiler.UI.RichEdit.Standard;
 
 /// <summary>
 /// The Broiler-drawn standard <see cref="UiRichEdit"/>. It lays out the document
-/// into wrapped visual lines, renders per-run styled text (bold, italic, underline,
-/// strike, foreground, and background), the selection, caret, and placeholder,
+/// into wrapped visual lines, renders per-run styled text (family, size, bold,
+/// italic, underline, strike, foreground, and background), the selection, caret, and placeholder,
 /// supports vertical scrolling, and hit-tests points to positions. Keyboard, text,
 /// and IME input drive caret/selection navigation plus editing and formatting
 /// through the <see cref="UiRichEdit"/> command surface and its single undo model.
@@ -143,8 +143,6 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
         RichTextPosition start = selection.Start;
         RichTextPosition end = selection.End;
-        double lineHeight = LineHeight;
-
         foreach (VisualLine line in _lines)
         {
             var lineStart = new RichTextPosition(line.ParagraphIndex, line.Start);
@@ -155,10 +153,9 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
                 continue;
 
             double y = ContentTop + line.Top - _scrollY;
-            if (y + lineHeight < inner.Top || y > inner.Bottom)
+            if (y + line.Height < inner.Top || y > inner.Bottom)
                 continue;
 
-            string text = LineText(line);
             int subStart = start.ParagraphIndex == line.ParagraphIndex ? Math.Clamp(start.Offset, line.Start, line.End) : line.Start;
             int subEnd = end.ParagraphIndex == line.ParagraphIndex ? Math.Clamp(end.Offset, line.Start, line.End) : line.End;
             if (start.ParagraphIndex < line.ParagraphIndex)
@@ -166,17 +163,18 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
             if (end.ParagraphIndex > line.ParagraphIndex)
                 subEnd = line.End;
 
-            double x1 = ContentLeft + MeasureAdvance(text[..(subStart - line.Start)]);
-            double x2 = ContentLeft + MeasureAdvance(text[..(subEnd - line.Start)]);
+            RichTextParagraph paragraph = Document.Paragraphs[line.ParagraphIndex];
+            double x1 = ContentLeft + MeasureAdvance(paragraph, line.Start, subStart);
+            double x2 = ContentLeft + MeasureAdvance(paragraph, line.Start, subEnd);
             double width = x2 - x1;
             if (width <= 0)
             {
                 if (!fullyInside)
                     continue;
-                width = MeasureAdvance(" "); // sliver marking an empty selected line
+                width = BTextMeasurer.MeasureAdvance(" ", Font); // sliver marking an empty selected line
             }
 
-            renderList.FillRect(new BRect(x1, y, width, lineHeight), SelectionBackground);
+            renderList.FillRect(new BRect(x1, y, width, line.Height), SelectionBackground);
         }
     }
 
@@ -185,50 +183,48 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         if (!IsEnabled)
             return;
 
-        double lineHeight = LineHeight;
         foreach (VisualLine line in _lines)
         {
             double y = ContentTop + line.Top - _scrollY;
-            if (y + lineHeight < inner.Top || y > inner.Bottom || line.End <= line.Start)
+            if (y + line.Height < inner.Top || y > inner.Bottom || line.End <= line.Start)
                 continue;
 
             foreach (LineSegment segment in LineSegments(line))
             {
                 if (!segment.Style.Background.IsEmpty && segment.Advance > 0)
-                    renderList.FillRect(new BRect(segment.X, y, segment.Advance, lineHeight), segment.Style.Background);
+                    renderList.FillRect(new BRect(segment.X, y, segment.Advance, line.Height), segment.Style.Background);
             }
         }
     }
 
     private void DrawText(BRenderList renderList, BRect inner)
     {
-        double lineHeight = LineHeight;
         BColor fallback = IsEnabled ? Foreground : PlaceholderForeground;
         foreach (VisualLine line in _lines)
         {
             double y = ContentTop + line.Top - _scrollY;
-            if (y + lineHeight < inner.Top || y > inner.Bottom || line.End <= line.Start)
+            if (y + line.Height < inner.Top || y > inner.Bottom || line.End <= line.Start)
                 continue;
 
             foreach (LineSegment segment in LineSegments(line))
             {
                 BColor color = IsEnabled && !segment.Style.Foreground.IsEmpty ? segment.Style.Foreground : fallback;
-                renderList.DrawText(new BTextRun(segment.Text, RunFont(segment.Style), color), new BPoint(segment.X, y));
-                DrawDecorations(renderList, segment, y, color);
+                renderList.DrawText(new BTextRun(segment.Text, segment.Font, color), new BPoint(segment.X, y));
+                DrawDecorations(renderList, segment, y, line.Height, color);
             }
         }
     }
 
-    private void DrawDecorations(BRenderList renderList, LineSegment segment, double y, BColor color)
+    private void DrawDecorations(BRenderList renderList, LineSegment segment, double y, double lineHeight, BColor color)
     {
         if (segment.Advance <= 0 || (!segment.Style.Underline && !segment.Style.Strikethrough))
             return;
 
-        double thickness = Math.Max(1, Math.Round(Font.SizeInPixels / 14));
+        double thickness = Math.Max(1, Math.Round(segment.Font.SizeInPixels / 14));
         if (segment.Style.Underline)
-            renderList.FillRect(new BRect(segment.X, y + LineHeight - thickness - 1, segment.Advance, thickness), color);
+            renderList.FillRect(new BRect(segment.X, y + lineHeight - thickness - 1, segment.Advance, thickness), color);
         if (segment.Style.Strikethrough)
-            renderList.FillRect(new BRect(segment.X, y + (LineHeight / 2), segment.Advance, thickness), color);
+            renderList.FillRect(new BRect(segment.X, y + (lineHeight / 2), segment.Advance, thickness), color);
     }
 
     private void DrawComposition(BRenderList renderList, BRect inner, bool focused)
@@ -238,21 +234,20 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
         VisualLine line = LineForPosition(Selection.Focus).Line;
         double y = ContentTop + line.Top - _scrollY;
-        if (y + LineHeight < inner.Top || y > inner.Bottom)
+        if (y + line.Height < inner.Top || y > inner.Bottom)
             return;
 
         double x = CaretX(Selection.Focus);
-        double advance = MeasureAdvance(_compositionText);
+        BFontStyle font = RunFont(CaretInlineStyle);
+        double advance = BTextMeasurer.MeasureAdvance(_compositionText, font);
         BColor color = IsEnabled ? Foreground : PlaceholderForeground;
-        renderList.DrawText(new BTextRun(_compositionText, Font, color), new BPoint(x, y));
-        renderList.FillRect(new BRect(x, y + LineHeight - 2, advance, 1), color); // composition underline
+        renderList.DrawText(new BTextRun(_compositionText, font, color), new BPoint(x, y));
+        renderList.FillRect(new BRect(x, y + line.Height - 2, advance, 1), color); // composition underline
     }
 
     /// <summary>
     /// Splits a visual line into contiguous styled segments, each carrying its
-    /// on-screen x origin and advance. Because <see cref="BTextMeasurer"/> advance
-    /// depends only on font size (not weight or slant), per-run bold/italic keep the
-    /// same geometry as the single-font layout, so caret and hit-testing stay exact.
+    /// resolved font, on-screen x origin, and advance.
     /// </summary>
     private IEnumerable<LineSegment> LineSegments(VisualLine line)
     {
@@ -271,19 +266,19 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
                 continue;
 
             string text = paragraph.Text.Substring(segStart, segEnd - segStart);
-            double advance = MeasureAdvance(text);
-            yield return new LineSegment(text, run.Style, x, advance);
+            BFontStyle font = RunFont(run.Style);
+            double advance = BTextMeasurer.MeasureAdvance(text, font);
+            yield return new LineSegment(text, run.Style, font, x, advance);
             x += advance;
         }
     }
 
     private BFontStyle RunFont(InlineStyle style)
     {
-        if (!style.Bold && !style.Italic)
-            return Font;
-
         return Font with
         {
+            FamilyName = string.IsNullOrWhiteSpace(style.FontFamily) ? Font.FamilyName : style.FontFamily,
+            SizeInPixels = style.FontSize is > 0 ? style.FontSize.Value : Font.SizeInPixels,
             Weight = style.Bold ? BFontWeight.Bold : Font.Weight,
             Slant = style.Italic ? BFontSlant.Italic : Font.Slant,
         };
@@ -390,7 +385,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private bool HandleWheel(UiInputEvent input)
     {
-        double newScroll = ClampScroll(_scrollY - input.WheelDeltaNotches * LineHeight * 3);
+        double newScroll = ClampScroll(_scrollY - input.WheelDeltaNotches * DefaultLineHeight * 3);
         if (newScroll == _scrollY)
             return false;
 
@@ -593,7 +588,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     private void PageMove(int direction, bool extend)
     {
         EnsureLayout();
-        int linesPerPage = Math.Max(1, (int)(ContentHeight / LineHeight));
+        int linesPerPage = Math.Max(1, (int)(ContentHeight / DefaultLineHeight));
         (VisualLine _, int index) = LineForPosition(Selection.Focus);
         double caretX = CaretX(Selection.Focus);
         int target = Math.Clamp(index + (direction * linesPerPage), 0, _lines.Count - 1);
@@ -724,33 +719,32 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private RichTextPosition PositionInLineAtX(VisualLine line, double x)
     {
-        string text = LineText(line);
-        int offset = OffsetAtX(text, x - ContentLeft);
+        int offset = OffsetAtX(line, x - ContentLeft);
         return new RichTextPosition(line.ParagraphIndex, line.Start + offset);
     }
 
-    private int OffsetAtX(string lineText, double localX)
+    private int OffsetAtX(VisualLine line, double localX)
     {
+        RichTextParagraph paragraph = Document.Paragraphs[line.ParagraphIndex];
         double advance = 0;
-        int index = 0;
-        while (index < lineText.Length)
+        int index = line.Start;
+        while (index < line.End)
         {
-            double charAdvance = CharAdvance(lineText, index, out int step);
+            double charAdvance = CharAdvance(paragraph, index, out int step);
             if (localX < advance + (charAdvance / 2))
                 break;
             advance += charAdvance;
             index += step;
         }
 
-        return index;
+        return index - line.Start;
     }
 
     private double CaretX(RichTextPosition position)
     {
         VisualLine line = LineForPosition(position).Line;
-        string text = LineText(line);
-        int within = Math.Clamp(position.Offset - line.Start, 0, text.Length);
-        return ContentLeft + MeasureAdvance(text[..within]);
+        int end = Math.Clamp(position.Offset, line.Start, line.End);
+        return ContentLeft + MeasureAdvance(Document.Paragraphs[line.ParagraphIndex], line.Start, end);
     }
 
     private BRect CaretRect(RichTextPosition position)
@@ -772,7 +766,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     // --- Layout ------------------------------------------------------------
 
-    private double LineHeight => BTextMeasurer.GetLineHeight(Font);
+    private double DefaultLineHeight => BTextMeasurer.GetLineHeight(Font);
 
     private BRect InnerBounds => new(
         Bounds.Left + PaddingX,
@@ -795,8 +789,32 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     private string LineText(VisualLine line) =>
         Document.Paragraphs[line.ParagraphIndex].Text.Substring(line.Start, line.End - line.Start);
 
-    private double MeasureAdvance(string text) =>
-        text.Length == 0 ? 0 : BTextMeasurer.MeasureAdvance(text, Font);
+    private double MeasureAdvance(RichTextParagraph paragraph, int start, int end)
+    {
+        start = Math.Clamp(start, 0, paragraph.Length);
+        end = Math.Clamp(end, start, paragraph.Length);
+        if (end <= start)
+            return 0;
+
+        double advance = 0;
+        int position = 0;
+        foreach (StyleRun run in paragraph.Runs)
+        {
+            int runStart = position;
+            int runEnd = position + run.Length;
+            position = runEnd;
+
+            int segmentStart = Math.Max(start, runStart);
+            int segmentEnd = Math.Min(end, runEnd);
+            if (segmentEnd <= segmentStart)
+                continue;
+
+            string text = paragraph.Text.Substring(segmentStart, segmentEnd - segmentStart);
+            advance += BTextMeasurer.MeasureAdvance(text, RunFont(run.Style));
+        }
+
+        return advance;
+    }
 
     private void EnsureLayout()
     {
@@ -820,26 +838,28 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     private void BuildLayout(double contentWidth)
     {
         _lines.Clear();
-        double lineHeight = LineHeight;
+        double defaultLineHeight = DefaultLineHeight;
         double y = 0;
         RichTextDocument document = Document;
 
         for (int paragraphIndex = 0; paragraphIndex < document.ParagraphCount; paragraphIndex++)
         {
-            string text = document.Paragraphs[paragraphIndex].Text;
+            RichTextParagraph paragraph = document.Paragraphs[paragraphIndex];
+            string text = paragraph.Text;
             foreach ((int segmentStart, int segmentEnd) in HardSegments(text))
             {
                 if (segmentStart == segmentEnd)
                 {
-                    _lines.Add(new VisualLine(paragraphIndex, segmentStart, segmentEnd, y, lineHeight));
-                    y += lineHeight;
+                    _lines.Add(new VisualLine(paragraphIndex, segmentStart, segmentEnd, y, defaultLineHeight));
+                    y += defaultLineHeight;
                     continue;
                 }
 
                 int i = segmentStart;
                 while (i < segmentEnd)
                 {
-                    int end = MeasureWrap(text, i, segmentEnd, contentWidth);
+                    int end = MeasureWrap(paragraph, i, segmentEnd, contentWidth);
+                    double lineHeight = MeasureLineHeight(paragraph, i, end, defaultLineHeight);
                     _lines.Add(new VisualLine(paragraphIndex, i, end, y, lineHeight));
                     y += lineHeight;
                     i = end;
@@ -849,8 +869,8 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
         if (_lines.Count == 0)
         {
-            _lines.Add(new VisualLine(0, 0, 0, 0, lineHeight));
-            y = lineHeight;
+            _lines.Add(new VisualLine(0, 0, 0, 0, defaultLineHeight));
+            y = defaultLineHeight;
         }
 
         _contentHeight = y;
@@ -873,17 +893,18 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         yield return (start, text.Length);
     }
 
-    private int MeasureWrap(string text, int start, int segmentEnd, double contentWidth)
+    private int MeasureWrap(RichTextParagraph paragraph, int start, int segmentEnd, double contentWidth)
     {
         if (contentWidth <= 0)
             return segmentEnd;
 
+        string text = paragraph.Text;
         double width = 0;
         int lastBreak = -1;
         int j = start;
         while (j < segmentEnd)
         {
-            double advance = CharAdvance(text, j, out int step);
+            double advance = CharAdvance(paragraph, j, out int step);
             if (width + advance > contentWidth && j > start)
                 break;
 
@@ -900,16 +921,40 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         return j;
     }
 
-    private double CharAdvance(string text, int index, out int step)
+    private double MeasureLineHeight(RichTextParagraph paragraph, int start, int end, double fallback)
     {
+        if (start >= end || paragraph.Runs.Count == 0)
+            return fallback;
+
+        double height = fallback;
+        int position = 0;
+        foreach (StyleRun run in paragraph.Runs)
+        {
+            int runStart = position;
+            int runEnd = position + run.Length;
+            position = runEnd;
+            if (Math.Max(start, runStart) >= Math.Min(end, runEnd))
+                continue;
+
+            height = Math.Max(height, BTextMeasurer.GetLineHeight(RunFont(run.Style)));
+        }
+
+        return height;
+    }
+
+    private double CharAdvance(RichTextParagraph paragraph, int index, out int step)
+    {
+        string text = paragraph.Text;
+        InlineStyle style = paragraph.StyleAt(index);
+        BFontStyle font = RunFont(style);
         if (index + 1 < text.Length && char.IsHighSurrogate(text[index]) && char.IsLowSurrogate(text[index + 1]))
         {
             step = 2;
-            return MeasureAdvance(text.Substring(index, 2));
+            return BTextMeasurer.MeasureAdvance(text.Substring(index, 2), font);
         }
 
         step = 1;
-        return MeasureAdvance(text[index].ToString());
+        return BTextMeasurer.MeasureAdvance(text[index].ToString(), font);
     }
 
     private bool IsDoubleClick(BPoint point)
@@ -942,5 +987,5 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private readonly record struct VisualLine(int ParagraphIndex, int Start, int End, double Top, double Height);
 
-    private readonly record struct LineSegment(string Text, InlineStyle Style, double X, double Advance);
+    private readonly record struct LineSegment(string Text, InlineStyle Style, BFontStyle Font, double X, double Advance);
 }

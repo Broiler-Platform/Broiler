@@ -18,7 +18,8 @@ concurrency:
 env:
   BROWSER_PROJECT_PATH: src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
   WRITER_PROJECT_PATH: Broiler.Writer/Broiler.Writer.csproj
-  CONFIGURATION: Release
+  WINDOWS_CONFIGURATION: Release-Windows
+  LINUX_CONFIGURATION: Release-Linux
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
@@ -46,21 +47,21 @@ jobs:
       - name: Restore Windows runtime graphs
         shell: pwsh
         run: |
-          dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64
-          dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
 
       - name: Build Windows targets
         shell: pwsh
         run: |
           dotnet build $env:BROWSER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --no-restore
 
           dotnet build $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --no-restore
 
@@ -71,7 +72,7 @@ jobs:
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
@@ -80,7 +81,7 @@ jobs:
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
@@ -94,7 +95,7 @@ jobs:
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
@@ -102,7 +103,7 @@ jobs:
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
@@ -224,21 +225,21 @@ jobs:
       - name: Restore Linux runtime graphs
         shell: pwsh
         run: |
-          dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64
-          dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
 
       - name: Build Linux targets
         shell: pwsh
         run: |
           dotnet build $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-restore
 
           dotnet build $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-restore
 
@@ -248,7 +249,7 @@ jobs:
           dotnet run `
             --project $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-build `
             -- `
@@ -258,7 +259,7 @@ jobs:
           dotnet run `
             --project $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-build `
             -- `
@@ -272,7 +273,7 @@ jobs:
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `
@@ -281,7 +282,7 @@ jobs:
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `
@@ -295,7 +296,7 @@ jobs:
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
@@ -303,7 +304,7 @@ jobs:
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `

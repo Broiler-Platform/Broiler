@@ -27,7 +27,8 @@ env:
   PROJECT_PATH: Broiler.Writer/Broiler.Writer.csproj
   APP_NAME: Broiler.Writer
   RELEASE_NAME: Broiler Writer
-  CONFIGURATION: Release
+  WINDOWS_CONFIGURATION: Release-Windows
+  LINUX_CONFIGURATION: Release-Linux
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
@@ -78,7 +79,7 @@ jobs:
 
       - name: Restore Windows runtime graph
         shell: pwsh
-        run: dotnet restore $env:PROJECT_PATH --runtime win-x64
+        run: dotnet restore $env:PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
 
       - name: Publish self-contained single exe
         shell: pwsh
@@ -86,7 +87,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP 'publish\windows-self-contained'
           dotnet publish $env:PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
@@ -105,7 +106,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP 'publish\windows-framework-dependent'
           dotnet publish $env:PROJECT_PATH `
             --framework net10.0-windows `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
@@ -230,14 +231,14 @@ jobs:
 
       - name: Restore Linux runtime graph
         shell: pwsh
-        run: dotnet restore $env:PROJECT_PATH --runtime linux-x64
+        run: dotnet restore $env:PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
 
       - name: Build Linux target
         shell: pwsh
         run: |
           dotnet build $env:PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-restore
 
@@ -247,7 +248,7 @@ jobs:
           dotnet run `
             --project $env:PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --no-build `
             -- `
@@ -260,7 +261,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP 'publish/linux-self-contained'
           dotnet publish $env:PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
@@ -281,7 +282,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP 'publish/linux-framework-dependent'
           dotnet publish $env:PROJECT_PATH `
             --framework net10.0 `
-            --configuration $env:CONFIGURATION `
+            --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -28,6 +29,7 @@ public class Program
     private const int TopBucketLimit = 5;
     private const int MissingContentDominantBucketMinimumFailures = 5;
     private const double MissingContentDominanceThreshold = 0.5;
+    private static readonly TimeSpan WorkerStartupTimeout = TimeSpan.FromSeconds(60);
     private static readonly string[] ExplicitDeferredFeatureSuites =
     [
         "css/css-view-transitions",
@@ -36,6 +38,11 @@ public class Program
     private static readonly Func<WptTestRunner, string, string, string?, WptTestResult> DefaultRunTestExecutor
         = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
     private static readonly AsyncLocal<Func<WptTestRunner, string, string, string?, WptTestResult>?> RunTestExecutorOverride = new();
+    private static readonly JsonSerializerOptions WorkerJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     internal static Func<WptTestRunner, string, string, string?, WptTestResult> RunTestExecutor
     {
@@ -60,11 +67,19 @@ public class Program
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
         bool verifyReference = false;
+        bool workerMode = false;
+        bool noWorkerIsolation = false;
 
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
+                case "--wpt-worker":
+                    workerMode = true;
+                    break;
+                case "--no-worker-isolation":
+                    noWorkerIsolation = true;
+                    break;
                 case "--wpt-dir" when i + 1 < args.Length:
                     wptPath = args[++i];
                     break;
@@ -193,6 +208,9 @@ public class Program
         // Default reference directory to <wptPath>/references if not specified.
         referenceDir ??= Path.Combine(wptPath, "references");
 
+        if (workerMode)
+            return RunWorkerMode(wptPath, referenceDir, failureImagesDir, verifyReference);
+
         if (!TryResolveRunTestTimeout(timeoutSeconds, out var runTestTimeout, out var timeoutError))
         {
             Console.Error.WriteLine(timeoutError);
@@ -209,6 +227,11 @@ public class Program
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
         Console.WriteLine($"Timeout       : {FormatSeconds(runTestTimeout)} second(s)");
         Console.WriteLine($"Mode          : {(nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests")}");
+        var useWorkerIsolation = !noWorkerIsolation && RunTestExecutorOverride.Value is null;
+        Console.WriteLine(
+            useWorkerIsolation
+                ? "Isolation     : worker process (timed-out tests are killed)"
+                : "Isolation     : in-process");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
         if (shardIndex != WptTestRunner.AllShards)
@@ -277,14 +300,40 @@ public class Program
         // match before writing the final summary/log output.
         var allResults = new List<WptTestResult>(totalTests);
         var progressStopwatch = Stopwatch.StartNew();
+        var runProgress = new WptRunProgress(totalTests);
+        var terminationDiagnostics = new TerminationDiagnosticWriter(runProgress);
+        using var sigTermRegistration = TryRegisterPosixSignal(
+            PosixSignal.SIGTERM,
+            "SIGTERM",
+            terminationDiagnostics.Write);
+        using var sigIntRegistration = TryRegisterPosixSignal(
+            PosixSignal.SIGINT,
+            "SIGINT",
+            terminationDiagnostics.Write);
+        using var workerClient = useWorkerIsolation
+            ? new WptWorkerClient(wptPath, referenceDir, failureImagesDir, verifyReference)
+            : null;
         int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
         foreach (var testPath in discoveredTests)
         {
             var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
+            runProgress.StartTest(testPath, displayPath, completed + 1);
             Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
 
-            var result = RunTestWithTimeout(runner, testPath, referenceDir, wptPath, runTestTimeout);
+            var result = workerClient is not null
+                ? RunTestWithWorkerTimeout(
+                    workerClient,
+                    testPath,
+                    runTestTimeout,
+                    runProgress.SetWorkerProcessId)
+                : RunTestWithTimeout(
+                    runner,
+                    testPath,
+                    referenceDir,
+                    wptPath,
+                    runTestTimeout,
+                    runProgress.SetWorkerThreadId);
             allResults.Add(result);
             completed++;
 
@@ -294,6 +343,8 @@ public class Program
                 runningSkipped++;
             else
                 runningFailed++;
+
+            runProgress.CompleteTest(completed, runningPassed, runningFailed, runningSkipped);
 
             if (completed == totalTests || completed % ProgressCheckpointInterval == 0)
             {
@@ -352,6 +403,7 @@ public class Program
         int missingReferenceSkipCount =
             skippedResults.Count(r => r.SkipReason == SkipReason.MissingReferenceImage);
         double comparedPassRate = comparedCount > 0 ? 100.0 * passed / comparedCount : 0;
+        var averageMatch = GetAverageMatchPercent(compared);
 
         Console.WriteLine();
         Console.WriteLine("=== Results ===");
@@ -364,6 +416,10 @@ public class Program
         Console.WriteLine(
             $"Compared         : {comparedCount}  ({comparedPassRate:F1}% of compared passed) " +
             "— only these were pixel-compared against a reference");
+        if (averageMatch.Count > 0)
+            Console.WriteLine(
+                $"Average match   : {FormatPercent(averageMatch.Percent!.Value)}% across " +
+                $"{averageMatch.Count} pixel-compared test(s)");
         Console.WriteLine(
             $"Skipped          : {skipped}  — not compared and not counted as passed " +
             "(no reference image / manual / unsupported media / unsupported variants)");
@@ -461,17 +517,103 @@ public class Program
         RunTestExecutorOverride.Value = null;
     }
 
+    private static int RunWorkerMode(
+        string wptPath,
+        string referenceDir,
+        string? failureImagesDir,
+        bool verifyReference)
+    {
+        var protocolOut = Console.Out;
+        Console.SetOut(Console.Error);
+
+        var runner = new WptTestRunner(
+            failureImageDir: failureImagesDir,
+            verifyReferenceHtml: verifyReference);
+
+        protocolOut.WriteLine(JsonSerializer.Serialize(new WptWorkerResponse { Ready = true }, WorkerJsonOptions));
+        protocolOut.Flush();
+
+        string? line;
+        while ((line = Console.In.ReadLine()) is not null)
+        {
+            WptWorkerResponse response;
+            try
+            {
+                var command = JsonSerializer.Deserialize<WptWorkerCommand>(line, WorkerJsonOptions);
+                if (command is null || string.IsNullOrWhiteSpace(command.TestPath))
+                    throw new InvalidOperationException("Worker command did not include a test path.");
+
+                response = new WptWorkerResponse
+                {
+                    Result = runner.RunTest(command.TestPath, referenceDir, wptPath),
+                };
+            }
+            catch (Exception ex)
+            {
+                response = new WptWorkerResponse
+                {
+                    Error = ex.ToString(),
+                };
+            }
+
+            protocolOut.WriteLine(JsonSerializer.Serialize(response, WorkerJsonOptions));
+            protocolOut.Flush();
+        }
+
+        return 0;
+    }
+
+    private static WptTestResult RunTestWithWorkerTimeout(
+        WptWorkerClient workerClient,
+        string testPath,
+        TimeSpan timeout,
+        Action<int>? workerProcessStarted = null)
+    {
+        try
+        {
+            return workerClient.RunTest(testPath, timeout, workerProcessStarted);
+        }
+        catch (TimeoutException)
+        {
+            var workerProcessId = workerClient.CurrentProcessId;
+            workerClient.KillCurrentWorker();
+
+            var timeoutResult = CreateTimeoutResult(
+                testPath,
+                timeout,
+                workerThreadId: -1,
+                workerProcessId);
+            Console.Error.WriteLine($"[TIMEOUT] {timeoutResult.Message}");
+            Console.Error.WriteLine(timeoutResult.StackTrace);
+            return timeoutResult;
+        }
+        catch (Exception ex)
+        {
+            workerClient.KillCurrentWorker();
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = $"Worker execution failed: {ex.Message}",
+                Category = FailureCategory.Unknown,
+                StackTrace = ex.ToString(),
+            };
+        }
+    }
+
     internal static WptTestResult RunTestWithTimeout(
         WptTestRunner runner,
         string testPath,
         string referenceDir,
         string? wptPath,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        Action<int>? workerThreadStarted = null)
     {
         int workerThreadId = -1;
         var runTestTask = Task.Run(() =>
         {
             workerThreadId = Environment.CurrentManagedThreadId;
+            workerThreadStarted?.Invoke(workerThreadId);
             return RunTestExecutor(runner, testPath, referenceDir, wptPath);
         });
 
@@ -492,6 +634,271 @@ public class Program
             Console.Error.WriteLine(timeoutResult.StackTrace);
             return timeoutResult;
         }
+    }
+
+    private sealed class WptWorkerClient : IDisposable
+    {
+        private readonly string _wptPath;
+        private readonly string _referenceDir;
+        private readonly string? _failureImagesDir;
+        private readonly bool _verifyReference;
+        private Process? _process;
+        private Task<string?>? _pendingResponse;
+
+        internal WptWorkerClient(
+            string wptPath,
+            string referenceDir,
+            string? failureImagesDir,
+            bool verifyReference)
+        {
+            _wptPath = wptPath;
+            _referenceDir = referenceDir;
+            _failureImagesDir = failureImagesDir;
+            _verifyReference = verifyReference;
+        }
+
+        internal int? CurrentProcessId
+        {
+            get
+            {
+                try
+                {
+                    return _process is { HasExited: false } process ? process.Id : null;
+                }
+                catch (InvalidOperationException)
+                {
+                    return null;
+                }
+            }
+        }
+
+        internal WptTestResult RunTest(
+            string testPath,
+            TimeSpan timeout,
+            Action<int>? workerProcessStarted)
+        {
+            var process = EnsureStarted();
+            workerProcessStarted?.Invoke(process.Id);
+
+            var command = new WptWorkerCommand { TestPath = testPath };
+            process.StandardInput.WriteLine(JsonSerializer.Serialize(command, WorkerJsonOptions));
+            process.StandardInput.Flush();
+
+            _pendingResponse = process.StandardOutput.ReadLineAsync();
+            string? responseLine;
+            try
+            {
+                responseLine = _pendingResponse.WaitAsync(timeout).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _pendingResponse = null;
+            }
+
+            if (responseLine is null)
+            {
+                var exitMessage = process.HasExited
+                    ? $"Worker exited with code {process.ExitCode} before returning a result."
+                    : "Worker closed stdout before returning a result.";
+                throw new InvalidOperationException(exitMessage);
+            }
+
+            WptWorkerResponse? response;
+            try
+            {
+                response = JsonSerializer.Deserialize<WptWorkerResponse>(responseLine, WorkerJsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException($"Worker returned invalid JSON: {responseLine}", ex);
+            }
+
+            if (response is null)
+                throw new InvalidOperationException("Worker returned an empty response.");
+
+            if (!string.IsNullOrWhiteSpace(response.Error))
+                throw new InvalidOperationException(response.Error);
+
+            return response.Result ?? new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = "Worker returned no test result.",
+                Category = FailureCategory.Unknown,
+            };
+        }
+
+        internal void KillCurrentWorker()
+        {
+            var process = _process;
+            _process = null;
+            _pendingResponse = null;
+
+            if (process is null)
+                return;
+
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex) when (
+                ex is InvalidOperationException ||
+                ex is NotSupportedException ||
+                ex is System.ComponentModel.Win32Exception)
+            {
+                Console.Error.WriteLine($"[WARN] Failed to kill WPT worker process: {ex.Message}");
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (_process is { HasExited: false } process)
+                {
+                    process.StandardInput.Close();
+                    if (!process.WaitForExit(milliseconds: 1000))
+                        process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (Exception ex) when (
+                ex is InvalidOperationException ||
+                ex is NotSupportedException ||
+                ex is System.ComponentModel.Win32Exception ||
+                ex is IOException)
+            {
+                Console.Error.WriteLine($"[WARN] Failed to stop WPT worker process cleanly: {ex.Message}");
+            }
+            finally
+            {
+                _process?.Dispose();
+                _process = null;
+            }
+        }
+
+        private Process EnsureStarted()
+        {
+            if (_process is { HasExited: false } liveProcess)
+                return liveProcess;
+
+            _process?.Dispose();
+            _process = StartWorkerProcess();
+            return _process;
+        }
+
+        private Process StartWorkerProcess()
+        {
+            var startInfo = CreateCurrentProgramStartInfo([
+                "--wpt-worker",
+                "--wpt-dir",
+                _wptPath,
+                "--reference-dir",
+                _referenceDir,
+            ]);
+
+            if (!string.IsNullOrWhiteSpace(_failureImagesDir))
+            {
+                startInfo.ArgumentList.Add("--failure-images");
+                startInfo.ArgumentList.Add(_failureImagesDir);
+            }
+
+            if (_verifyReference)
+                startInfo.ArgumentList.Add("--verify-reference");
+
+            startInfo.RedirectStandardInput = true;
+            startInfo.RedirectStandardOutput = true;
+            startInfo.RedirectStandardError = true;
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true;
+
+            var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Failed to start WPT worker process.");
+            process.ErrorDataReceived += static (_, e) =>
+            {
+                if (e.Data is not null)
+                    Console.Error.WriteLine(e.Data);
+            };
+            process.BeginErrorReadLine();
+
+            try
+            {
+                var readyLine = process.StandardOutput
+                    .ReadLineAsync()
+                    .WaitAsync(WorkerStartupTimeout)
+                    .GetAwaiter()
+                    .GetResult();
+                var readyResponse = readyLine is not null
+                    ? JsonSerializer.Deserialize<WptWorkerResponse>(readyLine, WorkerJsonOptions)
+                    : null;
+
+                if (readyResponse?.Ready != true)
+                    throw new InvalidOperationException($"WPT worker did not send a ready response: {readyLine ?? "<stdout closed>"}");
+            }
+            catch
+            {
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Best-effort cleanup; the startup exception below is the useful signal.
+                }
+
+                process.Dispose();
+                throw;
+            }
+
+            return process;
+        }
+    }
+
+    private sealed class WptWorkerCommand
+    {
+        public string TestPath { get; set; } = string.Empty;
+    }
+
+    private sealed class WptWorkerResponse
+    {
+        public bool Ready { get; set; }
+        public WptTestResult? Result { get; set; }
+        public string? Error { get; set; }
+    }
+
+    private static ProcessStartInfo CreateCurrentProgramStartInfo(IEnumerable<string> args)
+    {
+        var processPath = Environment.ProcessPath;
+        var assemblyPath = typeof(Program).Assembly.Location;
+        var startInfo = new ProcessStartInfo();
+
+        if (!string.IsNullOrWhiteSpace(processPath) && !IsDotNetHost(processPath))
+        {
+            startInfo.FileName = processPath;
+        }
+        else
+        {
+            startInfo.FileName = string.IsNullOrWhiteSpace(processPath)
+                ? "dotnet"
+                : processPath;
+            startInfo.ArgumentList.Add(assemblyPath);
+        }
+
+        foreach (var arg in args)
+            startInfo.ArgumentList.Add(arg);
+
+        return startInfo;
+    }
+
+    private static bool IsDotNetHost(string processPath)
+    {
+        var name = Path.GetFileNameWithoutExtension(processPath);
+        return name.Equals("dotnet", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryResolveRunTestTimeout(
@@ -637,7 +1044,8 @@ public class Program
     private static WptTestResult CreateTimeoutResult(
         string testPath,
         TimeSpan timeout,
-        int workerThreadId)
+        int workerThreadId,
+        int? workerProcessId = null)
     {
         var message = $"Test timed out after {FormatSeconds(timeout)} second(s): {testPath}";
         var invocationStackTrace = new StackTrace(skipFrames: 2, fNeedFileInfo: true).ToString();
@@ -645,6 +1053,7 @@ public class Program
             .AppendLine("=== Timeout diagnostics ===")
             .AppendLine(message)
             .AppendLine($"Worker thread id: {(workerThreadId >= 0 ? workerThreadId : "unknown")}")
+            .AppendLine($"Worker process id: {(workerProcessId.HasValue ? workerProcessId.Value : "unknown")}")
             .AppendLine()
             .AppendLine("RunTest invocation stack:")
             .AppendLine(invocationStackTrace)
@@ -663,8 +1072,224 @@ public class Program
         };
     }
 
+    private sealed class WptRunProgress
+    {
+        private readonly object _sync = new();
+        private readonly Stopwatch _runStopwatch = Stopwatch.StartNew();
+        private readonly int _totalTests;
+        private Stopwatch? _currentTestStopwatch;
+        private int _completed;
+        private int _passed;
+        private int _failed;
+        private int _skipped;
+        private int? _currentOrdinal;
+        private int _workerThreadId = -1;
+        private int? _workerProcessId;
+        private string? _currentDisplayPath;
+        private string? _currentTestPath;
+
+        internal WptRunProgress(int totalTests)
+        {
+            _totalTests = totalTests;
+        }
+
+        internal void StartTest(string testPath, string displayPath, int ordinal)
+        {
+            lock (_sync)
+            {
+                _currentTestPath = testPath;
+                _currentDisplayPath = displayPath;
+                _currentOrdinal = ordinal;
+                _workerThreadId = -1;
+                _workerProcessId = null;
+                _currentTestStopwatch = Stopwatch.StartNew();
+            }
+        }
+
+        internal void SetWorkerThreadId(int workerThreadId)
+        {
+            lock (_sync)
+            {
+                _workerThreadId = workerThreadId;
+            }
+        }
+
+        internal void SetWorkerProcessId(int workerProcessId)
+        {
+            lock (_sync)
+            {
+                _workerProcessId = workerProcessId;
+            }
+        }
+
+        internal void CompleteTest(int completed, int passed, int failed, int skipped)
+        {
+            lock (_sync)
+            {
+                _completed = completed;
+                _passed = passed;
+                _failed = failed;
+                _skipped = skipped;
+                _currentTestPath = null;
+                _currentDisplayPath = null;
+                _currentOrdinal = null;
+                _workerThreadId = -1;
+                _workerProcessId = null;
+                _currentTestStopwatch = null;
+            }
+        }
+
+        internal WptRunProgressSnapshot Snapshot()
+        {
+            lock (_sync)
+            {
+                return new WptRunProgressSnapshot(
+                    _completed,
+                    _totalTests,
+                    _passed,
+                    _failed,
+                    _skipped,
+                    _currentOrdinal,
+                    _currentDisplayPath,
+                    _currentTestPath,
+                    _runStopwatch.Elapsed,
+                    _currentTestStopwatch?.Elapsed,
+                    _workerThreadId,
+                    _workerProcessId);
+            }
+        }
+    }
+
+    private sealed class TerminationDiagnosticWriter
+    {
+        private readonly WptRunProgress _progress;
+        private int _written;
+
+        internal TerminationDiagnosticWriter(WptRunProgress progress)
+        {
+            _progress = progress;
+        }
+
+        internal void Write(string reason)
+        {
+            if (Interlocked.Exchange(ref _written, 1) != 0)
+                return;
+
+            Console.Error.WriteLine(CreateTerminationDiagnostics(reason, _progress.Snapshot()));
+            Console.Error.Flush();
+        }
+    }
+
+    internal readonly record struct WptRunProgressSnapshot(
+        int Completed,
+        int TotalTests,
+        int Passed,
+        int Failed,
+        int Skipped,
+        int? CurrentOrdinal,
+        string? CurrentDisplayPath,
+        string? CurrentTestPath,
+        TimeSpan RunElapsed,
+        TimeSpan? CurrentTestElapsed,
+        int WorkerThreadId,
+        int? WorkerProcessId);
+
+    internal static string CreateTerminationDiagnostics(
+        string reason,
+        WptRunProgressSnapshot snapshot)
+    {
+        var diagnostics = new StringBuilder()
+            .AppendLine("=== Termination diagnostics ===")
+            .AppendLine($"Reason: {reason}")
+            .AppendLine($"Process id: {Environment.ProcessId}")
+            .AppendLine(
+                $"Progress: {snapshot.Completed}/{snapshot.TotalTests} completed " +
+                $"({snapshot.Passed} passed, {snapshot.Failed} failed, {snapshot.Skipped} skipped)")
+            .AppendLine($"Run elapsed: {FormatDuration(snapshot.RunElapsed)}")
+            .AppendLine("Note: exit code 143 usually means SIGTERM, so the process was externally terminated.")
+            .AppendLine();
+
+        if (snapshot.CurrentDisplayPath is { Length: > 0 } currentDisplayPath)
+        {
+            var ordinal = snapshot.CurrentOrdinal.HasValue
+                ? $"{snapshot.CurrentOrdinal.Value}/{snapshot.TotalTests}"
+                : $"?/{snapshot.TotalTests}";
+            diagnostics.AppendLine($"Current test: ({ordinal}) {currentDisplayPath}");
+
+            if (snapshot.CurrentTestPath is { Length: > 0 } currentTestPath)
+                diagnostics.AppendLine($"Current test path: {currentTestPath}");
+
+            if (snapshot.CurrentTestElapsed is { } currentTestElapsed)
+                diagnostics.AppendLine($"Current test elapsed: {FormatDuration(currentTestElapsed)}");
+
+            diagnostics.AppendLine(
+                $"Worker thread id: {(snapshot.WorkerThreadId >= 0 ? snapshot.WorkerThreadId : "unknown")}");
+            diagnostics.AppendLine(
+                $"Worker process id: {(snapshot.WorkerProcessId.HasValue ? snapshot.WorkerProcessId.Value : "unknown")}");
+        }
+        else
+        {
+            diagnostics.AppendLine("Current test: none");
+        }
+
+        return diagnostics
+            .AppendLine()
+            .AppendLine("Termination detection stack:")
+            .AppendLine(Environment.StackTrace)
+            .ToString();
+    }
+
+    private static IDisposable? TryRegisterPosixSignal(
+        PosixSignal signal,
+        string reason,
+        Action<string> writeDiagnostics)
+    {
+        try
+        {
+            return PosixSignalRegistration.Create(signal, context =>
+            {
+                writeDiagnostics(reason);
+                context.Cancel = false;
+            });
+        }
+        catch (Exception ex) when (
+            ex is ArgumentException ||
+            ex is InvalidOperationException ||
+            ex is PlatformNotSupportedException)
+        {
+            return null;
+        }
+    }
+
     private static string FormatSeconds(TimeSpan value) =>
         value.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string FormatDuration(TimeSpan value) =>
+        value.ToString("c", CultureInfo.InvariantCulture);
+
+    private static string FormatPercent(double value) =>
+        value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static MatchPercentSummary GetAverageMatchPercent(IEnumerable<WptTestResult> results)
+    {
+        var count = 0;
+        var sum = 0.0;
+
+        foreach (var result in results)
+        {
+            if (result.MatchPercent is not { } matchPercent)
+                continue;
+
+            count++;
+            sum += matchPercent;
+        }
+
+        return count == 0
+            ? new MatchPercentSummary(0, null)
+            : new MatchPercentSummary(count, sum / count);
+    }
+
+    private sealed record MatchPercentSummary(int Count, double? Percent);
 
     /// <summary>
     /// Serialises the full test results to a structured JSON file for
@@ -692,6 +1317,9 @@ public class Program
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
         var timeoutSummary = GetTimeoutSummary(failures, wptPath);
+        var compared = passed + failed;
+        var comparedPassRate = compared > 0 ? 100.0 * passed / compared : 0;
+        var averageMatch = GetAverageMatchPercent(allResults);
 
         var report = new Dictionary<string, object?>
         {
@@ -702,12 +1330,16 @@ public class Program
                 ["displayName"] = BGraphicsBackend.CurrentDisplayName,
                 ["label"] = BGraphicsBackend.CurrentLabel,
             },
-            ["summary"] = new Dictionary<string, object>
+            ["summary"] = new Dictionary<string, object?>
             {
                 ["passed"] = passed,
                 ["failed"] = failed,
                 ["skipped"] = skipped,
                 ["total"] = allResults.Count,
+                ["compared"] = compared,
+                ["comparedPassRate"] = comparedPassRate,
+                ["averageMatchPercent"] = averageMatch.Percent,
+                ["averageMatchCount"] = averageMatch.Count,
             },
             ["shard"] = new Dictionary<string, object>
             {
@@ -877,6 +1509,11 @@ public class Program
             $"(= {passed} passed + {failed} failed + {skipped} skipped — mutually exclusive)");
         writer.WriteLine(
             $"- Compared (pixel-tested): {compared} — {comparedPassRate:F1}% of compared passed");
+        var averageMatch = GetAverageMatchPercent(allResults);
+        if (averageMatch.Count > 0)
+            writer.WriteLine(
+                $"- Average match: {FormatPercent(averageMatch.Percent!.Value)}% across " +
+                $"{averageMatch.Count} pixel-compared test(s)");
         writer.WriteLine($"- Passed: {passed}");
         writer.WriteLine($"- Failed: {failed}");
         writer.WriteLine(
@@ -1639,6 +2276,8 @@ public class Program
         Console.WriteLine("                             css-anchor-position scroll cluster. Env: BROILER_WPT_DEFER_PROMISE_TESTS=1");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
+        Console.WriteLine("  --no-worker-isolation      Run tests in-process instead of the default worker process");
+        Console.WriteLine("                             isolation. Useful for debugger sessions only.");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
         Console.WriteLine("  --failure-images <DIR>     Save rendered/reference/diff PNGs for each failure under DIR");

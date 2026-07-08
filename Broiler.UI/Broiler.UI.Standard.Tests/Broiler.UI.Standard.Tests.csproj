@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.UI.FileDialog.Standard\Broiler.UI.FileDialog.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.UI.FontDialog.Standard\Broiler.UI.FontDialog.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj" />
     <ProjectReference Include="..\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
   </ItemGroup>

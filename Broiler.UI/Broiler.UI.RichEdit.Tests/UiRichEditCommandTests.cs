@@ -1,3 +1,5 @@
+using Broiler.Graphics;
+
 namespace Broiler.UI.RichEdit.Tests;
 
 public sealed class UiRichEditCommandTests
@@ -30,6 +32,29 @@ public sealed class UiRichEditCommandTests
 
         edit.ExecuteCommand(RichEditCommand.Bold);
         Assert.False(edit.Document.Paragraphs[0].Runs[0].Style.Bold);
+    }
+
+    [Fact]
+    public void Font_Commands_Apply_Family_Size_And_Font_Style()
+    {
+        var edit = new FakeRichEdit();
+        edit.ExecuteCommand(RichEditCommand.InsertText, "Hello");
+        edit.ExecuteCommand(RichEditCommand.SelectAll);
+
+        edit.ExecuteCommand(RichEditCommand.SetFontFamily, "Consolas");
+        edit.ExecuteCommand(RichEditCommand.SetFontSize, 18);
+
+        InlineStyle style = edit.Document.Paragraphs[0].Runs[0].Style;
+        Assert.Equal("Consolas", style.FontFamily);
+        Assert.Equal(18f, style.FontSize.GetValueOrDefault());
+
+        edit.ExecuteCommand(RichEditCommand.SetFont, new BFontStyle("Georgia", 22, BFontWeight.Bold, BFontSlant.Italic));
+
+        style = edit.Document.Paragraphs[0].Runs[0].Style;
+        Assert.Equal("Georgia", style.FontFamily);
+        Assert.Equal(22f, style.FontSize.GetValueOrDefault());
+        Assert.True(style.Bold);
+        Assert.True(style.Italic);
     }
 
     [Fact]

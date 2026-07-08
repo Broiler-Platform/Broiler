@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,6 +10,10 @@
     <AssemblyName>Broiler.Input.Camera.Windows</AssemblyName>
     <PackageId>Broiler.Input.Camera.Windows</PackageId>
     <Description>Windows Media Foundation camera input provider for Broiler.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Windows;Release-Windows</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

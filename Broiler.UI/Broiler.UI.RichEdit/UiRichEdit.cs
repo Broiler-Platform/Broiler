@@ -180,7 +180,9 @@ public abstract class UiRichEdit : UiElement
             RichEditCommand.Italic => RichEditCommandState.For(editable, inline.Italic),
             RichEditCommand.Underline => RichEditCommandState.For(editable, inline.Underline),
             RichEditCommand.Strikethrough => RichEditCommandState.For(editable, inline.Strikethrough),
-            RichEditCommand.SetForeground or RichEditCommand.SetBackground or RichEditCommand.ClearFormatting =>
+            RichEditCommand.SetForeground or RichEditCommand.SetBackground or
+            RichEditCommand.SetFontFamily or RichEditCommand.SetFontSize or RichEditCommand.SetFont or
+            RichEditCommand.ClearFormatting =>
                 RichEditCommandState.For(editable),
             RichEditCommand.AlignLeft => RichEditCommandState.For(editable, paragraph.Alignment == TextAlignment.Left),
             RichEditCommand.AlignCenter => RichEditCommandState.For(editable, paragraph.Alignment == TextAlignment.Center),
@@ -293,6 +295,9 @@ public abstract class UiRichEdit : UiElement
         RichEditCommand.Strikethrough => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleStrikethrough(!_editor.CaretInlineStyle.Strikethrough)),
         RichEditCommand.SetForeground => parameter is BColor foreground && _editor.ApplyInlineStyle(InlineStyleDelta.WithForeground(foreground)),
         RichEditCommand.SetBackground => parameter is BColor background && _editor.ApplyInlineStyle(InlineStyleDelta.WithBackground(background)),
+        RichEditCommand.SetFontFamily => _editor.ApplyInlineStyle(InlineStyleDelta.WithFontFamily(NormalizeFontFamily(parameter as string))),
+        RichEditCommand.SetFontSize => TryGetFontSize(parameter, out float? size) && _editor.ApplyInlineStyle(InlineStyleDelta.WithFontSize(size)),
+        RichEditCommand.SetFont => parameter is BFontStyle font && _editor.ApplyInlineStyle(FontStyleDelta(font)),
         RichEditCommand.ClearFormatting => _editor.ClearFormatting(),
         RichEditCommand.AlignLeft => _editor.SetAlignment(TextAlignment.Left),
         RichEditCommand.AlignCenter => _editor.SetAlignment(TextAlignment.Center),
@@ -315,6 +320,48 @@ public abstract class UiRichEdit : UiElement
         ListKind target = CurrentParagraphStyle.ListKind == kind ? ListKind.None : kind;
         return _editor.SetListKind(target);
     }
+
+    private static InlineStyleDelta FontStyleDelta(BFontStyle font) => new()
+    {
+        SetFontFamily = true,
+        FontFamily = NormalizeFontFamily(font.FamilyName),
+        SetFontSize = true,
+        FontSize = NormalizeFontSize(font.SizeInPixels),
+        Bold = font.Weight >= BFontWeight.Bold,
+        Italic = font.Slant != BFontSlant.Normal,
+    };
+
+    private static string? NormalizeFontFamily(string? family)
+    {
+        family = family?.Trim();
+        return string.IsNullOrWhiteSpace(family) ? null : family;
+    }
+
+    private static bool TryGetFontSize(object? parameter, out float? size)
+    {
+        size = null;
+        if (parameter is null)
+            return true;
+
+        double value = parameter switch
+        {
+            float single => single,
+            double dbl => dbl,
+            int integer => integer,
+            decimal dec => (double)dec,
+            string text when double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double parsed) => parsed,
+            _ => double.NaN,
+        };
+
+        if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
+            return false;
+
+        size = NormalizeFontSize(value);
+        return true;
+    }
+
+    private static float NormalizeFontSize(double size) =>
+        (float)Math.Clamp(size, 1.0, 512.0);
 
     private bool Copy()
     {

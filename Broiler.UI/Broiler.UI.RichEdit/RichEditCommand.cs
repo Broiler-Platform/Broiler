@@ -30,6 +30,9 @@ public enum RichEditCommand
     Strikethrough,
     SetForeground,
     SetBackground,
+    SetFontFamily,
+    SetFontSize,
+    SetFont,
     ClearFormatting,
 
     // Paragraph format
