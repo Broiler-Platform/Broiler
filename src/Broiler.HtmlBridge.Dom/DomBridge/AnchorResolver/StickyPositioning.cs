@@ -1,0 +1,159 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
+namespace Broiler.HtmlBridge;
+
+/// <summary>
+/// CSS Positioned Layout 3 §sticky: computes the offset of
+/// <c>position: sticky</c> boxes and rewrites them to <c>position: relative</c>
+/// with that offset, so the static Broiler renderer (which treats
+/// <c>sticky</c> as static) reproduces the pinned position.
+///
+/// <para>This is a first increment: it handles the physical <c>top</c>/
+/// <c>bottom</c>/<c>left</c>/<c>right</c> inset constraints against the
+/// element's nearest scroll container (or the viewport), clamped to the
+/// element's containing block, evaluated at the container's current scroll
+/// offset.  It covers the common "pin to an edge" case — including a sticky
+/// box inside a fixed ancestor (WPT css-position/sticky/
+/// position-sticky-fixed-ancestor-002/003, #1316), where the box's natural
+/// position is already outside the scrollport and it pins to the edge.</para>
+/// </summary>
+public sealed partial class DomBridge
+{
+    private void ResolveStickyPositioning(DomElement root)
+    {
+        ResolveStickyPositioningTree(root);
+    }
+
+    private void ResolveStickyPositioningTree(DomElement el)
+    {
+        if (!el.IsTextNode && IsSticky(GetComputedProps(el)))
+            ApplyStickyOffset(el);
+
+        // Index-based: ApplyStickyOffset only mutates el's own style, not the
+        // child list, but stay defensive.
+        for (int i = 0; i < el.Children.Count; i++)
+            ResolveStickyPositioningTree(el.Children[i]);
+    }
+
+    private void ApplyStickyOffset(DomElement el)
+    {
+        var props = GetComputedProps(el);
+
+        var scrollContainer = FindScrollContainer(el);
+        var containingBlock = GetStickyContainingBlock(el);
+        if (scrollContainer == null || containingBlock == null)
+            return;
+
+        double dy = ComputeStickyShift(el, props, scrollContainer, containingBlock, vertical: true);
+        double dx = ComputeStickyShift(el, props, scrollContainer, containingBlock, vertical: false);
+
+        // The renderer treats `sticky` as static; expressing the resolved
+        // position as `relative` + offset reproduces it.  Relative and sticky
+        // both establish a containing block / stacking context, so this is
+        // behaviour-preserving for descendants.
+        el.Style["position"] = "relative";
+
+        if (dy != 0)
+        {
+            el.Style["top"] = dy.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            el.Style.Remove("bottom");
+        }
+        if (dx != 0)
+        {
+            el.Style["left"] = dx.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            el.Style.Remove("right");
+        }
+    }
+
+    private double ComputeStickyShift(
+        DomElement el, Dictionary<string, string> props,
+        DomElement scrollContainer, DomElement containingBlock, bool vertical)
+    {
+        string startInset = vertical ? "top" : "left";
+        string endInset = vertical ? "bottom" : "right";
+        bool hasStart = HasStickyInset(props.GetValueOrDefault(startInset));
+        bool hasEnd = HasStickyInset(props.GetValueOrDefault(endInset));
+        if (!hasStart && !hasEnd)
+            return 0;
+
+        bool scIsRoot = IsDocumentElement(scrollContainer);
+        double scrollportSize = vertical
+            ? GetClientHeightForDomElement(scrollContainer, scIsRoot)
+            : GetClientWidthForDomElement(scrollContainer, scIsRoot);
+        double scroll = GetElementScrollOffset(scrollContainer, vertical);
+        double naturalInScrollport = ComputeOffsetWithinAncestor(el, scrollContainer, vertical) - scroll;
+        double size = StickyBorderBoxSize(el, props, vertical);
+
+        double shift = 0;
+        if (hasStart)
+        {
+            double inset = ParseStickyInset(props.GetValueOrDefault(startInset), el, scrollContainer, vertical);
+            double needed = inset - naturalInScrollport;      // push toward the end (down/right)
+            if (needed > 0)
+                shift = needed;
+        }
+        if (shift == 0 && hasEnd)
+        {
+            double inset = ParseStickyInset(props.GetValueOrDefault(endInset), el, scrollContainer, vertical);
+            double overflow = (naturalInScrollport + size) - (scrollportSize - inset);
+            if (overflow > 0)
+                shift = -overflow;                            // push toward the start (up/left)
+        }
+        if (shift == 0)
+            return 0;
+
+        // Clamp so the box stays within its containing block's content box
+        // (CSS Position 3: a sticky box never leaves its containing block).
+        double naturalInCb = ComputeOffsetWithinAncestor(el, containingBlock, vertical);
+        double cbExtent = ResolveContentBoxExtent(containingBlock, vertical);
+        double minShift = -naturalInCb;
+        double maxShift = cbExtent - size - naturalInCb;
+        if (maxShift < minShift)
+            maxShift = minShift;
+
+        return Math.Clamp(shift, minShift, maxShift);
+    }
+
+    private double StickyBorderBoxSize(DomElement el, Dictionary<string, string> props, bool vertical)
+    {
+        double size = vertical ? GetBorderBoxHeight(props, el) : GetBorderBoxWidth(props, el);
+        if (size > 0)
+            return size;
+        return ResolveBorderBoxExtent(el, vertical);
+    }
+
+    private static bool HasStickyInset(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
+
+    private double ParseStickyInset(string? value, DomElement el, DomElement scrollContainer, bool vertical)
+    {
+        // Percentage insets on a sticky box resolve against the scroll
+        // container's content-box size along the axis.
+        double basis = vertical
+            ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
+            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer));
+        return ParseCssLengthToPixelsWithViewport(value, el, percentageBasis: basis);
+    }
+
+    /// <summary>
+    /// The containing block used to clamp a sticky box: its nearest ancestor
+    /// that establishes a block-level box (skips inline/anonymous wrappers).
+    /// </summary>
+    private DomElement? GetStickyContainingBlock(DomElement el)
+    {
+        for (var current = GetScrollTraversalParent(el); current != null; current = GetScrollTraversalParent(current))
+        {
+            if (current.IsTextNode)
+                continue;
+            var display = GetComputedProps(current).GetValueOrDefault("display") ?? "block";
+            bool inlineLevel = display is "inline" or "inline-block" or "inline-table"
+                or "inline-flex" or "inline-grid";
+            if (!inlineLevel)
+                return current;
+        }
+        return null;
+    }
+}

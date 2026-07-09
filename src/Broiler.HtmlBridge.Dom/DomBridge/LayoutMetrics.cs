@@ -2194,8 +2194,31 @@ public sealed partial class DomBridge
                 }
                 offset += ParseCssLengthToPixelsWithViewport(
                     siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), sibling);
-                offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "height" : "width"), sibling);
+                // Resolve the sibling's size against its containing block so a
+                // percentage (e.g. height:100%) contributes its used length to
+                // the following element's offset rather than collapsing to 0.
+                // Only resolve the (recursive) containing-block basis for actual
+                // percentage values — for the common px/keyword case it is unused,
+                // so skipping it keeps this O(n) per element, not O(n²).
+                var siblingSizeRaw = siblingProps.GetValueOrDefault(vertical ? "height" : "width");
+                double? siblingPercentBasis =
+                    siblingSizeRaw != null && siblingSizeRaw.Contains('%')
+                        ? ResolveContainingBlockReferenceLength(sibling, vertical)
+                        : null;
+                var siblingExtent = ParseCssLengthToPixelsWithViewport(
+                    siblingSizeRaw, sibling, percentageBasis: siblingPercentBasis);
+                // Block-in-inline (CSS2.1 §9.2.1.1): an inline box that contains
+                // block-level content is split into anonymous block boxes and so
+                // stacks vertically, but its CSS `height` is auto (inline boxes
+                // ignore `height`) and parses to 0 — dropping the block child's
+                // height from the following sibling's offset (breaking e.g.
+                // scrollIntoView on a target after such a sibling).  Fall back to
+                // the sibling's laid-out border-box extent in that case.  Gated to
+                // the block axis and to inline boxes with block content, so plain
+                // inline siblings (which share a line, not stack) are unchanged.
+                if (vertical && siblingExtent <= 0 && IsInlineBoxWithBlockContent(sibling, siblingProps))
+                    siblingExtent = ResolveBorderBoxExtent(sibling, vertical: true);
+                offset += siblingExtent;
                 offset += ParseCssLengthToPixelsWithViewport(
                     siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"), sibling);
             }
@@ -2209,6 +2232,39 @@ public sealed partial class DomBridge
         }
 
         return offset;
+    }
+
+    /// <summary>
+    /// True when <paramref name="element"/> is an inline-level box that contains
+    /// block-level content (CSS2.1 §9.2.1.1 block-in-inline).  Such a box is
+    /// broken into anonymous block boxes that stack in the block flow, so it
+    /// occupies its content's block-axis extent even though the CSS `height`
+    /// property does not apply to it (and therefore parses to 0).  A plain inline
+    /// box (inline content only) shares a line box with its siblings and does not
+    /// stack, so it is excluded.
+    /// </summary>
+    private bool IsInlineBoxWithBlockContent(DomElement element, Dictionary<string, string> props)
+    {
+        var display = props.GetValueOrDefault("display") ?? "inline";
+        bool inlineLevel = display is "inline" or "inline-block" or "inline-table"
+            or "inline-flex" or "inline-grid";
+        if (!inlineLevel)
+            return false;
+
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode)
+                continue;
+            var childDisplay = GetComputedProps(child).GetValueOrDefault("display");
+            if (childDisplay == null)
+                continue;
+            if (childDisplay is "block" or "flex" or "grid" or "list-item"
+                || childDisplay.StartsWith("table", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private double ResolveScrollIntoViewOffset(

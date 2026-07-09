@@ -22,6 +22,14 @@ public sealed partial class DomBridge
     /// <param name="viewportHeight">Viewport height in pixels (default 768).</param>
     public void ResolveAnchorPositions(int viewportWidth = 1024, int viewportHeight = 768)
     {
+        // -1. CSS Content 3 element replacement: when the root element's
+        //     `content` computes to a replaced value (an image), the root is
+        //     replaced by that image and its descendants generate no boxes —
+        //     so, per CSS Backgrounds 3 §body-background, the body background
+        //     no longer propagates to the canvas.  Reproduce this by replacing
+        //     the document body with a single <img> at the origin.
+        ReplaceRootWithReplacedContent();
+
         // 0. Apply UA default position:fixed to modal dialogs before anchor
         //    resolution, since browsers treat top-layer elements as fixed.
         ApplyDialogUAPositioning(DocumentElement);
@@ -114,6 +122,12 @@ public sealed partial class DomBridge
         //     the static renderer can reproduce zoomed fixed-position pages.
         ApplyVisualViewportSerializationState();
 
+        // 7b. Resolve position:sticky offsets into position:relative so the
+        //     static renderer pins sticky boxes to their scroll container /
+        //     containing-block edges.  Runs before scroll simulation so the
+        //     rewritten (relative) boxes flow through the normal path.
+        ResolveStickyPositioning(DocumentElement);
+
         // 8. Apply scroll simulation: shift content in scroll containers
         //    where JavaScript set scrollTop/scrollLeft to match Chromium output.
         ApplyScrollSimulation(DocumentElement);
@@ -123,6 +137,71 @@ public sealed partial class DomBridge
         // the resolution above mutated the DOM. No-op when the shared path is off.
         ClearSharedGeometrySnapshot();
     }
+
+    /// <summary>
+    /// CSS Content 3 §"content" element replacement: when the root element's
+    /// computed <c>content</c> is a replaced value (an image <c>url()</c>), the
+    /// root element is replaced by that image; its normal children generate no
+    /// boxes.  Because the root then has no in-flow body descendant contributing
+    /// a background, the body background does not propagate to the canvas
+    /// (CSS Backgrounds 3 §body-background).  Broiler does not model non-pseudo
+    /// element replacement in layout, so reproduce the visual result here: strip
+    /// the root/body backgrounds that would otherwise reach the canvas and
+    /// replace the body's contents with a single <c>&lt;img&gt;</c> of the
+    /// replaced image, positioned at the initial containing block origin.
+    /// </summary>
+    private void ReplaceRootWithReplacedContent()
+    {
+        var html = FindFirstElementByTagName(DocumentElement, "html");
+        if (html == null)
+            return;
+
+        var content = GetComputedProps(html).GetValueOrDefault("content")?.Trim();
+        if (string.IsNullOrEmpty(content))
+            return;
+
+        var url = ExtractContentImageUrl(content);
+        if (url == null)
+            return;
+
+        var body = FindFirstElementByTagName(html, "body");
+        if (body == null)
+            return;
+
+        // The replaced root paints only the image; neither the root nor the
+        // (box-less) body background reaches the canvas.
+        html.Style["background"] = "none";
+        html.Style["background-color"] = "transparent";
+        body.Style["margin"] = "0";
+        body.Style["padding"] = "0";
+        body.Style["background"] = "none";
+        body.Style["background-color"] = "transparent";
+
+        body.Children.Clear();
+
+        var img = new DomElement(
+            _document, "img", null, null, string.Empty, null,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["src"] = url,
+            });
+        img.Parent = body;
+        body.Children.Add(img);
+    }
+
+    /// <summary>
+    /// Extracts the target of a CSS <c>url(...)</c> value (used by the root
+    /// element-replacement path).  Returns <c>null</c> for non-<c>url()</c>
+    /// content (strings, counters, <c>normal</c>/<c>none</c>).
+    /// </summary>
+    private static string? ExtractContentImageUrl(string content)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            content, @"url\(\s*(['""]?)(?<u>[^'""\)]+)\1\s*\)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups["u"].Value.Trim() : null;
+    }
+
     private void ApplyVisualViewportSerializationState()
     {
         if (!HasActiveVisualViewport())
