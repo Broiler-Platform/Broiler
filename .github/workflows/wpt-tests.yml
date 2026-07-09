@@ -113,7 +113,7 @@ jobs:
 
   # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v5
 
@@ -133,7 +133,7 @@ jobs:
   # ── Run one shard of the suite ───────────────────────────────────────────
   run:
     needs: [plan, prepare]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -237,7 +237,7 @@ jobs:
   report:
     needs: run
     if: always() && needs.run.result != 'skipped'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v5
 
@@ -348,7 +348,7 @@ jobs:
     if: >-
       always()
       && (needs.run.result == 'success' || needs.run.result == 'failure')
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v5
         with:
