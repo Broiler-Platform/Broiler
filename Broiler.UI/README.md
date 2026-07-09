@@ -1,4 +1,4 @@
-# Broiler.UI
+﻿# Broiler.UI
 
 Broiler.UI is the platform-neutral retained-mode UI component for Broiler
 application chrome and general-purpose widgets.
@@ -14,61 +14,96 @@ FileDialog, FontDialog, and Toolbar.
 ## Projects
 
 ```text
-Broiler.UI
-Broiler.UI.Standard
-Broiler.UI.Window
-Broiler.UI.Window.Standard
-Broiler.UI.Panel
-Broiler.UI.Panel.Standard
-Broiler.UI.Label
-Broiler.UI.Label.Standard
-Broiler.UI.Button
-Broiler.UI.Button.Standard
-Broiler.UI.Edit
-Broiler.UI.Edit.Standard
-Broiler.UI.CheckBox
-Broiler.UI.CheckBox.Standard
-Broiler.UI.RadioButton
-Broiler.UI.RadioButton.Standard
-Broiler.UI.ToggleButton
-Broiler.UI.ToggleButton.Standard
-Broiler.UI.Slider
-Broiler.UI.Slider.Standard
-Broiler.UI.ProgressBar
-Broiler.UI.ProgressBar.Standard
-Broiler.UI.ImageView
-Broiler.UI.ImageView.Standard
-Broiler.UI.ScrollView
-Broiler.UI.ScrollView.Standard
-Broiler.UI.ListView
-Broiler.UI.ListView.Standard
-Broiler.UI.ComboBox
-Broiler.UI.ComboBox.Standard
-Broiler.UI.TabView
-Broiler.UI.TabView.Standard
-Broiler.UI.Menu
-Broiler.UI.Menu.Standard
-Broiler.UI.Tooltip
-Broiler.UI.Tooltip.Standard
-Broiler.UI.Dialog
-Broiler.UI.Dialog.Standard
-Broiler.UI.FileDialog
-Broiler.UI.FileDialog.Standard
-Broiler.UI.FontDialog
-Broiler.UI.FontDialog.Standard
-Broiler.UI.Toolbar
-Broiler.UI.Toolbar.Standard
-Broiler.UI.Win32.Demo
-Broiler.UI.Linux.Demo
-Broiler.UI.Tests
-Broiler.UI.Standard.Tests
-Broiler.UI.Toolbar.Tests
-Broiler.UI.Phase0.Tests
-Broiler.UI.Phase3.Tests
-Broiler.UI.Phase4.Tests
-Broiler.UI.Phase5.Tests
-Broiler.UI.Phase6.Tests
-Broiler.UI.Phase7.Tests
+src/Foundation
+  Broiler.UI
+  Broiler.UI.Standard
+
+src/Abstractions/Shell
+  Broiler.UI.Window
+  Broiler.UI.Dialog
+  Broiler.UI.Tooltip
+  Broiler.UI.FileDialog
+  Broiler.UI.FontDialog
+
+src/Abstractions/Layout
+  Broiler.UI.Panel
+  Broiler.UI.ScrollView
+  Broiler.UI.TabView
+
+src/Abstractions/Content
+  Broiler.UI.Label
+  Broiler.UI.ImageView
+  Broiler.UI.ProgressBar
+
+src/Abstractions/Commands
+  Broiler.UI.Button
+  Broiler.UI.ToggleButton
+  Broiler.UI.Toolbar
+  Broiler.UI.Menu
+
+src/Abstractions/ValueAndSelection
+  Broiler.UI.CheckBox
+  Broiler.UI.RadioButton
+  Broiler.UI.Slider
+  Broiler.UI.ListView
+  Broiler.UI.ComboBox
+
+src/Abstractions/Text
+  Broiler.UI.Edit
+  Broiler.UI.RichEdit
+
+src/Implementations/Standard/Shell
+  Broiler.UI.Window.Standard
+  Broiler.UI.Dialog.Standard
+  Broiler.UI.Tooltip.Standard
+  Broiler.UI.FileDialog.Standard
+  Broiler.UI.FontDialog.Standard
+
+src/Implementations/Standard/Layout
+  Broiler.UI.Panel.Standard
+  Broiler.UI.ScrollView.Standard
+  Broiler.UI.TabView.Standard
+
+src/Implementations/Standard/Content
+  Broiler.UI.Label.Standard
+  Broiler.UI.ImageView.Standard
+  Broiler.UI.ProgressBar.Standard
+
+src/Implementations/Standard/Commands
+  Broiler.UI.Button.Standard
+  Broiler.UI.ToggleButton.Standard
+  Broiler.UI.Toolbar.Standard
+  Broiler.UI.Menu.Standard
+
+src/Implementations/Standard/ValueAndSelection
+  Broiler.UI.CheckBox.Standard
+  Broiler.UI.RadioButton.Standard
+  Broiler.UI.Slider.Standard
+  Broiler.UI.ListView.Standard
+  Broiler.UI.ComboBox.Standard
+
+src/Implementations/Standard/Text
+  Broiler.UI.Edit.Standard
+  Broiler.UI.RichEdit.Standard
+
+src/Integrations/RichEdit
+  Broiler.UI.RichEdit.Rtf
+
+src/Bundles
+  Broiler.UI.All
+
+samples
+  Broiler.UI.Win32.Demo
+  Broiler.UI.Linux.Demo
+  Broiler.UI.RichEdit.Win32.Demo
+
+tests
+  Broiler.UI.Tests
+  Broiler.UI.Standard.Tests
+  Broiler.UI.Toolbar.Tests
+  Broiler.UI.RichEdit.Tests
+  Broiler.UI.RichEdit.Standard.Tests
+  Broiler.UI.RichEdit.Rtf.Tests
 ```
 
 `Broiler.UI` references only the platform-neutral `Broiler.Graphics` core and
@@ -91,6 +126,8 @@ standard controls live in their own `.Standard` assemblies.
   adapter.
 - [`docs/phase0/package-versioning-and-compatibility.md`](docs/phase0/package-versioning-and-compatibility.md)
   records repository, package, and compatibility-window decisions.
+- [`docs/phase0/directory-structure-path-inventory.md`](docs/phase0/directory-structure-path-inventory.md)
+  records the path-sensitive surfaces for the directory-structure refactor.
 - [`docs/adr`](docs/adr) contains the ADRs required by roadmap section 20.
 
 ## Phase 1 records
@@ -168,9 +205,9 @@ Windows-only camera and microphone previews remain intentionally outside this
 Linux first pass.
 
 ```bash
-dotnet run --project Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release
-dotnet run --project Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release -- --window --input --interactive
-dotnet publish Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishSingleFile=true
+dotnet run --project Broiler.UI/samples/Linux/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release
+dotnet run --project Broiler.UI/samples/Linux/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release -- --window --input --interactive
+dotnet publish Broiler.UI/samples/Linux/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --configuration Release --runtime linux-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
 ## Validation
@@ -179,7 +216,7 @@ dotnet publish Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj --c
 dotnet test Broiler.UI\Broiler.UI.slnx
 dotnet build Broiler.Input\Broiler.Input.slnx
 dotnet run --project Broiler.Graphics\Broiler.Graphics.Tests\Broiler.Graphics.Tests.csproj
-dotnet build Broiler.UI\Broiler.UI.Linux.Demo\Broiler.UI.Linux.Demo.csproj -c Release
+dotnet build Broiler.UI\samples\Linux\Broiler.UI.Linux.Demo\Broiler.UI.Linux.Demo.csproj -c Release
 ```
 
 The test projects use the `Broiler.Graphics` submodule only for

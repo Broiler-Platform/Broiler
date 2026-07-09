@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.RichEdit.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.RichEdit.Standard</AssemblyName>
+    <PackageId>Broiler.UI.RichEdit.Standard</PackageId>
+    <Description>Standard platform-neutral Broiler rich-edit implementation.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
+    <ProjectReference Include="..\..\..\..\Abstractions\Text\Broiler.UI.RichEdit\Broiler.UI.RichEdit.csproj" />
+    <ProjectReference Include="..\..\..\..\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

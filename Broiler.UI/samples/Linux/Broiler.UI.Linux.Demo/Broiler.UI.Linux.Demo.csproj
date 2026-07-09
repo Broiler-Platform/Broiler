@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Broiler.UI.Linux.Demo</RootNamespace>
+    <AssemblyName>Broiler.UI.Linux.Demo</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;Release;Debug-Linux;Release-Linux</Configurations>
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Release-Linux'">linux-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Graphics\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Graphics\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Linux\Broiler.Input.Linux.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj" />
+    <ProjectReference Include="..\..\..\src\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Shell\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Content\Broiler.UI.Label.Standard\Broiler.UI.Label.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Commands\Broiler.UI.Button.Standard\Broiler.UI.Button.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Text\Broiler.UI.Edit.Standard\Broiler.UI.Edit.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\ValueAndSelection\Broiler.UI.CheckBox.Standard\Broiler.UI.CheckBox.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Commands\Broiler.UI.ToggleButton.Standard\Broiler.UI.ToggleButton.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\ValueAndSelection\Broiler.UI.Slider.Standard\Broiler.UI.Slider.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Content\Broiler.UI.ProgressBar.Standard\Broiler.UI.ProgressBar.Standard.csproj" />
+  </ItemGroup>
+
+</Project>

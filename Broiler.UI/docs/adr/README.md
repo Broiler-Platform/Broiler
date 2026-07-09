@@ -6,8 +6,10 @@ Phase 0 ("Charter and ADRs") requirement from
 `docs/roadmap/broiler-ui-rich-edit-control.md` section 9 for the RichEdit control
 family. ADR 0018 records the RichEdit document-model promotion for the
 `Broiler.Documents` component (`docs/roadmap/broiler-documents-component.md`),
-superseding the model *placement* in ADRs 0013 and 0014. All are approved for
-their respective Phase 1 scaffolding and may be superseded only by later ADRs.
+superseding the model *placement* in ADRs 0013 and 0014. ADR 0019 records the
+approved filesystem taxonomy for the Broiler.UI directory-structure refactor.
+All are approved for their respective Phase 1 scaffolding and may be superseded
+only by later ADRs.
 
 | ADR | Topic |
 |---|---|
@@ -29,4 +31,4 @@ their respective Phase 1 scaffolding and may be superseded only by later ADRs.
 | [0016](0016-rich-clipboard-and-html-sanitization.md) | Rich clipboard and HTML sanitization |
 | [0017](0017-richedit-accessibility-semantics.md) | RichEdit accessibility semantics |
 | [0018](0018-richedit-document-model-promotion.md) | RichEdit document model promotion (to `Broiler.Documents.Model`) |
-
+| [0019](0019-directory-structure-topology.md) | Directory structure topology |
