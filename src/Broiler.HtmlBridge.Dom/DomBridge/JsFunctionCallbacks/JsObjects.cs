@@ -1005,14 +1005,18 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsRemove093Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent != null)
+        // Capture the parent up front: DomElement.Parent is computed from the canonical
+        // ParentNode, and Children.RemoveAt detaches it — so reading element.Parent after
+        // the removal would return null (→ NRE in InvalidateStyleScope). Mirrors the
+        // working removeChild path, which holds the parent reference independently.
+        var parent = element.Parent;
+        if (parent != null)
         {
-            var idx = element.Parent.Children.IndexOf(element);
+            var idx = parent.Children.IndexOf(element);
             if (idx >= 0)
             {
                 NotifyNodeIteratorPreRemoval(element);
-                element.Parent.Children.RemoveAt(idx);
-                var parent = element.Parent;
+                parent.Children.RemoveAt(idx);
                 element.Parent = null;
                 InvalidateStyleScope(parent);
                 NotifyChildRemoved(parent, element, idx);

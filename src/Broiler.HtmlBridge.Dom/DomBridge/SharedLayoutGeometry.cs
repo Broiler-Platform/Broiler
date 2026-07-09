@@ -16,6 +16,19 @@ public sealed partial class DomBridge
     // Mirrors the LayoutGeometryCacheEnabled test seam.
     internal static bool UseSharedLayoutGeometry = true;
 
+    // RF-BRIDGE-1b increment 6 (staged cutover — default OFF). When true, the geometry
+    // entry points answer *exclusively* from the shared snapshot for unzoomed elements:
+    // an unzoomed element with no shared box returns zero (detached / display:none
+    // semantics) instead of falling back to the coarse LayoutMetrics estimators. This
+    // stages the estimator deletion — flipping it on makes the estimator bodies dead
+    // for the unzoomed path. It stays OFF until (a) the zoom-correct shared snapshot
+    // lands (so zoomed subtrees no longer need the estimator — they are still routed to
+    // it by IsUnzoomedForSharedGeometry) and (b) the pre-layout resolvers (sticky/
+    // position-area, which depend on scroll-offset accounting the snapshot lacks) have a
+    // shared-geometry source. Only then can the estimator bodies actually be removed.
+    // See docs/roadmap/rf-bridge-1b-layout-unification.md §5 incr 6 "Deletion sequence".
+    internal static bool UseSharedGeometryExclusively = false;
+
     private SharedLayoutGeometryProvider _sharedLayoutGeometry;
 
     private SharedLayoutGeometryProvider SharedLayoutGeometry =>
@@ -45,6 +58,12 @@ public sealed partial class DomBridge
 
     private System.Collections.Generic.IReadOnlyDictionary<Broiler.Dom.DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
     {
+        // RF-BRIDGE-1b render-doc/live-doc separation: install a revert log so the zoom
+        // baking GetRenderDocument applies (needed for correct RENDERED geometry, incl. a
+        // zoomed descendant's overflow) is undone on the live document afterward. That keeps
+        // the live/CSSOM document pristine, so unzoomed CSSOM queries on zoomed elements
+        // (routed to the estimator) read original styles instead of baked ones.
+        _zoomSerializationRevertLog = [];
         try
         {
             var document = GetRenderDocument();
@@ -57,6 +76,10 @@ public sealed partial class DomBridge
             // etc.) degrades the whole pass to the estimator — a geometry query must
             // never throw because the renderer choked on the document.
             return EmptySharedGeometry;
+        }
+        finally
+        {
+            RevertZoomSerialization();
         }
     }
 
