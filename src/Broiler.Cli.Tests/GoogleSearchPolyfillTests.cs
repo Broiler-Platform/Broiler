@@ -1485,7 +1485,17 @@ public class GoogleSearchPolyfillTests
                 zoomedInner.offsetTop, zoomedInner.offsetLeft
             ].join(',');
         ");
-        Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,0,1", result);
+        // RF-BRIDGE-1b: zoomed offsetTop/Left now resolve from the renderer's real layout
+        // (shared snapshot, divided by the element's own used zoom) instead of the coarse
+        // estimator. The last pair is zoomedInner (zoom:2, margin:1, in-flow first child):
+        // its border box renders 2px below the offset parent's padding edge (margin 1px ×
+        // zoom 2), so offsetTop is 1 in the element's own unzoomed pixels (2 ÷ 2) — the
+        // margin contributes 1, exactly as the absolute unzoomedTwo case (margin 1 → +1
+        // under zoom 2) requires. The estimator previously reported 0, dropping the margin
+        // (and was internally inconsistent: it reports the same-position sibling
+        // unzoomedMiddle as 2). All other 15 values are unchanged, including the
+        // middle-ancestor-zoom unzoomedInner case (10,11).
+        Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,1,1", result);
     }
 
     [Fact]

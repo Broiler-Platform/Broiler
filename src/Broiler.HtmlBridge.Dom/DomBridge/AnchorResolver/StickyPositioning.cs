@@ -83,7 +83,10 @@ public sealed partial class DomBridge
             ? GetClientHeightForDomElement(scrollContainer, scIsRoot)
             : GetClientWidthForDomElement(scrollContainer, scIsRoot);
         double scroll = GetElementScrollOffset(scrollContainer, vertical);
-        double naturalInScrollport = ComputeOffsetWithinAncestor(el, scrollContainer, vertical) - scroll;
+        // RF-BRIDGE-1b: prefer the renderer's real natural offset (scroll-aware shared
+        // geometry) over the coarse estimator; the scroll container's own scroll is
+        // subtracted here, matching ComputeOffsetWithinAncestor's caller contract.
+        double naturalInScrollport = OffsetWithinAncestorPreferShared(el, scrollContainer, vertical) - scroll;
         double size = StickyBorderBoxSize(el, props, vertical);
 
         double shift = 0;
@@ -106,8 +109,10 @@ public sealed partial class DomBridge
 
         // Clamp so the box stays within its containing block's content box
         // (CSS Position 3: a sticky box never leaves its containing block).
-        double naturalInCb = ComputeOffsetWithinAncestor(el, containingBlock, vertical);
-        double cbExtent = ResolveContentBoxExtent(containingBlock, vertical);
+        double naturalInCb = OffsetWithinAncestorPreferShared(el, containingBlock, vertical);
+        double cbExtent = TrySharedContentBoxExtent(containingBlock, vertical, out var sharedCbExtent)
+            ? sharedCbExtent
+            : ResolveContentBoxExtent(containingBlock, vertical);
         double minShift = -naturalInCb;
         double maxShift = cbExtent - size - naturalInCb;
         if (maxShift < minShift)
@@ -118,6 +123,10 @@ public sealed partial class DomBridge
 
     private double StickyBorderBoxSize(DomElement el, Dictionary<string, string> props, bool vertical)
     {
+        // RF-BRIDGE-1b: prefer the renderer's real border-box size (scroll-independent, so
+        // safe to read from the shared snapshot); the estimator remains the fallback.
+        if (TrySharedBorderBoxExtent(el, vertical, out var sharedSize))
+            return sharedSize;
         double size = vertical ? GetBorderBoxHeight(props, el) : GetBorderBoxWidth(props, el);
         if (size > 0)
             return size;

@@ -282,9 +282,23 @@ natural fit for the existing per-pass `WithLayoutGeometryCache` lifetime. Benchm
    the estimator as a *fallback* for: `isRoot`/viewport, zoomed subtrees (the zoom
    gate), position-area resolution, and boxless elements. The estimator body cannot be
    deleted until *all* those fallbacks are covered without it. Concretely:
-   1. **Zoom-correct shared snapshot** (in progress, separate session). Until zoomed
-      elements are answered from shared, the zoom gate routes them to the estimator, so
-      the estimator can't go.
+   1. **Zoom-correct shared snapshot** — the open, unowned prerequisite. Until zoomed
+      elements are answered from shared, the zoom gate (`IsUnzoomedForSharedGeometry`)
+      routes them to the estimator, so the estimator can't go.
+      **Status (2026-07-09):** the earlier "separate session" work has **merged** to
+      `main` (PR #1348 / commit `b8f68cf7`, "shared-geometry scroll overflow, zoom
+      correctness, Element.remove() fix"), but that delivered zoom *size*-correctness
+      (path-independent, `SharedGeometryZoomSizeTests`) + the scroll-overflow partial
+      migration + the render-doc/live-doc separation already documented above — it did
+      **not** un-zoom the snapshot. The snapshot is still built from the zoom-*baked*
+      render document, so its boxes are in zoomed space and the gate remains. The
+      obvious fix (divide snapshot boxes by cumulative used-zoom) stays **reverted** —
+      it double-counts against `ApplyZoomSerializationStyles` (see the zoom notes above).
+      Closing this needs a renderer-side change (a `Broiler.HTML` submodule edit, per
+      `CLAUDE.md`) that either exposes the used-zoom alongside each box or produces a
+      non-baking geometry pass, so the snapshot can report unzoomed CSS pixels. That is
+      a deep change on freshly-stabilized code (the zoom suite is 7→1) and is not a safe
+      incremental edit; it deserves its own designed effort.
    2. **A pre-layout geometry source for the resolvers.** Sticky/position-area run
       *inside* `ResolveAnchorPositions` and mutate the DOM. They *can* read shared
       geometry without recursion (`GetRenderDocument` does NOT run the resolvers — the
