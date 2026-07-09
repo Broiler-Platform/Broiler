@@ -236,6 +236,14 @@ elif command -v npx &>/dev/null; then
         echo "No package-lock.json found; using npm install instead of npm ci"
         npm install 2>&1 | tail -10
     fi
+    echo "  Installing Playwright Chromium (up to $PLAYWRIGHT_INSTALL_RETRIES attempt(s))"
+    run_with_retries_tail \
+        "Playwright Chromium install" \
+        "$PLAYWRIGHT_INSTALL_RETRIES" \
+        "$PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS" \
+        10 \
+        40 \
+        npx playwright install --with-deps chromium
 
     # Set NODE_PATH so require('playwright') resolves from the local
     # node_modules installed above (Node.js resolves modules relative to
