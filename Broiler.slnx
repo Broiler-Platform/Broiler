@@ -1,4 +1,4 @@
-﻿<Solution>
+<Solution>
   <Configurations>
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
@@ -323,6 +323,8 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/Dependencies/UI/src/" />
+  <Folder Name="/Dependencies/UI/src/Abstractions/" />
   <Folder Name="/Dependencies/UI/src/Abstractions/Commands/">
     <Project Path="Broiler.UI/src/Abstractions/Commands/Broiler.UI.Button/Broiler.UI.Button.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -467,6 +469,8 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/" />
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/" />
   <Folder Name="/Dependencies/UI/src/Implementations/Standard/Commands/">
     <Project Path="Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Button.Standard/Broiler.UI.Button.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -539,6 +543,7 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/Dependencies/UI/src/Integrations/" />
   <Folder Name="/Dependencies/UI/src/Integrations/RichEdit/">
     <Project Path="Broiler.UI/src/Integrations/RichEdit/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -557,6 +562,8 @@
       <Build Project="false" Solution="Release-Linux|*" />
     </Project>
   </Folder>
+  <Folder Name="/Dependencies/UI/" />
+  <Folder Name="/Dependencies/UI/samples/" />
   <Folder Name="/Dependencies/UI/samples/Linux/">
     <Project Path="Broiler.UI/samples/Linux/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj">
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
@@ -591,6 +598,7 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/Dependencies/UI/tests/" />
   <Folder Name="/Dependencies/UI/tests/Commands/">
     <Project Path="Broiler.UI/tests/Commands/Broiler.UI.Toolbar.Tests/Broiler.UI.Toolbar.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -936,31 +944,31 @@
       <Build Project="false" Solution="Debug|*" />
       <Build Project="false" Solution="Release|*" />
     </Project>
-  </Folder>
-  <Folder Name="/src/">
     <Project Path="src/Broiler.App.Graphics/Broiler.App.Graphics.csproj">
-      <Build Project="false" Solution="Debug|*" />
-      <Build Project="false" Solution="Release|*" />
+      <Build Solution="Debug|*" Project="false" />
+      <Build Solution="Release|*" Project="false" />
     </Project>
     <Project Path="src/Broiler.App.Tests/Broiler.App.Tests.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
       <Build Solution="Debug|*" Project="false" />
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
     <Project Path="src/Broiler.Cli/Broiler.Cli.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
+  </Folder>
+  <Folder Name="/src/">
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />

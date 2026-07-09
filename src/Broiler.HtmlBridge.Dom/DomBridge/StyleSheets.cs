@@ -228,8 +228,41 @@ public sealed partial class DomBridge
             : ParseCssRuleStrings(nestedCss).Select(rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, parentRule)))
         .ToList();
 
-    private static JSObject BuildCssKeyframeRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject parentRule) =>
-        BuildCssKeyframeRuleObject(CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+    private static JSObject BuildCssKeyframeRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject parentRule)
+    {
+        // A keyframe block is a style rule whose selector is the key text
+        // (e.g. "0%, 50%"). Read the key + declarations from the model instead of
+        // serializing and re-parsing; unexpected shapes fall back to the text path.
+        if (rule is not Broiler.CSS.CssStyleRule styleRule)
+            return BuildCssKeyframeRuleObject(CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+
+        var ruleObj = new JSObject();
+        ruleObj.FastAddProperty(
+            (KeyString)"parentStyleSheet",
+            new JSFunction((in Arguments _) => parentStyleSheet, "get parentStyleSheet"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        ruleObj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => parentRule, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        ruleObj.FastAddValue((KeyString)"type", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        var keyText = CSS.Cssom.CssomRuleMetadata.GetSelectorText(styleRule);
+        ruleObj.FastAddValue((KeyString)"keyText", new JSString(keyText), JSPropertyAttributes.EnumerableConfigurableValue);
+        ruleObj.FastAddProperty(
+            (KeyString)"cssText",
+            new JSFunction((in Arguments _) => JsStyleSheetsGetCssText013Core(keyText, ruleObj, in _), "get cssText"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        var styleObj = BuildStyleObject(ParseStyle(CSS.CssSerializer.Serialize(styleRule.Declarations)), ruleObj);
+        ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return ruleObj;
+    }
 
     private static JSObject BuildCssKeyframeRuleObject(string ruleText, JSObject parentStyleSheet, JSObject parentRule)
     {
@@ -286,22 +319,296 @@ public sealed partial class DomBridge
     /// </summary>
     /// <summary>
     /// Builds a CSSRule JSObject from a shared <see cref="Broiler.CSS.CssRule"/>
-    /// model object (Phase 6). Rule detail extraction is shared with the
-    /// string-based builder via deterministic serialization, so behaviour is
-    /// identical while the CSSOM's rule storage is the model, not strings.
+    /// model object. Rule kind and metadata (selector text, prelude-derived
+    /// media/condition/name/href/prefix values, keyframe keys, and descriptors)
+    /// are read from the neutral <see cref="Broiler.CSS.Cssom.CssomRuleMetadata"/>
+    /// projection and the declaration model rather than by serializing the rule and
+    /// re-parsing the text. Declaration blocks still feed the JavaScript
+    /// <c>CSSStyleDeclaration</c> wrapper through <see cref="ParseStyle"/> on the
+    /// serialized block, which is unchanged. Unrecognized at-rules (for example
+    /// <c>@container</c> or a vendor-prefixed <c>@-webkit-keyframes</c>) fall back to
+    /// the legacy string builder, preserving their current behavior.
     /// </summary>
-    private static JSObject BuildCssRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject? parentRule = null) =>
-        BuildCssRuleObject(
-            CSS.CssSerializer.Serialize(rule),
-            parentStyleSheet,
-            parentRule,
-            // Drive the nested @media/@keyframes/@supports/@layer rule objects from the
-            // model (CssAtRule.Rules) instead of re-parsing serialized text, when the
-            // rule actually has nested rules. Gating on Count > 0 keeps declaration-bodied
-            // at-rules and empty blocks on the string path (Phase 6 tail).
-            rule is Broiler.CSS.CssAtRule { Declarations: null, HasBlock: true, Rules.Count: > 0 } atRule
-                ? atRule.Rules
-                : null);
+    private static JSObject BuildCssRuleObject(Broiler.CSS.CssRule rule, JSObject parentStyleSheet, JSObject? parentRule = null)
+    {
+        var kind = CSS.Cssom.CssomRuleMetadata.GetRuleType(rule);
+        if (kind == CSS.Cssom.CssomRuleType.Unknown)
+            return BuildCssRuleObject(CSS.CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
+
+        var ruleObj = new JSObject();
+        ruleObj.FastAddProperty(
+            (KeyString)"parentStyleSheet",
+            new JSFunction((in Arguments _) => parentStyleSheet, "get parentStyleSheet"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        ruleObj.FastAddProperty(
+            (KeyString)"parentRule",
+            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        ruleObj.FastAddValue((KeyString)"type", new JSNumber((int)kind), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Builds the JS CSSStyleDeclaration for a declaration-bodied rule from the
+        // model's declaration block — identical to the legacy substring path because
+        // ParseStyle sees the same declarations, just serialized from the block.
+        JSObject StyleFromBlock(Broiler.CSS.CssDeclarationBlock? block)
+        {
+            var map = block is null
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : ParseStyle(CSS.CssSerializer.Serialize(block));
+            return BuildStyleObject(map, ruleObj);
+        }
+
+        switch (kind)
+        {
+            case CSS.Cssom.CssomRuleType.Charset:
+            {
+                var encoding = CSS.Cssom.CssomRuleMetadata.GetCharsetEncoding((Broiler.CSS.CssAtRule)rule);
+                ruleObj.FastAddValue((KeyString)"encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => new JSString($"@charset \"{encoding}\";"), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Import:
+            {
+                var import = CSS.Cssom.CssomRuleMetadata.GetImport((Broiler.CSS.CssAtRule)rule);
+                ruleObj.FastAddValue((KeyString)"href", new JSString(import.Href), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"media", new JSString(import.Media), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText017Core(import.Href, import.Media, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Media:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var mediaText = atRule.Prelude;
+                var nestedRuleObjects = BuildNestedRuleObjects(string.Empty, atRule.Rules, parentStyleSheet, ruleObj);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
+
+                ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText018Core(mediaText, nestedRuleObjects, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.FontFace:
+            {
+                var styleObj = StyleFromBlock(((Broiler.CSS.CssAtRule)rule).Declarations);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText019Core(styleObj, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Keyframes:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var name = CSS.Cssom.CssomRuleMetadata.GetKeyframesName(atRule);
+                var nestedRuleObjects = BuildNestedKeyframeObjects(string.Empty, atRule.Rules, parentStyleSheet, ruleObj);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    text => BuildCssKeyframeRuleObject(text, parentStyleSheet, ruleObj));
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText020Core(name, nestedRuleObjects, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Property:
+            {
+                var descriptors = ParseStyle(CSS.CssSerializer.Serialize(((Broiler.CSS.CssAtRule)rule).Declarations ?? new Broiler.CSS.CssDeclarationBlock([])));
+                var propertyName = ((Broiler.CSS.CssAtRule)rule).Prelude;
+                var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
+                    ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                    : "*";
+                var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
+                    || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
+                var initialValue = descriptors.GetValueOrDefault("initial-value");
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue(
+                    (KeyString)"initialValue",
+                    string.IsNullOrEmpty(initialValue) ? JSNull.Value : new JSString(initialValue),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText021Core(inherits, initialValue, propertyName, syntax, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.CounterStyle:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var ruleName = atRule.Prelude;
+                var descriptors = ParseStyle(CSS.CssSerializer.Serialize(atRule.Declarations ?? new Broiler.CSS.CssDeclarationBlock([])));
+
+                ruleObj.FastAddValue((KeyString)"name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                var descriptorMap = new (string CssName, string JsName)[]
+                {
+                    ("system", "system"),
+                    ("symbols", "symbols"),
+                    ("additive-symbols", "additiveSymbols"),
+                    ("negative", "negative"),
+                    ("prefix", "prefix"),
+                    ("suffix", "suffix"),
+                    ("range", "range"),
+                    ("pad", "pad"),
+                    ("fallback", "fallback"),
+                    ("speak-as", "speakAs")
+                };
+
+                foreach (var (cssName, jsName) in descriptorMap)
+                {
+                    ruleObj.FastAddValue(
+                        (KeyString)jsName,
+                        descriptors.TryGetValue(cssName, out var value) ? new JSString(value) : JSUndefined.Value,
+                        JSPropertyAttributes.EnumerableConfigurableValue);
+                }
+
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText022Core(descriptorMap, ruleName, ruleObj, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Supports:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var conditionText = atRule.Prelude;
+                var nestedRuleObjects = BuildNestedRuleObjects(string.Empty, atRule.Rules, parentStyleSheet, ruleObj);
+                var nestedCssRules = BuildCssRuleListObject(
+                    nestedRuleObjects,
+                    text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
+
+                ruleObj.FastAddValue((KeyString)"conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText023Core(conditionText, nestedRuleObjects, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Layer:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var nameText = atRule.Prelude;
+                if (atRule.HasBlock)
+                {
+                    var nestedRuleObjects = BuildNestedRuleObjects(string.Empty, atRule.Rules, parentStyleSheet, ruleObj);
+                    var nestedCssRules = BuildCssRuleListObject(
+                        nestedRuleObjects,
+                        text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
+
+                    ruleObj.FastAddValue(
+                        (KeyString)"name",
+                        string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
+                        JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty(
+                        (KeyString)"cssText",
+                        new JSFunction((in Arguments _) => JsStyleSheetsGetCssText024Core(nameText, nestedRuleObjects, in _), "get cssText"),
+                        null,
+                        JSPropertyAttributes.EnumerableConfigurableProperty);
+                }
+                else
+                {
+                    // Statement form: `@layer a, b;` — no block, empty cssRules.
+                    ruleObj.FastAddValue(
+                        (KeyString)"name",
+                        string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
+                        JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue((KeyString)"cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty(
+                        (KeyString)"cssText",
+                        new JSFunction((in Arguments _) => JsStyleSheetsGetCssText025Core(nameText, in _), "get cssText"),
+                        null,
+                        JSPropertyAttributes.EnumerableConfigurableProperty);
+                }
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Namespace:
+            {
+                var ns = CSS.Cssom.CssomRuleMetadata.GetNamespace((Broiler.CSS.CssAtRule)rule);
+                ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(ns.Uri), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue(
+                    (KeyString)"prefix",
+                    string.IsNullOrEmpty(ns.Prefix) ? JSUndefined.Value : new JSString(ns.Prefix),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText026Core(ns.Uri, ns.Prefix, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            case CSS.Cssom.CssomRuleType.Page:
+            {
+                var atRule = (Broiler.CSS.CssAtRule)rule;
+                var selectorText = atRule.Prelude;
+                var styleObj = StyleFromBlock(atRule.Declarations);
+                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText027Core(selectorText, styleObj, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                break;
+            }
+
+            default:
+            {
+                // CSSStyleRule — type 1
+                var styleRule = (Broiler.CSS.CssStyleRule)rule;
+                var selectorText = CSS.Cssom.CssomRuleMetadata.GetSelectorText(styleRule);
+                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty(
+                    (KeyString)"cssText",
+                    new JSFunction((in Arguments _) => JsStyleSheetsGetCssText028Core(ruleObj, selectorText, in _), "get cssText"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+                var styleObj = StyleFromBlock(styleRule.Declarations);
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                break;
+            }
+        }
+
+        return ruleObj;
+    }
 
     private static JSObject BuildCssRuleObject(string ruleText, JSObject parentStyleSheet, JSObject? parentRule = null, IReadOnlyList<Broiler.CSS.CssRule>? nestedModelRules = null)
     {

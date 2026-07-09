@@ -65,12 +65,12 @@ public sealed partial class DomBridge
     }
 
 
-    private static MutationObserverOptions CreateMutationObserverOptions(JSValue? value)
+    private static Broiler.Dom.DomMutationObserverOptions CreateMutationObserverOptions(JSValue? value)
     {
         if (value is not JSObject optionsObject)
-            return new MutationObserverOptions();
+            return new Broiler.Dom.DomMutationObserverOptions();
 
-        return new MutationObserverOptions
+        return new Broiler.Dom.DomMutationObserverOptions
         {
             ChildList = GetMutationObserverOption(optionsObject, "childList"),
             Attributes = GetMutationObserverOption(optionsObject, "attributes"),
@@ -82,7 +82,7 @@ public sealed partial class DomBridge
     }
 
 
-    private void RegisterMutationObserver(JSObject observerObject, DomElement target, MutationObserverOptions options)
+    private void RegisterMutationObserver(JSObject observerObject, DomElement target, Broiler.Dom.DomMutationObserverOptions options)
     {
         _mutationObservers.RemoveAll(entry =>
             ReferenceEquals(entry.Observer, observerObject) &&

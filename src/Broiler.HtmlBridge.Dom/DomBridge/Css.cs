@@ -39,188 +39,6 @@ public sealed partial class DomBridge
     //  CSS specificity (Level 3) and <style> / <link> cascading
     // ------------------------------------------------------------------
 
-    /// <summary>
-    /// CSS initial values for commonly queried properties.
-    /// <c>getComputedStyle()</c> returns these when no CSS rule sets the property.
-    /// </summary>
-    private static readonly Dictionary<string, string> CssInitialValues = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["display"] = "inline",
-        ["position"] = "static",
-        ["float"] = "none",
-        ["visibility"] = "visible",
-        ["overflow"] = "visible",
-        ["overflow-x"] = "visible",
-        ["overflow-y"] = "visible",
-        ["text-transform"] = "none",
-        ["text-decoration"] = "none",
-        ["text-align"] = "start",
-        ["text-align-last"] = "auto",
-        ["text-indent"] = "0px",
-        ["text-shadow"] = "none",
-        ["white-space"] = "normal",
-        ["cursor"] = "auto",
-        ["font-style"] = "normal",
-        ["font-variant"] = "normal",
-        ["font-weight"] = "normal",
-        ["font-size"] = "16px",
-        ["font-family"] = "serif",
-        ["line-height"] = "normal",
-        ["letter-spacing"] = "normal",
-        ["word-spacing"] = "normal",
-        ["color"] = "rgb(0, 0, 0)",
-        ["background-color"] = "rgba(0, 0, 0, 0)",
-        ["background-image"] = "none",
-        ["background-position"] = "0% 0%",
-        ["background-repeat"] = "repeat",
-        ["margin"] = "0px",
-        ["margin-top"] = "0px",
-        ["margin-right"] = "0px",
-        ["margin-bottom"] = "0px",
-        ["margin-left"] = "0px",
-        ["padding"] = "0px",
-        ["padding-top"] = "0px",
-        ["padding-right"] = "0px",
-        ["padding-bottom"] = "0px",
-        ["padding-left"] = "0px",
-        ["border-style"] = "none",
-        ["border-width"] = "0px",
-        ["border-color"] = "rgb(0, 0, 0)",
-        ["border-top-width"] = "0px",
-        ["border-right-width"] = "0px",
-        ["border-bottom-width"] = "0px",
-        ["border-left-width"] = "0px",
-        ["border-top-style"] = "none",
-        ["border-right-style"] = "none",
-        ["border-bottom-style"] = "none",
-        ["border-left-style"] = "none",
-        ["border-top-color"] = "rgb(0, 0, 0)",
-        ["border-right-color"] = "rgb(0, 0, 0)",
-        ["border-bottom-color"] = "rgb(0, 0, 0)",
-        ["border-left-color"] = "rgb(0, 0, 0)",
-        ["border-collapse"] = "separate",
-        ["border-spacing"] = "0px",
-        ["opacity"] = "1",
-        ["vertical-align"] = "baseline",
-        ["clear"] = "none",
-        ["z-index"] = "auto",
-        ["top"] = "auto",
-        ["right"] = "auto",
-        ["bottom"] = "auto",
-        ["left"] = "auto",
-        ["width"] = "auto",
-        ["height"] = "auto",
-        ["min-width"] = "0px",
-        ["min-height"] = "0px",
-        ["max-width"] = "none",
-        ["max-height"] = "none",
-        ["box-sizing"] = "content-box",
-        ["list-style-type"] = "disc",
-        ["list-style-position"] = "outside",
-        ["content"] = "normal",
-        ["transform"] = "none",
-        ["mix-blend-mode"] = "normal",
-        ["background-blend-mode"] = "normal",
-        ["isolation"] = "auto",
-        ["filter"] = "none",
-        ["writing-mode"] = "horizontal-tb",
-        ["zoom"] = "1",
-    };
-
-    private static readonly HashSet<string> CssInheritedProperties = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "color",
-        "cursor",
-        "font-family",
-        "font-size",
-        "font-style",
-        "font-variant",
-        "font-weight",
-        "letter-spacing",
-        "line-height",
-        "text-align",
-        "text-align-last",
-        "text-indent",
-        "text-shadow",
-        "text-transform",
-        "visibility",
-        "white-space",
-        "word-spacing",
-        "writing-mode",
-    };
-
-    private static readonly Dictionary<string, string> UserAgentDefaultDisplayValues = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["html"] = "block",
-        ["address"] = "block",
-        ["blockquote"] = "block",
-        ["body"] = "block",
-        ["dd"] = "block",
-        ["div"] = "block",
-        ["dl"] = "block",
-        ["dt"] = "block",
-        ["fieldset"] = "block",
-        ["form"] = "block",
-        ["frame"] = "block",
-        ["frameset"] = "block",
-        ["h1"] = "block",
-        ["h2"] = "block",
-        ["h3"] = "block",
-        ["h4"] = "block",
-        ["h5"] = "block",
-        ["h6"] = "block",
-        ["noframes"] = "block",
-        ["ol"] = "block",
-        ["p"] = "block",
-        ["ul"] = "block",
-        ["center"] = "block",
-        ["dir"] = "block",
-        ["menu"] = "block",
-        ["pre"] = "block",
-        ["section"] = "block",
-        ["article"] = "block",
-        ["nav"] = "block",
-        ["aside"] = "block",
-        ["header"] = "block",
-        ["footer"] = "block",
-        ["main"] = "block",
-        ["figure"] = "block",
-        ["figcaption"] = "block",
-        ["details"] = "block",
-        ["li"] = "list-item",
-        ["summary"] = "list-item",
-        ["table"] = "table",
-        ["tr"] = "table-row",
-        ["thead"] = "table-header-group",
-        ["tbody"] = "table-row-group",
-        ["tfoot"] = "table-footer-group",
-        ["col"] = "table-column",
-        ["colgroup"] = "table-column-group",
-        ["td"] = "table-cell",
-        ["th"] = "table-cell",
-        ["caption"] = "table-caption",
-        ["button"] = "inline-block",
-        ["textarea"] = "inline-block",
-        ["input"] = "inline-block",
-        ["select"] = "inline-block",
-        ["iframe"] = "inline-block",
-        ["object"] = "inline-block",
-        ["head"] = "none",
-        ["style"] = "none",
-        ["title"] = "none",
-        ["script"] = "none",
-        ["link"] = "none",
-        ["meta"] = "none",
-        ["area"] = "none",
-        ["base"] = "none",
-        ["param"] = "none",
-        ["template"] = "none",
-        ["dialog"] = "none",
-    };
-
-    private static readonly System.Text.RegularExpressions.Regex LengthAttrFunctionPattern = new(
-        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Compatibility view of the main document's shared stylesheet model as the
@@ -276,57 +94,6 @@ public sealed partial class DomBridge
             {
                 MaterializeLegacyCssRules(atRule.Rules, target);
             }
-        }
-    }
-
-    private static bool IsRecognizedLengthValue(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        var trimmed = value.Trim();
-        return trimmed == "0" || !double.IsNaN(ParseCssLengthToPixels(trimmed));
-    }
-
-    private static void ResolveLengthAttrFunctions(
-        Dictionary<string, string> computed,
-        DomElement element)
-    {
-        foreach (var key in computed.Keys.ToList())
-        {
-            var value = computed[key];
-            if (string.IsNullOrWhiteSpace(value) ||
-                value.IndexOf("attr(", StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                continue;
-            }
-
-            computed[key] = LengthAttrFunctionPattern.Replace(
-                value,
-                match =>
-                {
-                    var attrName = match.Groups["name"].Value;
-                    var fallback = match.Groups["fallback"].Success
-                        ? match.Groups["fallback"].Value.Trim()
-                        : string.Empty;
-                    var attributeValue = element.Attributes.TryGetValue(attrName, out var raw)
-                        ? raw.Trim()
-                        : string.Empty;
-
-                    if (!string.IsNullOrEmpty(attributeValue) &&
-                        IsRecognizedLengthValue(attributeValue))
-                    {
-                        return attributeValue;
-                    }
-
-                    if (!string.IsNullOrEmpty(fallback) &&
-                        IsRecognizedLengthValue(fallback))
-                    {
-                        return fallback;
-                    }
-
-                    return string.Empty;
-                });
         }
     }
 
@@ -623,7 +390,7 @@ public sealed partial class DomBridge
             return;
 
         var parentProps = GetComputedProps(element.Parent);
-        foreach (var property in CssInheritedProperties)
+        foreach (var property in CSS.Dom.CssComputedDefaults.InheritedProperties)
         {
             if (computed.ContainsKey(property))
                 continue;
@@ -1001,7 +768,7 @@ public sealed partial class DomBridge
             return;
         }
 
-        if (UserAgentDefaultDisplayValues.TryGetValue(element.TagName, out var display))
+        if (CSS.Dom.CssUserAgentDefaults.DisplayValues.TryGetValue(element.TagName, out var display))
             computed["display"] = display;
     }
 

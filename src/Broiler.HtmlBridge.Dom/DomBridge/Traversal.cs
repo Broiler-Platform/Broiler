@@ -1042,16 +1042,11 @@ public sealed partial class DomBridge
         if (_mutationObservers.Count == 0)
             return;
 
+        var mutation = new Broiler.Dom.DomMutationRecord(Broiler.Dom.DomMutationType.ChildList, target);
         foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
         {
-            if (!options.ChildList)
+            if (!Broiler.Dom.DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;
-
-            if (!ReferenceEquals(target, observedTarget) &&
-                !(options.Subtree && IsDescendant(observedTarget, target)))
-            {
-                continue;
-            }
 
             if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
                 continue;
@@ -1081,9 +1076,10 @@ public sealed partial class DomBridge
         if (_mutationObservers.Count == 0)
             return;
 
+        var mutation = new Broiler.Dom.DomMutationRecord(Broiler.Dom.DomMutationType.Attributes, target, AttributeName: attributeName);
         foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
         {
-            if (!options.Attributes || !ShouldNotifyMutationObserver(target, observedTarget, options))
+            if (!Broiler.Dom.DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;
 
             if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
@@ -1106,9 +1102,10 @@ public sealed partial class DomBridge
         if (_mutationObservers.Count == 0)
             return;
 
+        var mutation = new Broiler.Dom.DomMutationRecord(Broiler.Dom.DomMutationType.CharacterData, target);
         foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
         {
-            if (!options.CharacterData || !ShouldNotifyMutationObserver(target, observedTarget, options))
+            if (!Broiler.Dom.DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;
 
             if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
@@ -1136,12 +1133,6 @@ public sealed partial class DomBridge
         UpdateCharacterData(target, newValue);
         if (!string.Equals(previousValue, target.TextContent, StringComparison.Ordinal))
             NotifyCharacterDataMutationObservers(target, previousValue);
-    }
-
-    private bool ShouldNotifyMutationObserver(DomElement target, DomElement observedTarget, MutationObserverOptions options)
-    {
-        return ReferenceEquals(target, observedTarget) ||
-               (options.Subtree && IsDescendant(observedTarget, target));
     }
 
     /// <summary>

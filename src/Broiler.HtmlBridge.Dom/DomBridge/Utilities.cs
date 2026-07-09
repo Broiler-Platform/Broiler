@@ -1024,6 +1024,12 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // classList.replace(oldToken, newToken)
+        classList.FastAddValue(
+            (KeyString)"replace",
+            new JSFunction((in Arguments a) => JsUtilitiesReplaceClassToken(element, onClassChanged, in a), "replace", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         return classList;
     }
 

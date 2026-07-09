@@ -47,7 +47,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         "scrollend"];
     private readonly HashSet<DomElement> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<(JSObject Observer, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
+    private readonly List<(JSObject Observer, DomElement Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
@@ -173,11 +173,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// All elements parsed from the HTML source.
     /// </summary>
     public IReadOnlyList<DomElement> Elements =>
-        _documentNode
+        [.. _documentNode
             .InclusiveDescendants()
             .OfType<DomElement>()
-            .Where(element => !ReferenceEquals(element, _documentNode))
-            .ToArray();
+            .Where(element => !ReferenceEquals(element, _documentNode))];
 
     private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
         ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
@@ -368,8 +367,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>setInterval</c>, or <c>requestAnimationFrame</c> callbacks
     /// waiting to execute.
     /// </summary>
-    public bool HasPendingTimers =>
-        _timeoutCallbacks.Count > 0 || _intervalCallbacks.Count > 0 || _rafCallbacks.Count > 0 || _frameActions.Count > 0;
+    public bool HasPendingTimers => !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
 
     /// <summary>
     /// Executes one batch of pending timer and animation-frame callbacks.
@@ -550,8 +548,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // and addEventListener registrations using the same event path.
         try
         {
-            var evt = _jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") as JSObject;
-            if (evt != null)
+            if (_jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") is JSObject evt)
                 DispatchEventOnElement(body, evt);
         }
         catch (Exception ex)
@@ -587,26 +584,26 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         var legacyCancelBubble = false;
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
+            new JSFunction((in _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
+            new JSFunction((in _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in Arguments _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new JSFunction((in _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddProperty(
             (KeyString)"cancelBubble",
-            new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in Arguments setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
+            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new JSFunction((in setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddProperty(
             (KeyString)"returnValue",
-            new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in Arguments setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new JSFunction((in setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in Arguments _) => new JSArray(_windowJSObject), "composedPath", 0),
+            new JSFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         if (_windowEventListeners.TryGetValue(eventType, out var listeners))
@@ -634,7 +631,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         var frames = new List<JSValue>();
         CollectWindowFrames(DocumentElement, frames);
-        return new JSArray(frames.ToArray());
+        return new JSArray([.. frames]);
     }
 
     private void CollectWindowFrames(DomElement element, List<JSValue> frames)
@@ -660,13 +657,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     //  HTML parsing helpers
     // ------------------------------------------------------------------
 
-    private static readonly System.Text.RegularExpressions.Regex TitlePattern = new(
-        @"<title[^>]*>(?<content>[\s\S]*?)</title>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TitlePattern = TitlePatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex OpenTagPattern = new(
-        @"<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b(?<attrs>[^>]*)\/?>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OpenTagPattern = OpenTagPatternRegex();
 
     private static readonly HashSet<string> SkippedTags = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -679,21 +672,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         "link", "meta", "param", "source", "track", "wbr"
     };
 
-    private static readonly System.Text.RegularExpressions.Regex IdPattern = new(
-        @"\bid\s*=\s*[""'](?<id>[^""']+)[""']",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex IdPattern = IdPatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex ClassPattern = new(
-        @"\bclass\s*=\s*[""'](?<cls>[^""']+)[""']",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ClassPattern = ClassPatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex AttributeSelectorPattern = new(
-        @"\[(?<name>[a-zA-Z][a-zA-Z0-9_:-]*)(?:(?<op>[~|^$*]?=)(?<value>[""'][^""']*[""']|[^\]]*))?\]",
-        RegexOptions.Compiled);
+    private static readonly Regex AttributeSelectorPattern = AttributeSelectorPatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex DocTypePattern = new(
-        @"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DocTypePattern = DocTypePatternRegex();
 
     private void ParseHtml(string html)
     {
@@ -820,9 +805,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// the last <em>valid</em> value wins (per CSS 2.1 §4.2 / CSS Syntax §5).
     /// </summary>
     /// <param name="reportDrops">
-    /// When <c>true</c>, declarations rejected by <see cref="IsAcceptableCssValue"/>
+    /// When <c>true</c>, declarations rejected by
+    /// <see cref="CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue"/>
     /// are surfaced through
-    /// <see cref="Broiler.CSS.Dom.CssEngineDiagnostics.DeclarationRejected"/>
+    /// <see cref="CSS.Dom.CssEngineDiagnostics.DeclarationRejected"/>
     /// (diagnostic #1b). The bridge rewrites the serialized <c>style</c> attribute
     /// from the survivors of this filter (see <c>PrepareCanonicalDocumentForRendering</c>),
     /// so a dropped inline declaration vanishes before the renderer's own style engine
@@ -834,16 +820,19 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var declarations = new Broiler.CSS.CssParser().ParseDeclarations(styleValue);
+        var declarations = new CSS.CssParser().ParseDeclarations(styleValue);
         foreach (var declaration in declarations.Declarations)
         {
             var prop = declaration.Name;
-            var val = declaration.Value.Text;
-            if (declaration.Important)
-                val += " !important";
+            // Validate the importance-stripped value against the shared CSS.Dom
+            // declaration table (the same closed-keyword error-recovery the cascade
+            // uses), then re-attach the "!important" suffix the bridge-owned
+            // declaration map carries as part of the string value.
+            var rawValue = declaration.Value.Text;
 
-            if (IsAcceptableCssValue(prop, val))
+            if (CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue(prop, rawValue))
             {
+                var val = declaration.Important ? rawValue + " !important" : rawValue;
                 result[prop] = val;
                 // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
                 var unprefixed = StripVendorPrefix(prop);
@@ -852,9 +841,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             }
             else if (reportDrops)
             {
-                // Report the raw value (without the synthetic " !important" suffix) so
+                // Report the raw value (without any synthetic " !important" suffix) so
                 // inline drops aggregate identically to the engine's stylesheet drops.
-                CSS.Dom.CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, declaration.Value.Text);
+                CSS.Dom.CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, rawValue);
             }
         }
         return result;
@@ -878,222 +867,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return property;
     }
 
-    /// <summary>
-    /// CSS error recovery: returns <c>false</c> for values that are clearly
-    /// invalid for the given property.  Only properties with a closed set of
-    /// keyword values are validated; all other properties accept any non-empty value.
-    /// </summary>
-    private static bool IsAcceptableCssValue(string property, string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return false;
-
-        // CSS-wide keywords are always valid
-        var v = value.ToLowerInvariant();
-        if (v is "inherit" or "initial" or "unset" or "revert") return true;
-
-        // Custom-property references are validated after cascade, not during
-        // raw declaration parsing. Keep them so the later resolution step can
-        // substitute them into closed-keyword properties too.
-        if (v.IndexOf("var(", StringComparison.OrdinalIgnoreCase) >= 0) return true;
-
-        switch (property.ToLowerInvariant())
-        {
-            case "white-space":
-                return IsWhiteSpaceValue(v);
-
-            case "display":
-                return v is "block" or "inline" or "inline-block" or "none"
-                    or "flex" or "inline-flex" or "grid" or "inline-grid"
-                    or "table" or "table-row" or "table-cell" or "table-column"
-                    or "table-row-group" or "table-header-group"
-                    or "table-footer-group" or "table-column-group"
-                    or "table-caption" or "list-item" or "contents"
-                    or "run-in" or "flow-root";
-
-            case "position":
-                return v is "static" or "relative" or "absolute" or "fixed" or "sticky";
-
-            case "float":
-            case "css-float":
-                return v is "none" or "left" or "right" or "inline-start" or "inline-end";
-
-            case "clear":
-                return v is "none" or "left" or "right" or "both" or "inline-start" or "inline-end";
-
-            case "visibility":
-                return v is "visible" or "hidden" or "collapse";
-
-            case "overflow":
-            case "overflow-x":
-            case "overflow-y":
-                // CSS Overflow Level 3: overflow can be one or two keywords
-                // (e.g. "hidden scroll" sets overflow-x:hidden and overflow-y:scroll).
-                foreach (var part in v.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (part is not ("visible" or "hidden" or "scroll" or "auto" or "clip"))
-                        return false;
-                }
-                return true;
-
-            case "text-align":
-                // CSS Text 4: text-align is a shorthand; 'justify-all' additionally
-                // justifies the last line.  The -webkit-{left,right,center} legacy
-                // keywords are non-standard but widely supported.
-                return v is "left" or "right" or "center" or "justify"
-                    or "start" or "end" or "justify-all" or "match-parent"
-                    or "-webkit-left" or "-webkit-right" or "-webkit-center";
-
-            case "text-align-last":
-                return v is "auto" or "start" or "end" or "left" or "right"
-                    or "center" or "justify" or "match-parent";
-
-            case "text-decoration-style":
-                return v is "solid" or "double" or "dotted" or "dashed" or "wavy";
-
-            case "text-transform":
-                return IsTextTransformValue(v);
-
-            case "vertical-align":
-                // Also accepts lengths/percentages, which won't match these keywords
-                return v is "baseline" or "sub" or "super" or "text-top"
-                    or "text-bottom" or "middle" or "top" or "bottom"
-                    || IsLengthOrPercentage(v);
-
-            case "box-sizing":
-                return v is "content-box" or "border-box";
-
-            case "cursor":
-                return v is "auto" or "default" or "none" or "context-menu"
-                    or "help" or "pointer" or "progress" or "wait"
-                    or "cell" or "crosshair" or "text" or "vertical-text"
-                    or "alias" or "copy" or "move" or "no-drop"
-                    or "not-allowed" or "grab" or "grabbing"
-                    or "e-resize" or "n-resize" or "ne-resize" or "nw-resize"
-                    or "s-resize" or "se-resize" or "sw-resize" or "w-resize"
-                    or "ew-resize" or "ns-resize" or "nesw-resize" or "nwse-resize"
-                    or "col-resize" or "row-resize" or "all-scroll" or "zoom-in" or "zoom-out"
-                    || v.StartsWith("url(", StringComparison.Ordinal);
-
-            case "list-style-type":
-                return v is "disc" or "circle" or "square" or "decimal"
-                    or "decimal-leading-zero" or "lower-roman" or "upper-roman"
-                    or "lower-greek" or "lower-latin" or "upper-latin"
-                    or "armenian" or "georgian" or "lower-alpha" or "upper-alpha"
-                    or "none";
-
-            case "border-style":
-            case "border-top-style":
-            case "border-right-style":
-            case "border-bottom-style":
-            case "border-left-style":
-            case "outline-style":
-                return v is "none" or "hidden" or "dotted" or "dashed"
-                    or "solid" or "double" or "groove" or "ridge"
-                    or "inset" or "outset";
-
-            case "font-style":
-                return v is "normal" or "italic" or "oblique";
-
-            case "font-weight":
-                return v is "normal" or "bold" or "bolder" or "lighter"
-                    || (int.TryParse(v, out var w) && w >= 1 && w <= 1000);
-
-            case "color":
-            case "background-color":
-            case "border-color":
-            case "border-top-color":
-            case "border-right-color":
-            case "border-bottom-color":
-            case "border-left-color":
-            case "outline-color":
-                // CSS color values: named colors, #hex, rgb(), rgba(),
-                // hsl(), hsla(), transparent, currentcolor.
-                // Reject unknown vendor-prefixed values (e.g. -acid3-bogus).
-                return !v.StartsWith('-')
-                    || v.StartsWith("-webkit-", StringComparison.Ordinal)
-                    || v.StartsWith("-moz-", StringComparison.Ordinal)
-                    || v.StartsWith("-ms-", StringComparison.Ordinal)
-                    || v.StartsWith("-o-", StringComparison.Ordinal);
-
-            default:
-                // For all other properties accept any non-empty value
-                return true;
-        }
-    }
-
     /// <summary>Checks whether <paramref name="v"/> looks like a CSS length or percentage.</summary>
-    // CSS Text 3 §2.1: none | [ [capitalize | uppercase | lowercase] || full-width
-    // || full-size-kana ] | math-auto. The case keywords are mutually exclusive; a
-    // valid multi-token value combines at most one case keyword with full-width
-    // and/or full-size-kana (in any order), each at most once.
-    // CSS Text 4 §3: white-space is a shorthand for white-space-collapse and
-    // text-wrap-mode. Accepts a legacy single keyword or the two-longhand form
-    // <'white-space-collapse'> || <'text-wrap-mode'> (at most one collapse keyword
-    // combined with at most one wrap keyword, in either order), so modern values
-    // like "preserve-breaks" and "break-spaces nowrap" are not dropped.
-    private static bool IsWhiteSpaceValue(string v)
-    {
-        if (v is "normal" or "nowrap" or "pre" or "pre-wrap" or "pre-line")
-            return true;
-
-        bool collapseSeen = false, wrapSeen = false;
-        foreach (var token in v.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            switch (token)
-            {
-                case "collapse":
-                case "preserve":
-                case "preserve-breaks":
-                case "preserve-spaces":
-                case "break-spaces":
-                    if (collapseSeen) return false;
-                    collapseSeen = true;
-                    break;
-                case "wrap":
-                case "nowrap":
-                    if (wrapSeen) return false;
-                    wrapSeen = true;
-                    break;
-                default:
-                    return false;
-            }
-        }
-
-        return collapseSeen || wrapSeen;
-    }
-
-    private static bool IsTextTransformValue(string v)
-    {
-        if (v is "none" or "math-auto")
-            return true;
-
-        bool caseSeen = false, fullWidth = false, fullSizeKana = false;
-        foreach (var token in v.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
-            switch (token)
-            {
-                case "capitalize":
-                case "uppercase":
-                case "lowercase":
-                    if (caseSeen) return false;
-                    caseSeen = true;
-                    break;
-                case "full-width":
-                    if (fullWidth) return false;
-                    fullWidth = true;
-                    break;
-                case "full-size-kana":
-                    if (fullSizeKana) return false;
-                    fullSizeKana = true;
-                    break;
-                default:
-                    return false;
-            }
-        }
-
-        return caseSeen || fullWidth || fullSizeKana;
-    }
-
     private static bool IsLengthOrPercentage(string v)
     {
         if (v == "0") return true;
@@ -1115,23 +889,26 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return false;
     }
 
+    [GeneratedRegex(@"<title[^>]*>(?<content>[\s\S]*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex TitlePatternRegex();
+    [GeneratedRegex(@"<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b(?<attrs>[^>]*)\/?>", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex OpenTagPatternRegex();
+    [GeneratedRegex(@"\bid\s*=\s*[""'](?<id>[^""']+)[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex IdPatternRegex();
+    [GeneratedRegex(@"\bclass\s*=\s*[""'](?<cls>[^""']+)[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex ClassPatternRegex();
+    [GeneratedRegex(@"\[(?<name>[a-zA-Z][a-zA-Z0-9_:-]*)(?:(?<op>[~|^$*]?=)(?<value>[""'][^""']*[""']|[^\]]*))?\]", RegexOptions.Compiled)]
+    private static partial Regex AttributeSelectorPatternRegex();
+    [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+    private static partial Regex DocTypePatternRegex();
 }
 
 /// <summary>
 /// Custom JSObject subclass for HTMLFormControlsCollection that returns null
 /// (not undefined) for named property lookups that don't match any control.
 /// </summary>
-internal sealed class FormElementsCollection : JSObject
+internal sealed class FormElementsCollection(DomElement form, DomBridge bridge) : JSObject()
 {
-    private readonly DomElement _form;
-    private readonly DomBridge _bridge;
-
-    public FormElementsCollection(DomElement form, DomBridge bridge) : base()
-    {
-        _form = form;
-        _bridge = bridge;
-    }
-
     protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
     {
         // First check own properties (length, numeric indices, known names)
@@ -1143,12 +920,12 @@ internal sealed class FormElementsCollection : JSObject
         var prop = key.Value.ToString();
         if (!string.IsNullOrEmpty(prop))
         {
-            var controls = DomBridge.CollectFormControls(_form);
+            var controls = DomBridge.CollectFormControls(form);
             foreach (var ctrl in controls)
             {
                 if (ctrl.Attributes.TryGetValue("name", out var name) &&
                     string.Equals(name, prop, StringComparison.Ordinal))
-                    return _bridge.ToJSObject(ctrl);
+                    return bridge.ToJSObject(ctrl);
             }
         }
 

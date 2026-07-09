@@ -8,21 +8,6 @@ internal readonly record struct EventListenerRegistration(
     bool Once = false,
     bool Passive = false);
 
-internal sealed class MutationObserverOptions
-{
-    public bool ChildList { get; set; }
-
-    public bool Attributes { get; set; }
-
-    public bool AttributeOldValue { get; set; }
-
-    public bool CharacterData { get; set; }
-
-    public bool CharacterDataOldValue { get; set; }
-
-    public bool Subtree { get; set; }
-}
-
 /// <summary>
 /// JavaScript and browser-runtime state associated with a legacy DOM node.
 /// The node model deliberately does not own this state.

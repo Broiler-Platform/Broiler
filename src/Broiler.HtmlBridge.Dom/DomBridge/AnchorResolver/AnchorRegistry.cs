@@ -330,7 +330,7 @@ public sealed partial class DomBridge
                 props[kv.Key] = kv.Value;
 
             ExpandCssShorthands(props);
-            ResolveLengthAttrFunctions(props, element);
+            CSS.Dom.CssStyleEngine.ResolveLengthAttrFunctions(props, element);
             ResolveExplicitInheritedValues(props, element);
             ApplyInheritedProperties(props, element);
 
@@ -385,7 +385,7 @@ public sealed partial class DomBridge
                 }
             }
 
-            if (CssInitialValues.TryGetValue(key, out var initialValue))
+            if (CSS.Dom.CssComputedDefaults.InitialValues.TryGetValue(key, out var initialValue))
                 props[key] = initialValue;
             else
                 props.Remove(key);

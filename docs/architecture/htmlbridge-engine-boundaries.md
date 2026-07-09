@@ -108,6 +108,75 @@ it consumes computed style and renderer geometry; its `display: contents`
 descendant behavior is covered by a dedicated regression gate. Content operations
 and JavaScript wrappers likewise remain outside the dependency-free kernel.
 
+Mutation-observer semantics are **not** yet fully canonical. The bridge still
+owns `MutationObserver` registration, observer-option matching, and mutation
+record filtering (`DomBridge/Registration/Events.cs` and the surrounding
+`__broilerRegisterMutationObserver` plumbing); it adapts filtered records into
+JavaScript callback objects. Several `DomRange` content operations are likewise
+still implemented in bridge rather than the kernel. Promoting the neutral parts
+of these paths — option matching/record filtering into `Broiler.DOM` and range
+content operations into canonical `DomRange` — is scoped as Phase 4 of the
+[DOM/CSS promotion roadmap](../roadmap/htmlbridge-dom-css-promotion-roadmap.md),
+not something already delivered here.
+
+## DOM/CSS promotion — Phase 0 baseline (2026-07-09)
+
+Phase 0 of the
+[HtmlBridge DOM/CSS promotion roadmap](../roadmap/htmlbridge-dom-css-promotion-roadmap.md)
+locks the boundary before any promotion PR slice moves code out of the bridge.
+The roadmap's later phases move neutral CSS/DOM algorithms into `Broiler.CSS`,
+`Broiler.CSS.Dom`, and `Broiler.DOM`. This section is the frozen inventory of
+what stays in the bridge and why, so those moves cannot silently re-package
+compatibility code as canonical engine code.
+
+### Allowed HtmlBridge compatibility seams
+
+Each seam is an intentional bridge-owned shim. Its removal boundary is
+`htmlbridge-public-surface/v2`; do not delete or promote it earlier. Adding a new
+seam to this list must be a deliberate, reviewed decision.
+
+| Seam | Kind | Ownership rationale | Promotion disposition |
+|---|---|---|---|
+| `Broiler.HtmlBridge.DomElement` | Versioned DOM adapter (`htmlbridge-dom-adapter/v1`) | Source-compatibility facade over `Broiler.Dom.DomElement`; delegates tree/attribute state to the canonical node | Non-candidate — remove at v2, do not promote |
+| `Broiler.HtmlBridge.HtmlTreeBuilder` | Versioned DOM adapter (`htmlbridge-dom-adapter/v1`) | Compatibility materializer over `Broiler.Dom.Html.HtmlDocumentParser` | Non-candidate — remove at v2, do not promote |
+| `DomBridge.CssRules` | Obsolete CSSOM compatibility view | Historical `(selector, specificity, declarations)` tuple projection; not a cascade store or render input | Remove at v2; consumers move to shared `Broiler.CSS` stylesheet/style-engine APIs |
+| `DomBridge.CalculateSpecificity(string)` | Static selector-specificity helper | Thin delegation to `Broiler.CSS.CssSelectorParser.CalculateSpecificity` | Remove at v2; public replacement is the CSS parser API |
+| CSSOM JavaScript wrappers (`DomBridge/StyleSheets.cs`) | Live JS object identity | Build `CSSStyleSheet`/`CSSRule` JS objects with parent-rule/sheet wiring and mutation events | Keep in bridge; Phase 3 thins them over a neutral CSS rule projection |
+| `ElementRuntimeState` | Bridge runtime state | JS identity, listeners, mutation-observer options, form/scroll/layout cache, dialog/shadow/animation state | Non-candidate — stays bridge-owned |
+| Host / resource loading (external stylesheet + subresource fetch) | Host integration | Fetching and base-path resolution are host concerns, not DOM/CSS | Keep in bridge; only host-supplied *text* assembly may move to CSS.Dom (Phase 2 open question) |
+
+The `MutationObserver` registration/option-matching/record-filtering paths and
+several `DomRange` content operations are also still bridge-owned; see the
+"Versioned DOM adapter policy" note above for their Phase 4 disposition.
+
+### Caller catalog (pre-v2 surface audit)
+
+Callers of the four named public seams, as of the Phase 0 baseline. This is the
+migration checklist that must reach zero non-test in-repo callers before the
+seam can be removed at v2.
+
+| Seam | In-repo production callers | Test callers |
+|---|---|---|
+| `DomElement` | Bridge-wide (`Broiler.HtmlBridge.Dom`); public entry points are `DomBridge.DocumentElement` / `DomBridge.Elements` | DOM/CSS/WPT compatibility tests via those entry points |
+| `HtmlTreeBuilder` | Bridge-internal only (`DomBridge.cs`, `DomBridge/SubDocuments.cs`, `DomBridge/JsFunctionCallbacks/*`) | `DomExtractionPhaseZeroTests` |
+| `DomBridge.CssRules` | **None** outside the bridge (already `[Obsolete]`) | `CssExtractionPhaseTwoTests`, `SelectorsLevel4SpecificityTests` |
+| `DomBridge.CalculateSpecificity` | **None** — no in-repo callers; tests call `Broiler.CSS.CssSelectorParser.CalculateSpecificity` directly | (specificity behavior covered against the CSS parser, not the bridge shim) |
+
+### Phase 0 guard tests
+
+The baseline is enforced from the main-repo test project so the guards run in
+main-repo CI without depending on submodule test runs:
+
+- `Broiler.Cli.Tests.HtmlBridgePromotionPhaseZeroTests` — freezes the seam
+  versions/shape above and guards that `Broiler.Dom` does not reference or expose
+  JavaScript-engine types and that `Broiler.CSS.Dom` does not reference
+  `Broiler.HtmlBridge.*`.
+
+The canonical components additionally self-guard inside their own submodules
+(`Broiler.Dom.Tests.DomArchitectureTests` forbids all non-framework dependencies;
+`Broiler.CSS.Dom.Tests.CssDomArchitectureTests` pins CSS.Dom's project references
+to `Broiler.CSS` + `Broiler.Dom` only).
+
 ## PR dashboard surfaces tied to this boundary
 
 - JavaScript conformance baseline:
