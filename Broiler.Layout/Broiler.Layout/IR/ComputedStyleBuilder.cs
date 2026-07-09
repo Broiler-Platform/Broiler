@@ -1,3 +1,4 @@
+using System;
 using Broiler.Layout.Engine;
 
 namespace Broiler.Layout.IR;
@@ -8,6 +9,28 @@ namespace Broiler.Layout.IR;
 /// </summary>
 internal static class ComputedStyleBuilder
 {
+    /// <summary>
+    /// CSS Overflow 3 §3.3 / CSS 2.1 §11.1.1: the root element's overflow is
+    /// applied to the viewport, and the root element's own used overflow
+    /// becomes <c>visible</c>.  A clipping value (<c>hidden</c>/<c>scroll</c>/
+    /// <c>auto</c>) on <c>&lt;html&gt;</c> must therefore not clip the element's
+    /// own box — which, for a short document (e.g. an empty body with only
+    /// absolutely positioned children), is much smaller than the viewport and
+    /// would wrongly clip content that belongs on the canvas.  The viewport
+    /// (== the render surface) provides the clip instead.
+    /// </summary>
+    private static string RootOverflowUsedValue(string overflow, string? tagName)
+    {
+        if (tagName != null
+            && tagName.Equals("html", StringComparison.OrdinalIgnoreCase)
+            && overflow is "hidden" or "scroll" or "auto")
+        {
+            return "visible";
+        }
+
+        return overflow;
+    }
+
     /// <summary>
     /// Snapshots the computed style of a CssBox, capturing all resolved actual values.
     /// </summary>
@@ -26,7 +49,7 @@ internal static class ComputedStyleBuilder
             Position = box.Position,
             Float = box.Float,
             Clear = box.Clear,
-            Overflow = box.Overflow,
+            Overflow = RootOverflowUsedValue(box.Overflow, tagName),
             Visibility = box.Visibility,
             Direction = box.Direction,
 
