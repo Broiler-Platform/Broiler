@@ -20,6 +20,14 @@ public sealed partial class DomBridge
     private const double DefaultProgressLikeTrackLengthPx = 120;
     private readonly Dictionary<DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];
 
+    // RF-BRIDGE-1b render-doc/live-doc separation: when non-null, ApplyZoomSerializationStyles
+    // records each mutated element's pre-bake Style + Attributes here so the geometry-snapshot
+    // path can restore the live document afterward (zoom baking is destructive — it scales
+    // sizes and drops the `zoom` property — which would otherwise corrupt subsequent unzoomed
+    // CSSOM queries, e.g. clientWidth of a zoomed element). The render/serialize paths leave
+    // this null so their baking stays permanent.
+    private List<(DomElement Element, Dictionary<string, string> Style, Dictionary<string, string> Attributes)>? _zoomSerializationRevertLog;
+
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
     /// Call this after JavaScript execution to obtain the modified page
@@ -27,6 +35,7 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
+        ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         return SharedHtmlSerializer.Serialize(
             DocumentElement,
@@ -46,9 +55,47 @@ public sealed partial class DomBridge
     /// </summary>
     public Broiler.Dom.DomDocument GetRenderDocument()
     {
+        // Zoom baking runs per call (not part of the run-once guarded transforms) so the
+        // geometry-snapshot path can revert it afterward via _zoomSerializationRevertLog;
+        // it is idempotent once baked (the `zoom` property is stripped), so repeat calls on
+        // the render path are no-ops. Must run before the guarded pseudo/progress transforms,
+        // which depend on the baked sizes.
+        ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         ReflectRenderState(DocumentElement);
         return _document;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1b render-doc/live-doc separation: restores the live document's zoom-baked
+    /// elements to their pre-bake Style/Attributes (captured in
+    /// <see cref="_zoomSerializationRevertLog"/>). Called by the geometry-snapshot path after
+    /// the layout is captured, so subsequent CSSOM/estimator queries see pristine (unzoomed)
+    /// styles rather than the render-oriented baked sizes.
+    /// </summary>
+    private void RevertZoomSerialization()
+    {
+        var log = _zoomSerializationRevertLog;
+        _zoomSerializationRevertLog = null;
+        if (log == null)
+            return;
+
+        for (var i = log.Count - 1; i >= 0; i--)
+        {
+            var (element, style, attributes) = log[i];
+            RestoreStringMap(element.Style, style);
+            RestoreStringMap(element.Attributes, attributes);
+        }
+
+        // Reverted styles must not read back the baked values from the computed cache.
+        _computedPropsCache.Clear();
+    }
+
+    private static void RestoreStringMap(IDictionary<string, string> target, Dictionary<string, string> saved)
+    {
+        target.Clear();
+        foreach (var kv in saved)
+            target[kv.Key] = kv.Value;
     }
 
     private void ReflectRenderState(DomElement element)
@@ -101,7 +148,9 @@ public sealed partial class DomBridge
 
         _serializationTransformsApplied = true;
         RemoveRenderCommentNodes(DocumentElement);
-        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
+        // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
+        // the baked sizes and must run after it.
         ApplyZoomPseudoSerializationOverrides();
         ApplyProgressLikeSerializationPlaceholders(DocumentElement);
     }
@@ -350,7 +399,17 @@ public sealed partial class DomBridge
         var specifiedZoom = props.GetValueOrDefault("zoom");
         var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
 
-        if (Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon)
+        var willScale = Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon;
+        var willSvg = ShouldApplySvgSerializationAttributes(element);
+        // Record the pre-bake state for the geometry-snapshot revert (only when this element
+        // is actually mutated — scaled, SVG-adjusted, or carrying a `zoom` to strip).
+        if (_zoomSerializationRevertLog != null && (willScale || willSvg || element.Style.ContainsKey("zoom")))
+            _zoomSerializationRevertLog.Add((
+                element,
+                new Dictionary<string, string>(element.Style),
+                new Dictionary<string, string>(element.Attributes)));
+
+        if (willScale)
         {
             foreach (var property in ZoomScaledSerializationProperties)
             {
@@ -363,7 +422,7 @@ public sealed partial class DomBridge
 
         }
 
-        if (ShouldApplySvgSerializationAttributes(element))
+        if (willSvg)
             ApplyZoomSerializationSvgAttributes(element, usedZoom);
 
         element.Style.Remove("zoom");

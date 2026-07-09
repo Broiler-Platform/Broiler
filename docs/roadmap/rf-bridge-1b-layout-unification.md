@@ -161,18 +161,163 @@ natural fit for the existing per-pass `WithLayoutGeometryCache` lifetime. Benchm
    **DONE.** `DomBridge.UseSharedLayoutGeometry` now defaults to **true**
    ([`SharedLayoutGeometry.cs`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SharedLayoutGeometry.cs));
    the live geometry entry points read the shared renderer layout, with the
-   estimators kept as the per-element fallback. The parity gate holds with a
-   documented `KnownRendererGapRegressions = 3` budget (the renderer's missing
-   `position-try`/anchor/grid layout — those elements fall back to the estimator).
-   Increments 6–7 (delete the estimators, retire `LayoutRuntimeState`) stay blocked
-   until the renderer closes that layout gap and the shortfall reaches 0.
+   estimators kept as the per-element fallback.
+
+   **Update (2026-07-09): parity budget lowered 3 → 0.** The renderer now sizes
+   `@position-try` elements correctly on the shared path (`position-try-002`
+   width+height, `position-try-grid-001` height all match), so the earlier
+   3-assertion budget was retired. The gate now reads **shared 345 / estimator 72
+   of 484** — the shared path beats the estimators by 273 assertions —
+   and holds at `KnownRendererGapRegressions = 0`. Position-try fallback *offsets*
+   are still wrong on the shared path, but the estimator gets them wrong too, so
+   they are not a shared-vs-estimator regression.
 6. **Delete the estimators.** Remove the ~2700-line estimator body from
    `LayoutMetrics.cs`, keeping only the thin JS-facing wrappers that now call the
    provider. Retire `WithLayoutGeometryCache` (the provider's snapshot cache replaces
    its purpose).
+   **BLOCKED (2026-07-09) — not on position-try sizing (that works now), but on a
+   provider capability gap.** `SharedLayoutGeometryProvider` only supplies static
+   box geometry (border/padding/content boxes for laid-out elements). The estimator
+   graph is still load-bearing for geometry the provider does **not** supply, so a
+   deletion regresses real behavior:
+   - **Scroll overflow extents** (`scrollWidth/Height`) — *partially migrated
+     (2026-07-09)*. `GetScrollWidth/HeightForDomElement` now answer **non-root,
+     unzoomed** elements from the shared snapshot via `TryGetSharedScrollExtent`
+     (union of the element's padding box + descendant border boxes from the snapshot;
+     `SharedScrollOverflowTests`), regression-free across the full scroll test family
+     (identical pass/fail set vs HEAD). Still on the estimator: (a) **zoomed
+     subtrees** (see the zoom note below); (b) the **root/viewport** scroll area.
+   - **Sticky positioning** (`AnchorResolver/StickyPositioning.cs`) — uses
+     `ComputeOffsetWithinAncestor` + border/content-box estimators.
+   - **`scrollIntoView`** alignment geometry.
+
+   **Zoom handling (2026-07-09).** The shared snapshot is in the renderer's *zoomed*
+   document space, so the raw shared branches returned zoomed values (`clientWidth` of a
+   `zoom:2` element read 120 not 60). **All shared geometry branches gate on
+   `IsUnzoomedForSharedGeometry`; zoomed elements route to the estimator**, which
+   resolves zoom from CSS directly and is path-independent.
+
+   A snapshot-side "divide by cumulative zoom" fix was tried and **reverted** — it is
+   correct for a plain `DomBridge` but double-counts in the render pipeline, because
+   `GetRenderDocument`'s `ApplyZoomSerializationStyles` bakes `zoom` into the serialized
+   box *size* while leaving the `zoom` property readable, so the snapshot box is already
+   partly unzoomed and dividing again halves it (`clientWidth` 60 → 30 in the pipeline).
+   The estimator avoids this entirely. Correct zoom size values are locked in
+   (path-independently) by `SharedGeometryZoomSizeTests`.
+
+   **`Element.remove()` bug fixed (2026-07-09) — this was the real blocker for the zoom
+   pixel tests.** `element.remove()` read `element.Parent` (computed from `ParentNode`)
+   *after* `Children.RemoveAt` had detached it → captured `null` →
+   `InvalidateStyleScope(null)` threw an NRE (surfaced to JS as a `ReferenceError`).
+   Any script calling `el.remove()` broke — including the CSSOM zoom tests' `measure()`
+   cleanup, which is why they were red (the pre-existing red `#pass` box never turned
+   green). Fixed by capturing the parent before removal, mirroring `removeChild`
+   (`ElementRemoveTests`). This flipped **4** previously-red tests:
+   `ScrollMetricsIncludeChildZoomOverflow`, `ClientAndScrollMetricsIncludePadding`,
+   `ZoomGeometryApis`, and `ZoomIcUnit`. Zero regressions (scroll family, mutation
+   observers, parity all unchanged/green). Remaining zoom failures
+   (`ZoomScrollAndOffsetApis`, `ZoomScrollPadding`, `ZoomScrollIntoViewAbsolutePosition`,
+   `PinchZoom`) are pre-existing and use `removeChild`/other paths — separate issues.
+
+   **`ZoomScrollAndOffsetApis` root cause (found 2026-07-09) — deep, pre-existing.**
+   Probing its values through the render pipeline shows only the *container-zoom* element
+   is wrong: `withZoom` (`zoom:4`) reports `clientWidth`/`scrollWidth` = 400/1000 instead
+   of 100/250 (exactly ×4); everything else (child-zoom overflow, scroll offsets, offsets)
+   is correct. Cause: `ApplyZoomSerializationStyles` (in `GetRenderDocument`)
+   **permanently mutates the live document** — it bakes zoom into the element's size
+   (`width:100`→`width:400`) and removes the `zoom` property (DomBridge.Serialization.cs
+   §ApplyZoomSerializationStyles). It runs once per pass when the shared snapshot is
+   built (triggered by any earlier *unzoomed* geometry query). Afterward the unzoomed
+   CSSOM metrics (`clientWidth`/`offsetWidth`) can't recover the original size — the zoom
+   info is gone. `getBoundingClientRect` passes precisely because it *wants* the zoomed
+   value (baked-size × zoom(now 1) = correct). This is an architectural conflict: one
+   document serves both rendering (needs baked zoom) and CSSOM (needs original zoom).
+   A proper fix separates the render document from the live/CSSOM document (don't mutate
+   the live DOM in `GetRenderDocument`), or preserves the used-zoom so unzoomed metrics
+   can divide it back out — both larger, higher-risk changes, deferred.
+
+   **Render-doc/live-doc separation — IMPLEMENTED for the zoom transform (2026-07-09).**
+   `GetRenderDocument` and `SerializeToHtml` share one guarded `ApplySerializationTransforms`
+   (`_serializationTransformsApplied`, runs once) that mutates the live document:
+   `RemoveRenderCommentNodes` (tree), `ApplyZoomSerializationStyles` (per-element style,
+   destructive), `ApplyZoomPseudoSerializationOverrides` (injects a `<style>` into `<head>`),
+   `ApplyProgressLikeSerializationPlaceholders` (injects child placeholders). This one path
+   serves three consumers with conflicting needs: JS-facing `outerHTML`/render (want baked)
+   and the geometry snapshot (wants baked for layout, then the live doc pristine for
+   subsequent CSSOM).
+
+   The full guard reset can't be reused per pass because the pseudo/progress transforms are
+   *non-idempotent* (re-running duplicates the injected nodes). The implemented fix isolates
+   the one *destructive, revertible* transform — zoom baking:
+   - `ApplyZoomSerializationStyles` is **extracted from the guarded set** and called by
+     `GetRenderDocument`/`SerializeToHtml` directly (before the guarded pseudo/progress,
+     preserving their zoom-baked-size dependency; idempotent once the `zoom` property is
+     stripped).
+   - When a `_zoomSerializationRevertLog` is installed, it records each mutated element's
+     pre-bake `Style`+`Attributes`; `RevertZoomSerialization` restores them (and clears the
+     computed-props cache).
+   - `BuildSharedGeometrySnapshot` installs the log, builds the (baked) snapshot for correct
+     rendered geometry, then reverts — leaving the live/CSSOM document pristine. The render
+     and `SerializeToHtml` paths install no log, so their baking stays permanent (unchanged).
+
+   Result: `ZoomScrollAndOffsetApis`, `ZoomScrollPadding`, and `ZoomScrollIntoViewAbsolutePosition`
+   flip green (full Zoom suite 7→1 fail across the session; only the unrelated
+   `PinchZoom` visual-viewport case remains). **Zero regressions** — scroll family (5 fixed,
+   none broken), Acid (13/328 == HEAD), serialization/outerHTML (== HEAD), mutation
+   observers (10/10), parity (345/72), all shared-geometry Cli tests. Regression test:
+   `SharedGeometryZoomSizeTests.Zoomed_Client_Stays_Unzoomed_After_A_Snapshot_Build`.
+
+   The remaining transforms (comment removal, pseudo/progress injection) still mutate the
+   live doc once via the guard — a smaller, separate residual; the same revert-log pattern
+   (or a full clone-with-identity-mapping keyed by `CssBox.SourceElement`) would extend the
+   separation to them if a JS-facing need arises.
+
+   Unblocks once the provider/renderer path also covers zoomed + root scroll, sticky,
+   and `scrollIntoView` geometry (the deferred "later increments" in §5). Then the
+   estimator helpers used only by the offset/client/bounding-rect entry points can
+   be removed and the fallback set to zeros (detached/`display:none` semantics).
+
+   **Deletion sequence (found 2026-07-09) — the remaining increments are ORDERED, and
+   intermediate migrations have no deletion payoff.** Every geometry entry point keeps
+   the estimator as a *fallback* for: `isRoot`/viewport, zoomed subtrees (the zoom
+   gate), position-area resolution, and boxless elements. The estimator body cannot be
+   deleted until *all* those fallbacks are covered without it. Concretely:
+   1. **Zoom-correct shared snapshot** (in progress, separate session). Until zoomed
+      elements are answered from shared, the zoom gate routes them to the estimator, so
+      the estimator can't go.
+   2. **A pre-layout geometry source for the resolvers.** Sticky/position-area run
+      *inside* `ResolveAnchorPositions` and mutate the DOM. They *can* read shared
+      geometry without recursion (`GetRenderDocument` does NOT run the resolvers — the
+      anchor resolver already does this via `TryGetAnchorLayoutBox`), **but a piecemeal
+      migration is unsafe**: `ComputeOffsetWithinAncestor` subtracts intermediate
+      **scroll offsets** (`GetElementScrollOffset`) and sticky runs *before* scroll
+      simulation, whereas the shared snapshot carries no JS-set scroll state — so a
+      shared-geometry sticky offset would diverge from the estimator exactly in the
+      scroll cases sticky exists to handle. Migrate these only at the final cutover with
+      a scroll-aware pre-layout geometry source, not as an intermediate step.
+   3. **Flip the fallback to zeros** (detached/`display:none` semantics) and delete the
+      estimator body — the actual deletion, possible only after 1 and 2.
+      **STAGED (2026-07-09).** The fallback→zeros is implemented behind the default-OFF
+      `DomBridge.UseSharedGeometryExclusively` flag: when on, every geometry entry point
+      (client/offset W/H, `getBoundingClientRect`, `scrollWidth/Height`, `offsetTop/Left`)
+      returns zero for an unzoomed element with no shared box instead of consulting the
+      estimator (`ShouldReturnExclusiveSharedZero`). Default off ⇒ zero behavior change
+      (verified: scroll family identical to HEAD); flipping it on is verified to read
+      real geometry for boxed elements and zero for `display:none`
+      (`SharedGeometryExclusiveCutoverTests`). It can be turned on — and the estimator
+      bodies deleted — once steps 1 and 2 land.
+
+   Net: no migration between here and step 3 deletes an estimator or flips a test; the
+   fallback mechanism is now staged (default off). The next *payoff-bearing* prerequisite
+   is the zoom-correct shared snapshot (step 1).
 7. **Move `LayoutRuntimeState`** (`ElementRuntimeState.cs:102`, four
    `RuntimeValue<double>` slots) out last — most of it becomes obsolete once geometry
    comes from the shared snapshot.
+   **BLOCKED (2026-07-09) — still load-bearing.** `LayoutRuntimeState` is not yet
+   obsolete: the anchor resolver stores resolved position-area geometry in it
+   (`AnchorResolver/PositionArea.cs` writes `.Layout.{Left,Top,Width,Height}`,
+   `PositionAreaQueries.cs` reads them). Retiring it requires routing position-area
+   anchor resolution through shared geometry first.
 
 ## 5a. Blocker found (2026-06-29) — the typed render path drops author `<style>` CSS
 

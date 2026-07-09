@@ -323,12 +323,49 @@ other two are gated on prerequisites that are not yet met (documented below).
 
 - **BLOCKED — finish RF-BRIDGE-1b geometry unification** (delete the ~2700-LOC
   `LayoutMetrics` estimators, increment 6, and retire `LayoutRuntimeState`,
-  increment 7). The `UseSharedLayoutGeometry` flag is now **on** (increment 5
-  landed), but the estimators remain the necessary fallback: the parity gate still
-  carries `KnownRendererGapRegressions = 3` because the **renderer has no
-  `position-try` (and anchor/grid) layout**, so those elements lay out 0×0 on the
-  shared path. Deleting the estimators today regresses geometry. Unblocks only when
-  the renderer implements that layout and the parity shortfall drops to 0.
+  increment 7). The `UseSharedLayoutGeometry` flag is **on** (increment 5 landed).
+
+  **Correction (2026-07-09): the previously-documented blocker was stale.** The
+  renderer *does* now size `@position-try` elements correctly on the shared path —
+  `position-try-002` width+height and `position-try-grid-001` height all match. The
+  parity gate now reads **shared 345 / estimator 72 of 484** (the shared path beats
+  the estimators by 273 assertions), so `KnownRendererGapRegressions` has been
+  lowered from 3 to **0**. Position-try *fallback offsets* are still wrong on the
+  shared path, but they are wrong on the estimator path too, so they are not a
+  shared-vs-estimator regression and do not gate the deletion.
+
+  **The actual blocker for increments 6–7 is a shared-provider capability gap, not
+  position-try sizing.** `SharedLayoutGeometryProvider` only supplies static box
+  geometry (border/padding/content boxes for laid-out elements). The estimators —
+  and `LayoutRuntimeState` — remain load-bearing for four things the provider does
+  **not** supply, so deleting them today regresses real, tested behavior:
+  1. **Scroll overflow extents** (`scrollWidth/Height`) — *partially migrated
+     (2026-07-09)*: `GetScrollWidth/HeightForDomElement` now answer **non-root,
+     unzoomed** elements from the shared snapshot (`TryGetSharedScrollExtent`),
+     regression-free. Zoomed subtrees and the root/viewport still use the estimator.
+     **Zoom (2026-07-09):** all shared geometry branches gate on
+     `IsUnzoomedForSharedGeometry`; zoomed elements use the estimator (path-independent).
+     A snapshot-side divide-by-zoom was tried and reverted (double-counts in the render
+     pipeline, which bakes zoom into serialized sizes). Correct zoom values locked in by
+     `SharedGeometryZoomSizeTests`. Separately fixed an `Element.remove()` NRE (read
+     computed `Parent` after detach) that was the real blocker for 4 zoom pixel tests —
+     flipped `ScrollMetricsIncludeChildZoomOverflow`, `ClientAndScrollMetricsIncludePadding`,
+     `ZoomGeometryApis`, `ZoomIcUnit` green. Then implemented the **render-doc/live-doc
+     separation for zoom** (extract zoom baking from the guarded transforms + revert after
+     the geometry snapshot so the live/CSSOM doc stays pristine) — flipped
+     `ZoomScrollAndOffsetApis`, `ZoomScrollPadding`, `ZoomScrollIntoViewAbsolutePosition`
+     green (Zoom suite 7→1; only unrelated `PinchZoom` remains). Zero regressions. See
+     rf-bridge-1b §5 incr 6.
+  2. **Sticky positioning** (`AnchorResolver/StickyPositioning.cs`) — uses
+     `ComputeOffsetWithinAncestor` and the border/content-box estimators.
+  3. **`scrollIntoView`** alignment geometry.
+  4. **Position-area / anchor resolved geometry** — the anchor resolver
+     (`PositionArea.cs`, `PositionAreaQueries.cs`) stores results in
+     `LayoutRuntimeState`.
+
+  Increments 6–7 unblock only once the provider/renderer covers scroll-overflow,
+  sticky, `scrollIntoView`, and position-area geometry (the deferred "later
+  increments" in rf-bridge-1b §5). Until then the estimators stay.
 
 Goal: remove compatibility adapters once consumers are on canonical APIs.
 

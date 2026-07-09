@@ -17,6 +17,7 @@ namespace Broiler.Cli.Tests;
 /// now is to establish the harness and the estimator baseline. Once ③ lands, the gate
 /// fails if the shared path answers fewer assertions correctly than the estimator did.
 /// </summary>
+[Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryParityTests
 {
     private readonly Xunit.Abstractions.ITestOutputHelper _output;
@@ -152,16 +153,16 @@ public sealed class SharedLayoutGeometryParityTests
             $"(±{TolerancePx}px)");
         Assert.Equal(estimator.Total, shared.Total); // same assertions evaluated both ways
 
-        // Known renderer gap: elements using @position-try lay out to 0×0 because the
-        // layout engine does not yet implement position-try fallback, so the shared
-        // path answers 3 fewer check-layout assertions than the estimator on this
-        // corpus (position-try-002 width+height, position-try-grid-001 height). The
-        // estimator "wins" there only by reading the declared width/height it never
-        // laid out. This budget keeps the gate active — it still fails on ANY further
-        // regression — and drops to 0 once the renderer lays out position-try (at which
-        // point the flag can flip). These cases are already in the WPT pixel-failing
-        // baseline, so the renderer does not render them correctly either.
-        const int KnownRendererGapRegressions = 3;
+        // The renderer now sizes @position-try elements correctly on the shared path
+        // (position-try-002 width+height and position-try-grid-001 height all match the
+        // estimator), so the historical 3-assertion budget is retired. Empirically the
+        // shared path now answers far MORE check-layout assertions than the estimator
+        // (≈345 vs ≈72 of 484 on this corpus), so the gate holds at a zero budget: the
+        // shared renderer-layout path must never answer fewer assertions than the coarse
+        // estimator. The remaining shared-path gaps are position-try fallback OFFSETS
+        // (anchor() inset resolution), which the estimator also gets wrong, so they are
+        // not a shared-vs-estimator regression.
+        const int KnownRendererGapRegressions = 0;
 
         // THE GATE: the shared renderer-layout path must answer at least as many
         // assertions correctly as the estimator, minus the documented renderer gap.
