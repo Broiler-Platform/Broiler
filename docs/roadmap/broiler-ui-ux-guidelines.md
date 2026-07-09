@@ -41,12 +41,12 @@ scale, keyboard-only and with a screen reader.
 Grounded in the current tree (not aspirational):
 
 1. **Theming is a 4-color record.** `StandardThemeTokens`
-   (`Broiler.UI/Broiler.UI.Standard/StandardThemeTokens.cs`) exposes only
+   (`Broiler.UI/src/Foundation/Broiler.UI.Standard/Theme/StandardThemeTokens.cs`) exposes only
    `Background`, `Foreground`, `Accent`, `FocusRing` with one `Default`. There is
    no typography scale, spacing scale, radius, elevation, semantic color roles,
    dark theme, or high-contrast theme. **This is the single largest UX gap.**
 2. **System-preference plumbing already exists but is under-consumed.**
-   `UiSystemSettings` (`Broiler.UI/Broiler.UI/UiSystemSettings.cs`) already
+   `UiSystemSettings` (`Broiler.UI/src/Foundation/Broiler.UI/System/UiSystemSettings.cs`) already
    carries `ContrastPreference`, `TextScale`, `ReducedMotion`, and
    `FlowDirection`. The pipes are there; the tokens and controls do not yet
    respond to them systematically.

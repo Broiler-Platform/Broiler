@@ -1,4 +1,4 @@
-<Solution>
+﻿<Solution>
   <Configurations>
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
@@ -237,116 +237,328 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
-  <Folder Name="/Dependencies/UI/">
-    <Project Path="Broiler.UI/Broiler.UI.Button.Standard/Broiler.UI.Button.Standard.csproj">
+  <Folder Name="/Dependencies/UI/src/Foundation/">
+    <Project Path="Broiler.UI/src/Foundation/Broiler.UI.Standard/Broiler.UI.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Button/Broiler.UI.Button.csproj">
+    <Project Path="Broiler.UI/src/Foundation/Broiler.UI/Broiler.UI.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.CheckBox.Standard/Broiler.UI.CheckBox.Standard.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/Shell/">
+    <Project Path="Broiler.UI/src/Abstractions/Shell/Broiler.UI.Dialog/Broiler.UI.Dialog.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Shell/Broiler.UI.FileDialog/Broiler.UI.FileDialog.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ComboBox.Standard/Broiler.UI.ComboBox.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Shell/Broiler.UI.FontDialog/Broiler.UI.FontDialog.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ComboBox/Broiler.UI.ComboBox.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Shell/Broiler.UI.Tooltip/Broiler.UI.Tooltip.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Dialog.Standard/Broiler.UI.Dialog.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Shell/Broiler.UI.Window/Broiler.UI.Window.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Dialog/Broiler.UI.Dialog.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/Layout/">
+    <Project Path="Broiler.UI/src/Abstractions/Layout/Broiler.UI.Panel/Broiler.UI.Panel.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Layout/Broiler.UI.ScrollView/Broiler.UI.ScrollView.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Edit/Broiler.UI.Edit.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Layout/Broiler.UI.TabView/Broiler.UI.TabView.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.FileDialog.Standard/Broiler.UI.FileDialog.Standard.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/Content/">
+    <Project Path="Broiler.UI/src/Abstractions/Content/Broiler.UI.ImageView/Broiler.UI.ImageView.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.FileDialog/Broiler.UI.FileDialog.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Content/Broiler.UI.Label/Broiler.UI.Label.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.FontDialog.Standard/Broiler.UI.FontDialog.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Content/Broiler.UI.ProgressBar/Broiler.UI.ProgressBar.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.FontDialog/Broiler.UI.FontDialog.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/Commands/">
+    <Project Path="Broiler.UI/src/Abstractions/Commands/Broiler.UI.Button/Broiler.UI.Button.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ImageView.Standard/Broiler.UI.ImageView.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Commands/Broiler.UI.Menu/Broiler.UI.Menu.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ImageView/Broiler.UI.ImageView.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Commands/Broiler.UI.ToggleButton/Broiler.UI.ToggleButton.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Label.Standard/Broiler.UI.Label.Standard.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/Commands/Broiler.UI.Toolbar/Broiler.UI.Toolbar.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Label/Broiler.UI.Label.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/ValueAndSelection/">
+    <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj">
+    <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.ComboBox/Broiler.UI.ComboBox.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.ListView/Broiler.UI.ListView.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.RadioButton/Broiler.UI.RadioButton.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.Slider/Broiler.UI.Slider.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Abstractions/Text/">
+    <Project Path="Broiler.UI/src/Abstractions/Text/Broiler.UI.Edit/Broiler.UI.Edit.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Abstractions/Text/Broiler.UI.RichEdit/Broiler.UI.RichEdit.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/Shell/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Dialog.Standard/Broiler.UI.Dialog.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.FileDialog.Standard/Broiler.UI.FileDialog.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.FontDialog.Standard/Broiler.UI.FontDialog.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Tooltip.Standard/Broiler.UI.Tooltip.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Window.Standard/Broiler.UI.Window.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/Layout/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.Panel.Standard/Broiler.UI.Panel.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.ScrollView.Standard/Broiler.UI.ScrollView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.TabView.Standard/Broiler.UI.TabView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/Content/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.ImageView.Standard/Broiler.UI.ImageView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.Label.Standard/Broiler.UI.Label.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.ProgressBar.Standard/Broiler.UI.ProgressBar.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/Commands/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Button.Standard/Broiler.UI.Button.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Menu.Standard/Broiler.UI.Menu.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.ToggleButton.Standard/Broiler.UI.ToggleButton.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Toolbar.Standard/Broiler.UI.Toolbar.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/ValueAndSelection/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.CheckBox.Standard/Broiler.UI.CheckBox.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.ComboBox.Standard/Broiler.UI.ComboBox.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.ListView.Standard/Broiler.UI.ListView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.RadioButton.Standard/Broiler.UI.RadioButton.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.Slider.Standard/Broiler.UI.Slider.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Implementations/Standard/Text/">
+    <Project Path="Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.RichEdit.Standard/Broiler.UI.RichEdit.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/src/Integrations/RichEdit/">
+    <Project Path="Broiler.UI/src/Integrations/RichEdit/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/samples/Win32/">
+    <Project Path="Broiler.UI/samples/Win32/Broiler.UI.Win32.Demo/Broiler.UI.Win32.Demo.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <Build Project="false" Solution="Debug|*" />
+      <Build Project="false" Solution="Release|*" />
+      <Build Project="false" Solution="Debug-Linux|*" />
+      <Build Project="false" Solution="Release-Linux|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/UI/samples/Linux/">
+    <Project Path="Broiler.UI/samples/Linux/Broiler.UI.Linux.Demo/Broiler.UI.Linux.Demo.csproj">
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
       <Build Project="false" Solution="Debug|*" />
@@ -354,97 +566,9 @@
       <Build Project="false" Solution="Debug-Windows|*" />
       <Build Project="false" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ListView.Standard/Broiler.UI.ListView.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ListView/Broiler.UI.ListView.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Menu.Standard/Broiler.UI.Menu.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Menu/Broiler.UI.Menu.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Panel.Standard/Broiler.UI.Panel.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Panel/Broiler.UI.Panel.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ProgressBar.Standard/Broiler.UI.ProgressBar.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ProgressBar/Broiler.UI.ProgressBar.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RadioButton.Standard/Broiler.UI.RadioButton.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RadioButton/Broiler.UI.RadioButton.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Rtf.Tests/Broiler.UI.RichEdit.Rtf.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Standard.Tests/Broiler.UI.RichEdit.Standard.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Standard/Broiler.UI.RichEdit.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Tests/Broiler.UI.RichEdit.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit.Win32.Demo/Broiler.UI.RichEdit.Win32.Demo.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/samples/RichEdit.Win32/">
+    <Project Path="Broiler.UI/samples/RichEdit.Win32/Broiler.UI.RichEdit.Win32.Demo/Broiler.UI.RichEdit.Win32.Demo.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <Build Project="false" Solution="Debug|*" />
@@ -452,129 +576,43 @@
       <Build Project="false" Solution="Debug-Linux|*" />
       <Build Project="false" Solution="Release-Linux|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.RichEdit/Broiler.UI.RichEdit.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/tests/Foundation/">
+    <Project Path="Broiler.UI/tests/Foundation/Broiler.UI.Standard.Tests/Broiler.UI.Standard.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ScrollView.Standard/Broiler.UI.ScrollView.Standard.csproj">
+    <Project Path="Broiler.UI/tests/Foundation/Broiler.UI.Tests/Broiler.UI.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ScrollView/Broiler.UI.ScrollView.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/tests/Commands/">
+    <Project Path="Broiler.UI/tests/Commands/Broiler.UI.Toolbar.Tests/Broiler.UI.Toolbar.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Slider.Standard/Broiler.UI.Slider.Standard.csproj">
+  </Folder>
+  <Folder Name="/Dependencies/UI/tests/Text/">
+    <Project Path="Broiler.UI/tests/Text/Broiler.UI.RichEdit.Rtf.Tests/Broiler.UI.RichEdit.Rtf.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Slider/Broiler.UI.Slider.csproj">
+    <Project Path="Broiler.UI/tests/Text/Broiler.UI.RichEdit.Standard.Tests/Broiler.UI.RichEdit.Standard.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Standard.Tests/Broiler.UI.Standard.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Standard/Broiler.UI.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.TabView.Standard/Broiler.UI.TabView.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.TabView/Broiler.UI.TabView.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Tests/Broiler.UI.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ToggleButton.Standard/Broiler.UI.ToggleButton.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.ToggleButton/Broiler.UI.ToggleButton.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Toolbar.Standard/Broiler.UI.Toolbar.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Toolbar.Tests/Broiler.UI.Toolbar.Tests.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Toolbar/Broiler.UI.Toolbar.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Tooltip.Standard/Broiler.UI.Tooltip.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Tooltip/Broiler.UI.Tooltip.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Win32.Demo/Broiler.UI.Win32.Demo.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <Build Project="false" Solution="Debug|*" />
-      <Build Project="false" Solution="Release|*" />
-      <Build Project="false" Solution="Debug-Linux|*" />
-      <Build Project="false" Solution="Release-Linux|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Window.Standard/Broiler.UI.Window.Standard.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI.Window/Broiler.UI.Window.csproj">
-      <BuildType Project="Debug" Solution="Debug-Linux|*" />
-      <BuildType Project="Release" Solution="Release-Linux|*" />
-      <BuildType Project="Debug" Solution="Debug-Windows|*" />
-      <BuildType Project="Release" Solution="Release-Windows|*" />
-    </Project>
-    <Project Path="Broiler.UI/Broiler.UI/Broiler.UI.csproj">
+    <Project Path="Broiler.UI/tests/Text/Broiler.UI.RichEdit.Tests/Broiler.UI.RichEdit.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />

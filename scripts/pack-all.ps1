@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Pack every shippable Broiler component into a folder of .nupkg/.snupkg files.
@@ -52,7 +52,7 @@ $targets = @(
     'Broiler.UI/Broiler.UI.slnx',
     'Broiler.Media/Broiler.Media.All/Broiler.Media.All.csproj',
     'Broiler.Input/Broiler.Input.All/Broiler.Input.All.csproj',
-    'Broiler.UI/Broiler.UI.All/Broiler.UI.All.csproj'
+    'Broiler.UI/src/Bundles/Broiler.UI.All/Broiler.UI.All.csproj'
 )
 if ($IncludeSubmodules) {
     $targets += @(
