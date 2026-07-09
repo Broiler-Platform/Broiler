@@ -158,6 +158,14 @@ natural fit for the existing per-pass `WithLayoutGeometryCache` lifetime. Benchm
    gate passes trivially today (shared == estimator, since ③ has not routed the live
    path); once ③ lands it fails on any regression.
 5. **Flip** `UseSharedLayoutGeometry` to true once parity holds and budgets pass.
+   **DONE.** `DomBridge.UseSharedLayoutGeometry` now defaults to **true**
+   ([`SharedLayoutGeometry.cs`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SharedLayoutGeometry.cs));
+   the live geometry entry points read the shared renderer layout, with the
+   estimators kept as the per-element fallback. The parity gate holds with a
+   documented `KnownRendererGapRegressions = 3` budget (the renderer's missing
+   `position-try`/anchor/grid layout — those elements fall back to the estimator).
+   Increments 6–7 (delete the estimators, retire `LayoutRuntimeState`) stay blocked
+   until the renderer closes that layout gap and the shortfall reaches 0.
 6. **Delete the estimators.** Remove the ~2700-line estimator body from
    `LayoutMetrics.cs`, keeping only the thin JS-facing wrappers that now call the
    provider. Retire `WithLayoutGeometryCache` (the provider's snapshot cache replaces

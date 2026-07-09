@@ -280,27 +280,6 @@ public static class SvgParser
 
         return root;
     }
-
-    /// <summary>Extracts the viewBox attribute as a <see cref="Rect"/> from the root SVG element.</summary>
-    public static Rect GetViewBox(SvgElement svg)
-    {
-        if (svg == null || !svg.Attributes.TryGetValue("viewBox", out var vb))
-            return default;
-
-        var parts = vb.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 4)
-            return default;
-
-        if (float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) &&
-            float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) &&
-            float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var w) &&
-            float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var h))
-        {
-            return new Rect(x, y, w, h);
-        }
-
-        return default;
-    }
 }
 
 /// <summary>SVG draw command types.</summary>
