@@ -292,6 +292,44 @@ Exit criteria:
 
 ### Phase 5: Public-surface cleanup
 
+Status: **in progress** (2026-07-09). One of the three workstreams is done; the
+other two are gated on prerequisites that are not yet met (documented below).
+
+- **DONE — delete the RF-BRIDGE-1a dead paint pipeline.** The bridge's parallel,
+  runtime-unused box model + paint pipeline is removed:
+  `Broiler.HtmlBridge.Rendering/CssBoxModel.cs`, `CssTextProperties.cs`, and
+  `RenderingStages.cs` (~29 public types: `CssBoxModel`/`LayoutBox`/`BoxDimensions`/
+  `Rect`/the CSS enum family, `CssFontFace`/`CssFontFaceCollection`, and
+  `Painter`/`Compositor`/`RenderOutput`/`PaintCommand*`) are deleted, along with the
+  last live caller — `ImagePipeline.GetViewBox` (dead: the JS `viewBox` property
+  parses the attribute inline and never called it). Verified: a full-codebase sweep
+  of all ~29 type names found no remaining consumers (`Broiler.DevConsole.BoxEdges`
+  is an unrelated same-named type in its own namespace); `Broiler.HtmlBridge.Rendering`
+  and `Broiler.Cli.Tests` build clean; `RenderingPipelineTests` (its comment-only
+  reference is stale but harmless) and the phase-zero guards pass. The two
+  `CssExtractionPhaseZeroTests.Phase7_*` failures are **pre-existing at HEAD**
+  (legacy `Broiler.HTML.CSS`/`CssData` environmental state), baselined as unrelated.
+
+- **BLOCKED — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
+  `Broiler.HtmlBridge.Dom.DomElement`, `HtmlTreeBuilder`, the obsolete `CssRules`
+  tuple view, and the bridge-only `DomBridge.CalculateSpecificity`. Gated on
+  **declaring the v2 boundary** (Open Question #5, unanswered) **and** migrating
+  callers to canonical APIs first. `DomElement` alone is referenced by **63
+  non-submodule files** and is entangled with RF-BRIDGE-1b geometry keying (boxes
+  key by bridge instances — see rf-bridge-1b §5a), so it cannot be ripped out
+  behind a single verifiable change; it is a staged migration, not a deletion.
+  `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
+  no longer need the facade node type.
+
+- **BLOCKED — finish RF-BRIDGE-1b geometry unification** (delete the ~2700-LOC
+  `LayoutMetrics` estimators, increment 6, and retire `LayoutRuntimeState`,
+  increment 7). The `UseSharedLayoutGeometry` flag is now **on** (increment 5
+  landed), but the estimators remain the necessary fallback: the parity gate still
+  carries `KnownRendererGapRegressions = 3` because the **renderer has no
+  `position-try` (and anchor/grid) layout**, so those elements lay out 0×0 on the
+  shared path. Deleting the estimators today regresses geometry. Unblocks only when
+  the renderer implements that layout and the parity shortfall drops to 0.
+
 Goal: remove compatibility adapters once consumers are on canonical APIs.
 
 Tasks:
@@ -301,7 +339,7 @@ Tasks:
   - `HtmlTreeBuilder`
   - obsolete `CssRules` tuple view
   - bridge-only specificity compatibility method if shared CSS parser APIs are the public replacement
-- Delete RF-BRIDGE-1a obsolete rendering pipeline types instead of moving them.
+- Delete RF-BRIDGE-1a obsolete rendering pipeline types instead of moving them. **(done)**
 - Finish RF-BRIDGE-1b layout unification by replacing bridge recursive geometry estimators with `Broiler.Layout` read-model access.
 
 Exit criteria:
