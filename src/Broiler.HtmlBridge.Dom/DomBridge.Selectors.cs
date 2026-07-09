@@ -5,7 +5,7 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static readonly Broiler.CSS.Dom.CssSelectorMatcher SharedSelectorMatcher =
+    private static readonly CSS.Dom.CssSelectorMatcher SharedSelectorMatcher =
         new(new BridgeSelectorStateProvider());
 
     private static bool MatchesSelector(
@@ -14,7 +14,7 @@ public sealed partial class DomBridge
         DomElement? scope = null) =>
         SharedSelectorMatcher.Matches(element, selector, scope);
 
-    private sealed class BridgeSelectorStateProvider : Broiler.CSS.Dom.ICssSelectorStateProvider
+    private sealed class BridgeSelectorStateProvider : CSS.Dom.ICssSelectorStateProvider
     {
         public bool? IsChecked(Broiler.Dom.DomElement element)
         {

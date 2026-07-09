@@ -53,12 +53,11 @@ public sealed partial class DomBridge
 
     private void ReflectRenderState(DomElement element)
     {
-        if (!element.IsTextNode && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+        if (!element.IsTextNode && !element.TagName.StartsWith('#'))
         {
             if (element.Style.Count == 0)
             {
-                if (element.Attributes.ContainsKey("style"))
-                    element.Attributes.Remove("style");
+                element.Attributes.Remove("style");
             }
             else
             {
@@ -93,8 +92,7 @@ public sealed partial class DomBridge
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(DomElement element) =>
-        string.Concat(element.Children.Select(SerializeElementToHtml));
+    private string SerializeChildrenToHtml(DomElement element) => string.Concat(element.Children.Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms()
     {
@@ -146,8 +144,10 @@ public sealed partial class DomBridge
         if (rules.Count == 0)
             return;
 
-        var styleElement = new DomElement("style", null, null, string.Empty);
-        styleElement.TextContent = string.Join(Environment.NewLine, rules);
+        var styleElement = new DomElement("style", null, null, string.Empty)
+        {
+            TextContent = string.Join(Environment.NewLine, rules)
+        };
 
         var head = FindFirstElementByTagName(DocumentElement, "head");
         if (head != null)
@@ -272,8 +272,7 @@ public sealed partial class DomBridge
         element.InnerHtml = string.Empty;
         element.TextContent = null;
 
-        var fill = new DomElement("div", null, null, string.Empty);
-        fill.Parent = element;
+        var fill = new DomElement("div", null, null, string.Empty) { Parent = element };
         fill.Style["position"] = "absolute";
         fill.Style["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
@@ -540,10 +539,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = Regex.Replace(
-            value,
-            @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
-            match => ScaleSvgNumericMatch(match, usedZoom));
+        element.Attributes[attributeName] = ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
     }
 
     private void ScaleSvgPathDataAttribute(DomElement element, string attributeName, double usedZoom)
@@ -551,10 +547,7 @@ public sealed partial class DomBridge
         if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = Regex.Replace(
-            value,
-            @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
-            match => ScaleSvgNumericMatch(match, usedZoom));
+        element.Attributes[attributeName] = ScaleSvgPathRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
     }
 
     private static string ScaleSvgNumericMatch(Match match, double factor)
@@ -655,7 +648,7 @@ public sealed partial class DomBridge
         if (!specified.TryGetValue("font", out var fontShorthand) || string.IsNullOrWhiteSpace(fontShorthand))
             return false;
 
-        var sizeMatch = Regex.Match(fontShorthand, @"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase);
+        var sizeMatch = FontShortHandRegex().Match(fontShorthand);
         if (!sizeMatch.Success ||
             !double.TryParse(sizeMatch.Groups[1].Value,
                 System.Globalization.NumberStyles.Float,
@@ -872,4 +865,13 @@ public sealed partial class DomBridge
 
         return string.Concat(subDocumentRoot.Children.Select(SerializeElementToHtml));
     }
+
+    [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
+    private static partial Regex ScaleSvgPointRegex();
+    
+    [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
+    private static partial Regex ScaleSvgPathRegex();
+
+    [GeneratedRegex(@"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase)]
+    private static partial Regex FontShortHandRegex();
 }

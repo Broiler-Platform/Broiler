@@ -252,28 +252,32 @@ public sealed partial class DomBridge
     }
 
 
+    // classList operations delegate to the canonical Broiler.Dom.DomTokenList
+    // ordered-set algorithm (parse/serialize on ASCII whitespace, unique-ordered,
+    // attribute-synchronized). The bridge keeps only the JavaScript argument
+    // marshaling, the lenient empty-token skip these methods have always applied,
+    // and the style-scope invalidation callback.
     private static JSValue JsUtilitiesContains025Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
-        var cls = a[0].ToString();
-        var classes = new HashSet<string>((element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0), StringComparer.Ordinal);
-        return classes.Contains(cls) ? JSBoolean.True : JSBoolean.False;
+        return new global::Broiler.Dom.DomTokenList(element, "class").Contains(a[0].ToString())
+            ? JSBoolean.True
+            : JSBoolean.False;
     }
 
 
     private static JSValue JsUtilitiesAdd026Core(global::Broiler.HtmlBridge.DomElement element, global::System.Action<global::Broiler.HtmlBridge.DomElement>? onClassChanged, in Arguments a)
     {
-        var classes = (element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0).ToList();
-        var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
+        var tokens = new List<string>();
         for (var i = 0; i < a.Length; i++)
         {
             var cls = a[i].ToString();
-            if (!string.IsNullOrEmpty(cls) && classSet.Add(cls))
-                classes.Add(cls);
+            if (!string.IsNullOrEmpty(cls))
+                tokens.Add(cls);
         }
 
-        element.ClassName = string.Join(" ", classes);
+        new global::Broiler.Dom.DomTokenList(element, "class").Add(tokens.ToArray());
         onClassChanged?.Invoke(element);
         return JSUndefined.Value;
     }
@@ -281,11 +285,15 @@ public sealed partial class DomBridge
 
     private static JSValue JsUtilitiesRemove027Core(global::Broiler.HtmlBridge.DomElement element, global::System.Action<global::Broiler.HtmlBridge.DomElement>? onClassChanged, in Arguments a)
     {
-        var toRemove = new HashSet<string>(StringComparer.Ordinal);
+        var tokens = new List<string>();
         for (var i = 0; i < a.Length; i++)
-            toRemove.Add(a[i].ToString());
-        var classes = (element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0 && !toRemove.Contains(s)).ToList();
-        element.ClassName = string.Join(" ", classes);
+        {
+            var cls = a[i].ToString();
+            if (!string.IsNullOrEmpty(cls))
+                tokens.Add(cls);
+        }
+
+        new global::Broiler.Dom.DomTokenList(element, "class").Remove(tokens.ToArray());
         onClassChanged?.Invoke(element);
         return JSUndefined.Value;
     }
@@ -296,24 +304,21 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSBoolean.False;
         var cls = a[0].ToString();
-        var classes = (element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0).ToList();
-        var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
-        bool shouldAdd = a.Length >= 2 && a[1] is not JSUndefined ? a[1].BooleanValue : !classSet.Contains(cls);
-        if (shouldAdd)
-        {
-            if (classSet.Add(cls))
-                classes.Add(cls);
-            element.ClassName = string.Join(" ", classes);
-            onClassChanged?.Invoke(element);
-            return JSBoolean.True;
-        }
-        else
-        {
-            classes.Remove(cls);
-            element.ClassName = string.Join(" ", classes);
-            onClassChanged?.Invoke(element);
+        bool? force = a.Length >= 2 && a[1] is not JSUndefined ? a[1].BooleanValue : null;
+        var present = new global::Broiler.Dom.DomTokenList(element, "class").Toggle(cls, force);
+        onClassChanged?.Invoke(element);
+        return present ? JSBoolean.True : JSBoolean.False;
+    }
+
+
+    private static JSValue JsUtilitiesReplaceClassToken(global::Broiler.HtmlBridge.DomElement element, global::System.Action<global::Broiler.HtmlBridge.DomElement>? onClassChanged, in Arguments a)
+    {
+        if (a.Length < 2)
             return JSBoolean.False;
-        }
+        var replaced = new global::Broiler.Dom.DomTokenList(element, "class").Replace(a[0].ToString(), a[1].ToString());
+        if (replaced)
+            onClassChanged?.Invoke(element);
+        return replaced ? JSBoolean.True : JSBoolean.False;
     }
 
 
