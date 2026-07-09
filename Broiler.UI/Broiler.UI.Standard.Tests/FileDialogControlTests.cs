@@ -87,6 +87,28 @@ public sealed class FileDialogControlTests
         Assert.Equal(Path.Combine(temp.Path, "new.md"), dialog.SelectedPath);
     }
 
+    [Fact]
+    public void Standard_File_Dialog_Shows_Places_And_Descriptive_Chrome()
+    {
+        var host = new TestHost();
+        using UiSession session = new StandardUiSessionBuilder().Build(host);
+        var dialog = new StandardFileDialog();
+
+        Assert.NotEmpty(dialog.PlacesList.Items);
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(home) && Directory.Exists(home))
+            Assert.Contains(dialog.PlacesList.Items, item => item.Text == "Home");
+
+        session.AddRoot(dialog);
+        BRenderList renderList = session.RenderFrame();
+
+        renderList.Validate();
+        Assert.Contains(renderList.Commands.OfType<BRenderCommand.DrawText>(), command => command.Text.Text == "Places");
+        Assert.Contains(renderList.Commands.OfType<BRenderCommand.DrawText>(), command => command.Text.Text.StartsWith("Choose a document", StringComparison.Ordinal));
+        Assert.Contains(renderList.Commands.OfType<BRenderCommand.DrawText>(), command => command.Text.Text == "File name");
+    }
+
     private sealed class TestHost : IUiHost
     {
         public BSize ViewportSize { get; } = new(640, 360);

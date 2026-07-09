@@ -57,7 +57,7 @@ internal sealed class WriterApp : IDisposable
     private string _lastAction = "Ready";
 
     private const string DefaultDocumentExtension = ".rtf";
-    private static readonly BSize FileDialogPreferredSize = new(560, 292);
+    private static readonly BSize FileDialogPreferredSize = new(740, 430);
     private static readonly BSize FontDialogPreferredSize = new(520, 322);
     private static readonly UiFileDialogFilter[] OpenDocumentFileFilters =
     [
