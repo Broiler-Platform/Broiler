@@ -314,14 +314,38 @@ other two are gated on prerequisites that are not yet met (documented below).
   `Broiler.HtmlBridge.Dom.DomElement`, `HtmlTreeBuilder`, the obsolete `CssRules`
   tuple view, and the bridge-only `DomBridge.CalculateSpecificity`. Gated on
   **declaring the v2 boundary** (Open Question #5, unanswered) **and** migrating
-  callers to canonical APIs first. `DomElement` alone is referenced by **63
-  non-submodule files** and is entangled with RF-BRIDGE-1b geometry keying (boxes
+  callers to canonical APIs first. `DomElement` alone is referenced by **58
+  non-submodule source files** (`grep -rlE '\bDomElement\b' --include=*.cs src/`)
+  and is entangled with RF-BRIDGE-1b geometry keying (boxes
   key by bridge instances — see rf-bridge-1b §5a), so it cannot be ripped out
   behind a single verifiable change; it is a staged migration, not a deletion.
   `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
   no longer need the facade node type.
 
-- **BLOCKED — finish RF-BRIDGE-1b geometry unification** (delete the ~2700-LOC
+  **Sharpened dependency analysis (2026-07-09).** The four adapters split into two
+  independent gates, not one:
+  - *Transitively gated on BLOCKED item 2 (RF-BRIDGE-1b).* `DomElement` instance
+    identity is the dictionary key for every bridge cache — runtime state
+    (`ConditionalWeakTable<DomElement, ElementRuntimeState>`, `DomBridge.cs`), JS
+    object identity (`_jsObjectCache`, `JsObjects.cs`), computed-style engines/caches
+    (`ComputedStyleEngine.cs`, `Css.cs`), the layout-rect/border-box caches
+    (`LayoutMetrics.cs`), and the shared geometry snapshot itself
+    (`SharedLayoutGeometry.cs`). Removing the facade *type* means re-keying all of
+    these off canonical `Broiler.Dom.DomNode` identity — which **is** the geometry
+    unification blocked in item 2. `HtmlTreeBuilder` only exists to *materialize*
+    `DomElement` nodes (`Build`/`BuildFragment` return `DomElement`), so it is gated
+    on the same migration. Neither can land ahead of item 2.
+  - *Gated only on the v2 governance decision (Open Question #5), zero code
+    migration.* `DomBridge.CalculateSpecificity` has **no production callers** (a
+    static delegation shim over `CssSelectorParser.CalculateSpecificity`; the
+    phase-zero guard test records this), and `DomBridge.CssRules` has **no
+    production callers** either — only two test consumers
+    (`CssExtractionPhaseTwoTests`, `SelectorsLevel4SpecificityTests`) plus the
+    obsolete-marker guard test. These two are removal-ready the moment v2 is
+    declared; only the two test callers of `CssRules` need routing to the shared
+    `Broiler.CSS` stylesheet API.
+
+- **BLOCKED — finish RF-BRIDGE-1b geometry unification** (delete the ~2950-LOC
   `LayoutMetrics` estimators, increment 6, and retire `LayoutRuntimeState`,
   increment 7). The `UseSharedLayoutGeometry` flag is **on** (increment 5 landed).
 

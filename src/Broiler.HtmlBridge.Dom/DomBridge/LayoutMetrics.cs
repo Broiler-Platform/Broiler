@@ -79,9 +79,11 @@ public sealed partial class DomBridge
             if (isRoot)
                 return GetViewportReferenceLength(element, vertical: false);
 
-            // RF-BRIDGE-1b: clientWidth is the padding-box width (content + padding).
-            if (UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element) && TryGetSharedLayoutGeometry(element, out var shared))
-                return shared.PaddingBox.Width;
+            // RF-BRIDGE-1b: clientWidth is the padding-box width (content + padding),
+            // reported in the element's own unzoomed CSS pixels (the shared snapshot is
+            // in zoom-baked space, so divide out the element's own used zoom).
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.PaddingBox.Width, element);
             if (ShouldReturnExclusiveSharedZero(element))
                 return 0;
 
@@ -100,9 +102,10 @@ public sealed partial class DomBridge
             if (isRoot)
                 return GetViewportReferenceLength(element, vertical: true);
 
-            // RF-BRIDGE-1b: clientHeight is the padding-box height (content + padding).
-            if (UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element) && TryGetSharedLayoutGeometry(element, out var shared))
-                return shared.PaddingBox.Height;
+            // RF-BRIDGE-1b: clientHeight is the padding-box height (content + padding),
+            // reported in the element's own unzoomed CSS pixels (see GetClientWidth).
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.PaddingBox.Height, element);
             if (ShouldReturnExclusiveSharedZero(element))
                 return 0;
 
@@ -136,8 +139,8 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element) && TryGetSharedLayoutGeometry(element, out var shared))
-                return shared.BorderBox.Width;
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
@@ -162,8 +165,8 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element) && TryGetSharedLayoutGeometry(element, out var shared))
-                return shared.BorderBox.Height;
+            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.BorderBox.Height, element);
 
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
@@ -389,11 +392,7 @@ public sealed partial class DomBridge
     private bool TryGetSharedOffset(DomElement element, DomElement offsetParent, bool vertical, out double offset)
     {
         offset = 0;
-        // Zoom is not reconciled against the shared snapshot's coordinate space (a
-        // zoomed offsetParent/element makes the raw doc-coord delta the wrong scale),
-        // so a zoomed subtree falls back to the estimator's explicit zoom handling.
-        if (!UseSharedLayoutGeometry || !IsUnzoomedForSharedGeometry(element) ||
-            !TryGetSharedLayoutGeometry(element, out var elementGeometry))
+        if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var elementGeometry))
             return false;
 
         double elementEdge = vertical ? elementGeometry.BorderBox.Top : elementGeometry.BorderBox.Left;
@@ -405,7 +404,15 @@ public sealed partial class DomBridge
             parentEdge = vertical ? parentGeometry.PaddingBox.Top : parentGeometry.PaddingBox.Left;
         }
 
-        offset = elementEdge - parentEdge;
+        // The snapshot delta is in zoom-baked document space (the element's own edge and
+        // the offset parent's padding edge are both baked). offsetTop/Left is reported in
+        // the element's own unzoomed CSS pixels — excluding its own zoom — so divide the
+        // delta by the element's cumulative used zoom (a no-op when unzoomed). This is the
+        // zoom-chain-aware reconciliation: both edges are in the same baked space, so a
+        // single division by the element's own zoom recovers the offset-parent-relative
+        // value for the common, middle-ancestor-zoom, and own-zoom cases alike.
+        var zoom = GetUsedZoomForElement(element);
+        offset = zoom > 0.0001 ? (elementEdge - parentEdge) / zoom : (elementEdge - parentEdge);
         return true;
     }
 
@@ -558,18 +565,15 @@ public sealed partial class DomBridge
     /// the element has no shared box (detached / <c>display:none</c>) so the caller
     /// falls back to the estimator.
     ///
-    /// <para>Zoom stays on the estimator (via <see cref="IsUnzoomedForSharedGeometry"/>):
-    /// the render pipeline bakes CSS <c>zoom</c> into the serialized box sizes
-    /// (<c>ApplyZoomSerializationStyles</c>) while the <c>zoom</c> property remains
-    /// readable, so a snapshot-side zoom division would double-count. The estimator
-    /// resolves zoom from CSS directly and is path-independent.</para>
+    /// <para>The snapshot is in zoom-baked space, so the raw extent is divided by the
+    /// element's own used zoom (<see cref="UnzoomSharedExtent"/>) to report the
+    /// element's own unzoomed CSS pixels; a zoomed descendant keeps its larger baked
+    /// extent, which correctly counts as scrollable overflow.</para>
     /// </summary>
     private bool TryGetSharedScrollExtent(DomElement element, bool vertical, out double extent)
     {
         extent = 0;
         if (!TryGetSharedLayoutGeometry(element, out var box))
-            return false;
-        if (!IsUnzoomedForSharedGeometry(element))
             return false;
 
         var paddingBox = box.PaddingBox;
@@ -584,43 +588,75 @@ public sealed partial class DomBridge
 
         foreach (var descendant in EnumerateRenderedDescendants(element))
         {
-            if (!IsUnzoomedForSharedGeometry(descendant))
-                return false; // a zoomed descendant → let the estimator answer the query
             if (!TryGetSharedLayoutGeometry(descendant, out var childBox))
                 continue;
             var childEnd = vertical ? childBox.BorderBox.Bottom : childBox.BorderBox.Right;
             max = Math.Max(max, (childEnd - origin) + endPadding);
         }
 
-        extent = max;
+        // The snapshot is in zoom-baked space; report the extent in the element's own
+        // unzoomed CSS pixels. Only the element's own used zoom is divided out, so a
+        // zoomed descendant's larger baked extent still counts as overflow.
+        extent = UnzoomSharedExtent(max, element);
         return true;
     }
 
     /// <summary>
-    /// RF-BRIDGE-1b: whether <paramref name="element"/> is free of CSS <c>zoom</c>
-    /// (cumulative used zoom == 1). The shared snapshot is in the renderer's zoomed
-    /// document space and the render pipeline additionally bakes <c>zoom</c> into the
-    /// serialized box sizes while leaving the <c>zoom</c> property readable, so the
-    /// bridge cannot reconcile zoom against the snapshot on either the size or the
-    /// position path without double-counting. Zoomed elements therefore route to the
-    /// estimator, which resolves zoom from CSS directly and is path-independent. Every
-    /// shared geometry branch gates on this. See the CSSOM/CSS-viewport zoom tests.
+    /// RF-BRIDGE-1b: converts a shared-snapshot extent (in the renderer's zoom-baked
+    /// document space) into <paramref name="element"/>'s own unzoomed CSS pixels by
+    /// dividing out its cumulative used zoom. A no-op for unzoomed elements
+    /// (used zoom == 1). Reads used zoom from the live document, which the geometry
+    /// snapshot pass restores after building (see the render-doc/live-doc separation),
+    /// so the true zoom is readable here.
     /// </summary>
-    private bool IsUnzoomedForSharedGeometry(DomElement element) =>
-        Math.Abs(GetUsedZoomForElement(element) - 1.0) < 0.0001;
+    private double UnzoomSharedExtent(double extent, DomElement element)
+    {
+        var zoom = GetUsedZoomForElement(element);
+        return zoom > 0.0001 ? extent / zoom : extent;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1b: <paramref name="element"/>'s border-box extent along the axis from
+    /// the shared renderer layout, in the element's own unzoomed CSS pixels. Returns
+    /// <c>false</c> (caller falls back to the estimator) when the shared path is off or the
+    /// element has no box.
+    /// </summary>
+    private bool TrySharedBorderBoxExtent(DomElement element, bool vertical, out double extent)
+    {
+        extent = 0;
+        if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var box))
+            return false;
+        extent = UnzoomSharedExtent(vertical ? box.BorderBox.Height : box.BorderBox.Width, element);
+        return true;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1b: <paramref name="element"/>'s content-box extent along the axis from
+    /// the shared renderer layout (the renderer's <c>ClientRectangle</c> is the content
+    /// box), in the element's own unzoomed CSS pixels. Returns <c>false</c> (caller falls
+    /// back to the estimator) when the shared path is off or the element has no box.
+    /// </summary>
+    private bool TrySharedContentBoxExtent(DomElement element, bool vertical, out double extent)
+    {
+        extent = 0;
+        if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var box))
+            return false;
+        extent = UnzoomSharedExtent(vertical ? box.ContentBox.Height : box.ContentBox.Width, element);
+        return true;
+    }
 
     /// <summary>
     /// RF-BRIDGE-1b increment 6 (staged cutover, default OFF). Under
-    /// <see cref="UseSharedGeometryExclusively"/>, an unzoomed element that produced no
-    /// shared box is treated as detached / <c>display:none</c> (zero geometry) rather
-    /// than consulting the coarse estimators — the entry points call this right after
-    /// their shared-snapshot branch. When the flag is off (the default) this is always
-    /// false, so the estimator fallback runs exactly as before. Zoomed subtrees are not
-    /// short-circuited (they still legitimately need the estimator until the shared
-    /// snapshot is zoom-correct).
+    /// <see cref="UseSharedGeometryExclusively"/>, an element that produced no shared box
+    /// is treated as detached / <c>display:none</c> (zero geometry) rather than consulting
+    /// the coarse estimators — the entry points call this right after their shared-snapshot
+    /// branch. When the flag is off (the default) this is always false, so the estimator
+    /// fallback runs exactly as before. Zoomed elements are handled on the shared path too
+    /// (their geometry is divided back to unzoomed CSS pixels by the element's own used
+    /// zoom), so they are no longer excepted here.
     /// </summary>
     private bool ShouldReturnExclusiveSharedZero(DomElement element) =>
-        UseSharedGeometryExclusively && UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element);
+        UseSharedGeometryExclusively && UseSharedLayoutGeometry;
 
     private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
@@ -628,9 +664,12 @@ public sealed partial class DomBridge
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
             return selectScrollWidth;
 
-        // RF-BRIDGE-1b: answer non-root scroll overflow from the shared renderer layout
-        // when available; the viewport/root scroll area stays on the estimator path.
-        if (!isRoot && UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: false, out var sharedScrollWidth))
+        // RF-BRIDGE-1b: answer scroll overflow from the shared renderer layout when
+        // available, including the root/viewport scrolling area — its scrollable overflow
+        // is the union of the root element's own box and its descendants, which
+        // TryGetSharedScrollExtent already computes from the snapshot. Falls back to the
+        // estimator when the element has no shared box.
+        if (UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: false, out var sharedScrollWidth))
             return sharedScrollWidth;
         if (!isRoot && ShouldReturnExclusiveSharedZero(element))
             return 0;
@@ -663,9 +702,10 @@ public sealed partial class DomBridge
         if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
             return selectScrollHeight;
 
-        // RF-BRIDGE-1b: answer non-root scroll overflow from the shared renderer layout
-        // when available; the viewport/root scroll area stays on the estimator path.
-        if (!isRoot && UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: true, out var sharedScrollHeight))
+        // RF-BRIDGE-1b: answer scroll overflow from the shared renderer layout when
+        // available, including the root/viewport scrolling area (see GetScrollWidth). Falls
+        // back to the estimator when the element has no shared box.
+        if (UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: true, out var sharedScrollHeight))
             return sharedScrollHeight;
         if (!isRoot && ShouldReturnExclusiveSharedZero(element))
             return 0;
@@ -834,17 +874,20 @@ public sealed partial class DomBridge
 
         // RF-BRIDGE-1b: prefer the renderer's real layout (border box, document coords)
         // for the element's rect, which powers getBoundingClientRect and offset top/left.
-        // Falls back to the estimator when the element has no box (detached/display:none)
-        // or when zoom is in play (the shared snapshot is not zoom-reconciled, and
-        // ComputeRenderedRect below re-applies zoom — using the zoomed shared box here
-        // would double-count it).
-        if (UseSharedLayoutGeometry && IsUnzoomedForSharedGeometry(element) && TryGetSharedLayoutGeometry(element, out var sharedGeometry))
+        // The snapshot is in zoom-baked space and ComputeRenderedRect re-applies zoom to
+        // the SIZE, so the size is divided back to the element's own unzoomed CSS pixels
+        // here; the position stays in the rendered document coordinate space, which is
+        // what getBoundingClientRect wants (a no-op for unzoomed elements). Falls back to
+        // the estimator when the element has no box (detached/display:none).
+        if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var sharedGeometry))
         {
+            var zoom = GetUsedZoomForElement(element);
+            var inverseZoom = zoom > 0.0001 ? 1.0 / zoom : 1.0;
             var sharedRect = (
                 (double)sharedGeometry.BorderBox.Left,
                 (double)sharedGeometry.BorderBox.Top,
-                (double)sharedGeometry.BorderBox.Width,
-                (double)sharedGeometry.BorderBox.Height);
+                sharedGeometry.BorderBox.Width * inverseZoom,
+                sharedGeometry.BorderBox.Height * inverseZoom);
             if (_layoutRectCache != null)
                 _layoutRectCache[element] = sharedRect;
             return sharedRect;
@@ -2261,6 +2304,75 @@ public sealed partial class DomBridge
         return offset;
     }
 
+    /// <summary>
+    /// RF-BRIDGE-1b: the scroll-aware shared-geometry equivalent of
+    /// <see cref="ComputeOffsetWithinAncestor"/>. The shared snapshot is a *natural*
+    /// (unscrolled) layout, so the element-border-to-ancestor-padding delta it yields is
+    /// the pre-scroll offset; the JS-set scroll offset of each intermediate scroll
+    /// container strictly between <paramref name="element"/> and <paramref name="ancestor"/>
+    /// is then subtracted, exactly as the estimator does (the ancestor's own scroll is left
+    /// to the caller). Returns <c>false</c> — so the caller falls back to the estimator —
+    /// when the shared path is off, either box is missing, or zoom is in play (a zoomed
+    /// cross-ancestor delta is not reconciled against the baked snapshot).
+    /// </summary>
+    private bool TrySharedOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical, out double offset)
+    {
+        offset = 0;
+        if (!UseSharedLayoutGeometry)
+            return false;
+        // Cross-frame (iframe subdocument) targets are laid out in the subframe's own
+        // coordinate frame, not the main snapshot's, so a main-document offset cannot be
+        // read from the shared boxes — leave those to the estimator's cross-frame walk
+        // (scrollIntoView on a fixed target inside an iframe: the target's main-doc offset
+        // must fold in the iframe's own position, which the main snapshot does not carry).
+        if (!ReferenceEquals(GetOwningDocumentElement(element), GetOwningDocumentElement(ancestor)))
+            return false;
+        // An absolutely/fixed-positioned element whose containing block is an inline box is
+        // placed by the renderer at the inline-flow position, ignoring its own insets, so its
+        // shared box is at the wrong place — the estimator resolves it from the explicit
+        // insets. Mirrors AnchorRegistry.ComputeElementBox's absPosInInlineCB bypass.
+        var elementPosition = GetComputedProps(element).GetValueOrDefault("position");
+        if ((elementPosition == "absolute" || elementPosition == "fixed")
+            && FindContainingBlockElement(element) is { } inlineCbAncestor
+            && IsInlineContainingBlock(inlineCbAncestor))
+            return false;
+        if (Math.Abs(GetUsedZoomForElement(element) - 1.0) >= 0.0001 ||
+            Math.Abs(GetUsedZoomForElement(ancestor) - 1.0) >= 0.0001)
+            return false;
+        if (!TryGetSharedLayoutGeometry(element, out var elementBox) ||
+            !TryGetSharedLayoutGeometry(ancestor, out var ancestorBox))
+            return false;
+
+        double natural = vertical
+            ? elementBox.BorderBox.Top - ancestorBox.PaddingBox.Top
+            : elementBox.BorderBox.Left - ancestorBox.PaddingBox.Left;
+
+        for (var current = element; ;)
+        {
+            var parent = GetScrollTraversalParent(current);
+            if (parent == null || ReferenceEquals(parent, ancestor))
+                break;
+            natural -= GetElementScrollOffset(parent, vertical);
+            current = parent;
+        }
+
+        offset = natural;
+        return true;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1b: offset of <paramref name="element"/> within
+    /// <paramref name="ancestor"/> from the scroll-aware shared snapshot when available
+    /// (<see cref="TrySharedOffsetWithinAncestor"/>), else the coarse estimator
+    /// (<see cref="ComputeOffsetWithinAncestor"/>). The two are behaviour-equivalent on
+    /// laid-out, unzoomed subtrees; the shared path additionally reflects real layout the
+    /// estimator only approximates.
+    /// </summary>
+    private double OffsetWithinAncestorPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
+        TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared)
+            ? shared
+            : ComputeOffsetWithinAncestor(element, ancestor, vertical);
+
     private double ComputeOffsetWithinScrollTraversalParent(DomElement element, DomElement parent, bool vertical)
     {
         var assignedSlot = GetAssignedSlot(element);
@@ -2395,7 +2507,7 @@ public sealed partial class DomBridge
         bool coordinateSpaceIsPhysical = false)
     {
         var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
-        var offset = offsetOverride ?? ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
+        var offset = offsetOverride ?? OffsetWithinAncestorPreferShared(element, scrollContainer, vertical);
         var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
         var (marginStart, marginStartOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
         var (marginEnd, marginEndOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
