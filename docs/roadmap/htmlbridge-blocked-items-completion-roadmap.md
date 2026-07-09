@@ -422,6 +422,10 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
+**Status: 3.1 LANDED (2026-07-09), engine-side, regression-free; 3.2 and 3.3 remain.**
+Once the bridge's `absPosInInlineCB` bypass/gate are also retired (a follow-up), 3.1
+stops blocking `ComputeOffsetWithinAncestor`; 2.4 still waits on 3.2 + 3.3.
+
 ### 3.1 — abspos-in-inline-CB placement
 
 **Symptom.** An absolutely/fixed-positioned element whose containing block is an
@@ -448,37 +452,59 @@ removed from the line, not laid out in it). The render tests only exercise `top:
 (static ≈ inset), which is why the engine bug is currently masked in rendering and
 only surfaces through the bridge's shared-geometry offset.
 
-**Root position path — narrowed by engine instrumentation (2026-07-09).** The
-box-model wiring (`GetAbsoluteContainingBlockPaddingBox` → `GetInlineBoundingBox`;
-`ComputeStaticAndFloatPosition` insets at `CssBox.Layout.cs:~844`; the
-`AdjustAbsolutePosition` word-shift at `CssLayoutEngine.cs:930/1328`) all *exist*.
-But temporary `Console.Error` probes (guarded on the target abspos, then on **every**
-abspos) proved that **for this scenario neither `ComputeStaticAndFloatPosition`'s
-abspos block NOR `FlowBox`'s line-930 abspos handler fires at all** — so the
-mis-placed `box.Location = (49.27, 50)` is set by a **third, not-yet-located path**.
-`CollectLayoutGeometry` reads `box.Location` here (not the line-rectangle union,
-because the sized target's `box.Bounds` is non-empty), so the wrong `Location` is the
-whole bug. Likely candidates for the real path: the **typed render path** the shared
-snapshot uses (`SetDocumentWithStyleSet(GetRenderDocument())` → `GetLayoutGeometry`,
-which differs from the string render path — see rf-bridge-1b §5a), or a separate
-abspos collection/positioning pass. The render tests use `top:0` (static ≈ inset),
-masking the bug; it surfaces only via the shared snapshot. Pinned by the skipped
-`Broiler.Cli.Tests.AbsPosInlineCbGeometryTests` (expects `20,60`, engine yields
-`49.27,50`).
+**Root cause — FOUND, and the earlier "third path" note was itself wrong
+(2026-07-09).** Instrumenting the `Location` setter proved the abspos target's
+`box.Location` is **never set at all** (only static boxes get Location sets); the
+mis-placed `(49.27, 50)` therefore does *not* come from `box.Location`. It comes from
+`CollectLayoutGeometry`'s **line-rectangle-union fallback**: because the target is
+never given a real `PerformLayout`, its used `Size` stays `(0,0)`, so `box.Bounds` is
+empty and the collector falls back to `UnionLineRectangles` — the static line rectangle
+`FlowBox` parked at the end of the "anchor" text. The deeper reason it is never laid
+out: `LayoutBlockChildren`'s **inlines-only branch** (`CssBox.Layout.cs`, the
+`ContainsInlinesOnly → CreateLineBoxes` path) lays out *floated* children after the
+line pass but has **no equivalent for out-of-flow abspos/fixed children**, so an abspos
+whose ancestor chain up to the block is all-inline (the `position:relative <span>`
+case) is flowed by `FlowBox` for its static rectangle only and never sized/positioned.
+Two further gaps compounded it: (a) the engine never **blockifies** an abspos per
+CSS 2.1 §9.7, so an inline-display abspos (`<a>`/`<span>`) skips `PerformLayoutImp`'s
+block path (`IsBlock == false`) that resolves width + inset position; and (b)
+`GetInlineBoundingBox` measured the inline CB's extent including its *own* out-of-flow
+child, whose transient static `Location` dragged the CB origin to `(0,0)`.
 
-**Work.** *First* locate the actual positioning path (instrument `AdjustAbsolutePosition`
-and the typed-path abspos layout; both obvious paths are ruled out), *then* make it set
-`box.Location` to the inline-CB origin + insets while preserving auto-sizing of
-abspos-with-inline-content (issue #1163 anchor labels). Then remove the bridge's
-`absPosInInlineCB` bypass + the accessor gate and un-skip `AbsPosInlineCbGeometryTests`.
-**Deep inline-formatting-context work on the engine's hottest path** — it changes
-rendered abspos placement, so gate on the full WPT pixel + Acid corpus (no *new*
-regressions; Acid is not pixel-perfect today, so the bar is "no net-worse," not
-"perfect"), plus `ScrollIntoView_TargetAfterBlockInInlineSibling` and the
-css-anchor-position `position-area-inline-container` cluster. **Fix not attempted this
-session** — the positioning path proved more buried than the two obvious candidates
-(both instrumented and ruled out), so it needs a dedicated multi-cycle tracing effort;
-the search is now narrowed to the typed render path / abspos pass.
+**Fix — LANDED in `Broiler.Layout` (2026-07-09), entirely engine-side.** Three
+coordinated changes, all CSS-spec-grounded:
+1. **`CreateLineBoxes` → `LayoutOutOfFlowInlineDescendants`** (`CssLayoutEngine.cs`):
+   after an inline formatting context is flowed, walk its in-flow inline subtree and
+   `PerformLayout` each out-of-flow abspos/fixed descendant (mirroring how the block
+   path lays out its out-of-flow children; floats/atomic-inlines/blocks run their own
+   layout and are skipped).
+2. **§9.7 blockification** (`CssBox.Layout.cs`, `PerformLayoutImp`): route out-of-flow
+   boxes through the block layout path regardless of computed display, so an
+   inline-level abspos resolves its shrink-to-fit width (§10.3.7) and inset position.
+3. **Inline static position preserved** (`CssBoxProperties.InlineStaticPosition` +
+   `FlowBox` records it + `ComputeStaticAndFloatPosition` honours it): an *auto*-inset
+   abspos keeps the inline cursor position `FlowBox` gave it, so it does not re-flow its
+   content from the top of its containing block (fixed a 7.6% pixel regression in
+   `position-area-abs-inline-container` where the `#inline-container` text jumped to the
+   origin); an *explicit* inset still overrides. Plus `GetInlineBoundingBox`
+   (`CssBox.ContainingBlock.cs`) now excludes out-of-flow children from the inline CB's
+   extent (§10.1).
+
+`AbsPosInlineCbGeometryTests` **un-skipped and green** (`20,60`). Verified
+regression-free vs a stashed HEAD baseline: `Broiler.Layout.Tests` 39/40 (the 1 is the
+pre-existing project-reference-path architecture test), Cli geometry/anchor/shared +
+`SharedLayoutGeometryParity` families green, and the WPT anchor/position-area/sticky +
+abspos/cssom-view clusters show **zero new failures** (every failure — e.g.
+`PositionAreaScrolling00{2,3}`, `OffsetTopLeft_BorderBoxPaddingEdge`,
+`AbsposInBlockInInlineInRelposInline` — also fails at HEAD). Notably
+`position-area-abs-inline-container` (which passed at HEAD) still passes.
+
+**Follow-up now unblocked (not done here).** With the engine placing abspos-in-inline-CB
+correctly, the bridge's `AnchorRegistry` `absPosInInlineCB` bypass + the
+`TrySharedOffsetWithinAncestor` gate (and, eventually, the `PromoteAbsPosFromInlineCBs`
+DOM-mutation workaround) can be retired — a separate bridge change to validate against
+the full anchor WPT cluster, and still one of the three renderer prerequisites (with
+3.2/3.3) that 2.4's estimator deletion waits on.
 
 ### 3.2 — cross-frame / subframe geometry in the main coordinate space
 
@@ -509,9 +535,10 @@ Smaller than 3.1/3.2 and mostly bridge-side, but depends on the fixed box's shar
 geometry being correct (interacts with 3.1/3.2). **Oracle:** the visual-viewport /
 fixed scrollIntoView cases.
 
-**Gate to close 2.4.** Once 3.1–3.3 land and the bridge's bypasses/gates are removed
-(so no resolver calls `ComputeOffsetWithinAncestor` / the size estimators), flip
-`UseSharedGeometryExclusively` (verified regression-free in 2.4) and delete the
+**Gate to close 2.4.** **3.1 has landed** (engine now places abspos-in-inline-CB
+correctly); 3.2 and 3.3 remain. Once all three land *and* the bridge's bypasses/gates
+are removed (so no resolver calls `ComputeOffsetWithinAncestor` / the size estimators),
+flip `UseSharedGeometryExclusively` (verified regression-free in 2.4) and delete the
 estimator body + `WithLayoutGeometryCache`. Only then does 2.5 (`LayoutRuntimeState`)
 also open up.
 

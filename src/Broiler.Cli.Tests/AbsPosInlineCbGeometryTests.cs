@@ -28,7 +28,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class AbsPosInlineCbGeometryTests
 {
-    [Fact(Skip = "RF-BRIDGE-1b Track 3.1: engine mis-places abspos-in-inline-CB; un-skip when Broiler.Layout is fixed.")]
+    [Fact]
     public void AbsPos_In_Relative_Inline_Uses_Inset_Position_From_Shared_Geometry()
     {
         var html = "<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head><body>" +

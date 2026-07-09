@@ -510,6 +510,17 @@ internal abstract partial class CssBoxProperties
     internal bool AbsposLocationFinalized { get; set; }
 
     /// <summary>
+    /// The static position (CSS2.1 §10.3.7 / §10.6.4) an out-of-flow box would
+    /// occupy in its inline formatting context — the inline cursor where FlowBox
+    /// encountered it. Recorded by the inline layout so that when the box's block
+    /// layout resolves its used position, an axis with <c>auto</c> insets falls
+    /// back to this inline static position instead of the block-flow static
+    /// (top of the containing block), which does not model inline placement.
+    /// Null when the box was not flowed through an inline formatting context.
+    /// </summary>
+    internal PointF? InlineStaticPosition { get; set; }
+
+    /// <summary>
     /// When this box is an absolutely-positioned grid item, the grid container's
     /// track-sizing pass records the item's resolved grid area here in absolute
     /// coordinates (X/Y = area origin, Width/Height = area size). CSS Grid §9

@@ -64,7 +64,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // are laid out, so the trimmed margins collapse to nothing.
         ApplyMarginTrim();
 
-        if (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
+        // CSS2.1 §9.7: an out-of-flow (absolutely/fixed positioned) box has its
+        // computed 'display' blockified — an inline-level abspos element (e.g. a
+        // positioned <a> or <span>) is laid out as a block. Route it through the
+        // block path so it resolves its own used width (shrink-to-fit per §10.3.7)
+        // and its inset position (ComputeStaticAndFloatPosition), rather than the
+        // inline else-branch which would leave its Size/Location uncomputed and let
+        // it report the static line-box rectangle instead of its inset box.
+        bool isOutOfFlow = Position == CssConstants.Absolute || Position == CssConstants.Fixed;
+
+        if (IsBlock || isOutOfFlow || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
         {
             // Because their width and height are set by CssTable
             if (Display != CssConstants.TableCell && Display != CssConstants.Table)
@@ -554,6 +563,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // reading ParentBox.ClientTop.
             double marginCollapse = MarginTopCollapse(flowPrev);
             double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + flowPrevBottom;
+
+            // CSS2.1 §10.3.7 / §10.6.4: an out-of-flow box that was flowed
+            // through an inline formatting context takes its *static* position
+            // from the inline cursor recorded at flow time, not from the block
+            // stacking computed above (which does not model inline placement).
+            // An axis with auto insets keeps this static position; an explicit
+            // inset overrides it below. Without this an abspos with auto insets
+            // inside inline content would re-flow its own content from the top
+            // of its containing block instead of its in-flow line position.
+            if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                && InlineStaticPosition is { } inlineStatic)
+            {
+                left = inlineStatic.X + ActualMarginLeft;
+                top = inlineStatic.Y + ActualMarginTop;
+            }
 
             // --- Float positioning ---
             if (Float != CssConstants.None)

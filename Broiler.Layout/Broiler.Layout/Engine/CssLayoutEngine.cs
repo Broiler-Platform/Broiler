@@ -549,6 +549,62 @@ internal static class CssLayoutEngine
             && blockBox.Overflow is CssConstants.Hidden or CssConstants.Auto or CssConstants.Scroll
             && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
             blockBox.ActualBottom = blockBox.Location.Y + blockBox.ActualHeight;
+
+        // CSS2.1 §9.6.1 / §10.3.7: An out-of-flow (absolutely/fixed positioned)
+        // descendant of this inline formatting context was flowed by FlowBox only
+        // to establish its static line-box rectangle; it never received its own
+        // PerformLayout, so its used size and inset-based position are unresolved.
+        // Now that the context's line rectangles are assigned (so an inline
+        // containing block such as a position:relative <span> has real geometry),
+        // lay those boxes out. Without this an abspos inside an inline CB reports
+        // its static line position instead of its top/left inset box.
+        LayoutOutOfFlowInlineDescendants(g, blockBox);
+    }
+
+    /// <summary>
+    /// Lays out the absolutely/fixed positioned boxes that hang off an inline
+    /// formatting context established by <paramref name="ifcRoot"/>. FlowBox
+    /// descends the inline subtree to establish each out-of-flow box's static
+    /// position but does not run its block layout (size + inset position); this
+    /// walk does, mirroring how the block path lays out its out-of-flow children
+    /// via <see cref="CssBox.PerformLayout"/>. It descends only through in-flow,
+    /// non-atomic inline boxes — the boxes FlowBox itself entered — because
+    /// floats, atomic inlines (inline-block/-flex/-grid/-table), and block-level
+    /// boxes run their own layout, which already resolves their out-of-flow
+    /// descendants.
+    /// </summary>
+    private static void LayoutOutOfFlowInlineDescendants(ILayoutEnvironment g, CssBox ifcRoot)
+    {
+        foreach (var child in ifcRoot.Boxes)
+            LayoutOutOfFlowInlineDescendantsCore(g, child);
+    }
+
+    private static void LayoutOutOfFlowInlineDescendantsCore(ILayoutEnvironment g, CssBox box)
+    {
+        if (box.Display == CssConstants.None)
+            return;
+
+        if (box.Position == CssConstants.Absolute || box.Position == CssConstants.Fixed)
+        {
+            // PerformLayout resolves the box's own size + inset position and
+            // recurses into its subtree, so do not descend past it here.
+            box.PerformLayout(g);
+            return;
+        }
+
+        // Only plain inline (and anonymous inline) boxes are part of this inline
+        // formatting context. Floats and atomic/block boxes establish their own
+        // layout and must not be re-entered here. Anonymous *block* wrappers (from
+        // a block-in-inline split) run their own CreateLineBoxes, so excluding
+        // IsBlock avoids laying their out-of-flow descendants out twice.
+        if (box.Float != CssConstants.None || box.IsBlock)
+            return;
+
+        if (box.Display == CssConstants.Inline || box.Kind == BoxKind.Anonymous)
+        {
+            foreach (var child in box.Boxes)
+                LayoutOutOfFlowInlineDescendantsCore(g, child);
+        }
     }
 
     public static void ApplyCellVerticalAlignment(ILayoutEnvironment g, CssBox cell)
@@ -669,6 +725,14 @@ internal static class CssLayoutEngine
             // height.
             bool isAbsposChild = b.Position == CssConstants.Absolute
                 || b.Position == CssConstants.Fixed;
+
+            // CSS2.1 §10.3.7 / §10.6.4: record the out-of-flow child's static
+            // position — the inline cursor it would occupy in this formatting
+            // context — so its own block layout can honour it for auto-inset
+            // axes (see CssBoxProperties.InlineStaticPosition).
+            if (isAbsposChild)
+                b.InlineStaticPosition = new PointF((float)curx, (float)cury);
+
             double childSaveCurx = curx;
             double childSaveCury = cury;
             double childSaveMaxRight = maxRight;
