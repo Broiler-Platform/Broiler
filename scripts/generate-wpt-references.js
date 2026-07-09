@@ -341,7 +341,7 @@ async function main(args = process.argv.slice(2)) {
     async function launchBrowser() {
         return chromium.launch({
             headless: true,
-            '/usr/bin/chromium',
+            executablePath: '/usr/bin/chromium',
             // Allow file:// pages to load other file:// resources (e.g. SVG images
             // referenced via <img src="support/...">) which Chrome blocks by default.
             args: ['--allow-file-access-from-files'],
