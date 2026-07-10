@@ -646,28 +646,26 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// RF-BRIDGE-1b increment 6 cutover (default ON). Under
+    /// RF-BRIDGE-1b increment 6 (pure exclusive, default ON). Under
     /// <see cref="UseSharedGeometryExclusively"/>, an element that produced no shared box is
-    /// treated as detached / <c>display:none</c> (zero geometry) rather than consulting the
-    /// coarse estimators — the entry points call this right after their shared-snapshot
-    /// branch. When the flag is off this is always false, so the estimator
-    /// fallback runs exactly as before. Zoomed elements are handled on the shared path too
-    /// (their geometry is divided back to unzoomed CSS pixels by the element's own used
-    /// zoom), so they are no longer excepted here.
+    /// reported as zero geometry — the geometry entry points call this right after their
+    /// shared-snapshot branch, so with the coarse estimators deleted the shared snapshot (plus
+    /// this zeros fallback) is the sole geometry source. When the flag is off this is always
+    /// false. Zoomed elements are handled on the shared path (their geometry is divided back to
+    /// unzoomed CSS pixels by the element's own used zoom), so they are not excepted here.
     ///
-    /// <para>Only elements that <em>genuinely generate no box</em> (<c>display:none</c>/
-    /// <c>display:contents</c>, text/comment nodes — see <see cref="HasAssociatedLayoutBox"/>)
-    /// zero out. A box-generating element that is merely <em>absent from the current shared
-    /// snapshot</em> is NOT zeroed: the snapshot can transiently miss a laid-out element (e.g.
-    /// during <c>scrollIntoView</c>, where the queried facade element and the render-document
-    /// element the snapshot is keyed by are different instances — the DomElement dual-tree
-    /// identity gap tracked by htmlbridge Track 1). Zeroing such an element would collapse its
-    /// geometry to 0 (a `scrollHeight` of 0 mis-clamps a programmatic scroll to the top,
-    /// blanking scrolled content — WPT zoom scroll-into-view regressions). Falling back to the
-    /// estimator is the correct shared-unavailable behaviour there, matching the flag-off path.</para>
+    /// <para>Earlier this additionally required <c>!HasAssociatedLayoutBox</c> so a
+    /// box-generating element merely <em>absent from the snapshot</em> fell back to the
+    /// estimator rather than zeroing — a guard for the <c>display:inline-block</c> snapshot gap
+    /// where the §9.2.1.1 block-inside-inline correction dissolved an inline-block's box. That
+    /// layout bug is fixed (see <c>DomParser.CorrectBlockInsideInlineImp</c> / the
+    /// <c>LayoutGeometryCompletenessTests</c> guard), so a box-generating element is no longer
+    /// absent from the snapshot; the guard is dropped and any snapshot-missing element (detached,
+    /// <c>display:none</c>/<c>contents</c>, or an unmaterialised/cross-origin frame the provider
+    /// cannot lay out) reports zero.</para>
     /// </summary>
     private bool ShouldReturnExclusiveSharedZero(DomElement element) =>
-        UseSharedGeometryExclusively && UseSharedLayoutGeometry && !HasAssociatedLayoutBox(element);
+        UseSharedGeometryExclusively && UseSharedLayoutGeometry;
 
     private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
