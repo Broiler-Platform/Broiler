@@ -8994,7 +8994,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 <html>
 <body style="margin:0; width:2000px; height:2000px;">
   <iframe id="fr"
-          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px; border:0;"
           srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>'></iframe>
 </body>
 </html>
@@ -9030,7 +9030,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 <html>
 <body style="margin:0; width:2000px; height:2000px;">
   <iframe id="fr"
-          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px; border:0;"
           srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>'></iframe>
 </body>
 </html>
