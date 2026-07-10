@@ -443,12 +443,29 @@ exclusive flag on; WPT check-layout + pixel + Acid baselines hold or improve;
 **Exit criteria.** Estimator bodies and `WithLayoutGeometryCache` are gone; all
 geometry answers come from the provider (or the zeros fallback).
 
+**DONE (2026-07-10, session 95a4149e) — PR #1354.** The estimator body (~2950-LOC web) is deleted;
+`WithLayoutGeometryCache` is reduced to the shared-snapshot pass lifecycle; the entry points answer
+shared-or-zero; the sticky/scrollIntoView resolver fallbacks use shared-or-zero; the parity harness's
+estimator arm is retired. The enabling fix: `TrySharedOffsetWithinAncestor` dropped its zoom gate and
+became zoom-aware — divide the element-to-ancestor delta by the **ancestor's** cumulative used zoom (not
+the element's own, which mis-scales a self-zoomed target). Validated regression-free across the full WPT
+(135 fails, −1 vs baseline, 0 new by name) + Cli/Acid (0 new by name) corpora.
+
 ### Milestone 2.5 — Retire `LayoutRuntimeState` (increment 7)
 
 **Goal.** Delete `LayoutRuntimeState` (`ElementRuntimeState.cs`, four
 `RuntimeValue<double>` slots reached via `.Layout`).
 
 **Depends on:** 2.3 (position-area resolution no longer stores into it).
+
+**Status (2026-07-10): ATTEMPTED + REVERTED — needs a re-entrancy-safe cache replacement.** `.Layout` is
+a per-element memo of the resolved position-area rect AND a re-entrancy guard: `ResolvePositionAreaForElement`
+is reachable from the geometry entry points, so removing the cache and re-resolving on-the-fly (rebuilding
+the anchor registry per call) recurses / corrupts shared state — it broke ~200 WPT tests (host abort) and
+was reverted. Retiring the type requires a re-entrancy-safe replacement first: a pass-scoped bridge-level
+`Dictionary<DomElement,rect>` (keyed off the `WithLayoutGeometryCache` pass), or sourcing position-area
+geometry from the shared snapshot in the entry points (the resolver already reflects the result into inline
+`left/top/width/height`). A focused follow-up.
 
 **Tasks.** Remove the `.Layout` slots and the `LayoutRuntimeState` type; confirm
 no reader remains (`PositionAreaQueries.cs`, any offset-property path).
