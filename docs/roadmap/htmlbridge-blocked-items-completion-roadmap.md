@@ -422,9 +422,12 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
-**Status: 3.1 COMPLETE (engine fix 2026-07-09 + bridge bypass/gate removal 2026-07-10),
-regression-free; 3.2 and 3.3 remain.** 3.1 no longer blocks
-`ComputeOffsetWithinAncestor`; 2.4's estimator deletion still waits on 3.2 + 3.3.
+**Status: 3.1 COMPLETE (engine fix 2026-07-09 + bridge bypass/gate removal 2026-07-10)
+and 3.3 COMPLETE (split-subtraction migration 2026-07-10), both regression-free; only
+3.2 remains.** The two fixed-target visual-viewport `scrollIntoView` sites and the
+abspos-in-inline-CB paths no longer call `ComputeOffsetWithinAncestor`; 2.4's estimator
+deletion now waits on 3.2 (cross-frame geometry) alone — plus dropping the remaining
+cross-frame gate once 3.2 lands.
 
 ### 3.1 — abspos-in-inline-CB placement
 
@@ -562,32 +565,51 @@ Smaller than 3.1/3.2 and mostly bridge-side, but depends on the fixed box's shar
 geometry being correct (interacts with 3.1/3.2). **Oracle:** the visual-viewport /
 fixed scrollIntoView cases.
 
-**Attempted + reverted (2026-07-10) — a blanket "viewport-anchored" flag is too coarse.**
-Added a `viewportAnchored` mode to `TrySharedOffsetWithinAncestor` that skips the whole
-intermediate-scroll-subtraction loop, and pointed the two `ScrollFixedElementIntoVisualViewport`
-`offsetOverride` sites at it. Both direct oracles (`VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset`,
-`VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop`) stayed green — but a hit
-probe showed that was **luck, not correctness**: for the `Adjusts_PageTop` case the shared
-value (1268) and estimator (744) disagree by exactly the intermediate scroll, and both
-clamp to the same max visual-viewport extra offset, so the test can't tell them apart.
-The disagreement is because that fixture's target is an `<input>` *inside* a
-`position:fixed; overflow:auto` box — i.e. the fixed element is **itself a scroll
-container**, and the target genuinely scrolls within it. So the subtraction must be split:
-skip it for scroll containers **above** the fixed element (between the fixed box and the
-document — those don't move a viewport-anchored box), but **keep** it for scroll containers
-**at or below** the fixed element in the subtree (the fixed box's own `overflow` scroll,
-which the target rides). A single flag can't express that; the correct fix walks the chain
-and stops subtracting only once it passes the nearest fixed ancestor's document-anchor —
-which needs that fixed box's shared geometry to be reliable (the 3.2/fixed-geometry
-dependency). Reverted; the two sites stay on the estimator until this split is implemented
-and validated against a fixture whose result is *not* clamp-saturated.
+**DONE — split-subtraction landed (2026-07-10).** The correct rule is a *split*, not a
+blanket skip. A first attempt with a `viewportAnchored` mode that skipped the whole
+intermediate-scroll-subtraction loop looked green but was clamp-luck: for the
+`Adjusts_PageTop` fixture (target is an `<input>` inside a `position:fixed; overflow:auto`
+box — the fixed element is **itself a scroll container** the target rides) it gave 1268 vs
+the estimator's 744, and both saturate the same max visual-viewport offset. So the loop now
+subtracts scroll only for containers **at or below** the target's nearest `position:fixed`
+ancestor F (the fixed box's own overflow + any scroller nested inside it, which the target
+rides) and **stops** once the walk climbs past F (containers above F don't move a
+viewport-anchored box). Implemented in `TrySharedOffsetWithinAncestor(..., viewportAnchored)`
+via `FindNearestFixedAncestorOrSelf` + a DOM ancestor check; the two
+`ScrollFixedElementIntoVisualViewport` `offsetOverride` sites now call
+`OffsetWithinAncestorForFixedPreferShared` instead of `ComputeOffsetWithinAncestor`.
 
-**Gate to close 2.4.** **3.1 is complete** — the engine places abspos-in-inline-CB
-correctly and the bridge's `absPosInInlineCB` bypass + gate are removed; 3.2 and 3.3
-remain. Once those land *and* their bypasses/gates are removed (so no resolver calls
-`ComputeOffsetWithinAncestor` / the size estimators), flip `UseSharedGeometryExclusively`
-(verified regression-free in 2.4) and delete the estimator body + `WithLayoutGeometryCache`.
-Only then does 2.5 (`LayoutRuntimeState`) also open up.
+Validated against a **non-clamp-saturated** fixture
+(`VisualViewport_ScrollIntoView_Target_In_TopFixed_Scroller_Uses_Unclamped_Offset`, added):
+a top-anchored fixed scroller with the target 150px down, scrolled into a 384px visual
+viewport, lands `pageTop` at 650 (= 500 layout + 150) — well under the 884 clamp. Probes
+confirmed the migration is behaviour-identical to the estimator wherever the fixed box's
+geometry is well-defined: for a **top-anchored** fixed element the shared offset equals the
+estimator *exactly* (36 = 36). The default (non-anchored) path — sticky, general
+scrollIntoView, position-area — is byte-for-byte unchanged (the split only engages under
+`viewportAnchored`). Zero new failures across the fixed / visual-viewport / scrollIntoView
+clusters; the residual pre-existing failures (`VisualScrollIntoView_002`,
+`SubframeRootScrollIntoView_Uses_SmoothScrollBehavior`, `ScrollIntoView_Maps_WritingMode…`)
+fail identically at HEAD.
+
+**Known separate bug it exposed (not 3.3).** A `bottom`/`right`-anchored fixed box is
+mis-placed in the shared geometry by its own extent — `getBoundingClientRect()` on a
+`position:fixed; bottom:0; height:60` box reports `top = innerHeight` (should be
+`innerHeight − 60`), i.e. it is anchored by its top edge to the viewport bottom instead of
+its bottom edge. This affects `getBoundingClientRect` and the estimator alike (both differ
+from each other only because they mis-handle it differently), is masked in every current
+test by the visual-viewport clamp, and is orthogonal to the scroll-accounting 3.3 fixes.
+File/fix it at the fixed-box layout layer separately; after the 3.3 migration scrollIntoView
+at least reads the *same* (shared) geometry as `getBoundingClientRect`, so the two are now
+mutually consistent.
+
+**Gate to close 2.4.** **3.1 and 3.3 are complete** — the engine places abspos-in-inline-CB
+correctly (bypass + gate removed) and the two fixed-target visual-viewport scrollIntoView
+sites read the shared snapshot; only **3.2** (cross-frame geometry) remains. Once it lands
+*and* the cross-frame gate is dropped (so no resolver calls `ComputeOffsetWithinAncestor` /
+the size estimators), flip `UseSharedGeometryExclusively` (verified regression-free in 2.4)
+and delete the estimator body + `WithLayoutGeometryCache`. Only then does 2.5
+(`LayoutRuntimeState`) also open up.
 
 ---
 

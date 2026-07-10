@@ -1810,7 +1810,7 @@ public sealed partial class DomBridge
             viewportSizeOverride: GetVisualViewportHeight(),
             currentScrollOverride: GetVisualViewportPageOffset(vertical: true),
             offsetOverride: GetElementScrollOffset(scrollContainer, vertical: true) +
-                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true),
+                OffsetWithinAncestorForFixedPreferShared(element, scrollContainer, vertical: true),
             coordinateSpaceIsPhysical: true);
         var targetLeft = ResolveScrollIntoViewOffset(
             element,
@@ -1820,7 +1820,7 @@ public sealed partial class DomBridge
             viewportSizeOverride: GetVisualViewportWidth(),
             currentScrollOverride: GetVisualViewportPageOffset(vertical: false),
             offsetOverride: GetElementScrollOffset(scrollContainer, vertical: false) +
-                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false),
+                OffsetWithinAncestorForFixedPreferShared(element, scrollContainer, vertical: false),
             coordinateSpaceIsPhysical: true);
         SetVisualViewportPageOffsets(left: targetLeft, top: targetTop);
     }
@@ -2315,7 +2315,8 @@ public sealed partial class DomBridge
     /// when the shared path is off, either box is missing, or zoom is in play (a zoomed
     /// cross-ancestor delta is not reconciled against the baked snapshot).
     /// </summary>
-    private bool TrySharedOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical, out double offset)
+    private bool TrySharedOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical, out double offset,
+        bool viewportAnchored = false)
     {
         offset = 0;
         if (!UseSharedLayoutGeometry)
@@ -2342,10 +2343,21 @@ public sealed partial class DomBridge
             ? elementBox.BorderBox.Top - ancestorBox.PaddingBox.Top
             : elementBox.BorderBox.Left - ancestorBox.PaddingBox.Left;
 
+        // (RF-BRIDGE-1b Track 3.3) For a viewport-anchored target — one being scrolled
+        // into the *visual* viewport whose containing chain includes a position:fixed
+        // ancestor F — only the scroll containers at or below F move the target: the
+        // target rides F's own overflow scroll (and any scroller nested inside F), but
+        // F itself is pinned to the viewport, so scroll containers *above* F do not
+        // shift it. Stop subtracting once the walk climbs past F. (A normal, non-anchored
+        // target subtracts every intermediate scroll container up to the ancestor.)
+        var fixedAnchor = viewportAnchored ? FindNearestFixedAncestorOrSelf(element) : null;
+
         for (var current = element; ;)
         {
             var parent = GetScrollTraversalParent(current);
             if (parent == null || ReferenceEquals(parent, ancestor))
+                break;
+            if (fixedAnchor != null && !IsDomDescendantOrSelf(parent, fixedAnchor))
                 break;
             natural -= GetElementScrollOffset(parent, vertical);
             current = parent;
@@ -2354,6 +2366,45 @@ public sealed partial class DomBridge
         offset = natural;
         return true;
     }
+
+    /// <summary>
+    /// Walks the DOM ancestry from <paramref name="element"/> (inclusive) and returns the
+    /// nearest <c>position:fixed</c> box, or null if none. Used to bound the scroll
+    /// subtraction for a viewport-anchored scrollIntoView target
+    /// (<see cref="TrySharedOffsetWithinAncestor"/>).
+    /// </summary>
+    private DomElement? FindNearestFixedAncestorOrSelf(DomElement element)
+    {
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (IsFixedPositionElement(current))
+                return current;
+        }
+        return null;
+    }
+
+    private static bool IsDomDescendantOrSelf(DomElement node, DomElement potentialAncestor)
+    {
+        for (var current = node; current != null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, potentialAncestor))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1b Track 3.3: offset of a viewport-anchored (fixed-subtree) target
+    /// within <paramref name="ancestor"/> from the shared snapshot, subtracting only the
+    /// scroll of containers at or below the target's nearest fixed ancestor
+    /// (<see cref="TrySharedOffsetWithinAncestor"/> with <c>viewportAnchored</c>), else
+    /// the estimator. Used by the visual-viewport fixed-element scrollIntoView sites so
+    /// they no longer call the estimator directly.
+    /// </summary>
+    private double OffsetWithinAncestorForFixedPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
+        TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared, viewportAnchored: true)
+            ? shared
+            : ComputeOffsetWithinAncestor(element, ancestor, vertical);
 
     /// <summary>
     /// RF-BRIDGE-1b: offset of <paramref name="element"/> within

@@ -2167,6 +2167,62 @@ document.getElementById('result').textContent =
         Assert.Contains("1000|1000|1384|1000|true|2|384", result);
     }
 
+    // RF-BRIDGE-1b Track 3.3: a fixed element that is itself a scroll container, with the
+    // target part-way down its overflow, scrolled into a scale-2 visual viewport. Unlike the
+    // bottom:0 sibling above (which clamp-saturates the visual page offset and so can't tell a
+    // correct offset from a wrong one), this top:0 case needs a *modest* extra offset: the
+    // target sits 150px into the fixed scroller, the visual viewport is 384px tall (max extra
+    // = 768 - 384 = 384), so pageTop lands at 500 (layout scroll) + 150 = 650 — well under the
+    // 884 clamp. This pins the shared-geometry offset (ScrollFixedElementIntoVisualViewport →
+    // OffsetWithinAncestorForFixedPreferShared) to the correct, non-saturated value, so a
+    // regression in the fixed-subtree scroll accounting is caught here rather than hidden by
+    // the clamp.
+    [Fact]
+    public void VisualViewport_ScrollIntoView_Target_In_TopFixed_Scroller_Uses_Unclamped_Offset()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.height = '4000px';
+            visualViewport.scale = 2;
+            window.scrollTo(0, 500);
+
+            var fixed = document.createElement('div');
+            fixed.style.position = 'fixed';
+            fixed.style.top = '0';
+            fixed.style.left = '0';
+            fixed.style.width = '100px';
+            fixed.style.height = '300px';
+            fixed.style.overflow = 'auto';
+
+            var spacer = document.createElement('div');
+            spacer.style.height = '150px';
+
+            var target = document.createElement('input');
+            target.style.display = 'block';
+            target.style.height = '20px';
+
+            fixed.appendChild(spacer);
+            fixed.appendChild(target);
+            document.body.appendChild(fixed);
+
+            var fired = false;
+            visualViewport.addEventListener('scroll', function() { fired = true; });
+            target.scrollIntoView({ behavior: 'instant' });
+
+            document.getElementById('result').textContent = [
+                window.scrollY,
+                visualViewport.pageTop,
+                fired,
+                visualViewport.scale,
+                visualViewport.height
+            ].join('|');
+        ");
+
+        // Non-saturated: pageTop = layout scroll (500) + target's 150px offset within the
+        // fixed scroller = 650 (clamp ceiling is 884).
+        Assert.Contains("500|650|true|2|384", result);
+    }
+
     [Fact]
     public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
     {
