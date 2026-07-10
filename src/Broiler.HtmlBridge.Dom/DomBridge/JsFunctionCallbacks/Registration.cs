@@ -871,7 +871,7 @@ public sealed partial class DomBridge
                 {
                     var dtEl = kvp.Key;
                     dtEl.Parent = docRoot;
-                    dtEl.OwnerDocRoot = docRoot;
+                    GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
                     docRoot.Children.Add(dtEl);
                     break;
                 }
@@ -885,7 +885,7 @@ public sealed partial class DomBridge
             if (!string.IsNullOrEmpty(ns))
                 docEl.NamespaceURI = ns;
             docEl.Parent = docRoot;
-            docEl.OwnerDocRoot = docRoot;
+            GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
             docRoot.Children.Add(docEl);
             _knownNodes.Add(docEl);
         }
@@ -908,18 +908,18 @@ public sealed partial class DomBridge
         GetElementRuntimeState(doctype).DocumentType.SystemId.Set(string.Empty);
         GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
         doctype.Parent = docRoot;
-        doctype.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         docRoot.Children.Add(doctype);
         _knownNodes.Add(doctype);
         var htmlEl = new DomElement(_document, "html", null, null, string.Empty);
         htmlEl.NamespaceURI = "http://www.w3.org/1999/xhtml";
         htmlEl.Parent = docRoot;
-        htmlEl.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
         docRoot.Children.Add(htmlEl);
         _knownNodes.Add(htmlEl);
         var headEl = new DomElement(_document, "head", null, null, string.Empty);
         headEl.Parent = htmlEl;
-        headEl.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(headEl).OwnerDocRoot = docRoot;
         htmlEl.Children.Add(headEl);
         _knownNodes.Add(headEl);
         // Add <title> element if title argument is provided
@@ -927,20 +927,20 @@ public sealed partial class DomBridge
         {
             var titleEl = new DomElement(_document, "title", null, null, string.Empty);
             titleEl.Parent = headEl;
-            titleEl.OwnerDocRoot = docRoot;
+            GetElementRuntimeState(titleEl).OwnerDocRoot = docRoot;
             headEl.Children.Add(titleEl);
             _knownNodes.Add(titleEl);
             var titleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             titleText.TextContent = title;
             titleText.Parent = titleEl;
-            titleText.OwnerDocRoot = docRoot;
+            GetElementRuntimeState(titleText).OwnerDocRoot = docRoot;
             titleEl.Children.Add(titleText);
             _knownNodes.Add(titleText);
         }
 
         var bodyEl = new DomElement(_document, "body", null, null, string.Empty);
         bodyEl.Parent = htmlEl;
-        bodyEl.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(bodyEl).OwnerDocRoot = docRoot;
         htmlEl.Children.Add(bodyEl);
         _knownNodes.Add(bodyEl);
         return BuildSubDocument(docRoot);

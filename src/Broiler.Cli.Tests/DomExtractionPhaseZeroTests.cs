@@ -11,9 +11,11 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DomExtractionPhaseZeroTests
 {
+    // RF-BRIDGE-1c Phase A relocated JsSetStyleProps and OwnerDocRoot off the facade
+    // into ElementRuntimeState (bridge runtime state the node model must not own), so
+    // they no longer appear on the DomElement surface below.
     private static readonly string[] LegacyMutableCollectionProperties =
     [
-        "JsSetStyleProps",
         "NsAttrMap",
         "Style",
     ];
@@ -24,7 +26,6 @@ public sealed class DomExtractionPhaseZeroTests
         "Id",
         "InnerHtml",
         "NamespaceURI",
-        "OwnerDocRoot",
         "Parent",
         "TextContent",
     ];

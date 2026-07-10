@@ -532,7 +532,7 @@ public sealed partial class DomBridge
 
     private static bool DocumentHasViewport(DomElement documentElement)
     {
-        var docRoot = documentElement.OwnerDocRoot;
+        var docRoot = GetElementRuntimeState(documentElement).OwnerDocRoot;
         if (docRoot == null)
             return true;
 

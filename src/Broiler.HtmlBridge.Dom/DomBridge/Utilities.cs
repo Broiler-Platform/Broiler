@@ -379,7 +379,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void AdoptSubtreeIntoDocument(DomElement node, DomElement? ownerDocRoot)
     {
-        node.OwnerDocRoot = ownerDocRoot;
+        GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
         foreach (var child in node.Children)
         {
@@ -700,12 +700,12 @@ public sealed partial class DomBridge
                 if (string.IsNullOrEmpty(val))
                 {
                     _element.Style.Remove(kebab);
-                    _element.JsSetStyleProps.Remove(kebab);
+                    GetElementRuntimeState(_element).JsSetStyleProps.Remove(kebab);
                 }
                 else
                 {
                     _element.Style[kebab] = val;
-                    _element.JsSetStyleProps.Add(kebab);
+                    GetElementRuntimeState(_element).JsSetStyleProps.Add(kebab);
                 }
 
                 // Invalidate cached position-area resolution when relevant
@@ -808,7 +808,7 @@ public sealed partial class DomBridge
                 declared[kv.Key] = kv.Value;
         }
 
-        foreach (var property in element.JsSetStyleProps)
+        foreach (var property in GetElementRuntimeState(element).JsSetStyleProps)
         {
             if (element.Style.TryGetValue(property, out var value))
                 declared[property] = value;

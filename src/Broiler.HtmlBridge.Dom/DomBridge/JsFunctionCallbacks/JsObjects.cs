@@ -134,11 +134,11 @@ public sealed partial class DomBridge
         {
             // Setting element.style = "prop: val; ..." parses as cssText
             element.Style.Clear();
-            element.JsSetStyleProps.Clear();
+            GetElementRuntimeState(element).JsSetStyleProps.Clear();
             foreach (var kv in ParseStyle(s.ToString(), reportDrops: true))
             {
                 element.Style[kv.Key] = kv.Value;
-                element.JsSetStyleProps.Add(kv.Key);
+                GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
 
             bridge.InvalidateStyleScope(element);
@@ -495,7 +495,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetOwnerDocument057Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         // For elements in sub-documents, return the sub-document JSObject
-        if (element.OwnerDocRoot != null && _docRootToDocJSObject.TryGetValue(element.OwnerDocRoot, out var subDoc))
+        if (GetElementRuntimeState(element).OwnerDocRoot != null && _docRootToDocJSObject.TryGetValue(GetElementRuntimeState(element).OwnerDocRoot, out var subDoc))
             return subDoc;
         // For main document elements, return the main document JSObject
         return _documentJSObject ?? JSNull.Value;
@@ -874,7 +874,7 @@ public sealed partial class DomBridge
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
         var shadowRoot = new DomElement(_document, "#shadow-root", null, null, string.Empty);
         shadowRoot.Parent = element;
-        shadowRoot.OwnerDocRoot = element.OwnerDocRoot;
+        GetElementRuntimeState(shadowRoot).OwnerDocRoot = GetElementRuntimeState(element).OwnerDocRoot;
         GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
         GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
         GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
@@ -994,7 +994,7 @@ public sealed partial class DomBridge
 
         oldEl.Parent = null;
         newEl.Parent = element;
-        AdoptSubtreeIntoDocument(newEl, element.OwnerDocRoot);
+        AdoptSubtreeIntoDocument(newEl, GetElementRuntimeState(element).OwnerDocRoot);
         element.Children[idx] = newEl;
         bridgeForAppend.InvalidateStyleScope(element);
         NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);

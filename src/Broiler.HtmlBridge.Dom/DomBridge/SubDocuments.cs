@@ -378,7 +378,7 @@ public sealed partial class DomBridge
 
     private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
     {
-        var ownerDocRoot = containerElement.OwnerDocRoot;
+        var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
         if (ownerDocRoot?.Parent != null && !ownerDocRoot.Parent.TagName.StartsWith("#", StringComparison.Ordinal))
             return GetOrCreateSubWindow(ownerDocRoot.Parent);
 
@@ -387,7 +387,7 @@ public sealed partial class DomBridge
 
     private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
-        var ownerDocRoot = containerElement.OwnerDocRoot;
+        var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
         if (ownerDocRoot?.Parent != null &&
             !ownerDocRoot.Parent.TagName.StartsWith("#", StringComparison.Ordinal) &&
             _subDocumentBaseUrlCache.TryGetValue(ownerDocRoot.Parent, out var parentBaseUrl) &&
@@ -1085,7 +1085,7 @@ public sealed partial class DomBridge
         }
 
         node.Parent = parent;
-        AdoptSubtreeIntoDocument(node, parent.OwnerDocRoot);
+        AdoptSubtreeIntoDocument(node, GetElementRuntimeState(parent).OwnerDocRoot);
         parent.Children.Insert(index, node);
         InvalidateStyleScope(parent);
         NotifyChildAdded(parent, node, index);
@@ -1174,7 +1174,7 @@ public sealed partial class DomBridge
             foreach (var child in fragmentContainer.Children.ToArray())
             {
                 child.Parent = element;
-                AdoptSubtreeIntoDocument(child, element.OwnerDocRoot);
+                AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
                 element.Children.Add(child);
                 AddElementsRecursive(child);
             }
@@ -1220,7 +1220,7 @@ public sealed partial class DomBridge
             foreach (var child in parsedContainer.Children.ToArray())
             {
                 child.Parent = parent;
-                AdoptSubtreeIntoDocument(child, parent.OwnerDocRoot);
+                AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
                 parent.Children.Insert(insertIndex, child);
                 AddElementsRecursive(child);
                 NotifyChildAdded(parent, child, insertIndex);

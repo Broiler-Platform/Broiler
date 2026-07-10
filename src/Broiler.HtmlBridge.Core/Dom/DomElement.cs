@@ -127,15 +127,11 @@ public sealed class DomElement : CanonicalElement
     /// </summary>
     public override string? NodeValue => IsTextNode ? _textContent : base.NodeValue;
 
-    public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
-
     public string? NamespaceURI
     {
         get => NamespaceUri;
         set => SetName(new CanonicalName(value, TagName));
     }
-
-    public DomElement? OwnerDocRoot { get; set; }
 
     public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = [];
 

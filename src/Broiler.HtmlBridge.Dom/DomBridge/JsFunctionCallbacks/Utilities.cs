@@ -28,13 +28,13 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesSetCssText004Core(global::Broiler.HtmlBridge.DomElement element, global::System.Action? onMutation, in Arguments a)
     {
         element.Style.Clear();
-        element.JsSetStyleProps.Clear();
+        GetElementRuntimeState(element).JsSetStyleProps.Clear();
         if (a.Length > 0)
         {
             foreach (var kv in ParseStyle(a[0].ToString(), reportDrops: true))
             {
                 element.Style[kv.Key] = kv.Value;
-                element.JsSetStyleProps.Add(kv.Key);
+                GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
         }
 
@@ -52,12 +52,12 @@ public sealed partial class DomBridge
             if (string.IsNullOrEmpty(value))
             {
                 element.Style.Remove(prop);
-                element.JsSetStyleProps.Remove(prop);
+                GetElementRuntimeState(element).JsSetStyleProps.Remove(prop);
             }
             else
             {
                 element.Style[prop] = value;
-                element.JsSetStyleProps.Add(prop);
+                GetElementRuntimeState(element).JsSetStyleProps.Add(prop);
             }
 
             onMutation?.Invoke();
@@ -96,7 +96,7 @@ public sealed partial class DomBridge
             var prop = a[0].ToString();
             var removed = element.Style.TryGetValue(prop, out var val) ? val : string.Empty;
             element.Style.Remove(prop);
-            element.JsSetStyleProps.Remove(prop);
+            GetElementRuntimeState(element).JsSetStyleProps.Remove(prop);
             onMutation?.Invoke();
             return new JSString(removed);
         }
