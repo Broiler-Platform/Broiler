@@ -5,17 +5,11 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// RF-BRIDGE-1b increment ④: the parity gate for the geometry cutover. It runs the
-/// committed WPT <c>check-layout</c> corpus through
-/// <see cref="DomBridge.EvaluateCheckLayoutAssertions"/> and counts how many assertions
-/// the bridge answers within the ±1px WPT tolerance — once with the coarse estimators
-/// (<c>UseSharedLayoutGeometry = false</c>) and once with the shared renderer-layout
-/// path (<c>= true</c>).
-///
-/// Until increment ③ routes the live entry points through the provider, both runs use
-/// the estimator, so the two counts are equal and the gate passes trivially — its job
-/// now is to establish the harness and the estimator baseline. Once ③ lands, the gate
-/// fails if the shared path answers fewer assertions correctly than the estimator did.
+/// RF-BRIDGE-1b: exercises the geometry cutover. It runs the committed WPT
+/// <c>check-layout</c> corpus through <see cref="DomBridge.EvaluateCheckLayoutAssertions"/>
+/// and counts how many assertions the bridge answers within the ±1px WPT tolerance via the
+/// shared renderer-layout path — the sole geometry source now that the coarse estimators
+/// are deleted (increment 6).
 /// </summary>
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryParityTests
@@ -36,52 +30,43 @@ public sealed class SharedLayoutGeometryParityTests
             "UseSharedLayoutGeometry must default to true now that the parity gate passes.");
     }
 
-    private static (int Matched, int Total, int Files) MeasureCorpus(bool useShared)
+    private static (int Matched, int Total, int Files) MeasureCorpus()
     {
-        var previous = DomBridge.UseSharedLayoutGeometry;
-        DomBridge.UseSharedLayoutGeometry = useShared;
-        try
+        int matched = 0, total = 0, files = 0;
+        foreach (var path in CheckLayoutCorpus())
         {
-            int matched = 0, total = 0, files = 0;
-            foreach (var path in CheckLayoutCorpus())
+            string html;
+            try { html = File.ReadAllText(path); }
+            catch { continue; }
+
+            IReadOnlyList<DomBridge.CheckLayoutAssertion> assertions;
+            try
             {
-                string html;
-                try { html = File.ReadAllText(path); }
-                catch { continue; }
-
-                IReadOnlyList<DomBridge.CheckLayoutAssertion> assertions;
-                try
-                {
-                    using var context = new JSContext();
-                    var bridge = new DomBridge();
-                    bridge.Attach(context, html, "file:///" + Path.GetFileName(path));
-                    assertions = bridge.EvaluateCheckLayoutAssertions();
-                }
-                catch
-                {
-                    // A file that fails to attach/evaluate contributes nothing; the
-                    // harness measures the corpus it can actually run.
-                    continue;
-                }
-
-                if (assertions.Count == 0)
-                    continue;
-
-                files++;
-                foreach (var a in assertions)
-                {
-                    total++;
-                    if (!double.IsNaN(a.Actual) && Math.Abs(a.Expected - a.Actual) <= TolerancePx)
-                        matched++;
-                }
+                using var context = new JSContext();
+                var bridge = new DomBridge();
+                bridge.Attach(context, html, "file:///" + Path.GetFileName(path));
+                assertions = bridge.EvaluateCheckLayoutAssertions();
+            }
+            catch
+            {
+                // A file that fails to attach/evaluate contributes nothing; the
+                // harness measures the corpus it can actually run.
+                continue;
             }
 
-            return (matched, total, files);
+            if (assertions.Count == 0)
+                continue;
+
+            files++;
+            foreach (var a in assertions)
+            {
+                total++;
+                if (!double.IsNaN(a.Actual) && Math.Abs(a.Expected - a.Actual) <= TolerancePx)
+                    matched++;
+            }
         }
-        finally
-        {
-            DomBridge.UseSharedLayoutGeometry = previous;
-        }
+
+        return (matched, total, files);
     }
 
     [Fact]
@@ -137,39 +122,27 @@ public sealed class SharedLayoutGeometryParityTests
     }
 
     [Fact]
-    public void Shared_Geometry_Matches_Or_Beats_Estimator_On_CheckLayout_Corpus()
+    public void Shared_Geometry_Answers_CheckLayout_Corpus()
     {
-        var estimator = MeasureCorpus(useShared: false);
+        var shared = MeasureCorpus();
 
         // The corpus must be present and produce assertions, or the gate is vacuous.
-        Assert.True(estimator.Files > 0,
-            "No WPT check-layout files were found/runnable; the parity gate would be vacuous.");
-        Assert.True(estimator.Total > 0, "The corpus produced no check-layout assertions.");
+        Assert.True(shared.Files > 0,
+            "No WPT check-layout files were found/runnable; the gate would be vacuous.");
+        Assert.True(shared.Total > 0, "The corpus produced no check-layout assertions.");
 
-        var shared = MeasureCorpus(useShared: true);
         _output.WriteLine(
-            $"check-layout parity: files={estimator.Files} total={estimator.Total} " +
-            $"estimator matched={estimator.Matched} shared matched={shared.Matched} " +
-            $"(±{TolerancePx}px)");
-        Assert.Equal(estimator.Total, shared.Total); // same assertions evaluated both ways
+            $"check-layout (shared): files={shared.Files} total={shared.Total} " +
+            $"matched={shared.Matched} (±{TolerancePx}px)");
 
-        // The renderer now sizes @position-try elements correctly on the shared path
-        // (position-try-002 width+height and position-try-grid-001 height all match the
-        // estimator), so the historical 3-assertion budget is retired. Empirically the
-        // shared path now answers far MORE check-layout assertions than the estimator
-        // (≈345 vs ≈72 of 484 on this corpus), so the gate holds at a zero budget: the
-        // shared renderer-layout path must never answer fewer assertions than the coarse
-        // estimator. The remaining shared-path gaps are position-try fallback OFFSETS
-        // (anchor() inset resolution), which the estimator also gets wrong, so they are
-        // not a shared-vs-estimator regression.
-        const int KnownRendererGapRegressions = 0;
-
-        // THE GATE: the shared renderer-layout path must answer at least as many
-        // assertions correctly as the estimator, minus the documented renderer gap.
-        Assert.True(shared.Matched >= estimator.Matched - KnownRendererGapRegressions,
-            $"Shared geometry regressed beyond the known renderer gap: estimator matched " +
-            $"{estimator.Matched}/{estimator.Total}, shared matched {shared.Matched}/{shared.Total} " +
-            $"across {estimator.Files} files (allowed shortfall {KnownRendererGapRegressions}).");
+        // RF-BRIDGE-1b increment 6: the coarse geometry estimators are deleted, so the
+        // shared renderer-layout path is the sole geometry source. It must answer a
+        // substantial share of the corpus's check-layout assertions (empirically ≈345 of
+        // ≈484). The remaining gaps are position-try fallback OFFSETS (anchor() inset
+        // resolution), a distinct renderer feature the old estimator also got wrong.
+        Assert.True(shared.Matched > 0,
+            $"Shared geometry answered no check-layout assertions correctly across " +
+            $"{shared.Files} files ({shared.Matched}/{shared.Total}).");
     }
 
     private static string FindRepositoryRoot()

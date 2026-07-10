@@ -33,7 +33,6 @@ public sealed partial class DomBridge
     // timer/raf maps.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<(DomElement Element, bool Vertical), byte> _contentExtentInProgress = new();
 
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
