@@ -67,6 +67,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed || box.ParentBox == null)
                 return box;
 
+            // RF-BRIDGE-1b Track 3.2: a nested browsing context's sub-viewport
+            // (#subdoc-root) is the initial containing block for its subtree, so an
+            // absolutely-positioned descendant with no positioned ancestor resolves
+            // against it rather than climbing out into the top-level document.
+            if (box.IsNestedViewportRoot)
+                return box;
+
             // If the block-inside-inline correction split a positioned inline
             // and hoisted this branch out, SplitPositionedAncestor links back
             // to the original positioned inline ancestor.
@@ -81,6 +88,41 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     private bool IsInitialContainingBlock(CssBox cb) => cb.ParentBox == null && LayoutEnvironment != null;
+
+    /// <summary>
+    /// RF-BRIDGE-1b Track 3.2: the viewport a <c>position:fixed</c> descendant of this
+    /// box resolves against — its used size (for inset percentages and viewport-basis
+    /// sizing) and its origin (for placement). When the box is inside a nested browsing
+    /// context (an <c>&lt;iframe&gt;</c> whose <c>#subdoc-root</c> is marked
+    /// <see cref="IsNestedViewportRoot"/>), this is that frame's content box (the
+    /// sub-viewport); otherwise it is the top-level viewport at the origin
+    /// (<c>0,0</c> + <see cref="ILayoutEnvironment.ViewportSize"/>) — byte-identical to
+    /// the previous behaviour for every box in the top-level document. The sub-viewport
+    /// origin is the root's <em>pre-translate</em> content origin; the later
+    /// <see cref="LayoutSubdocument"/> translate composes the whole subtree (fixed box
+    /// included) onto the frame's content origin, so the fixed box lands at
+    /// <c>frameContentOrigin + inset</c>.
+    /// </summary>
+    private RectangleF FixedPositioningViewport()
+    {
+        for (var box = ParentBox; box != null; box = box.ParentBox)
+        {
+            if (!box.IsNestedViewportRoot)
+                continue;
+
+            // Origin tracks the live Location (composed onto the frame content origin by
+            // the LayoutSubdocument translate); size comes from the pinned
+            // NestedViewportSize because the box's used Size is transiently 0 while its
+            // own subtree lays out.
+            double left = box.Location.X + box.ActualBorderLeftWidth + box.ActualPaddingLeft;
+            double top = box.Location.Y + box.ActualBorderTopWidth + box.ActualPaddingTop;
+            return new RectangleF((float)left, (float)top,
+                box.NestedViewportSize.Width, box.NestedViewportSize.Height);
+        }
+
+        var vp = LayoutEnvironment?.ViewportSize ?? SizeF.Empty;
+        return new RectangleF(0, 0, vp.Width, vp.Height);
+    }
 
     private void GetAbsoluteContainingBlockPaddingBox(CssBox cb,
         out double cbPadLeft,
@@ -121,6 +163,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             cbPadTop = 0;
             cbPadWidth = LayoutEnvironment.ViewportSize.Width;
             cbPadHeight = LayoutEnvironment.ViewportSize.Height;
+            return;
+        }
+
+        // RF-BRIDGE-1b Track 3.2: a nested browsing context's sub-viewport acts as the
+        // initial containing block for its subtree — an abspos descendant with no
+        // positioned ancestor resolves against the frame content box. Use the box's own
+        // (pre-translate) content box: its used Size is the sub-viewport, and its
+        // Location is composed onto the frame's content origin by the later
+        // LayoutSubdocument translate, exactly as the abspos static position is.
+        if (cb.IsNestedViewportRoot)
+        {
+            cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth + cb.ActualPaddingLeft;
+            cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth + cb.ActualPaddingTop;
+            cbPadWidth = cb.NestedViewportSize.Width;
+            cbPadHeight = cb.NestedViewportSize.Height;
             return;
         }
 
@@ -303,7 +360,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private double PercentageHeightContainingBlockHeight()
     {
         if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-            return LayoutEnvironment.ViewportSize.Height;
+            return FixedPositioningViewport().Height;
 
         if (Position == CssConstants.Absolute)
         {

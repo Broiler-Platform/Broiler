@@ -136,7 +136,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         if (Position == CssConstants.Fixed && LayoutEnvironment != null)
         {
-            width = LayoutEnvironment.ViewportSize.Width;
+            width = FixedPositioningViewport().Width;
         }
         else if (Position == CssConstants.Absolute)
         {
@@ -193,7 +193,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             double cbContentWidth = width;
 
             if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                cbContentWidth = LayoutEnvironment.ViewportSize.Width;
+                cbContentWidth = FixedPositioningViewport().Width;
 
             double cssLeft = CssLengthParser.ParseLength(Left, cbContentWidth, GetEmHeight());
             double cssRight = CssLengthParser.ParseLength(Right, cbContentWidth, GetEmHeight());
@@ -932,34 +932,54 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (hasLeft || hasRight || hasTop || hasBottom)
                 {
-                    var vpSize = LayoutEnvironment.ViewportSize;
+                    // RF-BRIDGE-1b Track 3.2: a fixed box anchors to its viewport — the
+                    // top-level viewport at the origin normally, or the enclosing nested
+                    // browsing context's sub-viewport when inside an <iframe>. The
+                    // sub-viewport rect carries both the origin (composed onto the frame
+                    // content box by the later LayoutSubdocument translate) and the size.
+                    var vp = FixedPositioningViewport();
                     float newX = Location.X, newY = Location.Y;
 
                     if (hasLeft)
                     {
-                        double cssLeft = CssLengthParser.ParseLength(Left, vpSize.Width, GetEmHeight());
-                        newX = (float)(cssLeft + ActualMarginLeft);
+                        double cssLeft = CssLengthParser.ParseLength(Left, vp.Width, GetEmHeight());
+                        newX = (float)(vp.X + cssLeft + ActualMarginLeft);
                     }
                     else if (hasRight)
                     {
-                        double cssRight = CssLengthParser.ParseLength(Right, vpSize.Width, GetEmHeight());
-                        newX = (float)(vpSize.Width - cssRight - ActualMarginRight - Size.Width);
+                        double cssRight = CssLengthParser.ParseLength(Right, vp.Width, GetEmHeight());
+                        newX = (float)(vp.X + vp.Width - cssRight - ActualMarginRight - Size.Width);
                     }
 
                     if (hasTop)
                     {
-                        double cssTop = CssLengthParser.ParseLength(Top, vpSize.Height, GetEmHeight());
-                        newY = (float)(cssTop + ActualMarginTop);
+                        double cssTop = CssLengthParser.ParseLength(Top, vp.Height, GetEmHeight());
+                        newY = (float)(vp.Y + cssTop + ActualMarginTop);
                     }
                     else if (hasBottom)
                     {
-                        double cssBottom = CssLengthParser.ParseLength(Bottom, vpSize.Height, GetEmHeight());
+                        double cssBottom = CssLengthParser.ParseLength(Bottom, vp.Height, GetEmHeight());
                         double boxHeight = ActualBottom - Location.Y;
 
                         if (boxHeight <= 0)
                             boxHeight = Size.Height;
 
-                        newY = (float)(vpSize.Height - cssBottom - ActualMarginBottom - boxHeight);
+                        // CSS2.1 §10.6.4: a bottom-anchored fixed box is positioned by its
+                        // bottom margin edge, so its used height must be subtracted. When
+                        // the box is placed before its block size resolves (both the used
+                        // height and Size.Height are still 0), derive the border-box height
+                        // from an explicit, non-percentage CSS height — otherwise the box is
+                        // anchored by its top edge to the viewport bottom (off by its own
+                        // height). Mirrors the abspos IMCB definite-height fallback.
+                        if (boxHeight <= 0
+                            && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                            && !Height.Contains('%'))
+                        {
+                            double cssHeight = CssLengthParser.ParseLength(Height, 0, GetEmHeight());
+                            boxHeight = ResolveSpecifiedHeightToBorderBox(cssHeight);
+                        }
+
+                        newY = (float)(vp.Y + vp.Height - cssBottom - ActualMarginBottom - boxHeight);
                     }
 
                     Location = new PointF(newX, newY);
@@ -1272,7 +1292,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             double cbHeight;
 
             if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                cbHeight = LayoutEnvironment.ViewportSize.Height;
+                cbHeight = FixedPositioningViewport().Height;
             else
             {
                 var cb = FindPositionedContainingBlock();
@@ -1361,7 +1381,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §9.6.1: For fixed-position elements, percentage
             // heights resolve against the viewport, not the parent.
             double cbHeight = (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                ? LayoutEnvironment.ViewportSize.Height
+                ? FixedPositioningViewport().Height
                 : ContainingBlock.Size.Height;
 
             if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))

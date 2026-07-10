@@ -16,6 +16,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     internal bool _tableFixed;
 
     /// <summary>
+    /// RF-BRIDGE-1b Track 3.2: for a nested-viewport-root box
+    /// (<see cref="IsNestedViewportRoot"/>), the frame content-box size (the
+    /// sub-viewport dimensions). Stored explicitly because the box's used
+    /// <see cref="Size"/> is transiently 0 while its own subtree lays out
+    /// (block heights resolve bottom-up, after out-of-flow descendants are placed),
+    /// so a fixed descendant reading <c>Size.Height</c> for its viewport basis would
+    /// see 0. The origin still tracks the live <see cref="Location"/> so the
+    /// LayoutSubdocument translate composes it onto the frame content origin.
+    /// </summary>
+    internal SizeF NestedViewportSize;
+
+    /// <summary>
     /// The canonical <see cref="Dom.DomElement"/> this box was built from,
     /// when the box tree was generated from a <see cref="Dom.DomDocument"/>
     /// (the <c>SetDocument</c> path). <c>null</c> on the legacy HTML-string parse path.
@@ -33,6 +45,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// can still find it.
     /// </summary>
     internal CssBox SplitPositionedAncestor { get; set; }
+
+    /// <summary>
+    /// RF-BRIDGE-1b Track 3.2: marks a materialised nested-browsing-context root
+    /// (the <c>#subdoc-root</c> box of an <c>&lt;iframe&gt;</c>/<c>&lt;object&gt;</c>
+    /// sub-document, positioned and sized to its frame's content box by
+    /// <see cref="LayoutSubdocument"/>). Such a box acts as the <em>sub-viewport</em>
+    /// (initial containing block) for its subtree: a <c>position:fixed</c> descendant
+    /// anchors to it, and an absolutely-positioned descendant with no positioned
+    /// ancestor resolves against it, rather than against the top-level viewport.
+    /// Only ever set on boxes that exist in the shared-geometry render document (never
+    /// in the paint document), so it cannot affect the top-level document layout or
+    /// painting.
+    /// </summary>
+    internal bool IsNestedViewportRoot { get; set; }
 
     /// <summary>
     /// When the block-inside-inline correction splits a positioned inline
@@ -391,8 +417,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             return;
 
         // The #subdoc-root box acts as the sub-viewport: a block filling the frame's
-        // content box, against which the sub-document's root element resolves.
+        // content box, against which the sub-document's root element resolves. Marking
+        // it a nested viewport root makes a position:fixed descendant anchor to this
+        // frame content box (and an abspos descendant with no positioned ancestor
+        // resolve against it) rather than the top-level viewport — RF-BRIDGE-1b Track 3.2.
         subdocRoot.Display = CssConstants.Block;
+        subdocRoot.IsNestedViewportRoot = true;
+        subdocRoot.NestedViewportSize = new SizeF((float)contentWidth, (float)contentHeight);
+        // Pin the sub-viewport to the frame content box with explicit used sizes, so the
+        // block-layout pass below does not shrink-wrap the height (which a fixed/abspos
+        // descendant reads back as the sub-viewport for bottom/right/percentage
+        // resolution).
+        subdocRoot.Width = contentWidth.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        subdocRoot.Height = contentHeight.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
         subdocRoot.Size = new SizeF((float)contentWidth, (float)contentHeight);
         subdocRoot.Location = new PointF((float)contentLeft, (float)contentTop);
         subdocRoot.ActualBottom = contentTop;
