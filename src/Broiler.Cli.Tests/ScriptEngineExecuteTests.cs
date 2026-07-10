@@ -210,6 +210,42 @@ function run() {
         Assert.Equal("old|true|new", result.ToString());
     }
 
+    // RF-BRIDGE-1b Track 3.2: a normal/absolutely-positioned element inside an iframe
+    // subdocument reports getBoundingClientRect in the *main* coordinate frame — the
+    // iframe's content-box origin plus the element's offset within the subframe. The
+    // shared-geometry snapshot lays out each materialised #subdoc-root subtree at its
+    // frame's content box (CssBox.LayoutNestedBrowsingContexts); before this the subframe
+    // boxes were left unpositioned (0,0,0,0). (position:fixed inside a subframe still
+    // resolves against the main viewport — a separate sub-viewport follow-up — so it is
+    // not exercised here.)
+    [Fact]
+    public void DomBridge_SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"></iframe>
+</body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                iframe.style.cssText = 'position:absolute; left:100px; top:300px; width:400px; height:300px; border:0';
+                iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="target" style="position:absolute; left:30px; top:40px; width:50px; height:50px;"></div></body></html>';
+                var r = iframe.contentDocument.getElementById('target').getBoundingClientRect();
+                return r.left + ',' + r.top + ',' + r.width + ',' + r.height;
+            })()
+            """);
+
+        // Iframe content origin (100,300) + target inset (30,40) = (130,340), size 50x50.
+        Assert.Equal("130,340,50,50", result.ToString());
+    }
+
     [Fact]
     public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets()
     {

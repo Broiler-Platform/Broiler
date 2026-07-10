@@ -181,6 +181,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // laid-out positions and sizes.
             foreach (var child in box.Boxes)
             {
+                // CSS2.1 §10.1: the inline containing block's extent is the box
+                // around the inline's own (in-flow) line boxes. An out-of-flow
+                // (absolutely/fixed positioned) descendant is not part of that
+                // extent — and while it is being positioned its transient static
+                // Location would otherwise pollute the bounds it is measured
+                // against (e.g. drag the CB top to 0), corrupting its own inset.
+                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                    continue;
+
                 if (child.Size.Width <= 0 && child.Size.Height <= 0)
                     continue;
 

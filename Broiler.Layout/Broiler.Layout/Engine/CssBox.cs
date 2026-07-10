@@ -332,11 +332,110 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 ApplyVerticalWritingModeFlow();
             }
+
+            // RF-BRIDGE-1b Track 3.2: after the main document is laid out, lay out any
+            // materialised nested browsing contexts (an <iframe>/<object>/<frame> whose
+            // sub-document DOM is present as a #subdoc-root subtree, as it is on the
+            // shared-geometry render document). Each subtree is placed at its frame's
+            // content-box origin and sized to the content box, so a subframe element
+            // reports real geometry composed into the main coordinate frame. This runs
+            // only at the document root and only touches #subdoc-root subtrees, which are
+            // absent from the paint document (that serialises the sub-document into the
+            // frame's srcdoc and rasterises it separately), so it cannot affect painting.
+            if (ParentBox == null)
+                LayoutNestedBrowsingContexts(this, g);
         }
         catch (Exception ex)
         {
             LayoutEnvironment.ReportLayoutError("Exception in box layout", ex);
         }
+    }
+
+    private static void LayoutNestedBrowsingContexts(CssBox box, ILayoutEnvironment g)
+    {
+        foreach (var child in box.Boxes)
+        {
+            if (child.SourceElement is { } source
+                && string.Equals(source.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+            {
+                LayoutSubdocument(box, child, g);
+            }
+
+            // Descend either way so nested frames (a subframe that itself embeds a frame)
+            // are laid out relative to their now-positioned parent subdocument.
+            LayoutNestedBrowsingContexts(child, g);
+        }
+    }
+
+    /// <summary>
+    /// Lays out a materialised sub-document subtree (<paramref name="subdocRoot"/>, a
+    /// <c>#subdoc-root</c> box) inside its containing frame (<paramref name="frame"/>):
+    /// positions it at the frame's content-box origin, sizes it to the content box (the
+    /// sub-viewport), and runs the normal block layout so its descendants report geometry
+    /// in the main coordinate frame. The static (unscrolled) sub-document position is
+    /// used — the bridge applies each frame's own scroll offset separately, exactly as it
+    /// does for the main document.
+    /// </summary>
+    private static void LayoutSubdocument(CssBox frame, CssBox subdocRoot, ILayoutEnvironment g)
+    {
+        double contentLeft = frame.Location.X + frame.ActualBorderLeftWidth + frame.ActualPaddingLeft;
+        double contentTop = frame.Location.Y + frame.ActualBorderTopWidth + frame.ActualPaddingTop;
+        double contentWidth = frame.Size.Width
+            - frame.ActualBorderLeftWidth - frame.ActualBorderRightWidth
+            - frame.ActualPaddingLeft - frame.ActualPaddingRight;
+        double contentHeight = frame.Size.Height
+            - frame.ActualBorderTopWidth - frame.ActualBorderBottomWidth
+            - frame.ActualPaddingTop - frame.ActualPaddingBottom;
+
+        if (contentWidth <= 0 || contentHeight <= 0)
+            return;
+
+        // The #subdoc-root box acts as the sub-viewport: a block filling the frame's
+        // content box, against which the sub-document's root element resolves.
+        subdocRoot.Display = CssConstants.Block;
+        subdocRoot.Size = new SizeF((float)contentWidth, (float)contentHeight);
+        subdocRoot.Location = new PointF((float)contentLeft, (float)contentTop);
+        subdocRoot.ActualBottom = contentTop;
+
+        subdocRoot.PerformLayoutImp(g);
+
+        // PerformLayoutImp resolves the subtree relative to the containing block's flow,
+        // which need not coincide with the frame content-box origin set above. Translate
+        // the whole subtree so its origin lands exactly at the content box.
+        double dx = contentLeft - subdocRoot.Location.X;
+        double dy = contentTop - subdocRoot.Location.Y;
+        if (dx != 0 || dy != 0)
+            TranslateSubtree(subdocRoot, dx, dy);
+    }
+
+    private static void TranslateSubtree(CssBox box, double dx, double dy)
+    {
+        box.Location = new PointF((float)(box.Location.X + dx), (float)(box.Location.Y + dy));
+        box.ActualBottom += dy;
+
+        foreach (var line in box.LineBoxes)
+        {
+            var keys = new List<CssBox>(line.Rectangles.Keys);
+            foreach (var key in keys)
+            {
+                var r = line.Rectangles[key];
+                line.Rectangles[key] = new RectangleF((float)(r.X + dx), (float)(r.Y + dy), r.Width, r.Height);
+            }
+            foreach (var word in line.Words)
+            {
+                word.Left += dx;
+                word.Top += dy;
+            }
+        }
+
+        foreach (var word in box.Words)
+        {
+            word.Left += dx;
+            word.Top += dy;
+        }
+
+        foreach (var child in box.Boxes)
+            TranslateSubtree(child, dx, dy);
     }
 
     public void SetBeforeBox(CssBox before)

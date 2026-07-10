@@ -422,6 +422,15 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
+**Status: 3.1 and 3.3 COMPLETE (2026-07-10), regression-free; 3.2 partially landed.**
+The two fixed-target visual-viewport `scrollIntoView` sites and the abspos-in-inline-CB
+paths no longer call `ComputeOffsetWithinAncestor`. 3.2's **geometry composition is done**
+— a subframe element now reports real `getBoundingClientRect` in the main coordinate frame
+(`CssBox.LayoutNestedBrowsingContexts`) — but its **offset migration is still gated**: a
+`position:fixed` element inside a subframe resolves against the main viewport, so the
+cross-frame `scrollIntoView` gate stays on the estimator until the subframe lays out under
+its own sub-viewport. 2.4's estimator deletion waits on that final 3.2 piece.
+
 ### 3.1 — abspos-in-inline-CB placement
 
 **Symptom.** An absolutely/fixed-positioned element whose containing block is an
@@ -448,37 +457,74 @@ removed from the line, not laid out in it). The render tests only exercise `top:
 (static ≈ inset), which is why the engine bug is currently masked in rendering and
 only surfaces through the bridge's shared-geometry offset.
 
-**Root position path — narrowed by engine instrumentation (2026-07-09).** The
-box-model wiring (`GetAbsoluteContainingBlockPaddingBox` → `GetInlineBoundingBox`;
-`ComputeStaticAndFloatPosition` insets at `CssBox.Layout.cs:~844`; the
-`AdjustAbsolutePosition` word-shift at `CssLayoutEngine.cs:930/1328`) all *exist*.
-But temporary `Console.Error` probes (guarded on the target abspos, then on **every**
-abspos) proved that **for this scenario neither `ComputeStaticAndFloatPosition`'s
-abspos block NOR `FlowBox`'s line-930 abspos handler fires at all** — so the
-mis-placed `box.Location = (49.27, 50)` is set by a **third, not-yet-located path**.
-`CollectLayoutGeometry` reads `box.Location` here (not the line-rectangle union,
-because the sized target's `box.Bounds` is non-empty), so the wrong `Location` is the
-whole bug. Likely candidates for the real path: the **typed render path** the shared
-snapshot uses (`SetDocumentWithStyleSet(GetRenderDocument())` → `GetLayoutGeometry`,
-which differs from the string render path — see rf-bridge-1b §5a), or a separate
-abspos collection/positioning pass. The render tests use `top:0` (static ≈ inset),
-masking the bug; it surfaces only via the shared snapshot. Pinned by the skipped
-`Broiler.Cli.Tests.AbsPosInlineCbGeometryTests` (expects `20,60`, engine yields
-`49.27,50`).
+**Root cause — FOUND, and the earlier "third path" note was itself wrong
+(2026-07-09).** Instrumenting the `Location` setter proved the abspos target's
+`box.Location` is **never set at all** (only static boxes get Location sets); the
+mis-placed `(49.27, 50)` therefore does *not* come from `box.Location`. It comes from
+`CollectLayoutGeometry`'s **line-rectangle-union fallback**: because the target is
+never given a real `PerformLayout`, its used `Size` stays `(0,0)`, so `box.Bounds` is
+empty and the collector falls back to `UnionLineRectangles` — the static line rectangle
+`FlowBox` parked at the end of the "anchor" text. The deeper reason it is never laid
+out: `LayoutBlockChildren`'s **inlines-only branch** (`CssBox.Layout.cs`, the
+`ContainsInlinesOnly → CreateLineBoxes` path) lays out *floated* children after the
+line pass but has **no equivalent for out-of-flow abspos/fixed children**, so an abspos
+whose ancestor chain up to the block is all-inline (the `position:relative <span>`
+case) is flowed by `FlowBox` for its static rectangle only and never sized/positioned.
+Two further gaps compounded it: (a) the engine never **blockifies** an abspos per
+CSS 2.1 §9.7, so an inline-display abspos (`<a>`/`<span>`) skips `PerformLayoutImp`'s
+block path (`IsBlock == false`) that resolves width + inset position; and (b)
+`GetInlineBoundingBox` measured the inline CB's extent including its *own* out-of-flow
+child, whose transient static `Location` dragged the CB origin to `(0,0)`.
 
-**Work.** *First* locate the actual positioning path (instrument `AdjustAbsolutePosition`
-and the typed-path abspos layout; both obvious paths are ruled out), *then* make it set
-`box.Location` to the inline-CB origin + insets while preserving auto-sizing of
-abspos-with-inline-content (issue #1163 anchor labels). Then remove the bridge's
-`absPosInInlineCB` bypass + the accessor gate and un-skip `AbsPosInlineCbGeometryTests`.
-**Deep inline-formatting-context work on the engine's hottest path** — it changes
-rendered abspos placement, so gate on the full WPT pixel + Acid corpus (no *new*
-regressions; Acid is not pixel-perfect today, so the bar is "no net-worse," not
-"perfect"), plus `ScrollIntoView_TargetAfterBlockInInlineSibling` and the
-css-anchor-position `position-area-inline-container` cluster. **Fix not attempted this
-session** — the positioning path proved more buried than the two obvious candidates
-(both instrumented and ruled out), so it needs a dedicated multi-cycle tracing effort;
-the search is now narrowed to the typed render path / abspos pass.
+**Fix — LANDED in `Broiler.Layout` (2026-07-09), entirely engine-side.** Three
+coordinated changes, all CSS-spec-grounded:
+1. **`CreateLineBoxes` → `LayoutOutOfFlowInlineDescendants`** (`CssLayoutEngine.cs`):
+   after an inline formatting context is flowed, walk its in-flow inline subtree and
+   `PerformLayout` each out-of-flow abspos/fixed descendant (mirroring how the block
+   path lays out its out-of-flow children; floats/atomic-inlines/blocks run their own
+   layout and are skipped).
+2. **§9.7 blockification** (`CssBox.Layout.cs`, `PerformLayoutImp`): route out-of-flow
+   boxes through the block layout path regardless of computed display, so an
+   inline-level abspos resolves its shrink-to-fit width (§10.3.7) and inset position.
+3. **Inline static position preserved** (`CssBoxProperties.InlineStaticPosition` +
+   `FlowBox` records it + `ComputeStaticAndFloatPosition` honours it): an *auto*-inset
+   abspos keeps the inline cursor position `FlowBox` gave it, so it does not re-flow its
+   content from the top of its containing block (fixed a 7.6% pixel regression in
+   `position-area-abs-inline-container` where the `#inline-container` text jumped to the
+   origin); an *explicit* inset still overrides. Plus `GetInlineBoundingBox`
+   (`CssBox.ContainingBlock.cs`) now excludes out-of-flow children from the inline CB's
+   extent (§10.1).
+
+`AbsPosInlineCbGeometryTests` **un-skipped and green** (`20,60`). Verified
+regression-free vs a stashed HEAD baseline: `Broiler.Layout.Tests` 39/40 (the 1 is the
+pre-existing project-reference-path architecture test), Cli geometry/anchor/shared +
+`SharedLayoutGeometryParity` families green, and the WPT anchor/position-area/sticky +
+abspos/cssom-view clusters show **zero new failures** (every failure — e.g.
+`PositionAreaScrolling00{2,3}`, `OffsetTopLeft_BorderBoxPaddingEdge`,
+`AbsposInBlockInInlineInRelposInline` — also fails at HEAD). Notably
+`position-area-abs-inline-container` (which passed at HEAD) still passes.
+
+**Bridge bypasses retired (2026-07-10).** With the engine placing abspos-in-inline-CB
+correctly, the two bridge fallbacks that mirrored the old renderer gap are **removed**:
+`AnchorRegistry.ComputeElementBox`'s `absPosInInlineCB` bypass (so an abspos anchor in
+an inline CB now registers from the real shared box) and
+`TrySharedOffsetWithinAncestor`'s matching abspos-in-inline-CB gate (so `scrollIntoView`
+on such a target reads the shared offset instead of the estimator). The cross-frame
+(3.2) and zoom gates in `TrySharedOffsetWithinAncestor` are **kept**. Verified
+regression-free: the WPT abspos-in-inline-CB cluster (`position-area-inline-container`,
+`-abs-inline-container`, `AnchorInlineContainingBlock`, `AbsPos*InInlineContainingBlock`)
+green; the anchor/position-area/sticky/anchor-scroll/position-try clusters show only the
+same pre-existing failures as HEAD (`PositionAreaScrolling00{2,3}`,
+`PositionAreaAnchorPartiallyOutside`, `PositionVisibilityRemoveAnchorsVisible`,
+`PositionTryGrid001`); Cli oracle + scrollIntoView-abspos + anchor + shared families
+green. (`position-area-percents-001` flakes under parallel load — passes 3/3 in
+isolation on both HEAD and this change.)
+
+The `PromoteAbsPosFromInlineCBs` DOM-mutation workaround in the anchor resolver is left
+in place — it is now redundant for geometry but is a larger, separate anchor-subsystem
+change with its own paint/registration coupling; retiring it is a follow-up. 3.1 no
+longer blocks `ComputeOffsetWithinAncestor`; 2.4's estimator deletion still waits on
+3.2 + 3.3.
 
 ### 3.2 — cross-frame / subframe geometry in the main coordinate space
 
@@ -496,6 +542,36 @@ target resolves without the estimator. **Oracle:** the
 `ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_*Fixed_Targets` and
 `Subframe*ScrollIntoView` cases.
 
+**Geometry composition LANDED (2026-07-10); offset migration still gated on subframe
+fixed-positioning.** Investigation corrected the earlier scope note: the render document
+(`GetRenderDocument()` = the live `_document`) *does* carry each iframe's sub-document as a
+`#subdoc-root` subtree, and `CollectLayoutGeometry` *does* key boxes for the subframe
+elements — but the layout leaves that subtree unpositioned (the iframe is a replaced leaf),
+so every subframe box came back at `(0,0,0,0)`. Fixed in `Broiler.Layout` (**main repo**,
+not the submodule) with `CssBox.LayoutNestedBrowsingContexts`: a root-only post-layout pass
+that finds each `#subdoc-root` box, places it at its frame's content-box origin, sizes it to
+the content box (the sub-viewport), runs the normal block layout, and translates the subtree
+onto the content origin. A subframe element now reports real `getBoundingClientRect` in the
+main coordinate frame (pinned by
+`DomBridge_SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame`: an abspos
+target at `(30,40)` in an iframe at `(100,300)` → `130,340,50,50`, was `0,0,0,0`). The pass
+is additive and touches only `#subdoc-root` subtrees — absent from the paint document (which
+serialises the sub-document into the frame's `srcdoc` and rasterises it separately), so paint
+is unaffected; regression-free across the layout, shared-geometry, anchor, and iframe/cssom
+clusters.
+
+**What still blocks dropping the cross-frame gate.** A `position:fixed` element *inside* a
+subframe resolves against the layout env's **global** `ViewportSize` (the main viewport),
+not the subframe's content box, so its composed box is wrong — dropping the gate regressed
+`ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets` (its target is fixed
+within the subframe). The gate therefore stays: `scrollIntoView` cross-frame offsets remain
+on the estimator's frame-aware walk. Closing that needs the subframe to lay out under its
+**own sub-viewport** — a delegating `ILayoutEnvironment` whose `ViewportSize` is the frame
+content box (and fixed positioning honouring a per-context origin so a fixed subframe box
+lands at `contentOrigin + inset`, not `(0,0) + inset`). That is the remaining 3.2 work; once
+it lands, drop the cross-frame gate and validate against the full iframe/subframe
+scrollIntoView + `Subframe*` corpus (several currently fail pre-existing).
+
 ### 3.3 — fixed-target offsets for the visual-viewport scrollIntoView sites
 
 **Symptom.** The two visual-viewport `offsetOverride` sites in
@@ -509,11 +585,52 @@ Smaller than 3.1/3.2 and mostly bridge-side, but depends on the fixed box's shar
 geometry being correct (interacts with 3.1/3.2). **Oracle:** the visual-viewport /
 fixed scrollIntoView cases.
 
-**Gate to close 2.4.** Once 3.1–3.3 land and the bridge's bypasses/gates are removed
-(so no resolver calls `ComputeOffsetWithinAncestor` / the size estimators), flip
-`UseSharedGeometryExclusively` (verified regression-free in 2.4) and delete the
-estimator body + `WithLayoutGeometryCache`. Only then does 2.5 (`LayoutRuntimeState`)
-also open up.
+**DONE — split-subtraction landed (2026-07-10).** The correct rule is a *split*, not a
+blanket skip. A first attempt with a `viewportAnchored` mode that skipped the whole
+intermediate-scroll-subtraction loop looked green but was clamp-luck: for the
+`Adjusts_PageTop` fixture (target is an `<input>` inside a `position:fixed; overflow:auto`
+box — the fixed element is **itself a scroll container** the target rides) it gave 1268 vs
+the estimator's 744, and both saturate the same max visual-viewport offset. So the loop now
+subtracts scroll only for containers **at or below** the target's nearest `position:fixed`
+ancestor F (the fixed box's own overflow + any scroller nested inside it, which the target
+rides) and **stops** once the walk climbs past F (containers above F don't move a
+viewport-anchored box). Implemented in `TrySharedOffsetWithinAncestor(..., viewportAnchored)`
+via `FindNearestFixedAncestorOrSelf` + a DOM ancestor check; the two
+`ScrollFixedElementIntoVisualViewport` `offsetOverride` sites now call
+`OffsetWithinAncestorForFixedPreferShared` instead of `ComputeOffsetWithinAncestor`.
+
+Validated against a **non-clamp-saturated** fixture
+(`VisualViewport_ScrollIntoView_Target_In_TopFixed_Scroller_Uses_Unclamped_Offset`, added):
+a top-anchored fixed scroller with the target 150px down, scrolled into a 384px visual
+viewport, lands `pageTop` at 650 (= 500 layout + 150) — well under the 884 clamp. Probes
+confirmed the migration is behaviour-identical to the estimator wherever the fixed box's
+geometry is well-defined: for a **top-anchored** fixed element the shared offset equals the
+estimator *exactly* (36 = 36). The default (non-anchored) path — sticky, general
+scrollIntoView, position-area — is byte-for-byte unchanged (the split only engages under
+`viewportAnchored`). Zero new failures across the fixed / visual-viewport / scrollIntoView
+clusters; the residual pre-existing failures (`VisualScrollIntoView_002`,
+`SubframeRootScrollIntoView_Uses_SmoothScrollBehavior`, `ScrollIntoView_Maps_WritingMode…`)
+fail identically at HEAD.
+
+**Known separate bug it exposed (not 3.3).** A `bottom`/`right`-anchored fixed box is
+mis-placed in the shared geometry by its own extent — `getBoundingClientRect()` on a
+`position:fixed; bottom:0; height:60` box reports `top = innerHeight` (should be
+`innerHeight − 60`), i.e. it is anchored by its top edge to the viewport bottom instead of
+its bottom edge. This affects `getBoundingClientRect` and the estimator alike (both differ
+from each other only because they mis-handle it differently), is masked in every current
+test by the visual-viewport clamp, and is orthogonal to the scroll-accounting 3.3 fixes.
+File/fix it at the fixed-box layout layer separately; after the 3.3 migration scrollIntoView
+at least reads the *same* (shared) geometry as `getBoundingClientRect`, so the two are now
+mutually consistent.
+
+**Gate to close 2.4.** **3.1 and 3.3 are complete** — the engine places abspos-in-inline-CB
+correctly (bypass + gate removed) and the two fixed-target visual-viewport scrollIntoView
+sites read the shared snapshot. **3.2's geometry composition has landed** (subframe boxes are
+now in the main-frame snapshot); the one remaining piece is the subframe sub-viewport so the
+cross-frame `scrollIntoView` gate can be dropped. Once that lands (so no resolver calls
+`ComputeOffsetWithinAncestor` / the size estimators), flip `UseSharedGeometryExclusively`
+(verified regression-free in 2.4) and delete the estimator body + `WithLayoutGeometryCache`.
+Only then does 2.5 (`LayoutRuntimeState`) also open up.
 
 ---
 
