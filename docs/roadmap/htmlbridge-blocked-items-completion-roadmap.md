@@ -311,31 +311,30 @@ visual-viewport `offsetOverride` sites (fixed-target path) are **not** migrated;
 main-document fixed target still hits the intermediate-scroll-subtraction mismatch, so
 they stay on the estimator.
 
-**KEY FINDING — estimator deletion is blocked on RENDERER capabilities, not bridge
-migration.** The two gated cases (cross-frame, abspos-in-inline-CB) *genuinely need*
-the estimator: the renderer/shared snapshot cannot place them correctly, so at the 2.4
-cutover their fallback cannot become "zeros" without breaking scrollIntoView. Deleting
-`ComputeOffsetWithinAncestor` therefore requires the **renderer** to (a) place
-abspos-in-inline-CB elements at their inset position and (b) expose cross-frame /
-subframe geometry in the main coordinate space — plus fixed-target handling for the
-visual-viewport sites. These are `Broiler.Layout`/nested-browsing-context features, a
-separate track from this bridge migration.
+**KEY FINDING (2026-07-09) — estimator deletion was blocked on RENDERER capabilities, now
+CLEARED (2026-07-10).** The gated cases (cross-frame, abspos-in-inline-CB) genuinely needed
+the estimator because the renderer/shared snapshot could not place them correctly. Deleting
+`ComputeOffsetWithinAncestor` required the **renderer** to (a) place abspos-in-inline-CB
+elements at their inset position, (b) expose cross-frame / subframe geometry in the main
+coordinate space, and (c) supply fixed-target offsets for the visual-viewport sites — all
+now delivered by Track 3 (3.1/3.2/3.3). Every gate is removed.
 
 **Net 2.3 status.** Sticky **fully migrated**; position-area **already** shared;
-slotted-child callers **not applicable**; scrollIntoView **general path migrated**
-(gated). The residual estimator callers — the two gates' fallbacks, the two
-visual-viewport fixed-target sites, and everything inside the estimator body itself —
-mean 2.4's estimator deletion waits on the renderer capabilities above, not on further
-bridge work here.
+slotted-child callers **not applicable**; scrollIntoView **fully migrated** (general,
+cross-frame, and visual-viewport fixed-target paths). No resolver retains a correctness gate
+on the estimator; the only residual estimator callers are the shared-*unavailable* fallbacks
+(cross-origin / non-materialised frames) inside the wrappers, which 2.4 can drop to zeros or
+keep as a slim degraded path.
 
 **Risk.** High — anchor/sticky/scroll interaction is subtle and well-tested.
 
 **Verification.** Sticky, position-area, and `scrollIntoView` test suites; the
 css-anchor-position WPT tail; parity gate.
 
-**Exit criteria.** No resolver calls an estimator method; position-area geometry
-is sourced from shared. (Sticky position: **met**; sizes + scrollIntoView +
-position-area: remaining.)
+**Exit criteria — MET (2026-07-10).** No resolver retains a correctness-gated estimator
+call; position-area geometry is sourced from shared; sticky size/position, scrollIntoView
+(general + cross-frame + visual-viewport fixed-target) all resolve from the snapshot. The
+estimator remains only as a shared-unavailable fallback, to be dropped/degraded in 2.4.
 
 ### Milestone 2.4 — Flip `UseSharedGeometryExclusively`, delete the estimators (increment 6)
 
@@ -376,14 +375,17 @@ position-area: remaining.)
   resolver fallbacks are **not** gated by `UseSharedGeometryExclusively` (only the
   entry points are), so they keep the estimator alive regardless of the flip.
 
-**The real blocker is the renderer, restated concretely.** `ComputeOffsetWithinAncestor`
-(and thus the estimator body) can only be deleted once the resolver fallbacks are
-removable — which needs the renderer to (a) place abspos-in-inline-CB elements at
-their inset position, (b) expose cross-frame/subframe geometry in the main coordinate
-space, and (c) supply fixed-target offsets for the visual-viewport scrollIntoView
-sites. Until then the estimator stays. Track 2 is therefore complete up to the
-renderer boundary: **2.1 + 2.2 fully landed; 2.3 migrated everything migratable; 2.4
-is gated on `Broiler.Layout`/nested-browsing-context work, not further bridge changes.**
+**The renderer blocker is now CLEARED (2026-07-10).** `ComputeOffsetWithinAncestor` can
+be deleted once the resolver fallbacks are removable, which needed the renderer to (a) place
+abspos-in-inline-CB elements at their inset position, (b) expose cross-frame/subframe geometry
+in the main coordinate space, and (c) supply fixed-target offsets for the visual-viewport
+scrollIntoView sites. All three are done (Track 3: 3.1, 3.2, 3.3). Every resolver correctness
+gate is gone — sticky size/position, position-area, and scrollIntoView (including cross-frame)
+all resolve from the shared snapshot, with the estimator only a shared-unavailable fallback
+(cross-origin / non-materialised frames). **2.4 is therefore unblocked**: flip
+`UseSharedGeometryExclusively` and delete the estimator body, either dropping the
+shared-unavailable fallback to zeros or keeping a slim degraded path for unmaterialised frames.
+Gate the deletion on the full parity + WPT pixel + Acid corpus as below.
 
 **Risk.** High — broad behavior surface. Gate on the full parity + WPT pixel +
 Acid suites; any net-worse assertion count is a blocker.
@@ -422,14 +424,15 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
-**Status: 3.1 and 3.3 COMPLETE (2026-07-10), regression-free; 3.2 partially landed.**
-The two fixed-target visual-viewport `scrollIntoView` sites and the abspos-in-inline-CB
-paths no longer call `ComputeOffsetWithinAncestor`. 3.2's **geometry composition is done**
-— a subframe element now reports real `getBoundingClientRect` in the main coordinate frame
-(`CssBox.LayoutNestedBrowsingContexts`) — but its **offset migration is still gated**: a
-`position:fixed` element inside a subframe resolves against the main viewport, so the
-cross-frame `scrollIntoView` gate stays on the estimator until the subframe lays out under
-its own sub-viewport. 2.4's estimator deletion waits on that final 3.2 piece.
+**Status: 3.1, 3.2, and 3.3 all COMPLETE (2026-07-10), regression-free.** The two
+fixed-target visual-viewport `scrollIntoView` sites and the abspos-in-inline-CB paths no
+longer call `ComputeOffsetWithinAncestor` (3.1/3.3); 3.2's geometry composition landed and
+its **offset migration is now done** — a `position:fixed` (or root-anchored abspos)
+descendant of a subframe resolves against the frame's own sub-viewport, the composed box is
+correct, and the **cross-frame `scrollIntoView` gate is removed**. All three renderer
+prerequisites are met, so no resolver depends on the estimator for a *correctness* gap any
+more; `ComputeOffsetWithinAncestor` survives only as a shared-unavailable fallback
+(cross-origin / non-materialised frames). This unblocks 2.4.
 
 ### 3.1 — abspos-in-inline-CB placement
 
@@ -560,17 +563,39 @@ serialises the sub-document into the frame's `srcdoc` and rasterises it separate
 is unaffected; regression-free across the layout, shared-geometry, anchor, and iframe/cssom
 clusters.
 
-**What still blocks dropping the cross-frame gate.** A `position:fixed` element *inside* a
-subframe resolves against the layout env's **global** `ViewportSize` (the main viewport),
-not the subframe's content box, so its composed box is wrong — dropping the gate regressed
-`ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets` (its target is fixed
-within the subframe). The gate therefore stays: `scrollIntoView` cross-frame offsets remain
-on the estimator's frame-aware walk. Closing that needs the subframe to lay out under its
-**own sub-viewport** — a delegating `ILayoutEnvironment` whose `ViewportSize` is the frame
-content box (and fixed positioning honouring a per-context origin so a fixed subframe box
-lands at `contentOrigin + inset`, not `(0,0) + inset`). That is the remaining 3.2 work; once
-it lands, drop the cross-frame gate and validate against the full iframe/subframe
-scrollIntoView + `Subframe*` corpus (several currently fail pre-existing).
+**Sub-viewport LANDED, cross-frame gate DROPPED (2026-07-10).** The remaining piece — a
+`position:fixed` (or root-anchored abspos) element inside a subframe resolving against the
+frame content box rather than the global viewport — is done, and entirely engine-side (no
+`ILayoutEnvironment` change needed, so no submodule/interface churn):
+- `CssBox.IsNestedViewportRoot` marks the `#subdoc-root` box a *sub-viewport*;
+  `LayoutSubdocument` sets it and stores the frame content-box dimensions in
+  `CssBox.NestedViewportSize` (read back for the viewport basis — the box's used `Size` is
+  transiently 0 while its own subtree lays out, since block heights resolve bottom-up).
+- `FixedPositioningViewport()` returns the enclosing sub-viewport rect (origin from the live
+  `Location`, size from `NestedViewportSize`) when inside a nested browsing context, else
+  `(0,0) + ViewportSize` — **byte-identical for every box in the top-level document** (the
+  flag only ever exists on `#subdoc-root` boxes in the render doc, never the paint doc). The
+  five fixed-positioning viewport reads + placement, and the abspos initial-containing-block
+  resolution, route through it; the existing `LayoutSubdocument` translate composes the fixed
+  box onto `frameContentOrigin + inset`.
+- One supporting fix at the fixed-box layout layer (this *is* 3.3's "known separate bug",
+  now resolved): a bottom/right-anchored fixed box placed before its block size resolves
+  (used height and `Size.Height` both 0) now derives its border-box height from an explicit
+  non-percentage CSS height, so it anchors by its bottom edge, not its top edge (was off by
+  its own height — CSS2.1 §10.6.4).
+
+With the composed subframe fixed/abspos geometry now correct, the cross-frame gate in
+`TrySharedOffsetWithinAncestor` is **removed**; when a subframe box is absent from the
+snapshot (cross-origin / non-materialised frame) the `TryGetSharedLayoutGeometry` lookups
+still return false and the caller falls back to the estimator. Verified regression-free: the
+two cross-frame fixed `scrollIntoView` oracles (`FixedIframeTarget`,
+`ScrollableFixedIframeTarget`, both the Cli and WPT-harness twins) pass via shared once
+normalised to `border:0` — the shared path is correctly iframe-border-aware where the
+estimator ignored the cross-frame border; the WPT CssomView/Fixed/Sticky cluster shows only
+pre-existing failures (SVG hit-testing, writing-mode, smooth-scroll, PositionArea/OffsetTopLeft
+pixels, harness-tuple `Assert.IsType` errors, subframe `elementsFromPoint`), each confirmed
+to fail identically at the merge-base; layout suite 39/40 (pre-existing architecture test) and
+Cli geometry 53/58 (5 pre-existing) unchanged.
 
 ### 3.3 — fixed-target offsets for the visual-viewport scrollIntoView sites
 
@@ -612,25 +637,27 @@ clusters; the residual pre-existing failures (`VisualScrollIntoView_002`,
 `SubframeRootScrollIntoView_Uses_SmoothScrollBehavior`, `ScrollIntoView_Maps_WritingMode…`)
 fail identically at HEAD.
 
-**Known separate bug it exposed (not 3.3).** A `bottom`/`right`-anchored fixed box is
-mis-placed in the shared geometry by its own extent — `getBoundingClientRect()` on a
-`position:fixed; bottom:0; height:60` box reports `top = innerHeight` (should be
-`innerHeight − 60`), i.e. it is anchored by its top edge to the viewport bottom instead of
-its bottom edge. This affects `getBoundingClientRect` and the estimator alike (both differ
-from each other only because they mis-handle it differently), is masked in every current
-test by the visual-viewport clamp, and is orthogonal to the scroll-accounting 3.3 fixes.
-File/fix it at the fixed-box layout layer separately; after the 3.3 migration scrollIntoView
-at least reads the *same* (shared) geometry as `getBoundingClientRect`, so the two are now
-mutually consistent.
+**Known separate bug it exposed — FIXED (2026-07-10, as part of 3.2's sub-viewport work).**
+A `bottom`/`right`-anchored fixed box was mis-placed in the shared geometry by its own extent
+— `getBoundingClientRect()` on a `position:fixed; bottom:0; height:60` box reported
+`top = innerHeight` (should be `innerHeight − 60`), anchoring by its top edge to the viewport
+bottom instead of its bottom edge — because it was placed before its block size resolved
+(`ActualBottom − Location.Y` and `Size.Height` both 0, so the subtracted box height was 0).
+The fixed `hasBottom` placement now derives the border-box height from an explicit
+non-percentage CSS `height` in that case (mirroring the abspos IMCB definite-height fallback,
+CSS2.1 §10.6.4). Surfaced concretely by the subframe fixed `scrollIntoView` oracle, whose
+`bottom:10` container was landing 150px too high until this fix.
 
-**Gate to close 2.4.** **3.1 and 3.3 are complete** — the engine places abspos-in-inline-CB
-correctly (bypass + gate removed) and the two fixed-target visual-viewport scrollIntoView
-sites read the shared snapshot. **3.2's geometry composition has landed** (subframe boxes are
-now in the main-frame snapshot); the one remaining piece is the subframe sub-viewport so the
-cross-frame `scrollIntoView` gate can be dropped. Once that lands (so no resolver calls
-`ComputeOffsetWithinAncestor` / the size estimators), flip `UseSharedGeometryExclusively`
-(verified regression-free in 2.4) and delete the estimator body + `WithLayoutGeometryCache`.
-Only then does 2.5 (`LayoutRuntimeState`) also open up.
+**Gate to close 2.4 — OPEN (2026-07-10).** All three renderer prerequisites are complete:
+3.1 places abspos-in-inline-CB correctly (bypass + gate removed); 3.3 reads the two
+fixed-target visual-viewport scrollIntoView sites from the shared snapshot; and 3.2's
+sub-viewport lands the last piece — subframe fixed/abspos geometry composes correctly and the
+cross-frame `scrollIntoView` gate is removed. No resolver now calls
+`ComputeOffsetWithinAncestor` (or the size estimators) for a *correctness* gap; the estimator
+survives only as a shared-unavailable fallback for cross-origin / non-materialised frames.
+**Next: 2.4** — flip `UseSharedGeometryExclusively` (verified regression-free) and delete the
+estimator body + `WithLayoutGeometryCache`, keeping (or degrading to zeros) the
+shared-unavailable fallback path. 2.5 (`LayoutRuntimeState`) opens up after 2.4.
 
 ---
 
