@@ -351,21 +351,24 @@ other two are gated on prerequisites that are not yet met (documented below).
     declared; only the two test callers of `CssRules` need routing to the shared
     `Broiler.CSS` stylesheet API.
 
-- **PARTIALLY DONE — finish RF-BRIDGE-1b geometry unification** (delete the ~2950-LOC
-  `LayoutMetrics` estimators, increment 6, and retire `LayoutRuntimeState`,
-  increment 7). The `UseSharedLayoutGeometry` flag is **on** (increment 5 landed).
-  **Update (2026-07-10): the increment-6 CUTOVER is now landed** —
-  `UseSharedGeometryExclusively` is flipped **on**, regression-free (guarded by
-  `ShouldReturnExclusiveSharedZero`'s `!HasAssociatedLayoutBox` check; verified zero delta
-  on the full Cli 1680 + WPT 545 corpora). The estimator *body* is not yet deleted, and (**corrected
-  2026-07-10, session 95a4149e**) its remaining consumer is a **real `Broiler.Layout` bug, NOT a
-  WPT-harness artifact** as previously believed: a `display:inline-block` element containing a
-  block-level child, when it has any sibling (even a `display:none` `<script>`), has its principal box
-  dropped by the CSS 2.1 §9.2.1.1 block-inside-inline correction (the correction splits the inline-block
-  instead of leaving it atomic). That drops it from the shared snapshot; the `!HasAssociatedLayoutBox`
-  guard masks it via the estimator. Deleting the estimator is gated on fixing that engine bug. See
+- **DONE — RF-BRIDGE-1b geometry unification (Item 2) is COMPLETE.** All of increments 5–7 have landed:
+  `UseSharedLayoutGeometry` on (5), `UseSharedGeometryExclusively` on and the ~2950-LOC `LayoutMetrics`
+  recursive estimator body **deleted** (increment 6, PR #1354), and `LayoutRuntimeState` **retired**
+  (increment 7). The increment-6 deletion was gated on a real `Broiler.Layout` bug — a
+  `display:inline-block` containing a block-level child with any sibling (even a `display:none` `<script>`)
+  had its principal box dropped by the CSS 2.1 §9.2.1.1 block-inside-inline correction splitting the
+  inline-block instead of keeping it atomic — which was **fixed** in the `Broiler.HTML` submodule (PR #1353,
+  the atomic-inline fold in `DomParser.cs`) and, with the box then present in the snapshot, let the
+  estimator be removed. Increment 7 retired `LayoutRuntimeState` by relocating its resolved-position-area
+  memo to the bridge-level `PositionAreaResolutions` `ConditionalWeakTable` (a pure, behaviour-identical
+  storage relocation — the previous "remove the cache and recompute" attempt recursed and was reverted).
+  Both changes verified regression-free against full-corpus HEAD baselines (zero new failures by name). The
+  three renderer prerequisites (Track 3: abspos-in-inline-CB placement, cross-frame/sub-viewport geometry,
+  fixed-target scrollIntoView) all landed. The two-box-model duplication is gone; the only residual
+  estimator caller is the shared-*unavailable* fallback (cross-origin / non-materialised frames). See
   [`htmlbridge-blocked-items-completion-roadmap.md`](htmlbridge-blocked-items-completion-roadmap.md)
-  Milestone 2.4 for the full root-cause analysis and fix region.
+  Track 2 for the full history. **This unblocks the `DomElement`/`HtmlTreeBuilder` facade removal
+  (Milestones 1.2/1.3), the remaining Item 1 work.**
 
   **Correction (2026-07-09): the previously-documented blocker was stale.** The
   renderer *does* now size `@position-try` elements correctly on the shared path —

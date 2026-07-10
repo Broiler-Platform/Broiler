@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
@@ -5,6 +7,65 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
     // position-area resolution for JS offset queries
     // -----------------------------------------------------------------
+
+    // RF-BRIDGE-1b (Milestone 2.5): the resolved position-area rect is memoized here
+    // instead of in the retired ElementRuntimeState.Layout (LayoutRuntimeState). It is
+    // both a perf cache — avoids rebuilding the anchor registry on every offset query —
+    // and a re-entrancy guard: ResolvePositionAreaForElement is reachable from the
+    // geometry entry points, so an already-resolved element short-circuits here before
+    // re-entering resolution (rebuilding the registry per call recurses / corrupts shared
+    // state — the failure mode that reverted the naive cache removal). A static CWT keyed
+    // by element identity mirrors ElementRuntimeStates' lifetime, so a detached element's
+    // memo is collected with it, and the invalidation (position-area / position-anchor
+    // mutation) and clone-copy semantics are unchanged from the old .Layout slots.
+    private static readonly ConditionalWeakTable<DomElement, PositionAreaResolution>
+        PositionAreaResolutions = [];
+
+    private sealed class PositionAreaResolution
+    {
+        public double Left;
+        public double Top;
+        public double Width;
+        public double Height;
+    }
+
+    private static bool TryGetPositionAreaResolution(
+        DomElement element, out (double left, double top, double width, double height) rect)
+    {
+        if (PositionAreaResolutions.TryGetValue(element, out var r))
+        {
+            rect = (r.Left, r.Top, r.Width, r.Height);
+            return true;
+        }
+
+        rect = default;
+        return false;
+    }
+
+    private static void SetPositionAreaResolution(
+        DomElement element, double left, double top, double width, double height) =>
+        PositionAreaResolutions.AddOrUpdate(element, new PositionAreaResolution
+        {
+            Left = left,
+            Top = top,
+            Width = width,
+            Height = height,
+        });
+
+    private static void ClearPositionAreaResolution(DomElement element) =>
+        PositionAreaResolutions.Remove(element);
+
+    private static void CopyPositionAreaResolution(DomElement source, DomElement target)
+    {
+        if (PositionAreaResolutions.TryGetValue(source, out var r))
+            PositionAreaResolutions.AddOrUpdate(target, new PositionAreaResolution
+            {
+                Left = r.Left,
+                Top = r.Top,
+                Width = r.Width,
+                Height = r.Height,
+            });
+    }
 
     /// <summary>
     /// Resolves position-area for a specific element during JS execution,
@@ -15,11 +76,8 @@ public sealed partial class DomBridge
         ResolvePositionAreaForElement(DomElement element)
     {
         // Check for pre-resolved values first.
-        if (GetElementRuntimeState(element).Layout.Left.TryGet(out var rl) && rl is double resolvedLeft &&
-            GetElementRuntimeState(element).Layout.Top.TryGet(out var rt) && rt is double resolvedTop &&
-            GetElementRuntimeState(element).Layout.Width.TryGet(out var rw) && rw is double resolvedWidth &&
-            GetElementRuntimeState(element).Layout.Height.TryGet(out var rh) && rh is double resolvedHeight)
-            return (resolvedLeft, resolvedTop, resolvedWidth, resolvedHeight);
+        if (TryGetPositionAreaResolution(element, out var cached))
+            return cached;
 
         // Resolve on-the-fly from CSS properties and inline styles.
         var cssProps = CollectMatchedRuleProperties(element);
@@ -46,10 +104,7 @@ public sealed partial class DomBridge
         if (rect == null) return null;
 
         // Cache the resolved values.
-        GetElementRuntimeState(element).Layout.Left.Set(rect.Value.Left);
-        GetElementRuntimeState(element).Layout.Top.Set(rect.Value.Top);
-        GetElementRuntimeState(element).Layout.Width.Set(rect.Value.Width);
-        GetElementRuntimeState(element).Layout.Height.Set(rect.Value.Height);
+        SetPositionAreaResolution(element, rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
 
         return (rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
     }
