@@ -646,17 +646,28 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// RF-BRIDGE-1b increment 6 (staged cutover, default OFF). Under
-    /// <see cref="UseSharedGeometryExclusively"/>, an element that produced no shared box
-    /// is treated as detached / <c>display:none</c> (zero geometry) rather than consulting
-    /// the coarse estimators — the entry points call this right after their shared-snapshot
-    /// branch. When the flag is off (the default) this is always false, so the estimator
+    /// RF-BRIDGE-1b increment 6 cutover (default ON). Under
+    /// <see cref="UseSharedGeometryExclusively"/>, an element that produced no shared box is
+    /// treated as detached / <c>display:none</c> (zero geometry) rather than consulting the
+    /// coarse estimators — the entry points call this right after their shared-snapshot
+    /// branch. When the flag is off this is always false, so the estimator
     /// fallback runs exactly as before. Zoomed elements are handled on the shared path too
     /// (their geometry is divided back to unzoomed CSS pixels by the element's own used
     /// zoom), so they are no longer excepted here.
+    ///
+    /// <para>Only elements that <em>genuinely generate no box</em> (<c>display:none</c>/
+    /// <c>display:contents</c>, text/comment nodes — see <see cref="HasAssociatedLayoutBox"/>)
+    /// zero out. A box-generating element that is merely <em>absent from the current shared
+    /// snapshot</em> is NOT zeroed: the snapshot can transiently miss a laid-out element (e.g.
+    /// during <c>scrollIntoView</c>, where the queried facade element and the render-document
+    /// element the snapshot is keyed by are different instances — the DomElement dual-tree
+    /// identity gap tracked by htmlbridge Track 1). Zeroing such an element would collapse its
+    /// geometry to 0 (a `scrollHeight` of 0 mis-clamps a programmatic scroll to the top,
+    /// blanking scrolled content — WPT zoom scroll-into-view regressions). Falling back to the
+    /// estimator is the correct shared-unavailable behaviour there, matching the flag-off path.</para>
     /// </summary>
     private bool ShouldReturnExclusiveSharedZero(DomElement element) =>
-        UseSharedGeometryExclusively && UseSharedLayoutGeometry;
+        UseSharedGeometryExclusively && UseSharedLayoutGeometry && !HasAssociatedLayoutBox(element);
 
     private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>

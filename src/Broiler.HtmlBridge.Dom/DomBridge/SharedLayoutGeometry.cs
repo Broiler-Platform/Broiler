@@ -16,18 +16,20 @@ public sealed partial class DomBridge
     // Mirrors the LayoutGeometryCacheEnabled test seam.
     internal static bool UseSharedLayoutGeometry = true;
 
-    // RF-BRIDGE-1b increment 6 (staged cutover — default OFF). When true, the geometry
-    // entry points answer *exclusively* from the shared snapshot for unzoomed elements:
-    // an unzoomed element with no shared box returns zero (detached / display:none
-    // semantics) instead of falling back to the coarse LayoutMetrics estimators. This
-    // stages the estimator deletion — flipping it on makes the estimator bodies dead
-    // for the unzoomed path. It stays OFF until (a) the zoom-correct shared snapshot
-    // lands (so zoomed subtrees no longer need the estimator — they are still routed to
-    // it by IsUnzoomedForSharedGeometry) and (b) the pre-layout resolvers (sticky/
-    // position-area, which depend on scroll-offset accounting the snapshot lacks) have a
-    // shared-geometry source. Only then can the estimator bodies actually be removed.
-    // See docs/roadmap/rf-bridge-1b-layout-unification.md §5 incr 6 "Deletion sequence".
-    internal static bool UseSharedGeometryExclusively = false;
+    // RF-BRIDGE-1b increment 6 cutover — ON by default (2026-07-10). When true, the
+    // geometry entry points answer *exclusively* from the shared snapshot: an element that
+    // genuinely generates no box (display:none/contents, text/comment — see
+    // HasAssociatedLayoutBox) reports zero geometry instead of consulting the coarse
+    // LayoutMetrics estimators. A box-generating element that is merely absent from the
+    // current snapshot still falls back to the estimator (see ShouldReturnExclusiveSharedZero)
+    // — the snapshot can transiently miss a laid-out element (observed in the WPT test
+    // harness's ExecuteScriptsWithDom flow, NOT in normal Attach+scrollIntoView usage; see
+    // milestone 2.4), and zeroing it would mis-collapse its geometry. That refinement is what
+    // makes this flippable without regressing the zoom scroll-into-view WPT pixel tests. Net
+    // behaviour change vs flag-off: only display:none/contents elements switch from an
+    // estimator guess to a correct zero.
+    // See docs/roadmap/htmlbridge-blocked-items-completion-roadmap.md milestone 2.4.
+    internal static bool UseSharedGeometryExclusively = true;
 
     private SharedLayoutGeometryProvider _sharedLayoutGeometry;
 

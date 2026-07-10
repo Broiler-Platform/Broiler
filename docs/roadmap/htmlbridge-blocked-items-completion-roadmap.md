@@ -68,12 +68,20 @@ Track 2 (geometry)                         Track 1 (public surface)
 
 ## Track 2 — RF-BRIDGE-1b geometry unification
 
-Current state (verified 2026-07-09): `UseSharedLayoutGeometry = true` (shared
-path live with estimator fallback); `UseSharedGeometryExclusively = false`
-(fallback→zeros staged but off); shared-geometry test families 16/16 green;
-estimators (`LayoutMetrics.cs`, ~2952 LOC) still load-bearing for `isRoot`/
-viewport, zoomed subtrees, sticky, position-area, `scrollIntoView`, and boxless
-elements. `LayoutRuntimeState` still stores resolved position-area geometry.
+Current state (updated 2026-07-10): `UseSharedLayoutGeometry = true` and
+**`UseSharedGeometryExclusively = true` (increment-6 cutover flipped ON,
+regression-free)**. Exclusive-shared is now the default: geometry entry points answer
+from the shared snapshot, and a *genuinely* boxless element (display:none/contents,
+text/comment) reports zero; a box-generating element merely absent from the current
+snapshot still falls back to the estimator via `ShouldReturnExclusiveSharedZero`'s
+`!HasAssociatedLayoutBox` guard (added 2026-07-10 — this is what makes the flip
+regression-free; see Milestone 2.4 Task 1). Verified zero delta on the full
+`Broiler.Cli.Tests` (1680) and `Broiler.Wpt.Tests` (545) corpora, gate families 20/20,
+`Broiler.Layout.Tests` 40/40. The estimator body (`LayoutMetrics.cs`, ~2952 LOC) is
+therefore **not yet deleted** — it stays load-bearing as the shared-unavailable fallback
+(see the DELETION analysis under Milestone 2.4: the only remaining snapshot gap is a WPT
+test-harness artifact, not real bridge usage). `LayoutRuntimeState` still stores resolved
+position-area geometry (Milestone 2.5, opens after the deletion).
 
 ### Milestone 2.1 — Zoom-correct shared snapshot (the gating prerequisite)
 
@@ -336,7 +344,11 @@ call; position-area geometry is sourced from shared; sticky size/position, scrol
 (general + cross-frame + visual-viewport fixed-target) all resolve from the snapshot. The
 estimator remains only as a shared-unavailable fallback, to be dropped/degraded in 2.4.
 
-### Milestone 2.4 — Flip `UseSharedGeometryExclusively`, delete the estimators (increment 6)
+### Milestone 2.4 — Flip `UseSharedGeometryExclusively` (DONE), delete the estimators (increment 6, pending)
+
+**Status (2026-07-10): the FLIP is DONE and regression-free; the estimator DELETION is not
+yet done** — its only remaining blocker is a WPT test-harness snapshot artifact (see Task 1
+and the DELETION analysis below), which the `!HasAssociatedLayoutBox` guard mitigates safely.
 
 **Goal.** The actual payoff: remove the ~2950-LOC estimator body from
 `LayoutMetrics.cs` and retire `WithLayoutGeometryCache`.
@@ -355,17 +367,33 @@ estimator remains only as a shared-unavailable fallback, to be dropped/degraded 
 
 **Empirical findings (2026-07-09) — the two tasks have opposite readiness.**
 
-- **Task 1 (flip) — verified regression-free, but not the bottleneck.** Flipping
-  `UseSharedGeometryExclusively` to `true` and measuring: the Cli geometry corpus
-  (Offset, BoundingClientRect, DisplayContents, ScrollMetrics, ClientAndScroll,
-  cutover) changed by exactly **one** test — `SharedGeometryExclusiveCutoverTests`'
-  `DefaultsOff`, which asserts the flag's default (expected). WPT `CssomView`
-  (excluding the pre-existing scroll/iframe stack-overflow crasher) gave the **same
-  4 failures** flag-on and flag-off — **zero delta**. So the entry-point estimator
-  fallback is effectively dead: the shared path already answers every boxed element,
-  and boxless→zero matches detached/`display:none`. (Reverted; the flag stays staged
-  off — flipping alone has no payoff without the deletion, and the full WPT/Acid
-  pixel corpus + the crasher path are unverified.)
+- **Task 1 (flip) — DONE, regression-free after fixing a newly-found sub-blocker
+  (2026-07-10).** The flag is now flipped **ON** by default. Getting there required correcting
+  the earlier "zero delta" claim (which only measured the Cli corpus + WPT `CssomView` subset)
+  and fixing a real regression it missed:
+  - **The naive flip regressed FOUR zoom+scroll WPT *pixel* tests**
+    (`Wpt_CssViewport_ZoomScrollIntoView{AbsolutePosition,AlignmentOptions}`, `…ZoomScrollPadding`,
+    `Wpt_CssomView_ScrollIntoView_DefaultInlineNearest…`), stably (4/4 in isolation);
+    `ZoomScrollPadding` dropped to 96.9% match with *content absent*.
+  - **Root cause (found via cross-process render-HTML diff + snapshot-key dump — in-process A/B
+    is static-cache-confounded and misleads):** during `scrollIntoView` the scroll container is
+    **absent from the shared snapshot** — the snapshot holds *a* `.container` div but a *different
+    instance* than the one the bridge queries (`SELFINSNAP=False`). This is the **DomElement
+    facade/canonical dual-tree identity gap** (Track 1). The old `ShouldReturnExclusiveSharedZero`
+    zeroed *any* snapshot-missing element, so the container's `scrollHeight` collapsed to 0, the
+    programmatic scroll clamped to the top, and the scrolled content rendered blank.
+  - **Fix:** `ShouldReturnExclusiveSharedZero` now additionally requires
+    `!HasAssociatedLayoutBox(element)` — only elements that *genuinely* generate no box
+    (display:none/contents, text/comment) zero out; a laid-out element merely missing from the
+    snapshot falls back to the estimator (matching flag-off). Net behaviour change vs flag-off:
+    **only display:none/contents elements** switch from an estimator guess to a correct zero.
+  - **Verified regression-free:** full `Broiler.Cli.Tests` (1680, crasher excluded) and full
+    `Broiler.Wpt.Tests` (545) both show **zero delta** vs the flag-off baseline; the 4 zoom tests
+    pass; `SharedGeometryExclusiveCutoverTests` (display:none→0) holds; `DefaultsOff`→`DefaultsOn`.
+  - **Consequence for Task 2:** the fix means the estimator is STILL load-bearing for
+    box-generating elements that the snapshot transiently misses (the identity gap). So the flip
+    landing does **not** by itself make the estimator dead — deleting the estimator body now
+    additionally requires closing the snapshot identity gap so laid-out elements are never missing.
 - **Task 2 (delete) — BLOCKED, and the flip does not unblock it.** The estimator
   methods are a single connected web shared between entry points *and* resolvers, so
   nothing deletes cleanly even with the flip on: `ResolveContentBoxExtent`/
@@ -382,10 +410,18 @@ in the main coordinate space, and (c) supply fixed-target offsets for the visual
 scrollIntoView sites. All three are done (Track 3: 3.1, 3.2, 3.3). Every resolver correctness
 gate is gone — sticky size/position, position-area, and scrollIntoView (including cross-frame)
 all resolve from the shared snapshot, with the estimator only a shared-unavailable fallback
-(cross-origin / non-materialised frames). **2.4 is therefore unblocked**: flip
-`UseSharedGeometryExclusively` and delete the estimator body, either dropping the
-shared-unavailable fallback to zeros or keeping a slim degraded path for unmaterialised frames.
-Gate the deletion on the full parity + WPT pixel + Acid corpus as below.
+(cross-origin / non-materialised frames).
+
+**The flip (Task 1) is now DONE; the estimator DELETION (Task 2) is what remains blocked
+(updated 2026-07-10).** Flipping `UseSharedGeometryExclusively` first regressed four zoom+scroll
+WPT pixel tests, which was root-caused to the snapshot transiently missing the `scrollIntoView`
+scroll container (the DomElement facade/canonical identity gap) and fixed by narrowing
+`ShouldReturnExclusiveSharedZero` to genuinely-boxless elements (see Task 1 above). The flag is
+now ON, regression-free. But that fix means the entry points still **fall back to the estimator**
+for any laid-out element the snapshot transiently misses, and the `SharedLayoutGeometryParityTests`
+estimator arm still exercises it — so the estimator body cannot be deleted until the snapshot
+identity gap is closed (laid-out elements never missing). Gate the eventual deletion on the full
+parity + WPT pixel + Acid corpus as below.
 
 **Risk.** High — broad behavior surface. Gate on the full parity + WPT pixel +
 Acid suites; any net-worse assertion count is a blocker.
@@ -648,16 +684,55 @@ non-percentage CSS `height` in that case (mirroring the abspos IMCB definite-hei
 CSS2.1 §10.6.4). Surfaced concretely by the subframe fixed `scrollIntoView` oracle, whose
 `bottom:10` container was landing 150px too high until this fix.
 
-**Gate to close 2.4 — OPEN (2026-07-10).** All three renderer prerequisites are complete:
-3.1 places abspos-in-inline-CB correctly (bypass + gate removed); 3.3 reads the two
-fixed-target visual-viewport scrollIntoView sites from the shared snapshot; and 3.2's
-sub-viewport lands the last piece — subframe fixed/abspos geometry composes correctly and the
-cross-frame `scrollIntoView` gate is removed. No resolver now calls
-`ComputeOffsetWithinAncestor` (or the size estimators) for a *correctness* gap; the estimator
-survives only as a shared-unavailable fallback for cross-origin / non-materialised frames.
-**Next: 2.4** — flip `UseSharedGeometryExclusively` (verified regression-free) and delete the
-estimator body + `WithLayoutGeometryCache`, keeping (or degrading to zeros) the
-shared-unavailable fallback path. 2.5 (`LayoutRuntimeState`) opens up after 2.4.
+**Gate to close 2.4 — the RESOLVER gates are closed, but a NEW render gate is OPEN
+(corrected 2026-07-10).** All three renderer prerequisites are complete: 3.1 places
+abspos-in-inline-CB correctly (bypass + gate removed); 3.3 reads the two fixed-target
+visual-viewport scrollIntoView sites from the shared snapshot; and 3.2's sub-viewport lands the
+last piece — subframe fixed/abspos geometry composes correctly and the cross-frame
+`scrollIntoView` gate is removed. No resolver now calls `ComputeOffsetWithinAncestor` (or the
+size estimators) for a *correctness* gap; the estimator survives only as a shared-unavailable
+fallback for cross-origin / non-materialised frames.
+
+**`UseSharedGeometryExclusively` is now flipped ON, regression-free (2026-07-10).** A full-corpus
+verification first caught four zoom+scroll WPT *pixel* regressions from the naive flip; these were
+root-caused to the snapshot missing the `scrollIntoView` scroll container and fixed by narrowing
+`ShouldReturnExclusiveSharedZero` to genuinely-boxless elements (Milestone 2.4 Task 1). Verified
+zero delta on the full Cli (1680) and WPT (545) corpora.
+
+**What blocks the estimator DELETION — sharpened twice (2026-07-10). The gap is DYNAMIC (bridge
+snapshot build), NOT a static layout box-construction gap.** Testing *pure* exclusive (zero any
+snapshot-missing element, no estimator fallback) surfaced regressions from ≥2 elements missing from
+the snapshot: the 4 css-viewport zoom scroll-into-view WPT tests (a `display:inline-block;
+overflow:hidden` container that is a direct child of `<body>`) and `GoogleLikeDiagTest.
+GridChild_UsesContentSizing` (a grid child). The first hypothesis — a static `Broiler.Layout`
+box-construction/attachment gap — was **disproven** by a completeness assertion
+(`Broiler.Cli.Tests.LayoutGeometryCompletenessTests`): a static `HtmlContainer.GetLayoutGeometry`
+call **collects every one of these elements** across 16 layout-mode fixtures, including the exact
+ZoomScrollPadding structure (two inline-block containers, second `zoom:2`) at 320/800/1024 viewports.
+So the layout engine DOES produce the boxes. (An earlier `CollectLayoutGeometry` line-box-traversal
+fix was also tried and proven ineffective — reverted.)
+
+The regression is therefore **dynamic** — and (sharpened 2026-07-10 via `BuildSharedGeometrySnapshot`
+instrumentation + a variant matrix) it is a **WPT-test-harness artifact of `WptTestRunner.
+ExecuteScriptsWithDom`, NOT a real bridge geometry gap.** Findings:
+- The first `.container` is missing from the snapshot on the **first** snapshot build (`call#1`), at
+  the bridge's default `1024×768` geometry viewport — so it is not cumulative bake/revert drift and
+  not a viewport mismatch (a static layout at 1024×768 collects it).
+- **Normal bridge usage does NOT miss.** A variant matrix (single vs two containers, with/without a
+  `zoom:2` sibling, direct `scrollHeight` vs `scrollIntoView` vs the exact loop-both-targets script,
+  ± `FireWindowLoadEvent` + `ResolveAnimationSnapshots`, ± a style-invalidation batch) via plain
+  `Attach` + `ctx.Eval` is **`present=True` in every case**. Only the full `ExecuteScriptsWithDom`
+  path (which injects `BrowserApiStubs`/testharness stubs and runs scripts through a microtask-draining
+  execution mechanism + a temp-file round-trip) produces `present=False`.
+
+So the estimator's entry-point fallback is exercised only by the WPT harness flow, not by real
+geometry queries. The `!HasAssociatedLayoutBox` guard safely mitigates (fall back to estimator), so
+the flip is regression-free. **To unblock the deletion, either (a) fix the specific
+`ExecuteScriptsWithDom` step that leaves the harness snapshot incomplete (remaining bisection: the
+stub injection / microtask-drain execution mechanism / file round-trip — `FireWindowLoadEvent`,
+`ResolveAnimationSnapshots`, and style batching are already excluded), or (b) treat the 4 zoom WPT
+cases as harness artifacts and keep the guard.** `LayoutGeometryCompletenessTests` (static, 18/18)
+guards the real-usage side. Gate any deletion on the full parity + WPT pixel + Acid corpus.
 
 ---
 
