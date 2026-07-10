@@ -2321,11 +2321,13 @@ public sealed partial class DomBridge
         offset = 0;
         if (!UseSharedLayoutGeometry)
             return false;
-        // Cross-frame (iframe subdocument) targets are laid out in the subframe's own
-        // coordinate frame, not the main snapshot's, so a main-document offset cannot be
-        // read from the shared boxes — leave those to the estimator's cross-frame walk
-        // (scrollIntoView on a fixed target inside an iframe: the target's main-doc offset
-        // must fold in the iframe's own position, which the main snapshot does not carry).
+        // Cross-frame (iframe subdocument) targets: the shared snapshot now composes each
+        // subframe's normal/absolute geometry into the main coordinate frame
+        // (CssBox.LayoutNestedBrowsingContexts, RF-BRIDGE-1b Track 3.2), but a
+        // position:fixed element inside a subframe still resolves against the *main*
+        // viewport rather than the subframe's (the layout env's ViewportSize is global),
+        // so its composed box is wrong. Until the subframe lays out under its own
+        // sub-viewport, keep the cross-frame offset on the estimator's frame-aware walk.
         if (!ReferenceEquals(GetOwningDocumentElement(element), GetOwningDocumentElement(ancestor)))
             return false;
         // (RF-BRIDGE-1b Track 3.1) The former abspos-in-inline-CB bypass is gone: the

@@ -422,12 +422,14 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
-**Status: 3.1 COMPLETE (engine fix 2026-07-09 + bridge bypass/gate removal 2026-07-10)
-and 3.3 COMPLETE (split-subtraction migration 2026-07-10), both regression-free; only
-3.2 remains.** The two fixed-target visual-viewport `scrollIntoView` sites and the
-abspos-in-inline-CB paths no longer call `ComputeOffsetWithinAncestor`; 2.4's estimator
-deletion now waits on 3.2 (cross-frame geometry) alone — plus dropping the remaining
-cross-frame gate once 3.2 lands.
+**Status: 3.1 and 3.3 COMPLETE (2026-07-10), regression-free; 3.2 partially landed.**
+The two fixed-target visual-viewport `scrollIntoView` sites and the abspos-in-inline-CB
+paths no longer call `ComputeOffsetWithinAncestor`. 3.2's **geometry composition is done**
+— a subframe element now reports real `getBoundingClientRect` in the main coordinate frame
+(`CssBox.LayoutNestedBrowsingContexts`) — but its **offset migration is still gated**: a
+`position:fixed` element inside a subframe resolves against the main viewport, so the
+cross-frame `scrollIntoView` gate stays on the estimator until the subframe lays out under
+its own sub-viewport. 2.4's estimator deletion waits on that final 3.2 piece.
 
 ### 3.1 — abspos-in-inline-CB placement
 
@@ -540,17 +542,35 @@ target resolves without the estimator. **Oracle:** the
 `ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_*Fixed_Targets` and
 `Subframe*ScrollIntoView` cases.
 
-**Scope confirmed (2026-07-10).** The shared snapshot (`BuildSharedGeometrySnapshot` →
-`GetRenderDocument()` → `CollectLayoutGeometry`) is a single `Dictionary<DomElement,
-BoxGeometry>` for the **main** document only — subframe elements are not keyed in it at
-all, so `TryGetSharedLayoutGeometry(subframeTarget)` already returns false and the
-cross-frame gate is a fast short-circuit over a box that is simply absent. Closing 3.2
-therefore means teaching `CollectLayoutGeometry` (Broiler.HTML orchestration) to recurse
-into each iframe's laid-out subdocument, translate its internal box geometry by the
-iframe element's own main-frame border-box origin, and add those entries to the snapshot —
-i.e. nested-browsing-context composition on the renderer side, not a bridge-only change.
-This is the largest of the three prerequisites and must gate on the full iframe/subframe
-scrollIntoView + `Subframe*` corpus (several of which currently fail pre-existing).
+**Geometry composition LANDED (2026-07-10); offset migration still gated on subframe
+fixed-positioning.** Investigation corrected the earlier scope note: the render document
+(`GetRenderDocument()` = the live `_document`) *does* carry each iframe's sub-document as a
+`#subdoc-root` subtree, and `CollectLayoutGeometry` *does* key boxes for the subframe
+elements — but the layout leaves that subtree unpositioned (the iframe is a replaced leaf),
+so every subframe box came back at `(0,0,0,0)`. Fixed in `Broiler.Layout` (**main repo**,
+not the submodule) with `CssBox.LayoutNestedBrowsingContexts`: a root-only post-layout pass
+that finds each `#subdoc-root` box, places it at its frame's content-box origin, sizes it to
+the content box (the sub-viewport), runs the normal block layout, and translates the subtree
+onto the content origin. A subframe element now reports real `getBoundingClientRect` in the
+main coordinate frame (pinned by
+`DomBridge_SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame`: an abspos
+target at `(30,40)` in an iframe at `(100,300)` → `130,340,50,50`, was `0,0,0,0`). The pass
+is additive and touches only `#subdoc-root` subtrees — absent from the paint document (which
+serialises the sub-document into the frame's `srcdoc` and rasterises it separately), so paint
+is unaffected; regression-free across the layout, shared-geometry, anchor, and iframe/cssom
+clusters.
+
+**What still blocks dropping the cross-frame gate.** A `position:fixed` element *inside* a
+subframe resolves against the layout env's **global** `ViewportSize` (the main viewport),
+not the subframe's content box, so its composed box is wrong — dropping the gate regressed
+`ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets` (its target is fixed
+within the subframe). The gate therefore stays: `scrollIntoView` cross-frame offsets remain
+on the estimator's frame-aware walk. Closing that needs the subframe to lay out under its
+**own sub-viewport** — a delegating `ILayoutEnvironment` whose `ViewportSize` is the frame
+content box (and fixed positioning honouring a per-context origin so a fixed subframe box
+lands at `contentOrigin + inset`, not `(0,0) + inset`). That is the remaining 3.2 work; once
+it lands, drop the cross-frame gate and validate against the full iframe/subframe
+scrollIntoView + `Subframe*` corpus (several currently fail pre-existing).
 
 ### 3.3 — fixed-target offsets for the visual-viewport scrollIntoView sites
 
@@ -605,11 +625,12 @@ mutually consistent.
 
 **Gate to close 2.4.** **3.1 and 3.3 are complete** — the engine places abspos-in-inline-CB
 correctly (bypass + gate removed) and the two fixed-target visual-viewport scrollIntoView
-sites read the shared snapshot; only **3.2** (cross-frame geometry) remains. Once it lands
-*and* the cross-frame gate is dropped (so no resolver calls `ComputeOffsetWithinAncestor` /
-the size estimators), flip `UseSharedGeometryExclusively` (verified regression-free in 2.4)
-and delete the estimator body + `WithLayoutGeometryCache`. Only then does 2.5
-(`LayoutRuntimeState`) also open up.
+sites read the shared snapshot. **3.2's geometry composition has landed** (subframe boxes are
+now in the main-frame snapshot); the one remaining piece is the subframe sub-viewport so the
+cross-frame `scrollIntoView` gate can be dropped. Once that lands (so no resolver calls
+`ComputeOffsetWithinAncestor` / the size estimators), flip `UseSharedGeometryExclusively`
+(verified regression-free in 2.4) and delete the estimator body + `WithLayoutGeometryCache`.
+Only then does 2.5 (`LayoutRuntimeState`) also open up.
 
 ---
 
