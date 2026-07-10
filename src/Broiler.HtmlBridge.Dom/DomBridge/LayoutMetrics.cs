@@ -2321,15 +2321,15 @@ public sealed partial class DomBridge
         offset = 0;
         if (!UseSharedLayoutGeometry)
             return false;
-        // Cross-frame (iframe subdocument) targets: the shared snapshot now composes each
-        // subframe's normal/absolute geometry into the main coordinate frame
-        // (CssBox.LayoutNestedBrowsingContexts, RF-BRIDGE-1b Track 3.2), but a
-        // position:fixed element inside a subframe still resolves against the *main*
-        // viewport rather than the subframe's (the layout env's ViewportSize is global),
-        // so its composed box is wrong. Until the subframe lays out under its own
-        // sub-viewport, keep the cross-frame offset on the estimator's frame-aware walk.
-        if (!ReferenceEquals(GetOwningDocumentElement(element), GetOwningDocumentElement(ancestor)))
-            return false;
+        // (RF-BRIDGE-1b Track 3.2) The former cross-frame gate is gone: the shared
+        // snapshot now composes each subframe's geometry into the main coordinate frame
+        // (CssBox.LayoutNestedBrowsingContexts) *and* a position:fixed / root-anchored
+        // abspos element inside a subframe resolves against the frame's own sub-viewport
+        // (CssBox.IsNestedViewportRoot / FixedPositioningViewport), so a cross-frame
+        // element's composed box is correct. When the subframe box is absent from the
+        // snapshot (e.g. a cross-origin or non-materialised frame), the
+        // TryGetSharedLayoutGeometry lookups below return false and the caller still
+        // falls back to the estimator's frame-aware walk.
         // (RF-BRIDGE-1b Track 3.1) The former abspos-in-inline-CB bypass is gone: the
         // layout engine now places an absolutely/fixed-positioned element whose
         // containing block is an inline box at its inset position, so its shared box is

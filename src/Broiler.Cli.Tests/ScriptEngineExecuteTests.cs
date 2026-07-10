@@ -269,6 +269,7 @@ function run() {
                 iframe.style.top = '300px';
                 iframe.style.width = '400px';
                 iframe.style.height = '300px';
+                iframe.style.border = '0';
                 iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>';
                 var target = iframe.contentDocument.getElementById('target');
                 target.scrollIntoView({ block: 'start', inline: 'start' });
@@ -307,6 +308,7 @@ function run() {
                 iframe.style.top = '300px';
                 iframe.style.width = '400px';
                 iframe.style.height = '300px';
+                iframe.style.border = '0';
                 iframe.srcdoc = '<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>';
                 var target = iframe.contentDocument.getElementById('target');
                 var container = iframe.contentDocument.getElementById('container');

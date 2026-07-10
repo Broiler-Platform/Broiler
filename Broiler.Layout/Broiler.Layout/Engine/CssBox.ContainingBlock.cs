@@ -110,13 +110,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (!box.IsNestedViewportRoot)
                 continue;
 
+            // Origin tracks the live Location (composed onto the frame content origin by
+            // the LayoutSubdocument translate); size comes from the pinned
+            // NestedViewportSize because the box's used Size is transiently 0 while its
+            // own subtree lays out.
             double left = box.Location.X + box.ActualBorderLeftWidth + box.ActualPaddingLeft;
             double top = box.Location.Y + box.ActualBorderTopWidth + box.ActualPaddingTop;
-            double width = box.Size.Width - box.ActualBorderLeftWidth - box.ActualBorderRightWidth
-                - box.ActualPaddingLeft - box.ActualPaddingRight;
-            double height = box.Size.Height - box.ActualBorderTopWidth - box.ActualBorderBottomWidth
-                - box.ActualPaddingTop - box.ActualPaddingBottom;
-            return new RectangleF((float)left, (float)top, (float)width, (float)height);
+            return new RectangleF((float)left, (float)top,
+                box.NestedViewportSize.Width, box.NestedViewportSize.Height);
         }
 
         var vp = LayoutEnvironment?.ViewportSize ?? SizeF.Empty;
@@ -175,10 +176,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth + cb.ActualPaddingLeft;
             cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth + cb.ActualPaddingTop;
-            cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth
-                - cb.ActualPaddingLeft - cb.ActualPaddingRight;
-            cbPadHeight = cb.Size.Height - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth
-                - cb.ActualPaddingTop - cb.ActualPaddingBottom;
+            cbPadWidth = cb.NestedViewportSize.Width;
+            cbPadHeight = cb.NestedViewportSize.Height;
             return;
         }
 

@@ -16,6 +16,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     internal bool _tableFixed;
 
     /// <summary>
+    /// RF-BRIDGE-1b Track 3.2: for a nested-viewport-root box
+    /// (<see cref="IsNestedViewportRoot"/>), the frame content-box size (the
+    /// sub-viewport dimensions). Stored explicitly because the box's used
+    /// <see cref="Size"/> is transiently 0 while its own subtree lays out
+    /// (block heights resolve bottom-up, after out-of-flow descendants are placed),
+    /// so a fixed descendant reading <c>Size.Height</c> for its viewport basis would
+    /// see 0. The origin still tracks the live <see cref="Location"/> so the
+    /// LayoutSubdocument translate composes it onto the frame content origin.
+    /// </summary>
+    internal SizeF NestedViewportSize;
+
+    /// <summary>
     /// The canonical <see cref="Dom.DomElement"/> this box was built from,
     /// when the box tree was generated from a <see cref="Dom.DomDocument"/>
     /// (the <c>SetDocument</c> path). <c>null</c> on the legacy HTML-string parse path.
@@ -411,6 +423,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // resolve against it) rather than the top-level viewport — RF-BRIDGE-1b Track 3.2.
         subdocRoot.Display = CssConstants.Block;
         subdocRoot.IsNestedViewportRoot = true;
+        subdocRoot.NestedViewportSize = new SizeF((float)contentWidth, (float)contentHeight);
         // Pin the sub-viewport to the frame content box with explicit used sizes, so the
         // block-layout pass below does not shrink-wrap the height (which a fixed/abspos
         // descendant reads back as the sub-viewport for bottom/right/percentage

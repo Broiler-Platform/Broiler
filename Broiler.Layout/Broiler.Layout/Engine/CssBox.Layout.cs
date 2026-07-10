@@ -964,6 +964,21 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         if (boxHeight <= 0)
                             boxHeight = Size.Height;
 
+                        // CSS2.1 §10.6.4: a bottom-anchored fixed box is positioned by its
+                        // bottom margin edge, so its used height must be subtracted. When
+                        // the box is placed before its block size resolves (both the used
+                        // height and Size.Height are still 0), derive the border-box height
+                        // from an explicit, non-percentage CSS height — otherwise the box is
+                        // anchored by its top edge to the viewport bottom (off by its own
+                        // height). Mirrors the abspos IMCB definite-height fallback.
+                        if (boxHeight <= 0
+                            && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                            && !Height.Contains('%'))
+                        {
+                            double cssHeight = CssLengthParser.ParseLength(Height, 0, GetEmHeight());
+                            boxHeight = ResolveSpecifiedHeightToBorderBox(cssHeight);
+                        }
+
                         newY = (float)(vp.Y + vp.Height - cssBottom - ActualMarginBottom - boxHeight);
                     }
 
