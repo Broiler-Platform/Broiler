@@ -68,6 +68,13 @@ public sealed class LayoutGeometryCompletenessTests
             "  <div id='target' class='container'>\n    <div class='buffer'></div>\n    <div class='buffer'></div>\n  </div>\n" +
             "  <div style='display:inline-block'>\n    <div class='container' style='zoom:2'>\n      <div class='buffer'></div>\n      <div class='buffer'></div>\n    </div>\n  </div>\n</body></html>" },
         new object[] { "inline-block-nested-in-block", 800, 600, Wrap("<div><div id='target' style='display:inline-block;overflow:hidden;width:100px;height:50px'>x</div></div>") },
+        // RF-BRIDGE-1b §9.2.1.1 regression (session 95a4149e): an inline-block containing a BLOCK
+        // child, when it has a display:none sibling (a <script>, or any hidden element), had its
+        // principal box dropped — ContainsInlinesOnlyDeep did not skip display:none children, so the
+        // block-inside-inline correction fired on <body> and mis-split the inline-block. The estimator
+        // fallback masked it; this fixture guards the layout fix directly.
+        new object[] { "inline-block-blockchild-with-script-sibling", 800, 600, Wrap("<div id='target' style='display:inline-block'><div style='height:50px'></div></div><script></script>") },
+        new object[] { "inline-block-blockchild-with-hidden-sibling", 800, 600, Wrap("<div id='target' style='display:inline-block'><div style='height:50px'></div></div><div style='display:none'></div>") },
         new object[] { "flex-item", 800, 600, Wrap("<div style='display:flex'><div id='target' style='width:50px;height:20px'>x</div></div>") },
         new object[] { "grid-item-fixed", 800, 600, Wrap("<div style='display:grid;grid-template-columns:100px'><div id='target'>x</div></div>") },
         new object[] { "grid-item-content-sized", 800, 600, Wrap("<div style='display:grid'><div id='target'>content</div></div>") },

@@ -40,73 +40,12 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
 
-    /// <summary>
-    /// Compatibility view of the main document's shared stylesheet model as the
-    /// historical (selector, specificity, declarations) tuples.
-    /// </summary>
-    /// <remarks>
-    /// New bridge code must consume <see cref="Broiler.CSS.Dom.CssStyleEngine"/>.
-    /// This projection remains for the frozen public surface and characterization
-    /// tests during the one-release Phase 7 compatibility window; it is not a
-    /// cascade store or an input to rendering, invalidation, or anchor layout.
-    /// </remarks>
-    [Obsolete("Use the shared Broiler.CSS stylesheet/style-engine APIs. This compatibility view will be removed after the Phase 7 transition window.")]
-    public IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> CssRules =>
-        BuildLegacyCssRuleView(DocumentElement);
-
-    private IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> BuildLegacyCssRuleView(
-        DomElement scope)
-    {
-        var result = new List<(string Selector, int Specificity, Dictionary<string, string> Declarations)>();
-        var styleElements = new List<DomElement>();
-        CollectStyleElementsInTree(GetDocumentRootFor(scope), styleElements);
-        foreach (var styleEl in styleElements)
-        {
-            var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(GetStyleElementCssText(styleEl));
-            MaterializeLegacyCssRules(sheet.Rules, result);
-        }
-
-        result.Sort((x, y) => x.Specificity.CompareTo(y.Specificity));
-        return result;
-    }
-
-    private void MaterializeLegacyCssRules(
-        IReadOnlyList<Broiler.CSS.CssRule> rules,
-        List<(string Selector, int Specificity, Dictionary<string, string> Declarations)> target)
-    {
-        foreach (var rule in rules)
-        {
-            if (rule is Broiler.CSS.CssStyleRule styleRule)
-            {
-                var declarations = ParseStyle(CSS.CssSerializer.Serialize(styleRule.Declarations));
-                foreach (var selector in styleRule.Selectors.Selectors)
-                {
-                    if (!string.IsNullOrWhiteSpace(selector.Text))
-                        target.Add((selector.Text.Trim(), selector.Specificity.Encoded, declarations));
-                }
-
-                continue;
-            }
-
-            if (rule is Broiler.CSS.CssAtRule atRule &&
-                atRule.Name.Equals("media", StringComparison.OrdinalIgnoreCase) &&
-                EvaluateMediaQuery(atRule.Prelude, _viewportWidth, _viewportHeight))
-            {
-                MaterializeLegacyCssRules(atRule.Rules, target);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Calculates CSS specificity for a selector, including Selectors L4
-    /// pseudo-class functions such as <c>:is()</c>, <c>:where()</c>,
-    /// <c>:has()</c>, and <c>:nth-child(... of ...)</c>.
-    /// Returns a sortable integer encoding of (a, b, c) where a = ID selectors,
-    /// b = class / attribute / pseudo-class selectors, and c = type selectors /
-    /// pseudo-elements. Inline styles are handled separately.
-    /// </summary>
-    public static int CalculateSpecificity(string selector) =>
-        CSS.CssSelectorParser.CalculateSpecificity(selector).Encoded;
+    // htmlbridge-public-surface/v2 (declared 2026-07-10): the compatibility
+    // `CssRules` tuple view and the `CalculateSpecificity` static delegation shim
+    // were removed here (Milestone 1.1). They had no production callers; consumers
+    // use the shared Broiler.CSS parser (`CssParser` / `CssStyleRule` /
+    // `CssDeclarationBlock.GetPropertyValue`) and `CssSelectorParser.CalculateSpecificity`
+    // directly. See docs/architecture/htmlbridge-engine-boundaries.md.
 
     /// <summary>
     /// Clears any CSS-derived compatibility values left in <see cref="DomElement.Style"/>

@@ -105,22 +105,16 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
-    public void DomBridge_CssRules_DoNotSplit_Commas_Inside_Is()
+    public void CssParser_DoesNotSplit_Commas_Inside_Is()
     {
-        const string html = """
-<!DOCTYPE html>
-<html><head>
-<style>
-:is(.alpha, .beta) { color: red; }
-</style>
-</head><body><div class="alpha"></div></body></html>
-""";
+        // Was a characterization test over the obsolete DomBridge.CssRules tuple
+        // view; rerouted to the shared Broiler.CSS parser (the single source of
+        // truth) when that seam was removed at htmlbridge-public-surface/v2. The
+        // comma inside :is(...) must not split the rule into two selectors.
+        var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(":is(.alpha, .beta) { color: red; }");
 
-        using var context = new JSContext();
-        var bridge = new DomBridge();
-        bridge.Attach(context, html, "file:///test.html");
-
-        var rule = Assert.Single(bridge.CssRules);
-        Assert.Equal(":is(.alpha, .beta)", rule.Selector);
+        var styleRule = Assert.IsType<Broiler.CSS.CssStyleRule>(Assert.Single(sheet.Rules));
+        var selector = Assert.Single(styleRule.Selectors.Selectors);
+        Assert.Equal(":is(.alpha, .beta)", selector.Text.Trim());
     }
 }
