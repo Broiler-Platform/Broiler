@@ -128,19 +128,28 @@ safe and is the true prerequisite for canonical text.
 Each phase is one or more PRs, each independently building + green. Gate every phase on
 the **full** validation set (see "Validation" below), baselined first per `CLAUDE.md`.
 
-**Progress (2026-07-10):** Phases A + B **DONE** on branch
+**Progress (2026-07-10/11):** Phases A + B + C **DONE** on branch
 `claude/rf-bridge-1c-domelement-facade-migration`, each full-`Broiler.Cli.Tests` regression-free
-(78-failure baseline, empty diff).
+(78-failure baseline; the only diff is the documented `GoogleSearchPolyfillTests`
+scrollIntoView-% parallel flake, which passes in isolation).
 - **Phase A** — `JsSetStyleProps` + `OwnerDocRoot` → `ElementRuntimeState` (42 sites).
 - **Phase B** — inline `.Style` → ERS via `DomBridge.InlineStyle(element)` (lazy-seeds from the
   `style=` attribute on first access; ~200 sites; clone + dialog-backdrop seed explicitly; facade
   `Style` deleted, ignored `style` ctor param retained until Phase F). Perf note: `InlineStyle`
   adds a CWT lookup per style access on hot paths — candidate for a per-pass cache if benchmarks
   regress.
+- **Phase C** — `Attributes` (`LegacyAttributeDictionary`) shim removed; ~195 sites moved to
+  bridge helpers over the canonical namespace-keyed attribute set (`TryGetAttribute`/`GetAttr`/
+  `HasAttr`/`SetAttr`/`RemoveAttr`/`AttributeNames`/`AttributeSnapshot`/`RestoreAttributes`, each
+  mirroring the legacy dict's case-insensitive scan-by-qualified-name exactly). `element.Attributes`
+  now resolves to the canonical read-only map. **`NsAttrMap` deferred** — its NS-handler rewrite has
+  namespace-normalization subtleties; isolate as its own follow-up (Phase C2). Note: canonical
+  `GetAttribute`/`SetAttribute` are no-namespace + lowercasing, so raw canonical methods are **not**
+  a drop-in for the legacy scan — the helpers are the faithful translation.
 
-Facade now retains: `InnerHtml` (deferred, ctor-coupled → Phase F), `Attributes`/`NsAttrMap`
-(Phase C), `IsTextNode`/`TextContent` (Phase D), `Parent`/`Children`/`NamespaceURI` (Phase E).
-Next: **Phase C** (canonicalize attribute access).
+Facade now retains: `InnerHtml` (deferred, ctor-coupled → Phase F), `NsAttrMap` (Phase C2),
+`IsTextNode`/`TextContent` (Phase D), `Parent`/`Children`/`NamespaceURI` (Phase E).
+Next: **Phase E** (widen tree traversal to `DomNode`) or **Phase C2** (`NsAttrMap`).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
