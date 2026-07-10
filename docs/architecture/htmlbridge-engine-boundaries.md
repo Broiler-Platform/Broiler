@@ -7,8 +7,16 @@ expanding the cross-engine contract.
 
 ## Boundary version
 
-- **Boundary version:** `htmlbridge-public-surface/v1`
-- **Status:** frozen for M1 follow-on work
+- **Boundary version:** `htmlbridge-public-surface/v2` **(declared 2026-07-10)**
+- **Prior boundary:** `htmlbridge-public-surface/v1` (M1 frozen surface)
+- **Status:** v2 declared by the maintainer, authorizing removal of the v1
+  compatibility adapters catalogued below. Removal proceeds per the
+  [HtmlBridge blocked-items completion roadmap](../roadmap/htmlbridge-blocked-items-completion-roadmap.md)
+  Track 1: the two zero-caller shims (`DomBridge.CalculateSpecificity`,
+  `DomBridge.CssRules`) are removed at v2 immediately (Milestone 1.1); the
+  `DomElement` / `HtmlTreeBuilder` facade removal (Milestones 1.2/1.3) additionally
+  waits on the RF-BRIDGE-1b geometry unification so the identity-keyed caches stop
+  keying on the facade.
 - **Change policy:** additive or behavioral changes inside this boundary require
   spec citations, targeted tests, and an explicit roadmap note; any breaking
   surface change requires a boundary-version bump.

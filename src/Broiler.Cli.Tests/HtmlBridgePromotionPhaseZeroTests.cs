@@ -43,35 +43,33 @@ public sealed class HtmlBridgePromotionPhaseZeroTests
     }
 
     [Fact]
-    public void CssRules_Compatibility_Tuple_View_Remains_An_Obsolete_Bridge_Seam()
+    public void CssRules_Compatibility_Tuple_View_Is_Removed_At_V2()
     {
-        // CssRules is the historical (selector, specificity, declarations) tuple
-        // projection. It is bridge-owned and obsolete-marked; canonical consumers
-        // use the shared Broiler.CSS stylesheet/style-engine APIs. It must remain
-        // discoverable so its removal at v2 is a deliberate change.
+        // htmlbridge-public-surface/v2 (Milestone 1.1): the obsolete CssRules tuple
+        // view had no production callers and is removed. Consumers use the shared
+        // Broiler.CSS parser (CssParser / CssStyleRule / CssDeclarationBlock)
+        // directly. This guard asserts the seam is gone so it cannot silently
+        // reappear.
         var cssRules = typeof(DomBridge).GetProperty(
-            nameof(DomBridge.CssRules),
+            "CssRules",
             BindingFlags.Public | BindingFlags.Instance);
 
-        Assert.NotNull(cssRules);
-        Assert.NotNull(cssRules!.GetCustomAttribute<ObsoleteAttribute>());
+        Assert.Null(cssRules);
     }
 
     [Fact]
-    public void CalculateSpecificity_Remains_A_Static_Delegation_Shim_Over_The_Css_Parser()
+    public void CalculateSpecificity_Static_Shim_Is_Removed_At_V2()
     {
-        // CalculateSpecificity is a static compatibility helper that delegates to
-        // Broiler.CSS.CssSelectorParser.CalculateSpecificity. It has no in-repo
-        // callers today; the public replacement is the CSS parser API. Freezing
-        // its shape prevents the bridge from re-growing a private specificity
-        // algorithm.
+        // htmlbridge-public-surface/v2 (Milestone 1.1): the bridge-only
+        // CalculateSpecificity static delegation shim had no production callers and
+        // is removed. The public replacement is
+        // Broiler.CSS.CssSelectorParser.CalculateSpecificity, which stays. This
+        // guard asserts the bridge shim is gone.
         var calculate = typeof(DomBridge).GetMethod(
-            nameof(DomBridge.CalculateSpecificity),
+            "CalculateSpecificity",
             BindingFlags.Public | BindingFlags.Static);
 
-        Assert.NotNull(calculate);
-        Assert.Equal(typeof(int), calculate!.ReturnType);
-        Assert.Equal([typeof(string)], calculate.GetParameters().Select(static p => p.ParameterType));
+        Assert.Null(calculate);
     }
 
     [Fact]

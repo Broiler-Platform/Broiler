@@ -42,24 +42,25 @@ public sealed class CssExtractionPhaseTwoTests
             }
             """;
 
-        using var context = new JSContext();
-        var bridge = new DomBridge();
-        bridge.Attach(
-            context,
-            $"<!doctype html><html><head><style>{css}</style></head><body><div class=\"asset\"></div></body></html>",
-            "https://example.test/css-phase-two");
+        // Was a characterization test over the obsolete DomBridge.CssRules tuple
+        // view; rerouted to the shared Broiler.CSS parser (the single source of
+        // truth) when that seam was removed at htmlbridge-public-surface/v2. The
+        // shared parser must keep complex declaration values intact — a data-URI
+        // with commas, a string with a semicolon, a custom property with a colon,
+        // and a calc() inside an @media block.
+        var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
 
-        var assetRules = bridge.CssRules
-            .Where(static rule => rule.Selector == ".asset")
-            .ToArray();
+        var baseAsset = sheet.Rules.OfType<Broiler.CSS.CssStyleRule>()
+            .Single(static r => r.Selectors.Selectors.Any(static s => s.Text.Trim() == ".asset"));
+        Assert.Equal("url(data:image/png;base64,AAAA)", baseAsset.Declarations.GetPropertyValue("background-image"));
+        Assert.Equal("\"alpha;beta\"", baseAsset.Declarations.GetPropertyValue("content"));
+        Assert.Equal("alpha:beta", baseAsset.Declarations.GetPropertyValue("--Payload"));
 
-        Assert.Equal(2, assetRules.Length);
-        Assert.Equal(
-            "url(data:image/png;base64,AAAA)",
-            assetRules[0].Declarations["background-image"]);
-        Assert.Equal("\"alpha;beta\"", assetRules[0].Declarations["content"]);
-        Assert.Equal("alpha:beta", assetRules[0].Declarations["--Payload"]);
-        Assert.Equal("calc(10px + 5px)", assetRules[1].Declarations["width"]);
+        var mediaRule = sheet.Rules.OfType<Broiler.CSS.CssAtRule>()
+            .Single(static r => r.Name.Equals("media", System.StringComparison.OrdinalIgnoreCase));
+        var mediaAsset = mediaRule.Rules.OfType<Broiler.CSS.CssStyleRule>()
+            .Single(static r => r.Selectors.Selectors.Any(static s => s.Text.Trim() == ".asset"));
+        Assert.Equal("calc(10px + 5px)", mediaAsset.Declarations.GetPropertyValue("width"));
     }
 
     [Fact]

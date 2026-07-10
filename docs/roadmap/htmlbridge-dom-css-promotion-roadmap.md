@@ -310,11 +310,17 @@ other two are gated on prerequisites that are not yet met (documented below).
   `CssExtractionPhaseZeroTests.Phase7_*` failures are **pre-existing at HEAD**
   (legacy `Broiler.HTML.CSS`/`CssData` environmental state), baselined as unrelated.
 
-- **BLOCKED — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
+- **IN PROGRESS — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
   `Broiler.HtmlBridge.Dom.DomElement`, `HtmlTreeBuilder`, the obsolete `CssRules`
-  tuple view, and the bridge-only `DomBridge.CalculateSpecificity`. Gated on
-  **declaring the v2 boundary** (Open Question #5, unanswered) **and** migrating
-  callers to canonical APIs first. `DomElement` alone is referenced by **58
+  tuple view, and the bridge-only `DomBridge.CalculateSpecificity`.
+  **Update (2026-07-10, session 95a4149e): the v2 boundary is DECLARED** (Open
+  Question #5 answered by the maintainer; see
+  `docs/architecture/htmlbridge-engine-boundaries.md`), and the two zero-caller shims
+  — `DomBridge.CssRules` and `DomBridge.CalculateSpecificity` — are **REMOVED**
+  (Milestone 1.1): the two `CssRules` test consumers were rerouted to the shared
+  `Broiler.CSS` parser and the phase-zero guards flipped to assert removal. The
+  `DomElement`/`HtmlTreeBuilder` facade removal (Milestones 1.2/1.3) still follows the
+  RF-BRIDGE-1b geometry unification. `DomElement` alone is referenced by **58
   non-submodule source files** (`grep -rlE '\bDomElement\b' --include=*.cs src/`)
   and is entangled with RF-BRIDGE-1b geometry keying (boxes
   key by bridge instances — see rf-bridge-1b §5a), so it cannot be ripped out
@@ -351,11 +357,15 @@ other two are gated on prerequisites that are not yet met (documented below).
   **Update (2026-07-10): the increment-6 CUTOVER is now landed** —
   `UseSharedGeometryExclusively` is flipped **on**, regression-free (guarded by
   `ShouldReturnExclusiveSharedZero`'s `!HasAssociatedLayoutBox` check; verified zero delta
-  on the full Cli 1680 + WPT 545 corpora). The estimator *body* is not yet deleted: its only
-  remaining consumer is a WPT test-harness snapshot artifact (real bridge usage produces a
-  complete snapshot), mitigated by the guard. See
+  on the full Cli 1680 + WPT 545 corpora). The estimator *body* is not yet deleted, and (**corrected
+  2026-07-10, session 95a4149e**) its remaining consumer is a **real `Broiler.Layout` bug, NOT a
+  WPT-harness artifact** as previously believed: a `display:inline-block` element containing a
+  block-level child, when it has any sibling (even a `display:none` `<script>`), has its principal box
+  dropped by the CSS 2.1 §9.2.1.1 block-inside-inline correction (the correction splits the inline-block
+  instead of leaving it atomic). That drops it from the shared snapshot; the `!HasAssociatedLayoutBox`
+  guard masks it via the estimator. Deleting the estimator is gated on fixing that engine bug. See
   [`htmlbridge-blocked-items-completion-roadmap.md`](htmlbridge-blocked-items-completion-roadmap.md)
-  Milestone 2.4 for the full flip/deletion analysis and the two paths to complete the deletion.
+  Milestone 2.4 for the full root-cause analysis and fix region.
 
   **Correction (2026-07-09): the previously-documented blocker was stale.** The
   renderer *does* now size `@position-try` elements correctly on the shared path —
