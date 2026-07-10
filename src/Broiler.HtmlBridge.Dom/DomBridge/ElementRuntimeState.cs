@@ -24,8 +24,6 @@ internal sealed class ElementRuntimeState
 
     public ScrollRuntimeState Scroll { get; } = new();
 
-    public LayoutRuntimeState Layout { get; } = new();
-
     public DialogRuntimeState Dialog { get; } = new();
 
     public ShadowRuntimeState Shadow { get; } = new();
@@ -47,10 +45,6 @@ internal sealed class ElementRuntimeState
         FormControl.ReturnValue.CopyTo(target.FormControl.ReturnValue);
         Scroll.Left.CopyTo(target.Scroll.Left);
         Scroll.Top.CopyTo(target.Scroll.Top);
-        Layout.Left.CopyTo(target.Layout.Left);
-        Layout.Top.CopyTo(target.Layout.Top);
-        Layout.Width.CopyTo(target.Layout.Width);
-        Layout.Height.CopyTo(target.Layout.Height);
         Dialog.Modal.CopyTo(target.Dialog.Modal);
         Dialog.TopLayerOrder.CopyTo(target.Dialog.TopLayerOrder);
         Dialog.PopoverOpen.CopyTo(target.Dialog.PopoverOpen);
@@ -83,14 +77,6 @@ internal sealed class ScrollRuntimeState
 {
     public RuntimeValue<double> Left { get; } = new();
     public RuntimeValue<double> Top { get; } = new();
-}
-
-internal sealed class LayoutRuntimeState
-{
-    public RuntimeValue<double> Left { get; } = new();
-    public RuntimeValue<double> Top { get; } = new();
-    public RuntimeValue<double> Width { get; } = new();
-    public RuntimeValue<double> Height { get; } = new();
 }
 
 internal sealed class DialogRuntimeState

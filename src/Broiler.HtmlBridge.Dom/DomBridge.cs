@@ -212,24 +212,18 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         out double width,
         out double height)
     {
-        var layout = GetElementRuntimeState(element).Layout;
-        var hasLeft = TryRead(layout.Left, out left);
-        var hasTop = TryRead(layout.Top, out top);
-        var hasWidth = TryRead(layout.Width, out width);
-        var hasHeight = TryRead(layout.Height, out height);
-        return hasLeft && hasTop && hasWidth && hasHeight;
-
-        static bool TryRead(RuntimeValue<double> slot, out double result)
+        // RF-BRIDGE-1b (Milestone 2.5): reads the memoized position-area resolution,
+        // relocated from ElementRuntimeState.Layout to the bridge-level
+        // PositionAreaResolutions cache. The four values are always set (and cleared)
+        // together, so a cached entry is equivalent to the old "all four slots present".
+        if (TryGetPositionAreaResolution(element, out var rect))
         {
-            if (slot.TryGet(out var value) && value is double number)
-            {
-                result = number;
-                return true;
-            }
-
-            result = 0;
-            return false;
+            (left, top, width, height) = rect;
+            return true;
         }
+
+        (left, top, width, height) = (0, 0, 0, 0);
+        return false;
     }
 
     /// <summary>

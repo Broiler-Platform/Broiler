@@ -68,20 +68,18 @@ Track 2 (geometry)                         Track 1 (public surface)
 
 ## Track 2 — RF-BRIDGE-1b geometry unification
 
-Current state (updated 2026-07-10): `UseSharedLayoutGeometry = true` and
-**`UseSharedGeometryExclusively = true` (increment-6 cutover flipped ON,
-regression-free)**. Exclusive-shared is now the default: geometry entry points answer
-from the shared snapshot, and a *genuinely* boxless element (display:none/contents,
-text/comment) reports zero; a box-generating element merely absent from the current
-snapshot still falls back to the estimator via `ShouldReturnExclusiveSharedZero`'s
-`!HasAssociatedLayoutBox` guard (added 2026-07-10 — this is what makes the flip
-regression-free; see Milestone 2.4 Task 1). Verified zero delta on the full
-`Broiler.Cli.Tests` (1680) and `Broiler.Wpt.Tests` (545) corpora, gate families 20/20,
-`Broiler.Layout.Tests` 40/40. The estimator body (`LayoutMetrics.cs`, ~2952 LOC) is
-therefore **not yet deleted** — it stays load-bearing as the shared-unavailable fallback
-(see the DELETION analysis under Milestone 2.4: the only remaining snapshot gap is a WPT
-test-harness artifact, not real bridge usage). `LayoutRuntimeState` still stores resolved
-position-area geometry (Milestone 2.5, opens after the deletion).
+Current state (updated 2026-07-10): **Track 2 / Item 2 is COMPLETE.** `UseSharedLayoutGeometry = true`,
+`UseSharedGeometryExclusively = true`, the ~2950-LOC recursive estimator body is **deleted** (Milestone 2.4,
+PR #1354 — gated on and unblocked by the §9.2.1.1 inline-block layout fix, PR #1353), and
+**`LayoutRuntimeState` is retired** (Milestone 2.5 — the resolved position-area memo relocated to the
+bridge-level `PositionAreaResolutions` CWT). Geometry entry points answer from the shared snapshot; a
+*genuinely* boxless element (display:none/contents, text/comment) reports zero, and the residual estimator
+survives only as a shared-*unavailable* fallback for cross-origin / non-materialised frames. All three
+renderer prerequisites (Track 3: 3.1 abspos-in-inline-CB, 3.2 cross-frame/sub-viewport geometry, 3.3
+fixed-target scrollIntoView) landed regression-free. Verified across the full `Broiler.Cli.Tests`,
+`Broiler.Wpt.Tests`, `Broiler.Layout.Tests`, and the parity gate. **The two-box-model duplication that
+RF-BRIDGE-1b existed to remove is gone.** Nothing in Track 2 remains open; the next roadmap work is Track 1
+(DomElement facade removal, Milestones 1.2/1.3), now unblocked.
 
 ### Milestone 2.1 — Zoom-correct shared snapshot (the gating prerequisite)
 
@@ -458,23 +456,39 @@ the element's own, which mis-scales a self-zoomed target). Validated regression-
 
 **Depends on:** 2.3 (position-area resolution no longer stores into it).
 
-**Status (2026-07-10): ATTEMPTED + REVERTED — needs a re-entrancy-safe cache replacement.** `.Layout` is
-a per-element memo of the resolved position-area rect AND a re-entrancy guard: `ResolvePositionAreaForElement`
-is reachable from the geometry entry points, so removing the cache and re-resolving on-the-fly (rebuilding
-the anchor registry per call) recurses / corrupts shared state — it broke ~200 WPT tests (host abort) and
-was reverted. Retiring the type requires a re-entrancy-safe replacement first: a pass-scoped bridge-level
-`Dictionary<DomElement,rect>` (keyed off the `WithLayoutGeometryCache` pass), or sourcing position-area
-geometry from the shared snapshot in the entry points (the resolver already reflects the result into inline
-`left/top/width/height`). A focused follow-up.
+**Status (2026-07-10): DONE — `LayoutRuntimeState` deleted; RF-BRIDGE-1b "definition of done" met.**
+The earlier attempt failed because it *removed* the cache and re-resolved on-the-fly per call — rebuilding
+the anchor registry inside a geometry query re-enters `ResolvePositionAreaForElement` and corrupts shared
+state (~200 WPT host aborts). The re-entrancy safety comes from the memo *existing*, not from where it
+lives, so the fix keeps the memo and merely **relocates** it out of the typed runtime-state object: the four
+`.Layout` `RuntimeValue<double>` slots are replaced by a bridge-level
+`ConditionalWeakTable<DomElement, PositionAreaResolution>` (`PositionAreaResolutions`, in
+`PositionAreaQueries.cs`) with helpers `TryGetPositionAreaResolution` / `SetPositionAreaResolution` /
+`ClearPositionAreaResolution` / `CopyPositionAreaResolution`. This is a *pure storage relocation* — same
+static-CWT lifetime as `ElementRuntimeStates` (a detached element's memo is collected with it), same
+read/write/invalidate/clone semantics — so it is behaviour-identical by construction rather than by
+recomputation. (The doc's pass-scoped `Dictionary` and shared-snapshot options were both rejected: the
+main-pass write stores adjusted `borderBoxW`/`borderBoxH` that the on-the-fly `ComputePositionAreaRect`
+does not reproduce, so recompute-per-pass would diverge.) All five call sites migrated: the two writers
+(`PositionArea.cs`, `PositionAreaQueries.cs`), the invalidation (`Utilities.cs`, on
+`position-area`/`position-anchor` mutation), the clone-copy (`CloneDomElement`), and the internal
+`DomBridge.TryGetResolvedLayout` reader (the WPT harness's `TryGetResolvedLayout` consumer). Verified
+regression-free: a HEAD stash-comparison shows the WPT anchor/position-area cluster **identical** (37 pass /
+same 5 pre-existing fails `PositionAreaAnchorPartiallyOutside`, `PositionAreaScrolling00{2,3}`,
+`PositionVisibilityRemoveAnchorsVisible`, `PositionTryGrid001`), Cli offset/position 5/5, parity + clone +
+anchor + sticky 45/45, and the **full `Broiler.Cli.Tests` (1699, slot crasher excluded) shows ZERO new
+failures by name** vs the flag-on baseline (81 fails, all pre-existing environmental/known — PDF/Skia/font/
+network/grid; the 5-name delta is documented parallel-run flakiness). `LayoutRuntimeState` no longer exists.
 
-**Tasks.** Remove the `.Layout` slots and the `LayoutRuntimeState` type; confirm
-no reader remains (`PositionAreaQueries.cs`, any offset-property path).
+**Tasks — DONE.** Removed the `.Layout` slots and the `LayoutRuntimeState` type; confirmed
+no reader remains (`PositionAreaQueries.cs`, `DomBridge.TryGetResolvedLayout`, any offset-property path).
 
 **Verification.** Full anchor/position-area suite; `DomBridge` builds without the
 type.
 
-**Exit criteria.** `LayoutRuntimeState` deleted; RF-BRIDGE-1b "definition of
-done" met — the two-box-model duplication is gone.
+**Exit criteria — MET (2026-07-10).** `LayoutRuntimeState` deleted; RF-BRIDGE-1b "definition of
+done" met — the recursive-estimator box model (2.4) and its resolved-geometry runtime store (2.5) are
+both gone. **Track 2 / Item 2 complete.**
 
 ---
 

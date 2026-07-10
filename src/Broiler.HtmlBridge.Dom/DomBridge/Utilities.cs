@@ -405,6 +405,9 @@ public sealed partial class DomBridge
             clone.NsAttrMap[kv.Key] = kv.Value;
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(source).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
+        // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
+        // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
+        CopyPositionAreaResolution(source, clone);
 
         if (deep)
         {
@@ -708,12 +711,7 @@ public sealed partial class DomBridge
                 // Invalidate cached position-area resolution when relevant
                 // properties change so offset queries recompute.
                 if (kebab is "position-area" or "position-anchor")
-                {
-                    GetElementRuntimeState(_element).Layout.Left.Remove();
-                    GetElementRuntimeState(_element).Layout.Top.Remove();
-                    GetElementRuntimeState(_element).Layout.Width.Remove();
-                    GetElementRuntimeState(_element).Layout.Height.Remove();
-                }
+                    ClearPositionAreaResolution(_element);
 
                 _onMutation?.Invoke();
             }
