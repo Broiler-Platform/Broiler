@@ -2327,15 +2327,10 @@ public sealed partial class DomBridge
         // must fold in the iframe's own position, which the main snapshot does not carry).
         if (!ReferenceEquals(GetOwningDocumentElement(element), GetOwningDocumentElement(ancestor)))
             return false;
-        // An absolutely/fixed-positioned element whose containing block is an inline box is
-        // placed by the renderer at the inline-flow position, ignoring its own insets, so its
-        // shared box is at the wrong place — the estimator resolves it from the explicit
-        // insets. Mirrors AnchorRegistry.ComputeElementBox's absPosInInlineCB bypass.
-        var elementPosition = GetComputedProps(element).GetValueOrDefault("position");
-        if ((elementPosition == "absolute" || elementPosition == "fixed")
-            && FindContainingBlockElement(element) is { } inlineCbAncestor
-            && IsInlineContainingBlock(inlineCbAncestor))
-            return false;
+        // (RF-BRIDGE-1b Track 3.1) The former abspos-in-inline-CB bypass is gone: the
+        // layout engine now places an absolutely/fixed-positioned element whose
+        // containing block is an inline box at its inset position, so its shared box is
+        // correct and the estimator fallback is no longer needed here.
         if (Math.Abs(GetUsedZoomForElement(element) - 1.0) >= 0.0001 ||
             Math.Abs(GetUsedZoomForElement(ancestor) - 1.0) >= 0.0001)
             return false;

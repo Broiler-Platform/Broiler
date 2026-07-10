@@ -422,9 +422,9 @@ hottest, most-tested path — a **distinct track** from the bridge migration, an
 must be gated on the **full WPT pixel + Acid corpus**, not just the geometry unit
 tests. Scoped from investigation (2026-07-09):
 
-**Status: 3.1 LANDED (2026-07-09), engine-side, regression-free; 3.2 and 3.3 remain.**
-Once the bridge's `absPosInInlineCB` bypass/gate are also retired (a follow-up), 3.1
-stops blocking `ComputeOffsetWithinAncestor`; 2.4 still waits on 3.2 + 3.3.
+**Status: 3.1 COMPLETE (engine fix 2026-07-09 + bridge bypass/gate removal 2026-07-10),
+regression-free; 3.2 and 3.3 remain.** 3.1 no longer blocks
+`ComputeOffsetWithinAncestor`; 2.4's estimator deletion still waits on 3.2 + 3.3.
 
 ### 3.1 — abspos-in-inline-CB placement
 
@@ -499,12 +499,27 @@ abspos/cssom-view clusters show **zero new failures** (every failure — e.g.
 `AbsposInBlockInInlineInRelposInline` — also fails at HEAD). Notably
 `position-area-abs-inline-container` (which passed at HEAD) still passes.
 
-**Follow-up now unblocked (not done here).** With the engine placing abspos-in-inline-CB
-correctly, the bridge's `AnchorRegistry` `absPosInInlineCB` bypass + the
-`TrySharedOffsetWithinAncestor` gate (and, eventually, the `PromoteAbsPosFromInlineCBs`
-DOM-mutation workaround) can be retired — a separate bridge change to validate against
-the full anchor WPT cluster, and still one of the three renderer prerequisites (with
-3.2/3.3) that 2.4's estimator deletion waits on.
+**Bridge bypasses retired (2026-07-10).** With the engine placing abspos-in-inline-CB
+correctly, the two bridge fallbacks that mirrored the old renderer gap are **removed**:
+`AnchorRegistry.ComputeElementBox`'s `absPosInInlineCB` bypass (so an abspos anchor in
+an inline CB now registers from the real shared box) and
+`TrySharedOffsetWithinAncestor`'s matching abspos-in-inline-CB gate (so `scrollIntoView`
+on such a target reads the shared offset instead of the estimator). The cross-frame
+(3.2) and zoom gates in `TrySharedOffsetWithinAncestor` are **kept**. Verified
+regression-free: the WPT abspos-in-inline-CB cluster (`position-area-inline-container`,
+`-abs-inline-container`, `AnchorInlineContainingBlock`, `AbsPos*InInlineContainingBlock`)
+green; the anchor/position-area/sticky/anchor-scroll/position-try clusters show only the
+same pre-existing failures as HEAD (`PositionAreaScrolling00{2,3}`,
+`PositionAreaAnchorPartiallyOutside`, `PositionVisibilityRemoveAnchorsVisible`,
+`PositionTryGrid001`); Cli oracle + scrollIntoView-abspos + anchor + shared families
+green. (`position-area-percents-001` flakes under parallel load — passes 3/3 in
+isolation on both HEAD and this change.)
+
+The `PromoteAbsPosFromInlineCBs` DOM-mutation workaround in the anchor resolver is left
+in place — it is now redundant for geometry but is a larger, separate anchor-subsystem
+change with its own paint/registration coupling; retiring it is a follow-up. 3.1 no
+longer blocks `ComputeOffsetWithinAncestor`; 2.4's estimator deletion still waits on
+3.2 + 3.3.
 
 ### 3.2 — cross-frame / subframe geometry in the main coordinate space
 
@@ -535,12 +550,12 @@ Smaller than 3.1/3.2 and mostly bridge-side, but depends on the fixed box's shar
 geometry being correct (interacts with 3.1/3.2). **Oracle:** the visual-viewport /
 fixed scrollIntoView cases.
 
-**Gate to close 2.4.** **3.1 has landed** (engine now places abspos-in-inline-CB
-correctly); 3.2 and 3.3 remain. Once all three land *and* the bridge's bypasses/gates
-are removed (so no resolver calls `ComputeOffsetWithinAncestor` / the size estimators),
-flip `UseSharedGeometryExclusively` (verified regression-free in 2.4) and delete the
-estimator body + `WithLayoutGeometryCache`. Only then does 2.5 (`LayoutRuntimeState`)
-also open up.
+**Gate to close 2.4.** **3.1 is complete** — the engine places abspos-in-inline-CB
+correctly and the bridge's `absPosInInlineCB` bypass + gate are removed; 3.2 and 3.3
+remain. Once those land *and* their bypasses/gates are removed (so no resolver calls
+`ComputeOffsetWithinAncestor` / the size estimators), flip `UseSharedGeometryExclusively`
+(verified regression-free in 2.4) and delete the estimator body + `WithLayoutGeometryCache`.
+Only then does 2.5 (`LayoutRuntimeState`) also open up.
 
 ---
 
