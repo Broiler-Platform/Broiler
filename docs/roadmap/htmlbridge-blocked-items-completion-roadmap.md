@@ -537,6 +537,18 @@ target resolves without the estimator. **Oracle:** the
 `ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_*Fixed_Targets` and
 `Subframe*ScrollIntoView` cases.
 
+**Scope confirmed (2026-07-10).** The shared snapshot (`BuildSharedGeometrySnapshot` →
+`GetRenderDocument()` → `CollectLayoutGeometry`) is a single `Dictionary<DomElement,
+BoxGeometry>` for the **main** document only — subframe elements are not keyed in it at
+all, so `TryGetSharedLayoutGeometry(subframeTarget)` already returns false and the
+cross-frame gate is a fast short-circuit over a box that is simply absent. Closing 3.2
+therefore means teaching `CollectLayoutGeometry` (Broiler.HTML orchestration) to recurse
+into each iframe's laid-out subdocument, translate its internal box geometry by the
+iframe element's own main-frame border-box origin, and add those entries to the snapshot —
+i.e. nested-browsing-context composition on the renderer side, not a bridge-only change.
+This is the largest of the three prerequisites and must gate on the full iframe/subframe
+scrollIntoView + `Subframe*` corpus (several of which currently fail pre-existing).
+
 ### 3.3 — fixed-target offsets for the visual-viewport scrollIntoView sites
 
 **Symptom.** The two visual-viewport `offsetOverride` sites in
@@ -549,6 +561,26 @@ for a viewport-anchored fixed box. Left on the estimator.
 Smaller than 3.1/3.2 and mostly bridge-side, but depends on the fixed box's shared
 geometry being correct (interacts with 3.1/3.2). **Oracle:** the visual-viewport /
 fixed scrollIntoView cases.
+
+**Attempted + reverted (2026-07-10) — a blanket "viewport-anchored" flag is too coarse.**
+Added a `viewportAnchored` mode to `TrySharedOffsetWithinAncestor` that skips the whole
+intermediate-scroll-subtraction loop, and pointed the two `ScrollFixedElementIntoVisualViewport`
+`offsetOverride` sites at it. Both direct oracles (`VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset`,
+`VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop`) stayed green — but a hit
+probe showed that was **luck, not correctness**: for the `Adjusts_PageTop` case the shared
+value (1268) and estimator (744) disagree by exactly the intermediate scroll, and both
+clamp to the same max visual-viewport extra offset, so the test can't tell them apart.
+The disagreement is because that fixture's target is an `<input>` *inside* a
+`position:fixed; overflow:auto` box — i.e. the fixed element is **itself a scroll
+container**, and the target genuinely scrolls within it. So the subtraction must be split:
+skip it for scroll containers **above** the fixed element (between the fixed box and the
+document — those don't move a viewport-anchored box), but **keep** it for scroll containers
+**at or below** the fixed element in the subtree (the fixed box's own `overflow` scroll,
+which the target rides). A single flag can't express that; the correct fix walks the chain
+and stops subtracting only once it passes the nearest fixed ancestor's document-anchor —
+which needs that fixed box's shared geometry to be reliable (the 3.2/fixed-geometry
+dependency). Reverted; the two sites stay on the estimator until this split is implemented
+and validated against a fixture whose result is *not* clamp-saturated.
 
 **Gate to close 2.4.** **3.1 is complete** — the engine places abspos-in-inline-CB
 correctly and the bridge's `absPosInInlineCB` bypass + gate are removed; 3.2 and 3.3
