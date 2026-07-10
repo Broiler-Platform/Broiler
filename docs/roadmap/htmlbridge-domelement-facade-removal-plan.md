@@ -128,6 +128,12 @@ safe and is the true prerequisite for canonical text.
 Each phase is one or more PRs, each independently building + green. Gate every phase on
 the **full** validation set (see "Validation" below), baselined first per `CLAUDE.md`.
 
+**Progress (2026-07-10):** Phase A **DONE** — `JsSetStyleProps` + `OwnerDocRoot` relocated
+to `ElementRuntimeState` (42 sites), facade members deleted, frozen guard updated; full
+`Broiler.Cli.Tests` (1699, crasher excluded) zero new failures by name vs HEAD. `InnerHtml`
+deferred out of Phase A (constructor-coupled; fold in near Phase F). Next: Phase B
+(`.Style` → ERS). Branch: `claude/rf-bridge-1c-domelement-facade-migration`.
+
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
 Independent, low-risk, no canonical-model change. Proves the relocation pattern and
@@ -146,17 +152,39 @@ nested `CssStyleDeclaration`/`CssStyleMap` JS-object classes can reach it.
 
 ### Phase B — Canonicalize `.Style` (node-attached inline style)
 
-- Add an ERS-backed accessor `Dictionary<string,string> InlineStyle(DomNode)`.
-- Populate it wherever the facade `Style` is populated today: `HtmlTreeBuilder`
-  construction (`ParseStyle`), the `style=` attribute setter (`Attributes.cs`), and JS
-  `element.style` writes (`Utilities.cs` `CssStyleDeclaration`).
-- Migrate the ~200 `.Style` read/write/remove/enumerate sites to `InlineStyle(node)`.
-- Delete facade `Style`; drop `"Style"` from the frozen list.
+- Add an **eager** ERS field `Dictionary<string,string> Style` (init empty,
+  `OrdinalIgnoreCase`) and a bridge accessor `Dictionary<string,string> InlineStyle(DomNode)`
+  → `GetElementRuntimeState(node).Style`.
+- Migrate the ~207 element `.Style` sites (136 writes) to `InlineStyle(node)`.
+- Seed at construction where the facade seeds today:
+  - `CloneDomElement` (in `DomBridge` partial — copy `InlineStyle(source)` into
+    `InlineStyle(clone)`; drop the `style` constructor arg).
+  - `HtmlTreeBuilder` element case — parses `style` at construction, but the builder is a
+    **separate class** and cannot reach the private static `GetElementRuntimeState`. Seed
+    in `DomBridge` after `Build`/`ParseFragment` returns (walk the returned elements, parse
+    each node's `style` attribute into `InlineStyle`), or expose an internal seeding hook.
+- Delete facade `Style` (and its constructor param); drop `"Style"` from the frozen list.
 
-**Risk.** High (breadth, ~200 sites), but mechanical and locally verifiable. Split into
-sub-PRs by cluster (anchor-resolver, JS-callbacks, serialization/computed-style).
-**Exit.** No `.Style` on the node; inline style lives in ERS; computed-style, anchor,
-animation, serialization suites green.
+**Findings that shape this phase (2026-07-10):**
+- **The `Style` dict is the authoritative in-memory inline style, not the `style`
+  attribute.** It is seeded from `style=` at parse/set time (`Attributes.cs` clears +
+  reparses the dict on a `style=` write), mutated directly by JS `element.style`
+  (`Utilities.cs` `CssStyleDeclaration`), the anchor resolver, and synthetic form-control
+  styling (`DomBridge.Serialization.cs`), and only written **back** to the `style`
+  attribute at serialization. Therefore `InlineStyle` must be an **eager persistent** ERS
+  dict seeded once — a lazy "parse the `style` attribute on first access" design would
+  silently drop unsynced JS mutations (notably on `cloneNode`, whose clone must copy the
+  live dict, not re-parse the possibly-stale attribute).
+- **`.Style` is NOT a facade-unique member name** — it also occurs on tuples
+  (`_zoomSerializationRevertLog`'s `(Element, Style, Attributes)`), computed-props maps,
+  etc. So **no blind `sed`** (unlike Phase A's facade-unique `OwnerDocRoot`/
+  `JsSetStyleProps`): each `.Style` site needs confirmation it is on a `DomElement` value.
+  Migrate file-by-file with review.
+
+**Risk.** High (breadth ~207 sites + construction seeding + non-unique name → per-site
+judgment). Split into sub-PRs by cluster (anchor-resolver, JS-callbacks,
+serialization/computed-style). **Exit.** No `.Style` on the node; inline style lives in
+ERS; computed-style, anchor, animation, serialization suites green.
 
 ### Phase C — Canonicalize attribute access (`Attributes` + `NsAttrMap`)
 
