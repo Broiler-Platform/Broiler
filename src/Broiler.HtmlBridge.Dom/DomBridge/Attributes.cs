@@ -229,9 +229,9 @@ public sealed partial class DomBridge
             element.ClassName = attrVal;
         else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            element.Style.Clear();
+            InlineStyle(element).Clear();
             foreach (var kv in ParseStyle(attrVal, reportDrops: true))
-                element.Style[kv.Key] = kv.Value;
+                InlineStyle(element)[kv.Key] = kv.Value;
             InvalidateStyleScope(element);
         }
         else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
@@ -284,9 +284,9 @@ public sealed partial class DomBridge
             element.ClassName = attrVal;
         else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            element.Style.Clear();
+            InlineStyle(element).Clear();
             foreach (var kv in ParseStyle(attrVal, reportDrops: true))
-                element.Style[kv.Key] = kv.Value;
+                InlineStyle(element)[kv.Key] = kv.Value;
             InvalidateStyleScope(element);
         }
         else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))

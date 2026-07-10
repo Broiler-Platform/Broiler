@@ -36,6 +36,23 @@ internal sealed class ElementRuntimeState
     /// </summary>
     public DomElement? OwnerDocRoot { get; set; }
 
+    /// <summary>
+    /// The node's inline style in CSS kebab-case — the authoritative in-memory inline
+    /// style (mutated by JS <c>element.style</c>, the anchor resolver, and synthetic
+    /// form-control styling; synced back to the <c>style=</c> attribute at serialization).
+    /// Relocated off the <c>DomElement</c> facade (RF-BRIDGE-1c Phase B); reached through
+    /// <c>DomBridge.InlineStyle(element)</c>, which lazily seeds it from the <c>style=</c>
+    /// attribute on first access (see <see cref="StyleSeeded"/>).
+    /// </summary>
+    public Dictionary<string, string> Style { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether <see cref="Style"/> has been seeded from the element's <c>style=</c>
+    /// attribute yet. The lazy seed runs once on first <c>InlineStyle</c> access; the
+    /// <c>style=</c> attribute setter and <c>cloneNode</c> set this explicitly.
+    /// </summary>
+    public bool StyleSeeded { get; set; }
+
     public FormControlRuntimeState FormControl { get; } = new();
 
     public ScrollRuntimeState Scroll { get; } = new();

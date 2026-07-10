@@ -55,12 +55,12 @@ public sealed partial class DomBridge
                     // avoiding the rendering artefact where negative-margin
                     // spacers can leak above the container's top edge.
                     var wrapper = new DomElement(_document, "div", null, null, "");
-                    wrapper.Style["position"] = "relative";
+                    InlineStyle(wrapper)["position"] = "relative";
                     if (scrollTop != 0)
-                        wrapper.Style["top"] =
+                        InlineStyle(wrapper)["top"] =
                             $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
                     if (scrollLeft != 0)
-                        wrapper.Style["left"] =
+                        InlineStyle(wrapper)["left"] =
                             $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
 
                     var originalChildren = SnapshotChildren(el);
@@ -115,7 +115,7 @@ public sealed partial class DomBridge
                             childOffset += childMT;
                             if (childOffset + childH <= scrollTop)
                             {
-                                child.Style["visibility"] = "hidden";
+                                InlineStyle(child)["visibility"] = "hidden";
                                 childOffset += childH;
                             }
                             else

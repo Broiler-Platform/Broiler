@@ -35,9 +35,9 @@ public sealed partial class DomBridge
         animationShorthand = null;
         animationDelay = null;
 
-        if (element.Style.TryGetValue("animation", out animationShorthand))
+        if (InlineStyle(element).TryGetValue("animation", out animationShorthand))
         {
-            element.Style.TryGetValue("animation-delay", out animationDelay);
+            InlineStyle(element).TryGetValue("animation-delay", out animationDelay);
             return true;
         }
 

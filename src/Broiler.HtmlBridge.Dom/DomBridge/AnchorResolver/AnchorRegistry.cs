@@ -317,7 +317,7 @@ public sealed partial class DomBridge
 
             foreach (var kv in CollectMatchedRuleProperties(element))
                 props[kv.Key] = kv.Value;
-            foreach (var kv in element.Style)
+            foreach (var kv in InlineStyle(element))
                 props[kv.Key] = kv.Value;
 
             ExpandCssShorthands(props);

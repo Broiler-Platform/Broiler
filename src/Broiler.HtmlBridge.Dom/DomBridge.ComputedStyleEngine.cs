@@ -98,7 +98,7 @@ public sealed partial class DomBridge
     /// <paramref name="element"/> from matching stylesheet rules (no inline styles,
     /// inheritance, or initial-value backfill), via the shared style engine. This
     /// replaces the legacy <c>foreach (… in CssRules) if (MatchesSelector(…))</c>
-    /// collection loops; callers still merge <c>element.Style</c> on top as before.
+    /// collection loops; callers still merge <c>InlineStyle(element)</c> on top as before.
     /// </summary>
     private Dictionary<string, string> CollectMatchedRuleProperties(DomElement element) =>
         new(GetSyncedScopedEngine(element).GetCascadedDeclaredValues(element), StringComparer.OrdinalIgnoreCase);

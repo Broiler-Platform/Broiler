@@ -86,7 +86,7 @@ public sealed partial class DomBridge
         {
             // Collect all CSS + inline properties to find position-try-fallbacks.
             var cssProps = CollectMatchedRuleProperties(element);
-            foreach (var kv in element.Style)
+            foreach (var kv in InlineStyle(element))
                 cssProps[kv.Key] = kv.Value;
 
             string? fallbacks = cssProps.GetValueOrDefault("position-try-fallbacks") ??
@@ -116,15 +116,15 @@ public sealed partial class DomBridge
         double cbHeight = FindContainingBlockHeight(element);
 
         // Check if the base style overflows the IMCB.
-        double baseLeft = TryParsePx(element.Style.GetValueOrDefault("left")) ?? 0;
-        double baseTop = TryParsePx(element.Style.GetValueOrDefault("top")) ?? 0;
-        double baseRight = TryParsePx(element.Style.GetValueOrDefault("right")) ??
+        double baseLeft = TryParsePx(InlineStyle(element).GetValueOrDefault("left")) ?? 0;
+        double baseTop = TryParsePx(InlineStyle(element).GetValueOrDefault("top")) ?? 0;
+        double baseRight = TryParsePx(InlineStyle(element).GetValueOrDefault("right")) ??
                            TryParsePx(baseProps.GetValueOrDefault("right")) ?? 0;
-        double baseBottom = TryParsePx(element.Style.GetValueOrDefault("bottom")) ??
+        double baseBottom = TryParsePx(InlineStyle(element).GetValueOrDefault("bottom")) ??
                             TryParsePx(baseProps.GetValueOrDefault("bottom")) ?? 0;
-        double baseWidth = TryParsePx(element.Style.GetValueOrDefault("width")) ??
+        double baseWidth = TryParsePx(InlineStyle(element).GetValueOrDefault("width")) ??
                            TryParsePx(baseProps.GetValueOrDefault("width")) ?? 0;
-        double baseHeight = TryParsePx(element.Style.GetValueOrDefault("height")) ??
+        double baseHeight = TryParsePx(InlineStyle(element).GetValueOrDefault("height")) ??
                             TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
 
         // Compute IMCB (inset-modified containing block) dimensions.
@@ -262,13 +262,13 @@ public sealed partial class DomBridge
             if (fits)
             {
                 // Apply the fallback: set resolved values as inline styles.
-                element.Style["left"] = $"{tryLeft.ToString(CultureInfo.InvariantCulture)}px";
-                element.Style["top"] = $"{tryTop.ToString(CultureInfo.InvariantCulture)}px";
-                element.Style["width"] = $"{tryWidth.ToString(CultureInfo.InvariantCulture)}px";
-                element.Style["height"] = $"{tryHeight.ToString(CultureInfo.InvariantCulture)}px";
-                element.Style.Remove("right");
-                element.Style.Remove("bottom");
-                element.Style.Remove("inset");
+                InlineStyle(element)["left"] = $"{tryLeft.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(element)["top"] = $"{tryTop.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(element)["width"] = $"{tryWidth.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(element)["height"] = $"{tryHeight.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(element).Remove("right");
+                InlineStyle(element).Remove("bottom");
+                InlineStyle(element).Remove("inset");
                 return;
             }
         }
@@ -285,7 +285,7 @@ public sealed partial class DomBridge
         {
             if (child.IsTextNode) continue;
             var childProps = CollectMatchedRuleProperties(child);
-            foreach (var kv in child.Style)
+            foreach (var kv in InlineStyle(child))
                 childProps[kv.Key] = kv.Value;
 
             double childWidth = TryParsePx(childProps.GetValueOrDefault("width")) ?? 0;

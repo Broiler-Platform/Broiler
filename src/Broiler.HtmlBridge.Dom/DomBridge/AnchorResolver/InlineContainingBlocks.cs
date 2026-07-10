@@ -12,7 +12,7 @@ public sealed partial class DomBridge
     {
         foreach (var el in Elements)
         {
-            if (el.Style.TryGetValue("anchor-name", out var anchorName) &&
+            if (InlineStyle(el).TryGetValue("anchor-name", out var anchorName) &&
                 !string.IsNullOrWhiteSpace(anchorName))
             {
                 var box = ComputeElementBoxWithContainer(el);
@@ -330,24 +330,24 @@ public sealed partial class DomBridge
             double curTop = TryParsePx(childCss.GetValueOrDefault("top")) ?? 0;
             double curWidth = TryParsePx(childCss.GetValueOrDefault("width")) ?? 0;
             double curHeight = TryParsePx(childCss.GetValueOrDefault("height")) ?? 0;
-            child.Style["position"] = childCss.GetValueOrDefault("position") ?? "absolute";
+            InlineStyle(child)["position"] = childCss.GetValueOrDefault("position") ?? "absolute";
             // Ensure inline elements (like <span>) are treated as block-level
             // after absolute positioning, so the renderer paints backgrounds.
             string? childDisplay = childCss.GetValueOrDefault("display");
             if (IsInlineElement(child.TagName, childDisplay))
-                child.Style["display"] = "block";
-            child.Style["left"] = $"{(curLeft + offX).ToString(CultureInfo.InvariantCulture)}px";
-            child.Style["top"] = $"{(curTop + offY).ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(child)["display"] = "block";
+            InlineStyle(child)["left"] = $"{(curLeft + offX).ToString(CultureInfo.InvariantCulture)}px";
+            InlineStyle(child)["top"] = $"{(curTop + offY).ToString(CultureInfo.InvariantCulture)}px";
             // Ensure width and height are preserved as inline styles.
             if (curWidth > 0)
-                child.Style["width"] = $"{curWidth.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(child)["width"] = $"{curWidth.ToString(CultureInfo.InvariantCulture)}px";
             if (curHeight > 0)
-                child.Style["height"] = $"{curHeight.ToString(CultureInfo.InvariantCulture)}px";
+                InlineStyle(child)["height"] = $"{curHeight.ToString(CultureInfo.InvariantCulture)}px";
             // Preserve background-color if specified in CSS rules.
             string? bg = childCss.GetValueOrDefault("background-color")
                       ?? childCss.GetValueOrDefault("background");
             if (!string.IsNullOrWhiteSpace(bg) && bg != "transparent" && bg != "initial")
-                child.Style["background-color"] = bg;
+                InlineStyle(child)["background-color"] = bg;
 
             // Move from inline CB to block ancestor.
             inlineCB.Children.Remove(child);
@@ -357,7 +357,7 @@ public sealed partial class DomBridge
             var blockProps = GetComputedProps(blockAncestor);
             string? blockPos = blockProps.GetValueOrDefault("position");
             if (blockPos == null || blockPos == "static")
-                blockAncestor.Style["position"] = "relative";
+                InlineStyle(blockAncestor)["position"] = "relative";
         }
     }
     private void CollectInlineCBPromotions(

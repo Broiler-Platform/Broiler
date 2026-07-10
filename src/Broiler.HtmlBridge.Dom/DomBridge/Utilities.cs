@@ -397,8 +397,14 @@ public sealed partial class DomBridge
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
         var attrs = new Dictionary<string, string>(source.Attributes, StringComparer.OrdinalIgnoreCase);
-        var style = new Dictionary<string, string>(source.Style, StringComparer.OrdinalIgnoreCase);
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, style, attrs, source.IsTextNode);
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, source.IsTextNode);
+        // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
+        // source's live style dict (which may hold JS mutations not yet synced to the
+        // `style=` attribute), replacing the clone's lazily-seeded attribute values.
+        var cloneStyle = InlineStyle(clone);
+        cloneStyle.Clear();
+        foreach (var kv in InlineStyle(source))
+            cloneStyle[kv.Key] = kv.Value;
         clone.TextContent = source.TextContent;
         clone.NamespaceURI = source.NamespaceURI;
         foreach (var kv in source.NsAttrMap)
@@ -672,8 +678,8 @@ public sealed partial class DomBridge
     /// A JSObject subclass that intercepts property get/set to sync
     /// JavaScript camelCase style property assignments (e.g.
     /// <c>style.animationDelay = '-100s'</c>) with the DOM element's
-    /// <see cref="DomElement.Style"/> dictionary in CSS kebab-case
-    /// (<c>animation-delay: -100s</c>).
+    /// inline style (<see cref="ElementRuntimeState.Style"/>, reached via
+    /// <c>InlineStyle</c>) in CSS kebab-case (<c>animation-delay: -100s</c>).
     /// </summary>
     private sealed class CssStyleDeclaration : JSObject
     {
@@ -699,12 +705,12 @@ public sealed partial class DomBridge
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
-                    _element.Style.Remove(kebab);
+                    InlineStyle(_element).Remove(kebab);
                     GetElementRuntimeState(_element).JsSetStyleProps.Remove(kebab);
                 }
                 else
                 {
-                    _element.Style[kebab] = val;
+                    InlineStyle(_element)[kebab] = val;
                     GetElementRuntimeState(_element).JsSetStyleProps.Add(kebab);
                 }
 
@@ -727,7 +733,7 @@ public sealed partial class DomBridge
             if (result != null && !result.IsUndefined)
                 return result;
 
-            // Fall back to element.Style lookup (kebab-case)
+            // Fall back to InlineStyle(element) lookup (kebab-case)
             var nameStr = key.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
@@ -795,7 +801,7 @@ public sealed partial class DomBridge
         => style.Keys.ToList();
 
     private static List<string> GetStylePropertyNames(DomElement element)
-        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)element.Style);
+        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)InlineStyle(element));
 
     private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
     {
@@ -810,7 +816,7 @@ public sealed partial class DomBridge
 
         foreach (var property in GetElementRuntimeState(element).JsSetStyleProps)
         {
-            if (element.Style.TryGetValue(property, out var value))
+            if (InlineStyle(element).TryGetValue(property, out var value))
                 declared[property] = value;
         }
 
@@ -862,7 +868,7 @@ public sealed partial class DomBridge
 
     private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
     {
-        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)element.Style, property, out value!))
+        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)InlineStyle(element), property, out value!))
             return true;
 
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
@@ -885,7 +891,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) => JsUtilitiesSetProperty005Core(element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // style.getPropertyValue(property) — checks element.Style dict first, then
+        // style.getPropertyValue(property) — checks InlineStyle(element) dict first, then
         // tries camelCase conversion for kebab-case input (or vice versa),
         // and also checks JSObject properties (set via el.style.camelCase = value).
         style.FastAddValue(

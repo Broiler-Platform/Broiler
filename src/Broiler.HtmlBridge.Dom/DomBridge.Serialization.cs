@@ -83,7 +83,7 @@ public sealed partial class DomBridge
         for (var i = log.Count - 1; i >= 0; i--)
         {
             var (element, style, attributes) = log[i];
-            RestoreStringMap(element.Style, style);
+            RestoreStringMap(InlineStyle(element), style);
             RestoreStringMap(element.Attributes, attributes);
         }
 
@@ -102,7 +102,7 @@ public sealed partial class DomBridge
     {
         if (!element.IsTextNode && !element.TagName.StartsWith('#'))
         {
-            if (element.Style.Count == 0)
+            if (InlineStyle(element).Count == 0)
             {
                 element.Attributes.Remove("style");
             }
@@ -110,7 +110,7 @@ public sealed partial class DomBridge
             {
                 var styleText = string.Join(
                     "; ",
-                    element.Style
+                    InlineStyle(element)
                         .OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
                         .Select(static kv => $"{kv.Key}: {kv.Value}"));
                 if (!element.Attributes.TryGetValue("style", out var currentStyle) ||
@@ -304,26 +304,26 @@ public sealed partial class DomBridge
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
         var ratio = ResolveProgressLikeValueRatio(element, tag);
 
-        element.Style["display"] = "inline-block";
-        element.Style["box-sizing"] = "border-box";
-        element.Style["position"] = "relative";
-        element.Style["overflow"] = "hidden";
-        element.Style["padding"] = "0";
-        element.Style["border"] = "1px solid #767676";
-        element.Style["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
-        element.Style["vertical-align"] = "middle";
+        InlineStyle(element)["display"] = "inline-block";
+        InlineStyle(element)["box-sizing"] = "border-box";
+        InlineStyle(element)["position"] = "relative";
+        InlineStyle(element)["overflow"] = "hidden";
+        InlineStyle(element)["padding"] = "0";
+        InlineStyle(element)["border"] = "1px solid #767676";
+        InlineStyle(element)["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
+        InlineStyle(element)["vertical-align"] = "middle";
         if (!string.IsNullOrWhiteSpace(width) && !string.Equals(width, "auto", StringComparison.OrdinalIgnoreCase))
-            element.Style["width"] = width;
+            InlineStyle(element)["width"] = width;
         if (!string.IsNullOrWhiteSpace(height) && !string.Equals(height, "auto", StringComparison.OrdinalIgnoreCase))
-            element.Style["height"] = height;
+            InlineStyle(element)["height"] = height;
 
         element.Children.Clear();
         element.InnerHtml = string.Empty;
         element.TextContent = null;
 
         var fill = new DomElement("div", null, null, string.Empty) { Parent = element };
-        fill.Style["position"] = "absolute";
-        fill.Style["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
+        InlineStyle(fill)["position"] = "absolute";
+        InlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
         var fillExtent = vertical
             ? ReadPixelLength(height, DefaultProgressLikeTrackLengthPx) * ratio
@@ -331,17 +331,17 @@ public sealed partial class DomBridge
         var fillExtentPx = $"{fillExtent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}px";
         if (vertical)
         {
-            fill.Style["left"] = "0";
-            fill.Style["right"] = "0";
-            fill.Style[reverseInline ? "bottom" : "top"] = "0";
-            fill.Style["height"] = fillExtentPx;
+            InlineStyle(fill)["left"] = "0";
+            InlineStyle(fill)["right"] = "0";
+            InlineStyle(fill)[reverseInline ? "bottom" : "top"] = "0";
+            InlineStyle(fill)["height"] = fillExtentPx;
         }
         else
         {
-            fill.Style["top"] = "0";
-            fill.Style["bottom"] = "0";
-            fill.Style[reverseInline ? "right" : "left"] = "0";
-            fill.Style["width"] = fillExtentPx;
+            InlineStyle(fill)["top"] = "0";
+            InlineStyle(fill)["bottom"] = "0";
+            InlineStyle(fill)[reverseInline ? "right" : "left"] = "0";
+            InlineStyle(fill)["width"] = fillExtentPx;
         }
 
         element.Children.Add(fill);
@@ -403,10 +403,10 @@ public sealed partial class DomBridge
         var willSvg = ShouldApplySvgSerializationAttributes(element);
         // Record the pre-bake state for the geometry-snapshot revert (only when this element
         // is actually mutated — scaled, SVG-adjusted, or carrying a `zoom` to strip).
-        if (_zoomSerializationRevertLog != null && (willScale || willSvg || element.Style.ContainsKey("zoom")))
+        if (_zoomSerializationRevertLog != null && (willScale || willSvg || InlineStyle(element).ContainsKey("zoom")))
             _zoomSerializationRevertLog.Add((
                 element,
-                new Dictionary<string, string>(element.Style),
+                new Dictionary<string, string>(InlineStyle(element)),
                 new Dictionary<string, string>(element.Attributes)));
 
         if (willScale)
@@ -417,7 +417,7 @@ public sealed partial class DomBridge
                     continue;
 
                 if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
-                    element.Style[property] = scaled;
+                    InlineStyle(element)[property] = scaled;
             }
 
         }
@@ -425,7 +425,7 @@ public sealed partial class DomBridge
         if (willSvg)
             ApplyZoomSerializationSvgAttributes(element, usedZoom);
 
-        element.Style.Remove("zoom");
+        InlineStyle(element).Remove("zoom");
 
         foreach (var child in element.Children)
             ApplyZoomSerializationStyles(child, usedZoom);
@@ -458,7 +458,7 @@ public sealed partial class DomBridge
         if (props.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (!element.Style.TryGetValue(property, out var specified) ||
+        if (!InlineStyle(element).TryGetValue(property, out var specified) ||
             !string.Equals(specified?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase) ||
             element.Parent == null)
         {
@@ -469,7 +469,7 @@ public sealed partial class DomBridge
         if (parentProps.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (element.Parent.Style.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+        if (InlineStyle(element.Parent!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
         return false;
@@ -569,7 +569,7 @@ public sealed partial class DomBridge
             return;
 
         string? value = null;
-        if (preferInlineStyle && element.Style.TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
+        if (preferInlineStyle && InlineStyle(element).TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
             value = inlineValue;
         else if (props.TryGetValue(propertyName, out var propValue) && !string.IsNullOrWhiteSpace(propValue))
             value = propValue;
@@ -872,7 +872,7 @@ public sealed partial class DomBridge
             !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
-            element.Style.OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
+            InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
         GetText: static element => element.TextContent,
         GetRawInnerHtml: static element => element.InnerHtml);
 

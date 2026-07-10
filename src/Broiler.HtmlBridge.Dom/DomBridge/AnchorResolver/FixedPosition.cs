@@ -24,14 +24,14 @@ public sealed partial class DomBridge
             // Collect cascaded CSS properties for this element.
             var cssProps = CollectMatchedRuleProperties(el);
             // Merge inline styles (higher priority).
-            foreach (var kv in el.Style)
+            foreach (var kv in InlineStyle(el))
                 cssProps[kv.Key] = kv.Value;
 
             if (cssProps.TryGetValue("position", out var pos) &&
                 string.Equals(pos, "fixed", StringComparison.OrdinalIgnoreCase))
             {
                 // Ensure position: fixed is set as inline style.
-                el.Style["position"] = "fixed";
+                InlineStyle(el)["position"] = "fixed";
 
                 // Expand the 'inset' shorthand into top/right/bottom/left.
                 if (cssProps.TryGetValue("inset", out var insetVal) &&
@@ -42,38 +42,38 @@ public sealed partial class DomBridge
                     string r = parts.Length > 1 ? parts[1] : parts[0];
                     string b = parts.Length > 2 ? parts[2] : parts[0];
                     string l = parts.Length > 3 ? parts[3] : r;
-                    if (!el.Style.ContainsKey("top")) el.Style["top"] = t;
-                    if (!el.Style.ContainsKey("right")) el.Style["right"] = r;
-                    if (!el.Style.ContainsKey("bottom")) el.Style["bottom"] = b;
-                    if (!el.Style.ContainsKey("left")) el.Style["left"] = l;
+                    if (!InlineStyle(el).ContainsKey("top")) InlineStyle(el)["top"] = t;
+                    if (!InlineStyle(el).ContainsKey("right")) InlineStyle(el)["right"] = r;
+                    if (!InlineStyle(el).ContainsKey("bottom")) InlineStyle(el)["bottom"] = b;
+                    if (!InlineStyle(el).ContainsKey("left")) InlineStyle(el)["left"] = l;
                 }
 
                 // Copy top/left/right/bottom/width/height from CSS if not already inline.
                 foreach (var prop in new[] { "top", "left", "right", "bottom", "width", "height" })
                 {
-                    if (!el.Style.ContainsKey(prop) && cssProps.TryGetValue(prop, out var v))
+                    if (!InlineStyle(el).ContainsKey(prop) && cssProps.TryGetValue(prop, out var v))
                     {
                         if (!v.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
-                            el.Style[prop] = v;
+                            InlineStyle(el)[prop] = v;
                     }
                 }
 
                 // Resolve width from opposing left/right insets when no explicit width.
-                if (!el.Style.ContainsKey("width") || el.Style["width"] == "auto")
+                if (!InlineStyle(el).ContainsKey("width") || InlineStyle(el)["width"] == "auto")
                 {
-                    var leftPx = TryParsePx(el.Style.GetValueOrDefault("left"));
-                    var rightPx = TryParsePx(el.Style.GetValueOrDefault("right"));
+                    var leftPx = TryParsePx(InlineStyle(el).GetValueOrDefault("left"));
+                    var rightPx = TryParsePx(InlineStyle(el).GetValueOrDefault("right"));
                     if (leftPx.HasValue && rightPx.HasValue)
-                        el.Style["width"] = $"{vpW - leftPx.Value - rightPx.Value}px";
+                        InlineStyle(el)["width"] = $"{vpW - leftPx.Value - rightPx.Value}px";
                 }
 
                 // Resolve height from opposing top/bottom insets when no explicit height.
-                if (!el.Style.ContainsKey("height") || el.Style["height"] == "auto")
+                if (!InlineStyle(el).ContainsKey("height") || InlineStyle(el)["height"] == "auto")
                 {
-                    var topPx = TryParsePx(el.Style.GetValueOrDefault("top"));
-                    var bottomPx = TryParsePx(el.Style.GetValueOrDefault("bottom"));
+                    var topPx = TryParsePx(InlineStyle(el).GetValueOrDefault("top"));
+                    var bottomPx = TryParsePx(InlineStyle(el).GetValueOrDefault("bottom"));
                     if (topPx.HasValue && bottomPx.HasValue)
-                        el.Style["height"] = $"{vpH - topPx.Value - bottomPx.Value}px";
+                        InlineStyle(el)["height"] = $"{vpH - topPx.Value - bottomPx.Value}px";
                 }
             }
         }

@@ -56,7 +56,12 @@ public sealed class DomElement : CanonicalElement
         _children = new LegacyChildList(this);
         _attributes = new LegacyAttributeDictionary(this);
         InnerHtml = innerHtml;
-        Style = style ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // RF-BRIDGE-1c Phase B: inline style is no longer stored on the node. It lives in
+        // ElementRuntimeState and is reached via DomBridge.InlineStyle(element), which lazily
+        // seeds it from the `style=` attribute (already applied from `attributes` below). The
+        // `style` parameter is retained only for call-site compatibility until construction
+        // flips to canonical factories (Phase F); it is intentionally not read here.
+        _ = style;
         IsTextNode = isTextNode || string.Equals(tagName, "#text", StringComparison.Ordinal);
 
         if (attributes is not null)
@@ -84,8 +89,6 @@ public sealed class DomElement : CanonicalElement
     }
 
     public string InnerHtml { get; set; }
-
-    public Dictionary<string, string> Style { get; }
 
     public new LegacyAttributeDictionary Attributes => _attributes;
 

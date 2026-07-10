@@ -95,7 +95,7 @@ public sealed partial class DomBridge
                 (scPos == "relative" || scPos == "absolute" ||
                  scPos == "fixed" || scPos == "sticky");
             if (!alreadyPositioned)
-                sc.Style["position"] = "relative";
+                InlineStyle(sc)["position"] = "relative";
         }
 
         // 4. Insert backdrop elements for modal dialogs.
@@ -170,12 +170,12 @@ public sealed partial class DomBridge
 
         // The replaced root paints only the image; neither the root nor the
         // (box-less) body background reaches the canvas.
-        html.Style["background"] = "none";
-        html.Style["background-color"] = "transparent";
-        body.Style["margin"] = "0";
-        body.Style["padding"] = "0";
-        body.Style["background"] = "none";
-        body.Style["background-color"] = "transparent";
+        InlineStyle(html)["background"] = "none";
+        InlineStyle(html)["background-color"] = "transparent";
+        InlineStyle(body)["margin"] = "0";
+        InlineStyle(body)["padding"] = "0";
+        InlineStyle(body)["background"] = "none";
+        InlineStyle(body)["background-color"] = "transparent";
 
         body.Children.Clear();
 
@@ -212,7 +212,7 @@ public sealed partial class DomBridge
             return;
 
         var combinedZoom = GetUsedZoomForElement(DocumentElement) * scale;
-        DocumentElement.Style["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
+        InlineStyle(DocumentElement)["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
         GetElementRuntimeState(DocumentElement).Scroll.Left.Set(GetVisualViewportPageOffset(vertical: false));
         GetElementRuntimeState(DocumentElement).Scroll.Top.Set(GetVisualViewportPageOffset(vertical: true));
     }

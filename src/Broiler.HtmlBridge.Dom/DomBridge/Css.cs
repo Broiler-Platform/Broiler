@@ -47,7 +47,8 @@ public sealed partial class DomBridge
     // directly. See docs/architecture/htmlbridge-engine-boundaries.md.
 
     /// <summary>
-    /// Clears any CSS-derived compatibility values left in <see cref="DomElement.Style"/>
+    /// Clears any CSS-derived compatibility values left in the element's inline style
+    /// (<see cref="ElementRuntimeState.Style"/>, reached via <c>InlineStyle</c>)
     /// after a selector-affecting mutation. Stylesheet declarations are resolved lazily
     /// by the shared style engine; only inline declarations and JavaScript-set values
     /// remain in the bridge-owned declaration map.
@@ -65,11 +66,11 @@ public sealed partial class DomBridge
         }
 
         // Remove all CSS-derived properties (keep inline ones AND JS-set ones).
-        var keysToRemove = element.Style.Keys
+        var keysToRemove = InlineStyle(element).Keys
             .Where(k => !inlineStyleProps.Contains(k) && !GetElementRuntimeState(element).JsSetStyleProps.Contains(k))
             .ToList();
         foreach (var key in keysToRemove)
-            element.Style.Remove(key);
+            InlineStyle(element).Remove(key);
     }
 
     /// <summary>
@@ -671,7 +672,7 @@ public sealed partial class DomBridge
             if (blockStyleAttribute && element.Attributes.ContainsKey("style"))
             {
                 element.Attributes.Remove("style");
-                element.Style.Clear();
+                InlineStyle(element).Clear();
                 InvalidateStyleScope(element);
             }
         }

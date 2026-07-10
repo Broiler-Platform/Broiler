@@ -52,7 +52,7 @@ public sealed partial class DomBridge
                         var anchorEl = FindElementByAnchorName(posAnchor);
                         if (anchorEl != null && !IsAnchorVisibleForTarget(anchorEl, el))
                         {
-                            el.Style["display"] = "none";
+                            InlineStyle(el)["display"] = "none";
                         }
                     }
                 }
@@ -84,7 +84,7 @@ public sealed partial class DomBridge
                     }
 
                     if (!hasValidAnchor)
-                        el.Style["display"] = "none";
+                        InlineStyle(el)["display"] = "none";
                 }
             }
         }
@@ -105,7 +105,7 @@ public sealed partial class DomBridge
         {
             if (el.IsTextNode) continue;
             // Check inline styles first.
-            if (el.Style.TryGetValue("anchor-name", out var n) &&
+            if (InlineStyle(el).TryGetValue("anchor-name", out var n) &&
                 string.Equals(n.Trim(), anchorName, StringComparison.Ordinal))
                 return el;
         }

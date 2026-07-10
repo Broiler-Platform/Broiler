@@ -53,17 +53,17 @@ public sealed partial class DomBridge
         // position as `relative` + offset reproduces it.  Relative and sticky
         // both establish a containing block / stacking context, so this is
         // behaviour-preserving for descendants.
-        el.Style["position"] = "relative";
+        InlineStyle(el)["position"] = "relative";
 
         if (dy != 0)
         {
-            el.Style["top"] = dy.ToString("0.###", CultureInfo.InvariantCulture) + "px";
-            el.Style.Remove("bottom");
+            InlineStyle(el)["top"] = dy.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            InlineStyle(el).Remove("bottom");
         }
         if (dx != 0)
         {
-            el.Style["left"] = dx.ToString("0.###", CultureInfo.InvariantCulture) + "px";
-            el.Style.Remove("right");
+            InlineStyle(el)["left"] = dx.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            InlineStyle(el).Remove("right");
         }
     }
 

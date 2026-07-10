@@ -181,6 +181,29 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
         ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
 
+    /// <summary>
+    /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
+    /// relocated off the <c>DomElement</c> facade into <see cref="ElementRuntimeState"/>
+    /// (RF-BRIDGE-1c Phase B). Lazily seeded once from the element's <c>style=</c>
+    /// attribute; thereafter it is the source of truth (JS <c>element.style</c> writes,
+    /// anchor/form-control styling), synced back to the attribute at serialization.
+    /// </summary>
+    private static Dictionary<string, string> InlineStyle(DomElement element)
+    {
+        var state = GetElementRuntimeState(element);
+        if (!state.StyleSeeded)
+        {
+            state.StyleSeeded = true;
+            var styleAttr = element.GetAttribute("style");
+            if (!string.IsNullOrEmpty(styleAttr))
+            {
+                foreach (var kv in ParseStyle(styleAttr))
+                    state.Style[kv.Key] = kv.Value;
+            }
+        }
+        return state.Style;
+    }
+
     private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomElement element) =>
         GetElementRuntimeState(element).EventListeners;
 
@@ -719,8 +742,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             DocumentElement.ClassName = docElement.ClassName;
         foreach (var kv in docElement.Attributes)
             DocumentElement.Attributes[kv.Key] = kv.Value;
-        foreach (var kv in docElement.Style)
-            DocumentElement.Style[kv.Key] = kv.Value;
+        foreach (var kv in InlineStyle(docElement))
+            InlineStyle(DocumentElement)[kv.Key] = kv.Value;
 
         _knownNodes.UnionWith(allElements);
 
@@ -807,7 +830,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// from the survivors of this filter (see <c>PrepareCanonicalDocumentForRendering</c>),
     /// so a dropped inline declaration vanishes before the renderer's own style engine
     /// can report it — this is the only place such drops are observable. Set it only at
-    /// inline-style <em>ingestion</em> sites that write <c>element.Style</c> (so the drop
+    /// inline-style <em>ingestion</em> sites that write <c>InlineStyle(element)</c> (so the drop
     /// reaches the rendered output); leave it off for query/bookkeeping re-parses and for
     /// stylesheet-rule / descriptor parsing (cascade drops the style engine already reports).
     /// </param>

@@ -133,11 +133,11 @@ public sealed partial class DomBridge
         if (a.Length > 0 && a[0] is JSString s)
         {
             // Setting element.style = "prop: val; ..." parses as cssText
-            element.Style.Clear();
+            InlineStyle(element).Clear();
             GetElementRuntimeState(element).JsSetStyleProps.Clear();
             foreach (var kv in ParseStyle(s.ToString(), reportDrops: true))
             {
-                element.Style[kv.Key] = kv.Value;
+                InlineStyle(element)[kv.Key] = kv.Value;
                 GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
 
@@ -163,9 +163,9 @@ public sealed partial class DomBridge
                 element.ClassName = attrVal;
             else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
             {
-                element.Style.Clear();
+                InlineStyle(element).Clear();
                 foreach (var kv in ParseStyle(attrVal, reportDrops: true))
-                    element.Style[kv.Key] = kv.Value;
+                    InlineStyle(element)[kv.Key] = kv.Value;
                 bridgeForSet.InvalidateStyleScope(element);
             }
             // Compile on* event handler attributes into functions

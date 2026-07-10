@@ -34,7 +34,7 @@ public sealed partial class DomBridge
 
             // Set position:fixed as UA default for modal dialogs that have
             // no explicit position, matching Chromium's top-layer behaviour.
-            el.Style["position"] = "fixed";
+            InlineStyle(el)["position"] = "fixed";
         }
     }
 
@@ -67,18 +67,18 @@ public sealed partial class DomBridge
 
             if (!alreadyPositioned)
             {
-                el.Style["position"] = "fixed";
-                if (!el.Style.ContainsKey("top") && !props.ContainsKey("top"))
-                    el.Style["top"] = "0";
-                if (!el.Style.ContainsKey("left") && !props.ContainsKey("left"))
-                    el.Style["left"] = "0";
+                InlineStyle(el)["position"] = "fixed";
+                if (!InlineStyle(el).ContainsKey("top") && !props.ContainsKey("top"))
+                    InlineStyle(el)["top"] = "0";
+                if (!InlineStyle(el).ContainsKey("left") && !props.ContainsKey("left"))
+                    InlineStyle(el)["left"] = "0";
             }
 
             // Elevate into the synthetic top layer, ordered by show order, so the
             // popover paints above non-top-layer content (e.g. a plain
             // position:fixed sibling) and later popovers paint over earlier ones.
             int order = GetElementRuntimeState(el).Dialog.TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
-            el.Style["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            InlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }
     // -----------------------------------------------------------------
@@ -126,9 +126,9 @@ public sealed partial class DomBridge
                 .GetCascadedDeclaredValues(dialog, "::backdrop");
             OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
 
-            var backdrop = new DomElement(
-                "div", null, null, string.Empty,
-                style: backdropStyle);
+            var backdrop = new DomElement("div", null, null, string.Empty);
+            foreach (var kv in backdropStyle)
+                InlineStyle(backdrop)[kv.Key] = kv.Value;
             backdrop.Parent = parent;
 
             int idx = parent.Children.IndexOf(dialog);
@@ -156,24 +156,24 @@ public sealed partial class DomBridge
             // Ensure the dialog has UA default styles.
             // Check both inline styles and CSS rules before applying defaults.
             var dialogProps = GetComputedProps(dialog);
-            if (!dialog.Style.ContainsKey("display"))
-                dialog.Style["display"] = "block";
-            if (!dialog.Style.ContainsKey("border") &&
+            if (!InlineStyle(dialog).ContainsKey("display"))
+                InlineStyle(dialog)["display"] = "block";
+            if (!InlineStyle(dialog).ContainsKey("border") &&
                 !dialogProps.ContainsKey("border") &&
                 !dialogProps.ContainsKey("border-width"))
             {
-                dialog.Style["border-width"] = "1px";
-                dialog.Style["border-style"] = "solid";
-                dialog.Style["border-color"] = "black";
+                InlineStyle(dialog)["border-width"] = "1px";
+                InlineStyle(dialog)["border-style"] = "solid";
+                InlineStyle(dialog)["border-color"] = "black";
             }
-            if (!dialog.Style.ContainsKey("padding") &&
+            if (!InlineStyle(dialog).ContainsKey("padding") &&
                 !dialogProps.ContainsKey("padding"))
-                dialog.Style["padding"] = "1em";
-            if (!dialog.Style.ContainsKey("background") &&
-                !dialog.Style.ContainsKey("background-color") &&
+                InlineStyle(dialog)["padding"] = "1em";
+            if (!InlineStyle(dialog).ContainsKey("background") &&
+                !InlineStyle(dialog).ContainsKey("background-color") &&
                 !dialogProps.ContainsKey("background") &&
                 !dialogProps.ContainsKey("background-color"))
-                dialog.Style["background-color"] = "white";
+                InlineStyle(dialog)["background-color"] = "white";
         }
     }
     /// <summary>

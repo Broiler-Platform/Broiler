@@ -11,13 +11,14 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DomExtractionPhaseZeroTests
 {
-    // RF-BRIDGE-1c Phase A relocated JsSetStyleProps and OwnerDocRoot off the facade
-    // into ElementRuntimeState (bridge runtime state the node model must not own), so
-    // they no longer appear on the DomElement surface below.
+    // RF-BRIDGE-1c relocated bridge runtime state off the facade into
+    // ElementRuntimeState (the node model must not own it): Phase A moved
+    // JsSetStyleProps + OwnerDocRoot; Phase B moved the inline Style dictionary
+    // (now reached via DomBridge.InlineStyle). They no longer appear on the
+    // DomElement surface below.
     private static readonly string[] LegacyMutableCollectionProperties =
     [
         "NsAttrMap",
-        "Style",
     ];
 
     private static readonly string[] LegacySettableScalarProperties =
