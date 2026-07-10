@@ -31,10 +31,13 @@ public sealed class SharedGeometryExclusiveCutoverTests
     }
 
     [Fact]
-    public void DefaultsOff()
+    public void DefaultsOn()
     {
-        // The staged cutover must stay off by default so the estimator fallback is intact.
-        Assert.False(DomBridge.UseSharedGeometryExclusively);
+        // RF-BRIDGE-1b increment 6 cutover: exclusive-shared geometry is the default.
+        // Box-generating elements resolve from the shared snapshot (or the estimator when
+        // transiently absent from it); only genuinely boxless elements (display:none/
+        // contents) read zero. See the flag comment in SharedLayoutGeometry.cs.
+        Assert.True(DomBridge.UseSharedGeometryExclusively);
     }
 
     [Fact]

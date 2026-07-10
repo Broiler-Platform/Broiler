@@ -345,9 +345,17 @@ other two are gated on prerequisites that are not yet met (documented below).
     declared; only the two test callers of `CssRules` need routing to the shared
     `Broiler.CSS` stylesheet API.
 
-- **BLOCKED — finish RF-BRIDGE-1b geometry unification** (delete the ~2950-LOC
+- **PARTIALLY DONE — finish RF-BRIDGE-1b geometry unification** (delete the ~2950-LOC
   `LayoutMetrics` estimators, increment 6, and retire `LayoutRuntimeState`,
   increment 7). The `UseSharedLayoutGeometry` flag is **on** (increment 5 landed).
+  **Update (2026-07-10): the increment-6 CUTOVER is now landed** —
+  `UseSharedGeometryExclusively` is flipped **on**, regression-free (guarded by
+  `ShouldReturnExclusiveSharedZero`'s `!HasAssociatedLayoutBox` check; verified zero delta
+  on the full Cli 1680 + WPT 545 corpora). The estimator *body* is not yet deleted: its only
+  remaining consumer is a WPT test-harness snapshot artifact (real bridge usage produces a
+  complete snapshot), mitigated by the guard. See
+  [`htmlbridge-blocked-items-completion-roadmap.md`](htmlbridge-blocked-items-completion-roadmap.md)
+  Milestone 2.4 for the full flip/deletion analysis and the two paths to complete the deletion.
 
   **Correction (2026-07-09): the previously-documented blocker was stale.** The
   renderer *does* now size `@position-try` elements correctly on the shared path —
