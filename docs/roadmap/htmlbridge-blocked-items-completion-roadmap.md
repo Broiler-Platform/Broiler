@@ -346,9 +346,19 @@ estimator remains only as a shared-unavailable fallback, to be dropped/degraded 
 
 ### Milestone 2.4 — Flip `UseSharedGeometryExclusively` (DONE), delete the estimators (increment 6, pending)
 
-**Status (2026-07-10): the FLIP is DONE and regression-free; the estimator DELETION is not
-yet done** — its only remaining blocker is a WPT test-harness snapshot artifact (see Task 1
-and the DELETION analysis below), which the `!HasAssociatedLayoutBox` guard mitigates safely.
+**Status (2026-07-10): the FLIP is DONE and regression-free; the estimator DELETION's blocker is
+now FIXED (session 95a4149e).** The blocker was previously mis-described as a WPT-harness snapshot
+artifact; investigation proved it a real `Broiler.Layout` bug (see the corrected DELETION analysis
+below) and it is now fixed at source in `Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/
+DomParser.cs`: the block-inside-inline correction's leading-run fold now folds atomic inlines
+(`IsAtomicInlineLevel(box.Boxes[0]) || ContainsInlinesOnlyDeep(box.Boxes[0])`), so an `inline-block`
+containing a block child is no longer mis-selected as the "block to split around" and dissolved.
+Validated regression-free across the full corpus: `LayoutGeometryCompletenessTests` 19/19 (with two new
+`<script>`/`display:none`-sibling fixtures), `Broiler.Layout.Tests` 40/40, full `Broiler.Wpt.Tests`
+(136 fails = exact baseline, 0 new by name) and full `Broiler.Cli.Tests` (76 unique fails = exact
+baseline, 0 new by name). With the box now present in the snapshot for these elements, the
+`!HasAssociatedLayoutBox` guard no longer masks a real gap here — the estimator deletion (Task 2) can
+proceed once the parity harness is retired.
 
 **Goal.** The actual payoff: remove the ~2950-LOC estimator body from
 `LayoutMetrics.cs` and retire `WithLayoutGeometryCache`.
@@ -699,40 +709,45 @@ root-caused to the snapshot missing the `scrollIntoView` scroll container and fi
 `ShouldReturnExclusiveSharedZero` to genuinely-boxless elements (Milestone 2.4 Task 1). Verified
 zero delta on the full Cli (1680) and WPT (545) corpora.
 
-**What blocks the estimator DELETION — sharpened twice (2026-07-10). The gap is DYNAMIC (bridge
-snapshot build), NOT a static layout box-construction gap.** Testing *pure* exclusive (zero any
-snapshot-missing element, no estimator fallback) surfaced regressions from ≥2 elements missing from
-the snapshot: the 4 css-viewport zoom scroll-into-view WPT tests (a `display:inline-block;
-overflow:hidden` container that is a direct child of `<body>`) and `GoogleLikeDiagTest.
-GridChild_UsesContentSizing` (a grid child). The first hypothesis — a static `Broiler.Layout`
-box-construction/attachment gap — was **disproven** by a completeness assertion
-(`Broiler.Cli.Tests.LayoutGeometryCompletenessTests`): a static `HtmlContainer.GetLayoutGeometry`
-call **collects every one of these elements** across 16 layout-mode fixtures, including the exact
-ZoomScrollPadding structure (two inline-block containers, second `zoom:2`) at 320/800/1024 viewports.
-So the layout engine DOES produce the boxes. (An earlier `CollectLayoutGeometry` line-box-traversal
-fix was also tried and proven ineffective — reverted.)
+**What blocks the estimator DELETION — CORRECTED 2026-07-10 (session 95a4149e): it is a REAL
+`Broiler.Layout` bug, NOT a WPT-test-harness artifact.** The earlier "harness artifact / normal bridge
+usage never misses" conclusion (retained below struck through for provenance) was **wrong** — it was an
+artifact of the *variant matrix's own fixtures* omitting a `display:none` sibling. Re-reproduced via
+**plain `Attach` + `ctx.Eval`** (no `WptTestRunner`) with a temporary
+`DomBridge.SharedGeometryMissDiagnostic` hook plus a `HtmlContainerInt.CollectLayoutGeometry` box-tree +
+render-doc DOM dump:
 
-The regression is therefore **dynamic** — and (sharpened 2026-07-10 via `BuildSharedGeometrySnapshot`
-instrumentation + a variant matrix) it is a **WPT-test-harness artifact of `WptTestRunner.
-ExecuteScriptsWithDom`, NOT a real bridge geometry gap.** Findings:
-- The first `.container` is missing from the snapshot on the **first** snapshot build (`call#1`), at
-  the bridge's default `1024×768` geometry viewport — so it is not cumulative bake/revert drift and
-  not a viewport mismatch (a static layout at 1024×768 collects it).
-- **Normal bridge usage does NOT miss.** A variant matrix (single vs two containers, with/without a
-  `zoom:2` sibling, direct `scrollHeight` vs `scrollIntoView` vs the exact loop-both-targets script,
-  ± `FireWindowLoadEvent` + `ResolveAnimationSnapshots`, ± a style-invalidation batch) via plain
-  `Attach` + `ctx.Eval` is **`present=True` in every case**. Only the full `ExecuteScriptsWithDom`
-  path (which injects `BrowserApiStubs`/testharness stubs and runs scripts through a microtask-draining
-  execution mechanism + a temp-file round-trip) produces `present=False`.
+- The queried `.container` is `inDoc=True` (present in the live DocumentElement tree) and the render-doc
+  DOM is **structurally perfect**, yet the element has **no box** in the layout tree — its block children
+  are promoted to become direct block children of `<body>`. So it is a pure layout-engine bug, not a
+  bridge / render-doc-transform / snapshot-identity gap.
+- **Minimal trigger (isolated by matrix):** a `display:inline-block` element that (1) contains ≥1
+  **block-level child** and (2) has **any sibling** in its parent — even a `display:none` one
+  (`<script>`, a hidden `<div>`; before *or* after). Then the inline-block's principal box is dropped.
+  NOT required: overflow, zoom, scroll, scrollIntoView, or the WPT harness (all irrelevant). NOT
+  triggered by: a lone inline-block (no sibling → correct), an inline-block with only text children, or a
+  plain `display:block` element.
+- **Root cause:** `LayoutBoxUtils.ContainsInlinesOnly` skips `display:none` children and treats the
+  inline-block as inline-compatible → routes the parent (`<body>`) onto the line-box path
+  (`CssBox.Layout.cs:1074` → `CreateLineBoxes`). The **block-inside-inline correction (CSS 2.1 §9.2.1.1)**
+  then splits the inline-block as though it were a bare inline box, hoisting its block children into the
+  parent and dropping the inline-block's own box. An inline-block establishes a BFC and must **not** be
+  split. **Fix region:** the §9.2.1.1 correction (referenced at `CssLayoutEngine.cs:1767-1769`,
+  `CssBox.cs:40-76`) must exclude atomic inlines (inline-block / -flex / -grid / -table, replaced
+  elements) from the split.
 
-So the estimator's entry-point fallback is exercised only by the WPT harness flow, not by real
-geometry queries. The `!HasAssociatedLayoutBox` guard safely mitigates (fall back to estimator), so
-the flip is regression-free. **To unblock the deletion, either (a) fix the specific
-`ExecuteScriptsWithDom` step that leaves the harness snapshot incomplete (remaining bisection: the
-stub injection / microtask-drain execution mechanism / file round-trip — `FireWindowLoadEvent`,
-`ResolveAnimationSnapshots`, and style batching are already excluded), or (b) treat the 4 zoom WPT
-cases as harness artifacts and keep the guard.** `LayoutGeometryCompletenessTests` (static, 18/18)
-guards the real-usage side. Gate any deletion on the full parity + WPT pixel + Acid corpus.
+Impact: `getBoundingClientRect` / `client*` / `offset*` / `scroll*` return nothing from the shared
+snapshot for such inline-blocks; the `!HasAssociatedLayoutBox` guard masks it by falling back to the
+estimator. **Deleting the estimator is therefore gated on FIXING this §9.2.1.1 layout bug** (hottest
+`Broiler.Layout` path — `Broiler.HTML` submodule — needs full WPT + Acid gating). `LayoutGeometry­
+CompletenessTests` does **not** catch it (its fixtures have no `display:none` sibling); add a
+`<script>`-sibling inline-block fixture as the regression guard. Gate any deletion on the full parity +
+WPT pixel + Acid corpus.
+
+> ~~Superseded (2026-07-10, earlier same day): the gap was believed DYNAMIC and a WPT-test-harness
+> artifact of `WptTestRunner.ExecuteScriptsWithDom` — "normal bridge usage does not miss." That was a
+> false negative: the variant matrix's fixtures had no `display:none` sibling, so they never hit the
+> §9.2.1.1 trigger.~~
 
 ---
 

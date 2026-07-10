@@ -11,6 +11,7 @@ namespace Broiler.Cli.Tests;
 /// provider in isolation; the live <c>LayoutMetrics</c> routing (behind
 /// <c>UseSharedLayoutGeometry</c>) lands in increment ③.
 /// </summary>
+[Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryProviderTests
 {
     [Fact]

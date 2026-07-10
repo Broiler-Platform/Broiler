@@ -15,6 +15,7 @@ namespace Broiler.Cli.Tests;
 /// tree. These tests pin the box-model arithmetic the bridge will later consume in
 /// place of its coarse estimators.
 /// </summary>
+[Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryTests
 {
     private static IReadOnlyDictionary<DomElement, BoxGeometry> LayoutGeometry(
