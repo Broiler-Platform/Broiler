@@ -112,7 +112,7 @@ public sealed partial class DomBridge
         double naturalInCb = OffsetWithinAncestorPreferShared(el, containingBlock, vertical);
         double cbExtent = TrySharedContentBoxExtent(containingBlock, vertical, out var sharedCbExtent)
             ? sharedCbExtent
-            : ResolveContentBoxExtent(containingBlock, vertical);
+            : 0;
         double minShift = -naturalInCb;
         double maxShift = cbExtent - size - naturalInCb;
         if (maxShift < minShift)
@@ -123,14 +123,14 @@ public sealed partial class DomBridge
 
     private double StickyBorderBoxSize(DomElement el, Dictionary<string, string> props, bool vertical)
     {
-        // RF-BRIDGE-1b: prefer the renderer's real border-box size (scroll-independent, so
-        // safe to read from the shared snapshot); the estimator remains the fallback.
+        // RF-BRIDGE-1b: the renderer's real border-box size from the shared snapshot
+        // (scroll-independent). With the estimators deleted, an explicit CSS border-box from
+        // the computed props is the only fallback (a real in-flow sticky box is always in the
+        // snapshot); a genuinely-boxless element reports 0.
         if (TrySharedBorderBoxExtent(el, vertical, out var sharedSize))
             return sharedSize;
         double size = vertical ? GetBorderBoxHeight(props, el) : GetBorderBoxWidth(props, el);
-        if (size > 0)
-            return size;
-        return ResolveBorderBoxExtent(el, vertical);
+        return size > 0 ? size : 0;
     }
 
     private static bool HasStickyInset(string? value) =>

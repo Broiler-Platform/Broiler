@@ -11,49 +11,44 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    // Box-geometry memoization for a single read pass over a static layout
-    // snapshot (e.g. check-layout assertion evaluation). The estimators below
-    // recurse up (containing block), down (auto content extent), and across
-    // (preceding siblings), so a single offset query re-derives the same
-    // sub-rects combinatorially — exponential in DOM nesting depth, which times
-    // out on deep css-align / css-anchor-position trees (WPT #1113). The caches
-    // are consulted only while installed (non-null) and are always torn down at
-    // the end of the owning pass via WithLayoutGeometryCache, so live JS
-    // geometry queries (where the DOM may mutate between calls) are unaffected.
-    private Dictionary<DomElement, (double Left, double Top, double Width, double Height)>? _layoutRectCache;
-    private Dictionary<(DomElement Element, bool Vertical), double>? _contentExtentCache;
-    private Dictionary<(DomElement Element, bool Vertical), double>? _borderBoxExtentCache;
+    // RF-BRIDGE-1b: tracks whether a shared-geometry read pass is active. The pass reads
+    // one static post-script layout snapshot (_sharedGeometrySnapshot, built up front by
+    // WithLayoutGeometryCache); nested WithLayoutGeometryCache calls share the outermost
+    // pass's snapshot, and only the owner builds and tears it down — so live JS geometry
+    // queries (where the DOM may mutate between calls) each lay out fresh. The old coarse
+    // estimators recursed up/down/across the tree and fanned out exponentially on deep
+    // css-align / css-anchor-position trees (WPT #1113); they are gone now — the shared
+    // renderer layout is the sole geometry source.
+    private bool _layoutGeometryPassActive;
 
-    // Test seam: lets equivalence tests run the same pass with memoization off to
-    // prove the cached geometry values are identical to the un-memoized path.
+    // Test seam retained so the equivalence tests compile. The shared snapshot is the
+    // single geometry source now, so toggling this no longer selects an alternate path.
     internal static bool LayoutGeometryCacheEnabled = true;
 
     /// <summary>
-    /// Runs <paramref name="evaluate"/> with the box-geometry memoization caches
-    /// installed, then tears them down. Only sound for a read pass over a static
-    /// layout snapshot (no DOM or computed-style mutation mid-pass); nested calls
-    /// share the outermost pass's caches.
+    /// Runs <paramref name="evaluate"/> with the shared-geometry snapshot installed for the
+    /// pass, then tears it down. Only sound for a read pass over a static layout snapshot
+    /// (no DOM or computed-style mutation mid-pass); nested calls share the outermost pass's
+    /// snapshot and only the owner builds/clears it.
     /// </summary>
     private T WithLayoutGeometryCache<T>(Func<T> evaluate)
     {
         if (!LayoutGeometryCacheEnabled)
             return evaluate();
 
-        var owner = _layoutRectCache is null;
+        var owner = !_layoutGeometryPassActive;
         if (owner)
         {
-            _layoutRectCache = [];
-            _contentExtentCache = [];
-            _borderBoxExtentCache = [];
-            // RF-BRIDGE-1b: build the shared-geometry snapshot up front, before the
-            // read pass enumerates the element tree. BuildSharedGeometrySnapshot calls
+            _layoutGeometryPassActive = true;
+            // RF-BRIDGE-1b: build the shared-geometry snapshot up front, before the read
+            // pass enumerates the element tree. BuildSharedGeometrySnapshot calls
             // GetRenderDocument, which mutates the document (reflects style into
-            // attributes); doing that lazily mid-traversal modified a Children
-            // collection that an enclosing foreach was still enumerating
-            // (InvalidOperationException). Building once here also bounds it to one
-            // layout per pass.
-            if (UseSharedLayoutGeometry)
-                _sharedGeometrySnapshot = BuildSharedGeometrySnapshot();
+            // attributes); doing that lazily mid-traversal modified a Children collection
+            // that an enclosing foreach was still enumerating (InvalidOperationException).
+            // Building once here also bounds it to one layout per pass. Built
+            // unconditionally so a stale snapshot left by a non-pass shared query (e.g. the
+            // anchor resolver) is overwritten fresh for this pass.
+            _sharedGeometrySnapshot = BuildSharedGeometrySnapshot();
         }
 
         try
@@ -64,11 +59,9 @@ public sealed partial class DomBridge
         {
             if (owner)
             {
-                _layoutRectCache = null;
-                _contentExtentCache = null;
-                _borderBoxExtentCache = null;
                 // RF-BRIDGE-1b: the shared-geometry snapshot is scoped to the same pass.
                 ClearSharedGeometrySnapshot();
+                _layoutGeometryPassActive = false;
             }
         }
     }
@@ -81,19 +74,12 @@ public sealed partial class DomBridge
 
             // RF-BRIDGE-1b: clientWidth is the padding-box width (content + padding),
             // reported in the element's own unzoomed CSS pixels (the shared snapshot is
-            // in zoom-baked space, so divide out the element's own used zoom).
-            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+            // in zoom-baked space, so divide out the element's own used zoom). An element
+            // with no shared box (detached / display:none) reports zero.
+            if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.PaddingBox.Width, element);
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
 
-            var props = GetComputedProps(element);
-            var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-            var width = ResolveContentBoxExtent(element, vertical: false);
-
-            return width
-                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
-                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
+            return 0;
         });
 
     private double GetClientHeightForDomElement(DomElement element, bool isRoot) =>
@@ -103,19 +89,12 @@ public sealed partial class DomBridge
                 return GetViewportReferenceLength(element, vertical: true);
 
             // RF-BRIDGE-1b: clientHeight is the padding-box height (content + padding),
-            // reported in the element's own unzoomed CSS pixels (see GetClientWidth).
-            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+            // reported in the element's own unzoomed CSS pixels (see GetClientWidth). An
+            // element with no shared box (detached / display:none) reports zero.
+            if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.PaddingBox.Height, element);
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
 
-            var props = GetComputedProps(element);
-            var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-            var height = ResolveContentBoxExtent(element, vertical: true);
-
-            return height
-                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
-                 + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
+            return 0;
         });
 
     private double GetClientTopForDomElement(DomElement element)
@@ -139,21 +118,14 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+            if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.width;
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
 
-            var props = GetComputedProps(element);
-            var width = GetBorderBoxWidth(props, element);
-            if (width > 0)
-                return width;
-
-            return ResolveBorderBoxExtent(element, vertical: false);
+            return 0;
         });
 
     private double GetOffsetHeightForDomElement(DomElement element, bool isRoot) =>
@@ -165,181 +137,18 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var shared))
+            if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Height, element);
 
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.height;
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
 
-            var props = GetComputedProps(element);
-            var height = GetBorderBoxHeight(props, element);
-            if (height > 0)
-                return height;
-
-            return ResolveBorderBoxExtent(element, vertical: true);
+            return 0;
         });
 
     private static bool ShouldReportZeroOffsetMetrics(DomElement element) =>
         string.Equals(element.TagName, "map", StringComparison.OrdinalIgnoreCase);
-
-    private double ResolveContentBoxExtent(DomElement element, bool vertical)
-    {
-        if (_contentExtentCache != null && _contentExtentCache.TryGetValue((element, vertical), out var cached))
-            return cached;
-
-        // A re-entrant request for an extent still being computed returns 0 (the
-        // legacy transient); it is element/axis-specific and must never be cached.
-        if (!_contentExtentInProgress.TryAdd((element, vertical), 0))
-            return 0;
-
-        try
-        {
-            var extent = ResolveContentBoxExtentCore(element, vertical);
-            if (_contentExtentCache != null)
-                _contentExtentCache[(element, vertical)] = extent;
-            return extent;
-        }
-        finally
-        {
-            _contentExtentInProgress.TryRemove((element, vertical), out _);
-        }
-    }
-
-    private double ResolveContentBoxExtentCore(DomElement element, bool vertical)
-    {
-        var props = GetComputedProps(element);
-        var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
-        var specified = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "height" : "width"),
-            element,
-            percentageBasis: percentageBasis);
-        if (specified > 0)
-            return specified;
-
-        var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
-        if (svgLength > 0)
-            return svgLength;
-
-        var replacedElementLength = ResolveReplacedElementAttributeExtent(element, vertical);
-        if (replacedElementLength > 0)
-            return replacedElementLength;
-
-        return EstimateAutoContentExtent(element, vertical, []);
-    }
-
-    private static double ResolveReplacedElementAttributeExtent(DomElement element, bool vertical)
-    {
-        if (!string.Equals(element.TagName, "img", StringComparison.OrdinalIgnoreCase))
-            return 0;
-
-        return ParsePositiveDouble(element.Attributes.GetValueOrDefault(vertical ? "height" : "width"));
-    }
-
-    private double ResolveBorderBoxExtent(DomElement element, bool vertical)
-    {
-        if (_borderBoxExtentCache != null && _borderBoxExtentCache.TryGetValue((element, vertical), out var cached))
-            return cached;
-
-        var props = GetComputedProps(element);
-        var contentExtent = ResolveContentBoxExtent(element, vertical);
-        var startPadding = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "padding-top" : "padding-left"),
-            element);
-        var endPadding = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "padding-bottom" : "padding-right"),
-            element);
-        var startBorder = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "border-top-width" : "border-left-width"),
-            element);
-        var endBorder = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "border-bottom-width" : "border-right-width"),
-            element);
-        var borderBoxExtent = contentExtent + startPadding + endPadding + startBorder + endBorder;
-        if (_borderBoxExtentCache != null)
-            _borderBoxExtentCache[(element, vertical)] = borderBoxExtent;
-        return borderBoxExtent;
-    }
-
-    private double EstimateAutoContentExtent(DomElement element, bool vertical, HashSet<DomElement> visited)
-    {
-        // Auto-size estimation recurses through descendants; guard against any
-        // accidental cycles in synthesized DOM trees while deriving extents.
-        if (!visited.Add(element))
-            return 0;
-
-        var extent = MeasureDirectTextExtent(element, vertical);
-        var flowExtent = 0d;
-
-        foreach (var child in element.Children)
-        {
-            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
-                continue;
-
-            if (!HasAssociatedLayoutBox(child))
-                continue;
-
-            var childProps = GetComputedProps(child);
-            var childPosition = childProps.GetValueOrDefault("position");
-            if (string.Equals(childPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(childPosition, "fixed", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var childExtent = ResolveBorderBoxExtent(child, vertical);
-            if (vertical)
-            {
-                flowExtent += ParseCssLengthToPixelsWithViewport(childProps.GetValueOrDefault("margin-top"), child);
-                flowExtent += childExtent;
-                flowExtent += ParseCssLengthToPixelsWithViewport(childProps.GetValueOrDefault("margin-bottom"), child);
-                extent = Math.Max(extent, flowExtent);
-            }
-            else
-            {
-                var childInlineExtent =
-                    ParseCssLengthToPixelsWithViewport(childProps.GetValueOrDefault("margin-left"), child) +
-                    childExtent +
-                    ParseCssLengthToPixelsWithViewport(childProps.GetValueOrDefault("margin-right"), child);
-                extent = Math.Max(extent, childInlineExtent);
-            }
-        }
-
-        visited.Remove(element);
-        return extent;
-    }
-
-    private double MeasureDirectTextExtent(DomElement element, bool vertical)
-    {
-        var textFragments = new List<string>();
-        if (!string.IsNullOrWhiteSpace(element.TextContent))
-            textFragments.Add(element.TextContent);
-
-        foreach (var child in element.Children)
-        {
-            if (child.IsTextNode && !string.IsNullOrWhiteSpace(child.TextContent))
-                textFragments.Add(child.TextContent);
-        }
-
-        if (textFragments.Count == 0)
-            return 0;
-
-        var fontSize = ResolveFontSizeForElement(element);
-        if (vertical)
-            return fontSize;
-
-        // Approximate inline text advance with an average glyph width of half the
-        // current font size, which is enough for the bridge's coarse box metrics.
-        var longestLine = textFragments
-            .SelectMany(text => text.Replace("\r", string.Empty).Split('\n'))
-            .Select(line => line.Trim())
-            .Where(line => line.Length > 0)
-            .DefaultIfEmpty(string.Empty)
-            .Max(line => line.Length);
-        return longestLine * fontSize * 0.5;
-    }
 
     private double GetOffsetTopForDomElement(DomElement element) =>
         WithLayoutGeometryCache(() =>
@@ -351,13 +160,8 @@ public sealed partial class DomBridge
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: true, out var sharedTop))
                 return sharedTop;
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
-            if (offsetParent != null)
-                return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: true);
 
-            var layoutRect = ComputeUnzoomedLayoutRect(element);
-            return layoutRect.Top;
+            return 0;
         });
 
     private double GetOffsetLeftForDomElement(DomElement element) =>
@@ -370,13 +174,8 @@ public sealed partial class DomBridge
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: false, out var sharedLeft))
                 return sharedLeft;
-            if (ShouldReturnExclusiveSharedZero(element))
-                return 0;
-            if (offsetParent != null)
-                return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: false);
 
-            var layoutRect = ComputeUnzoomedLayoutRect(element);
-            return layoutRect.Left;
+            return 0;
         });
 
     /// <summary>
@@ -645,219 +444,35 @@ public sealed partial class DomBridge
         return true;
     }
 
-    /// <summary>
-    /// RF-BRIDGE-1b increment 6 (pure exclusive, default ON). Under
-    /// <see cref="UseSharedGeometryExclusively"/>, an element that produced no shared box is
-    /// reported as zero geometry — the geometry entry points call this right after their
-    /// shared-snapshot branch, so with the coarse estimators deleted the shared snapshot (plus
-    /// this zeros fallback) is the sole geometry source. When the flag is off this is always
-    /// false. Zoomed elements are handled on the shared path (their geometry is divided back to
-    /// unzoomed CSS pixels by the element's own used zoom), so they are not excepted here.
-    ///
-    /// <para>Earlier this additionally required <c>!HasAssociatedLayoutBox</c> so a
-    /// box-generating element merely <em>absent from the snapshot</em> fell back to the
-    /// estimator rather than zeroing — a guard for the <c>display:inline-block</c> snapshot gap
-    /// where the §9.2.1.1 block-inside-inline correction dissolved an inline-block's box. That
-    /// layout bug is fixed (see <c>DomParser.CorrectBlockInsideInlineImp</c> / the
-    /// <c>LayoutGeometryCompletenessTests</c> guard), so a box-generating element is no longer
-    /// absent from the snapshot; the guard is dropped and any snapshot-missing element (detached,
-    /// <c>display:none</c>/<c>contents</c>, or an unmaterialised/cross-origin frame the provider
-    /// cannot lay out) reports zero.</para>
-    /// </summary>
-    private bool ShouldReturnExclusiveSharedZero(DomElement element) =>
-        UseSharedGeometryExclusively && UseSharedLayoutGeometry;
-
     private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
-        if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
-            return selectScrollWidth;
+            if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
+                return selectScrollWidth;
 
-        // RF-BRIDGE-1b: answer scroll overflow from the shared renderer layout when
-        // available, including the root/viewport scrolling area — its scrollable overflow
-        // is the union of the root element's own box and its descendants, which
-        // TryGetSharedScrollExtent already computes from the snapshot. Falls back to the
-        // estimator when the element has no shared box.
-        if (UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: false, out var sharedScrollWidth))
-            return sharedScrollWidth;
-        if (!isRoot && ShouldReturnExclusiveSharedZero(element))
+            // RF-BRIDGE-1b: scroll overflow comes from the shared renderer layout — the
+            // union of the element's own box and its rendered descendants, including the
+            // root/viewport scrolling area, computed by TryGetSharedScrollExtent. An
+            // element with no shared box (detached / display:none) reports zero.
+            if (TryGetSharedScrollExtent(element, vertical: false, out var sharedScrollWidth))
+                return sharedScrollWidth;
+
             return 0;
-
-        var props = GetComputedProps(element);
-        var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
-        var ownZoom = GetUsedZoomForElement(element);
-        var maxWidth = ownWidth;
-        var elementRect = ComputeRenderedRect(element);
-        var borderLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
-        var originLeft = elementRect.Left + borderLeft;
-
-        foreach (var child in EnumerateRenderedDescendants(element))
-        {
-            var childRect = ComputeRenderedRect(child);
-            var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
-            var childOffset = ReferenceEquals(GetAssignedSlot(child), element)
-                ? ComputeOffsetWithinAncestor(child, element, vertical: false)
-                : childRect.Left - originLeft;
-            maxWidth = Math.Max(maxWidth, childOffset + widthInContainerSpace + trailingPadding);
-        }
-
-        return maxWidth;
         });
 
     private double GetScrollHeightForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
-        if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
-            return selectScrollHeight;
+            if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
+                return selectScrollHeight;
 
-        // RF-BRIDGE-1b: answer scroll overflow from the shared renderer layout when
-        // available, including the root/viewport scrolling area (see GetScrollWidth). Falls
-        // back to the estimator when the element has no shared box.
-        if (UseSharedLayoutGeometry && TryGetSharedScrollExtent(element, vertical: true, out var sharedScrollHeight))
-            return sharedScrollHeight;
-        if (!isRoot && ShouldReturnExclusiveSharedZero(element))
+            // RF-BRIDGE-1b: scroll overflow comes from the shared renderer layout (see
+            // GetScrollWidth). An element with no shared box reports zero.
+            if (TryGetSharedScrollExtent(element, vertical: true, out var sharedScrollHeight))
+                return sharedScrollHeight;
+
             return 0;
-
-        var props = GetComputedProps(element);
-        var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
-        var ownZoom = GetUsedZoomForElement(element);
-        var maxHeight = ownHeight;
-        var elementRect = ComputeRenderedRect(element);
-        var borderTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element);
-        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
-        var originTop = elementRect.Top + borderTop;
-
-        foreach (var child in EnumerateRenderedDescendants(element))
-        {
-            var childRect = ComputeRenderedRect(child);
-            var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
-            var childOffset = ReferenceEquals(GetAssignedSlot(child), element)
-                ? ComputeOffsetWithinAncestor(child, element, vertical: true)
-                : childRect.Top - originTop;
-            maxHeight = Math.Max(maxHeight, childOffset + heightInContainerSpace + trailingPadding);
-        }
-
-        return maxHeight;
         });
-
-    private double ComputeOffsetRelativeToAncestor(DomElement element, DomElement ancestor, bool vertical)
-    {
-        double offset = 0;
-        var current = element;
-        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
-        {
-            offset += ComputeOffsetWithinParentForOffset(current, vertical);
-            current = current.Parent;
-        }
-
-        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-            offset += ComputeOffsetWithinParentForOffset(current, vertical);
-
-        return offset;
-    }
-
-    private double ComputeOffsetWithinActualAncestor(DomElement element, DomElement ancestor, bool vertical)
-    {
-        double offset = 0;
-        var current = element;
-
-        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
-        {
-            offset += ComputeOffsetWithinParent(current, vertical);
-            current = current.Parent;
-        }
-
-        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-            offset += ComputeOffsetWithinParent(current, vertical);
-
-        return offset;
-    }
-
-    private double ComputeOffsetWithinParentForOffset(DomElement element, bool vertical)
-    {
-        var parent = element.Parent;
-        if (parent == null)
-            return 0;
-
-        var props = GetComputedProps(element);
-        var position = props.GetValueOrDefault("position");
-        var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
-        var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
-        var parentProps = GetComputedProps(parent);
-        var parentPadding = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), parent);
-
-        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
-            return margin + positional;
-
-        double offset = parentPadding;
-        if (vertical)
-        {
-            foreach (var sibling in parent.Children)
-            {
-                if (ReferenceEquals(sibling, element))
-                    break;
-                if (sibling.IsTextNode)
-                    continue;
-                if (!HasAssociatedLayoutBox(sibling))
-                    continue;
-
-                var siblingProps = GetComputedProps(sibling);
-                var siblingPosition = siblingProps.GetValueOrDefault("position");
-                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (!ShouldCollapseTopMarginWithParent(sibling))
-                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
-                offset += GetBorderBoxHeight(siblingProps, sibling);
-                offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
-                if (string.Equals(siblingPosition, "relative", StringComparison.OrdinalIgnoreCase))
-                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("top"), sibling);
-            }
-
-            if (!ShouldCollapseTopMarginWithParent(element))
-                offset += margin;
-        }
-        else
-        {
-            offset += margin;
-        }
-
-        if (string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
-            offset += positional;
-
-        return offset;
-    }
-
-    private bool ShouldCollapseTopMarginWithParent(DomElement element)
-    {
-        if (element.Parent == null)
-            return false;
-
-        var props = GetComputedProps(element);
-        var position = props.GetValueOrDefault("position");
-        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        foreach (var sibling in element.Parent.Children)
-        {
-            if (sibling.IsTextNode)
-                continue;
-            if (ReferenceEquals(sibling, element))
-                break;
-            return false;
-        }
-
-        var parentProps = GetComputedProps(element.Parent);
-        return ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent) == 0 &&
-               ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent) == 0;
-    }
 
     private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
@@ -878,195 +493,25 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
-        if (_layoutRectCache != null && _layoutRectCache.TryGetValue(element, out var cached))
-            return cached;
-
-        // RF-BRIDGE-1b: prefer the renderer's real layout (border box, document coords)
-        // for the element's rect, which powers getBoundingClientRect and offset top/left.
+        // RF-BRIDGE-1b: the element's rect comes from the renderer's real layout (border
+        // box, document coords), which powers getBoundingClientRect and offset top/left.
         // The snapshot is in zoom-baked space and ComputeRenderedRect re-applies zoom to
         // the SIZE, so the size is divided back to the element's own unzoomed CSS pixels
         // here; the position stays in the rendered document coordinate space, which is
-        // what getBoundingClientRect wants (a no-op for unzoomed elements). Falls back to
-        // the estimator when the element has no box (detached/display:none).
-        if (UseSharedLayoutGeometry && TryGetSharedLayoutGeometry(element, out var sharedGeometry))
+        // what getBoundingClientRect wants (a no-op for unzoomed elements). An element with
+        // no shared box (detached / display:none) reports a zero rect.
+        if (TryGetSharedLayoutGeometry(element, out var sharedGeometry))
         {
             var zoom = GetUsedZoomForElement(element);
             var inverseZoom = zoom > 0.0001 ? 1.0 / zoom : 1.0;
-            var sharedRect = (
+            return (
                 (double)sharedGeometry.BorderBox.Left,
                 (double)sharedGeometry.BorderBox.Top,
                 sharedGeometry.BorderBox.Width * inverseZoom,
                 sharedGeometry.BorderBox.Height * inverseZoom);
-            if (_layoutRectCache != null)
-                _layoutRectCache[element] = sharedRect;
-            return sharedRect;
         }
 
-        // RF-BRIDGE-1b increment 6 (staged): under exclusive-shared, an unzoomed element
-        // with no box is detached/display:none → zero rect, no estimator.
-        if (ShouldReturnExclusiveSharedZero(element))
-        {
-            if (_layoutRectCache != null)
-                _layoutRectCache[element] = (0, 0, 0, 0);
-            return (0, 0, 0, 0);
-        }
-
-        // Cache unconditionally: re-entrant computations (an auto content-extent
-        // pass asking for the rect of an element whose own extent is mid-flight)
-        // run to completion before the owning call returns, so the owner's final
-        // rect overwrites any transient entry — the values consumers observe are
-        // identical to the un-memoized path, only computed once. See WPT #1113.
-        var rect = ComputeUnzoomedLayoutRectCore(element);
-        if (_layoutRectCache != null)
-            _layoutRectCache[element] = rect;
-        return rect;
-    }
-
-    private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRectCore(DomElement element)
-    {
-        var props = GetComputedProps(element);
-        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-        var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
-        var width = ResolveContentBoxExtent(element, vertical: false);
-        var height = ResolveContentBoxExtent(element, vertical: true);
-        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"), element, percentageBasis: containingBlockWidth);
-        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"), element, percentageBasis: containingBlockWidth);
-        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element, percentageBasis: containingBlockHeight);
-        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element, percentageBasis: containingBlockWidth);
-        var position = props.GetValueOrDefault("position");
-        var isSvgPositionedGeometryElement = IsSvgPositionedGeometryElement(element);
-
-        if (isSvgPositionedGeometryElement)
-        {
-            top = ResolveSvgGeometryLength(element, "y", vertical: true, containingBlockHeight);
-            left = ResolveSvgGeometryLength(element, "x", vertical: false, containingBlockWidth);
-            position = "absolute";
-            marginTop = 0;
-            marginLeft = 0;
-        }
-
-        if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
-            return (0, 0, width, height);
-
-        if (string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
-        {
-            var specifiedMarginTop = props.GetValueOrDefault("margin-top");
-            var specifiedMarginLeft = props.GetValueOrDefault("margin-left");
-            var bodyMarginTop = HasExplicitBodyMargin(specifiedMarginTop) ? marginTop : DefaultBodyMarginPixels;
-            var bodyMarginLeft = HasExplicitBodyMargin(specifiedMarginLeft) ? marginLeft : DefaultBodyMarginPixels;
-            return (bodyMarginLeft, bodyMarginTop, width, height);
-        }
-
-        var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
-        var parentProps = GetComputedProps(element.Parent);
-        var parentBorderTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent);
-        var parentBorderLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-left-width"), element.Parent);
-        var parentPaddingTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent);
-        var parentPaddingLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-left"), element.Parent);
-
-        var baseTop = parentRect.Top + parentBorderTop + parentPaddingTop;
-        var baseLeft = parentRect.Left + parentBorderLeft + parentPaddingLeft;
-
-        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) && !IsSvgGeometryContainer(element.Parent))
-        {
-            foreach (var sibling in element.Parent.Children)
-            {
-                if (ReferenceEquals(sibling, element))
-                    break;
-                if (sibling.IsTextNode)
-                    continue;
-
-                var siblingProps = GetComputedProps(sibling);
-                var siblingDisplay = siblingProps.GetValueOrDefault("display");
-                if (!string.Equals(siblingDisplay, "contents", StringComparison.OrdinalIgnoreCase) &&
-                    !HasAssociatedLayoutBox(sibling))
-                {
-                    continue;
-                }
-
-                var siblingRect = ComputeRenderedRect(sibling);
-                var siblingPosition = siblingProps.GetValueOrDefault("position");
-                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                baseTop += GetNormalFlowHeightContribution(sibling, siblingRect);
-                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
-                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
-            }
-        }
-
-        var resolvedTop = baseTop + marginTop;
-        var resolvedLeft = baseLeft + marginLeft;
-
-        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
-        {
-            resolvedTop += top;
-            resolvedLeft += left;
-        }
-
-        var (translateX, translateY) = GetTransformTranslate(element);
-        resolvedTop += translateY;
-        resolvedLeft += translateX;
-
-        return (resolvedLeft, resolvedTop, width, height);
-    }
-
-    private double GetNormalFlowHeightContribution(
-        DomElement element,
-        (double Left, double Top, double Width, double Height) renderedRect)
-    {
-        var display = GetComputedProps(element).GetValueOrDefault("display");
-        if (!string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
-            return renderedRect.Height;
-
-        var hasRect = false;
-        var minTop = 0.0;
-        var maxBottom = 0.0;
-        CollectDisplayContentsFlowExtents(element, ref hasRect, ref minTop, ref maxBottom);
-        return hasRect ? Math.Max(0, maxBottom - minTop) : 0;
-    }
-
-    private void CollectDisplayContentsFlowExtents(
-        DomElement element,
-        ref bool hasRect,
-        ref double minTop,
-        ref double maxBottom)
-    {
-        foreach (var child in element.Children)
-        {
-            if (child.IsTextNode || string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var childProps = GetComputedProps(child);
-            var childPosition = childProps.GetValueOrDefault("position");
-            if (string.Equals(childPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(childPosition, "fixed", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var childDisplay = childProps.GetValueOrDefault("display");
-            if (string.Equals(childDisplay, "contents", StringComparison.OrdinalIgnoreCase))
-            {
-                CollectDisplayContentsFlowExtents(child, ref hasRect, ref minTop, ref maxBottom);
-                continue;
-            }
-
-            var rect = ComputeRenderedRect(child);
-            if (!hasRect)
-            {
-                minTop = rect.Top;
-                maxBottom = rect.Top + rect.Height;
-                hasRect = true;
-                continue;
-            }
-
-            minTop = Math.Min(minTop, rect.Top);
-            maxBottom = Math.Max(maxBottom, rect.Top + rect.Height);
-        }
+        return (0, 0, 0, 0);
     }
 
     private static bool IsSvgGeometryContainer(DomElement? element) =>
@@ -2290,39 +1735,15 @@ public sealed partial class DomBridge
         return scrollContainer;
     }
 
-    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical)
-    {
-        double offset = 0;
-        var current = element;
-
-        while (true)
-        {
-            var parent = GetScrollTraversalParent(current);
-            if (parent == null || ReferenceEquals(parent, ancestor))
-                break;
-
-            offset += ComputeOffsetWithinScrollTraversalParent(current, parent, vertical);
-            offset -= GetElementScrollOffset(parent, vertical);
-            current = parent;
-        }
-
-        var directParent = GetScrollTraversalParent(current);
-        if (directParent != null && ReferenceEquals(directParent, ancestor))
-            offset += ComputeOffsetWithinScrollTraversalParent(current, directParent, vertical);
-
-        return offset;
-    }
-
     /// <summary>
-    /// RF-BRIDGE-1b: the scroll-aware shared-geometry equivalent of
-    /// <see cref="ComputeOffsetWithinAncestor"/>. The shared snapshot is a *natural*
+    /// RF-BRIDGE-1b: the scroll-aware offset of <paramref name="element"/> within
+    /// <paramref name="ancestor"/> from the shared snapshot. The snapshot is a *natural*
     /// (unscrolled) layout, so the element-border-to-ancestor-padding delta it yields is
     /// the pre-scroll offset; the JS-set scroll offset of each intermediate scroll
     /// container strictly between <paramref name="element"/> and <paramref name="ancestor"/>
-    /// is then subtracted, exactly as the estimator does (the ancestor's own scroll is left
-    /// to the caller). Returns <c>false</c> — so the caller falls back to the estimator —
-    /// when the shared path is off, either box is missing, or zoom is in play (a zoomed
-    /// cross-ancestor delta is not reconciled against the baked snapshot).
+    /// is then subtracted (the ancestor's own scroll is left to the caller). Returns
+    /// <c>false</c> — so the caller reports zero — when either box is missing, or zoom is in
+    /// play (a zoomed cross-ancestor delta is not reconciled against the baked snapshot).
     /// </summary>
     private bool TrySharedOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical, out double offset,
         bool viewportAnchored = false)
@@ -2343,16 +1764,23 @@ public sealed partial class DomBridge
         // layout engine now places an absolutely/fixed-positioned element whose
         // containing block is an inline box at its inset position, so its shared box is
         // correct and the estimator fallback is no longer needed here.
-        if (Math.Abs(GetUsedZoomForElement(element) - 1.0) >= 0.0001 ||
-            Math.Abs(GetUsedZoomForElement(ancestor) - 1.0) >= 0.0001)
-            return false;
         if (!TryGetSharedLayoutGeometry(element, out var elementBox) ||
             !TryGetSharedLayoutGeometry(ancestor, out var ancestorBox))
             return false;
 
-        double natural = vertical
+        // Both edges are in the snapshot's zoom-baked document space; the offset is expressed
+        // in the ANCESTOR's coordinate frame, so divide the delta by the ancestor's cumulative
+        // used zoom to recover unzoomed CSS pixels. (Dividing by the *element's* own zoom would
+        // be wrong when only the element is zoomed: its own zoom scales its size/content, not
+        // its flow position within the ancestor.) A no-op when the ancestor is unzoomed. The
+        // former zoom gate that deferred zoomed elements to the estimator is gone, so the
+        // estimator can be deleted. Intermediate scroll offsets are already in unzoomed CSS
+        // pixels (JS scrollTo), so they subtract cleanly after this division.
+        var offsetZoom = GetUsedZoomForElement(ancestor);
+        var inverseOffsetZoom = offsetZoom > 0.0001 ? 1.0 / offsetZoom : 1.0;
+        double natural = (vertical
             ? elementBox.BorderBox.Top - ancestorBox.PaddingBox.Top
-            : elementBox.BorderBox.Left - ancestorBox.PaddingBox.Left;
+            : elementBox.BorderBox.Left - ancestorBox.PaddingBox.Left) * inverseOffsetZoom;
 
         // (RF-BRIDGE-1b Track 3.3) For a viewport-anchored target — one being scrolled
         // into the *visual* viewport whose containing chain includes a position:fixed
@@ -2415,143 +1843,19 @@ public sealed partial class DomBridge
     private double OffsetWithinAncestorForFixedPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
         TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared, viewportAnchored: true)
             ? shared
-            : ComputeOffsetWithinAncestor(element, ancestor, vertical);
+            : 0;
 
     /// <summary>
     /// RF-BRIDGE-1b: offset of <paramref name="element"/> within
-    /// <paramref name="ancestor"/> from the scroll-aware shared snapshot when available
-    /// (<see cref="TrySharedOffsetWithinAncestor"/>), else the coarse estimator
-    /// (<see cref="ComputeOffsetWithinAncestor"/>). The two are behaviour-equivalent on
-    /// laid-out, unzoomed subtrees; the shared path additionally reflects real layout the
-    /// estimator only approximates.
+    /// <paramref name="ancestor"/> from the scroll-aware shared snapshot
+    /// (<see cref="TrySharedOffsetWithinAncestor"/>). With the coarse estimators deleted, a
+    /// shared-unavailable element (cross-origin / non-materialised frame) reports 0 — real
+    /// in-flow sticky/scrollIntoView targets are always present in the snapshot.
     /// </summary>
     private double OffsetWithinAncestorPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
         TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared)
             ? shared
-            : ComputeOffsetWithinAncestor(element, ancestor, vertical);
-
-    private double ComputeOffsetWithinScrollTraversalParent(DomElement element, DomElement parent, bool vertical)
-    {
-        var assignedSlot = GetAssignedSlot(element);
-        if (assignedSlot != null && ReferenceEquals(assignedSlot, parent))
-        {
-            var host = element.Parent;
-            if (host == null)
-                return 0;
-
-            var slotProps = GetComputedProps(parent);
-            var slotPadding = ParseCssLengthToPixelsWithViewport(
-                slotProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"),
-                parent);
-            return slotPadding + ComputeOffsetWithinActualAncestor(element, host, vertical);
-        }
-
-        return ComputeOffsetWithinParent(element, vertical);
-    }
-
-    private double ComputeOffsetWithinParent(DomElement element, bool vertical)
-    {
-        if (element.Parent == null)
-            return 0;
-
-        var parentProps = GetComputedProps(element.Parent);
-        var elementProps = GetComputedProps(element);
-        var position = elementProps.GetValueOrDefault("position");
-        double offset = ParseCssLengthToPixelsWithViewport(
-            parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), element.Parent);
-        offset += ParseCssLengthToPixelsWithViewport(
-            elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
-
-        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var sibling in element.Parent.Children)
-            {
-                if (ReferenceEquals(sibling, element))
-                    break;
-                if (sibling.IsTextNode)
-                    continue;
-
-                var siblingProps = GetComputedProps(sibling);
-                var siblingPosition = siblingProps.GetValueOrDefault("position");
-                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), sibling);
-                // Resolve the sibling's size against its containing block so a
-                // percentage (e.g. height:100%) contributes its used length to
-                // the following element's offset rather than collapsing to 0.
-                // Only resolve the (recursive) containing-block basis for actual
-                // percentage values — for the common px/keyword case it is unused,
-                // so skipping it keeps this O(n) per element, not O(n²).
-                var siblingSizeRaw = siblingProps.GetValueOrDefault(vertical ? "height" : "width");
-                double? siblingPercentBasis =
-                    siblingSizeRaw != null && siblingSizeRaw.Contains('%')
-                        ? ResolveContainingBlockReferenceLength(sibling, vertical)
-                        : null;
-                var siblingExtent = ParseCssLengthToPixelsWithViewport(
-                    siblingSizeRaw, sibling, percentageBasis: siblingPercentBasis);
-                // Block-in-inline (CSS2.1 §9.2.1.1): an inline box that contains
-                // block-level content is split into anonymous block boxes and so
-                // stacks vertically, but its CSS `height` is auto (inline boxes
-                // ignore `height`) and parses to 0 — dropping the block child's
-                // height from the following sibling's offset (breaking e.g.
-                // scrollIntoView on a target after such a sibling).  Fall back to
-                // the sibling's laid-out border-box extent in that case.  Gated to
-                // the block axis and to inline boxes with block content, so plain
-                // inline siblings (which share a line, not stack) are unchanged.
-                if (vertical && siblingExtent <= 0 && IsInlineBoxWithBlockContent(sibling, siblingProps))
-                    siblingExtent = ResolveBorderBoxExtent(sibling, vertical: true);
-                offset += siblingExtent;
-                offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"), sibling);
-            }
-        }
-
-        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
-        {
-            offset += ResolvePositionedInset(element, vertical);
-        }
-
-        return offset;
-    }
-
-    /// <summary>
-    /// True when <paramref name="element"/> is an inline-level box that contains
-    /// block-level content (CSS2.1 §9.2.1.1 block-in-inline).  Such a box is
-    /// broken into anonymous block boxes that stack in the block flow, so it
-    /// occupies its content's block-axis extent even though the CSS `height`
-    /// property does not apply to it (and therefore parses to 0).  A plain inline
-    /// box (inline content only) shares a line box with its siblings and does not
-    /// stack, so it is excluded.
-    /// </summary>
-    private bool IsInlineBoxWithBlockContent(DomElement element, Dictionary<string, string> props)
-    {
-        var display = props.GetValueOrDefault("display") ?? "inline";
-        bool inlineLevel = display is "inline" or "inline-block" or "inline-table"
-            or "inline-flex" or "inline-grid";
-        if (!inlineLevel)
-            return false;
-
-        foreach (var child in element.Children)
-        {
-            if (child.IsTextNode)
-                continue;
-            var childDisplay = GetComputedProps(child).GetValueOrDefault("display");
-            if (childDisplay == null)
-                continue;
-            if (childDisplay is "block" or "flex" or "grid" or "list-item"
-                || childDisplay.StartsWith("table", StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
+            : 0;
 
     private double ResolveScrollIntoViewOffset(
         DomElement element,
@@ -2692,50 +1996,6 @@ public sealed partial class DomBridge
         }
 
         return inset * (ownerZoom / containerZoom);
-    }
-
-    private double ResolvePositionedInset(DomElement element, bool vertical)
-    {
-        if (element.Parent == null)
-            return 0;
-
-        var props = GetComputedProps(element);
-        var primaryProperty = vertical ? "top" : "left";
-        var secondaryProperty = vertical ? "bottom" : "right";
-        var value = props.GetValueOrDefault(primaryProperty);
-        if (string.IsNullOrWhiteSpace(value) ||
-            string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
-        {
-            var fallback = props.GetValueOrDefault(secondaryProperty);
-            if (string.IsNullOrWhiteSpace(fallback) ||
-                string.Equals(fallback, "auto", StringComparison.OrdinalIgnoreCase))
-            {
-                return 0;
-            }
-
-            var reference = ResolveContainingBlockReferenceLength(element, vertical);
-            var borderBoxSize = vertical
-                ? GetBorderBoxHeight(props, element)
-                : GetBorderBoxWidth(props, element);
-            var fallbackPixels = ParseCssLengthToPixelsWithViewport(fallback, element, percentageBasis: reference);
-            return Math.Max(0, reference - borderBoxSize - fallbackPixels);
-        }
-
-        var normalized = value.Trim().ToLowerInvariant();
-        if (normalized.EndsWith("%"))
-        {
-            if (!double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var percent))
-            {
-                return 0;
-            }
-
-            var parentProps = GetComputedProps(element.Parent);
-            var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"), element.Parent);
-            return reference <= 0 ? 0 : reference * (percent / 100.0);
-        }
-
-        return ParseCssLengthToPixelsWithViewport(value, element);
     }
 
     private double ParseCssLengthToPixelsWithViewport(

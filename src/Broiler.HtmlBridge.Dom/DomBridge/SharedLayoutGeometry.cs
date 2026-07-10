@@ -16,18 +16,13 @@ public sealed partial class DomBridge
     // Mirrors the LayoutGeometryCacheEnabled test seam.
     internal static bool UseSharedLayoutGeometry = true;
 
-    // RF-BRIDGE-1b increment 6 cutover — ON by default (2026-07-10). When true, the
-    // geometry entry points answer *exclusively* from the shared snapshot: an element that
-    // genuinely generates no box (display:none/contents, text/comment — see
-    // HasAssociatedLayoutBox) reports zero geometry instead of consulting the coarse
-    // LayoutMetrics estimators. A box-generating element that is merely absent from the
-    // current snapshot still falls back to the estimator (see ShouldReturnExclusiveSharedZero)
-    // — the snapshot can transiently miss a laid-out element (observed in the WPT test
-    // harness's ExecuteScriptsWithDom flow, NOT in normal Attach+scrollIntoView usage; see
-    // milestone 2.4), and zeroing it would mis-collapse its geometry. That refinement is what
-    // makes this flippable without regressing the zoom scroll-into-view WPT pixel tests. Net
-    // behaviour change vs flag-off: only display:none/contents elements switch from an
-    // estimator guess to a correct zero.
+    // RF-BRIDGE-1b increment 6 cutover — the geometry entry points now answer *exclusively*
+    // from the shared snapshot: an element with a shared box reads its real geometry and any
+    // snapshot-missing element (detached, display:none/contents, text/comment, or an
+    // unmaterialised/cross-origin frame the provider cannot lay out) reports zero. The coarse
+    // LayoutMetrics estimators that this flag used to gate a fallback to are deleted, so the
+    // flag is now vestigial (retained only because the cutover tests still reference it) and
+    // toggling it no longer changes behaviour.
     // See docs/roadmap/htmlbridge-blocked-items-completion-roadmap.md milestone 2.4.
     internal static bool UseSharedGeometryExclusively = true;
 
