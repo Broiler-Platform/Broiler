@@ -128,11 +128,19 @@ safe and is the true prerequisite for canonical text.
 Each phase is one or more PRs, each independently building + green. Gate every phase on
 the **full** validation set (see "Validation" below), baselined first per `CLAUDE.md`.
 
-**Progress (2026-07-10):** Phase A **DONE** — `JsSetStyleProps` + `OwnerDocRoot` relocated
-to `ElementRuntimeState` (42 sites), facade members deleted, frozen guard updated; full
-`Broiler.Cli.Tests` (1699, crasher excluded) zero new failures by name vs HEAD. `InnerHtml`
-deferred out of Phase A (constructor-coupled; fold in near Phase F). Next: Phase B
-(`.Style` → ERS). Branch: `claude/rf-bridge-1c-domelement-facade-migration`.
+**Progress (2026-07-10):** Phases A + B **DONE** on branch
+`claude/rf-bridge-1c-domelement-facade-migration`, each full-`Broiler.Cli.Tests` regression-free
+(78-failure baseline, empty diff).
+- **Phase A** — `JsSetStyleProps` + `OwnerDocRoot` → `ElementRuntimeState` (42 sites).
+- **Phase B** — inline `.Style` → ERS via `DomBridge.InlineStyle(element)` (lazy-seeds from the
+  `style=` attribute on first access; ~200 sites; clone + dialog-backdrop seed explicitly; facade
+  `Style` deleted, ignored `style` ctor param retained until Phase F). Perf note: `InlineStyle`
+  adds a CWT lookup per style access on hot paths — candidate for a per-pass cache if benchmarks
+  regress.
+
+Facade now retains: `InnerHtml` (deferred, ctor-coupled → Phase F), `Attributes`/`NsAttrMap`
+(Phase C), `IsTextNode`/`TextContent` (Phase D), `Parent`/`Children`/`NamespaceURI` (Phase E).
+Next: **Phase C** (canonicalize attribute access).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
