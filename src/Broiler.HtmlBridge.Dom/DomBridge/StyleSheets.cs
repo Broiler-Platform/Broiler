@@ -53,10 +53,10 @@ public sealed partial class DomBridge
     {
         if (!string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
             return false;
-        if (!element.Attributes.TryGetValue("rel", out var rel) ||
+        if (!TryGetAttribute(element, "rel", out var rel) ||
             !rel.Contains("stylesheet", StringComparison.OrdinalIgnoreCase))
             return false;
-        return element.Attributes.ContainsKey("href");
+        return HasAttr(element, "href");
     }
 
     /// <summary>

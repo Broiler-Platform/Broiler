@@ -63,8 +63,8 @@ public sealed partial class DomBridge
 
     private static bool SlotAcceptsNode(DomElement slot, DomElement node)
     {
-        var slotName = slot.Attributes.GetValueOrDefault("name");
-        var nodeSlot = node.Attributes.GetValueOrDefault("slot");
+        var slotName = GetAttr(slot, "name");
+        var nodeSlot = GetAttr(node, "slot");
         return string.IsNullOrEmpty(slotName)
             ? string.IsNullOrEmpty(nodeSlot)
             : string.Equals(slotName, nodeSlot, StringComparison.OrdinalIgnoreCase);

@@ -12,7 +12,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var name = a[0].ToString();
-        if (!element.Attributes.TryGetValue(name, out var val))
+        if (!TryGetAttribute(element, name, out var val))
             return JSNull.Value;
         return BuildAttrNode(name, val, element, ownerObj);
     }
@@ -24,7 +24,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !element.Attributes.TryGetValue(qName, out var val))
+        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
             return JSNull.Value;
         return BuildAttrNode(qName, val, element, ownerObj);
     }
@@ -42,7 +42,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var value = attrObj[(KeyString)"value"].ToString();
         JSValue old = JSNull.Value;
-        if (element.Attributes.TryGetValue(name, out var oldVal))
+        if (TryGetAttribute(element, name, out var oldVal))
             old = BuildAttrNode(name, oldVal, element, ownerObj);
         SetAttributeLikeSetAttribute(element, name, value);
         return old;
@@ -60,7 +60,7 @@ public sealed partial class DomBridge
         var ns = GetAttrNodeNamespace(attrObj);
         var value = attrObj[(KeyString)"value"].ToString();
         JSValue old = JSNull.Value;
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && element.Attributes.TryGetValue(oldQName, out var oldVal))
+        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && TryGetAttribute(element, oldQName, out var oldVal))
             old = BuildAttrNode(oldQName, oldVal, element, ownerObj);
         SetAttributeLikeSetAttributeNS(element, ns, name, localName, value);
         return old;
@@ -72,7 +72,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var name = a[0].ToString();
-        if (!element.Attributes.TryGetValue(name, out var val))
+        if (!TryGetAttribute(element, name, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(name, val, element, ownerObj);
         RemoveAttributeLikeRemoveAttribute(element, name);
@@ -86,7 +86,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !element.Attributes.TryGetValue(qName, out var val))
+        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(qName, val, element, ownerObj);
         RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
@@ -99,21 +99,21 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var idx = (int)a[0].DoubleValue;
-        var keys = element.Attributes.Keys.ToList();
+        var keys = AttributeNames(element).ToList();
         if (idx < 0 || idx >= keys.Count)
             return JSNull.Value;
         var name = keys[idx];
-        return BuildAttrNode(name, element.Attributes[name], element, ownerObj);
+        return BuildAttrNode(name, GetAttr(element, name) ?? string.Empty, element, ownerObj);
     }
 
 
     private JSValue JsAttributesCallback009Core(global::Broiler.HtmlBridge.DomElement element, global::System.Int32 idx, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments _)
     {
-        var keys = element.Attributes.Keys.ToList();
+        var keys = AttributeNames(element).ToList();
         if (idx >= keys.Count)
             return JSUndefined.Value;
         var n = keys[idx];
-        return BuildAttrNode(n, element.Attributes[n], element, ownerObj);
+        return BuildAttrNode(n, GetAttr(element, n) ?? string.Empty, element, ownerObj);
     }
 
 }

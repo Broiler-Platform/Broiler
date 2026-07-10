@@ -10,6 +10,105 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // -----------------------------------------------------------------
+    // RF-BRIDGE-1c Phase C: string-keyed attribute access over canonical
+    // Broiler.Dom attributes, replacing the removed DomElement.Attributes
+    // (LegacyAttributeDictionary) facade. Each helper mirrors the legacy
+    // dictionary's semantics exactly — a case-insensitive scan by qualified
+    // name over the canonical (namespace-keyed) attribute set — so the
+    // migration is behaviour-preserving (same O(n) scan the shim did).
+    // -----------------------------------------------------------------
+
+    /// <summary>Legacy <c>Attributes.TryGetValue</c>: case-insensitive lookup by
+    /// qualified name; <paramref name="value"/> is <c>""</c> when absent.</summary>
+    private static bool TryGetAttribute(DomElement element, string qualifiedName, out string value)
+    {
+        foreach (var attribute in element.Attributes.Values)
+        {
+            if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = attribute.Value;
+                return true;
+            }
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    /// <summary>Legacy <c>Attributes.GetValueOrDefault</c> / null-returning indexer get.</summary>
+    private static string? GetAttr(DomElement element, string qualifiedName) =>
+        TryGetAttribute(element, qualifiedName, out var value) ? value : null;
+
+    /// <summary>Legacy <c>Attributes.ContainsKey</c>.</summary>
+    private static bool HasAttr(DomElement element, string qualifiedName) =>
+        TryGetAttribute(element, qualifiedName, out _);
+
+    /// <summary>Legacy string-keyed <c>Attributes[name] = value</c> setter: updates an
+    /// existing attribute in place (preserving its namespace) or creates a no-namespace one.</summary>
+    private static void SetAttr(DomElement element, string qualifiedName, string value)
+    {
+        Broiler.Dom.DomAttribute? existing = null;
+        foreach (var attribute in element.Attributes.Values)
+        {
+            if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            {
+                existing = attribute;
+                break;
+            }
+        }
+
+        if (existing is { } found)
+            element.SetAttributeNS(found.NamespaceUri, found.QualifiedName, value);
+        else
+            element.SetAttribute(qualifiedName, value);
+    }
+
+    /// <summary>Legacy <c>Attributes.Remove</c>: removes the attribute matched by qualified name.</summary>
+    private static bool RemoveAttr(DomElement element, string qualifiedName)
+    {
+        Broiler.Dom.DomAttribute? existing = null;
+        foreach (var attribute in element.Attributes.Values)
+        {
+            if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            {
+                existing = attribute;
+                break;
+            }
+        }
+
+        return existing is { } found && element.RemoveAttributeNS(found.NamespaceUri, found.LocalName);
+    }
+
+    /// <summary>Legacy <c>Attributes.Keys</c>: the qualified names of the element's attributes.</summary>
+    private static IEnumerable<string> AttributeNames(DomElement element) =>
+        element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
+
+    /// <summary>Legacy enumeration/snapshot of the string-keyed attribute map (qualified
+    /// name → value, case-insensitive, last-wins on collision — matching the old
+    /// <c>LegacyAttributeDictionary.Snapshot</c>).</summary>
+    private static Dictionary<string, string> AttributeSnapshot(DomElement element)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in element.Attributes.Values)
+            result[attribute.QualifiedName] = attribute.Value;
+        return result;
+    }
+
+    /// <summary>Restores the element's attribute set to <paramref name="saved"/> — the
+    /// attribute-map equivalent of <c>RestoreStringMap</c> (remove extras, then set saved).</summary>
+    private static void RestoreAttributes(DomElement element, Dictionary<string, string> saved)
+    {
+        foreach (var name in AttributeNames(element).ToList())
+        {
+            if (!saved.ContainsKey(name))
+                RemoveAttr(element, name);
+        }
+
+        foreach (var kv in saved)
+            SetAttr(element, kv.Key, kv.Value);
+    }
+
     private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
     {
         foreach (var child in root.Children)
@@ -31,7 +130,7 @@ public sealed partial class DomBridge
             if (!child.IsTextNode &&
                 (string.Equals(child.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(child.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
-                child.Attributes.ContainsKey("href"))
+                HasAttr(child, "href"))
             {
                 results.Add(ToJSObject(child));
             }
@@ -119,7 +218,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Numeric index access — expose each attribute by index
-        var attrKeys = element.Attributes.Keys.ToList();
+        var attrKeys = AttributeNames(element).ToList();
         for (var i = 0; i < attrKeys.Count; i++)
         {
             var idx = i;
@@ -221,8 +320,8 @@ public sealed partial class DomBridge
 
     private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
     {
-        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
-        element.Attributes[attrName] = attrVal;
+        TryGetAttribute(element, attrName, out var previousAttrVal);
+        SetAttr(element, attrName, attrVal);
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = attrVal;
         else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
@@ -248,8 +347,8 @@ public sealed partial class DomBridge
 
     private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
     {
-        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
-        var removed = element.Attributes.Remove(attrName);
+        TryGetAttribute(element, attrName, out var previousAttrVal);
+        var removed = RemoveAttr(element, attrName);
         foreach (var key in element.NsAttrMap.Where(kv => string.Equals(kv.Value, attrName, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Key).ToList())
             element.NsAttrMap.Remove(key);
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
@@ -267,13 +366,13 @@ public sealed partial class DomBridge
         string? previousAttrVal = null;
         if (element.NsAttrMap.TryGetValue((namespaceUri, localName), out var previousQualifiedName))
         {
-            element.Attributes.TryGetValue(previousQualifiedName, out previousAttrVal);
+            TryGetAttribute(element, previousQualifiedName, out previousAttrVal);
             if (!string.Equals(previousQualifiedName, attrName, StringComparison.OrdinalIgnoreCase))
-                element.Attributes.Remove(previousQualifiedName);
+                RemoveAttr(element, previousQualifiedName);
         }
         else
         {
-            element.Attributes.TryGetValue(attrName, out previousAttrVal);
+            TryGetAttribute(element, attrName, out previousAttrVal);
         }
 
         element.SetAttributeNS(namespaceUri, attrName, attrVal);
@@ -306,8 +405,8 @@ public sealed partial class DomBridge
         if (!element.NsAttrMap.TryGetValue((namespaceUri, localName), out var attrName))
             return;
 
-        element.Attributes.TryGetValue(attrName, out var previousAttrVal);
-        var removed = element.Attributes.Remove(attrName);
+        TryGetAttribute(element, attrName, out var previousAttrVal);
+        var removed = RemoveAttr(element, attrName);
         element.NsAttrMap.Remove((namespaceUri, localName));
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = null;

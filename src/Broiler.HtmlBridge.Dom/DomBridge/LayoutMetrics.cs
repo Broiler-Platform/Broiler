@@ -588,7 +588,7 @@ public sealed partial class DomBridge
             return transform;
         }
 
-        return element.Attributes.TryGetValue("transform", out var attributeTransform)
+        return TryGetAttribute(element, "transform", out var attributeTransform)
             ? attributeTransform
             : null;
     }
@@ -725,7 +725,7 @@ public sealed partial class DomBridge
             if (!IsSvgTextContentElement(current))
                 continue;
 
-            if (current.Attributes.TryGetValue(attributeName, out var rawValue))
+            if (TryGetAttribute(current, attributeName, out var rawValue))
             {
                 var percentageBasis = ResolveContainingBlockReferenceLength(
                     current,
@@ -760,14 +760,14 @@ public sealed partial class DomBridge
     }
 
     private static bool HasOwnSvgCoordinate(DomElement element, string attributeName) =>
-        element.Attributes.TryGetValue(attributeName, out var rawValue) &&
+        TryGetAttribute(element, attributeName, out var rawValue) &&
         !string.IsNullOrWhiteSpace(rawValue);
 
     private bool TryResolveSvgTextPathStart(DomElement element, out (double X, double Y) point)
     {
         point = default;
-        if (!element.Attributes.TryGetValue("href", out var href) &&
-            !element.Attributes.TryGetValue("xlink:href", out href))
+        if (!TryGetAttribute(element, "href", out var href) &&
+            !TryGetAttribute(element, "xlink:href", out href))
         {
             return false;
         }
@@ -781,7 +781,7 @@ public sealed partial class DomBridge
             ? FindInTree(documentElement, candidate => string.Equals(candidate.Id, href[1..], StringComparison.Ordinal))
             : null;
         if (referencedPath == null ||
-            !referencedPath.Attributes.TryGetValue("d", out var pathData) ||
+            !TryGetAttribute(referencedPath, "d", out var pathData) ||
             string.IsNullOrWhiteSpace(pathData))
         {
             return false;
@@ -1481,7 +1481,7 @@ public sealed partial class DomBridge
         for (var index = 0; index < options.Count; index++)
         {
             var option = options[index];
-            if (option.Attributes.ContainsKey("selected") ||
+            if (HasAttr(option, "selected") ||
                 (GetElementRuntimeState(option).FormControl.DefaultSelected.TryGet(out var defaultSelected) && defaultSelected is true))
             {
                 return index;
@@ -1517,7 +1517,7 @@ public sealed partial class DomBridge
         if (GetElementRuntimeState(option).FormControl.Value.TryGet(out var domValue) && domValue is string stringValue)
             return stringValue;
 
-        if (option.Attributes.TryGetValue("value", out var attrValue))
+        if (TryGetAttribute(option, "value", out var attrValue))
             return attrValue;
 
         return option.TextContent;
@@ -1529,7 +1529,7 @@ public sealed partial class DomBridge
         for (var index = 0; index < options.Count; index++)
         {
             var option = options[index];
-            var optionValue = option.Attributes.TryGetValue("value", out var attrValue)
+            var optionValue = TryGetAttribute(option, "value", out var attrValue)
                 ? attrValue
                 : option.TextContent;
             if (string.Equals(optionValue, value, StringComparison.Ordinal))
@@ -2219,7 +2219,7 @@ public sealed partial class DomBridge
                 if (frameLength > 0)
                     return frameLength;
 
-                if (frameElement.Attributes.TryGetValue(vertical ? "height" : "width", out var frameAttribute) &&
+                if (TryGetAttribute(frameElement, vertical ? "height" : "width", out var frameAttribute) &&
                     double.TryParse(frameAttribute, System.Globalization.NumberStyles.Float,
                         System.Globalization.CultureInfo.InvariantCulture, out frameLength) &&
                     frameLength > 0)
@@ -2294,7 +2294,7 @@ public sealed partial class DomBridge
 
         for (var current = element; current != null; current = current.Parent)
         {
-            if (!current.Attributes.TryGetValue("font-size", out var attributeValue) ||
+            if (!TryGetAttribute(current, "font-size", out var attributeValue) ||
                 string.IsNullOrWhiteSpace(attributeValue))
             {
                 continue;

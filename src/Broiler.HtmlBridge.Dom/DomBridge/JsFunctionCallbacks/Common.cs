@@ -47,10 +47,10 @@ public sealed partial class DomBridge
 
     private bool IsCurrentIframeCrossOrigin(DomElement element)
     {
-        if (element.Attributes.ContainsKey("srcdoc"))
+        if (HasAttr(element, "srcdoc"))
             return false;
 
-        var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
+        var iframeSrcValue = TryGetAttribute(element, "src", out var srcVal) ? srcVal : string.Empty;
         return IsCrossOrigin(iframeSrcValue, _pageUrl);
     }
 

@@ -17,7 +17,7 @@ public sealed partial class DomBridge
     {
         var val = a.Length > 0 ? a[0].ToString() : string.Empty;
         element.Id = val;
-        element.Attributes["id"] = val;
+        SetAttr(element, "id", val);
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -28,7 +28,7 @@ public sealed partial class DomBridge
         // Prefer Attributes['class'] (synced by setAttribute and className setter).
         // Fall back to element.ClassName for elements created with a class in the constructor
         // but not yet synced to Attributes (e.g. parsed HTML elements).
-        if (element.Attributes.TryGetValue("class", out var cls))
+        if (TryGetAttribute(element, "class", out var cls))
             return new JSString(cls);
         return element.ClassName != null ? new JSString(element.ClassName) : new JSString(string.Empty);
     }
@@ -38,7 +38,7 @@ public sealed partial class DomBridge
     {
         var val = a.Length > 0 ? a[0].ToString() : string.Empty;
         element.ClassName = val;
-        element.Attributes["class"] = val;
+        SetAttr(element, "class", val);
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -46,28 +46,28 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetTitle006Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["title"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "title", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsSetLang008Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["lang"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "lang", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsSetAccessKey010Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["accesskey"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "accesskey", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsSetDir012Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["dir"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "dir", a.Length > 0 ? a[0].ToString() : string.Empty);
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -75,7 +75,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetDraggable013Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (element.Attributes.TryGetValue("draggable", out var draggable))
+        if (TryGetAttribute(element, "draggable", out var draggable))
             return string.Equals(draggable, "true", StringComparison.OrdinalIgnoreCase) ? JSBoolean.True : JSBoolean.False;
         return JSBoolean.False;
     }
@@ -83,7 +83,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetDraggable014Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["draggable"] = a.Length > 0 && a[0].BooleanValue ? "true" : "false";
+        SetAttr(element, "draggable", a.Length > 0 && a[0].BooleanValue ? "true" : "false");
         return JSUndefined.Value;
     }
 
@@ -154,8 +154,8 @@ public sealed partial class DomBridge
         {
             var attrName = a[0].ToString();
             var attrVal = a[1].ToString();
-            element.Attributes.TryGetValue(attrName, out var previousAttrVal);
-            element.Attributes[attrName] = attrVal;
+            TryGetAttribute(element, attrName, out var previousAttrVal);
+            SetAttr(element, attrName, attrVal);
             // Sync special properties
             if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                 element.Id = attrVal;
@@ -189,7 +189,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var name = a[0].ToString();
-        return element.Attributes.TryGetValue(name, out var val) ? new JSString(val) : JSNull.Value;
+        return TryGetAttribute(element, name, out var val) ? new JSString(val) : JSNull.Value;
     }
 
 
@@ -198,7 +198,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var name = a[0].ToString();
-        return element.Attributes.TryGetValue(name, out var val) ? BuildAttrNode(name, val, element, obj) : JSNull.Value;
+        return TryGetAttribute(element, name, out var val) ? BuildAttrNode(name, val, element, obj) : JSNull.Value;
     }
 
 
@@ -208,7 +208,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !element.Attributes.TryGetValue(qName, out var val))
+        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
             return JSNull.Value;
         return BuildAttrNode(qName, val, element, obj);
     }
@@ -516,7 +516,7 @@ public sealed partial class DomBridge
     {
         if (a.Length == 0)
             return JSBoolean.False;
-        return element.Attributes.ContainsKey(a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+        return HasAttr(element, a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
     }
 
 
@@ -525,8 +525,8 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var attrName = a[0].ToString();
-            element.Attributes.TryGetValue(attrName, out var previousAttrVal);
-            var removed = element.Attributes.Remove(attrName);
+            TryGetAttribute(element, attrName, out var previousAttrVal);
+            var removed = RemoveAttr(element, attrName);
             // Sync special properties
             if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                 element.Id = null;
@@ -546,7 +546,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSBoolean.False;
         var attrName = a[0].ToString();
-        var hasAttribute = element.Attributes.ContainsKey(attrName);
+        var hasAttribute = HasAttr(element, attrName);
         var forceSpecified = a.Length > 1 && !a[1].IsUndefined;
         var shouldHaveAttribute = forceSpecified ? a[1].BooleanValue : !hasAttribute;
         if (shouldHaveAttribute)
@@ -569,7 +569,7 @@ public sealed partial class DomBridge
         var name = GetAttrNodeName(attrObj);
         if (string.IsNullOrEmpty(name))
             return JSNull.Value;
-        var old = element.Attributes.TryGetValue(name, out var oldVal) ? BuildAttrNode(name, oldVal, element, obj) : JSNull.Value;
+        var old = TryGetAttribute(element, name, out var oldVal) ? BuildAttrNode(name, oldVal, element, obj) : JSNull.Value;
         SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
         return old;
     }
@@ -585,7 +585,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = GetAttrNodeNamespace(attrObj);
         JSValue old = JSNull.Value;
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && element.Attributes.TryGetValue(oldQName, out var oldVal))
+        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && TryGetAttribute(element, oldQName, out var oldVal))
             old = BuildAttrNode(oldQName, oldVal, element, obj);
         SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
         return old;
@@ -597,7 +597,7 @@ public sealed partial class DomBridge
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
         var name = GetAttrNodeName(attrObj);
-        if (string.IsNullOrEmpty(name) || !element.Attributes.TryGetValue(name, out var val))
+        if (string.IsNullOrEmpty(name) || !TryGetAttribute(element, name, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(name, val, element, obj);
         RemoveAttributeLikeRemoveAttribute(element, name);
@@ -613,7 +613,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrEmpty(localName))
             return JSNull.Value;
         var ns = GetAttrNodeNamespace(attrObj);
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !element.Attributes.TryGetValue(qName, out var val))
+        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(qName, val, element, obj);
         RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
@@ -642,7 +642,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var qName) && element.Attributes.TryGetValue(qName, out var val))
+        if (element.NsAttrMap.TryGetValue((ns, localName), out var qName) && TryGetAttribute(element, qName, out var val))
             return new JSString(val);
         return JSNull.Value;
     }
@@ -1134,17 +1134,17 @@ public sealed partial class DomBridge
         // Toggle checked state for checkboxes/radio buttons (per HTML spec)
         if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase))
         {
-            var inputType = element.Attributes.TryGetValue("type", out var t) ? t.ToLowerInvariant() : "text";
+            var inputType = TryGetAttribute(element, "type", out var t) ? t.ToLowerInvariant() : "text";
             if (inputType == "checkbox")
             {
-                bool wasChecked = GetElementRuntimeState(element).FormControl.Checked.TryGet(out var cv) && cv is true || (!GetElementRuntimeState(element).FormControl.Checked.IsSet && element.Attributes.ContainsKey("checked"));
+                bool wasChecked = GetElementRuntimeState(element).FormControl.Checked.TryGet(out var cv) && cv is true || (!GetElementRuntimeState(element).FormControl.Checked.IsSet && HasAttr(element, "checked"));
                 GetElementRuntimeState(element).FormControl.Checked.Set(!wasChecked);
             }
             else if (inputType == "radio")
             {
                 GetElementRuntimeState(element).FormControl.Checked.Set(true);
                 // Radio mutual exclusion
-                if (element.Attributes.TryGetValue("name", out var radioName) && !string.IsNullOrEmpty(radioName))
+                if (TryGetAttribute(element, "name", out var radioName) && !string.IsNullOrEmpty(radioName))
                 {
                     var scope = element;
                     while (scope.Parent != null)
@@ -1171,7 +1171,7 @@ public sealed partial class DomBridge
         if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase) || string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
         {
             var btnType = "text";
-            if (element.Attributes.TryGetValue("type", out var bt))
+            if (TryGetAttribute(element, "type", out var bt))
                 btnType = bt.ToLowerInvariant();
             else if (string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
                 btnType = "submit"; // <button> defaults to type="submit" per HTML spec
@@ -1276,7 +1276,7 @@ public sealed partial class DomBridge
             return new JSString(GetSelectValue(element));
         if (GetElementRuntimeState(element).FormControl.Value.TryGet(out var domVal) && domVal is string sv)
             return new JSString(sv);
-        if (element.Attributes.TryGetValue("value", out var val))
+        if (TryGetAttribute(element, "value", out var val))
             return new JSString(val);
         return new JSString(string.Empty);
     }
@@ -1291,7 +1291,7 @@ public sealed partial class DomBridge
         else if (tag == "select")
             SetSelectValue(element, v);
         else
-            element.Attributes["value"] = v;
+            SetAttr(element, "value", v);
         return JSUndefined.Value;
     }
 
@@ -1301,7 +1301,7 @@ public sealed partial class DomBridge
         // IDL property takes precedence over content attribute
         if (GetElementRuntimeState(element).FormControl.Checked.TryGet(out var v))
             return v is true ? JSBoolean.True : JSBoolean.False;
-        return element.Attributes.ContainsKey("checked") ? JSBoolean.True : JSBoolean.False;
+        return HasAttr(element, "checked") ? JSBoolean.True : JSBoolean.False;
     }
 
 
@@ -1312,7 +1312,7 @@ public sealed partial class DomBridge
         if (newVal)
         {
             // Radio button mutual exclusion: uncheck others in same group
-            if (element.Attributes.TryGetValue("type", out var tp) && string.Equals(tp, "radio", StringComparison.OrdinalIgnoreCase) && element.Attributes.TryGetValue("name", out var radioName) && !string.IsNullOrEmpty(radioName))
+            if (TryGetAttribute(element, "type", out var tp) && string.Equals(tp, "radio", StringComparison.OrdinalIgnoreCase) && TryGetAttribute(element, "name", out var radioName) && !string.IsNullOrEmpty(radioName))
             {
                 // Find the scope for radio group — form parent, or document root if not in a form
                 var scope = element.Parent;
@@ -1335,7 +1335,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetType110Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Attributes.TryGetValue("type", out var t))
+        if (TryGetAttribute(element, "type", out var t))
             return new JSString(t.ToLowerInvariant());
         // Default type values per HTML spec
         var tag = element.TagName.ToLowerInvariant();
@@ -1347,14 +1347,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetType111Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["type"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "type", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsGetName112Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Attributes.TryGetValue("name", out var n))
+        if (TryGetAttribute(element, "name", out var n))
             return new JSString(n);
         return new JSString(string.Empty);
     }
@@ -1362,7 +1362,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetName113Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "name", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
@@ -1370,9 +1370,9 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetDisabled115Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
-            element.Attributes["disabled"] = "disabled";
+            SetAttr(element, "disabled", "disabled");
         else
-            element.Attributes.Remove("disabled");
+            RemoveAttr(element, "disabled");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -1381,9 +1381,9 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetHidden117Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
-            element.Attributes["hidden"] = string.Empty;
+            SetAttr(element, "hidden", string.Empty);
         else
-            element.Attributes.Remove("hidden");
+            RemoveAttr(element, "hidden");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -1391,7 +1391,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetTabIndex118Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (element.Attributes.TryGetValue("tabindex", out var rawTabIndex) && int.TryParse(rawTabIndex, out var parsedTabIndex))
+        if (TryGetAttribute(element, "tabindex", out var rawTabIndex) && int.TryParse(rawTabIndex, out var parsedTabIndex))
         {
             return new JSNumber(parsedTabIndex);
         }
@@ -1405,7 +1405,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSUndefined.Value;
         var tabIndex = (int)Math.Truncate(a[0].DoubleValue);
-        element.Attributes["tabindex"] = tabIndex.ToString();
+        SetAttr(element, "tabindex", tabIndex.ToString());
         return JSUndefined.Value;
     }
 
@@ -1413,9 +1413,9 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetRequired121Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
-            element.Attributes["required"] = "required";
+            SetAttr(element, "required", "required");
         else
-            element.Attributes.Remove("required");
+            RemoveAttr(element, "required");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -1614,7 +1614,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetSrc139Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["src"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "src", a.Length > 0 ? a[0].ToString() : string.Empty);
         // Invalidate cached sub-document when src changes
         InvalidateCachedSubDocument(element);
         _onloadFired.Remove(element);
@@ -1626,7 +1626,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetSrcdoc141Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["srcdoc"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "srcdoc", a.Length > 0 ? a[0].ToString() : string.Empty);
         InvalidateCachedSubDocument(element);
         _onloadFired.Remove(element);
         bridgeForSrc.FireSubDocumentOnload(element);

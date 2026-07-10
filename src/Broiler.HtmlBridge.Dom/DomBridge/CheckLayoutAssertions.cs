@@ -61,7 +61,7 @@ public sealed partial class DomBridge
     {
         foreach (var (attribute, property) in CheckLayoutAttributeMap)
         {
-            if (element.Attributes.TryGetValue(attribute, out var raw) &&
+            if (TryGetAttribute(element, attribute, out var raw) &&
                 double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var expected))
             {
                 results.Add(new CheckLayoutAssertion(
@@ -108,7 +108,7 @@ public sealed partial class DomBridge
                 builder.Append('.').Append(firstClass);
         }
 
-        if (element.Attributes.TryGetValue("title", out var title) && !string.IsNullOrEmpty(title))
+        if (TryGetAttribute(element, "title", out var title) && !string.IsNullOrEmpty(title))
             builder.Append("[title=").Append(title).Append(']');
 
         return builder.ToString();

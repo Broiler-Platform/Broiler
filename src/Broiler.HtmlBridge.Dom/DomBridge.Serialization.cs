@@ -84,7 +84,7 @@ public sealed partial class DomBridge
         {
             var (element, style, attributes) = log[i];
             RestoreStringMap(InlineStyle(element), style);
-            RestoreStringMap(element.Attributes, attributes);
+            RestoreAttributes(element, attributes);
         }
 
         // Reverted styles must not read back the baked values from the computed cache.
@@ -104,7 +104,7 @@ public sealed partial class DomBridge
         {
             if (InlineStyle(element).Count == 0)
             {
-                element.Attributes.Remove("style");
+                RemoveAttr(element, "style");
             }
             else
             {
@@ -113,19 +113,19 @@ public sealed partial class DomBridge
                     InlineStyle(element)
                         .OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
                         .Select(static kv => $"{kv.Key}: {kv.Value}"));
-                if (!element.Attributes.TryGetValue("style", out var currentStyle) ||
+                if (!TryGetAttribute(element, "style", out var currentStyle) ||
                     !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
                 {
-                    element.Attributes["style"] = styleText;
+                    SetAttr(element, "style", styleText);
                 }
             }
 
             if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
-                !element.Attributes.ContainsKey("value") &&
+                !HasAttr(element, "value") &&
                 GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
                 idlValue is string { Length: > 0 } idlString)
             {
-                element.Attributes["value"] = idlString;
+                SetAttr(element, "value", idlString);
             }
         }
 
@@ -360,7 +360,7 @@ public sealed partial class DomBridge
 
     private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
+        if (!TryGetAttribute(element, attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
             return fallback;
 
         return double.TryParse(
@@ -407,7 +407,7 @@ public sealed partial class DomBridge
             _zoomSerializationRevertLog.Add((
                 element,
                 new Dictionary<string, string>(InlineStyle(element)),
-                new Dictionary<string, string>(element.Attributes)));
+                AttributeSnapshot(element)));
 
         if (willScale)
         {
@@ -565,7 +565,7 @@ public sealed partial class DomBridge
         string propertyName,
         bool preferInlineStyle = false)
     {
-        if (element.Attributes.ContainsKey(propertyName))
+        if (HasAttr(element, propertyName))
             return;
 
         string? value = null;
@@ -579,34 +579,34 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[propertyName] = value.Trim();
+        SetAttr(element, propertyName, value.Trim());
     }
 
     private void ScaleSvgLengthAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) ||
+        if (!TryGetAttribute(element, attributeName, out var value) ||
             !TryScaleSvgLengthToken(element, value, usedZoom, out var scaled))
         {
             return;
         }
 
-        element.Attributes[attributeName] = scaled;
+        SetAttr(element, attributeName, scaled);
     }
 
     private void ScaleSvgPointListAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+        if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
+        SetAttr(element, attributeName, ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom)));
     }
 
     private void ScaleSvgPathDataAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+        if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = ScaleSvgPathRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
+        SetAttr(element, attributeName, ScaleSvgPathRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom)));
     }
 
     private static string ScaleSvgNumericMatch(Match match, double factor)
@@ -884,8 +884,10 @@ public sealed partial class DomBridge
             yield return new("class", element.ClassName);
 
         var serializedSrcDoc = TrySerializeCurrentSrcDoc(element);
-        foreach (var (name, value) in element.Attributes)
+        foreach (var attribute in element.Attributes.Values)
         {
+            var name = attribute.QualifiedName;
+            var value = attribute.Value;
             if (name.Equals("id", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("class", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("style", StringComparison.OrdinalIgnoreCase))
@@ -901,7 +903,7 @@ public sealed partial class DomBridge
         }
 
         if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
-            !element.Attributes.ContainsKey("value") &&
+            !HasAttr(element, "value") &&
             GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
             idlValue is string { Length: > 0 } idlString)
         {
@@ -912,7 +914,7 @@ public sealed partial class DomBridge
     private string? TrySerializeCurrentSrcDoc(DomElement element)
     {
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
-            !element.Attributes.ContainsKey("srcdoc"))
+            !HasAttr(element, "srcdoc"))
         {
             return null;
         }

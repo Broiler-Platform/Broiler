@@ -570,7 +570,7 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetLinks042Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var results = new List<JSValue>();
-        CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && el.Attributes.ContainsKey("href"), results);
+        CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && HasAttr(el, "href"), results);
         return new JSArray(results);
     }
 

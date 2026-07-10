@@ -290,7 +290,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetAction027Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["action"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "action", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
@@ -298,9 +298,9 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesSetOpen029Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
-            element.Attributes["open"] = "";
+            SetAttr(element, "open", "");
         else
-            element.Attributes.Remove("open");
+            RemoveAttr(element, "open");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -308,7 +308,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesShowModal030Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        element.Attributes["open"] = "";
+        SetAttr(element, "open", "");
         GetElementRuntimeState(element).Dialog.Modal.Set(true);
         GetElementRuntimeState(element).Dialog.TopLayerOrder.Set(++bridge._topLayerCounter);
         bridge.InvalidateStyleScope(element);
@@ -318,7 +318,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesShow031Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        element.Attributes["open"] = "";
+        SetAttr(element, "open", "");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -352,7 +352,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesClose032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes.Remove("open");
+        RemoveAttr(element, "open");
         GetElementRuntimeState(element).Dialog.Modal.Remove();
         if (a.Length > 0)
             GetElementRuntimeState(element).FormControl.ReturnValue.Set(a[0].ToString());
@@ -364,9 +364,9 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesSetOpen034Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
-            element.Attributes["open"] = "";
+            SetAttr(element, "open", "");
         else
-            element.Attributes.Remove("open");
+            RemoveAttr(element, "open");
         bridge.InvalidateStyleScope(element);
         return JSUndefined.Value;
     }
@@ -440,7 +440,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesGetSize042Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (element.Attributes.TryGetValue("size", out var rawSize) && int.TryParse(rawSize, out var parsedSize) && parsedSize > 0)
+        if (TryGetAttribute(element, "size", out var rawSize) && int.TryParse(rawSize, out var parsedSize) && parsedSize > 0)
         {
             return new JSNumber(parsedSize);
         }
@@ -455,9 +455,9 @@ public sealed partial class DomBridge
             return JSUndefined.Value;
         var size = (int)Math.Truncate(a[0].DoubleValue);
         if (size > 0)
-            element.Attributes["size"] = size.ToString();
+            SetAttr(element, "size", size.ToString());
         else
-            element.Attributes.Remove("size");
+            RemoveAttr(element, "size");
         return JSUndefined.Value;
     }
 
@@ -471,21 +471,21 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetHtmlFor047Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["for"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "for", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsElementInterfacesSetHttpEquiv049Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["http-equiv"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "http-equiv", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsElementInterfacesGetData050Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (!element.Attributes.TryGetValue("data", out var d))
+        if (!TryGetAttribute(element, "data", out var d))
             return new JSString(string.Empty);
         // Resolve relative URI against base URL
         if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, d, out var resolved))
@@ -496,7 +496,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetData051Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["data"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "data", a.Length > 0 ? a[0].ToString() : string.Empty);
         // Invalidate cached sub-document when data changes
         bridge.InvalidateCachedSubDocument(element);
         return JSUndefined.Value;
@@ -505,14 +505,14 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetType053Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["type"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "type", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsElementInterfacesGetContentDocument054Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var dataUrl = element.Attributes.TryGetValue("data", out var d) ? d : string.Empty;
+        var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
         if (IsCrossOrigin(dataUrl, bridge._pageUrl))
             return JSNull.Value;
         // Check if the resource actually loaded successfully
@@ -524,7 +524,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesGetSVGDocument055Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var dataUrl = element.Attributes.TryGetValue("data", out var d) ? d : string.Empty;
+        var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
         if (IsCrossOrigin(dataUrl, bridge._pageUrl))
             return JSNull.Value;
         return bridge.GetOrCreateSubDocument(element);
@@ -533,7 +533,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesGetHref056Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (!element.Attributes.TryGetValue("href", out var h))
+        if (!TryGetAttribute(element, "href", out var h))
             return new JSString(string.Empty);
         if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, h, out var resolved))
             return new JSString(resolved.AbsoluteUri);
@@ -543,21 +543,21 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetHref057Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["href"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsElementInterfacesCallback059Core(global::System.String? captured, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes[captured] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, captured, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsElementInterfacesGetHref060Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        if (!element.Attributes.TryGetValue("href", out var h))
+        if (!TryGetAttribute(element, "href", out var h))
             return new JSString(string.Empty);
         if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, h, out var resolved))
             return new JSString(resolved.AbsoluteUri);
@@ -567,7 +567,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesSetHref061Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes["href"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+        SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
@@ -589,7 +589,7 @@ public sealed partial class DomBridge
         }
 
         // Fallback: HTML attribute
-        if (element.Attributes.TryGetValue(dimName, out var attrVal) && double.TryParse(attrVal, out var attrNum))
+        if (TryGetAttribute(element, dimName, out var attrVal) && double.TryParse(attrVal, out var attrNum))
             return new JSNumber(attrNum);
         return new JSNumber(0);
     }
@@ -597,7 +597,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesCallback063Core(global::System.String? dimName, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        element.Attributes[dimName] = a.Length > 0 ? a[0].ToString() : "0";
+        SetAttr(element, dimName, a.Length > 0 ? a[0].ToString() : "0");
         return JSUndefined.Value;
     }
 
@@ -715,7 +715,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesCallback086Core(global::System.String? attrName, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         var animLength = new JSObject();
-        var valueStr = element.Attributes.TryGetValue(attrName, out var v) ? v : "0";
+        var valueStr = TryGetAttribute(element, attrName, out var v) ? v : "0";
         double.TryParse(valueStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var numVal);
         var baseVal = CreateSvgLengthValue(numVal);
         var animVal = CreateSvgLengthValue(numVal);
@@ -730,7 +730,7 @@ public sealed partial class DomBridge
         var animRect = new JSObject();
         var baseRect = new JSObject();
         double vbX = 0, vbY = 0, vbW = 0, vbH = 0;
-        if (element.Attributes.TryGetValue("viewBox", out var vb) && !string.IsNullOrWhiteSpace(vb))
+        if (TryGetAttribute(element, "viewBox", out var vb) && !string.IsNullOrWhiteSpace(vb))
         {
             var parts = vb.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 4)
@@ -766,7 +766,7 @@ public sealed partial class DomBridge
         CollectTextContent(element, sb);
         // Stub: estimate using font-size * character count * 0.6 average advance ratio
         double fontSize = 16;
-        if (element.Attributes.TryGetValue("font-size", out var fs))
+        if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
             double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
@@ -787,7 +787,7 @@ public sealed partial class DomBridge
         if (nchars == 0)
             return new JSNumber(0);
         double fontSize = 16;
-        if (element.Attributes.TryGetValue("font-size", out var fs))
+        if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
             double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
@@ -805,7 +805,7 @@ public sealed partial class DomBridge
         if (charnum < 0 || charnum >= sb.Length)
             throw new JSException("INDEX_SIZE_ERR");
         double fontSize = 16;
-        if (element.Attributes.TryGetValue("font-size", out var fs))
+        if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
             double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
@@ -826,7 +826,7 @@ public sealed partial class DomBridge
         if (charnum < 0 || charnum >= sb.Length)
             throw new JSException("INDEX_SIZE_ERR");
         double fontSize = 16;
-        if (element.Attributes.TryGetValue("font-size", out var fs))
+        if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
             double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);

@@ -49,7 +49,7 @@ public sealed partial class DomBridge
         var tag = element.TagName?.ToLowerInvariant();
         if (tag != "iframe" && tag != "object") return;
 
-        var hasSrcDoc = tag == "iframe" && element.Attributes.ContainsKey("srcdoc");
+        var hasSrcDoc = tag == "iframe" && HasAttr(element, "srcdoc");
         var resourceUrl = hasSrcDoc ? "about:srcdoc" : GetSubResourceUrl(element);
         if (string.IsNullOrWhiteSpace(resourceUrl) && !hasSrcDoc) return;
 
@@ -139,7 +139,7 @@ public sealed partial class DomBridge
         if (docRoot == null)
         {
             if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
-                containerElement.Attributes.TryGetValue("srcdoc", out var srcDoc))
+                TryGetAttribute(containerElement, "srcdoc", out var srcDoc))
             {
                 _subDocumentLocationCache[containerElement] = "about:srcdoc";
                 _subDocumentBaseUrlCache[containerElement] = GetInheritedSubDocumentBaseUrl(containerElement);
@@ -339,7 +339,7 @@ public sealed partial class DomBridge
         }
 
         if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
-            containerElement.Attributes.ContainsKey("srcdoc"))
+            HasAttr(containerElement, "srcdoc"))
             return "about:srcdoc";
 
         var resolvedUrl = ResolveSubResourceUrl(GetSubResourceUrl(containerElement), GetInheritedSubDocumentBaseUrl(containerElement));
@@ -645,9 +645,9 @@ public sealed partial class DomBridge
     {
         var tag = containerElement.TagName?.ToLowerInvariant();
         if (tag == "iframe")
-            return containerElement.Attributes.TryGetValue("src", out var src) ? src : string.Empty;
+            return TryGetAttribute(containerElement, "src", out var src) ? src : string.Empty;
         if (tag == "object")
-            return containerElement.Attributes.TryGetValue("data", out var data) ? data : string.Empty;
+            return TryGetAttribute(containerElement, "data", out var data) ? data : string.Empty;
         return string.Empty;
     }
 
@@ -973,7 +973,7 @@ public sealed partial class DomBridge
             return false;
         }
 
-        if (!AttributeMapsAreEqual(first.Attributes, second.Attributes) ||
+        if (!AttributeMapsAreEqual(AttributeSnapshot(first), AttributeSnapshot(second)) ||
             !NamespaceAttributeMapsAreEqual(first.NsAttrMap, second.NsAttrMap) ||
             first.Children.Count != second.Children.Count)
         {
@@ -1343,7 +1343,7 @@ public sealed partial class DomBridge
         foreach (var attr in xe.Attributes())
         {
             if (!attr.IsNamespaceDeclaration)
-                el.Attributes[attr.Name.LocalName] = attr.Value;
+                SetAttr(el, attr.Name.LocalName, attr.Value);
         }
 
         foreach (var child in xe.Nodes())

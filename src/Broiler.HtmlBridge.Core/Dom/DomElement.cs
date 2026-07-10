@@ -22,7 +22,6 @@ public sealed class DomElement : CanonicalElement
     public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
 
     private readonly LegacyChildList _children;
-    private readonly LegacyAttributeDictionary _attributes;
     private string? _textContent;
 
     public DomElement(
@@ -54,7 +53,6 @@ public sealed class DomElement : CanonicalElement
             ResolveNodeType(tagName, isTextNode))
     {
         _children = new LegacyChildList(this);
-        _attributes = new LegacyAttributeDictionary(this);
         InnerHtml = innerHtml;
         // RF-BRIDGE-1c Phase B: inline style is no longer stored on the node. It lives in
         // ElementRuntimeState and is reached via DomBridge.InlineStyle(element), which lazily
@@ -66,8 +64,11 @@ public sealed class DomElement : CanonicalElement
 
         if (attributes is not null)
         {
+            // Fresh node: no existing attributes to update in place, so a plain
+            // canonical SetAttribute (no-namespace) matches the old legacy-dictionary
+            // seeding exactly.
             foreach (var (name, value) in attributes)
-                _attributes[name] = value;
+                SetAttribute(name, value);
         }
 
         if (id is not null)
@@ -89,8 +90,6 @@ public sealed class DomElement : CanonicalElement
     }
 
     public string InnerHtml { get; set; }
-
-    public new LegacyAttributeDictionary Attributes => _attributes;
 
     public DomElement? Parent
     {
@@ -199,89 +198,4 @@ public sealed class DomElement : CanonicalElement
         public DomElement? Find(Predicate<DomElement> match) => owner.ChildNodes.Cast<DomElement>().FirstOrDefault(item => match(item));
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
-
-    public sealed class LegacyAttributeDictionary(DomElement owner) :
-        IDictionary<string, string>,
-        IReadOnlyDictionary<string, string>
-    {
-        public string this[string key]
-        {
-            get => Find(key)?.Value ?? throw new KeyNotFoundException(key);
-            set
-            {
-                var existing = Find(key);
-                if (existing is { } attribute)
-                    owner.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, value);
-                else
-                    owner.SetAttribute(key, value);
-            }
-        }
-
-        public ICollection<string> Keys => Snapshot().Keys;
-        public ICollection<string> Values => Snapshot().Values;
-        IEnumerable<string> IReadOnlyDictionary<string, string>.Keys => Keys;
-        IEnumerable<string> IReadOnlyDictionary<string, string>.Values => Values;
-        public int Count => owner.baseAttributes().Count;
-        public bool IsReadOnly => false;
-
-        public void Add(string key, string value) => this[key] = value;
-        public void Add(KeyValuePair<string, string> item) => Add(item.Key, item.Value);
-        public void Clear()
-        {
-            foreach (var key in Keys.ToArray())
-                owner.RemoveAttribute(key);
-        }
-
-        public bool Contains(KeyValuePair<string, string> item) =>
-            TryGetValue(item.Key, out var value) && string.Equals(value, item.Value, StringComparison.Ordinal);
-        public bool ContainsKey(string key) => Find(key) is not null;
-        public void CopyTo(KeyValuePair<string, string>[] array, int arrayIndex) =>
-            Snapshot().ToArray().CopyTo(array, arrayIndex);
-        public IEnumerator<KeyValuePair<string, string>> GetEnumerator() => Snapshot().GetEnumerator();
-        public bool Remove(string key)
-        {
-            var existing = Find(key);
-            return existing is { } attribute &&
-                owner.RemoveAttributeNS(attribute.NamespaceUri, attribute.LocalName);
-        }
-        public bool Remove(KeyValuePair<string, string> item) => Contains(item) && Remove(item.Key);
-        public bool TryGetValue(string key, out string value)
-        {
-            var found = Find(key);
-            value = found?.Value ?? string.Empty;
-            return found is not null;
-        }
-
-        public string? GetValueOrDefault(string key) => Find(key)?.Value;
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-        private Dictionary<string, string> Snapshot()
-        {
-            // Two attributes can collapse to the same key under case-insensitive
-            // comparison (e.g. an element carrying both `xml:lang` and `XML:LANG`,
-            // common in XHTML/XML fixtures). ToDictionary throws "An item with the
-            // same key has already been added" in that case, which aborts the whole
-            // snapshot (signature LegacyAttributeDictionary.Snapshot). Build the map
-            // defensively with last-wins semantics instead.
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var attribute in owner.baseAttributes().Values)
-                result[attribute.QualifiedName] = attribute.Value;
-            return result;
-        }
-
-        private Broiler.Dom.DomAttribute? Find(string qualifiedName)
-        {
-            foreach (var attribute in owner.baseAttributes().Values)
-            {
-                if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
-                    return attribute;
-            }
-
-            return null;
-        }
-    }
-
-    private IReadOnlyDictionary<(string? NamespaceUri, string LocalName), Broiler.Dom.DomAttribute> baseAttributes() =>
-        base.Attributes;
 }

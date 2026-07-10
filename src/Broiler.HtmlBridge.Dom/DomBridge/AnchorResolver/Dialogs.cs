@@ -19,7 +19,7 @@ public sealed partial class DomBridge
         {
             if (!string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (!el.Attributes.ContainsKey("open"))
+            if (!HasAttr(el, "open"))
                 continue;
             if (!(GetElementRuntimeState(el).Dialog.Modal.TryGet(out var m) && m is true))
                 continue;
@@ -283,7 +283,7 @@ public sealed partial class DomBridge
     private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement, bool)> results)
     {
         if (string.Equals(element.TagName, "dialog", StringComparison.OrdinalIgnoreCase) &&
-            element.Attributes.ContainsKey("open") &&
+            HasAttr(element, "open") &&
             GetElementRuntimeState(element).Dialog.Modal.TryGet(out var isModal) &&
             isModal is bool modal && modal &&
             element.Parent != null)

@@ -396,7 +396,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
-        var attrs = new Dictionary<string, string>(source.Attributes, StringComparer.OrdinalIgnoreCase);
+        var attrs = AttributeSnapshot(source);
         var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, source.IsTextNode);
         // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
         // source's live style dict (which may hold JS mutations not yet synced to the
@@ -567,9 +567,9 @@ public sealed partial class DomBridge
             if (!child.IsTextNode && !ReferenceEquals(child, except))
             {
                 if (string.Equals(child.TagName, "input", StringComparison.OrdinalIgnoreCase) &&
-                    child.Attributes.TryGetValue("type", out var st) &&
+                    TryGetAttribute(child, "type", out var st) &&
                     string.Equals(st, "radio", StringComparison.OrdinalIgnoreCase) &&
-                    child.Attributes.TryGetValue("name", out var sn) &&
+                    TryGetAttribute(child, "name", out var sn) &&
                     string.Equals(sn, radioName, StringComparison.Ordinal))
                 {
                     GetElementRuntimeState(child).FormControl.Checked.Set(false);
@@ -807,7 +807,7 @@ public sealed partial class DomBridge
     {
         var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+        if (TryGetAttribute(element, "style", out var inlineStyle) &&
             !string.IsNullOrEmpty(inlineStyle))
         {
             foreach (var kv in ParseStyle(inlineStyle))
@@ -1085,8 +1085,8 @@ public sealed partial class DomBridge
     {
         var ctx = new JSObject();
         int width = 300, height = 150;
-        if (canvas.Attributes.TryGetValue("width", out var w) && int.TryParse(w, out var pw)) width = pw;
-        if (canvas.Attributes.TryGetValue("height", out var h) && int.TryParse(h, out var ph)) height = ph;
+        if (TryGetAttribute(canvas, "width", out var w) && int.TryParse(w, out var pw)) width = pw;
+        if (TryGetAttribute(canvas, "height", out var h) && int.TryParse(h, out var ph)) height = ph;
 
         var context2d = new CanvasRenderingContext2D(width, height);
 

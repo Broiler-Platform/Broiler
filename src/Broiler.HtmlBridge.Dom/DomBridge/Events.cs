@@ -94,14 +94,14 @@ public sealed partial class DomBridge
         }
 
         // Individual element validation
-        if (!element.Attributes.ContainsKey("required")) return true;
+        if (!HasAttr(element, "required")) return true;
 
         var tag = element.TagName;
         if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(tag, "textarea", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(tag, "select", StringComparison.OrdinalIgnoreCase))
         {
-            element.Attributes.TryGetValue("value", out var val);
+            TryGetAttribute(element, "value", out var val);
             return !string.IsNullOrEmpty(val);
         }
         return true;
@@ -267,7 +267,7 @@ public sealed partial class DomBridge
         foreach (var eventName in InlineEventNames)
         {
             var attrName = $"on{eventName}";
-            if (element.Attributes.TryGetValue(attrName, out var code) &&
+            if (TryGetAttribute(element, attrName, out var code) &&
                 !string.IsNullOrEmpty(code) &&
                 !GetInlineEventHandlers(element).ContainsKey(eventName))
             {

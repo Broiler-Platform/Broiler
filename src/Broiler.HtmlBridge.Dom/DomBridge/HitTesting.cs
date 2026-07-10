@@ -313,9 +313,9 @@ public sealed partial class DomBridge
         if (map == null || !string.Equals(map.TagName, "map", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var mapName = map.Attributes.GetValueOrDefault("name");
+        var mapName = GetAttr(map, "name");
         if (string.IsNullOrWhiteSpace(mapName))
-            mapName = map.Attributes.GetValueOrDefault("id");
+            mapName = GetAttr(map, "id");
         if (string.IsNullOrWhiteSpace(mapName))
             return null;
 
@@ -325,7 +325,7 @@ public sealed partial class DomBridge
             if (!string.Equals(candidate.TagName, "img", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var useMap = candidate.Attributes.GetValueOrDefault("usemap")?.Trim();
+            var useMap = GetAttr(candidate, "usemap")?.Trim();
             if (string.Equals(useMap, expectedUseMap, StringComparison.OrdinalIgnoreCase))
                 return candidate;
         }
@@ -350,8 +350,8 @@ public sealed partial class DomBridge
         DomElement image,
         (double Left, double Top, double Width, double Height) imageRect)
     {
-        var widthBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("width"));
-        var heightBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("height"));
+        var widthBasis = ParsePositiveDouble(GetAttr(image, "width"));
+        var heightBasis = ParsePositiveDouble(GetAttr(image, "height"));
 
         return (
             widthBasis > 0 ? imageRect.Width / widthBasis : 1,
@@ -360,11 +360,11 @@ public sealed partial class DomBridge
 
     private bool IsPointInsideAreaShape(DomElement area, double x, double y)
     {
-        var shape = area.Attributes.GetValueOrDefault("shape")?.Trim().ToLowerInvariant();
+        var shape = GetAttr(area, "shape")?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(shape))
             shape = "rect";
 
-        var coords = ParseAreaCoords(area.Attributes.GetValueOrDefault("coords"));
+        var coords = ParseAreaCoords(GetAttr(area, "coords"));
         return shape switch
         {
             "default" => true,

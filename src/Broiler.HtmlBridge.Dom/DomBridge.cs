@@ -660,7 +660,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
             if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
             {
-                var src = child.Attributes.TryGetValue("src", out var srcValue) ? srcValue : string.Empty;
+                var src = TryGetAttribute(child, "src", out var srcValue) ? srcValue : string.Empty;
                 if (!IsCrossOrigin(src, _pageUrl))
                     frames.Add(GetOrCreateSubWindow(child));
             }
@@ -740,8 +740,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             DocumentElement.Id = docElement.Id;
         if (!string.IsNullOrEmpty(docElement.ClassName))
             DocumentElement.ClassName = docElement.ClassName;
-        foreach (var kv in docElement.Attributes)
-            DocumentElement.Attributes[kv.Key] = kv.Value;
+        foreach (var attribute in docElement.Attributes.Values)
+            SetAttr(DocumentElement, attribute.QualifiedName, attribute.Value);
         foreach (var kv in InlineStyle(docElement))
             InlineStyle(DocumentElement)[kv.Key] = kv.Value;
 
@@ -940,7 +940,7 @@ internal sealed class FormElementsCollection(DomElement form, DomBridge bridge) 
             var controls = DomBridge.CollectFormControls(form);
             foreach (var ctrl in controls)
             {
-                if (ctrl.Attributes.TryGetValue("name", out var name) &&
+                if (ctrl.GetAttribute("name") is { } name &&
                     string.Equals(name, prop, StringComparison.Ordinal))
                     return bridge.ToJSObject(ctrl);
             }

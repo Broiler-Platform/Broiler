@@ -58,7 +58,7 @@ public sealed partial class DomBridge
         // 1. Collect property names that come from the inline style attribute.
         //    These must never be cleared or overwritten by the cascade.
         var inlineStyleProps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+        if (TryGetAttribute(element, "style", out var inlineStyle) &&
             !string.IsNullOrEmpty(inlineStyle))
         {
             foreach (var kv in ParseStyle(inlineStyle))
@@ -313,7 +313,7 @@ public sealed partial class DomBridge
             StringComparer.OrdinalIgnoreCase);
 
         if (pseudoElement == null &&
-            element.Attributes.TryGetValue("style", out var inlineStyleAttr) &&
+            TryGetAttribute(element, "style", out var inlineStyleAttr) &&
             !string.IsNullOrEmpty(inlineStyleAttr))
         {
             foreach (var kv in ParseStyle(inlineStyleAttr))
@@ -381,7 +381,7 @@ public sealed partial class DomBridge
         switch (tag)
         {
             case "input":
-                string type = element.Attributes.GetValueOrDefault("type")?.ToLowerInvariant() ?? "text";
+                string type = GetAttr(element, "type")?.ToLowerInvariant() ?? "text";
                 switch (type)
                 {
                     case "hidden":
@@ -398,7 +398,7 @@ public sealed partial class DomBridge
                     case "reset":
                         logicalInlineSize = 72;
                         logicalBlockSize = 20;
-                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, element.Attributes.GetValueOrDefault("value"));
+                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetAttr(element, "value"));
                         break;
                     default:
                         logicalInlineSize = 173;
@@ -487,8 +487,8 @@ public sealed partial class DomBridge
 
     private static int GetSelectVisibleRowCount(DomElement element)
     {
-        bool isMultiple = element.Attributes.ContainsKey("multiple");
-        if (element.Attributes.TryGetValue("size", out var rawSize) &&
+        bool isMultiple = HasAttr(element, "multiple");
+        if (TryGetAttribute(element, "size", out var rawSize) &&
             int.TryParse(rawSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedSize) &&
             parsedSize > 0)
         {
@@ -578,7 +578,7 @@ public sealed partial class DomBridge
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&
-            styleEl.Attributes.TryGetValue("href", out var href) &&
+            TryGetAttribute(styleEl, "href", out var href) &&
             !string.IsNullOrEmpty(href))
         {
             if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
@@ -661,7 +661,7 @@ public sealed partial class DomBridge
         {
             if (element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
             {
-                var nonce = element.Attributes.TryGetValue("nonce", out var n) ? n : null;
+                var nonce = TryGetAttribute(element, "nonce", out var n) ? n : null;
                 if (!csp.AllowsInlineStyleElement(nonce, GetStyleElementCssText(element)))
                 {
                     element.Remove();
@@ -669,9 +669,9 @@ public sealed partial class DomBridge
                 }
             }
 
-            if (blockStyleAttribute && element.Attributes.ContainsKey("style"))
+            if (blockStyleAttribute && HasAttr(element, "style"))
             {
-                element.Attributes.Remove("style");
+                RemoveAttr(element, "style");
                 InlineStyle(element).Clear();
                 InvalidateStyleScope(element);
             }
@@ -701,7 +701,7 @@ public sealed partial class DomBridge
         if (computed.ContainsKey("display"))
             return;
 
-        if (element.Attributes.ContainsKey("hidden"))
+        if (HasAttr(element, "hidden"))
         {
             computed["display"] = "none";
             return;
@@ -1459,7 +1459,7 @@ public sealed partial class DomBridge
         if (parent != null && !parent.TagName.StartsWith("#", StringComparison.Ordinal))
         {
             // parent is the iframe/object element — check its style for dimensions
-            if (parent.Attributes.TryGetValue("style", out var style) && !string.IsNullOrEmpty(style))
+            if (TryGetAttribute(parent, "style", out var style) && !string.IsNullOrEmpty(style))
             {
                 var w = ExtractCssDimension(style, "width");
                 var h = ExtractCssDimension(style, "height");
@@ -1467,8 +1467,8 @@ public sealed partial class DomBridge
                     return (w, h);
             }
 
-            var attributeWidth = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("width"));
-            var attributeHeight = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("height"));
+            var attributeWidth = ParseViewportDimensionAttribute(GetAttr(parent, "width"));
+            var attributeHeight = ParseViewportDimensionAttribute(GetAttr(parent, "height"));
             if (attributeWidth > 0 || attributeHeight > 0)
                 return (attributeWidth, attributeHeight);
         }

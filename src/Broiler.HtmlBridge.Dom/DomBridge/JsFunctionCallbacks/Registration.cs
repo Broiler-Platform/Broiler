@@ -758,7 +758,7 @@ public sealed partial class DomBridge
         {
             if (string.Equals(el.TagName, "form", StringComparison.OrdinalIgnoreCase))
             {
-                if (el.Attributes.TryGetValue("name", out var formName) && !string.IsNullOrEmpty(formName))
+                if (TryGetAttribute(el, "name", out var formName) && !string.IsNullOrEmpty(formName))
                     arr.FastAddValue((KeyString)formName, ToJSObject(el), JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
