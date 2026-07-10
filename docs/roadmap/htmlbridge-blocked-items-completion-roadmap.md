@@ -827,6 +827,14 @@ selectors suites green.
 
 ### Milestone 1.2 — Migrate `DomElement` callers off the facade
 
+> **Detailed implementation plan (2026-07-10):**
+> [`htmlbridge-domelement-facade-removal-plan.md`](htmlbridge-domelement-facade-removal-plan.md)
+> stages Milestones 1.2 + 1.3 into ~13–16 PRs (Phases A–F) using a strangler /
+> transitional-helper approach. It measures the real scope (~800+ facade refs, 76
+> construction sites, `.Style`-on-node and text-as-element as the two architectural
+> couplings) and resolves the design questions (where `.Style` lives; text/comment →
+> canonical `DomText`/`DomComment`). Read it before starting 1.2.
+
 **Goal.** Reduce the ~58 non-submodule source references to `DomElement` to zero
 by moving callers onto canonical `Broiler.Dom.DomNode`/`DomElement`.
 

@@ -320,7 +320,11 @@ other two are gated on prerequisites that are not yet met (documented below).
   (Milestone 1.1): the two `CssRules` test consumers were rerouted to the shared
   `Broiler.CSS` parser and the phase-zero guards flipped to assert removal. The
   `DomElement`/`HtmlTreeBuilder` facade removal (Milestones 1.2/1.3) still follows the
-  RF-BRIDGE-1b geometry unification. `DomElement` alone is referenced by **58
+  RF-BRIDGE-1b geometry unification — now unblocked (Item 2 complete) and detailed in a
+  dedicated staged plan:
+  [`htmlbridge-domelement-facade-removal-plan.md`](htmlbridge-domelement-facade-removal-plan.md)
+  (Phases A–F, ~13–16 PRs, strangler via transitional bridge helpers). `DomElement`
+  alone is referenced by **58
   non-submodule source files** (`grep -rlE '\bDomElement\b' --include=*.cs src/`)
   and is entangled with RF-BRIDGE-1b geometry keying (boxes
   key by bridge instances — see rf-bridge-1b §5a), so it cannot be ripped out
