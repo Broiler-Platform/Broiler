@@ -514,20 +514,6 @@ public sealed partial class DomBridge
         return (0, 0, 0, 0);
     }
 
-    private static bool IsSvgGeometryContainer(DomElement? element) =>
-        element != null && IsSvgElement(element);
-
-    private static bool IsSvgPositionedGeometryElement(DomElement element)
-    {
-        if (!IsSvgElement(element))
-            return false;
-
-        if (IsSvgShapeElement(element))
-            return true;
-
-        return IsSvgViewportElement(element) && IsSvgGeometryContainer(element.Parent);
-    }
-
     private static bool IsSvgShapeElement(DomElement element)
     {
         var tag = element.TagName;
@@ -550,32 +536,6 @@ public sealed partial class DomBridge
         string.Equals(element.NamespaceURI, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
         IsSvgViewportElement(element) ||
         IsSvgShapeElement(element);
-
-    private double ResolveSvgGeometryLength(DomElement element, string attributeName, bool vertical, double percentageBasis)
-    {
-        if (!IsSvgElement(element) || !element.Attributes.TryGetValue(attributeName, out var rawValue))
-            return 0;
-
-        var parsed = ParseCssLengthToPixelsWithViewport(rawValue, element, percentageBasis: percentageBasis);
-        if (parsed > 0 || string.Equals(rawValue?.Trim(), "0", StringComparison.Ordinal))
-            return parsed;
-
-        if ((string.Equals(attributeName, "width", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(attributeName, "height", StringComparison.OrdinalIgnoreCase)) &&
-            element.Attributes.TryGetValue("viewBox", out var viewBox) &&
-            !string.IsNullOrWhiteSpace(viewBox))
-        {
-            var parts = viewBox.Split([' ', ',', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 4 &&
-                double.TryParse(parts[vertical ? 3 : 2], System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var viewBoxLength))
-            {
-                return viewBoxLength;
-            }
-        }
-
-        return 0;
-    }
 
     private double GetUsedZoomForElement(DomElement element)
     {
@@ -616,36 +576,6 @@ public sealed partial class DomBridge
         }
 
         return 1;
-    }
-
-    private (double X, double Y) GetTransformTranslate(DomElement element)
-    {
-        var transform = GetElementTransformValue(element);
-        if (string.IsNullOrWhiteSpace(transform))
-            return (0, 0);
-
-        double translateX = 0;
-        double translateY = 0;
-        foreach (Match match in Regex.Matches(
-                     transform,
-                     @"translate\(\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[,\s]+(?<y>[-+]?[0-9]*\.?[0-9]+))?\s*\)",
-                     RegexOptions.IgnoreCase))
-        {
-            if (double.TryParse(match.Groups["x"].Value, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var parsedX))
-            {
-                translateX += parsedX;
-            }
-
-            if (match.Groups["y"].Success &&
-                double.TryParse(match.Groups["y"].Value, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var parsedY))
-            {
-                translateY += parsedY;
-            }
-        }
-
-        return (translateX, translateY);
     }
 
     private string? GetElementTransformValue(DomElement element)
