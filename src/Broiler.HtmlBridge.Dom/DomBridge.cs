@@ -52,7 +52,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
     private readonly DomElement _documentNode;
-    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = [];
+    // Milestone 1.2 (DomElement facade removal): keyed off canonical
+    // Broiler.Dom.DomElement identity, not the v1 facade type. The facade IS a
+    // canonical element (DomElement : Broiler.Dom.DomElement), so every current key
+    // is unchanged by reference; widening the key type decouples the per-element
+    // runtime-state layer from the facade ahead of its deletion. The key is used
+    // purely as an identity token here (no facade members read), so this is safe.
+    private static readonly ConditionalWeakTable<Broiler.Dom.DomElement, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -178,7 +184,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             .OfType<DomElement>()
             .Where(element => !ReferenceEquals(element, _documentNode))];
 
-    private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
+    private static ElementRuntimeState GetElementRuntimeState(Broiler.Dom.DomElement element) =>
         ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
 
     private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomElement element) =>

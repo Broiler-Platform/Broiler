@@ -18,7 +18,10 @@ public sealed partial class DomBridge
     // by element identity mirrors ElementRuntimeStates' lifetime, so a detached element's
     // memo is collected with it, and the invalidation (position-area / position-anchor
     // mutation) and clone-copy semantics are unchanged from the old .Layout slots.
-    private static readonly ConditionalWeakTable<DomElement, PositionAreaResolution>
+    // Milestone 1.2 (DomElement facade removal): keyed off canonical
+    // Broiler.Dom.DomElement identity, not the v1 facade type — the key is a pure
+    // identity token (no facade members read), matching ElementRuntimeStates.
+    private static readonly ConditionalWeakTable<Broiler.Dom.DomElement, PositionAreaResolution>
         PositionAreaResolutions = [];
 
     private sealed class PositionAreaResolution
@@ -30,7 +33,7 @@ public sealed partial class DomBridge
     }
 
     private static bool TryGetPositionAreaResolution(
-        DomElement element, out (double left, double top, double width, double height) rect)
+        Broiler.Dom.DomElement element, out (double left, double top, double width, double height) rect)
     {
         if (PositionAreaResolutions.TryGetValue(element, out var r))
         {
@@ -43,7 +46,7 @@ public sealed partial class DomBridge
     }
 
     private static void SetPositionAreaResolution(
-        DomElement element, double left, double top, double width, double height) =>
+        Broiler.Dom.DomElement element, double left, double top, double width, double height) =>
         PositionAreaResolutions.AddOrUpdate(element, new PositionAreaResolution
         {
             Left = left,
@@ -52,10 +55,10 @@ public sealed partial class DomBridge
             Height = height,
         });
 
-    private static void ClearPositionAreaResolution(DomElement element) =>
+    private static void ClearPositionAreaResolution(Broiler.Dom.DomElement element) =>
         PositionAreaResolutions.Remove(element);
 
-    private static void CopyPositionAreaResolution(DomElement source, DomElement target)
+    private static void CopyPositionAreaResolution(Broiler.Dom.DomElement source, Broiler.Dom.DomElement target)
     {
         if (PositionAreaResolutions.TryGetValue(source, out var r))
             PositionAreaResolutions.AddOrUpdate(target, new PositionAreaResolution

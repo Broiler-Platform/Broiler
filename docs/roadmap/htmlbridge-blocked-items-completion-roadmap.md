@@ -830,18 +830,44 @@ selectors suites green.
 **Goal.** Reduce the ~58 non-submodule source references to `DomElement` to zero
 by moving callers onto canonical `Broiler.Dom.DomNode`/`DomElement`.
 
-**Depends on:** Track 2 (2.4/2.5) — the geometry caches must stop keying on the
-facade first. The remaining identity-keyed caches (runtime state, JS object
-identity, computed style) also re-key onto canonical nodes here.
+**Depends on:** Track 2 (2.4/2.5) — MET (both complete). The geometry caches no
+longer key on the facade (2.4 deleted them); the remaining identity-keyed caches
+(runtime state, JS object identity, computed style) re-key onto canonical nodes here.
+
+**Key structural finding (2026-07-10, from slice 1).** The facade
+`DomElement : Broiler.Dom.DomElement` — it *inherits from* the canonical element,
+so re-keying a cache is a **type-widening** (facade→canonical base) that preserves
+reference identity, not a lookup rewrite. But the facade is **not just an identity
+key**: it carries real per-element bridge state read pervasively — `Style` (everywhere),
+`IsTextNode` (**121** sites), `OwnerDocRoot` (32), `NsAttrMap` (19), `JsSetStyleProps`
+(11), `InnerHtml` (7), plus the `Children`/`Attributes` legacy views and `TextContent`.
+So a cache can be cleanly re-keyed **only if its key is used as a pure identity token**
+(no facade members read); caches whose *accessors* read facade state are gated on
+**relocating that state** (side tables keyed by canonical node, or onto canonical nodes),
+which is the bulk of the work and overlaps Task 2.
 
 **Tasks (staged; each independently verifiable).**
 
-1. Re-key `ElementRuntimeState`, `_jsObjectCache`, computed-style engines, and
-   computed-props caches from the facade to canonical node identity.
+1. Re-key the identity caches from the facade to canonical node identity.
+   - **Slice 1 — DONE (2026-07-10).** `ElementRuntimeStates` (all per-element runtime
+     state) and `PositionAreaResolutions` (the 2.5 position-area memo) re-keyed to
+     `Broiler.Dom.DomElement`; accessors `GetElementRuntimeState` /
+     `TryGet/Set/Clear/CopyPositionAreaResolution` widened. Both are pure-identity
+     `ConditionalWeakTable`s (no facade-member key access, no iteration), so the widening
+     is behaviour-preserving. Verified: bridge + Cli + Wpt build clean; focused
+     Anchor/Sticky/Clone/Offset/MutationObserver 50/50; WPT anchor/position-area cluster
+     identical to baseline (37/42, same 5 pre-existing fails).
+   - **Deferred to later slices.** `_jsObjectCache` — iterated by `FindDomElementByJSObject`
+     (returns facade `DomElement?`) and the sub-document adoption loops, which read facade
+     members off the key; re-keying needs those consumers migrated first.
+     `_computedPropsCache` / `_computedStyleEngines` — their accessors (`GetComputedProps`,
+     computed-style) read facade `Style` off the element, so they are gated on relocating
+     the facade's per-element state (Task 2), not just the key type.
 2. Migrate the non-geometry caller clusters (serialization, attributes,
    traversal, event/callback plumbing) file-by-file.
 3. Keep a caller-count guard (`grep -rlE '\bDomElement\b' --include=*.cs src/`)
-   trending to zero; `log()`-equivalent progress in the PR series.
+   trending to zero (57 non-facade-defining files at slice-1 time); `log()`-equivalent
+   progress in the PR series.
 
 **Risk.** High — 58 files, broad surface; must stay behind green tests at every
 slice.
