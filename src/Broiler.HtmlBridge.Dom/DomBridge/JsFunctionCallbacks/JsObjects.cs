@@ -208,7 +208,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
+        if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
         return BuildAttrNode(qName, val, element, obj);
     }
@@ -585,7 +585,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = GetAttrNodeNamespace(attrObj);
         JSValue old = JSNull.Value;
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && TryGetAttribute(element, oldQName, out var oldVal))
+        if (TryGetNsAttribute(element, ns, localName, out var oldQName, out var oldVal))
             old = BuildAttrNode(oldQName, oldVal, element, obj);
         SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
         return old;
@@ -613,7 +613,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrEmpty(localName))
             return JSNull.Value;
         var ns = GetAttrNodeNamespace(attrObj);
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
+        if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(qName, val, element, obj);
         RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
@@ -642,9 +642,8 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var qName) && TryGetAttribute(element, qName, out var val))
-            return new JSString(val);
-        return JSNull.Value;
+        var val = element.GetAttributeNS(ns, localName);
+        return val is not null ? new JSString(val) : JSNull.Value;
     }
 
 
@@ -667,7 +666,7 @@ public sealed partial class DomBridge
             return JSBoolean.False;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        return element.NsAttrMap.ContainsKey((ns, localName)) ? JSBoolean.True : JSBoolean.False;
+        return element.GetAttributeNS(ns, localName) is not null ? JSBoolean.True : JSBoolean.False;
     }
 
 

@@ -396,8 +396,20 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
-        var attrs = AttributeSnapshot(source);
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, IsText(source));
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, null, IsText(source));
+        // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
+        // set so namespaced attributes (namespace, prefix, local name) survive the clone —
+        // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
+        // attributes go through SetAttribute (which lowercases, matching the prior snapshot
+        // path); a prefixed qualified name can only exist with a namespace, so it never
+        // reaches the SetAttribute branch (which would throw on the ':').
+        foreach (var attribute in source.Attributes.Values)
+        {
+            if (attribute.NamespaceUri is null)
+                clone.SetAttribute(attribute.QualifiedName, attribute.Value);
+            else
+                clone.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, attribute.Value);
+        }
         // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
         // source's live style dict (which may hold JS mutations not yet synced to the
         // `style=` attribute), replacing the clone's lazily-seeded attribute values.
@@ -407,8 +419,6 @@ public sealed partial class DomBridge
             cloneStyle[kv.Key] = kv.Value;
         clone.TextContent = source.TextContent;
         clone.NamespaceURI = source.NamespaceURI;
-        foreach (var kv in source.NsAttrMap)
-            clone.NsAttrMap[kv.Key] = kv.Value;
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(source).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,

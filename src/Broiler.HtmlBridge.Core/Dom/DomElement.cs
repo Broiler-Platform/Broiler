@@ -120,8 +120,6 @@ public sealed class DomElement : CanonicalElement
         set => SetName(new CanonicalName(value, TagName));
     }
 
-    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = [];
-
     private static bool IsSpecialNode(string tagName) => tagName.StartsWith('#');
 
     private static CanonicalNodeType ResolveNodeType(string tagName, bool isTextNode) =>
