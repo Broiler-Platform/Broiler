@@ -1,11 +1,10 @@
 # HtmlBridge `DomElement` Facade Removal — Current State & Handoff
 
-Status: **in progress** — the facade now carries only `NamespaceURI`. The atomic text-node
-flip (F3c part 2) is **fully implemented and `Broiler.Cli.Tests`-verified (0 regressions,
-8 fixes)** across the green widening prefix (2a/2b/2c) + the irreversible construction flip
-(2d). **2d is committed but NOT merged** — it awaits the WPT range/selection/serialization +
-Acid gate (see the merge gate in §4). After 2d merges, only **F4** (element construction flip,
-remove `NamespaceURI`, delete `DomElement.cs`/`HtmlTreeBuilder.cs`) remains.
+Status: **facade removed — F4 implemented and `Broiler.Cli.Tests`-verified (0 regressions).**
+The `DomElement` facade and `HtmlTreeBuilder` are **deleted**; the bridge holds only canonical
+`Broiler.Dom` nodes. F3c part 2 (2a–2d) and F4 are all committed on
+`claude/htmlbridge-domelement-f3c-flip` but **NOT merged** — the whole F3c/F4 stack awaits the
+WPT range/selection/serialization + Acid + pixel gate (WPT is dispatch-only here; see §4/§5 gates).
 Last updated: 2026-07-11.
 
 ## Decomposition note (F3c part 2)
@@ -51,10 +50,11 @@ instances. The goal is to delete both types so the bridge holds only canonical
 | `Children` (+`LegacyChildList`) | ✅ removed (E2) | canonical `ChildNodes` |
 | `NsAttrMap` | ✅ removed (C2) | canonical namespaced attributes |
 | `InnerHtml` | ✅ removed (F1) | ERS |
-| **`TextContent`** | ⏳ **remains** | → canonical `DomText`/`DomComment`.`Data` (F3c part 2) |
-| **`NamespaceURI`** | ⏳ **remains** | → canonical read + `CreateElementNS` at construction (F4) |
+| `TextContent` | ✅ removed (F3c part 2d) | canonical `DomText`/`DomComment`.`Data` |
+| `NamespaceURI` | ✅ removed (F4) | canonical `NamespaceUri` read + `CreateElementNS` at construction |
 
-`DomElement` and `HtmlTreeBuilder` themselves are deleted in **F4**.
+`DomElement` and `HtmlTreeBuilder` are **deleted (F4)** — the facade surface is empty and both
+types are gone. The bridge holds only canonical `Broiler.Dom` nodes + bridge-runtime state.
 
 ## 3. Transitional machinery currently in place
 
@@ -237,6 +237,48 @@ sentinel-namespace regressions (SVG/foreign `createElementNS`) and any reader of
 NamespaceURI-into-construction + cache re-key + seam widen (green, incremental); (b) flip the funnel
 to canonical, retire `HtmlTreeBuilder`, delete both files, update guards (the irreversible cutover).
 Spike the parser-document-ownership question (item 6) before starting.
+
+### F4 — DONE + `Broiler.Cli.Tests`-verified (0 regressions); ⚠️ NOT MERGED (awaits WPT/pixel gate)
+
+Landed on `claude/htmlbridge-domelement-f3c-flip` as the two commits the sketch predicted:
+
+- **Step (a) — `CreateBridgeElement` funnel (green, `aa00ecf5`).** Added `CreateBridgeElement` /
+  `CreateBridgeElementNS` (beside the F3c text/comment funnels) and routed all 58 `new DomElement(...)`
+  sites through them; folded the ~7 `el.NamespaceURI = ns` overrides into the NS funnel and converted
+  every `NamespaceURI` *read* to canonical `NamespaceUri`. Facade-bodied, behaviour-preserving.
+- **Step (b) — atomic cutover (`ddad4769`).** Flipped the funnel bodies to `_document.CreateElementNS`
+  (`#`-sentinels → null namespace + preserved name; case preserved exactly). Added
+  `global using DomElement = Broiler.Dom.DomElement;` so the ~900 unqualified element-handling sites
+  resolve to the canonical type en masse (`is`/`as DomElement` discriminates element-vs-text
+  identically; `<DomElement,…>` caches re-key for free); swapped the ~217 qualified
+  `Broiler.HtmlBridge.DomElement` refs. **Retired `HtmlTreeBuilder`** — the item-6 spike confirmed the
+  re-materialization was pure overhead: `HtmlDocumentParser` already yields canonical nodes and
+  canonical `AppendChild` **auto-adopts** the reparented subtree into `_document`
+  (`DomNode.InsertBefore`), so the new `DomBridge.BuildDocumentTree` / `BuildFragmentTree` just parse
+  and hand the tree back (`AllElements` keeps the old non-structural registration contract). Widened the
+  Core seam `IDomBridgeRuntime.Elements` to canonical. Deleted `DomElement.cs` + `HtmlTreeBuilder.cs`
+  and rewrote the three frozen guards (`DomExtractionPhaseZeroTests`, `HtmlBridgePromotionPhaseZeroTests`,
+  `HtmlBridgeBoundaryGuardTests`) from "surface is frozen" to "facade is removed" — `DocumentElement`/
+  `Elements` are no longer an engine-internal leak.
+
+**Notes for the next reader.** (1) The doctype sentinel node is now `NodeType.Element` (the old facade
+gave it `NodeType.DocumentType`); this is invisible — the JS `nodeType` getter, serialization, and every
+`#doctype` check key off `TagName`, and nothing tests `NodeType == DocumentType`/`is DomDocumentType`.
+(2) `Broiler.Wpt.Tests` was **already non-compiling before F4** (it references the facade's `.Style`/
+`.Parent` compat members that phases B/E1 removed) and is outside the `Broiler.Cli.Tests` verification
+scope; the item-5 seam type-swap is applied there regardless, but resurrecting those stale tests is a
+separate follow-up.
+
+**Verified:** clean build of `Broiler.HtmlBridge.Core`/`.Dom`, `Broiler.Cli`, `Broiler.Wpt`,
+`Broiler.Cli.Tests` (0 errors). Full `Broiler.Cli.Tests` before/after TRX name-diff (slot-scroll crasher
+excluded): **0 new failures** — after-failures (73) are a strict subset of the pre-F4 baseline (74); the
+lone dropped failure is a pre-existing flaky render test (`VerticalTextPositioningTests`). Same
+environmental baseline as post-2d.
+
+**⚠️ MERGE GATE (F4 + the whole F3c stack).** Regression-free on `Broiler.Cli.Tests` (incl. Acid3), but
+the irreversible cutover still requires the **full WPT + Acid + pixel** corpus before merge (silent
+`outerHTML`/selection/render corruption is the failure mode; watch SVG/foreign `createElementNS`). WPT is
+dispatch-only in this environment — run it green before merging `aa00ecf5`/`ddad4769`.
 
 ## 6. Verification methodology (used for every landed commit)
 
