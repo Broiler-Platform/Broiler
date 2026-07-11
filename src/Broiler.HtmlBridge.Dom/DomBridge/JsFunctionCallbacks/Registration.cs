@@ -867,9 +867,8 @@ public sealed partial class DomBridge
             // Find the DomElement for the doctype JSObject
             foreach (var kvp in _jsObjectCache)
             {
-                if (kvp.Value == dtObj)
+                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {
-                    var dtEl = kvp.Key;
                     SetParent(dtEl, docRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
                     docRoot.AppendChild(dtEl);

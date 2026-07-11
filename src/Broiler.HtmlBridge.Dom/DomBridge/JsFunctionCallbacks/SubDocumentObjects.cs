@@ -612,9 +612,8 @@ public sealed partial class DomBridge
             return a.Length > 0 ? a[0] : JSNull.Value;
         foreach (var kvp in bridge._jsObjectCache)
         {
-            if (kvp.Value == childObj)
+            if (kvp.Value == childObj && kvp.Key is DomElement child)
             {
-                var child = kvp.Key;
                 if (ParentEl(child) != null)
                     child.Remove();
                 SetParent(child, docRoot);
@@ -684,9 +683,8 @@ public sealed partial class DomBridge
         {
             foreach (var kvp in _jsObjectCache)
             {
-                if (kvp.Value == dtObj)
+                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {
-                    var dtEl = kvp.Key;
                     SetParent(dtEl, subDocRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = subDocRoot;
                     subDocRoot.AppendChild(dtEl);

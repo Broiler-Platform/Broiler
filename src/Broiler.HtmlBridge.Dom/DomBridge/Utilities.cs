@@ -296,7 +296,16 @@ public sealed partial class DomBridge
     /// Finds the <see cref="DomElement"/> corresponding to a given <see cref="JSObject"/>
     /// by looking up the JS object cache.
     /// </summary>
-    private DomElement? FindDomElementByJSObject(JSObject jsObj)
+    private DomElement? FindDomElementByJSObject(JSObject jsObj) =>
+        FindDomNodeByJSObject(jsObj) as DomElement;
+
+    /// <summary>
+    /// Finds the canonical <see cref="Broiler.Dom.DomNode"/> corresponding to a given
+    /// <see cref="JSObject"/> by reverse-scanning the JS-object cache. Unlike
+    /// <see cref="FindDomElementByJSObject"/> this also resolves text/comment nodes
+    /// (RF-BRIDGE-1c Phase F — needed once ranges/selection carry canonical char-data nodes).
+    /// </summary>
+    private Broiler.Dom.DomNode? FindDomNodeByJSObject(JSObject jsObj)
     {
         foreach (var kvp in _jsObjectCache)
         {

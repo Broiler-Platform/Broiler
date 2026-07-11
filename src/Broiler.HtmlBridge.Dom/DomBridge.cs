@@ -45,7 +45,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
-    private readonly HashSet<DomElement> _knownNodes =
+    // RF-BRIDGE-1c Phase F (F3b): the registration set is keyed by canonical DomNode so
+    // it can hold text/comment nodes once they flip to canonical DomText/DomComment (which
+    // are not DomElement). A facade node IS-A DomNode, so this is a behaviour-preserving
+    // widen on the current homogeneous tree.
+    private readonly HashSet<Broiler.Dom.DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
     private readonly List<(JSObject Observer, DomElement Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
