@@ -24,11 +24,18 @@ are done. The facade removal is unblocked.
 ## Status at a glance (2026-07-11)
 
 Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a + F3b + F3c-part1 on branch
-`claude/htmlbridge-domelement-removal-ucyw5j`. Each row is its own commit, every one regression-free
+`claude/htmlbridge-domelement-removal-ucyw5j`; **F3c part 2a (`ToJSObject` split) on branch
+`claude/htmlbridge-domelement-f3c-flip`.** Each row is its own commit, every one regression-free
 against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) environmental baseline —
-Phase C2 verified 0 baseline-passing tests regressed (before/after trx diff; the sole delta is the
-pre-existing `GoogleSearchPolyfillTests` render/scroll environmental failures, confirmed failing on the
-pre-change tree too).
+F3c part 2a verified via a full before/after TRX **name**-diff (identical 81 env failures, **0
+regressed, 0 newly-failing**), same methodology Phase C2 used.
+
+**F3c part 2 decomposition:** part 2 is now landed as green, `Cli.Tests`-verified type-widening
+commits (2a done; 2b `RangeState`/tree-mutation; 2c `ChildAt`/`ChildElements`) capped by the single
+irreversible construction flip (2d, gated on WPT range/selection/serialization + Acid). Rationale: the
+widening is behaviour-preserving on today's homogeneous facade tree — a canonical `DomText` is not yet
+in the tree, so the widened branches are dead code — and only construction + the `TextContent`
+aggregation split are genuinely atomic. See the current-state doc §4.
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
@@ -71,10 +78,21 @@ pre-change tree too).
   (caught + fixed a `GetTreeRoot` over-walk that mis-rooted isConnected/getRootNode/compareDocumentPosition).
 
 **Phase F remaining (staged):**
-- **F3c part 2 — the atomic flip (big-bang; not cleanly green-steppable).** Widening `ChildAt` to return
-  `DomNode` opens the full tree-heterogeneity cascade (~68 range/tree-walker/normalize/serialization
-  sites that must handle non-element children) — coupled with the construction flip, so it lands
-  atomically. **The `ToJSObject` blocker:** today `ToJSObject` gives every node
+- **F3c part 2a — `ToJSObject` split. DONE + verified** (branch `claude/htmlbridge-domelement-f3c-flip`).
+  Canonical `DomText`/`DomComment` now get their own minimal Node/CharacterData wrapper
+  (`PopulateCharacterDataJSObject`) via a `node is not DomElement` branch that replaces the F3b
+  `(DomElement)node` cast; ~25 node-level `*Core` helpers + the tree/clone leaf helpers (`IsDescendant`,
+  `CompareTreeOrder`, `CloneDomElement` w/ char-data factory branch, `NodesAreEqual`,
+  `FindContainingShadowRoot`, `SetCharacterData` family) widened to `DomNode`; text-node construction
+  funnels through `CreateBridgeTextNode`. Dead on today's homogeneous tree (facade text/comment keep the
+  full element wrapper); full `Broiler.Cli.Tests` before/after name-diff regression-free. The wrapper
+  omits the ChildNode mixin + EventTarget, folded into 2b (they entangle with `RangeState`).
+- **F3c part 2 remainder — reframed as green widening (2b `RangeState`/tree-mutation, 2c `ChildAt`/
+  `ChildElements`) then the atomic construction flip (2d).** The type-widening is behaviour-preserving on
+  today's homogeneous tree, so it lands as `Cli.Tests`-verified green commits; only 2d (construction flip
+  + `TextContent` aggregation split + facade-member removal) is irreversible. Original framing follows;
+  see the current-state doc §4 for the current step breakdown. **The `ToJSObject` blocker (now resolved by
+  2a):** today `ToJSObject` gives every node
   — text/comment included — the full element wrapper; a canonical `DomText`/`DomComment` (not a
   `DomElement`) needs its own minimal Node/CharacterData wrapper (replacing the `(DomElement)node` cast
   F3b left in place). Then: widen `RangeState.StartContainer`/`EndContainer`/`Root` + the ~10 range

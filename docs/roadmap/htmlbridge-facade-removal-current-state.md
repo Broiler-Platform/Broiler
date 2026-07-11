@@ -1,8 +1,24 @@
 # HtmlBridge `DomElement` Facade Removal — Current State & Handoff
 
-Status: **in progress** — facade thinned to 2 remaining members; the irreversible
-text-node flip (F3c part 2) is teed up but not yet applied.
+Status: **in progress** — facade thinned to 2 remaining members. The atomic text-node
+flip (F3c part 2) is now decomposed into a **green type-widening prefix** (behaviour-
+preserving, verifiable against `Broiler.Cli.Tests`) followed by the **irreversible
+construction flip**; **F3c part 2a — the `ToJSObject` split** — is landed and verified.
 Last updated: 2026-07-11.
+
+## Decomposition note (F3c part 2)
+
+The original plan framed F3c part 2 as one indivisible big-bang. Ground-truthing the
+cascade showed the bulk is **type-widening** (`ChildAt`→`DomNode`, the `ToJSObject`
+split, `RangeState`→`DomNode`, `ChildElements`→`OfType`, `CloneDomElement`/tree-helper
+widening) that is **safe and green on today's homogeneous facade tree** — a canonical
+`DomText` is not yet in the tree, so every widened branch is behaviour-preserving (dead
+code exercised only after the flip). Only the **construction flip** (text/comment →
+`document.CreateTextNode`/`CreateComment`) + the `TextContent` aggregation split + facade-
+member removal are genuinely atomic/irreversible. So part 2 lands as a sequence of green,
+`Cli.Tests`-verified widening commits (2a, 2b, …) capped by the one atomic flip gated on
+the WPT range/selection/serialization + Acid corpus. This shrinks the irreversible surface
+and matches the effort's PR-per-cluster cadence.
 
 This is the standalone "where things stand" snapshot for the RF-BRIDGE-1c effort
 (Milestones 1.2/1.3 of the blocked-items roadmap). The *design* lives in
@@ -57,54 +73,74 @@ Introduced by the in-progress phases; the next implementer builds on these:
   (`childNodes`/`firstChild`/`lastChild`/`nextSibling`/`previousSibling`/`isConnected`,
   `nodeType`/`nodeName`) are all typed on canonical **`DomNode`**. `FindDomNodeByJSObject`
   resolves any node from its JS wrapper (`FindDomElementByJSObject` narrows with `as DomElement`).
-  `ToJSObject(DomNode)` currently keeps a `(DomElement)node` cast that always succeeds on
-  today's homogeneous tree — F3c part 2 replaces it with the char-data branch.
+- **`ToJSObject` split (F3c part 2a — DONE, verified):** the `(DomElement)node` cast is replaced
+  by a `node is not DomElement` branch that builds a minimal Node/CharacterData wrapper for
+  canonical `DomText`/`DomComment` (`PopulateCharacterDataJSObject`). Dead on today's homogeneous
+  tree — facade text/comment are `DomElement` and keep the full element wrapper, so behaviour is
+  preserved; goes live at the construction flip. The node-level `*Core` helpers the wrapper shares
+  are widened to `DomNode`: `nodeValue`/`data`/`length`/`splitText`/`substring`/`append`/`delete`/
+  `insert`/`replaceData`, `localName`/`prefix`/`namespaceURI` (`is DomElement` guards),
+  `ownerDocument`, `parentElement`, `contains`, `compareDocumentPosition`, `isSameNode`,
+  `normalize` (no-op on char-data), `isEqualNode`, `getRootNode`, `cloneNode`, plus
+  `GetNodeTextValue`. The tree/clone leaf helpers they cascade into — `IsDescendant`,
+  `CompareTreeOrder`, `CloneDomElement` (now has a `DomCharacterData` factory branch + deep-clones
+  over raw `ChildNodes`), `NodesAreEqual`, `FindContainingShadowRoot`, `SetCharacterData`/
+  `UpdateCharacterData`/`NotifyCharacterDataMutationObservers` — are widened too; text-node
+  construction now funnels through `CreateBridgeTextNode`. The node-argument lookups in
+  `contains`/`compareDocumentPosition`/`isSameNode`/`isEqualNode` use `FindDomNodeByJSObject`
+  (equivalent today, forward-correct after the flip). **Verified:** full `Broiler.Cli.Tests`
+  before/after TRX name-diff — identical 81 env failures, **0 regressed, 0 newly-failing**.
+  **Intentionally deferred to F3c part 2b:** the wrapper omits the ChildNode mixin
+  (`remove`/`before`/`after`/`replaceWith`) and EventTarget, which entangle with the `RangeState`/
+  tree-mutation surface — added with that widening, before the wrapper goes live.
 
 Everything above is **behaviour-preserving on the current homogeneous facade tree** and
 verified regression-free against the full `Broiler.Cli.Tests` (1699 tests).
 
-## 4. What remains — F3c part 2 (the atomic flip)
+## 4. What remains — F3c part 2 (green widening prefix → atomic flip)
 
-This is the one irreversible, **big-bang** step: the moment a canonical `DomText` enters the
-tree, every site below must already handle a non-`DomElement` child, so it cannot be
-decomposed into more build-green commits. Concrete work, roughly in order:
+Split into **green, `Cli.Tests`-verified widening** (2a–2c) and the **atomic construction flip**
+(2d). Each widening step is behaviour-preserving on the homogeneous tree (the widened branches are
+dead until a canonical `DomText` exists). Concrete work:
 
-1. **`ChildAt` → `DomNode`** and fix the resulting **~68 tree-heterogeneity sites** (range
-   extraction in `Traversal.cs`/`JsFunctionCallbacks/Traversal.cs`, TreeWalker/NodeIterator,
-   `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`, `Css.cs`,
-   `AnchorResolver/*`) so they handle/skip non-element children correctly. *(Measured: 68
-   compile errors across 9 files when `ChildAt` returns `DomNode`.)*
-2. **`ToJSObject` split** — the blocker. `ToJSObject` is an 823-line method (~110 properties)
-   whose Node-level/CharacterData callbacks are all typed `DomElement`. Split it into
-   node-level (all nodes) + element-only (`if (node is DomElement element)`), giving canonical
-   `DomText`/`DomComment` a proper minimal wrapper (replacing the `(DomElement)node` cast).
-   F3c-part1 already widened the navigation/`nodeType`/`nodeName` callbacks; the CharacterData
-   (`data`/`length`/`splitText`/`substring`/`append`/`delete`/`insert`/`replaceData`),
-   `cloneNode`, `remove`, `before`/`after`/`replaceWith`, EventTarget, `contains`,
-   `compareDocumentPosition`, `isSameNode`, `normalize`, `isEqualNode`, `getRootNode`,
-   `ownerDocument`, `parentElement` callbacks still need widening to `DomNode`.
-3. **`RangeState` cascade** — widen `StartContainer`/`EndContainer`/`Root` and the ~10 range
-   helpers they feed (`GetNodesInRange`, `CollectRangeText`, `CreatePartialCloneForExtract`,
-   `ExtractStartPath`/`EndPath`, `FindCommonAncestor`, `GetDocumentOrderNodes`, …) to `DomNode`.
-4. **Construction flip** — the ~23 `new DomElement("#text"/"#comment", …)` sites →
-   `document.CreateTextNode`/`CreateComment`, including `HtmlTreeBuilder.ConvertNode` (whose
-   `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers).
-5. **Split `TextContent`'s element-aggregation duty** — element `textContent` *set* → clear +
-   append a child `DomText`; *get* → aggregate over child `DomText`. Remove the element-store
-   shortcut (`Common.cs:34`, `SubDocumentObjects.cs:53/74`, `LayoutMetrics.cs:709/1523/1534`,
-   `Css.cs:573`, `SubDocuments.cs:1145/1406`, `AnimationResolver.cs:43/186`,
-   `Serialization.cs:322`, `Utilities.cs` clone).
-6. **`ChildElements` → `OfType<DomElement>()`** and route the text-needing callers
-   (serialization `GetChildren`, JS `childNodes`, `CollectTextContent`, the Range routines) to
-   raw `ChildNodes`.
-7. **`CloneDomElement`** clone canonical char-data via the document factories; fix the three
-   raw casts in `Traversal.cs` (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch
-   serialization `GetKind` to a `NodeType` switch; widen the serialization adapter off
-   `<DomElement>`.
-8. **Remove facade `TextContent` + the `NodeValue` override**; update the frozen scalar guard.
+- ✅ **2a — `ToJSObject` split. DONE + verified** (0 regressions). Canonical char-data gets its own
+  minimal wrapper via `PopulateCharacterDataJSObject`; ~25 node-level `*Core` helpers + the
+  tree/clone leaf helpers widened to `DomNode` (see §3). The wrapper still **omits** the ChildNode
+  mixin + EventTarget (folded into 2b, below).
 
-**Gate:** the plan requires the WPT range/selection/serialization + Acid corpus in addition to
-`Broiler.Cli.Tests` for this step (silent `outerHTML`/selection corruption is the failure mode).
+- ⏳ **2b — `RangeState` + tree-mutation cascade → `DomNode`** (green). Widen
+  `RangeState.StartContainer`/`EndContainer`/`Root` and the ~10 range helpers they feed
+  (`GetNodesInRange`, `CollectRangeText`, `CreatePartialCloneForExtract`, `ExtractStartPath`/
+  `EndPath`, `FindCommonAncestor`, `GetDocumentOrderNodes`, `IsPositionAfter`/
+  `CompareBoundaryPosition`, `RangeState.AdjustForRemoval`) and the tree-mutation helpers
+  (`InsertNodeAt`, `NotifyChildAdded`/`NotifyChildRemoved`, `NotifyNodeIteratorPreRemoval`,
+  `AdoptSubtreeIntoDocument`, `BuildChildNodeArgumentNodes`, `DispatchEventOnElement`,
+  `GetEventListeners`). Then **add the deferred `remove`/`before`/`after`/`replaceWith` + EventTarget
+  members to `PopulateCharacterDataJSObject`** so the char-data wrapper is complete.
+
+- ⏳ **2c — `ChildAt` → `DomNode`** (green) and fix the resulting **~68 tree-heterogeneity sites**
+  (TreeWalker/NodeIterator, `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`,
+  `Css.cs`, `AnchorResolver/*`) to handle/skip non-element children; **`ChildElements` →
+  `OfType<DomElement>()`** and route text-needing callers (serialization `GetChildren`, JS
+  `childNodes`, `CollectTextContent`, the Range routines) to raw `ChildNodes`. *(Measured: 68
+  compile errors across 9 files when `ChildAt` returns `DomNode`.)* Also fix the three raw casts in
+  `Traversal.cs` (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch serialization `GetKind` to a
+  `NodeType` switch; widen the serialization adapter off `<DomElement>`. (`CloneDomElement`'s
+  char-data factory branch already landed in 2a; the four range-clone casts are tagged in-code.)
+
+- ⚠️ **2d — the atomic construction flip (irreversible).** The ~23
+  `new DomElement("#text"/"#comment", …)` sites → `document.CreateTextNode`/`CreateComment` (via
+  `CreateBridgeTextNode`/a comment sibling), including `HtmlTreeBuilder.ConvertNode` (whose
+  `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers). **Split
+  `TextContent`'s element-aggregation duty** — element `textContent` *set* → clear + append a child
+  `DomText`; *get* → aggregate over child `DomText`. Remove the element-store shortcut (`Common.cs`
+  aggregation, `SubDocumentObjects.cs`, `LayoutMetrics.cs`, `Css.cs`, `SubDocuments.cs`,
+  `AnimationResolver.cs`, `Serialization.cs`, `CloneDomElement`). **Remove facade `TextContent` +
+  the `NodeValue` override**; update the frozen scalar guard.
+
+**Gate (2d):** the WPT range/selection/serialization + Acid corpus in addition to `Broiler.Cli.Tests`
+(silent `outerHTML`/selection corruption is the failure mode). The green steps 2a–2c gate on
+`Broiler.Cli.Tests` before/after name-diff alone.
 
 ## 5. What remains — F4 (final cutover, irreversible)
 
