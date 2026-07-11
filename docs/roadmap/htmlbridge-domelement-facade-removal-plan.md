@@ -23,7 +23,7 @@ are done. The facade removal is unblocked.
 
 ## Status at a glance (2026-07-11)
 
-Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a on branch
+Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a + F3b on branch
 `claude/htmlbridge-domelement-removal-ucyw5j`. Each row is its own commit, every one regression-free
 against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) environmental baseline —
 Phase C2 verified 0 baseline-passing tests regressed (before/after trx diff; the sole delta is the
@@ -56,26 +56,29 @@ pre-change tree too).
   homogeneous facade tree; full `Broiler.Cli.Tests` regression-free. Element-level `textContent`
   aggregation and text/comment construction are intentionally left for F3c.
 
+- **F3b — widen the node-identity surface to `DomNode` (safe, no behaviour change). DONE.** Re-typed
+  `_knownNodes` and `_jsObjectCache` to canonical `DomNode`, widened `ToJSObject(DomNode)` (body keeps a
+  `(DomElement)node` cast that always succeeds on today's homogeneous tree), and added
+  `FindDomNodeByJSObject` (the raw reverse lookup; `FindDomElementByJSObject` now narrows with
+  `as DomElement`). Full `Broiler.Cli.Tests` regression-free. `RangeState` + the ~10 range helpers it
+  feeds stay `DomElement`-typed — that widen cascades and lands with the flip in F3c.
+
 **Phase F remaining (staged):**
-- **F3b — widen the node-identity surface to `DomNode` (safe, no behaviour change):** re-type
-  `_knownNodes`, `_jsObjectCache`, `RangeState.StartContainer`/`EndContainer`, `_docRootToDocJSObject`,
-  mutation-observer targets, and `RuntimeValue<DomElement>` (shadow root/host) from the facade to
-  canonical `DomNode` (a facade node IS-A `DomNode`, so this compiles and behaves identically on the
-  current tree). Rework `ToJSObject(DomNode)` to build a minimal Node/CharacterData wrapper for
-  non-element nodes while the element body stays cast-guarded; add `FindDomNodeByJSObject`.
-  **The blocker for F3c:** today `ToJSObject` gives every node — text/comment included — the full
-  element wrapper; a canonical `DomText`/`DomComment` (not a `DomElement`) needs its own wrapper.
-- **F3c — the flip (higher risk):** flip the ~23 text/comment construction sites to
-  `document.CreateTextNode`/`CreateComment` (incl. `HtmlTreeBuilder.ConvertNode`, whose `allElements`
-  list widens to `DomNode`); split `TextContent`'s remaining element-aggregation double duty (element
-  `textContent` set → child `DomText`; get → compute over child `DomText`); narrow `ChildElements` to
-  `OfType<DomElement>()` and route the text-needing callers (serialization `GetChildren`, JS
-  `childNodes`, `CollectTextContent`, the Range routines) to raw `ChildNodes`; fix the three
-  `Traversal.cs` tree-node casts (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; make `CloneDomElement`
-  clone canonical char-data via the document factories; switch serialization `GetKind` to a `NodeType`
-  switch; remove facade `TextContent` + the `NodeValue` override. Gate on WPT
-  range/selection/serialization + Acid. (`IsComment`/`BridgeText`/`SetBridgeText` and the ~80
-  character-data sites are already done in F3a.)
+- **F3c — the flip (higher risk).** **The `ToJSObject` blocker:** today `ToJSObject` gives every node
+  — text/comment included — the full element wrapper; a canonical `DomText`/`DomComment` (not a
+  `DomElement`) needs its own minimal Node/CharacterData wrapper (replacing the `(DomElement)node` cast
+  F3b left in place). Then: widen `RangeState.StartContainer`/`EndContainer`/`Root` + the ~10 range
+  helpers they feed to `DomNode` (and `_mutationObservers` targets for characterData observers); flip
+  the ~23 text/comment construction sites to `document.CreateTextNode`/`CreateComment` (incl.
+  `HtmlTreeBuilder.ConvertNode`, whose `allElements` list widens to `DomNode`); split `TextContent`'s
+  remaining element-aggregation double duty (element `textContent` set → child `DomText`; get → compute
+  over child `DomText`); narrow `ChildElements` to `OfType<DomElement>()` and route the text-needing
+  callers (serialization `GetChildren`, JS `childNodes`, `CollectTextContent`, the Range routines) to
+  raw `ChildNodes`; fix the three `Traversal.cs` tree-node casts (`:62`, `:71`, `:232`) +
+  `ToTraversalJsValue`; make `CloneDomElement` clone canonical char-data via the document factories;
+  switch serialization `GetKind` to a `NodeType` switch; remove facade `TextContent` + the `NodeValue`
+  override. Gate on WPT range/selection/serialization + Acid. (`IsComment`/`BridgeText`/`SetBridgeText`,
+  the ~80 character-data sites, and the `DomNode` node-identity widening are already done in F3a+F3b.)
 - **F4 — construction flip + cache re-key + delete facade:** flip the ~40 real-element
   `new DomElement(...)` sites to `document.CreateElement`/`CreateElementNS` (removes the `NamespaceURI`
   ctor-coupling — `SetName` is `protected`, so the namespace must be set at construction); retire
