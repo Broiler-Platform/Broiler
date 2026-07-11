@@ -318,7 +318,7 @@ public sealed partial class DomBridge
             InlineStyle(element)["height"] = height;
 
         ClearChildren(element);
-        element.InnerHtml = string.Empty;
+        GetElementRuntimeState(element).InnerHtml = string.Empty;
         element.TextContent = null;
 
         var fill = new DomElement("div", null, null, string.Empty);
@@ -875,7 +875,7 @@ public sealed partial class DomBridge
         GetStyles: static element =>
             InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
         GetText: static element => element.TextContent,
-        GetRawInnerHtml: static element => element.InnerHtml);
+        GetRawInnerHtml: static element => GetElementRuntimeState(element).InnerHtml);
 
     private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
     {

@@ -37,6 +37,16 @@ internal sealed class ElementRuntimeState
     public DomElement? OwnerDocRoot { get; set; }
 
     /// <summary>
+    /// The element's raw inner-HTML/inner-text string — the source text for raw-text
+    /// elements (<c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>/<c>&lt;textarea&gt;</c>), an
+    /// <c>innerHTML</c>-getter fallback, and the value round-tripped by serialization.
+    /// Relocated off the <c>DomElement</c> facade (RF-BRIDGE-1c Phase F — the node model
+    /// does not own this bridge state). Empty by default; seeded by the <c>innerHTML</c>
+    /// setter and copied across <c>cloneNode</c>.
+    /// </summary>
+    public string InnerHtml { get; set; } = string.Empty;
+
+    /// <summary>
     /// The node's inline style in CSS kebab-case — the authoritative in-memory inline
     /// style (mutated by JS <c>element.style</c>, the anchor resolver, and synthetic
     /// form-control styling; synced back to the <c>style=</c> attribute at serialization).

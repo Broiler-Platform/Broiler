@@ -22,12 +22,12 @@ public sealed class DomExtractionPhaseZeroTests
 
     // RF-BRIDGE-1c Phase E relocated the facade Parent getter/setter to
     // DomBridge.ParentEl / SetParent over canonical ParentNode, so Parent is no
-    // longer a settable scalar on the DomElement surface below.
+    // longer a settable scalar on the DomElement surface below. Phase F relocated
+    // InnerHtml into ElementRuntimeState, so it is no longer a settable scalar either.
     private static readonly string[] LegacySettableScalarProperties =
     [
         "ClassName",
         "Id",
-        "InnerHtml",
         "NamespaceURI",
         "TextContent",
     ];

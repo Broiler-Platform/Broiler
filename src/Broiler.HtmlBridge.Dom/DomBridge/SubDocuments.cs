@@ -1141,7 +1141,7 @@ public sealed partial class DomBridge
     private void SetElementInnerHtml(DomElement element, string html)
     {
         html ??= string.Empty;
-        element.InnerHtml = html;
+        GetElementRuntimeState(element).InnerHtml = html;
         element.TextContent = null;
 
         if (IsText(element))

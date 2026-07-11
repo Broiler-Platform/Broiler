@@ -573,8 +573,8 @@ public sealed partial class DomBridge
         if (cssText.Length == 0 && styleEl.TextContent != null)
             cssText.Append(styleEl.TextContent);
 
-        if (cssText.Length == 0 && !string.IsNullOrEmpty(styleEl.InnerHtml))
-            cssText.Append(styleEl.InnerHtml);
+        if (cssText.Length == 0 && !string.IsNullOrEmpty(GetElementRuntimeState(styleEl).InnerHtml))
+            cssText.Append(GetElementRuntimeState(styleEl).InnerHtml);
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&

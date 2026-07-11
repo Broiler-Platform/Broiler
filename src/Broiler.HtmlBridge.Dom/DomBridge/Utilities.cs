@@ -396,7 +396,10 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, null, IsText(source));
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, string.Empty, null, null, IsText(source));
+        // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
+        // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
+        GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
         // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
         // set so namespaced attributes (namespace, prefix, local name) survive the clone —
         // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace

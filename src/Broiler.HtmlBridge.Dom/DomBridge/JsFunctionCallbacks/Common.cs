@@ -41,7 +41,7 @@ public sealed partial class DomBridge
             return new JSString(sb.ToString());
         }
 
-        return new JSString(element.InnerHtml);
+        return new JSString(GetElementRuntimeState(element).InnerHtml);
     }
 
 
