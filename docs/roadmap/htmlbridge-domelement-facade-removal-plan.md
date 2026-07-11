@@ -39,14 +39,33 @@ pre-change tree too).
 | `IsTextNode` | D1 | canonical `NodeType` via `IsText(node)` | 119 |
 | `Children` (+ `LegacyChildList`) | E2 | canonical `ChildNodes` via `ChildElements`/… | 421 |
 | `NsAttrMap` | C2 | canonical namespaced attributes via `TryGetNsAttribute`/`GetAttributeNS` | 18 |
+| `InnerHtml` | F1 | `ElementRuntimeState` via `GetElementRuntimeState(el).InnerHtml` | ~7 |
 
-**Facade `DomElement` still carries:** `InnerHtml`, `TextContent`, `NamespaceURI`.
+**Facade `DomElement` still carries:** `TextContent`, `NamespaceURI`.
 
-**Not yet started:** the **Phase F cutover** — flip text/comment construction to canonical
-`DomText`/`DomComment` (removing `TextContent`), which cascades into re-typing `RangeState`,
-`_knownNodes`, and the JS-object cache, then re-key the remaining per-node caches, remove
-`HtmlTreeBuilder`, and delete the `DomElement` type. `InnerHtml` and `NamespaceURI` (ctor-coupled;
-`SetName` is `protected`) fold into Phase F.
+**Phase F remaining (staged):**
+- **F3 — canonical text/comment flip (highest risk):** re-type `_knownNodes`, `_jsObjectCache`,
+  `RangeState.StartContainer`/`EndContainer`, `_docRootToDocJSObject`, mutation-observer targets, and
+  `RuntimeValue<DomElement>` (shadow root/host) to canonical `DomNode`; flip the ~23 text/comment
+  construction sites to `document.CreateTextNode`/`CreateComment`; split `TextContent`'s double duty
+  (text/comment character-data → `DomText`/`DomComment`.`Data`; element `textContent` aggregation →
+  compute over child `DomText`); add an `IsComment(node)` helper (a `DomComment` has no `TagName`);
+  narrow `ChildElements` to `OfType<DomElement>()` and route the text-needing callers (serialization
+  `GetChildren`, JS `childNodes`, `CollectTextContent`, the Range routines) to raw `ChildNodes`; fix the
+  three `Traversal.cs` tree-node casts (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch
+  serialization `GetKind` to a `NodeType` switch; remove facade `TextContent`. Gate on WPT
+  range/selection/serialization + Acid.
+- **F4 — construction flip + cache re-key + delete facade:** flip the ~40 real-element
+  `new DomElement(...)` sites to `document.CreateElement`/`CreateElementNS` (removes the `NamespaceURI`
+  ctor-coupling — `SetName` is `protected`, so the namespace must be set at construction); retire
+  `HtmlTreeBuilder` (callers parse via `HtmlDocumentParser.ParseDocument(html, _document)` directly);
+  re-key the ~14 remaining per-node caches to canonical `DomElement`; widen the public seams
+  `DomBridge.Elements`/`DocumentElement` + `IDomBridgeRuntime.Elements` to canonical (update the
+  `WptTestRunnerTests` helper); remove facade `NamespaceURI`; delete `DomElement.cs` +
+  `HtmlTreeBuilder.cs`; update/remove the frozen seam guard tests.
+
+Dependency: F1 (done) is independent; **F3 gates F4** (element construction flips last, once no facade
+instances or facade-only members remain). F4 is the only irreversible step.
 
 ## The facade in one paragraph
 
@@ -156,10 +175,11 @@ Each phase is one or more PRs, each independently building + green. Gate every p
 the **full** validation set (see "Validation" below), baselined first per `CLAUDE.md`.
 
 **Progress (2026-07-10/11):** Phases A + B + C + E1 + D1 + E2 **DONE** on branch
-`claude/rf-bridge-1c-domelement-facade-migration`; **Phase C2 DONE** on branch
+`claude/rf-bridge-1c-domelement-facade-migration`; **Phases C2 + F1 (`InnerHtml`) DONE** on branch
 `claude/htmlbridge-domelement-removal-ucyw5j`. Each is full-`Broiler.Cli.Tests` regression-free
 (the only diff is the documented `GoogleSearchPolyfillTests` render/scroll environmental failures,
-confirmed pre-existing on the pre-change tree).
+confirmed pre-existing on the pre-change tree). Phase A's deferred **A3 (`InnerHtml` → ERS)** landed
+here as **F1**.
 - **Phase A** — `JsSetStyleProps` + `OwnerDocRoot` → `ElementRuntimeState` (42 sites).
 - **Phase B** — inline `.Style` → ERS via `DomBridge.InlineStyle(element)` (lazy-seeds from the
   `style=` attribute on first access; ~200 sites; clone + dialog-backdrop seed explicitly; facade
