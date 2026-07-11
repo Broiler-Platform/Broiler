@@ -131,7 +131,8 @@ public sealed partial class DomBridge
         // Use index-based loop because the list may grow during iteration
         // (wrapper insertion above).
         for (int i = 0; i < el.ChildNodes.Count; i++)
-            ApplyScrollSimulationTree(ChildAt(el, i));
+            if (ChildAt(el, i) is DomElement child)
+                ApplyScrollSimulationTree(child);
     }
     /// <summary>
     /// Recursively collects all descendants with <c>position: fixed</c>

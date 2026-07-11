@@ -923,7 +923,9 @@ public sealed partial class DomBridge
             var child = ChildAt(node, index);
             if (!IsText(child))
             {
-                NormalizeNode(child);
+                // Recurse into element children (a comment has no text children to merge).
+                if (child is DomElement childElement)
+                    NormalizeNode(childElement);
                 index++;
                 continue;
             }

@@ -211,12 +211,13 @@ public sealed partial class DomBridge
         var snapshot = new List<DomElement>();
         for (var i = 0; ; i++)
         {
-            DomElement child;
+            DomElement? child;
             try
             {
                 if (i >= root.ChildNodes.Count)
                     break;
-                child = ChildAt(root, i);
+                // Element snapshot: a char-data child (post-flip) is skipped (null).
+                child = ChildAt(root, i) as DomElement;
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {

@@ -124,14 +124,17 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    private static void CollectTextContent(DomElement node, StringBuilder sb)
+    private static void CollectTextContent(Broiler.Dom.DomNode node, StringBuilder sb)
     {
         if (IsText(node))
         {
             sb.Append(BridgeText(node));
             return;
         }
-        foreach (var child in ChildElements(node))
+        // RF-BRIDGE-1c Phase F (F3c part 2c): walk raw ChildNodes so direct text children are
+        // aggregated (comment children contribute nothing — not IsText, no element children).
+        // Behaviour-preserving on today's homogeneous tree where every child is an element.
+        foreach (var child in node.ChildNodes)
             CollectTextContent(child, sb);
     }
 
@@ -536,10 +539,12 @@ public sealed partial class DomBridge
             DomElement? lastSection = null;
             for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
             {
-                var ctag = ChildAt(table, i).TagName.ToLowerInvariant();
+                if (ChildAt(table, i) is not DomElement childElement)
+                    continue;
+                var ctag = childElement.TagName.ToLowerInvariant();
                 if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
                 {
-                    lastSection = ChildAt(table, i);
+                    lastSection = childElement;
                     break;
                 }
             }

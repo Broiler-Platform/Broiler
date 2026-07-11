@@ -37,8 +37,8 @@ public sealed partial class DomBridge
     {
         for (var i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = ChildAt(element, i);
-            if (!IsText(child) && !child.TagName.StartsWith("#", StringComparison.Ordinal))
+            // Only element children are hit-test candidates (skip text/comment).
+            if (ChildAt(element, i) is DomElement child && !child.TagName.StartsWith("#", StringComparison.Ordinal))
                 CollectHitTestMatches(child, x, y, hits);
         }
 

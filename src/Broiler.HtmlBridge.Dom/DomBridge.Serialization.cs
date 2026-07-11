@@ -851,17 +851,26 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private HtmlSerializationAdapter<DomElement> CreateSerializationAdapter() => new(
-        GetKind: static element => element.TagName.ToLowerInvariant() switch
-        {
-            "#text" => HtmlSerializationNodeKind.Text,
-            "#comment" => HtmlSerializationNodeKind.Comment,
-            "#document-fragment" => HtmlSerializationNodeKind.Fragment,
-            "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
-            "#doctype" => HtmlSerializationNodeKind.DocumentType,
-            _ => HtmlSerializationNodeKind.Element
-        },
-        GetName: static element => element.TagName,
+    // RF-BRIDGE-1c Phase F (F3c part 2c): the serialization adapter is over canonical DomNode so
+    // text/comment children serialize once construction flips to DomText/DomComment. GetKind keys
+    // text/comment off NodeType (holds for facade and canonical char-data), and the remaining
+    // special kinds off the facade #document-fragment/#subdoc-root/#doctype TagNames (still facade
+    // elements). GetName/GetAttributes/GetStyles/GetRawInnerHtml are only invoked for element/doctype
+    // nodes (see HtmlSerializer.Append), so their DomElement narrowing is always satisfied.
+    private HtmlSerializationAdapter<Broiler.Dom.DomNode> CreateSerializationAdapter() => new(
+        GetKind: static node =>
+            IsText(node) ? HtmlSerializationNodeKind.Text
+            : IsComment(node) ? HtmlSerializationNodeKind.Comment
+            : node is DomElement element
+                ? element.TagName.ToLowerInvariant() switch
+                {
+                    "#document-fragment" => HtmlSerializationNodeKind.Fragment,
+                    "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
+                    "#doctype" => HtmlSerializationNodeKind.DocumentType,
+                    _ => HtmlSerializationNodeKind.Element
+                }
+                : HtmlSerializationNodeKind.Element,
+        GetName: static node => node is DomElement element ? element.TagName : string.Empty,
         // Never serialise a materialised nested-browsing-context (#subdoc-root) into
         // its container.  A sub-document is fetched and attached to its <iframe>/
         // <object>/<frame> so scripts can reach contentDocument and onload can fire,
@@ -870,13 +879,14 @@ public sealed partial class DomBridge
         // embedded p{background:green;height:100%} painted the whole parent green).
         // The renderer rasterises each embedded document in isolation instead
         // (srcdoc content is round-tripped via the srcdoc attribute).
-        GetChildren: static element => ChildElements(element).Where(static child =>
-            !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
-        GetAttributes: GetSerializableAttributes,
-        GetStyles: static element =>
-            InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
-        GetText: static element => BridgeText(element),
-        GetRawInnerHtml: static element => GetElementRuntimeState(element).InnerHtml);
+        GetChildren: static node => node.ChildNodes.Where(static child =>
+            !(child is DomElement childElement && string.Equals(childElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))),
+        GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
+        GetStyles: static node => node is DomElement element
+            ? InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+            : [],
+        GetText: static node => BridgeText(node),
+        GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
 
     private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
     {

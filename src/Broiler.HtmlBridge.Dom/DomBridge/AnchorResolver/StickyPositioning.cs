@@ -34,7 +34,8 @@ public sealed partial class DomBridge
         // Index-based: ApplyStickyOffset only mutates el's own style, not the
         // child list, but stay defensive.
         for (int i = 0; i < el.ChildNodes.Count; i++)
-            ResolveStickyPositioningTree(ChildAt(el, i));
+            if (ChildAt(el, i) is DomElement child)
+                ResolveStickyPositioningTree(child);
     }
 
     private void ApplyStickyOffset(DomElement el)

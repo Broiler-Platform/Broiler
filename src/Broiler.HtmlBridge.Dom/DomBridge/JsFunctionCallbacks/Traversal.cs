@@ -45,7 +45,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalNextNode008Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalNextNode008Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         // Try children first
@@ -111,19 +111,19 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         while (true)
         {
             // Try previous sibling's deepest descendant
-            if (ParentEl(node) != null && !ReferenceEquals(node, root))
+            var parent = node?.ParentNode;
+            if (parent != null && !ReferenceEquals(node, root))
             {
-                var siblings = ChildElements(ParentEl(node)).ToList();
-                var idx = siblings.IndexOf(node);
+                var idx = ChildIndexOf(parent, node!);
                 if (idx > 0)
                 {
-                    node = siblings[idx - 1];
+                    node = parent.ChildNodes[idx - 1];
                     // Go to deepest last child
                     while (node.ChildNodes.Count > 0)
                         node = ChildAt(node, ^1);
@@ -612,12 +612,8 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    // Element: clone and extract children from startOffset.
-                    // RF-BRIDGE-1c Phase F (F3c): this branch runs only for element containers
-                    // (the text-container case is handled above), so the clone is an element.
-                    // CloneDomElement now returns DomNode; narrow here. RangeState widening (F3c
-                    // step 3) revisits the range-extract container typing wholesale.
-                    var clone = (DomElement)CloneDomElement(state.StartContainer, false);
+                    // Element container (text case handled above); clone and extract children.
+                    var clone = CloneDomElement(state.StartContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = state.StartOffset; ci < state.StartContainer.ChildNodes.Count;)
                     {
@@ -674,10 +670,8 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    // Element container (text case handled above); the clone is an element.
-                    // RF-BRIDGE-1c Phase F (F3c): narrow the now-DomNode clone (see the start-side
-                    // note; RangeState widening in F3c step 3 revisits this typing).
-                    var clone = (DomElement)CloneDomElement(state.EndContainer, false);
+                    // Element container (text case handled above); clone and extract children.
+                    var clone = CloneDomElement(state.EndContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = 0; ci < state.EndOffset && state.EndContainer.ChildNodes.Count > 0; ci++)
                     {

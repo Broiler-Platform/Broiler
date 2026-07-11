@@ -68,7 +68,7 @@ public sealed partial class DomBridge
 
         tw.FastAddProperty(
             (KeyString)"currentNode",
-            new JSFunction((in Arguments a) => ToJSObject((DomElement)walker.CurrentNode), "get currentNode"),
+            new JSFunction((in Arguments a) => ToJSObject(walker.CurrentNode), "get currentNode"),
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length > 0 && a[0] is JSObject nodeObject &&
@@ -130,23 +130,27 @@ public sealed partial class DomBridge
         return tw;
     }
 
+    // RF-BRIDGE-1c Phase F (F3c part 2c): a TreeWalker/NodeIterator result may be a text/comment
+    // node (SHOW_TEXT/SHOW_COMMENT), so convert any non-null node — not just elements — to its JS
+    // wrapper. Behaviour-preserving today: walker results over the homogeneous facade tree are all
+    // DomElement (text/comment are facade elements); forward-correct once they flip to canonical.
     private JSValue ToTraversalJsValue(Broiler.Dom.DomNode? node) =>
-        node is DomElement element ? ToJSObject(element) : JSNull.Value;
+        node is not null ? ToJSObject(node) : JSNull.Value;
 
     /// <summary>Helper: get next sibling or ancestor's next sibling, skipping subtree.</summary>
-    private static DomElement? GetNextSkippingChildren(DomElement node, DomElement root)
+    private static Broiler.Dom.DomNode? GetNextSkippingChildren(Broiler.Dom.DomNode node, Broiler.Dom.DomNode root)
     {
-        while (node != null && !ReferenceEquals(node, root))
+        Broiler.Dom.DomNode? current = node;
+        while (current != null && !ReferenceEquals(current, root))
         {
-            if (ParentEl(node) != null)
+            var parent = current.ParentNode;
+            if (parent != null)
             {
-                var siblings = ChildElements(ParentEl(node)).ToList();
-                var idx = siblings.IndexOf(node);
-                if (idx >= 0 && idx + 1 < siblings.Count)
-                    return siblings[idx + 1];
+                var idx = ChildIndexOf(parent, current);
+                if (idx >= 0 && idx + 1 < parent.ChildNodes.Count)
+                    return parent.ChildNodes[idx + 1];
+                current = parent;
             }
-            if (ParentEl(node) != null)
-                node = ParentEl(node);
             else
                 return null;
         }
@@ -156,10 +160,10 @@ public sealed partial class DomBridge
     /// <summary>
     /// TreeWalker helper: traverse to first/last child.
     /// </summary>
-    private JSValue TreeWalkerTraverseChildren(DomElement node, bool first, DomElement root, int whatToShow, JSFunction? filterFn, ref DomElement currentNode)
+    private JSValue TreeWalkerTraverseChildren(Broiler.Dom.DomNode node, bool first, Broiler.Dom.DomNode root, int whatToShow, JSFunction? filterFn, ref Broiler.Dom.DomNode currentNode)
     {
         if (node.ChildNodes.Count == 0) return JSNull.Value;
-        var child = first ? ChildAt(node, 0) : ChildAt(node, ^1);
+        Broiler.Dom.DomNode? child = first ? ChildAt(node, 0) : ChildAt(node, ^1);
         while (child != null)
         {
             var result = ApplyFilter(child, whatToShow, filterFn);
@@ -178,15 +182,15 @@ public sealed partial class DomBridge
     /// <summary>
     /// TreeWalker helper: traverse to next/previous sibling.
     /// </summary>
-    private JSValue TreeWalkerTraverseSiblings(DomElement node, bool next, DomElement root, int whatToShow, JSFunction? filterFn, ref DomElement currentNode)
+    private JSValue TreeWalkerTraverseSiblings(Broiler.Dom.DomNode node, bool next, Broiler.Dom.DomNode root, int whatToShow, JSFunction? filterFn, ref Broiler.Dom.DomNode currentNode)
     {
         var sibling = node;
         while (true)
         {
-            if (ParentEl(sibling) == null || ReferenceEquals(sibling, root)) return JSNull.Value;
-            var siblings = ChildElements(ParentEl(sibling)).ToList();
-            var idx = siblings.IndexOf(sibling);
-            var target = next ? (idx + 1 < siblings.Count ? siblings[idx + 1] : null) : (idx > 0 ? siblings[idx - 1] : null);
+            var parent = sibling.ParentNode;
+            if (parent == null || ReferenceEquals(sibling, root)) return JSNull.Value;
+            var idx = ChildIndexOf(parent, sibling);
+            Broiler.Dom.DomNode? target = next ? (idx + 1 < parent.ChildNodes.Count ? parent.ChildNodes[idx + 1] : null) : (idx > 0 ? parent.ChildNodes[idx - 1] : null);
             if (target != null)
             {
                 var result = ApplyFilter(target, whatToShow, filterFn);
@@ -200,8 +204,8 @@ public sealed partial class DomBridge
                 continue;
             }
             // No more siblings — move up (DOM spec steps 3.3-3.5)
-            sibling = ParentEl(sibling);
-            if (sibling == null || ReferenceEquals(sibling, root)) return JSNull.Value;
+            if (parent == null || ReferenceEquals(parent, root)) return JSNull.Value;
+            sibling = parent;
             // Per spec: if filter accepts parent, return null
             // (the parent is a "real" node, so don't skip over it)
             var parentResult = ApplyFilter(sibling, whatToShow, filterFn);
@@ -210,13 +214,13 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Helper: get next/previous sibling, or null if past boundaries.</summary>
-    private static DomElement? GetSiblingInDirection(DomElement node, bool forward, DomElement boundary)
+    private static Broiler.Dom.DomNode? GetSiblingInDirection(Broiler.Dom.DomNode node, bool forward, Broiler.Dom.DomNode boundary)
     {
-        if (ParentEl(node) == null || ReferenceEquals(node, boundary)) return null;
-        var siblings = ChildElements(ParentEl(node)).ToList();
-        var idx = siblings.IndexOf(node);
-        if (forward && idx + 1 < siblings.Count) return siblings[idx + 1];
-        if (!forward && idx > 0) return siblings[idx - 1];
+        var parent = node.ParentNode;
+        if (parent == null || ReferenceEquals(node, boundary)) return null;
+        var idx = ChildIndexOf(parent, node);
+        if (forward && idx + 1 < parent.ChildNodes.Count) return parent.ChildNodes[idx + 1];
+        if (!forward && idx > 0) return parent.ChildNodes[idx - 1];
         return null;
     }
 

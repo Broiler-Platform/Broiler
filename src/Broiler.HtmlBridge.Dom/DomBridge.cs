@@ -201,22 +201,24 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // to OfType and callers gain IsText handling.
     // -----------------------------------------------------------------
 
-    /// <summary>The element's child nodes as <see cref="DomElement"/> (drop-in for the old
-    /// <c>element.Children</c> enumeration).</summary>
-    private static IEnumerable<DomElement> ChildElements(DomElement element) =>
-        element.ChildNodes.Cast<DomElement>();
+    /// <summary>The element's <see cref="DomElement"/> children. RF-BRIDGE-1c Phase F (F3c part 2c):
+    /// narrowed from <c>Cast</c> to <c>OfType&lt;DomElement&gt;()</c> so it skips canonical
+    /// <c>DomText</c>/<c>DomComment</c> children once construction flips; a no-op on today's
+    /// homogeneous tree. Callers that need text/comment children walk raw <c>ChildNodes</c> instead.</summary>
+    private static IEnumerable<DomElement> ChildElements(Broiler.Dom.DomNode element) =>
+        element.ChildNodes.OfType<DomElement>();
 
-    /// <summary>The child at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
-    /// Phase F (F3c part 2b): the parent is any <see cref="Broiler.Dom.DomNode"/> (range containers
-    /// are widened to <c>DomNode</c>); the return stays <c>DomElement</c> (a safe cast on today's
-    /// homogeneous tree) until F3c part 2c widens it to <c>DomNode</c>.</summary>
-    private static DomElement ChildAt(Broiler.Dom.DomNode element, int index) => (DomElement)element.ChildNodes[index];
+    /// <summary>The child node at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
+    /// Phase F (F3c part 2c): returns canonical <see cref="Broiler.Dom.DomNode"/> — a child may be a
+    /// <c>DomText</c>/<c>DomComment</c> once construction flips. Element-only callers narrow with
+    /// <c>as DomElement</c>/<c>is DomElement</c>; on today's homogeneous tree every child is an element.</summary>
+    private static Broiler.Dom.DomNode ChildAt(Broiler.Dom.DomNode element, int index) => element.ChildNodes[index];
 
-    /// <summary>The child at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
+    /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
     /// from-end indexer.</summary>
-    private static DomElement ChildAt(Broiler.Dom.DomNode element, System.Index index) =>
-        (DomElement)element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
+    private static Broiler.Dom.DomNode ChildAt(Broiler.Dom.DomNode element, System.Index index) =>
+        element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
