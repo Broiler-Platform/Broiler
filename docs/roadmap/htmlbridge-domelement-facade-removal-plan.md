@@ -147,9 +147,26 @@ scrollIntoView-% parallel flake, which passes in isolation).
   `GetAttribute`/`SetAttribute` are no-namespace + lowercasing, so raw canonical methods are **not**
   a drop-in for the legacy scan — the helpers are the faithful translation.
 
-Facade now retains: `InnerHtml` (deferred, ctor-coupled → Phase F), `NsAttrMap` (Phase C2),
-`IsTextNode`/`TextContent` (Phase D), `Parent`/`Children`/`NamespaceURI` (Phase E).
-Next: **Phase E** (widen tree traversal to `DomNode`) or **Phase C2** (`NsAttrMap`).
+- **Phase E (part 1 — `Parent`)** — facade `Parent` getter/setter removed; ~450 sites → bridge
+  helpers `ParentEl(element)` (= `ParentNode as DomElement`) and `SetParent(child, parent)`
+  (mirrors the old setter). Phase-D-safe (a node's parent is always an element, so `ParentEl`
+  survives text→`DomText`). `.Parent` is **not** universally facade-owned — the receiver-scoped
+  sed over-matched `DirectoryInfo.Parent`, a member chain, `?.Parent` guards, an object
+  initializer, and an indexer receiver; all reverted by hand.
+
+**Phase E remainder (`Children`, `NamespaceURI`):**
+- **`Children`** is the true Phase-D blocker — a `LegacyChildList : IList<DomElement>` can't hold
+  a future `DomText`. Its ~350 sites (Add/Insert/Remove/IndexOf/Count/indexer/LINQ) and the
+  loop-body `IsTextNode`/`TagName` checks are intertwined with the text-node model, so **do
+  `Children` together with Phase D** (introduce `IsBridgeText`/`ChildElements`/`ChildIndexOf`
+  helpers, migrate, flip text construction, then delete `Children` + `IsTextNode`/`TextContent`).
+- **`NamespaceURI`** is constructor-coupled (8 sets right after `new DomElement`; canonical
+  `SetName` is `protected`, unreachable from `DomBridge`) — fold into **Phase F** with the
+  construction flip.
+
+Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `IsTextNode`/`TextContent` +
+`Children` (Phase D/E2 combined), `NamespaceURI` (Phase F).
+Next: **Phase D+E2** (text-node canonicalization + `Children`) or **Phase C2** (`NsAttrMap`).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
