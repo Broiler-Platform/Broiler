@@ -21,6 +21,29 @@ Track 3 renderer prerequisites in `Broiler.Layout`. Governance Milestone 1.0
 (`htmlbridge-public-surface/v2` declared) and Milestone 1.1 (zero-caller shim removal)
 are done. The facade removal is unblocked.
 
+## Status at a glance (2026-07-11)
+
+Branch `claude/rf-bridge-1c-domelement-facade-migration`. Each row is its own commit, every one
+regression-free against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) 78-failure
+environmental baseline.
+
+| Facade member removed | Phase | Moved to | Sites |
+| --- | --- | --- | --- |
+| `JsSetStyleProps`, `OwnerDocRoot` | A | `ElementRuntimeState` | 42 |
+| `Style` | B | `ElementRuntimeState` via `InlineStyle(node)` | ~200 |
+| `Attributes` (+ `LegacyAttributeDictionary`) | C | canonical attributes via `TryGetAttribute`/`SetAttr`/… | ~195 |
+| `Parent` | E1 | canonical `ParentNode` via `ParentEl`/`SetParent` | ~450 |
+| `IsTextNode` | D1 | canonical `NodeType` via `IsText(node)` | 119 |
+| `Children` (+ `LegacyChildList`) | E2 | canonical `ChildNodes` via `ChildElements`/… | 421 |
+
+**Facade `DomElement` still carries:** `InnerHtml`, `TextContent`, `NamespaceURI`, `NsAttrMap`.
+
+**Not yet started:** **Phase C2** (`NsAttrMap` → canonical namespaced attributes) and the **Phase F
+cutover** — flip text/comment construction to canonical `DomText`/`DomComment` (removing `TextContent`),
+which cascades into re-typing `RangeState`, `_knownNodes`, and the JS-object cache, then re-key the
+remaining per-node caches, remove `HtmlTreeBuilder`, and delete the `DomElement` type. `InnerHtml` and
+`NamespaceURI` (ctor-coupled; `SetName` is `protected`) fold into Phase F.
+
 ## The facade in one paragraph
 
 `Broiler.HtmlBridge.DomElement` (`src/Broiler.HtmlBridge.Core/Dom/DomElement.cs`) is

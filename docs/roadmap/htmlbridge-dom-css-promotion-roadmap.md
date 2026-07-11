@@ -323,14 +323,21 @@ other two are gated on prerequisites that are not yet met (documented below).
   RF-BRIDGE-1b geometry unification — now unblocked (Item 2 complete) and detailed in a
   dedicated staged plan:
   [`htmlbridge-domelement-facade-removal-plan.md`](htmlbridge-domelement-facade-removal-plan.md)
-  (Phases A–F, ~13–16 PRs, strangler via transitional bridge helpers). `DomElement`
-  alone is referenced by **58
-  non-submodule source files** (`grep -rlE '\bDomElement\b' --include=*.cs src/`)
-  and is entangled with RF-BRIDGE-1b geometry keying (boxes
-  key by bridge instances — see rf-bridge-1b §5a), so it cannot be ripped out
-  behind a single verifiable change; it is a staged migration, not a deletion.
+  (Phases A–F, strangler via transitional bridge helpers). `DomElement`
+  alone was referenced by **58 non-submodule source files** and is entangled with
+  RF-BRIDGE-1b geometry keying, so it cannot be ripped out behind a single verifiable
+  change; it is a staged migration, not a deletion.
   `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
   no longer need the facade node type.
+  **Progress (2026-07-11):** Milestone 1.2 is well under way on branch
+  `claude/rf-bridge-1c-domelement-facade-migration` — **7 facade members deleted**
+  (`JsSetStyleProps`, `OwnerDocRoot`, `Style`, `Attributes`+`LegacyAttributeDictionary`,
+  `Parent`, `IsTextNode`, `Children`+`LegacyChildList`; Phases A/B/C/E1/D1/E2), each a
+  behaviour-preserving relocation to `ElementRuntimeState` or canonical DOM, verified
+  regression-free (empty-diff vs the full-`Broiler.Cli.Tests` baseline). Facade remnants
+  `InnerHtml`/`TextContent`/`NamespaceURI`/`NsAttrMap` + the text→`DomText` construction
+  flip and cache/`RangeState` re-keying are the Phase C2/F remainder (see the plan's
+  "Status at a glance").
 
   **Sharpened dependency analysis (2026-07-09).** The four adapters split into two
   independent gates, not one:
