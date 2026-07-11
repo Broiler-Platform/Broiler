@@ -572,18 +572,18 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildEmptySubDocument(DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var htmlEl = new DomElement("html", null, null, string.Empty);
+        var htmlEl = CreateBridgeElement("html");
         SetParent(htmlEl, docRoot);
         docRoot.AppendChild(htmlEl);
 
-        var headEl = new DomElement("head", null, null, string.Empty);
+        var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         htmlEl.AppendChild(headEl);
 
-        var bodyEl = new DomElement("body", null, null, string.Empty);
+        var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
         htmlEl.AppendChild(bodyEl);
 
@@ -602,23 +602,23 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentWithText(string textContent, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var htmlEl = new DomElement("html", null, null, string.Empty);
+        var htmlEl = CreateBridgeElement("html");
         SetParent(htmlEl, docRoot);
         docRoot.AppendChild(htmlEl);
 
-        var headEl = new DomElement("head", null, null, string.Empty);
+        var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         htmlEl.AppendChild(headEl);
 
-        var bodyEl = new DomElement("body", null, null, string.Empty);
+        var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
         htmlEl.AppendChild(bodyEl);
 
         // Wrap text content in <pre> element
-        var preEl = new DomElement("pre", null, null, string.Empty);
+        var preEl = CreateBridgeElement("pre");
         SetParent(preEl, bodyEl);
         bodyEl.AppendChild(preEl);
 
@@ -865,7 +865,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
         var builder = new HtmlTreeBuilder();
@@ -983,7 +983,7 @@ public sealed partial class DomBridge
         var firstEl = (DomElement)first;
         var secondEl = (DomElement)second;
         if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
-            !string.Equals(firstEl.NamespaceURI, secondEl.NamespaceURI, StringComparison.Ordinal) ||
+            !string.Equals(firstEl.NamespaceUri, secondEl.NamespaceUri, StringComparison.Ordinal) ||
             !string.Equals(BridgeText(firstEl), BridgeText(secondEl), StringComparison.Ordinal))
         {
             return false;
@@ -1207,7 +1207,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(html))
         {
             var parsingContext = parent.TagName.StartsWith("#", StringComparison.Ordinal)
-                ? new DomElement("body", null, null, string.Empty)
+                ? CreateBridgeElement("body")
                 : parent;
             if (TryBuildInnerHtmlFragmentContainer(parsingContext, html, out var fragmentContainer))
                 parsedContainer = fragmentContainer;
@@ -1276,7 +1276,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
         try
@@ -1342,7 +1342,7 @@ public sealed partial class DomBridge
     private DomElement BuildDomElementFromXElement(System.Xml.Linq.XElement xe)
     {
         var tagName = xe.Name.LocalName.ToLowerInvariant();
-        var el = new DomElement(tagName, null, null, string.Empty);
+        var el = CreateBridgeElement(tagName);
 
         foreach (var attr in xe.Attributes())
         {

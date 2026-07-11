@@ -179,9 +179,9 @@ public sealed partial class DomBridge
 
         ClearChildren(body);
 
-        var img = new DomElement(
-            _document, "img", null, null, string.Empty, null,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var img = CreateBridgeElement(
+            "img",
+            attributes: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["src"] = url,
             });

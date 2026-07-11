@@ -131,7 +131,7 @@ public sealed partial class DomBridge
         var tag = a[0].ToString();
         ValidateElementName(tag, context);
         tag = AsciiToLower(tag);
-        var el = new DomElement(_document, tag, null, null, string.Empty);
+        var el = CreateBridgeElement(tag);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -158,7 +158,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationCreateDocumentFragment017Core(in Arguments a)
     {
-        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        var fragment = CreateBridgeElement("#document-fragment");
         _knownNodes.Add(fragment);
         return ToJSObject(fragment);
     }
@@ -771,9 +771,9 @@ public sealed partial class DomBridge
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
         ValidateQualifiedName(localName, ns, context);
-        var el = new DomElement(_document, localName, null, null, string.Empty);
-        if (!string.IsNullOrEmpty(ns))
-            el.NamespaceURI = ns;
+        var el = string.IsNullOrEmpty(ns)
+            ? CreateBridgeElement(localName)
+            : CreateBridgeElementNS(ns, localName);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -839,7 +839,7 @@ public sealed partial class DomBridge
             ValidateQualifiedName(qualifiedName, null, context);
         else
             ValidateElementName(qualifiedName, context);
-        var doctype = new DomElement(_document, "#doctype", null, null, string.Empty);
+        var doctype = CreateBridgeElement("#doctype");
         GetElementRuntimeState(doctype).DocumentType.Name.Set(qualifiedName);
         GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
         GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
@@ -857,7 +857,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(qName))
             ValidateQualifiedName(qName, ns, context);
         // Build a new document root
-        var docRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(docRoot).Document.HasViewport.Set(false);
         _knownNodes.Add(docRoot);
         // Append doctype if provided
@@ -879,9 +879,9 @@ public sealed partial class DomBridge
         // Create document element if qualifiedName is provided
         if (!string.IsNullOrEmpty(qName))
         {
-            var docEl = new DomElement(_document, qName, null, null, string.Empty);
-            if (!string.IsNullOrEmpty(ns))
-                docEl.NamespaceURI = ns;
+            var docEl = string.IsNullOrEmpty(ns)
+                ? CreateBridgeElement(qName)
+                : CreateBridgeElementNS(ns, qName);
             SetParent(docEl, docRoot);
             GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
             docRoot.AppendChild(docEl);
@@ -896,11 +896,11 @@ public sealed partial class DomBridge
     {
         var title = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         // Build a new HTML document root with html/head/body
-        var docRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(docRoot).Document.HasViewport.Set(false);
         _knownNodes.Add(docRoot);
         // Add DOCTYPE
-        var doctype = new DomElement(_document, "#doctype", null, null, string.Empty);
+        var doctype = CreateBridgeElement("#doctype");
         GetElementRuntimeState(doctype).DocumentType.Name.Set("html");
         GetElementRuntimeState(doctype).DocumentType.PublicId.Set(string.Empty);
         GetElementRuntimeState(doctype).DocumentType.SystemId.Set(string.Empty);
@@ -909,13 +909,13 @@ public sealed partial class DomBridge
         GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         docRoot.AppendChild(doctype);
         _knownNodes.Add(doctype);
-        var htmlEl = new DomElement(_document, "html", null, null, string.Empty);
-        htmlEl.NamespaceURI = "http://www.w3.org/1999/xhtml";
+        // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
+        var htmlEl = CreateBridgeElement("html");
         SetParent(htmlEl, docRoot);
         GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
         docRoot.AppendChild(htmlEl);
         _knownNodes.Add(htmlEl);
-        var headEl = new DomElement(_document, "head", null, null, string.Empty);
+        var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         GetElementRuntimeState(headEl).OwnerDocRoot = docRoot;
         htmlEl.AppendChild(headEl);
@@ -923,7 +923,7 @@ public sealed partial class DomBridge
         // Add <title> element if title argument is provided
         if (title != null)
         {
-            var titleEl = new DomElement(_document, "title", null, null, string.Empty);
+            var titleEl = CreateBridgeElement("title");
             SetParent(titleEl, headEl);
             GetElementRuntimeState(titleEl).OwnerDocRoot = docRoot;
             headEl.AppendChild(titleEl);
@@ -935,7 +935,7 @@ public sealed partial class DomBridge
             _knownNodes.Add(titleText);
         }
 
-        var bodyEl = new DomElement(_document, "body", null, null, string.Empty);
+        var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
         GetElementRuntimeState(bodyEl).OwnerDocRoot = docRoot;
         htmlEl.AppendChild(bodyEl);

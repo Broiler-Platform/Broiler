@@ -533,7 +533,7 @@ public sealed partial class DomBridge
     }
 
     private static bool IsSvgElement(DomElement element) =>
-        string.Equals(element.NamespaceURI, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.NamespaceUri, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
         IsSvgViewportElement(element) ||
         IsSvgShapeElement(element);
 

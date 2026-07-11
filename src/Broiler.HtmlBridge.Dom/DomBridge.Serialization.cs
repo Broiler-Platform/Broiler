@@ -194,7 +194,7 @@ public sealed partial class DomBridge
         if (rules.Count == 0)
             return;
 
-        var styleElement = new DomElement("style", null, null, string.Empty);
+        var styleElement = CreateBridgeElement("style");
         SetElementTextContent(styleElement, string.Join(Environment.NewLine, rules));
 
         var head = FindFirstElementByTagName(DocumentElement, "head");
@@ -319,7 +319,7 @@ public sealed partial class DomBridge
         ClearChildren(element);
         GetElementRuntimeState(element).InnerHtml = string.Empty;
 
-        var fill = new DomElement("div", null, null, string.Empty);
+        var fill = CreateBridgeElement("div");
         SetParent(fill, element);
         InlineStyle(fill)["position"] = "absolute";
         InlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";

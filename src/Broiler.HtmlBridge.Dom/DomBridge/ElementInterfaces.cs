@@ -501,7 +501,7 @@ public sealed partial class DomBridge
         // -- Phase 6: SVG DOM interfaces --
 
         // SVG element properties — provide SVGAnimatedLength stubs for dimensional attributes
-        if (element.NamespaceURI == "http://www.w3.org/2000/svg" ||
+        if (element.NamespaceUri == "http://www.w3.org/2000/svg" ||
             tag == "svg" || tag == "rect" || tag == "circle" || tag == "ellipse" ||
             tag == "line" || tag == "polyline" || tag == "polygon" || tag == "path" ||
             tag == "text" || tag == "g" || tag == "use" || tag == "image" ||

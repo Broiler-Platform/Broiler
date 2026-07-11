@@ -314,7 +314,7 @@ public sealed partial class DomBridge
         }
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
-        if (!string.IsNullOrEmpty(element.NamespaceURI) && !string.Equals(element.NamespaceURI, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
             return new JSString(element.TagName);
         return new JSString(element.TagName.ToUpperInvariant());
     }
@@ -351,8 +351,8 @@ public sealed partial class DomBridge
         // namespaceURI is null for non-element nodes (text/comment/document).
         if (node is not DomElement element)
             return JSNull.Value;
-        if (element.NamespaceURI != null)
-            return new JSString(element.NamespaceURI);
+        if (element.NamespaceUri != null)
+            return new JSString(element.NamespaceUri);
         // Default namespace for HTML elements
         if (!element.TagName.StartsWith("#"))
             return new JSString("http://www.w3.org/1999/xhtml");
@@ -881,7 +881,7 @@ public sealed partial class DomBridge
         }
 
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
-        var shadowRoot = new DomElement(_document, "#shadow-root", null, null, string.Empty);
+        var shadowRoot = CreateBridgeElement("#shadow-root");
         SetParent(shadowRoot, element);
         GetElementRuntimeState(shadowRoot).OwnerDocRoot = GetElementRuntimeState(element).OwnerDocRoot;
         GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);

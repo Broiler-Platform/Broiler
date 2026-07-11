@@ -51,8 +51,8 @@ public sealed partial class DomBridge
         obj.FastAddValue(
             (KeyString)"tagName",
             new JSString(
-                string.IsNullOrEmpty(element.NamespaceURI) ||
-                string.Equals(element.NamespaceURI, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase)
+                string.IsNullOrEmpty(element.NamespaceUri) ||
+                string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase)
                     ? element.TagName.ToUpperInvariant()
                     : element.TagName),
             JSPropertyAttributes.EnumerableConfigurableValue);

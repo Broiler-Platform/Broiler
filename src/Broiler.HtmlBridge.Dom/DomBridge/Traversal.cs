@@ -628,7 +628,7 @@ public sealed partial class DomBridge
         {
             // chain[i] for i >= 1 is an ancestor element.
             var original = (DomElement)chain[i];
-            var clone = new DomElement(original.TagName, null, null, string.Empty);
+            var clone = bridge.CreateBridgeElement(original.TagName);
             bridge._knownNodes.Add(clone);
 
             if (topClone == null) topClone = clone;

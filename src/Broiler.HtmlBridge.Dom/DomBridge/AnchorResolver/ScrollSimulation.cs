@@ -54,7 +54,7 @@ public sealed partial class DomBridge
                     // container's overflow:hidden at all edges (including top),
                     // avoiding the rendering artefact where negative-margin
                     // spacers can leak above the container's top edge.
-                    var wrapper = new DomElement(_document, "div", null, null, "");
+                    var wrapper = CreateBridgeElement("div");
                     InlineStyle(wrapper)["position"] = "relative";
                     if (scrollTop != 0)
                         InlineStyle(wrapper)["top"] =

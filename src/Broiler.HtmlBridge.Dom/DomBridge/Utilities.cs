@@ -72,7 +72,7 @@ public sealed partial class DomBridge
         var publicId = match.Groups[2].Success ? match.Groups[2].Value : string.Empty;
         var systemId = match.Groups[3].Success ? match.Groups[3].Value : string.Empty;
 
-        var doctype = new DomElement("#doctype", null, null, string.Empty);
+        var doctype = CreateBridgeElement("#doctype");
         GetElementRuntimeState(doctype).DocumentType.Name.Set(name);
         GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
         GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
@@ -422,7 +422,10 @@ public sealed partial class DomBridge
         }
 
         var element = (DomElement)source;
-        var clone = new DomElement(element.TagName, element.Id, element.ClassName, string.Empty, null, null, IsText(element));
+        // Preserve the source element's exact namespace (folds the old post-construction
+        // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
+        // their namespace rather than defaulting to HTML.
+        var clone = CreateBridgeElementNS(element.NamespaceUri, element.TagName, element.Id, element.ClassName);
         // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
         // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
         GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
@@ -448,7 +451,7 @@ public sealed partial class DomBridge
             cloneStyle[kv.Key] = kv.Value;
         // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
         // the deep-clone loop below — no element-store TextContent scalar to copy.
-        clone.NamespaceURI = element.NamespaceURI;
+        // (The namespace was carried at construction via CreateBridgeElementNS above.)
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
@@ -530,7 +533,7 @@ public sealed partial class DomBridge
     /// </summary>
     private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
     {
-        var tr = new DomElement("tr", null, null, string.Empty);
+        var tr = CreateBridgeElement("tr");
         bridge._knownNodes.Add(tr);
 
         var allRows = CollectTableRows(table);
@@ -552,7 +555,7 @@ public sealed partial class DomBridge
             if (lastSection == null && allRows.Count == 0)
             {
                 // No sections and no rows at all: create a new tbody per spec
-                var tbody = new DomElement("tbody", null, null, string.Empty);
+                var tbody = CreateBridgeElement("tbody");
                 bridge._knownNodes.Add(tbody);
                 SetParent(tbody, table);
                 table.AppendChild(tbody);

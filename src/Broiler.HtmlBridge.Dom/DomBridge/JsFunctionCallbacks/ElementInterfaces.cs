@@ -55,7 +55,7 @@ public sealed partial class DomBridge
         var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
             return ToJSObject(cap);
-        cap = new DomElement(_document, "caption", null, null, string.Empty);
+        cap = CreateBridgeElement("caption");
         bridge._knownNodes.Add(cap);
         SetParent(cap, element);
         InsertChildAt(element, 0, cap);
@@ -68,7 +68,7 @@ public sealed partial class DomBridge
         var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
             return ToJSObject(th);
-        th = new DomElement(_document, "thead", null, null, string.Empty);
+        th = CreateBridgeElement("thead");
         bridge._knownNodes.Add(th);
         SetParent(th, element);
         element.AppendChild(th);
@@ -81,7 +81,7 @@ public sealed partial class DomBridge
         var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
             return ToJSObject(tf);
-        tf = new DomElement(_document, "tfoot", null, null, string.Empty);
+        tf = CreateBridgeElement("tfoot");
         bridge._knownNodes.Add(tf);
         SetParent(tf, element);
         element.AppendChild(tf);
@@ -174,7 +174,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesInsertRow017Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
-        var tr = new DomElement(_document, "tr", null, null, string.Empty);
+        var tr = CreateBridgeElement("tr");
         bridge._knownNodes.Add(tr);
         SetParent(tr, element);
         var trRows = ChildElements(element).Where(c => string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -242,7 +242,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesInsertCell022Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
-        var td = new DomElement(_document, "td", null, null, string.Empty);
+        var td = CreateBridgeElement("td");
         bridge._knownNodes.Add(td);
         SetParent(td, element);
         var cells = ChildElements(element).Where(c => !IsText(c) && IsTableCellElement(c)).ToList();

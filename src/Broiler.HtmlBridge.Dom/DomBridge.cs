@@ -157,8 +157,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public DomBridge()
     {
         _document = new CanonicalDocument();
-        _documentNode = new DomElement(_document, "#document", null, null, string.Empty);
-        DocumentElement = new DomElement(_document, "html", null, null, string.Empty);
+        _documentNode = CreateBridgeElement("#document");
+        DocumentElement = CreateBridgeElement("html");
         _document.AppendChild(_documentNode);
         _documentNode.AppendChild(DocumentElement);
     }
@@ -304,6 +304,39 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>Mints a canonical <see cref="Broiler.Dom.DomComment"/> carrying <paramref name="data"/>
     /// (see <see cref="CreateBridgeTextNode"/>).</summary>
     private Broiler.Dom.DomNode CreateBridgeCommentNode(string data) => _document.CreateComment(data);
+
+    /// <summary>
+    /// The single construction funnel for bridge element nodes (RF-BRIDGE-1c Phase F, F4). Every
+    /// <c>new DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
+    /// so the irreversible cutover to canonical <c>Broiler.Dom</c> factories touches exactly one
+    /// place. The tag name may be an HTML element literal (HTML namespace) or a <c>#</c>-sentinel
+    /// (<c>#document</c>, <c>#subdoc-root</c>, …), which the facade ctor gives a null namespace and a
+    /// preserved name. Phase F4 step (a) keeps the facade body (behaviour-preserving); step (b) flips
+    /// it to <c>_document.CreateElementNS</c> and deletes the facade.
+    /// </summary>
+    private DomElement CreateBridgeElement(
+        string tagName,
+        string? id = null,
+        string? className = null,
+        Dictionary<string, string>? attributes = null) =>
+        new(_document, tagName, id, className, string.Empty, null, attributes);
+
+    /// <summary>
+    /// Element construction with an explicit namespace used verbatim (may be <c>null</c>), matching
+    /// the old <c>el.NamespaceURI = ns</c> post-construction override on <c>createElementNS</c>
+    /// handlers, sub-document roots, and clones. See <see cref="CreateBridgeElement"/>.
+    /// </summary>
+    private DomElement CreateBridgeElementNS(
+        string? namespaceUri,
+        string tagName,
+        string? id = null,
+        string? className = null,
+        Dictionary<string, string>? attributes = null)
+    {
+        var element = new DomElement(_document, tagName, id, className, string.Empty, null, attributes);
+        element.NamespaceURI = namespaceUri;
+        return element;
+    }
 
     /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
     /// replaces all children with a single canonical <see cref="Broiler.Dom.DomText"/> (or none when

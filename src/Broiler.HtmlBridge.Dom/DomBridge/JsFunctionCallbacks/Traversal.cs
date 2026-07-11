@@ -502,7 +502,7 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalCloneContents032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        var fragment = CreateBridgeElement("#document-fragment");
         bridge._knownNodes.Add(fragment);
         var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
         foreach (var node in nodes)
@@ -519,7 +519,7 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalExtractContents033Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        var fragment = CreateBridgeElement("#document-fragment");
         bridge._knownNodes.Add(fragment);
         // Handle same-container text node case
         if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || IsComment(state.StartContainer)))
