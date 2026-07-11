@@ -29,12 +29,12 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static DomElement? FindContainingShadowRoot(DomElement? element)
+    private static DomElement? FindContainingShadowRoot(Broiler.Dom.DomNode? node)
     {
-        for (var current = element; current != null; current = ParentEl(current))
+        for (var current = node; current != null; current = current.ParentNode)
         {
-            if (string.Equals(current.TagName, "#shadow-root", StringComparison.Ordinal))
-                return current;
+            if (current is DomElement element && string.Equals(element.TagName, "#shadow-root", StringComparison.Ordinal))
+                return element;
         }
 
         return null;

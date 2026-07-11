@@ -322,13 +322,13 @@ public sealed partial class DomBridge
     /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
     /// <paramref name="ancestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendant(DomElement ancestor, DomElement candidate)
+    private static bool IsDescendant(Broiler.Dom.DomNode ancestor, Broiler.Dom.DomNode candidate)
     {
-        var current = ParentEl(candidate);
+        var current = candidate.ParentNode;
         while (current != null)
         {
             if (ReferenceEquals(current, ancestor)) return true;
-            current = ParentEl(current);
+            current = current.ParentNode;
         }
         return false;
     }
@@ -338,18 +338,18 @@ public sealed partial class DomBridge
     /// Returns -1 when <paramref name="first"/> precedes <paramref name="second"/>,
     /// 1 when it follows, and 0 when no ordering can be determined.
     /// </summary>
-    private static int CompareTreeOrder(DomElement first, DomElement second)
+    private static int CompareTreeOrder(Broiler.Dom.DomNode first, Broiler.Dom.DomNode second)
     {
         if (ReferenceEquals(first, second))
             return 0;
 
-        var firstAncestors = new List<DomElement>();
-        for (var current = first; current != null; current = ParentEl(current))
+        var firstAncestors = new List<Broiler.Dom.DomNode>();
+        for (Broiler.Dom.DomNode? current = first; current != null; current = current.ParentNode)
             firstAncestors.Add(current);
         firstAncestors.Reverse();
 
-        var secondAncestors = new List<DomElement>();
-        for (var current = second; current != null; current = ParentEl(current))
+        var secondAncestors = new List<Broiler.Dom.DomNode>();
+        for (Broiler.Dom.DomNode? current = second; current != null; current = current.ParentNode)
             secondAncestors.Add(current);
         secondAncestors.Reverse();
 
@@ -403,9 +403,21 @@ public sealed partial class DomBridge
     /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
     /// all descendants are recursively cloned.
     /// </summary>
-    private DomElement CloneDomElement(DomElement source, bool deep)
+    private Broiler.Dom.DomNode CloneDomElement(Broiler.Dom.DomNode source, bool deep)
     {
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, string.Empty, null, null, IsText(source));
+        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes clone via the document
+        // factories (DomText/DomComment ctors are internal). Dead on today's homogeneous facade
+        // tree — facade text/comment nodes are DomElement and take the element path below; live
+        // once text/comment construction flips to canonical DomText/DomComment.
+        if (source is Broiler.Dom.DomCharacterData sourceCharData)
+        {
+            return IsComment(source)
+                ? _document.CreateComment(sourceCharData.Data)
+                : _document.CreateTextNode(sourceCharData.Data);
+        }
+
+        var element = (DomElement)source;
+        var clone = new DomElement(element.TagName, element.Id, element.ClassName, string.Empty, null, null, IsText(element));
         // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
         // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
         GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
@@ -415,7 +427,7 @@ public sealed partial class DomBridge
         // attributes go through SetAttribute (which lowercases, matching the prior snapshot
         // path); a prefixed qualified name can only exist with a namespace, so it never
         // reaches the SetAttribute branch (which would throw on the ':').
-        foreach (var attribute in source.Attributes.Values)
+        foreach (var attribute in element.Attributes.Values)
         {
             if (attribute.NamespaceUri is null)
                 clone.SetAttribute(attribute.QualifiedName, attribute.Value);
@@ -427,19 +439,22 @@ public sealed partial class DomBridge
         // `style=` attribute), replacing the clone's lazily-seeded attribute values.
         var cloneStyle = InlineStyle(clone);
         cloneStyle.Clear();
-        foreach (var kv in InlineStyle(source))
+        foreach (var kv in InlineStyle(element))
             cloneStyle[kv.Key] = kv.Value;
-        clone.TextContent = source.TextContent;
-        clone.NamespaceURI = source.NamespaceURI;
+        clone.TextContent = element.TextContent;
+        clone.NamespaceURI = element.NamespaceURI;
         // Copy browser-runtime values (e.g., checked state for inputs).
-        GetElementRuntimeState(source).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
+        GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
         // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
-        CopyPositionAreaResolution(source, clone);
+        CopyPositionAreaResolution(element, clone);
 
         if (deep)
         {
-            foreach (var child in ChildElements(source))
+            // RF-BRIDGE-1c Phase F (F3c): iterate raw ChildNodes (not ChildElements) so text/
+            // comment children clone too once they flip to canonical DomText/DomComment. On the
+            // homogeneous facade tree every child is already an element, so this is a no-op widen.
+            foreach (var child in element.ChildNodes)
             {
                 var childClone = CloneDomElement(child, true);
                 SetParent(childClone, clone);

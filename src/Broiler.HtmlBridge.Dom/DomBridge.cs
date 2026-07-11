@@ -289,6 +289,18 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             facade.TextContent = value;
     }
 
+    /// <summary>Mints a bridge text node carrying <paramref name="data"/> (RF-BRIDGE-1c Phase F).
+    /// The single funnel for text-node construction: it builds a facade <c>DomElement</c> text
+    /// node on today's tree, and flips to <c>_document.CreateTextNode(data)</c> (canonical
+    /// <c>DomText</c>) at the F3c construction cutover. Callers treat the result as a
+    /// <see cref="Broiler.Dom.DomNode"/>.</summary>
+    private Broiler.Dom.DomNode CreateBridgeTextNode(string data)
+    {
+        var node = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
+        SetBridgeText(node, data);
+        return node;
+    }
+
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
     /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become

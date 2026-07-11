@@ -785,7 +785,9 @@ public sealed partial class DomBridge
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
-            var clone = bridge.CloneDomElement(original, false);
+            // RF-BRIDGE-1c Phase F (F3c): chain holds ancestor elements, so the clone is an
+            // element; narrow the now-DomNode CloneDomElement result.
+            var clone = (DomElement)bridge.CloneDomElement(original, false);
             bridge._knownNodes.Add(clone);
             clones[i] = clone;
             if (i < chain.Count - 1)
@@ -874,7 +876,8 @@ public sealed partial class DomBridge
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
-            var clone = bridge.CloneDomElement(original, false);
+            // RF-BRIDGE-1c Phase F (F3c): chain holds ancestor elements; narrow the clone.
+            var clone = (DomElement)bridge.CloneDomElement(original, false);
             bridge._knownNodes.Add(clone);
             clones[i] = clone;
         }
@@ -1097,7 +1100,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void NotifyCharacterDataMutationObservers(DomElement target, string? oldValue)
+    private void NotifyCharacterDataMutationObservers(Broiler.Dom.DomNode target, string? oldValue)
     {
         if (_mutationObservers.Count == 0)
             return;
@@ -1122,12 +1125,12 @@ public sealed partial class DomBridge
         }
     }
 
-    private static void UpdateCharacterData(DomElement target, string? newValue)
+    private static void UpdateCharacterData(Broiler.Dom.DomNode target, string? newValue)
     {
         SetBridgeText(target, newValue ?? string.Empty);
     }
 
-    private void SetCharacterData(DomElement target, string? newValue)
+    private void SetCharacterData(Broiler.Dom.DomNode target, string? newValue)
     {
         var previousValue = BridgeText(target);
         UpdateCharacterData(target, newValue);

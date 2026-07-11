@@ -31,13 +31,22 @@ public sealed partial class DomBridge
         if (_jsObjectCache.TryGetValue(node, out var cached))
             return cached;
 
-        // RF-BRIDGE-1c Phase F (F3b): the tree is still homogeneous facade DomElement, so this
-        // cast always succeeds. F3c replaces it with a `node is not DomElement` branch that builds
-        // a minimal Node/CharacterData wrapper for canonical DomText/DomComment.
-        var element = (DomElement)node;
         var obj = new JSObject();
-        var bridge = this;
         _jsObjectCache[node] = obj;
+
+        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
+        // DomElement, so they receive a minimal Node/CharacterData wrapper instead of the full
+        // element surface below. This branch is dead on today's homogeneous facade tree — facade
+        // text/comment nodes are DomElement and fall through to the element wrapper, preserving
+        // behaviour — and goes live once text/comment construction flips to canonical
+        // DomText/DomComment (F3c construction cutover).
+        if (node is not DomElement element)
+        {
+            PopulateCharacterDataJSObject(obj, node);
+            return obj;
+        }
+
+        var bridge = this;
 
         obj.FastAddValue(
             (KeyString)"tagName",
@@ -849,6 +858,218 @@ public sealed partial class DomBridge
         obj.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    /// <summary>
+    /// RF-BRIDGE-1c Phase F (F3c): builds the minimal Node/CharacterData JS wrapper for a canonical
+    /// <c>DomText</c>/<c>DomComment</c> — the members a character-data node actually exposes (no
+    /// tagName/style/attributes/querySelector/form/iframe surface). Populated onto the already-cached
+    /// <paramref name="obj"/> (the caller registers it in <c>_jsObjectCache</c> before calling, so
+    /// re-entrant <c>ToJSObject</c> lookups resolve). The node-level <c>*Core</c> helpers are the
+    /// same ones the element wrapper uses, now widened to <see cref="Broiler.Dom.DomNode"/>.
+    /// The ChildNode-mixin (remove/before/after/replaceWith) and EventTarget members are added with
+    /// the tree-mutation/RangeState widening (they entangle with the range surface); they are absent
+    /// here but this wrapper is dead code until the construction flip, which lands after that widening.
+    /// </summary>
+    private void PopulateCharacterDataJSObject(JSObject obj, Broiler.Dom.DomNode node)
+    {
+        var bridge = this;
+
+        // -- Node identity --
+        obj.FastAddProperty(
+            (KeyString)"nodeType",
+            new JSFunction((in Arguments a) => JsJsObjectsGetNodeType038Core(node, in a), "get nodeType"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"nodeName",
+            new JSFunction((in Arguments a) => JsJsObjectsGetNodeName039Core(node, in a), "get nodeName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"localName",
+            new JSFunction((in Arguments a) => JsJsObjectsGetLocalName040Core(node, in a), "get localName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"prefix",
+            new JSFunction((in Arguments a) => JsJsObjectsGetPrefix041Core(node, in a), "get prefix"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"namespaceURI",
+            new JSFunction((in Arguments a) => JsJsObjectsGetNamespaceURI042Core(node, in a), "get namespaceURI"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // -- Character data --
+        obj.FastAddProperty(
+            (KeyString)"nodeValue",
+            new JSFunction((in Arguments a) => JsJsObjectsGetNodeValue043Core(node, in a), "get nodeValue"),
+            new JSFunction((in Arguments a) => JsJsObjectsSetNodeValue044Core(bridge, node, in a), "set nodeValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"textContent",
+            new JSFunction((in Arguments _) => GetNodeTextValue(node), "get textContent"),
+            new JSFunction((in Arguments a) => JsJsObjectsSetNodeValue044Core(bridge, node, in a), "set textContent"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"data",
+            new JSFunction((in Arguments a) => JsJsObjectsGetData045Core(node, in a), "get data"),
+            new JSFunction((in Arguments a) => JsJsObjectsSetData046Core(bridge, node, in a), "set data"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments a) => JsJsObjectsGetLength047Core(node, in a), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // splitText is Text-only (not on Comment).
+        if (IsText(node))
+        {
+            obj.FastAddValue(
+                (KeyString)"splitText",
+                new JSFunction((in Arguments a) => JsJsObjectsSplitText048Core(node, in a), "splitText", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        obj.FastAddValue(
+            (KeyString)"substringData",
+            new JSFunction((in Arguments a) => JsJsObjectsSubstringData049Core(node, in a), "substringData", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"appendData",
+            new JSFunction((in Arguments a) => JsJsObjectsAppendData050Core(bridge, node, in a), "appendData", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"deleteData",
+            new JSFunction((in Arguments a) => JsJsObjectsDeleteData051Core(bridge, node, in a), "deleteData", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"insertData",
+            new JSFunction((in Arguments a) => JsJsObjectsInsertData052Core(bridge, node, in a), "insertData", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"replaceData",
+            new JSFunction((in Arguments a) => JsJsObjectsReplaceData053Core(bridge, node, in a), "replaceData", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // -- Tree navigation --
+        obj.FastAddProperty(
+            (KeyString)"parentNode",
+            new JSFunction((in Arguments a) => ParentEl(node) != null ? ToJSObject(ParentEl(node)) : JSNull.Value, "get parentNode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"parentElement",
+            new JSFunction((in Arguments a) => JsJsObjectsGetParentElement058Core(node, in a), "get parentElement"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"isConnected",
+            new JSFunction((in Arguments a) => JsJsObjectsGetIsConnected032Core(node, in a), "get isConnected"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"childNodes",
+            new JSFunction((in Arguments a) => JsJsObjectsGetChildNodes033Core(node, in a), "get childNodes"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"firstChild",
+            new JSFunction((in Arguments a) => JsJsObjectsGetFirstChild034Core(node, in a), "get firstChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"lastChild",
+            new JSFunction((in Arguments a) => JsJsObjectsGetLastChild035Core(node, in a), "get lastChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"nextSibling",
+            new JSFunction((in Arguments a) => JsJsObjectsGetNextSibling036Core(node, in a), "get nextSibling"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"previousSibling",
+            new JSFunction((in Arguments a) => JsJsObjectsGetPreviousSibling037Core(node, in a), "get previousSibling"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty(
+            (KeyString)"ownerDocument",
+            new JSFunction((in Arguments a) => JsJsObjectsGetOwnerDocument057Core(node, in a), "get ownerDocument"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddValue(
+            (KeyString)"hasChildNodes",
+            new JSFunction((in Arguments a) => node.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // -- Node methods --
+        obj.FastAddValue(
+            (KeyString)"cloneNode",
+            new JSFunction((in Arguments a) => JsJsObjectsCloneNode079Core(node, in a), "cloneNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"contains",
+            new JSFunction((in Arguments a) => JsJsObjectsContains073Core(node, in a), "contains", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"compareDocumentPosition",
+            new JSFunction((in Arguments a) => JsJsObjectsCompareDocumentPosition074Core(node, in a), "compareDocumentPosition", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"isSameNode",
+            new JSFunction((in Arguments a) => JsJsObjectsIsSameNode075Core(node, in a), "isSameNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"isEqualNode",
+            new JSFunction((in Arguments a) => JsJsObjectsIsEqualNode077Core(node, in a), "isEqualNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"getRootNode",
+            new JSFunction((in Arguments a) => JsJsObjectsGetRootNode078Core(node, in a), "getRootNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"normalize",
+            new JSFunction((in Arguments a) => JsJsObjectsNormalize076Core(node, in a), "normalize", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Node type constants (exist on all Node objects).
+        obj.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"ATTRIBUTE_NODE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"CDATA_SECTION_NODE", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
 }

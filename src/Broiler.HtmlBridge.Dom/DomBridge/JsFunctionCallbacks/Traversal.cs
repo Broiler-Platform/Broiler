@@ -611,8 +611,12 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    // Element: clone and extract children from startOffset
-                    var clone = CloneDomElement(state.StartContainer, false);
+                    // Element: clone and extract children from startOffset.
+                    // RF-BRIDGE-1c Phase F (F3c): this branch runs only for element containers
+                    // (the text-container case is handled above), so the clone is an element.
+                    // CloneDomElement now returns DomNode; narrow here. RangeState widening (F3c
+                    // step 3) revisits the range-extract container typing wholesale.
+                    var clone = (DomElement)CloneDomElement(state.StartContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = state.StartOffset; ci < state.StartContainer.ChildNodes.Count;)
                     {
@@ -669,7 +673,10 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    var clone = CloneDomElement(state.EndContainer, false);
+                    // Element container (text case handled above); the clone is an element.
+                    // RF-BRIDGE-1c Phase F (F3c): narrow the now-DomNode clone (see the start-side
+                    // note; RangeState widening in F3c step 3 revisits this typing).
+                    var clone = (DomElement)CloneDomElement(state.EndContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = 0; ci < state.EndOffset && state.EndContainer.ChildNodes.Count > 0; ci++)
                     {

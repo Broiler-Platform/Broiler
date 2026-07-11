@@ -960,28 +960,39 @@ public sealed partial class DomBridge
         NotifyChildRemoved(parent, child, index);
     }
 
-    private static bool NodesAreEqual(DomElement first, DomElement second)
+    private static bool NodesAreEqual(Broiler.Dom.DomNode first, Broiler.Dom.DomNode second)
     {
         if (ReferenceEquals(first, second))
             return true;
 
-        if (IsText(first) != IsText(second) ||
-            !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
-            !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
-            !string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal))
+        if (first.NodeType != second.NodeType)
+            return false;
+
+        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (text/comment) have no
+        // TagName/attributes — they are equal iff their data matches. Dead on today's homogeneous
+        // facade tree (facade text/comment are DomElement and take the element path below); live
+        // once construction flips to canonical DomText/DomComment.
+        if (first is Broiler.Dom.DomCharacterData || second is Broiler.Dom.DomCharacterData)
+            return string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal);
+
+        var firstEl = (DomElement)first;
+        var secondEl = (DomElement)second;
+        if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
+            !string.Equals(firstEl.NamespaceURI, secondEl.NamespaceURI, StringComparison.Ordinal) ||
+            !string.Equals(BridgeText(firstEl), BridgeText(secondEl), StringComparison.Ordinal))
         {
             return false;
         }
 
-        if (!CanonicalAttributesAreEqual(first, second) ||
-            first.ChildNodes.Count != second.ChildNodes.Count)
+        if (!CanonicalAttributesAreEqual(firstEl, secondEl) ||
+            firstEl.ChildNodes.Count != secondEl.ChildNodes.Count)
         {
             return false;
         }
 
-        for (var index = 0; index < first.ChildNodes.Count; index++)
+        for (var index = 0; index < firstEl.ChildNodes.Count; index++)
         {
-            if (!NodesAreEqual(ChildAt(first, index), ChildAt(second, index)))
+            if (!NodesAreEqual(ChildAt(firstEl, index), ChildAt(secondEl, index)))
                 return false;
         }
 
