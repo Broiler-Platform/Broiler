@@ -120,12 +120,12 @@ public sealed partial class DomBridge
 
     private void InvalidateStyleScopeRecursive(DomElement element)
     {
-        if (!element.IsTextNode && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+        if (!IsText(element) && !element.TagName.StartsWith("#", StringComparison.Ordinal))
             InvalidateElementStyles(element);
 
         foreach (var child in element.Children)
         {
-            if (!child.IsTextNode && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+            if (!IsText(child) && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
                 InvalidateStyleScopeRecursive(child);
         }
     }
@@ -156,7 +156,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in SnapshotChildren(root))
         {
-            if (!child.IsTextNode)
+            if (!IsText(child))
             {
                 if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                     styleElements.Add(child);
@@ -521,7 +521,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in element.Children)
         {
-            if (child.IsTextNode)
+            if (IsText(child))
             {
                 if (!string.IsNullOrEmpty(child.TextContent))
                     builder.Append(child.TextContent);
@@ -566,7 +566,7 @@ public sealed partial class DomBridge
         var cssText = new StringBuilder();
         foreach (var child in styleEl.Children)
         {
-            if (child.IsTextNode && child.TextContent != null)
+            if (IsText(child) && child.TextContent != null)
                 cssText.Append(child.TextContent);
         }
 
@@ -657,7 +657,7 @@ public sealed partial class DomBridge
 
     private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
     {
-        if (!element.IsTextNode)
+        if (!IsText(element))
         {
             if (element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
             {

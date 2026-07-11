@@ -96,7 +96,7 @@ public sealed partial class DomBridge
     /// </summary>
     private double? ResolveBlockUsedWidthFromAncestors(DomElement blockEl)
     {
-        for (var a = ParentEl(blockEl); a != null && !a.IsTextNode; a = ParentEl(a))
+        for (var a = ParentEl(blockEl); a != null && !IsText(a); a = ParentEl(a))
         {
             var ap = GetComputedProps(a);
             double? w = TryParsePx(ap.GetValueOrDefault("width"));
@@ -172,7 +172,7 @@ public sealed partial class DomBridge
     {
         foreach (var el in Elements)
         {
-            if (!el.IsTextNode &&
+            if (!IsText(el) &&
                 string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase))
                 return el;
         }
@@ -208,7 +208,7 @@ public sealed partial class DomBridge
         // enough"). SnapshotChildren tolerates both, matching the other walks here.
         foreach (var child in SnapshotChildren(element))
         {
-            if (child.IsTextNode)
+            if (IsText(child))
             {
                 // Estimate text width from font-size (Ahem font: 1ch = font-size).
                 int charCount = (child.TextContent ?? "").Length;
@@ -365,7 +365,7 @@ public sealed partial class DomBridge
         List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
             double offX, double offY)> promotions)
     {
-        if (!element.IsTextNode && IsInlineContainingBlock(element))
+        if (!IsText(element) && IsInlineContainingBlock(element))
         {
             var (offX, offY, blockAncestor) = ComputeInlineCBOffset(element);
             if (blockAncestor != null)
@@ -373,7 +373,7 @@ public sealed partial class DomBridge
                 // Collect absolutely positioned children.
                 foreach (var child in SnapshotChildren(element))
                 {
-                    if (child.IsTextNode) continue;
+                    if (IsText(child)) continue;
                     var childProps = GetComputedProps(child);
                     string? childPos = childProps.GetValueOrDefault("position");
                     if (childPos == "absolute" || childPos == "fixed")
@@ -408,7 +408,7 @@ public sealed partial class DomBridge
         // Find nearest block-level ancestor.
         while (parent != null)
         {
-            if (!parent.IsTextNode)
+            if (!IsText(parent))
             {
                 var parentProps = GetComputedProps(parent);
                 string? parentDisplay = parentProps.GetValueOrDefault("display");
@@ -496,7 +496,7 @@ public sealed partial class DomBridge
         foreach (var sibling in SnapshotChildren(parent))
         {
             if (sibling == element) break;
-            if (sibling.IsTextNode)
+            if (IsText(sibling))
             {
                 // Count line breaks in text content.
                 var text = sibling.TextContent ?? "";
@@ -568,7 +568,7 @@ public sealed partial class DomBridge
         {
             if (sibling == element) break;
 
-            if (sibling.IsTextNode)
+            if (IsText(sibling))
             {
                 // Decode HTML entities (e.g. &nbsp; → \u00A0) before counting.
                 var text = System.Net.WebUtility.HtmlDecode(sibling.TextContent ?? "");

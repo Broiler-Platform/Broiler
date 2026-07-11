@@ -20,7 +20,7 @@ public sealed partial class DomBridge
         HashSet<DomElement> scrollContainersNeedingRelative,
         List<(DomElement element, DomElement oldParent, DomElement newParent)> deferredDomMoves)
     {
-        if (!element.IsTextNode)
+        if (!IsText(element))
         {
             var cssProps = CollectMatchedRuleProperties(element);
             foreach (var kv in InlineStyle(element))
@@ -581,7 +581,7 @@ public sealed partial class DomBridge
         double maxWidth = containerWidth;
         foreach (var child in SnapshotChildren(scrollContainer))
         {
-            if (child.IsTextNode) continue;
+            if (IsText(child)) continue;
             var childProps = GetComputedProps(child);
             double? childW = TryParsePx(childProps.GetValueOrDefault("width"));
             if (childW.HasValue)
@@ -608,7 +608,7 @@ public sealed partial class DomBridge
         double stackedHeight = 0;
         foreach (var child in SnapshotChildren(scrollContainer))
         {
-            if (child.IsTextNode) continue;
+            if (IsText(child)) continue;
             var childProps = GetComputedProps(child);
             var pos = childProps.GetValueOrDefault("position");
             if (pos == "absolute" || pos == "fixed")
@@ -651,7 +651,7 @@ public sealed partial class DomBridge
         var parent = ParentEl(el);
         while (parent != null)
         {
-            if (!parent.IsTextNode)
+            if (!IsText(parent))
             {
                 var props = GetComputedProps(parent);
                 if (HasOverflowClipping(props))

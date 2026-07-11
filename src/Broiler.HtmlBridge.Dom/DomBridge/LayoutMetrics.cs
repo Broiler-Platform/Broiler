@@ -342,7 +342,7 @@ public sealed partial class DomBridge
 
     private bool HasAssociatedLayoutBox(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return false;
 
         if (element.TagName.StartsWith("#", StringComparison.Ordinal))
@@ -623,7 +623,7 @@ public sealed partial class DomBridge
 
         foreach (var child in element.Children)
         {
-            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
             var childRect = GetHitTestRectForElement(child);
@@ -711,7 +711,7 @@ public sealed partial class DomBridge
 
         foreach (var child in element.Children)
         {
-            if (child.IsTextNode && !string.IsNullOrWhiteSpace(child.TextContent))
+            if (IsText(child) && !string.IsNullOrWhiteSpace(child.TextContent))
                 sb.Append(child.TextContent);
         }
 
@@ -1415,7 +1415,7 @@ public sealed partial class DomBridge
     private static int CountSelectOptions(DomElement element)
     {
         int count = 0;
-        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        foreach (var child in element.Children.Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1452,7 +1452,7 @@ public sealed partial class DomBridge
     private static List<DomElement> CollectSelectOptions(DomElement element)
     {
         var options = new List<DomElement>();
-        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        foreach (var child in element.Children.Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1563,7 +1563,7 @@ public sealed partial class DomBridge
 
             foreach (var child in host.Children)
             {
-                if (!child.IsTextNode && SlotAcceptsNode(element, child))
+                if (!IsText(child) && SlotAcceptsNode(element, child))
                     yield return child;
             }
 
@@ -1572,7 +1572,7 @@ public sealed partial class DomBridge
 
         foreach (var child in element.Children)
         {
-            if (!child.IsTextNode)
+            if (!IsText(child))
                 yield return child;
         }
     }

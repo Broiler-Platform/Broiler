@@ -19,7 +19,7 @@ public sealed partial class DomBridge
     }
     private void ResolveFixedPositionSizingInTree(DomElement el, int vpW, int vpH)
     {
-        if (!el.IsTextNode)
+        if (!IsText(el))
         {
             // Collect cascaded CSS properties for this element.
             var cssProps = CollectMatchedRuleProperties(el);

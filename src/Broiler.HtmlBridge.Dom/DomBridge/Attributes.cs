@@ -113,7 +113,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
+            if (!IsText(child) && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
                 results.Add(ToJSObject(child));
             CollectByTagName(child, tag, results);
         }
@@ -127,7 +127,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode &&
+            if (!IsText(child) &&
                 (string.Equals(child.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(child.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
                 HasAttr(child, "href"))
@@ -143,7 +143,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && predicate(child))
+            if (!IsText(child) && predicate(child))
                 results.Add(ToJSObject(child));
             CollectMatching(child, predicate, results);
         }

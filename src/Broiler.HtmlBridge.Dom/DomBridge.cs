@@ -188,6 +188,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// attribute; thereafter it is the source of truth (JS <c>element.style</c> writes,
     /// anchor/form-control styling), synced back to the attribute at serialization.
     /// </summary>
+    /// <summary>Whether <paramref name="node"/> is a text node (RF-BRIDGE-1c Phase D: replaces
+    /// the facade <c>IsText(DomElement)</c>). NodeType-based, so it holds for the current
+    /// facade text nodes and for canonical <c>DomText</c> once construction flips in the
+    /// <c>Children</c>/text cutover.</summary>
+    private static bool IsText(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Text;
+
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
     /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
@@ -311,7 +317,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         foreach (var el in Elements)
         {
-            if (el.IsTextNode || string.IsNullOrEmpty(el.Id))
+            if (IsText(el) || string.IsNullOrEmpty(el.Id))
                 continue;
             // Only register if the global doesn't already exist
             // (user-defined globals take precedence — a `var`/`function` or a
@@ -672,7 +678,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         foreach (var child in element.Children)
         {
-            if (child.IsTextNode)
+            if (IsText(child))
                 continue;
 
             if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))

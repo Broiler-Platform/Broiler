@@ -245,7 +245,7 @@ public sealed partial class DomBridge
         var td = new DomElement(_document, "td", null, null, string.Empty);
         bridge._knownNodes.Add(td);
         SetParent(td, element);
-        var cells = element.Children.Where(c => !c.IsTextNode && IsTableCellElement(c)).ToList();
+        var cells = element.Children.Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
         if (index < 0 || index >= cells.Count)
         {
             element.Children.Add(td);
@@ -269,7 +269,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             throw new JSException("Failed to execute 'deleteCell' on 'HTMLTableRowElement': 1 argument required, but only 0 present.");
         var index = (int)Math.Truncate(a[0].DoubleValue);
-        var cells = element.Children.Where(c => !c.IsTextNode && IsTableCellElement(c)).ToList();
+        var cells = element.Children.Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
         if (index < 0)
             index = cells.Count + index;
         if (index < 0 || index >= cells.Count)

@@ -111,7 +111,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in form.Children)
         {
-            if (!child.IsTextNode && !CheckElementValidity(child)) return false;
+            if (!IsText(child) && !CheckElementValidity(child)) return false;
             if (!ValidateFormChildren(child)) return false;
         }
         return true;

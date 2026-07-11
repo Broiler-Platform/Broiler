@@ -60,7 +60,10 @@ public sealed class DomElement : CanonicalElement
         // `style` parameter is retained only for call-site compatibility until construction
         // flips to canonical factories (Phase F); it is intentionally not read here.
         _ = style;
-        IsTextNode = isTextNode || string.Equals(tagName, "#text", StringComparison.Ordinal);
+        // RF-BRIDGE-1c Phase D: text-node identity is the canonical NodeType (set from
+        // ResolveNodeType in the base call above), reached via DomBridge.IsText(node). The
+        // `isTextNode` parameter still drives ResolveNodeType; there is no separate flag.
+        _ = isTextNode;
 
         if (attributes is not null)
         {
@@ -93,8 +96,6 @@ public sealed class DomElement : CanonicalElement
 
     public LegacyChildList Children => _children;
 
-    public bool IsTextNode { get; }
-
     public string? TextContent
     {
         get => _textContent;
@@ -112,10 +113,10 @@ public sealed class DomElement : CanonicalElement
     /// Exposes a text node's content through the canonical <see cref="CanonicalElement.NodeValue"/>
     /// so engine-neutral consumers (notably the renderer's typed DOM-to-box builder) can read
     /// bridge text without depending on this facade type. The bridge models text nodes as a
-    /// <see cref="DomElement"/> with <see cref="IsTextNode"/> set rather than a canonical
+    /// <see cref="DomElement"/> with a text <see cref="CanonicalNodeType"/> rather than a canonical
     /// <c>DomText</c>, so <c>NodeValue</c> is the only canonical bridge for that text.
     /// </summary>
-    public override string? NodeValue => IsTextNode ? _textContent : base.NodeValue;
+    public override string? NodeValue => NodeType == CanonicalNodeType.Text ? _textContent : base.NodeValue;
 
     public string? NamespaceURI
     {

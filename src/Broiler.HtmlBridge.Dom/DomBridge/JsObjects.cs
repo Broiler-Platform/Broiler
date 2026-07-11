@@ -288,7 +288,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // splitText(offset) — splits a text node at the given character offset
-        if (element.IsTextNode)
+        if (IsText(element))
         {
             obj.FastAddValue(
                 (KeyString)"splitText",
@@ -297,7 +297,7 @@ public sealed partial class DomBridge
         }
 
         // substringData(offset, count) — for text/comment CharacterData nodes
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             obj.FastAddValue(
                 (KeyString)"substringData",
@@ -508,7 +508,7 @@ public sealed partial class DomBridge
         // childElementCount (read-only)
         obj.FastAddProperty(
             (KeyString)"childElementCount",
-            new JSFunction((in Arguments a) => new JSNumber(element.Children.Count(c => !c.IsTextNode && !IsSubDocRoot(c))),
+            new JSFunction((in Arguments a) => new JSNumber(element.Children.Count(c => !IsText(c) && !IsSubDocRoot(c))),
                 "get childElementCount"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

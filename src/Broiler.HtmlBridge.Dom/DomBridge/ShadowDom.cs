@@ -74,7 +74,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (child.IsTextNode)
+            if (IsText(child))
                 continue;
 
             if (string.Equals(child.TagName, "slot", StringComparison.OrdinalIgnoreCase) &&
@@ -93,7 +93,7 @@ public sealed partial class DomBridge
 
     private DomElement? GetAssignedSlot(DomElement element)
     {
-        if (element.IsTextNode || ParentEl(element) == null)
+        if (IsText(element) || ParentEl(element) == null)
             return null;
 
         var shadowRoot = GetShadowRoot(ParentEl(element));

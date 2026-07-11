@@ -34,7 +34,7 @@ public sealed partial class DomBridge
         {
             foreach (var child in SnapshotChildren(el))
             {
-                if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
+                if (IsText(child) && !string.IsNullOrEmpty(child.TextContent))
                 {
                     // Strip CSS comments first: a comment inside a @position-try
                     // body (common in WPT, e.g. "/* 2: position right */") contains
@@ -81,7 +81,7 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
-        if (!element.IsTextNode &&
+        if (!IsText(element) &&
             !string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             // Collect all CSS + inline properties to find position-try-fallbacks.
@@ -283,7 +283,7 @@ public sealed partial class DomBridge
         double maxWidth = 0;
         foreach (var child in SnapshotChildren(element))
         {
-            if (child.IsTextNode) continue;
+            if (IsText(child)) continue;
             var childProps = CollectMatchedRuleProperties(child);
             foreach (var kv in InlineStyle(child))
                 childProps[kv.Key] = kv.Value;

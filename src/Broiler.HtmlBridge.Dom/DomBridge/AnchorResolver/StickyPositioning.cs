@@ -28,7 +28,7 @@ public sealed partial class DomBridge
 
     private void ResolveStickyPositioningTree(DomElement el)
     {
-        if (!el.IsTextNode && IsSticky(GetComputedProps(el)))
+        if (!IsText(el) && IsSticky(GetComputedProps(el)))
             ApplyStickyOffset(el);
 
         // Index-based: ApplyStickyOffset only mutates el's own style, not the
@@ -155,7 +155,7 @@ public sealed partial class DomBridge
     {
         for (var current = GetScrollTraversalParent(el); current != null; current = GetScrollTraversalParent(current))
         {
-            if (current.IsTextNode)
+            if (IsText(current))
                 continue;
             var display = GetComputedProps(current).GetValueOrDefault("display") ?? "block";
             bool inlineLevel = display is "inline" or "inline-block" or "inline-table"

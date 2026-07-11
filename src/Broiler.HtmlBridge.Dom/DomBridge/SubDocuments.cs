@@ -368,12 +368,12 @@ public sealed partial class DomBridge
         if (docRoot == null)
             return null;
 
-        return docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+        return docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
     }
 
     private static DomElement? FindBodyElement(DomElement documentElement) =>
         documentElement.Children.FirstOrDefault(c =>
-            !c.IsTextNode &&
+            !IsText(c) &&
             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
 
     private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
@@ -921,7 +921,7 @@ public sealed partial class DomBridge
         for (var index = 0; index < node.Children.Count;)
         {
             var child = node.Children[index];
-            if (!child.IsTextNode)
+            if (!IsText(child))
             {
                 NormalizeNode(child);
                 index++;
@@ -930,7 +930,7 @@ public sealed partial class DomBridge
 
             var mergedText = child.TextContent ?? string.Empty;
             var nextIndex = index + 1;
-            while (nextIndex < node.Children.Count && node.Children[nextIndex].IsTextNode)
+            while (nextIndex < node.Children.Count && IsText(node.Children[nextIndex]))
             {
                 mergedText += node.Children[nextIndex].TextContent ?? string.Empty;
                 RemoveChildAt(node, nextIndex);
@@ -965,7 +965,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(first, second))
             return true;
 
-        if (first.IsTextNode != second.IsTextNode ||
+        if (IsText(first) != IsText(second) ||
             !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
             !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
             !string.Equals(first.TextContent ?? string.Empty, second.TextContent ?? string.Empty, StringComparison.Ordinal))
@@ -1157,7 +1157,7 @@ public sealed partial class DomBridge
         element.InnerHtml = html;
         element.TextContent = null;
 
-        if (element.IsTextNode)
+        if (IsText(element))
         {
             element.TextContent = html;
             return;
@@ -1250,7 +1250,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+            if (!IsText(child) && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
                 return child;
 
             var match = FindFirstElementByTag(child, tag);
@@ -1415,7 +1415,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static string GetTextContentRecursive(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return element.TextContent ?? string.Empty;
 
         var sb = new StringBuilder();

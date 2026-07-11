@@ -115,7 +115,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetTextContent021Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             bridge.SetCharacterData(element, text);
             return JSUndefined.Value;
@@ -282,7 +282,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetNodeType038Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return new JSNumber(3); // TEXT_NODE
         if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(8); // COMMENT_NODE
@@ -298,7 +298,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetNodeName039Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return new JSString("#text");
         if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return new JSString("#comment");
@@ -320,7 +320,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetLocalName040Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return JSNull.Value;
         if (element.TagName.StartsWith("#"))
             return JSNull.Value; // #comment, #document, etc.
@@ -346,7 +346,7 @@ public sealed partial class DomBridge
         if (element.NamespaceURI != null)
             return new JSString(element.NamespaceURI);
         // Default namespace for HTML elements
-        if (!element.IsTextNode && !element.TagName.StartsWith("#"))
+        if (!IsText(element) && !element.TagName.StartsWith("#"))
             return new JSString("http://www.w3.org/1999/xhtml");
         return JSNull.Value;
     }
@@ -354,7 +354,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetNodeValue043Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return element.TextContent != null ? new JSString(element.TextContent) : JSNull.Value;
         return JSNull.Value;
     }
@@ -362,7 +362,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetNodeValue044Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
@@ -370,7 +370,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetData045Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
         return JSUndefined.Value;
     }
@@ -378,7 +378,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsSetData046Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
@@ -386,7 +386,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetLength047Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return new JSNumber((element.TextContent ?? string.Empty).Length);
         return new JSNumber(element.Children.Count);
     }
@@ -506,7 +506,7 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
-        if (ParentEl(element).IsTextNode)
+        if (IsText(ParentEl(element)))
             return JSNull.Value;
         return ToJSObject(ParentEl(element));
     }
@@ -803,7 +803,7 @@ public sealed partial class DomBridge
         var result = new List<JSValue>();
         foreach (var child in element.Children)
         {
-            if (!child.IsTextNode && !IsSubDocRoot(child))
+            if (!IsText(child) && !IsSubDocRoot(child))
                 result.Add(ToJSObject(child));
         }
 
@@ -813,14 +813,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetFirstElementChild083Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var first = element.Children.FirstOrDefault(c => !c.IsTextNode && !IsSubDocRoot(c));
+        var first = element.Children.FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
     private JSValue JsJsObjectsGetLastElementChild084Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var last = element.Children.LastOrDefault(c => !c.IsTextNode && !IsSubDocRoot(c));
+        var last = element.Children.LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
@@ -833,7 +833,7 @@ public sealed partial class DomBridge
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
-            if (!siblings[i].IsTextNode && !IsSubDocRoot(siblings[i]))
+            if (!IsText(siblings[i]) && !IsSubDocRoot(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 
@@ -849,7 +849,7 @@ public sealed partial class DomBridge
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
-            if (!siblings[i].IsTextNode && !IsSubDocRoot(siblings[i]))
+            if (!IsText(siblings[i]) && !IsSubDocRoot(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 

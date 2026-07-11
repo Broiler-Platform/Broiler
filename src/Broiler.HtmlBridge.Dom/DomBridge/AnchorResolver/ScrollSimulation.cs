@@ -20,7 +20,7 @@ public sealed partial class DomBridge
     }
     private void ApplyScrollSimulationTree(DomElement el)
     {
-        if (!el.IsTextNode)
+        if (!IsText(el))
         {
             double scrollTop = 0;
             double scrollLeft = 0;
@@ -103,7 +103,7 @@ public sealed partial class DomBridge
                         double childOffset = 0;
                         foreach (var child in SnapshotChildren(wrapper))
                         {
-                            if (child.IsTextNode) continue;
+                            if (IsText(child)) continue;
                             var cp = GetComputedProps(child);
                             var childPos = cp.GetValueOrDefault("position");
                             if (childPos == "absolute" || childPos == "fixed")
@@ -141,7 +141,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in SnapshotChildren(parent))
         {
-            if (child.IsTextNode) continue;
+            if (IsText(child)) continue;
             var cp = GetComputedProps(child);
             var pos = cp.GetValueOrDefault("position");
             if (pos == "fixed")

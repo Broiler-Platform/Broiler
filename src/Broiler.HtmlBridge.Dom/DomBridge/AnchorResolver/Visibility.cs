@@ -21,7 +21,7 @@ public sealed partial class DomBridge
         DomElement el,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
-        if (!el.IsTextNode)
+        if (!IsText(el))
         {
             var props = GetComputedProps(el);
             string? posVis = props.GetValueOrDefault("position-visibility");
@@ -103,7 +103,7 @@ public sealed partial class DomBridge
     {
         foreach (var el in Elements)
         {
-            if (el.IsTextNode) continue;
+            if (IsText(el)) continue;
             // Check inline styles first.
             if (InlineStyle(el).TryGetValue("anchor-name", out var n) &&
                 string.Equals(n.Trim(), anchorName, StringComparison.Ordinal))
@@ -113,7 +113,7 @@ public sealed partial class DomBridge
         // Fall back to the shared cascade.
         foreach (var el in Elements)
         {
-            if (el.IsTextNode) continue;
+            if (IsText(el)) continue;
             var declarations = CollectMatchedRuleProperties(el);
             if (declarations.TryGetValue("anchor-name", out var name) &&
                 string.Equals(name.Trim(), anchorName, StringComparison.Ordinal))

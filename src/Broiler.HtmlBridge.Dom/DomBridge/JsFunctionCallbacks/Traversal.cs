@@ -491,7 +491,7 @@ public sealed partial class DomBridge
         state.StartOffset = 0;
         state.EndContainer = el;
         // For text/comment nodes, endOffset is the character length
-        if (el.IsTextNode || string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(el) || string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             state.EndOffset = (el.TextContent ?? string.Empty).Length;
         else
             state.EndOffset = el.Children.Count;
@@ -522,7 +522,7 @@ public sealed partial class DomBridge
         var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
         bridge._knownNodes.Add(fragment);
         // Handle same-container text node case
-        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (state.StartContainer.IsTextNode || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
+        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
         {
             var text = state.StartContainer.TextContent ?? string.Empty;
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));
@@ -597,7 +597,7 @@ public sealed partial class DomBridge
             if (ReferenceEquals(startAncestorChild, state.StartContainer))
             {
                 // Start container IS the direct child of ancestor
-                if (state.StartContainer.IsTextNode)
+                if (IsText(state.StartContainer))
                 {
                     // Text node: split at startOffset
                     var text = state.StartContainer.TextContent ?? string.Empty;
@@ -656,7 +656,7 @@ public sealed partial class DomBridge
         {
             if (ReferenceEquals(endAncestorChild, state.EndContainer))
             {
-                if (state.EndContainer.IsTextNode)
+                if (IsText(state.EndContainer))
                 {
                     var text = state.EndContainer.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(0, state.EndOffset);
@@ -731,7 +731,7 @@ public sealed partial class DomBridge
         // Remove from old parent if needed
         ParentEl(el)?.Children.Remove(el);
         // If start container is a text node, split it
-        if (state.StartContainer.IsTextNode)
+        if (IsText(state.StartContainer))
         {
             var parent = ParentEl(state.StartContainer);
             if (parent == null)
@@ -795,8 +795,8 @@ public sealed partial class DomBridge
         if (!ReferenceEquals(state.StartContainer, state.EndContainer))
         {
             // Check if start container is partially selected (text/comment node with offset in middle)
-            bool startPartial = (state.StartContainer.IsTextNode || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.StartOffset > 0;
-            bool endPartial = (state.EndContainer.IsTextNode || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.EndOffset < (state.EndContainer.TextContent ?? "").Length;
+            bool startPartial = (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.StartOffset > 0;
+            bool endPartial = (IsText(state.EndContainer) || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.EndOffset < (state.EndContainer.TextContent ?? "").Length;
             // Per spec: if any non-Text node is partially contained, throw HIERARCHY_REQUEST_ERR
             var ancestor = FindCommonAncestor(state.StartContainer, state.EndContainer);
             if (ancestor != null)
@@ -805,7 +805,7 @@ public sealed partial class DomBridge
                 var node = state.StartContainer;
                 while (node != null && !ReferenceEquals(node, ancestor))
                 {
-                    if (!node.IsTextNode && !string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    if (!IsText(node) && !string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
                     {
                         // Non-text node between start/end — check if partially selected
                         if (!ReferenceEquals(node, state.StartContainer) || !ReferenceEquals(node, state.EndContainer))
@@ -822,7 +822,7 @@ public sealed partial class DomBridge
 
             // If both are comment/text nodes but different, the range spans partially across non-text nodes
             // In Acid3 test 11, both are comment nodes partially selected — per spec this raises an exception
-            if ((state.StartContainer.IsTextNode || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && (state.EndContainer.IsTextNode || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && startPartial && endPartial)
+            if ((IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && (IsText(state.EndContainer) || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && startPartial && endPartial)
             {
                 // BAD_BOUNDARYPOINTS_ERR / INVALID_STATE_ERR
                 ThrowDOMException(bridge._jsContext!, "Invalid state", "InvalidStateError");
@@ -836,8 +836,8 @@ public sealed partial class DomBridge
         {
             // Count existing element children (minus any that will be moved into newParent)
             var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
-            var elemCount = state.StartContainer.Children.Count(c => !c.IsTextNode && !string.Equals(c.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
-            var removedElems = nodes.Count(n => !n.IsTextNode && !string.Equals(n.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
+            var elemCount = state.StartContainer.Children.Count(c => !IsText(c) && !string.Equals(c.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
+            var removedElems = nodes.Count(n => !IsText(n) && !string.Equals(n.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
             // After removal + adding newParent, there would be (elemCount - removedElems + 1) element children
             if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !string.Equals(newParent.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
             {
@@ -906,7 +906,7 @@ public sealed partial class DomBridge
     {
         var sb = new StringBuilder();
         // Handle case where range is within a single text/comment node
-        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (state.StartContainer.IsTextNode || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
+        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
         {
             var text = state.StartContainer.TextContent ?? string.Empty;
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));

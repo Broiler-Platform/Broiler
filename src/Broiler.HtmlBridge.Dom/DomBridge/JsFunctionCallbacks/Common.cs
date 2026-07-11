@@ -28,7 +28,7 @@ public sealed partial class DomBridge
 
     private JSValue GetNodeTextValue(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
 
         if (element.TextContent != null && element.Children.Count == 0)
@@ -99,7 +99,7 @@ public sealed partial class DomBridge
 
     private static DomElement GetDocumentElement(DomElement docRoot)
     {
-        return docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"))
+        return docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
             ?? docRoot;
     }
 

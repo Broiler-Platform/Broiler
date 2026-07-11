@@ -16,7 +16,7 @@ public sealed partial class DomBridge
 
         var documentElement = IsDocumentElement(docRoot)
             ? docRoot
-            : docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+            : docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
         if (documentElement == null)
             return Array.Empty<DomElement>();
 
@@ -38,7 +38,7 @@ public sealed partial class DomBridge
         for (var i = element.Children.Count - 1; i >= 0; i--)
         {
             var child = element.Children[i];
-            if (!child.IsTextNode && !child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (!IsText(child) && !child.TagName.StartsWith("#", StringComparison.Ordinal))
                 CollectHitTestMatches(child, x, y, hits);
         }
 
@@ -222,14 +222,14 @@ public sealed partial class DomBridge
             return false;
 
         var cells = row.Children
-            .Where(child => !child.IsTextNode && IsTableCellElement(child))
+            .Where(child => !IsText(child) && IsTableCellElement(child))
             .ToList();
         var cellIndex = cells.FindIndex(candidate => ReferenceEquals(candidate, element));
         if (cellIndex < 0)
             return false;
 
         var columnCount = rows
-            .Select(candidate => candidate.Children.Count(child => !child.IsTextNode && IsTableCellElement(child)))
+            .Select(candidate => candidate.Children.Count(child => !IsText(child) && IsTableCellElement(child)))
             .DefaultIfEmpty(0)
             .Max();
         if (columnCount <= 0 || rows.Count <= 0)
@@ -337,7 +337,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
             yield return child;
@@ -508,7 +508,7 @@ public sealed partial class DomBridge
     {
         for (var current = element; current != null; current = ParentEl(current))
         {
-            if (current.IsTextNode)
+            if (IsText(current))
                 return false;
 
             if (current.TagName.StartsWith("#", StringComparison.Ordinal))

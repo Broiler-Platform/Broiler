@@ -100,7 +100,7 @@ public sealed partial class DomBridge
 
     private void ReflectRenderState(DomElement element)
     {
-        if (!element.IsTextNode && !element.TagName.StartsWith('#'))
+        if (!IsText(element) && !element.TagName.StartsWith('#'))
         {
             if (InlineStyle(element).Count == 0)
             {
@@ -216,7 +216,7 @@ public sealed partial class DomBridge
         List<string> rules,
         ref int pseudoIndex)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
         var props = GetComputedProps(element);
@@ -285,7 +285,7 @@ public sealed partial class DomBridge
 
     private void ApplyProgressLikeSerializationPlaceholders(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
         foreach (var child in element.Children.ToList())
@@ -393,7 +393,7 @@ public sealed partial class DomBridge
 
     private void ApplyZoomSerializationStyles(DomElement element, double parentZoom)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
         var props = GetComputedProps(element);

@@ -14,7 +14,7 @@ public sealed partial class DomBridge
         DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
-        if (!element.IsTextNode)
+        if (!IsText(element))
         {
             var cssProps = GetComputedProps(element);
 

@@ -523,7 +523,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(startContainer, endContainer))
         {
             // Same container
-            if (startContainer.IsTextNode)
+            if (IsText(startContainer))
             {
                 var text = startContainer.TextContent ?? string.Empty;
                 var s = Math.Max(0, Math.Min(startOffset, text.Length));
@@ -540,7 +540,7 @@ public sealed partial class DomBridge
         }
 
         // Start container: collect from startOffset to end
-        if (startContainer.IsTextNode)
+        if (IsText(startContainer))
         {
             var text = startContainer.TextContent ?? string.Empty;
             if (startOffset < text.Length)
@@ -568,7 +568,7 @@ public sealed partial class DomBridge
                     if (IsDescendant(startContainer, node) || IsDescendant(endContainer, node))
                         continue;
                     // Only collect from top-level nodes
-                    if (node.IsTextNode)
+                    if (IsText(node))
                         sb.Append(node.TextContent ?? string.Empty);
                     else if (node.Children.Count == 0)
                         continue; // element with no text children
@@ -578,7 +578,7 @@ public sealed partial class DomBridge
         }
 
         // End container: collect from 0 to endOffset
-        if (endContainer.IsTextNode)
+        if (IsText(endContainer))
         {
             // Don't include end container text for Range.toString()
             // (end boundary is exclusive for text)
@@ -722,7 +722,7 @@ public sealed partial class DomBridge
         DomElement node,
         List<(double Left, double Top, double Width, double Height)> rects)
     {
-        if (node.IsTextNode || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(node) || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return;
 
         var display = GetComputedProps(node).GetValueOrDefault("display");
@@ -806,7 +806,7 @@ public sealed partial class DomBridge
             if (i == 0)
             {
                 // This is the startContainer level
-                if (original.IsTextNode)
+                if (IsText(original))
                 {
                     var text = original.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(startOffset);
@@ -889,7 +889,7 @@ public sealed partial class DomBridge
             if (i == 0)
             {
                 // This is the endContainer level
-                if (original.IsTextNode)
+                if (IsText(original))
                 {
                     var text = original.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(0, endOffset);

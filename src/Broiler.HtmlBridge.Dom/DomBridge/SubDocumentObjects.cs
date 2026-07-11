@@ -298,7 +298,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (!child.IsTextNode && !child.TagName.StartsWith("#") && predicate(child))
+            if (!IsText(child) && !child.TagName.StartsWith("#") && predicate(child))
                 return child;
             var found = FindInSubTree(child, predicate);
             if (found != null) return found;

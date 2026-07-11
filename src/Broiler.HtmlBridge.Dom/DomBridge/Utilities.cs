@@ -111,7 +111,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in parent.Children)
         {
-            if (!child.IsTextNode && MatchesSelector(child, selector, scope))
+            if (!IsText(child) && MatchesSelector(child, selector, scope))
             {
                 results.Add(bridge.ToJSObject(child));
                 if (!all) return;
@@ -126,7 +126,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectTextContent(DomElement node, StringBuilder sb)
     {
-        if (node.IsTextNode)
+        if (IsText(node))
         {
             sb.Append(node.TextContent ?? string.Empty);
             return;
@@ -397,7 +397,7 @@ public sealed partial class DomBridge
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
         var attrs = AttributeSnapshot(source);
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, source.IsTextNode);
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, IsText(source));
         // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
         // source's live style dict (which may hold JS mutations not yet synced to the
         // `style=` attribute), replacing the clone's lazily-seeded attribute values.
@@ -564,7 +564,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in scope.Children)
         {
-            if (!child.IsTextNode && !ReferenceEquals(child, except))
+            if (!IsText(child) && !ReferenceEquals(child, except))
             {
                 if (string.Equals(child.TagName, "input", StringComparison.OrdinalIgnoreCase) &&
                     TryGetAttribute(child, "type", out var st) &&
@@ -661,7 +661,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static int GetNodeType(DomElement element)
     {
-        if (element.IsTextNode) return 3; // TEXT_NODE
+        if (IsText(element)) return 3; // TEXT_NODE
         if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return 8;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;

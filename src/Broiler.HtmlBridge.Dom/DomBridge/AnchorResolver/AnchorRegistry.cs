@@ -26,7 +26,7 @@ public sealed partial class DomBridge
         var candidates = new Dictionary<string, List<AnchorInfo>>(StringComparer.Ordinal);
         foreach (var el in Elements)
         {
-            if (el.IsTextNode)
+            if (IsText(el))
                 continue;
 
             var declarations = CollectMatchedRuleProperties(el);
@@ -401,7 +401,7 @@ public sealed partial class DomBridge
         foreach (var sibling in SnapshotChildren(ParentEl(element)))
         {
             if (sibling == element) break;
-            if (sibling.IsTextNode) continue;
+            if (IsText(sibling)) continue;
 
             var sibProps = GetComputedProps(sibling);
             string? sibPos = sibProps.GetValueOrDefault("position");

@@ -45,7 +45,7 @@ public sealed partial class DomBridge
             if (string.IsNullOrEmpty(css))
             {
                 css = string.Concat(root.Children
-                    .Where(c => c.IsTextNode)
+                    .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
@@ -187,7 +187,7 @@ public sealed partial class DomBridge
             if (string.IsNullOrEmpty(css))
             {
                 css = string.Concat(node.Children
-                    .Where(c => c.IsTextNode)
+                    .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
 
