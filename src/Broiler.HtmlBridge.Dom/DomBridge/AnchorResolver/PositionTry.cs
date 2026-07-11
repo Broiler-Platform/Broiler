@@ -34,12 +34,12 @@ public sealed partial class DomBridge
         {
             foreach (var child in SnapshotChildren(el))
             {
-                if (IsText(child) && !string.IsNullOrEmpty(child.TextContent))
+                if (IsText(child) && !string.IsNullOrEmpty(BridgeText(child)))
                 {
                     // Strip CSS comments first: a comment inside a @position-try
                     // body (common in WPT, e.g. "/* 2: position right */") contains
                     // ':' and ';' that would otherwise corrupt declaration parsing.
-                    var styleText = CssCommentPattern.Replace(child.TextContent, " ");
+                    var styleText = CssCommentPattern.Replace(BridgeText(child), " ");
                     foreach (Match m in PositionTryParsePattern.Matches(styleText))
                     {
                         var name = m.Groups["name"].Value;
@@ -81,8 +81,7 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
-        if (!IsText(element) &&
-            !string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (!IsText(element) && !IsComment(element))
         {
             // Collect all CSS + inline properties to find position-try-fallbacks.
             var cssProps = CollectMatchedRuleProperties(element);

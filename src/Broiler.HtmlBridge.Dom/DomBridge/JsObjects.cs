@@ -297,7 +297,7 @@ public sealed partial class DomBridge
         }
 
         // substringData(offset, count) — for text/comment CharacterData nodes
-        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || IsComment(element))
         {
             obj.FastAddValue(
                 (KeyString)"substringData",

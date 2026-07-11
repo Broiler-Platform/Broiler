@@ -623,7 +623,7 @@ public sealed partial class DomBridge
         bodyEl.AppendChild(preEl);
 
         var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        textNode.TextContent = textContent;
+        SetBridgeText(textNode, textContent);
         SetParent(textNode, preEl);
         preEl.AppendChild(textNode);
 
@@ -928,11 +928,11 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            var mergedText = child.TextContent ?? string.Empty;
+            var mergedText = BridgeText(child);
             var nextIndex = index + 1;
             while (nextIndex < node.ChildNodes.Count && IsText(ChildAt(node, nextIndex)))
             {
-                mergedText += ChildAt(node, nextIndex).TextContent ?? string.Empty;
+                mergedText += BridgeText(ChildAt(node, nextIndex));
                 RemoveChildAt(node, nextIndex);
             }
 
@@ -968,7 +968,7 @@ public sealed partial class DomBridge
         if (IsText(first) != IsText(second) ||
             !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
             !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
-            !string.Equals(first.TextContent ?? string.Empty, second.TextContent ?? string.Empty, StringComparison.Ordinal))
+            !string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal))
         {
             return false;
         }
@@ -1345,7 +1345,7 @@ public sealed partial class DomBridge
             else if (child is System.Xml.Linq.XText childText)
             {
                 var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-                textNode.TextContent = childText.Value;
+                SetBridgeText(textNode, childText.Value);
                 SetParent(textNode, el);
                 el.AppendChild(textNode);
                 _knownNodes.Add(textNode);

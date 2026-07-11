@@ -211,7 +211,7 @@ public sealed partial class DomBridge
             if (IsText(child))
             {
                 // Estimate text width from font-size (Ahem font: 1ch = font-size).
-                int charCount = (child.TextContent ?? "").Length;
+                int charCount = BridgeText(child).Length;
                 totalWidth += charCount * fontSize;
             }
             else
@@ -499,7 +499,7 @@ public sealed partial class DomBridge
             if (IsText(sibling))
             {
                 // Count line breaks in text content.
-                var text = sibling.TextContent ?? "";
+                var text = BridgeText(sibling);
                 int lineBreaks = text.Count(c => c == '\n');
                 // Don't count text node line breaks as they're usually
                 // just whitespace in the HTML source.
@@ -571,7 +571,7 @@ public sealed partial class DomBridge
             if (IsText(sibling))
             {
                 // Decode HTML entities (e.g. &nbsp; → \u00A0) before counting.
-                var text = System.Net.WebUtility.HtmlDecode(sibling.TextContent ?? "");
+                var text = System.Net.WebUtility.HtmlDecode(BridgeText(sibling));
                 int charCount = 0;
                 foreach (char c in text)
                 {

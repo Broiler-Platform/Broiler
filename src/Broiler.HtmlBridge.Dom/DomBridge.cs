@@ -258,6 +258,33 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>Children</c>/text cutover.</summary>
     private static bool IsText(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Text;
 
+    /// <summary>Whether <paramref name="node"/> is a comment node (RF-BRIDGE-1c Phase F).
+    /// NodeType-based, so it holds for the current facade comment nodes and for canonical
+    /// <c>DomComment</c> once construction flips — the replacement for the many
+    /// <c>TagName == "#comment"</c> checks, since a canonical <c>DomComment</c> has no
+    /// <c>TagName</c>.</summary>
+    private static bool IsComment(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Comment;
+
+    /// <summary>Reads a text/comment node's character data (RF-BRIDGE-1c Phase F). Canonical
+    /// <c>DomText</c>/<c>DomComment</c> expose it as <c>Data</c>; the facade text/comment nodes
+    /// (pre-flip) expose it as <c>TextContent</c>. The single accessor both models funnel through
+    /// during the text cutover; returns <c>""</c> (never null) for character-data nodes.</summary>
+    private static string BridgeText(Broiler.Dom.DomNode node) => node switch
+    {
+        Broiler.Dom.DomCharacterData characterData => characterData.Data,
+        DomElement facade => facade.TextContent ?? string.Empty,
+        _ => node.NodeValue ?? string.Empty,
+    };
+
+    /// <summary>Writes a text/comment node's character data (see <see cref="BridgeText"/>).</summary>
+    private static void SetBridgeText(Broiler.Dom.DomNode node, string value)
+    {
+        if (node is Broiler.Dom.DomCharacterData characterData)
+            characterData.Data = value;
+        else if (node is DomElement facade)
+            facade.TextContent = value;
+    }
+
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
     /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become

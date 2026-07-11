@@ -128,7 +128,7 @@ public sealed partial class DomBridge
     {
         if (IsText(node))
         {
-            sb.Append(node.TextContent ?? string.Empty);
+            sb.Append(BridgeText(node));
             return;
         }
         foreach (var child in ChildElements(node))
@@ -675,7 +675,7 @@ public sealed partial class DomBridge
     private static int GetNodeType(DomElement element)
     {
         if (IsText(element)) return 3; // TEXT_NODE
-        if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return 8;
+        if (IsComment(element)) return 8;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE

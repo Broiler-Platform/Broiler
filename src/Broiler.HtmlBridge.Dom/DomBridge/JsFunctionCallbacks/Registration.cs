@@ -141,7 +141,7 @@ public sealed partial class DomBridge
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        el.TextContent = text;
+        SetBridgeText(el, text);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -626,7 +626,7 @@ public sealed partial class DomBridge
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#comment", null, null, string.Empty, isTextNode: false);
-        el.TextContent = data;
+        SetBridgeText(el, data);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -931,7 +931,7 @@ public sealed partial class DomBridge
             headEl.AppendChild(titleEl);
             _knownNodes.Add(titleEl);
             var titleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            titleText.TextContent = title;
+            SetBridgeText(titleText, title);
             SetParent(titleText, titleEl);
             GetElementRuntimeState(titleText).OwnerDocRoot = docRoot;
             titleEl.AppendChild(titleText);

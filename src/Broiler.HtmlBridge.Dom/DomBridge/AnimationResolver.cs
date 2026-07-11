@@ -46,7 +46,7 @@ public sealed partial class DomBridge
             {
                 css = string.Concat(ChildElements(root)
                     .Where(c => IsText(c))
-                    .Select(c => c.TextContent ?? string.Empty));
+                    .Select(c => BridgeText(c)));
             }
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
             foreach (var atRule in styleSheet.Rules.OfType<Broiler.CSS.CssAtRule>())
@@ -188,7 +188,7 @@ public sealed partial class DomBridge
             {
                 css = string.Concat(ChildElements(node)
                     .Where(c => IsText(c))
-                    .Select(c => c.TextContent ?? string.Empty));
+                    .Select(c => BridgeText(c)));
             }
 
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);

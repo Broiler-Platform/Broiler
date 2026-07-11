@@ -174,14 +174,15 @@ public sealed partial class DomBridge
     {
         for (int i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = ChildAt(element, i);
-            if (string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+            var child = element.ChildNodes[i];
+            if (IsComment(child))
             {
                 RemoveNthChild(element, i);
                 continue;
             }
 
-            RemoveRenderCommentNodes(child);
+            if (child is DomElement childElement)
+                RemoveRenderCommentNodes(childElement);
         }
     }
 
@@ -874,7 +875,7 @@ public sealed partial class DomBridge
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
             InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
-        GetText: static element => element.TextContent,
+        GetText: static element => BridgeText(element),
         GetRawInnerHtml: static element => GetElementRuntimeState(element).InnerHtml);
 
     private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)

@@ -19,7 +19,7 @@ public sealed partial class DomBridge
     }
     private void EnsureContainingBlockPositioningTree(DomElement el)
     {
-        if (!IsText(el) && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (!IsText(el) && !IsComment(el))
         {
             var props = CollectMatchedRuleProperties(el);
             foreach (var kv in InlineStyle(el))
