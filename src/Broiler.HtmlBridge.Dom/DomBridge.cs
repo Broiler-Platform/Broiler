@@ -307,24 +307,26 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>
     /// The single construction funnel for bridge element nodes (RF-BRIDGE-1c Phase F, F4). Every
-    /// <c>new DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
-    /// so the irreversible cutover to canonical <c>Broiler.Dom</c> factories touches exactly one
-    /// place. The tag name may be an HTML element literal (HTML namespace) or a <c>#</c>-sentinel
-    /// (<c>#document</c>, <c>#subdoc-root</c>, …), which the facade ctor gives a null namespace and a
-    /// preserved name. Phase F4 step (a) keeps the facade body (behaviour-preserving); step (b) flips
-    /// it to <c>_document.CreateElementNS</c> and deletes the facade.
+    /// former <c>new DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
+    /// so element construction lives in exactly one place over the canonical <c>Broiler.Dom</c>
+    /// document factories. The tag name may be an HTML element literal (HTML namespace) or a
+    /// <c>#</c>-sentinel (<c>#document</c>, <c>#subdoc-root</c>, …), which keeps a null namespace and
+    /// its preserved name — the bridge-internal document/fragment/shadow model over canonical types.
     /// </summary>
     private DomElement CreateBridgeElement(
         string tagName,
         string? id = null,
         string? className = null,
         Dictionary<string, string>? attributes = null) =>
-        new(_document, tagName, id, className, string.Empty, null, attributes);
+        // A leading '#' marks a bridge sentinel (document/fragment/shadow/doctype root): null
+        // namespace, name preserved verbatim. Every other tag is an HTML element. CreateElementNS
+        // preserves the given name's case exactly as the old facade ctor did (no ToLowerInvariant).
+        CreateBridgeElementNS(tagName.StartsWith('#') ? null : Broiler.Dom.DomNamespaces.Html, tagName, id, className, attributes);
 
     /// <summary>
-    /// Element construction with an explicit namespace used verbatim (may be <c>null</c>), matching
-    /// the old <c>el.NamespaceURI = ns</c> post-construction override on <c>createElementNS</c>
-    /// handlers, sub-document roots, and clones. See <see cref="CreateBridgeElement"/>.
+    /// Element construction with an explicit namespace used verbatim (may be <c>null</c>), for the
+    /// <c>createElementNS</c> handlers, sub-document roots, and clones (which preserve the source
+    /// element's namespace). See <see cref="CreateBridgeElement"/>.
     /// </summary>
     private DomElement CreateBridgeElementNS(
         string? namespaceUri,
@@ -333,8 +335,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         string? className = null,
         Dictionary<string, string>? attributes = null)
     {
-        var element = new DomElement(_document, tagName, id, className, string.Empty, null, attributes);
-        element.NamespaceURI = namespaceUri;
+        var element = _document.CreateElementNS(namespaceUri, tagName);
+        if (attributes is not null)
+            foreach (var (name, value) in attributes)
+                element.SetAttribute(name, value);
+        if (id is not null)
+            element.Id = id;
+        if (className is not null)
+            element.ClassName = className;
         return element;
     }
 
@@ -915,9 +923,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         Layout.DocumentModeContext.CurrentQuirksMode =
             Layout.DocumentModeContext.IsQuirksHtml(html);
 
-        // Use WHATWG-aligned tokeniser & tree builder
-        var builder = new HtmlTreeBuilder();
-        var (docElement, allElements, title) = builder.Build(html, _document);
+        // Use WHATWG-aligned tokeniser & tree builder (shared HtmlDocumentParser).
+        var (docElement, allElements, title) = BuildDocumentTree(html);
         Title = title;
         ClearChildren(DocumentElement);
         // RF-BRIDGE-1c Phase F (F3c part 2d): reparent ALL children (raw ChildNodes) so any

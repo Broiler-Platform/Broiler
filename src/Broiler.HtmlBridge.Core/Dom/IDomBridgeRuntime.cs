@@ -14,7 +14,7 @@ public interface IDomBridgeRuntime
 
     Action? TaskCheckpointCallback { get; set; }
 
-    IReadOnlyList<DomElement> Elements { get; }
+    IReadOnlyList<Broiler.Dom.DomElement> Elements { get; }
 
     int CurrentScriptIndex { get; set; }
 

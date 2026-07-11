@@ -8151,7 +8151,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         ctx.Eval("document.getElementById('sc').scrollTop = 100;");
 
         // Verify scrollTop is stored
-        Broiler.HtmlBridge.DomElement? sc = null;
+        Broiler.Dom.DomElement? sc = null;
         FindDomElement(bridge.DocumentElement, "sc", ref sc);
         Assert.NotNull(sc);
         Assert.True(
@@ -8161,7 +8161,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // Resolve anchor positions (includes position-visibility)
         bridge.ResolveAnchorPositions();
 
-        Broiler.HtmlBridge.DomElement? targetEl = null;
+        Broiler.Dom.DomElement? targetEl = null;
         FindDomElement(bridge.DocumentElement, "target", ref targetEl);
         Assert.NotNull(targetEl);
 
@@ -8194,7 +8194,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // Must not throw (previously crashed with "Destination array was not long enough").
         bridge.ResolveAnchorPositions();
 
-        Broiler.HtmlBridge.DomElement? abs = null;
+        Broiler.Dom.DomElement? abs = null;
         FindDomElement(bridge.DocumentElement, "abs", ref abs);
         Assert.NotNull(abs);
 
@@ -8223,7 +8223,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             sc.scrollBy({ top: 15 });
             """);
 
-        Broiler.HtmlBridge.DomElement? sc = null;
+        Broiler.Dom.DomElement? sc = null;
         FindDomElement(bridge.DocumentElement, "sc", ref sc);
         Assert.NotNull(sc);
         Assert.True(
@@ -8741,7 +8741,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             verticalRtl.scrollTop = -999;
             """);
 
-        Broiler.HtmlBridge.DomElement? rtl = null;
+        Broiler.Dom.DomElement? rtl = null;
         FindDomElement(bridge.DocumentElement, "rtl", ref rtl);
         Assert.NotNull(rtl);
         Assert.True(
@@ -8749,7 +8749,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             bridge.TryGetStoredScrollOffset(rtl, vertical: true, out var rtlTop) && rtlTop == 300,
             $"Expected rtl scroller left=-150 top=300, got left={bridge.GetStoredScrollOffsetOrDefault(rtl, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(rtl, vertical: true)}");
 
-        Broiler.HtmlBridge.DomElement? verticalRtl = null;
+        Broiler.Dom.DomElement? verticalRtl = null;
         FindDomElement(bridge.DocumentElement, "verticalRtl", ref verticalRtl);
         Assert.NotNull(verticalRtl);
         Assert.True(
@@ -8785,7 +8785,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             implicit.scrollTop = 50;
             """);
 
-        Broiler.HtmlBridge.DomElement? hidden = null;
+        Broiler.Dom.DomElement? hidden = null;
         FindDomElement(bridge.DocumentElement, "hidden", ref hidden);
         Assert.NotNull(hidden);
         Assert.True(
@@ -8793,7 +8793,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             bridge.TryGetStoredScrollOffset(hidden, vertical: true, out var hiddenTop) && hiddenTop == 50,
             $"Expected overflow:hidden element to scroll to 40,50 but got left={bridge.GetStoredScrollOffsetOrDefault(hidden, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(hidden, vertical: true)}");
 
-        Broiler.HtmlBridge.DomElement? visible = null;
+        Broiler.Dom.DomElement? visible = null;
         FindDomElement(bridge.DocumentElement, "visible", ref visible);
         Assert.NotNull(visible);
         Assert.True(
@@ -8801,7 +8801,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             bridge.TryGetStoredScrollOffset(visible, vertical: true, out var visibleTop) && visibleTop == 0,
             $"Expected overflow:visible element to stay at 0,0 but got left={bridge.GetStoredScrollOffsetOrDefault(visible, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(visible, vertical: true)}");
 
-        Broiler.HtmlBridge.DomElement? implicitVisible = null;
+        Broiler.Dom.DomElement? implicitVisible = null;
         FindDomElement(bridge.DocumentElement, "implicit", ref implicitVisible);
         Assert.NotNull(implicitVisible);
         Assert.True(
@@ -9974,7 +9974,7 @@ iframe {
     private static (double left, double top, double width, double height)?
         GetResolvedPosition(Broiler.HtmlBridge.DomBridge bridge, string id)
     {
-        Broiler.HtmlBridge.DomElement? el = null;
+        Broiler.Dom.DomElement? el = null;
         FindDomElement(bridge.DocumentElement, id, ref el);
         if (el == null) return null;
 
@@ -10042,7 +10042,7 @@ iframe {
         bridge.ResolveAnchorPositions();
 
         // Verify the anchor position was computed correctly from right:-50px.
-        Broiler.HtmlBridge.DomElement? anchor = null;
+        Broiler.Dom.DomElement? anchor = null;
         FindDomElement(bridge.DocumentElement, "anchor", ref anchor);
         Assert.NotNull(anchor);
 
@@ -10058,7 +10058,7 @@ iframe {
         // Check that the anchored element got position-area resolution.
         // The test changes position-area via JS, but the first assignment
         // "span-all" should produce left:0, top:-50, width:450, height:450.
-        Broiler.HtmlBridge.DomElement? anchored = null;
+        Broiler.Dom.DomElement? anchored = null;
         FindDomElement(bridge.DocumentElement, "anchored", ref anchored);
 
         var anchoredStyleStr = anchored != null
@@ -10082,7 +10082,7 @@ iframe {
         var bridge = RunAnchorResolution("position-try-cascade.html");
 
         // The first element (abs_try) should have the fallback applied
-        Broiler.HtmlBridge.DomElement? absTry = null;
+        Broiler.Dom.DomElement? absTry = null;
         FindDomElement(bridge.DocumentElement, "abs_try", ref absTry);
         // The fallback should set left:50, top:50
         if (absTry != null)
@@ -10095,11 +10095,11 @@ iframe {
         }
     }
 
-    private static void FindDomElement(Broiler.HtmlBridge.DomElement el, string id, ref Broiler.HtmlBridge.DomElement? found)
+    private static void FindDomElement(Broiler.Dom.DomElement el, string id, ref Broiler.Dom.DomElement? found)
     {
         if (found != null) return;
         if (el.Id == id) { found = el; return; }
-        foreach (var c in el.ChildNodes.OfType<Broiler.HtmlBridge.DomElement>())
+        foreach (var c in el.ChildNodes.OfType<Broiler.Dom.DomElement>())
             FindDomElement(c, id, ref found);
     }
 

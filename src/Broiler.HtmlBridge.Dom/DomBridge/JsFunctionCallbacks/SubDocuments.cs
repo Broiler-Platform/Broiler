@@ -5,7 +5,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsSubDocumentsScroll006Core(global::Broiler.HtmlBridge.DomElement containerElement, in Arguments a)
+    private JSValue JsSubDocumentsScroll006Core(global::Broiler.Dom.DomElement containerElement, in Arguments a)
     {
         var (left, top, behavior) = GetScrollArguments(a);
         SetSubWindowScrollOffsets(containerElement, left, top, behavior: behavior);
@@ -13,7 +13,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentsScrollTo007Core(global::Broiler.HtmlBridge.DomElement containerElement, in Arguments a)
+    private JSValue JsSubDocumentsScrollTo007Core(global::Broiler.Dom.DomElement containerElement, in Arguments a)
     {
         var (left, top, behavior) = GetScrollArguments(a);
         SetSubWindowScrollOffsets(containerElement, left, top, behavior: behavior);
@@ -21,7 +21,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentsScrollBy008Core(global::Broiler.HtmlBridge.DomElement containerElement, in Arguments a)
+    private JSValue JsSubDocumentsScrollBy008Core(global::Broiler.Dom.DomElement containerElement, in Arguments a)
     {
         var (left, top, behavior) = GetScrollArguments(a);
         SetSubWindowScrollOffsets(containerElement, left, top, relative: true, behavior: behavior);

@@ -868,8 +868,7 @@ public sealed partial class DomBridge
         var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var builder = new HtmlTreeBuilder();
-        var (parsedRoot, allElements, _) = builder.Build(html, _document);
+        var (parsedRoot, allElements, _) = BuildDocumentTree(html);
 
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Move it under #subdoc-root as the documentElement.
@@ -1244,8 +1243,7 @@ public sealed partial class DomBridge
         if (IsVoidHtmlElementTag(contextTag))
             return false;
 
-        var builder = new HtmlTreeBuilder();
-        var (fragment, _) = builder.BuildFragment(html, contextTag, _document);
+        var (fragment, _) = BuildFragmentTree(html, contextTag);
         container = fragment;
         return true;
     }

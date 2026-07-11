@@ -515,8 +515,7 @@ public sealed partial class DomBridge
             if (a.Length == 0)
                 return JSUndefined.Value;
             var fragment = a[0].ToString();
-            var builder = new HtmlTreeBuilder();
-            var (fragmentRoot, allEls) = builder.BuildFragment(fragment, "body", _document);
+            var (fragmentRoot, allEls) = BuildFragmentTree(fragment, "body");
             if (fragmentRoot.ChildNodes.Count > 0)
             {
                 // Find the <body> element in the main tree
@@ -640,7 +639,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRemoveChild047Core(global::Broiler.HtmlBridge.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationRemoveChild047Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -664,7 +663,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAppendChild048Core(global::Broiler.HtmlBridge.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationAppendChild048Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -695,7 +694,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationInsertBefore049Core(global::Broiler.HtmlBridge.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationInsertBefore049Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -944,7 +943,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAddEventListener060Core(global::Broiler.HtmlBridge.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationAddEventListener060Core(global::Broiler.Dom.DomElement? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -963,7 +962,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRemoveEventListener061Core(global::Broiler.HtmlBridge.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationRemoveEventListener061Core(global::Broiler.Dom.DomElement? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -986,7 +985,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationDispatchEvent062Core(global::Broiler.HtmlBridge.DomBridge? bridgeRef, global::Broiler.HtmlBridge.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationDispatchEvent062Core(global::Broiler.HtmlBridge.DomBridge? bridgeRef, global::Broiler.Dom.DomElement? docNode, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.True;
@@ -1449,7 +1448,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationGetCurrentTime152Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private static JSValue JsRegistrationGetCurrentTime152Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)
         {
@@ -1460,7 +1459,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationSetCurrentTime153Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private static JSValue JsRegistrationSetCurrentTime153Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0)
             GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(a[0].DoubleValue);

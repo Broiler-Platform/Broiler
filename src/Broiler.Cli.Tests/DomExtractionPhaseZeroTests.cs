@@ -5,76 +5,68 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Characterization tests for the Phase 0 surface and its final versioned
-/// adapter boundary. Historical checks freeze the extraction starting point;
-/// ownership checks ensure the adapter remains over the canonical DOM.
+/// Characterization tests for the extraction end state. The RF-BRIDGE-1c effort
+/// removed the <c>DomElement</c> compatibility facade and the <c>HtmlTreeBuilder</c>
+/// materializer at the <c>htmlbridge-public-surface/v2</c> boundary (Phase F4); these
+/// checks assert the facade types are gone and the bridge holds only canonical
+/// <c>Broiler.Dom</c> nodes.
 /// </summary>
 public sealed class DomExtractionPhaseZeroTests
 {
-    // RF-BRIDGE-1c relocated bridge runtime state off the facade into
-    // ElementRuntimeState (the node model must not own it): Phase A moved
-    // JsSetStyleProps + OwnerDocRoot; Phase B moved the inline Style dictionary
-    // (now reached via DomBridge.InlineStyle). Phase C2 removed NsAttrMap, whose
-    // (namespace, local name) → qualified-name bookkeeping is now derived from the
-    // canonical namespace-keyed attribute set. No mutable-collection property remains
-    // on the DomElement surface below.
-    private static readonly string[] LegacyMutableCollectionProperties = [];
-
-    // RF-BRIDGE-1c Phase E relocated the facade Parent getter/setter to
-    // DomBridge.ParentEl / SetParent over canonical ParentNode, so Parent is no
-    // longer a settable scalar on the DomElement surface below. Phase F relocated
-    // InnerHtml into ElementRuntimeState, and F3c part 2d flipped text/comment to
-    // canonical DomText/DomComment — so TextContent is gone from the facade too.
-    private static readonly string[] LegacySettableScalarProperties =
-    [
-        "ClassName",
-        "Id",
-        "NamespaceURI",
-    ];
-
     [Fact]
-    public void Legacy_DomElement_Compatibility_Surface_Is_Explicitly_Frozen()
+    public void Facade_DomElement_And_HtmlTreeBuilder_Types_Are_Removed_At_V2()
     {
-        var properties = typeof(DomElement)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        // RF-BRIDGE-1c Phase F4 (final cutover): the Core-owned compatibility facade
+        // Broiler.HtmlBridge.DomElement and the Dom-owned materializer
+        // Broiler.HtmlBridge.HtmlTreeBuilder no longer exist. The bridge builds its
+        // whole tree from canonical Broiler.Dom nodes via the shared HtmlDocumentParser.
+        var coreAssembly = typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly;
+        var domAssembly = typeof(DomBridge).Assembly;
 
-        var mutableCollections = properties
-            .Where(static property =>
-                property.PropertyType.IsGenericType &&
-                property.PropertyType.GetGenericTypeDefinition() is var definition &&
-                (definition == typeof(Dictionary<,>) ||
-                 definition == typeof(HashSet<>) ||
-                 definition == typeof(List<>)))
-            .Select(static property => property.Name)
-            .OrderBy(static name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        var settableScalars = properties
-            .Where(static property => property.SetMethod?.IsPublic == true)
-            .Select(static property => property.Name)
-            .OrderBy(static name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(LegacyMutableCollectionProperties, mutableCollections);
-        Assert.Equal(LegacySettableScalarProperties, settableScalars);
+        Assert.Null(coreAssembly.GetType("Broiler.HtmlBridge.DomElement"));
+        Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.DomElement"));
+        Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.HtmlTreeBuilder"));
     }
 
     [Fact]
-    public void Legacy_DomElement_Is_A_Canonical_Dom_Node()
+    public void DomBridge_Exposes_Canonical_Dom_Elements_Only()
     {
-        var element = new DomElement("div", "host", null, string.Empty);
+        // The public element seams surface canonical Broiler.Dom.DomElement — no facade
+        // subtype leaks through.
+        Assert.Equal(
+            typeof(Broiler.Dom.DomElement),
+            typeof(DomBridge).GetProperty(nameof(DomBridge.DocumentElement))!.PropertyType);
 
-        Assert.IsAssignableFrom<Broiler.Dom.DomNode>(element);
-        Assert.IsAssignableFrom<Broiler.Dom.DomElement>(element);
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<main id='host'><span id='child'></span></main>");
+
+        Assert.IsType<Broiler.Dom.DomElement>(bridge.DocumentElement);
+        Assert.All(bridge.Elements, element => Assert.IsType<Broiler.Dom.DomElement>(element));
     }
 
     [Fact]
-    public void Compatibility_Materializers_Are_Versioned_For_The_V1_Boundary()
+    public void DomBridge_Parses_Implicit_Structure_With_Consistent_Parent_Links()
     {
-        Assert.Equal("htmlbridge-dom-adapter/v1", DomElement.CompatibilitySurfaceVersion);
-        Assert.Equal("htmlbridge-public-surface/v2", DomElement.RemovalBoundaryVersion);
-        Assert.Equal("htmlbridge-dom-adapter/v1", HtmlTreeBuilder.CompatibilitySurfaceVersion);
-        Assert.Equal("htmlbridge-public-surface/v2", HtmlTreeBuilder.RemovalBoundaryVersion);
+        // Replaces the retired HtmlTreeBuilder characterization test: the bridge parses
+        // via the shared HtmlDocumentParser and exposes the same implicit html/head/body
+        // structure through its public canonical seams.
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<title>Phase Zero</title><main id='host'><span>one</span><span>two</span></main>");
+
+        var documentElement = bridge.DocumentElement;
+        Assert.Equal("html", documentElement.TagName);
+        Assert.Equal("Phase Zero", bridge.Title);
+
+        var body = Assert.Single(
+            documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(),
+            static child => child.TagName == "body");
+        Assert.Same(documentElement, body.ParentNode);
+
+        var host = Assert.Single(bridge.Elements, static element => element.Id == "host");
+        Assert.Equal(["span", "span"], host.ChildNodes.OfType<Broiler.Dom.DomElement>().Select(static child => child.TagName));
+        Assert.All(host.ChildNodes.OfType<Broiler.Dom.DomElement>(), child => Assert.Same(host, child.ParentNode));
     }
 
     [Fact]
@@ -89,28 +81,6 @@ public sealed class DomExtractionPhaseZeroTests
         Assert.Same(
             bridge.Elements.Single(element => element.Id == "child"),
             bridge.Document.GetElementById("child"));
-    }
-
-    [Fact]
-    public void HtmlTreeBuilder_Creates_Implicit_Structure_With_Consistent_Parent_Links()
-    {
-        var builder = new HtmlTreeBuilder();
-
-        var (documentElement, elements, title) = builder.Build(
-            "<title>Phase Zero</title><main id='host'><span>one</span><span>two</span></main>");
-
-        Assert.Equal("html", documentElement.TagName);
-        Assert.Equal("Phase Zero", title);
-
-        var head = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "head");
-        var body = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "body");
-        Assert.Same(documentElement, head.ParentNode);
-        Assert.Same(documentElement, body.ParentNode);
-
-        var host = Assert.Single(elements.OfType<Broiler.Dom.DomElement>(), static element => element.Id == "host");
-        Assert.Same(body, host.ParentNode);
-        Assert.Equal(["span", "span"], host.ChildNodes.OfType<Broiler.Dom.DomElement>().Select(static child => child.TagName));
-        Assert.All(host.ChildNodes, child => Assert.Same(host, child.ParentNode));
     }
 
     [Fact]

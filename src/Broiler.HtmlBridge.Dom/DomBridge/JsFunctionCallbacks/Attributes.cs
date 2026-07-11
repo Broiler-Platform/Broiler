@@ -7,7 +7,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsAttributesGetNamedItem002Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesGetNamedItem002Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesGetNamedItemNS003Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesGetNamedItemNS003Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length < 2)
             return JSNull.Value;
@@ -30,7 +30,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesSetNamedItem004Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesSetNamedItem004Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -49,7 +49,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesSetNamedItemNS005Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesSetNamedItemNS005Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
@@ -67,7 +67,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesRemoveNamedItem006Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesRemoveNamedItem006Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -80,7 +80,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesRemoveNamedItemNS007Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesRemoveNamedItemNS007Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length < 2)
             return JSNull.Value;
@@ -94,7 +94,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesItem008Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
+    private JSValue JsAttributesItem008Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -107,7 +107,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsAttributesCallback009Core(global::Broiler.HtmlBridge.DomElement element, global::System.Int32 idx, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments _)
+    private JSValue JsAttributesCallback009Core(global::Broiler.Dom.DomElement element, global::System.Int32 idx, global::Broiler.JavaScript.Runtime.JSObject ownerObj, in Arguments _)
     {
         var keys = AttributeNames(element).ToList();
         if (idx >= keys.Count)

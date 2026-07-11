@@ -12,7 +12,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsTraversalSetCurrentNode002Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, in Arguments a)
+    private JSValue JsTraversalSetCurrentNode002Core(ref global::Broiler.Dom.DomElement? currentNode, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSObject nodeObj)
         {
@@ -25,7 +25,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalParentNode003Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalParentNode003Core(ref global::Broiler.Dom.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         while (node != null && !ReferenceEquals(node, root))
@@ -45,7 +45,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalNextNode008Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalNextNode008Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         // Try children first
@@ -111,7 +111,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         while (true)
@@ -156,7 +156,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalNextNode012Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalNextNode012Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
     {
         if (detached)
             return JSNull.Value;
@@ -203,7 +203,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalPreviousNode013Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalPreviousNode013Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
     {
         if (detached)
             return JSNull.Value;
