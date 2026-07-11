@@ -1019,14 +1019,14 @@ public sealed partial class DomBridge
     /// Notifies all active ranges that a child was removed from <paramref name="parent"/>
     /// at the given <paramref name="index"/>.
     /// </summary>
-    private void NotifyChildAdded(DomElement parent, DomElement addedChild, int index)
+    private void NotifyChildAdded(DomElement parent, Broiler.Dom.DomNode addedChild, int index)
     {
         var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
         var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
         NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
     }
 
-    private void NotifyChildRemoved(DomElement parent, DomElement removedChild, int index, DomElement? previousSibling = null, DomElement? nextSibling = null)
+    private void NotifyChildRemoved(DomElement parent, Broiler.Dom.DomNode removedChild, int index, Broiler.Dom.DomNode? previousSibling = null, Broiler.Dom.DomNode? nextSibling = null)
     {
         for (var i = _activeRanges.Count - 1; i >= 0; i--)
         {
@@ -1043,10 +1043,10 @@ public sealed partial class DomBridge
 
     private void NotifyMutationObservers(
         DomElement target,
-        DomElement? addedChild,
-        DomElement? removedChild,
-        DomElement? previousSibling,
-        DomElement? nextSibling)
+        Broiler.Dom.DomNode? addedChild,
+        Broiler.Dom.DomNode? removedChild,
+        Broiler.Dom.DomNode? previousSibling,
+        Broiler.Dom.DomNode? nextSibling)
     {
         if (_mutationObservers.Count == 0)
             return;
@@ -1149,7 +1149,7 @@ public sealed partial class DomBridge
     /// Must be called BEFORE the node is actually removed from the tree
     /// so that tree traversal can find neighboring nodes.
     /// </summary>
-    private void NotifyNodeIteratorPreRemoval(DomElement nodeToBeRemoved)
+    private void NotifyNodeIteratorPreRemoval(Broiler.Dom.DomNode nodeToBeRemoved)
     {
         for (var i = _activeNodeIterators.Count - 1; i >= 0; i--)
         {

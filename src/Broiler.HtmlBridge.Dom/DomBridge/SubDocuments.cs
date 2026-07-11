@@ -1057,7 +1057,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void InsertNodeAt(DomElement parent, DomElement node, int index)
+    private void InsertNodeAt(DomElement parent, Broiler.Dom.DomNode node, int index)
     {
         if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
@@ -1088,11 +1088,16 @@ public sealed partial class DomBridge
         InvalidateStyleScope(parent);
         NotifyChildAdded(parent, node, index);
 
-        var insertedTag = node.TagName?.ToLowerInvariant();
-        if (insertedTag == "iframe" || insertedTag == "object")
-            FireSubDocumentOnload(node);
-        else
-            FireDescendantOnloads(node);
+        // RF-BRIDGE-1c Phase F (F3c part 2b): only elements carry a TagName / fire onloads; a
+        // canonical char-data node inserts with no sub-document side effects.
+        if (node is DomElement insertedElement)
+        {
+            var insertedTag = insertedElement.TagName?.ToLowerInvariant();
+            if (insertedTag == "iframe" || insertedTag == "object")
+                FireSubDocumentOnload(insertedElement);
+            else
+                FireDescendantOnloads(insertedElement);
+        }
     }
 
     private List<DomElement> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
@@ -1115,20 +1120,23 @@ public sealed partial class DomBridge
         return nodes;
     }
 
-    private List<DomElement> BuildChildNodeArgumentNodes(in Arguments arguments)
+    private List<Broiler.Dom.DomNode> BuildChildNodeArgumentNodes(in Arguments arguments)
     {
-        var nodes = new List<DomElement>();
+        // RF-BRIDGE-1c Phase F (F3c part 2b): returns canonical DomNode — an argument may be a
+        // text node (resolved via FindDomNodeByJSObject) and string arguments mint text nodes.
+        var nodes = new List<Broiler.Dom.DomNode>();
         for (var i = 0; i < arguments.Length; i++)
         {
             var value = arguments[i];
             if (value is JSObject candidateObject)
             {
-                var candidateNode = FindDomElementByJSObject(candidateObject);
+                var candidateNode = FindDomNodeByJSObject(candidateObject);
                 if (candidateNode != null)
                 {
-                    if (string.Equals(candidateNode.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+                    if (candidateNode is DomElement candidateElement &&
+                        string.Equals(candidateElement.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var fragmentChild in ChildElements(candidateNode).ToArray())
+                        foreach (var fragmentChild in candidateElement.ChildNodes.ToArray())
                             nodes.Add(fragmentChild);
                         continue;
                     }
@@ -1138,10 +1146,7 @@ public sealed partial class DomBridge
                 }
             }
 
-            var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
-            {
-                TextContent = value.ToString()
-            };
+            var textNode = CreateBridgeTextNode(value.ToString());
             _knownNodes.Add(textNode);
             nodes.Add(textNode);
         }

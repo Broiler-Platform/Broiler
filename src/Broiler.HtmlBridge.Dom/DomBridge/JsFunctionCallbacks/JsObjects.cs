@@ -1019,9 +1019,9 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemove093Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemove093Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
-        // Capture the parent up front: ParentEl(DomElement) is computed from the canonical
+        // Capture the parent up front: ParentEl(node) is computed from the canonical
         // ParentNode, and Children.RemoveAt detaches it — so reading ParentEl(element) after
         // the removal would return null (→ NRE in InvalidateStyleScope). Mirrors the
         // working removeChild path, which holds the parent reference independently.
@@ -1043,7 +1043,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsBefore094Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsBefore094Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
@@ -1057,7 +1057,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAfter095Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAfter095Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
@@ -1072,7 +1072,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsReplaceWith096Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsReplaceWith096Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null)
             return JSUndefined.Value;
@@ -1092,7 +1092,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAddEventListener097Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAddEventListener097Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -1111,7 +1111,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveEventListener098Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemoveEventListener098Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -1134,7 +1134,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsDispatchEvent099Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsDispatchEvent099Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.True;

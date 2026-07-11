@@ -867,9 +867,10 @@ public sealed partial class DomBridge
     /// <paramref name="obj"/> (the caller registers it in <c>_jsObjectCache</c> before calling, so
     /// re-entrant <c>ToJSObject</c> lookups resolve). The node-level <c>*Core</c> helpers are the
     /// same ones the element wrapper uses, now widened to <see cref="Broiler.Dom.DomNode"/>.
-    /// The ChildNode-mixin (remove/before/after/replaceWith) and EventTarget members are added with
-    /// the tree-mutation/RangeState widening (they entangle with the range surface); they are absent
-    /// here but this wrapper is dead code until the construction flip, which lands after that widening.
+    /// Includes the ChildNode mixin (remove/before/after/replaceWith) and EventTarget (added once the
+    /// tree-mutation helpers were widened in F3c part 2b). This wrapper is dead code until the F3c
+    /// construction flip; it does not yet expose <c>surroundContents</c>-style range members that only
+    /// apply to elements.
     /// </summary>
     private void PopulateCharacterDataJSObject(JSObject obj, Broiler.Dom.DomNode node)
     {
@@ -1059,6 +1060,43 @@ public sealed partial class DomBridge
         obj.FastAddValue(
             (KeyString)"normalize",
             new JSFunction((in Arguments a) => JsJsObjectsNormalize076Core(node, in a), "normalize", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // -- ChildNode mixin --
+        obj.FastAddValue(
+            (KeyString)"remove",
+            new JSFunction((in Arguments a) => JsJsObjectsRemove093Core(node, in a), "remove", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"before",
+            new JSFunction((in Arguments a) => JsJsObjectsBefore094Core(node, in a), "before", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"after",
+            new JSFunction((in Arguments a) => JsJsObjectsAfter095Core(node, in a), "after", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"replaceWith",
+            new JSFunction((in Arguments a) => JsJsObjectsReplaceWith096Core(node, in a), "replaceWith", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // -- EventTarget --
+        obj.FastAddValue(
+            (KeyString)"addEventListener",
+            new JSFunction((in Arguments a) => JsJsObjectsAddEventListener097Core(node, in a), "addEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"removeEventListener",
+            new JSFunction((in Arguments a) => JsJsObjectsRemoveEventListener098Core(node, in a), "removeEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue(
+            (KeyString)"dispatchEvent",
+            new JSFunction((in Arguments a) => JsJsObjectsDispatchEvent099Core(bridge, node, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants (exist on all Node objects).

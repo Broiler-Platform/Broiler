@@ -344,10 +344,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return state.Style;
     }
 
-    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomElement element) =>
+    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).EventListeners;
 
-    private static Dictionary<string, JSValue> GetInlineEventHandlers(DomElement element) =>
+    private static Dictionary<string, JSValue> GetInlineEventHandlers(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
 
     internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)

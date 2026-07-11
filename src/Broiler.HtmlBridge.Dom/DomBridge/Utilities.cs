@@ -386,13 +386,15 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(DomElement node, DomElement? ownerDocRoot)
+    private static void AdoptSubtreeIntoDocument(Broiler.Dom.DomNode node, DomElement? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
-        foreach (var child in ChildElements(node))
+        // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so char-data children are adopted
+        // too. Behaviour-preserving on today's homogeneous tree (every child is an element).
+        foreach (var child in node.ChildNodes)
         {
-            if (IsSubDocRoot(child))
+            if (child is DomElement childElement && IsSubDocRoot(childElement))
                 continue;
 
             AdoptSubtreeIntoDocument(child, ownerDocRoot);
