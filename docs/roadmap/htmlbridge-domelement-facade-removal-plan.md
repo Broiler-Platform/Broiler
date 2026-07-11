@@ -164,9 +164,26 @@ scrollIntoView-% parallel flake, which passes in isolation).
   `SetName` is `protected`, unreachable from `DomBridge`) — fold into **Phase F** with the
   construction flip.
 
-Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `IsTextNode`/`TextContent` +
-`Children` (Phase D/E2 combined), `NamespaceURI` (Phase F).
-Next: **Phase D+E2** (text-node canonicalization + `Children`) or **Phase C2** (`NsAttrMap`).
+- **Phase D (part 1 — `IsTextNode`)** — facade `IsTextNode` removed; 119 sites → `IsText(node)`
+  (`node.NodeType == DomNodeType.Text`). NodeType-based, so forward-compatible with canonical
+  `DomText`; the facade `NodeValue` now keys off `NodeType`. This is the discrimination step the
+  `Children`/text cutover builds on. (Sed over-captured `state.StartContainer/EndContainer` member
+  chains; corrected + hand-migrated the `ParentEl(...)`/`siblings[i]`/`Children[i]` receivers.)
+
+**Remaining D+E2 cluster (one coordinated cutover — the hardest piece):**
+`Children` (`LegacyChildList : IList<DomElement>`, ~350 sites), `TextContent`→
+`DomText`/`DomComment`.`Data` (90 sites), and flipping text/comment **construction** to
+`document.CreateTextNode`/`CreateComment`. These cannot be sub-sliced: a `DomText` cannot enter an
+`IList<DomElement>`, and text-data storage flips *with* construction. Plan: introduce
+`ChildElements`/`ChildIndexOf`/child-mutation helpers + `TextData`/`SetTextData` (route reads via
+`NodeValue`/`DomCharacterData.Data`), migrate the `Children` reads/mutations and the loop-body
+`TagName`/`#comment` checks (`IsComment(node)`), flip the ~20 text/comment construction sites, then
+delete `Children` + `TextContent` in one commit. Gate on the full WPT range/selection + serialization
+corpus (text boundaries silently corrupt `outerHTML`/selection).
+
+Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `TextContent` + `Children`
+(D+E2 cluster above), `NamespaceURI` (Phase F).
+Next: the **D+E2 `Children`/construction cutover** (largest remaining), or **Phase C2** (`NsAttrMap`).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
