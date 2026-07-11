@@ -23,7 +23,7 @@ are done. The facade removal is unblocked.
 
 ## Status at a glance (2026-07-11)
 
-Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a + F3b on branch
+Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a + F3b + F3c-part1 on branch
 `claude/htmlbridge-domelement-removal-ucyw5j`. Each row is its own commit, every one regression-free
 against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) environmental baseline —
 Phase C2 verified 0 baseline-passing tests regressed (before/after trx diff; the sole delta is the
@@ -63,8 +63,18 @@ pre-change tree too).
   `as DomElement`). Full `Broiler.Cli.Tests` regression-free. `RangeState` + the ~10 range helpers it
   feeds stay `DomElement`-typed — that widen cascades and lands with the flip in F3c.
 
+- **F3c part 1 — node-level `DomNode` widening (safe, green). DONE.** Widened
+  `ElementRuntimeStates`(CWT)/`GetElementRuntimeState`, `_mutationObservers` targets, `ChildIndexOf`,
+  `ParentEl`, `SetParent`, `GetTreeRoot`/`ToJSRootNode`, and the Node-navigation callbacks
+  (`childNodes`/`firstChild`/`lastChild`/`nextSibling`/`previousSibling`/`isConnected`, now walking raw
+  `ChildNodes`) + `nodeType`/`nodeName` to canonical `DomNode`. Full `Broiler.Cli.Tests` regression-free
+  (caught + fixed a `GetTreeRoot` over-walk that mis-rooted isConnected/getRootNode/compareDocumentPosition).
+
 **Phase F remaining (staged):**
-- **F3c — the flip (higher risk).** **The `ToJSObject` blocker:** today `ToJSObject` gives every node
+- **F3c part 2 — the atomic flip (big-bang; not cleanly green-steppable).** Widening `ChildAt` to return
+  `DomNode` opens the full tree-heterogeneity cascade (~68 range/tree-walker/normalize/serialization
+  sites that must handle non-element children) — coupled with the construction flip, so it lands
+  atomically. **The `ToJSObject` blocker:** today `ToJSObject` gives every node
   — text/comment included — the full element wrapper; a canonical `DomText`/`DomComment` (not a
   `DomElement`) needs its own minimal Node/CharacterData wrapper (replacing the `(DomElement)node` cast
   F3b left in place). Then: widen `RangeState.StartContainer`/`EndContainer`/`Root` + the ~10 range
