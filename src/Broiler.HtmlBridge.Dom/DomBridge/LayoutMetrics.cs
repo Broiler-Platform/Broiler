@@ -217,7 +217,7 @@ public sealed partial class DomBridge
 
     private DomElement? GetOffsetParentForDomElement(DomElement element)
     {
-        if (element.Parent == null ||
+        if (ParentEl(element) == null ||
             ReferenceEquals(element, DocumentElement) ||
             string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
@@ -231,7 +231,7 @@ public sealed partial class DomBridge
 
         var documentElement = GetOwningDocumentElement(element);
         var fallbackBody = FindBodyElement(documentElement);
-        for (var current = element.Parent; current != null; current = current.Parent)
+        for (var current = ParentEl(element); current != null; current = ParentEl(current))
         {
             if (string.Equals(current.TagName, "body", StringComparison.OrdinalIgnoreCase))
                 return current;
@@ -283,14 +283,14 @@ public sealed partial class DomBridge
             return FindNearestScrollParent(containingBlock, documentElement);
         }
 
-        return FindNearestScrollParent(element.Parent, documentElement);
+        return FindNearestScrollParent(ParentEl(element), documentElement);
     }
 
     private DomElement GetDocumentScrollingElement(DomElement documentElement) => documentElement;
 
     private DomElement FindNearestScrollParent(DomElement? start, DomElement documentElement)
     {
-        for (var current = start; current != null; current = current.Parent)
+        for (var current = start; current != null; current = ParentEl(current))
         {
             if (ReferenceEquals(current, documentElement))
                 return GetDocumentScrollingElement(documentElement);
@@ -307,7 +307,7 @@ public sealed partial class DomBridge
 
     private DomElement? FindFixedPositionContainingBlock(DomElement element, DomElement documentElement)
     {
-        for (var current = element.Parent; current != null; current = current.Parent)
+        for (var current = ParentEl(element); current != null; current = ParentEl(current))
         {
             if (ReferenceEquals(current, documentElement))
                 break;
@@ -342,7 +342,7 @@ public sealed partial class DomBridge
 
     private bool HasAssociatedLayoutBox(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return false;
 
         if (element.TagName.StartsWith("#", StringComparison.Ordinal))
@@ -541,7 +541,7 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
-        var parentZoom = element.Parent != null ? GetUsedZoomForElement(element.Parent) : 1.0;
+        var parentZoom = ParentEl(element) != null ? GetUsedZoomForElement(ParentEl(element)) : 1.0;
         return ResolveSpecifiedZoom(specifiedZoom, parentZoom);
     }
 
@@ -588,7 +588,7 @@ public sealed partial class DomBridge
             return transform;
         }
 
-        return element.Attributes.TryGetValue("transform", out var attributeTransform)
+        return TryGetAttribute(element, "transform", out var attributeTransform)
             ? attributeTransform
             : null;
     }
@@ -621,9 +621,9 @@ public sealed partial class DomBridge
         var maxRight = 0d;
         var maxBottom = 0d;
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
-            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
             var childRect = GetHitTestRectForElement(child);
@@ -709,9 +709,9 @@ public sealed partial class DomBridge
         if (!string.IsNullOrWhiteSpace(element.TextContent))
             sb.Append(element.TextContent);
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
-            if (child.IsTextNode && !string.IsNullOrWhiteSpace(child.TextContent))
+            if (IsText(child) && !string.IsNullOrWhiteSpace(child.TextContent))
                 sb.Append(child.TextContent);
         }
 
@@ -720,12 +720,12 @@ public sealed partial class DomBridge
 
     private double ResolveSvgTextCoordinate(DomElement element, string attributeName)
     {
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
             if (!IsSvgTextContentElement(current))
                 continue;
 
-            if (current.Attributes.TryGetValue(attributeName, out var rawValue))
+            if (TryGetAttribute(current, attributeName, out var rawValue))
             {
                 var percentageBasis = ResolveContainingBlockReferenceLength(
                     current,
@@ -760,14 +760,14 @@ public sealed partial class DomBridge
     }
 
     private static bool HasOwnSvgCoordinate(DomElement element, string attributeName) =>
-        element.Attributes.TryGetValue(attributeName, out var rawValue) &&
+        TryGetAttribute(element, attributeName, out var rawValue) &&
         !string.IsNullOrWhiteSpace(rawValue);
 
     private bool TryResolveSvgTextPathStart(DomElement element, out (double X, double Y) point)
     {
         point = default;
-        if (!element.Attributes.TryGetValue("href", out var href) &&
-            !element.Attributes.TryGetValue("xlink:href", out href))
+        if (!TryGetAttribute(element, "href", out var href) &&
+            !TryGetAttribute(element, "xlink:href", out href))
         {
             return false;
         }
@@ -781,7 +781,7 @@ public sealed partial class DomBridge
             ? FindInTree(documentElement, candidate => string.Equals(candidate.Id, href[1..], StringComparison.Ordinal))
             : null;
         if (referencedPath == null ||
-            !referencedPath.Attributes.TryGetValue("d", out var pathData) ||
+            !TryGetAttribute(referencedPath, "d", out var pathData) ||
             string.IsNullOrWhiteSpace(pathData))
         {
             return false;
@@ -813,7 +813,7 @@ public sealed partial class DomBridge
 
     private static DomElement? FindNearestSvgViewportAncestor(DomElement element)
     {
-        for (var current = element.Parent; current != null; current = current.Parent)
+        for (var current = ParentEl(element); current != null; current = ParentEl(current))
         {
             if (IsSvgViewportElement(current))
                 return current;
@@ -1415,7 +1415,7 @@ public sealed partial class DomBridge
     private static int CountSelectOptions(DomElement element)
     {
         int count = 0;
-        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        foreach (var child in ChildElements(element).Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1452,7 +1452,7 @@ public sealed partial class DomBridge
     private static List<DomElement> CollectSelectOptions(DomElement element)
     {
         var options = new List<DomElement>();
-        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        foreach (var child in ChildElements(element).Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1481,7 +1481,7 @@ public sealed partial class DomBridge
         for (var index = 0; index < options.Count; index++)
         {
             var option = options[index];
-            if (option.Attributes.ContainsKey("selected") ||
+            if (HasAttr(option, "selected") ||
                 (GetElementRuntimeState(option).FormControl.DefaultSelected.TryGet(out var defaultSelected) && defaultSelected is true))
             {
                 return index;
@@ -1517,7 +1517,7 @@ public sealed partial class DomBridge
         if (GetElementRuntimeState(option).FormControl.Value.TryGet(out var domValue) && domValue is string stringValue)
             return stringValue;
 
-        if (option.Attributes.TryGetValue("value", out var attrValue))
+        if (TryGetAttribute(option, "value", out var attrValue))
             return attrValue;
 
         return option.TextContent;
@@ -1529,7 +1529,7 @@ public sealed partial class DomBridge
         for (var index = 0; index < options.Count; index++)
         {
             var option = options[index];
-            var optionValue = option.Attributes.TryGetValue("value", out var attrValue)
+            var optionValue = TryGetAttribute(option, "value", out var attrValue)
                 ? attrValue
                 : option.TextContent;
             if (string.Equals(optionValue, value, StringComparison.Ordinal))
@@ -1561,18 +1561,18 @@ public sealed partial class DomBridge
             if (host == null)
                 yield break;
 
-            foreach (var child in host.Children)
+            foreach (var child in ChildElements(host))
             {
-                if (!child.IsTextNode && SlotAcceptsNode(element, child))
+                if (!IsText(child) && SlotAcceptsNode(element, child))
                     yield return child;
             }
 
             yield break;
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
-            if (!child.IsTextNode)
+            if (!IsText(child))
                 yield return child;
         }
     }
@@ -1621,11 +1621,11 @@ public sealed partial class DomBridge
 
     private static bool IsViewportBodyElement(DomElement element, DomElement documentElement) =>
         string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) &&
-        ReferenceEquals(element.Parent, documentElement);
+        ReferenceEquals(ParentEl(element), documentElement);
 
     private DomElement GetOwningDocumentElement(DomElement element)
     {
-        for (var current = element; current != null; current = current.Parent!)
+        for (var current = element; current != null; current = ParentEl(current)!)
         {
             if (string.Equals(current.TagName, "html", StringComparison.OrdinalIgnoreCase))
                 return current;
@@ -1650,10 +1650,10 @@ public sealed partial class DomBridge
 
     private static DomElement? GetOuterFrameElement(DomElement documentElement)
     {
-        var docRoot = documentElement.Parent;
+        var docRoot = ParentEl(documentElement);
         return docRoot != null &&
                string.Equals(docRoot.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)
-            ? docRoot.Parent
+            ? ParentEl(docRoot)
             : null;
     }
 
@@ -1744,7 +1744,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement? FindNearestFixedAncestorOrSelf(DomElement element)
     {
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
             if (IsFixedPositionElement(current))
                 return current;
@@ -1754,7 +1754,7 @@ public sealed partial class DomBridge
 
     private static bool IsDomDescendantOrSelf(DomElement node, DomElement potentialAncestor)
     {
-        for (var current = node; current != null; current = current.Parent)
+        for (var current = node; current != null; current = ParentEl(current))
         {
             if (ReferenceEquals(current, potentialAncestor))
                 return true;
@@ -1906,8 +1906,8 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
         var value = props.GetValueOrDefault(propertyName);
-        if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && element.Parent != null)
-            return ResolveScrollIntoViewInset(element.Parent, propertyName);
+        if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && ParentEl(element) != null)
+            return ResolveScrollIntoViewInset(ParentEl(element), propertyName);
 
         return (ParseCssLengthToPixelsWithViewport(value, element), element);
     }
@@ -2024,7 +2024,7 @@ public sealed partial class DomBridge
             double emBasis;
             if (forFontSize)
             {
-                var parent = referenceElement.Parent;
+                var parent = ParentEl(referenceElement);
                 emBasis = parent != null ? ResolveFontSizeForElement(parent) : 16;
             }
             else
@@ -2190,16 +2190,16 @@ public sealed partial class DomBridge
 
     private double ResolveContainingBlockReferenceLength(DomElement element, bool vertical)
     {
-        if (element.Parent == null ||
+        if (ParentEl(element) == null ||
             string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(element.Parent.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(element.Parent.TagName, "body", StringComparison.OrdinalIgnoreCase))
+            string.Equals(ParentEl(element).TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(ParentEl(element).TagName, "body", StringComparison.OrdinalIgnoreCase))
         {
             return GetViewportReferenceLength(element, vertical);
         }
 
-        var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
+        var parentRect = ComputeUnzoomedLayoutRect(ParentEl(element));
         var reference = vertical ? parentRect.Height : parentRect.Width;
         return reference > 0 ? reference : GetViewportReferenceLength(element, vertical);
     }
@@ -2219,7 +2219,7 @@ public sealed partial class DomBridge
                 if (frameLength > 0)
                     return frameLength;
 
-                if (frameElement.Attributes.TryGetValue(vertical ? "height" : "width", out var frameAttribute) &&
+                if (TryGetAttribute(frameElement, vertical ? "height" : "width", out var frameAttribute) &&
                     double.TryParse(frameAttribute, System.Globalization.NumberStyles.Float,
                         System.Globalization.CultureInfo.InvariantCulture, out frameLength) &&
                     frameLength > 0)
@@ -2240,7 +2240,7 @@ public sealed partial class DomBridge
 
     private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)
     {
-        var target = rootRelative ? GetRootElement(element) : (forLineHeight ? element.Parent ?? element : element);
+        var target = rootRelative ? GetRootElement(element) : (forLineHeight ? ParentEl(element) ?? element : element);
         return ResolveLineHeightForElement(target);
     }
 
@@ -2254,9 +2254,9 @@ public sealed partial class DomBridge
     {
         DomElement? htmlElement = null;
         var current = element;
-        while (current.Parent != null)
+        while (ParentEl(current) != null)
         {
-            current = current.Parent;
+            current = ParentEl(current);
             if (string.Equals(current.TagName, "html", StringComparison.OrdinalIgnoreCase))
                 htmlElement = current;
         }
@@ -2292,9 +2292,9 @@ public sealed partial class DomBridge
         if (fontSize > 0)
             return fontSize;
 
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
-            if (!current.Attributes.TryGetValue("font-size", out var attributeValue) ||
+            if (!TryGetAttribute(current, "font-size", out var attributeValue) ||
                 string.IsNullOrWhiteSpace(attributeValue))
             {
                 continue;

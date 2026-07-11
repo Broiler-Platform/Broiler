@@ -28,13 +28,13 @@ public sealed partial class DomBridge
 
     private JSValue GetNodeTextValue(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
 
-        if (element.TextContent != null && element.Children.Count == 0)
+        if (element.TextContent != null && element.ChildNodes.Count == 0)
             return new JSString(element.TextContent);
 
-        if (element.Children.Count > 0)
+        if (element.ChildNodes.Count > 0)
         {
             var sb = new StringBuilder();
             CollectTextContent(element, sb);
@@ -47,10 +47,10 @@ public sealed partial class DomBridge
 
     private bool IsCurrentIframeCrossOrigin(DomElement element)
     {
-        if (element.Attributes.ContainsKey("srcdoc"))
+        if (HasAttr(element, "srcdoc"))
             return false;
 
-        var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
+        var iframeSrcValue = TryGetAttribute(element, "src", out var srcVal) ? srcVal : string.Empty;
         return IsCrossOrigin(iframeSrcValue, _pageUrl);
     }
 
@@ -99,7 +99,7 @@ public sealed partial class DomBridge
 
     private static DomElement GetDocumentElement(DomElement docRoot)
     {
-        return docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"))
+        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
             ?? docRoot;
     }
 
@@ -112,11 +112,11 @@ public sealed partial class DomBridge
         if (IsDescendant(containerA, containerB))
         {
             var node = containerB;
-            while (node.Parent != null && !ReferenceEquals(node.Parent, containerA))
-                node = node.Parent;
-            if (node.Parent != null)
+            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerA))
+                node = ParentEl(node);
+            if (ParentEl(node) != null)
             {
-                var childIdx = containerA.Children.IndexOf(node);
+                var childIdx = ChildIndexOf(containerA, node);
                 return offsetA > childIdx;
             }
 
@@ -126,11 +126,11 @@ public sealed partial class DomBridge
         if (IsDescendant(containerB, containerA))
         {
             var node = containerA;
-            while (node.Parent != null && !ReferenceEquals(node.Parent, containerB))
-                node = node.Parent;
-            if (node.Parent != null)
+            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerB))
+                node = ParentEl(node);
+            if (ParentEl(node) != null)
             {
-                var childIdx = containerB.Children.IndexOf(node);
+                var childIdx = ChildIndexOf(containerB, node);
                 return childIdx >= offsetB;
             }
 

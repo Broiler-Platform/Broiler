@@ -36,7 +36,7 @@ public sealed partial class DomBridge
     /// <summary>Collects all style elements in the sub-tree.</summary>
     private static void CollectStyleElements(DomElement root, List<DomElement> results)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                 results.Add(child);
@@ -53,10 +53,10 @@ public sealed partial class DomBridge
     {
         if (!string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
             return false;
-        if (!element.Attributes.TryGetValue("rel", out var rel) ||
+        if (!TryGetAttribute(element, "rel", out var rel) ||
             !rel.Contains("stylesheet", StringComparison.OrdinalIgnoreCase))
             return false;
-        return element.Attributes.ContainsKey("href");
+        return HasAttr(element, "href");
     }
 
     /// <summary>

@@ -47,7 +47,8 @@ public sealed partial class DomBridge
     // directly. See docs/architecture/htmlbridge-engine-boundaries.md.
 
     /// <summary>
-    /// Clears any CSS-derived compatibility values left in <see cref="DomElement.Style"/>
+    /// Clears any CSS-derived compatibility values left in the element's inline style
+    /// (<see cref="ElementRuntimeState.Style"/>, reached via <c>InlineStyle</c>)
     /// after a selector-affecting mutation. Stylesheet declarations are resolved lazily
     /// by the shared style engine; only inline declarations and JavaScript-set values
     /// remain in the bridge-owned declaration map.
@@ -57,7 +58,7 @@ public sealed partial class DomBridge
         // 1. Collect property names that come from the inline style attribute.
         //    These must never be cleared or overwritten by the cascade.
         var inlineStyleProps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+        if (TryGetAttribute(element, "style", out var inlineStyle) &&
             !string.IsNullOrEmpty(inlineStyle))
         {
             foreach (var kv in ParseStyle(inlineStyle))
@@ -65,11 +66,11 @@ public sealed partial class DomBridge
         }
 
         // Remove all CSS-derived properties (keep inline ones AND JS-set ones).
-        var keysToRemove = element.Style.Keys
-            .Where(k => !inlineStyleProps.Contains(k) && !element.JsSetStyleProps.Contains(k))
+        var keysToRemove = InlineStyle(element).Keys
+            .Where(k => !inlineStyleProps.Contains(k) && !GetElementRuntimeState(element).JsSetStyleProps.Contains(k))
             .ToList();
         foreach (var key in keysToRemove)
-            element.Style.Remove(key);
+            InlineStyle(element).Remove(key);
     }
 
     /// <summary>
@@ -119,12 +120,12 @@ public sealed partial class DomBridge
 
     private void InvalidateStyleScopeRecursive(DomElement element)
     {
-        if (!element.IsTextNode && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+        if (!IsText(element) && !element.TagName.StartsWith("#", StringComparison.Ordinal))
             InvalidateElementStyles(element);
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
-            if (!child.IsTextNode && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+            if (!IsText(child) && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
                 InvalidateStyleScopeRecursive(child);
         }
     }
@@ -137,12 +138,12 @@ public sealed partial class DomBridge
     private static DomElement GetDocumentRootFor(DomElement el)
     {
         var root = el;
-        while (root.Parent != null)
+        while (ParentEl(root) != null)
         {
             // If we've reached a document root, stop here
             if (root.TagName.StartsWith("#", StringComparison.Ordinal))
                 return root;
-            root = root.Parent;
+            root = ParentEl(root);
         }
         return root;
     }
@@ -155,7 +156,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in SnapshotChildren(root))
         {
-            if (!child.IsTextNode)
+            if (!IsText(child))
             {
                 if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                     styleElements.Add(child);
@@ -175,7 +176,7 @@ public sealed partial class DomBridge
     /// sub-document root materialising during the walk).
     /// </summary>
     /// <remarks>
-    /// A plain <c>root.Children.ToList()</c> is NOT thread-safe here.
+    /// A plain <c>ChildElements(root).ToList()</c> is NOT thread-safe here.
     /// <see cref="DomElement.LegacyChildList"/> projects the live
     /// <c>ChildNodes</c> collection: <see cref="Enumerable.ToList{T}"/> reads
     /// <c>Count</c>, allocates a destination array of that size, then calls
@@ -195,7 +196,7 @@ public sealed partial class DomBridge
         {
             try
             {
-                return root.Children.ToList();
+                return ChildElements(root).ToList();
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
@@ -213,9 +214,9 @@ public sealed partial class DomBridge
             DomElement child;
             try
             {
-                if (i >= root.Children.Count)
+                if (i >= root.ChildNodes.Count)
                     break;
-                child = root.Children[i];
+                child = ChildAt(root, i);
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {
@@ -312,7 +313,7 @@ public sealed partial class DomBridge
             StringComparer.OrdinalIgnoreCase);
 
         if (pseudoElement == null &&
-            element.Attributes.TryGetValue("style", out var inlineStyleAttr) &&
+            TryGetAttribute(element, "style", out var inlineStyleAttr) &&
             !string.IsNullOrEmpty(inlineStyleAttr))
         {
             foreach (var kv in ParseStyle(inlineStyleAttr))
@@ -324,10 +325,10 @@ public sealed partial class DomBridge
 
     private void ApplyInheritedProperties(Dictionary<string, string> computed, DomElement element)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return;
 
-        var parentProps = GetComputedProps(element.Parent);
+        var parentProps = GetComputedProps(ParentEl(element));
         foreach (var property in CSS.Dom.CssComputedDefaults.InheritedProperties)
         {
             if (computed.ContainsKey(property))
@@ -380,7 +381,7 @@ public sealed partial class DomBridge
         switch (tag)
         {
             case "input":
-                string type = element.Attributes.GetValueOrDefault("type")?.ToLowerInvariant() ?? "text";
+                string type = GetAttr(element, "type")?.ToLowerInvariant() ?? "text";
                 switch (type)
                 {
                     case "hidden":
@@ -397,7 +398,7 @@ public sealed partial class DomBridge
                     case "reset":
                         logicalInlineSize = 72;
                         logicalBlockSize = 20;
-                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, element.Attributes.GetValueOrDefault("value"));
+                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetAttr(element, "value"));
                         break;
                     default:
                         logicalInlineSize = 173;
@@ -486,8 +487,8 @@ public sealed partial class DomBridge
 
     private static int GetSelectVisibleRowCount(DomElement element)
     {
-        bool isMultiple = element.Attributes.ContainsKey("multiple");
-        if (element.Attributes.TryGetValue("size", out var rawSize) &&
+        bool isMultiple = HasAttr(element, "multiple");
+        if (TryGetAttribute(element, "size", out var rawSize) &&
             int.TryParse(rawSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedSize) &&
             parsedSize > 0)
         {
@@ -518,9 +519,9 @@ public sealed partial class DomBridge
 
     private static void AppendRenderedText(DomElement element, StringBuilder builder)
     {
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
-            if (child.IsTextNode)
+            if (IsText(child))
             {
                 if (!string.IsNullOrEmpty(child.TextContent))
                     builder.Append(child.TextContent);
@@ -563,9 +564,9 @@ public sealed partial class DomBridge
     private string GetStyleElementSourceText(DomElement styleEl)
     {
         var cssText = new StringBuilder();
-        foreach (var child in styleEl.Children)
+        foreach (var child in ChildElements(styleEl))
         {
-            if (child.IsTextNode && child.TextContent != null)
+            if (IsText(child) && child.TextContent != null)
                 cssText.Append(child.TextContent);
         }
 
@@ -577,7 +578,7 @@ public sealed partial class DomBridge
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&
-            styleEl.Attributes.TryGetValue("href", out var href) &&
+            TryGetAttribute(styleEl, "href", out var href) &&
             !string.IsNullOrEmpty(href))
         {
             if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
@@ -656,11 +657,11 @@ public sealed partial class DomBridge
 
     private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
     {
-        if (!element.IsTextNode)
+        if (!IsText(element))
         {
             if (element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
             {
-                var nonce = element.Attributes.TryGetValue("nonce", out var n) ? n : null;
+                var nonce = TryGetAttribute(element, "nonce", out var n) ? n : null;
                 if (!csp.AllowsInlineStyleElement(nonce, GetStyleElementCssText(element)))
                 {
                     element.Remove();
@@ -668,16 +669,16 @@ public sealed partial class DomBridge
                 }
             }
 
-            if (blockStyleAttribute && element.Attributes.ContainsKey("style"))
+            if (blockStyleAttribute && HasAttr(element, "style"))
             {
-                element.Attributes.Remove("style");
-                element.Style.Clear();
+                RemoveAttr(element, "style");
+                InlineStyle(element).Clear();
                 InvalidateStyleScope(element);
             }
         }
 
         // Snapshot: a blocked <style> child removes itself from this collection.
-        foreach (var child in element.Children.ToArray())
+        foreach (var child in ChildElements(element).ToArray())
             ApplyStyleCsp(child, csp, blockStyleAttribute);
     }
 
@@ -700,7 +701,7 @@ public sealed partial class DomBridge
         if (computed.ContainsKey("display"))
             return;
 
-        if (element.Attributes.ContainsKey("hidden"))
+        if (HasAttr(element, "hidden"))
         {
             computed["display"] = "none";
             return;
@@ -1454,11 +1455,11 @@ public sealed partial class DomBridge
 
         // Walk up from docRoot to find the containing iframe/object element
         // The docRoot is typically a #subdoc-root child of the iframe element
-        var parent = docRoot.Parent;
+        var parent = ParentEl(docRoot);
         if (parent != null && !parent.TagName.StartsWith("#", StringComparison.Ordinal))
         {
             // parent is the iframe/object element — check its style for dimensions
-            if (parent.Attributes.TryGetValue("style", out var style) && !string.IsNullOrEmpty(style))
+            if (TryGetAttribute(parent, "style", out var style) && !string.IsNullOrEmpty(style))
             {
                 var w = ExtractCssDimension(style, "width");
                 var h = ExtractCssDimension(style, "height");
@@ -1466,8 +1467,8 @@ public sealed partial class DomBridge
                     return (w, h);
             }
 
-            var attributeWidth = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("width"));
-            var attributeHeight = ParseViewportDimensionAttribute(parent.Attributes.GetValueOrDefault("height"));
+            var attributeWidth = ParseViewportDimensionAttribute(GetAttr(parent, "width"));
+            var attributeHeight = ParseViewportDimensionAttribute(GetAttr(parent, "height"));
             if (attributeWidth > 0 || attributeHeight > 0)
                 return (attributeWidth, attributeHeight);
         }

@@ -83,8 +83,8 @@ public sealed partial class DomBridge
         for (var i = log.Count - 1; i >= 0; i--)
         {
             var (element, style, attributes) = log[i];
-            RestoreStringMap(element.Style, style);
-            RestoreStringMap(element.Attributes, attributes);
+            RestoreStringMap(InlineStyle(element), style);
+            RestoreAttributes(element, attributes);
         }
 
         // Reverted styles must not read back the baked values from the computed cache.
@@ -100,36 +100,36 @@ public sealed partial class DomBridge
 
     private void ReflectRenderState(DomElement element)
     {
-        if (!element.IsTextNode && !element.TagName.StartsWith('#'))
+        if (!IsText(element) && !element.TagName.StartsWith('#'))
         {
-            if (element.Style.Count == 0)
+            if (InlineStyle(element).Count == 0)
             {
-                element.Attributes.Remove("style");
+                RemoveAttr(element, "style");
             }
             else
             {
                 var styleText = string.Join(
                     "; ",
-                    element.Style
+                    InlineStyle(element)
                         .OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
                         .Select(static kv => $"{kv.Key}: {kv.Value}"));
-                if (!element.Attributes.TryGetValue("style", out var currentStyle) ||
+                if (!TryGetAttribute(element, "style", out var currentStyle) ||
                     !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
                 {
-                    element.Attributes["style"] = styleText;
+                    SetAttr(element, "style", styleText);
                 }
             }
 
             if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
-                !element.Attributes.ContainsKey("value") &&
+                !HasAttr(element, "value") &&
                 GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
                 idlValue is string { Length: > 0 } idlString)
             {
-                element.Attributes["value"] = idlString;
+                SetAttr(element, "value", idlString);
             }
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             ReflectRenderState(child);
     }
 
@@ -139,7 +139,7 @@ public sealed partial class DomBridge
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(DomElement element) => string.Concat(element.Children.Select(SerializeElementToHtml));
+    private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms()
     {
@@ -172,12 +172,12 @@ public sealed partial class DomBridge
     /// </summary>
     private static void RemoveRenderCommentNodes(DomElement element)
     {
-        for (int i = element.Children.Count - 1; i >= 0; i--)
+        for (int i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = element.Children[i];
+            var child = ChildAt(element, i);
             if (string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             {
-                element.Children.RemoveAt(i);
+                RemoveNthChild(element, i);
                 continue;
             }
 
@@ -201,13 +201,13 @@ public sealed partial class DomBridge
         var head = FindFirstElementByTagName(DocumentElement, "head");
         if (head != null)
         {
-            styleElement.Parent = head;
-            head.Children.Add(styleElement);
+            SetParent(styleElement, head);
+            head.AppendChild(styleElement);
             return;
         }
 
-        styleElement.Parent = DocumentElement;
-        DocumentElement.Children.Insert(0, styleElement);
+        SetParent(styleElement, DocumentElement);
+        InsertChildAt(DocumentElement, 0, styleElement);
     }
 
     private void CollectZoomPseudoSerializationOverrides(
@@ -216,7 +216,7 @@ public sealed partial class DomBridge
         List<string> rules,
         ref int pseudoIndex)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
         var props = GetComputedProps(element);
@@ -229,7 +229,7 @@ public sealed partial class DomBridge
             AppendZoomPseudoSerializationOverride(element, "::after", usedZoom, rules, ref pseudoIndex);
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             CollectZoomPseudoSerializationOverrides(child, usedZoom, rules, ref pseudoIndex);
     }
 
@@ -273,7 +273,7 @@ public sealed partial class DomBridge
         if (string.Equals(root.TagName, tagName, StringComparison.OrdinalIgnoreCase))
             return root;
 
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             var match = FindFirstElementByTagName(child, tagName);
             if (match != null)
@@ -285,10 +285,10 @@ public sealed partial class DomBridge
 
     private void ApplyProgressLikeSerializationPlaceholders(DomElement element)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
-        foreach (var child in element.Children.ToList())
+        foreach (var child in ChildElements(element).ToList())
             ApplyProgressLikeSerializationPlaceholders(child);
 
         var tag = element.TagName.ToLowerInvariant();
@@ -304,26 +304,27 @@ public sealed partial class DomBridge
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
         var ratio = ResolveProgressLikeValueRatio(element, tag);
 
-        element.Style["display"] = "inline-block";
-        element.Style["box-sizing"] = "border-box";
-        element.Style["position"] = "relative";
-        element.Style["overflow"] = "hidden";
-        element.Style["padding"] = "0";
-        element.Style["border"] = "1px solid #767676";
-        element.Style["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
-        element.Style["vertical-align"] = "middle";
+        InlineStyle(element)["display"] = "inline-block";
+        InlineStyle(element)["box-sizing"] = "border-box";
+        InlineStyle(element)["position"] = "relative";
+        InlineStyle(element)["overflow"] = "hidden";
+        InlineStyle(element)["padding"] = "0";
+        InlineStyle(element)["border"] = "1px solid #767676";
+        InlineStyle(element)["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
+        InlineStyle(element)["vertical-align"] = "middle";
         if (!string.IsNullOrWhiteSpace(width) && !string.Equals(width, "auto", StringComparison.OrdinalIgnoreCase))
-            element.Style["width"] = width;
+            InlineStyle(element)["width"] = width;
         if (!string.IsNullOrWhiteSpace(height) && !string.Equals(height, "auto", StringComparison.OrdinalIgnoreCase))
-            element.Style["height"] = height;
+            InlineStyle(element)["height"] = height;
 
-        element.Children.Clear();
+        ClearChildren(element);
         element.InnerHtml = string.Empty;
         element.TextContent = null;
 
-        var fill = new DomElement("div", null, null, string.Empty) { Parent = element };
-        fill.Style["position"] = "absolute";
-        fill.Style["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
+        var fill = new DomElement("div", null, null, string.Empty);
+        SetParent(fill, element);
+        InlineStyle(fill)["position"] = "absolute";
+        InlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
         var fillExtent = vertical
             ? ReadPixelLength(height, DefaultProgressLikeTrackLengthPx) * ratio
@@ -331,20 +332,20 @@ public sealed partial class DomBridge
         var fillExtentPx = $"{fillExtent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}px";
         if (vertical)
         {
-            fill.Style["left"] = "0";
-            fill.Style["right"] = "0";
-            fill.Style[reverseInline ? "bottom" : "top"] = "0";
-            fill.Style["height"] = fillExtentPx;
+            InlineStyle(fill)["left"] = "0";
+            InlineStyle(fill)["right"] = "0";
+            InlineStyle(fill)[reverseInline ? "bottom" : "top"] = "0";
+            InlineStyle(fill)["height"] = fillExtentPx;
         }
         else
         {
-            fill.Style["top"] = "0";
-            fill.Style["bottom"] = "0";
-            fill.Style[reverseInline ? "right" : "left"] = "0";
-            fill.Style["width"] = fillExtentPx;
+            InlineStyle(fill)["top"] = "0";
+            InlineStyle(fill)["bottom"] = "0";
+            InlineStyle(fill)[reverseInline ? "right" : "left"] = "0";
+            InlineStyle(fill)["width"] = fillExtentPx;
         }
 
-        element.Children.Add(fill);
+        element.AppendChild(fill);
     }
 
     private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
@@ -360,7 +361,7 @@ public sealed partial class DomBridge
 
     private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
+        if (!TryGetAttribute(element, attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
             return fallback;
 
         return double.TryParse(
@@ -392,7 +393,7 @@ public sealed partial class DomBridge
 
     private void ApplyZoomSerializationStyles(DomElement element, double parentZoom)
     {
-        if (element.IsTextNode)
+        if (IsText(element))
             return;
 
         var props = GetComputedProps(element);
@@ -403,11 +404,11 @@ public sealed partial class DomBridge
         var willSvg = ShouldApplySvgSerializationAttributes(element);
         // Record the pre-bake state for the geometry-snapshot revert (only when this element
         // is actually mutated — scaled, SVG-adjusted, or carrying a `zoom` to strip).
-        if (_zoomSerializationRevertLog != null && (willScale || willSvg || element.Style.ContainsKey("zoom")))
+        if (_zoomSerializationRevertLog != null && (willScale || willSvg || InlineStyle(element).ContainsKey("zoom")))
             _zoomSerializationRevertLog.Add((
                 element,
-                new Dictionary<string, string>(element.Style),
-                new Dictionary<string, string>(element.Attributes)));
+                new Dictionary<string, string>(InlineStyle(element)),
+                AttributeSnapshot(element)));
 
         if (willScale)
         {
@@ -417,7 +418,7 @@ public sealed partial class DomBridge
                     continue;
 
                 if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
-                    element.Style[property] = scaled;
+                    InlineStyle(element)[property] = scaled;
             }
 
         }
@@ -425,9 +426,9 @@ public sealed partial class DomBridge
         if (willSvg)
             ApplyZoomSerializationSvgAttributes(element, usedZoom);
 
-        element.Style.Remove("zoom");
+        InlineStyle(element).Remove("zoom");
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             ApplyZoomSerializationStyles(child, usedZoom);
     }
 
@@ -458,18 +459,18 @@ public sealed partial class DomBridge
         if (props.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (!element.Style.TryGetValue(property, out var specified) ||
+        if (!InlineStyle(element).TryGetValue(property, out var specified) ||
             !string.Equals(specified?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase) ||
-            element.Parent == null)
+            ParentEl(element) == null)
         {
             return false;
         }
 
-        var parentProps = GetComputedProps(element.Parent);
+        var parentProps = GetComputedProps(ParentEl(element));
         if (parentProps.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (element.Parent.Style.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+        if (InlineStyle(ParentEl(element)!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
         return false;
@@ -565,11 +566,11 @@ public sealed partial class DomBridge
         string propertyName,
         bool preferInlineStyle = false)
     {
-        if (element.Attributes.ContainsKey(propertyName))
+        if (HasAttr(element, propertyName))
             return;
 
         string? value = null;
-        if (preferInlineStyle && element.Style.TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
+        if (preferInlineStyle && InlineStyle(element).TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
             value = inlineValue;
         else if (props.TryGetValue(propertyName, out var propValue) && !string.IsNullOrWhiteSpace(propValue))
             value = propValue;
@@ -579,34 +580,34 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[propertyName] = value.Trim();
+        SetAttr(element, propertyName, value.Trim());
     }
 
     private void ScaleSvgLengthAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) ||
+        if (!TryGetAttribute(element, attributeName, out var value) ||
             !TryScaleSvgLengthToken(element, value, usedZoom, out var scaled))
         {
             return;
         }
 
-        element.Attributes[attributeName] = scaled;
+        SetAttr(element, attributeName, scaled);
     }
 
     private void ScaleSvgPointListAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+        if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
+        SetAttr(element, attributeName, ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom)));
     }
 
     private void ScaleSvgPathDataAttribute(DomElement element, string attributeName, double usedZoom)
     {
-        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+        if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
 
-        element.Attributes[attributeName] = ScaleSvgPathRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom));
+        SetAttr(element, attributeName, ScaleSvgPathRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom)));
     }
 
     private static string ScaleSvgNumericMatch(Match match, double factor)
@@ -682,7 +683,7 @@ public sealed partial class DomBridge
 
     private double ResolveOriginalNearestSpecifiedFontSizePx(DomElement element)
     {
-        for (DomElement? current = element; current != null; current = current.Parent)
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             if (TryGetSpecifiedFontSizePx(current, out var fontSize))
                 return fontSize;
@@ -745,7 +746,7 @@ public sealed partial class DomBridge
 
     private double GetNearestExplicitFontSizeOwnerZoom(DomElement element)
     {
-        for (DomElement? current = element; current != null; current = current.Parent)
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             var props = GetComputedProps(current);
             if (props.TryGetValue("font-size", out var fontSize) && !string.IsNullOrWhiteSpace(fontSize))
@@ -868,11 +869,11 @@ public sealed partial class DomBridge
         // embedded p{background:green;height:100%} painted the whole parent green).
         // The renderer rasterises each embedded document in isolation instead
         // (srcdoc content is round-tripped via the srcdoc attribute).
-        GetChildren: static element => element.Children.Where(static child =>
+        GetChildren: static element => ChildElements(element).Where(static child =>
             !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
-            element.Style.OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
+            InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1),
         GetText: static element => element.TextContent,
         GetRawInnerHtml: static element => element.InnerHtml);
 
@@ -884,8 +885,10 @@ public sealed partial class DomBridge
             yield return new("class", element.ClassName);
 
         var serializedSrcDoc = TrySerializeCurrentSrcDoc(element);
-        foreach (var (name, value) in element.Attributes)
+        foreach (var attribute in element.Attributes.Values)
         {
+            var name = attribute.QualifiedName;
+            var value = attribute.Value;
             if (name.Equals("id", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("class", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("style", StringComparison.OrdinalIgnoreCase))
@@ -901,7 +904,7 @@ public sealed partial class DomBridge
         }
 
         if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
-            !element.Attributes.ContainsKey("value") &&
+            !HasAttr(element, "value") &&
             GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
             idlValue is string { Length: > 0 } idlString)
         {
@@ -912,17 +915,17 @@ public sealed partial class DomBridge
     private string? TrySerializeCurrentSrcDoc(DomElement element)
     {
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
-            !element.Attributes.ContainsKey("srcdoc"))
+            !HasAttr(element, "srcdoc"))
         {
             return null;
         }
 
-        var subDocumentRoot = element.Children.FirstOrDefault(child =>
+        var subDocumentRoot = ChildElements(element).FirstOrDefault(child =>
             string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
-        if (subDocumentRoot == null || subDocumentRoot.Children.Count == 0)
+        if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 
-        return string.Concat(subDocumentRoot.Children.Select(SerializeElementToHtml));
+        return string.Concat(ChildElements(subDocumentRoot).Select(SerializeElementToHtml));
     }
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]

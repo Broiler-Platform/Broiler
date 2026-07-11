@@ -176,7 +176,7 @@ public sealed partial class DomBridge
             // action (read/write)
             obj.FastAddProperty(
                 (KeyString)"action",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("action", out var act) ? new JSString(act) : new JSString(string.Empty),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty),
                     "get action"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetAction027Core(element, in a), "set action"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -186,7 +186,7 @@ public sealed partial class DomBridge
         {
             obj.FastAddProperty(
                 (KeyString)"open",
-                new JSFunction((in Arguments _) => element.Attributes.ContainsKey("open") ? JSBoolean.True : JSBoolean.False,
+                new JSFunction((in Arguments _) => HasAttr(element, "open") ? JSBoolean.True : JSBoolean.False,
                     "get open"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetOpen029Core(bridge, element, in a), "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -216,7 +216,7 @@ public sealed partial class DomBridge
             // open (getter/setter)
             obj.FastAddProperty(
                 (KeyString)"open",
-                new JSFunction((in Arguments _) => element.Attributes.ContainsKey("open") ? JSBoolean.True : JSBoolean.False,
+                new JSFunction((in Arguments _) => HasAttr(element, "open") ? JSBoolean.True : JSBoolean.False,
                     "get open"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetOpen034Core(bridge, element, in a), "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -232,7 +232,7 @@ public sealed partial class DomBridge
 
         // Popover API (HTML §popover) — showPopover()/hidePopover() are exposed on
         // any element carrying the global `popover` attribute, not tied to a tag.
-        if (element.Attributes.ContainsKey("popover"))
+        if (HasAttr(element, "popover"))
         {
             obj.FastAddValue(
                 (KeyString)"showPopover",
@@ -293,7 +293,7 @@ public sealed partial class DomBridge
         {
             obj.FastAddProperty(
                 (KeyString)"htmlFor",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("for", out var f) ? new JSString(f) : new JSString(string.Empty),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "for", out var f) ? new JSString(f) : new JSString(string.Empty),
                     "get htmlFor"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetHtmlFor047Core(element, in a), "set htmlFor"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -304,7 +304,7 @@ public sealed partial class DomBridge
         {
             obj.FastAddProperty(
                 (KeyString)"httpEquiv",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("http-equiv", out var he) ? new JSString(he) : new JSString(string.Empty),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "http-equiv", out var he) ? new JSString(he) : new JSString(string.Empty),
                     "get httpEquiv"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetHttpEquiv049Core(element, in a), "set httpEquiv"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -322,7 +322,7 @@ public sealed partial class DomBridge
             // type property (MIME type of the resource)
             obj.FastAddProperty(
                 (KeyString)"type",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("type", out var t) ? new JSString(t) : new JSString(string.Empty),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "type", out var t) ? new JSString(t) : new JSString(string.Empty),
                     "get type"),
                 new JSFunction((in Arguments a) => JsElementInterfacesSetType053Core(element, in a), "set type"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -362,7 +362,7 @@ public sealed partial class DomBridge
                 var captured = attrName; // capture for closure
                 obj.FastAddProperty(
                     (KeyString)captured,
-                    new JSFunction((in Arguments _) => element.Attributes.TryGetValue(captured, out var v) ? new JSString(v) : new JSString(string.Empty),
+                    new JSFunction((in Arguments _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty),
                         "get " + captured),
                     new JSFunction((in Arguments a) => JsElementInterfacesCallback059Core(captured, element, in a), "set " + captured),
                     JSPropertyAttributes.EnumerableConfigurableProperty);

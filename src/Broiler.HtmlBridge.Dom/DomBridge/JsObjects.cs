@@ -58,7 +58,7 @@ public sealed partial class DomBridge
         // title (read/write) — synced with attributes["title"]
         obj.FastAddProperty(
             (KeyString)"title",
-            new JSFunction((in Arguments a) => element.Attributes.TryGetValue("title", out var t) ? new JSString(t) : new JSString(string.Empty),
+            new JSFunction((in Arguments a) => TryGetAttribute(element, "title", out var t) ? new JSString(t) : new JSString(string.Empty),
                 "get title"),
             new JSFunction((in Arguments a) => JsJsObjectsSetTitle006Core(element, in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -66,7 +66,7 @@ public sealed partial class DomBridge
         // lang (read/write) — synced with attributes["lang"]
         obj.FastAddProperty(
             (KeyString)"lang",
-            new JSFunction((in Arguments a) => element.Attributes.TryGetValue("lang", out var lang) ? new JSString(lang) : new JSString(string.Empty),
+            new JSFunction((in Arguments a) => TryGetAttribute(element, "lang", out var lang) ? new JSString(lang) : new JSString(string.Empty),
                 "get lang"),
             new JSFunction((in Arguments a) => JsJsObjectsSetLang008Core(element, in a), "set lang"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -74,7 +74,7 @@ public sealed partial class DomBridge
         // accessKey (read/write) — synced with attributes["accesskey"]
         obj.FastAddProperty(
             (KeyString)"accessKey",
-            new JSFunction((in Arguments a) => element.Attributes.TryGetValue("accesskey", out var accessKey) ? new JSString(accessKey) : new JSString(string.Empty),
+            new JSFunction((in Arguments a) => TryGetAttribute(element, "accesskey", out var accessKey) ? new JSString(accessKey) : new JSString(string.Empty),
                 "get accessKey"),
             new JSFunction((in Arguments a) => JsJsObjectsSetAccessKey010Core(element, in a), "set accessKey"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -82,7 +82,7 @@ public sealed partial class DomBridge
         // dir (read/write) — synced with attributes["dir"]
         obj.FastAddProperty(
             (KeyString)"dir",
-            new JSFunction((in Arguments a) => element.Attributes.TryGetValue("dir", out var dir) ? new JSString(dir) : new JSString(string.Empty),
+            new JSFunction((in Arguments a) => TryGetAttribute(element, "dir", out var dir) ? new JSString(dir) : new JSString(string.Empty),
                 "get dir"),
             new JSFunction((in Arguments a) => JsJsObjectsSetDir012Core(bridge, element, in a), "set dir"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -185,7 +185,7 @@ public sealed partial class DomBridge
         // parentNode (read-only, dynamic)
         obj.FastAddProperty(
             (KeyString)"parentNode",
-            new JSFunction((in Arguments a) => element.Parent != null ? ToJSObject(element.Parent) : JSNull.Value,
+            new JSFunction((in Arguments a) => ParentEl(element) != null ? ToJSObject(ParentEl(element)) : JSNull.Value,
                 "get parentNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -288,7 +288,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // splitText(offset) — splits a text node at the given character offset
-        if (element.IsTextNode)
+        if (IsText(element))
         {
             obj.FastAddValue(
                 (KeyString)"splitText",
@@ -297,7 +297,7 @@ public sealed partial class DomBridge
         }
 
         // substringData(offset, count) — for text/comment CharacterData nodes
-        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             obj.FastAddValue(
                 (KeyString)"substringData",
@@ -370,7 +370,7 @@ public sealed partial class DomBridge
         // hasChildNodes()
         obj.FastAddValue(
             (KeyString)"hasChildNodes",
-            new JSFunction((in Arguments a) => element.Children.Count > 0 ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments a) => element.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False,
                 "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -390,7 +390,7 @@ public sealed partial class DomBridge
         // getAttributeNames()
         obj.FastAddValue(
             (KeyString)"getAttributeNames",
-            new JSFunction((in Arguments _) => new JSArray(element.Attributes.Keys.Select(static name => (JSValue)new JSString(name)).ToArray()),
+            new JSFunction((in Arguments _) => new JSArray(AttributeNames(element).Select(static name => (JSValue)new JSString(name)).ToArray()),
                 "getAttributeNames", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -508,7 +508,7 @@ public sealed partial class DomBridge
         // childElementCount (read-only)
         obj.FastAddProperty(
             (KeyString)"childElementCount",
-            new JSFunction((in Arguments a) => new JSNumber(element.Children.Count(c => !c.IsTextNode && !IsSubDocRoot(c))),
+            new JSFunction((in Arguments a) => new JSNumber(ChildElements(element).Count(c => !IsText(c) && !IsSubDocRoot(c))),
                 "get childElementCount"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -691,7 +691,7 @@ public sealed partial class DomBridge
         // disabled (read/write) — for form controls
         obj.FastAddProperty(
             (KeyString)"disabled",
-            new JSFunction((in Arguments a) => element.Attributes.ContainsKey("disabled") ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments a) => HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False,
                 "get disabled"),
             new JSFunction((in Arguments a) => JsJsObjectsSetDisabled115Core(bridge, element, in a), "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -699,7 +699,7 @@ public sealed partial class DomBridge
         // hidden (read/write) — global reflected boolean attribute
         obj.FastAddProperty(
             (KeyString)"hidden",
-            new JSFunction((in Arguments a) => element.Attributes.ContainsKey("hidden") ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments a) => HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False,
                 "get hidden"),
             new JSFunction((in Arguments a) => JsJsObjectsSetHidden117Core(bridge, element, in a), "set hidden"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -714,7 +714,7 @@ public sealed partial class DomBridge
         // required (read/write) — form validation
         obj.FastAddProperty(
             (KeyString)"required",
-            new JSFunction((in Arguments a) => element.Attributes.ContainsKey("required") ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments a) => HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False,
                 "get required"),
             new JSFunction((in Arguments a) => JsJsObjectsSetRequired121Core(bridge, element, in a), "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -811,20 +811,20 @@ public sealed partial class DomBridge
             var bridgeForSrc = this;
             obj.FastAddProperty(
                 (KeyString)"src",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
                 new JSFunction((in Arguments a) => JsJsObjectsSetSrc139Core(bridgeForSrc, element, in a), "set src"),
                  JSPropertyAttributes.EnumerableConfigurableProperty);
 
             obj.FastAddProperty(
                 (KeyString)"srcdoc",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
                 new JSFunction((in Arguments a) => JsJsObjectsSetSrcdoc141Core(bridgeForSrc, element, in a), "set srcdoc"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // sandbox attribute access
             obj.FastAddProperty(
                 (KeyString)"sandbox",
-                new JSFunction((in Arguments _) => element.Attributes.TryGetValue("sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
+                new JSFunction((in Arguments _) => TryGetAttribute(element, "sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }

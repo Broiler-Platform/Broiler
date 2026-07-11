@@ -28,13 +28,13 @@ public sealed partial class DomBridge
 
     private void ResolveStickyPositioningTree(DomElement el)
     {
-        if (!el.IsTextNode && IsSticky(GetComputedProps(el)))
+        if (!IsText(el) && IsSticky(GetComputedProps(el)))
             ApplyStickyOffset(el);
 
         // Index-based: ApplyStickyOffset only mutates el's own style, not the
         // child list, but stay defensive.
-        for (int i = 0; i < el.Children.Count; i++)
-            ResolveStickyPositioningTree(el.Children[i]);
+        for (int i = 0; i < el.ChildNodes.Count; i++)
+            ResolveStickyPositioningTree(ChildAt(el, i));
     }
 
     private void ApplyStickyOffset(DomElement el)
@@ -53,17 +53,17 @@ public sealed partial class DomBridge
         // position as `relative` + offset reproduces it.  Relative and sticky
         // both establish a containing block / stacking context, so this is
         // behaviour-preserving for descendants.
-        el.Style["position"] = "relative";
+        InlineStyle(el)["position"] = "relative";
 
         if (dy != 0)
         {
-            el.Style["top"] = dy.ToString("0.###", CultureInfo.InvariantCulture) + "px";
-            el.Style.Remove("bottom");
+            InlineStyle(el)["top"] = dy.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            InlineStyle(el).Remove("bottom");
         }
         if (dx != 0)
         {
-            el.Style["left"] = dx.ToString("0.###", CultureInfo.InvariantCulture) + "px";
-            el.Style.Remove("right");
+            InlineStyle(el)["left"] = dx.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+            InlineStyle(el).Remove("right");
         }
     }
 
@@ -155,7 +155,7 @@ public sealed partial class DomBridge
     {
         for (var current = GetScrollTraversalParent(el); current != null; current = GetScrollTraversalParent(current))
         {
-            if (current.IsTextNode)
+            if (IsText(current))
                 continue;
             var display = GetComputedProps(current).GetValueOrDefault("display") ?? "block";
             bool inlineLevel = display is "inline" or "inline-block" or "inline-table"

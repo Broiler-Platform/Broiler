@@ -138,15 +138,15 @@ public sealed partial class DomBridge
     {
         while (node != null && !ReferenceEquals(node, root))
         {
-            if (node.Parent != null)
+            if (ParentEl(node) != null)
             {
-                var siblings = node.Parent.Children;
+                var siblings = ChildElements(ParentEl(node)).ToList();
                 var idx = siblings.IndexOf(node);
                 if (idx >= 0 && idx + 1 < siblings.Count)
                     return siblings[idx + 1];
             }
-            if (node.Parent != null)
-                node = node.Parent;
+            if (ParentEl(node) != null)
+                node = ParentEl(node);
             else
                 return null;
         }
@@ -158,15 +158,15 @@ public sealed partial class DomBridge
     /// </summary>
     private JSValue TreeWalkerTraverseChildren(DomElement node, bool first, DomElement root, int whatToShow, JSFunction? filterFn, ref DomElement currentNode)
     {
-        if (node.Children.Count == 0) return JSNull.Value;
-        var child = first ? node.Children[0] : node.Children[^1];
+        if (node.ChildNodes.Count == 0) return JSNull.Value;
+        var child = first ? ChildAt(node, 0) : ChildAt(node, ^1);
         while (child != null)
         {
             var result = ApplyFilter(child, whatToShow, filterFn);
             if (result == 1) { currentNode = child; return ToJSObject(child); }
-            if (result == 3 && child.Children.Count > 0) // SKIP — descend
+            if (result == 3 && child.ChildNodes.Count > 0) // SKIP — descend
             {
-                child = first ? child.Children[0] : child.Children[^1];
+                child = first ? ChildAt(child, 0) : ChildAt(child, ^1);
                 continue;
             }
             // REJECT or SKIP with no children — next/previous sibling
@@ -183,15 +183,15 @@ public sealed partial class DomBridge
         var sibling = node;
         while (true)
         {
-            if (sibling.Parent == null || ReferenceEquals(sibling, root)) return JSNull.Value;
-            var siblings = sibling.Parent.Children;
+            if (ParentEl(sibling) == null || ReferenceEquals(sibling, root)) return JSNull.Value;
+            var siblings = ChildElements(ParentEl(sibling)).ToList();
             var idx = siblings.IndexOf(sibling);
             var target = next ? (idx + 1 < siblings.Count ? siblings[idx + 1] : null) : (idx > 0 ? siblings[idx - 1] : null);
             if (target != null)
             {
                 var result = ApplyFilter(target, whatToShow, filterFn);
                 if (result == 1) { currentNode = target; return ToJSObject(target); }
-                if (result == 3 && target.Children.Count > 0) // SKIP — try children
+                if (result == 3 && target.ChildNodes.Count > 0) // SKIP — try children
                 {
                     var child = TreeWalkerTraverseChildren(target, next, root, whatToShow, filterFn, ref currentNode);
                     if (!child.IsNull) return child;
@@ -200,7 +200,7 @@ public sealed partial class DomBridge
                 continue;
             }
             // No more siblings — move up (DOM spec steps 3.3-3.5)
-            sibling = sibling.Parent;
+            sibling = ParentEl(sibling);
             if (sibling == null || ReferenceEquals(sibling, root)) return JSNull.Value;
             // Per spec: if filter accepts parent, return null
             // (the parent is a "real" node, so don't skip over it)
@@ -212,8 +212,8 @@ public sealed partial class DomBridge
     /// <summary>Helper: get next/previous sibling, or null if past boundaries.</summary>
     private static DomElement? GetSiblingInDirection(DomElement node, bool forward, DomElement boundary)
     {
-        if (node.Parent == null || ReferenceEquals(node, boundary)) return null;
-        var siblings = node.Parent.Children;
+        if (ParentEl(node) == null || ReferenceEquals(node, boundary)) return null;
+        var siblings = ChildElements(ParentEl(node)).ToList();
         var idx = siblings.IndexOf(node);
         if (forward && idx + 1 < siblings.Count) return siblings[idx + 1];
         if (!forward && idx > 0) return siblings[idx - 1];
@@ -468,13 +468,13 @@ public sealed partial class DomBridge
         while (current != null)
         {
             ancestors.Add(current);
-            current = current.Parent;
+            current = ParentEl(current);
         }
         current = b;
         while (current != null)
         {
             if (ancestors.Contains(current)) return current;
-            current = current.Parent;
+            current = ParentEl(current);
         }
         return null;
     }
@@ -489,8 +489,8 @@ public sealed partial class DomBridge
         if (ReferenceEquals(startContainer, endContainer))
         {
             // Same container — return children between offsets
-            for (var i = startOffset; i < Math.Min(endOffset, startContainer.Children.Count); i++)
-                result.Add(startContainer.Children[i]);
+            for (var i = startOffset; i < Math.Min(endOffset, startContainer.ChildNodes.Count); i++)
+                result.Add(ChildAt(startContainer, i));
             return result;
         }
 
@@ -523,7 +523,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(startContainer, endContainer))
         {
             // Same container
-            if (startContainer.IsTextNode)
+            if (IsText(startContainer))
             {
                 var text = startContainer.TextContent ?? string.Empty;
                 var s = Math.Max(0, Math.Min(startOffset, text.Length));
@@ -533,14 +533,14 @@ public sealed partial class DomBridge
             else
             {
                 // Element container — collect text from children between offsets
-                for (var i = startOffset; i < Math.Min(endOffset, startContainer.Children.Count); i++)
-                    CollectTextContent(startContainer.Children[i], sb);
+                for (var i = startOffset; i < Math.Min(endOffset, startContainer.ChildNodes.Count); i++)
+                    CollectTextContent(ChildAt(startContainer, i), sb);
             }
             return;
         }
 
         // Start container: collect from startOffset to end
-        if (startContainer.IsTextNode)
+        if (IsText(startContainer))
         {
             var text = startContainer.TextContent ?? string.Empty;
             if (startOffset < text.Length)
@@ -548,8 +548,8 @@ public sealed partial class DomBridge
         }
         else
         {
-            for (var i = startOffset; i < startContainer.Children.Count; i++)
-                CollectTextContent(startContainer.Children[i], sb);
+            for (var i = startOffset; i < startContainer.ChildNodes.Count; i++)
+                CollectTextContent(ChildAt(startContainer, i), sb);
         }
 
         // Middle nodes: collect all text from nodes between start and end paths
@@ -568,9 +568,9 @@ public sealed partial class DomBridge
                     if (IsDescendant(startContainer, node) || IsDescendant(endContainer, node))
                         continue;
                     // Only collect from top-level nodes
-                    if (node.IsTextNode)
+                    if (IsText(node))
                         sb.Append(node.TextContent ?? string.Empty);
-                    else if (node.Children.Count == 0)
+                    else if (node.ChildNodes.Count == 0)
                         continue; // element with no text children
                     // Don't double-collect descendants
                 }
@@ -578,15 +578,15 @@ public sealed partial class DomBridge
         }
 
         // End container: collect from 0 to endOffset
-        if (endContainer.IsTextNode)
+        if (IsText(endContainer))
         {
             // Don't include end container text for Range.toString()
             // (end boundary is exclusive for text)
         }
         else
         {
-            for (var i = 0; i < Math.Min(endOffset, endContainer.Children.Count); i++)
-                CollectTextContent(endContainer.Children[i], sb);
+            for (var i = 0; i < Math.Min(endOffset, endContainer.ChildNodes.Count); i++)
+                CollectTextContent(ChildAt(endContainer, i), sb);
         }
     }
 
@@ -602,7 +602,7 @@ public sealed partial class DomBridge
         while (node != null && !ReferenceEquals(node, commonAncestor))
         {
             chain.Add(node);
-            node = node.Parent;
+            node = ParentEl(node);
         }
         if (chain.Count == 0) return null;
 
@@ -629,27 +629,27 @@ public sealed partial class DomBridge
             if (topClone == null) topClone = clone;
             if (currentParent != null)
             {
-                clone.Parent = currentParent;
-                currentParent.Children.Add(clone);
+                SetParent(clone, currentParent);
+                currentParent.AppendChild(clone);
             }
 
             // For start boundary: include siblings after the text node within this element
             // For end boundary: include siblings before the text node within this element
             if (i == 1) // direct parent of text node
             {
-                var childIdx = original.Children.IndexOf(chain[0]);
+                var childIdx = ChildIndexOf(original, chain[0]);
                 if (isStart)
                 {
                     // Include the extracted text + remaining siblings
-                    extractedTextNode.Parent = clone;
-                    clone.Children.Add(extractedTextNode);
+                    SetParent(extractedTextNode, clone);
+                    clone.AppendChild(extractedTextNode);
                     // Move siblings after the text node into the clone
-                    for (var j = childIdx + 1; j < original.Children.Count; )
+                    for (var j = childIdx + 1; j < original.ChildNodes.Count; )
                     {
-                        var sibling = original.Children[j];
-                        original.Children.RemoveAt(j);
-                        sibling.Parent = clone;
-                        clone.Children.Add(sibling);
+                        var sibling = ChildAt(original, j);
+                        RemoveNthChild(original, j);
+                        SetParent(sibling, clone);
+                        clone.AppendChild(sibling);
                     }
                 }
                 else
@@ -657,14 +657,14 @@ public sealed partial class DomBridge
                     // Move siblings before the text node into the clone
                     for (var j = 0; j < childIdx; )
                     {
-                        var sibling = original.Children[0];
-                        original.Children.RemoveAt(0);
+                        var sibling = ChildAt(original, 0);
+                        RemoveNthChild(original, 0);
                         childIdx--;
-                        sibling.Parent = clone;
-                        clone.Children.Add(sibling);
+                        SetParent(sibling, clone);
+                        clone.AppendChild(sibling);
                     }
-                    extractedTextNode.Parent = clone;
-                    clone.Children.Add(extractedTextNode);
+                    SetParent(extractedTextNode, clone);
+                    clone.AppendChild(extractedTextNode);
                 }
             }
             currentParent = clone;
@@ -722,13 +722,13 @@ public sealed partial class DomBridge
         DomElement node,
         List<(double Left, double Top, double Width, double Height)> rects)
     {
-        if (node.IsTextNode || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(node) || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return;
 
         var display = GetComputedProps(node).GetValueOrDefault("display");
         if (string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var child in node.Children)
+            foreach (var child in ChildElements(node))
                 CollectClientRectsForRangeNode(child, rects);
 
             return;
@@ -776,7 +776,7 @@ public sealed partial class DomBridge
         {
             chain.Add(node);
             if (ReferenceEquals(node, topNode)) break;
-            node = node.Parent;
+            node = ParentEl(node);
         }
 
         // Pass 1: Clone the ancestor chain from top to bottom, creating
@@ -790,7 +790,7 @@ public sealed partial class DomBridge
             clones[i] = clone;
             if (i < chain.Count - 1)
             {
-                clone.Parent = clones[i + 1];
+                SetParent(clone, clones[i + 1]);
                 // Will position correctly in Pass 2
             }
         }
@@ -806,7 +806,7 @@ public sealed partial class DomBridge
             if (i == 0)
             {
                 // This is the startContainer level
-                if (original.IsTextNode)
+                if (IsText(original))
                 {
                     var text = original.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(startOffset);
@@ -815,12 +815,12 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    for (var ci = startOffset; ci < original.Children.Count; )
+                    for (var ci = startOffset; ci < original.ChildNodes.Count; )
                     {
-                        var child = original.Children[ci];
-                        original.Children.RemoveAt(ci);
-                        child.Parent = clone;
-                        clone.Children.Add(child);
+                        var child = ChildAt(original, ci);
+                        RemoveNthChild(original, ci);
+                        SetParent(child, clone);
+                        clone.AppendChild(child);
                     }
                 }
             }
@@ -830,20 +830,20 @@ public sealed partial class DomBridge
                 var childClone = clones[i - 1]; // next-in-chain clone
 
                 // First add the deeper clone (already populated from previous iterations)
-                childClone.Parent = parentClone;
-                parentClone.Children.Add(childClone);
+                SetParent(childClone, parentClone);
+                parentClone.AppendChild(childClone);
 
                 // Then move siblings after the chain child in the original
                 var nextInChain = chain[i - 1];
-                var childIdx = original.Children.IndexOf(nextInChain);
+                var childIdx = ChildIndexOf(original, nextInChain);
                 if (childIdx >= 0)
                 {
-                    for (var ci = childIdx + 1; ci < original.Children.Count; )
+                    for (var ci = childIdx + 1; ci < original.ChildNodes.Count; )
                     {
-                        var child = original.Children[ci];
-                        original.Children.RemoveAt(ci);
-                        child.Parent = parentClone;
-                        parentClone.Children.Add(child);
+                        var child = ChildAt(original, ci);
+                        RemoveNthChild(original, ci);
+                        SetParent(child, parentClone);
+                        parentClone.AppendChild(child);
                     }
                 }
             }
@@ -866,7 +866,7 @@ public sealed partial class DomBridge
         {
             chain.Add(node);
             if (ReferenceEquals(node, topNode)) break;
-            node = node.Parent;
+            node = ParentEl(node);
         }
 
         // Pass 1: Create clones for the chain
@@ -889,7 +889,7 @@ public sealed partial class DomBridge
             if (i == 0)
             {
                 // This is the endContainer level
-                if (original.IsTextNode)
+                if (IsText(original))
                 {
                     var text = original.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(0, endOffset);
@@ -898,12 +898,12 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    for (var ci = 0; ci < endOffset && original.Children.Count > 0; ci++)
+                    for (var ci = 0; ci < endOffset && original.ChildNodes.Count > 0; ci++)
                     {
-                        var child = original.Children[0];
-                        original.Children.RemoveAt(0);
-                        child.Parent = clone;
-                        clone.Children.Add(child);
+                        var child = ChildAt(original, 0);
+                        RemoveNthChild(original, 0);
+                        SetParent(child, clone);
+                        clone.AppendChild(child);
                     }
                 }
             }
@@ -914,22 +914,22 @@ public sealed partial class DomBridge
 
                 // First move siblings before the chain child in the original
                 var nextInChain = chain[i - 1];
-                var childIdx = original.Children.IndexOf(nextInChain);
+                var childIdx = ChildIndexOf(original, nextInChain);
                 if (childIdx >= 0)
                 {
                     for (var ci = 0; ci < childIdx; )
                     {
-                        var child = original.Children[0];
-                        original.Children.RemoveAt(0);
+                        var child = ChildAt(original, 0);
+                        RemoveNthChild(original, 0);
                         childIdx--;
-                        child.Parent = parentClone;
-                        parentClone.Children.Add(child);
+                        SetParent(child, parentClone);
+                        parentClone.AppendChild(child);
                     }
                 }
 
                 // Then add the deeper clone (already populated)
-                childClone.Parent = parentClone;
-                parentClone.Children.Add(childClone);
+                SetParent(childClone, parentClone);
+                parentClone.AppendChild(childClone);
             }
         }
 
@@ -996,11 +996,11 @@ public sealed partial class DomBridge
 
         private static bool IsDescendantOf(DomElement node, DomElement potentialAncestor)
         {
-            var current = node.Parent;
+            var current = ParentEl(node);
             while (current != null)
             {
                 if (ReferenceEquals(current, potentialAncestor)) return true;
-                current = current.Parent;
+                current = ParentEl(current);
             }
             return false;
         }
@@ -1012,8 +1012,8 @@ public sealed partial class DomBridge
     /// </summary>
     private void NotifyChildAdded(DomElement parent, DomElement addedChild, int index)
     {
-        var previousSibling = index > 0 ? parent.Children[index - 1] : null;
-        var nextSibling = index + 1 < parent.Children.Count ? parent.Children[index + 1] : null;
+        var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
+        var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
         NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
     }
 
@@ -1027,8 +1027,8 @@ public sealed partial class DomBridge
                 _activeRanges.RemoveAt(i); // GC'd — prune
         }
 
-        previousSibling ??= index > 0 ? parent.Children[index - 1] : null;
-        nextSibling ??= index < parent.Children.Count ? parent.Children[index] : null;
+        previousSibling ??= index > 0 ? ChildAt(parent, index - 1) : null;
+        nextSibling ??= index < parent.ChildNodes.Count ? ChildAt(parent, index) : null;
         NotifyMutationObservers(parent, null, removedChild, previousSibling, nextSibling);
     }
 
@@ -1242,14 +1242,14 @@ public sealed partial class DomBridge
             var current = node;
             while (current != null && !ReferenceEquals(current, root))
             {
-                if (current.Parent != null)
+                if (ParentEl(current) != null)
                 {
-                    var siblings = current.Parent.Children;
+                    var siblings = ChildElements(ParentEl(current)).ToList();
                     var idx = siblings.IndexOf(current);
                     if (idx >= 0 && idx + 1 < siblings.Count)
                         return siblings[idx + 1];
                 }
-                current = current.Parent;
+                current = ParentEl(current);
             }
             return null;
         }
@@ -1260,30 +1260,30 @@ public sealed partial class DomBridge
         /// </summary>
         private static DomElement? GetPreviousNodeBefore(DomElement node, DomElement root)
         {
-            if (node.Parent == null) return null;
-            var siblings = node.Parent.Children;
+            if (ParentEl(node) == null) return null;
+            var siblings = ChildElements(ParentEl(node)).ToList();
             var idx = siblings.IndexOf(node);
             if (idx > 0)
             {
                 // Go to the deepest last descendant of the previous sibling
                 var prev = siblings[idx - 1];
-                while (prev.Children.Count > 0)
-                    prev = prev.Children[^1];
+                while (prev.ChildNodes.Count > 0)
+                    prev = ChildAt(prev, ^1);
                 return prev;
             }
             // No previous sibling — parent is the previous node (unless it's root)
-            if (!ReferenceEquals(node.Parent, root))
-                return node.Parent;
+            if (!ReferenceEquals(ParentEl(node), root))
+                return ParentEl(node);
             return null;
         }
 
         private static bool IsDescendantOf(DomElement node, DomElement potentialAncestor)
         {
-            var current = node.Parent;
+            var current = ParentEl(node);
             while (current != null)
             {
                 if (ReferenceEquals(current, potentialAncestor)) return true;
-                current = current.Parent;
+                current = ParentEl(current);
             }
             return false;
         }

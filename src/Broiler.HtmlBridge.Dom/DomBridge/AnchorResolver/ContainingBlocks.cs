@@ -19,10 +19,10 @@ public sealed partial class DomBridge
     }
     private void EnsureContainingBlockPositioningTree(DomElement el)
     {
-        if (!el.IsTextNode && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (!IsText(el) && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
         {
             var props = CollectMatchedRuleProperties(el);
-            foreach (var kv in el.Style)
+            foreach (var kv in InlineStyle(el))
                 props[kv.Key] = kv.Value;
 
             // If the element already has explicit positioning, no change needed.
@@ -31,7 +31,7 @@ public sealed partial class DomBridge
 
             if (!alreadyPositioned && EstablishesContainingBlock(props))
             {
-                el.Style["position"] = "relative";
+                InlineStyle(el)["position"] = "relative";
             }
         }
 

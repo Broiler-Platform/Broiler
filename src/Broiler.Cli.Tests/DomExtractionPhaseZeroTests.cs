@@ -11,21 +11,25 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DomExtractionPhaseZeroTests
 {
+    // RF-BRIDGE-1c relocated bridge runtime state off the facade into
+    // ElementRuntimeState (the node model must not own it): Phase A moved
+    // JsSetStyleProps + OwnerDocRoot; Phase B moved the inline Style dictionary
+    // (now reached via DomBridge.InlineStyle). They no longer appear on the
+    // DomElement surface below.
     private static readonly string[] LegacyMutableCollectionProperties =
     [
-        "JsSetStyleProps",
         "NsAttrMap",
-        "Style",
     ];
 
+    // RF-BRIDGE-1c Phase E relocated the facade Parent getter/setter to
+    // DomBridge.ParentEl / SetParent over canonical ParentNode, so Parent is no
+    // longer a settable scalar on the DomElement surface below.
     private static readonly string[] LegacySettableScalarProperties =
     [
         "ClassName",
         "Id",
         "InnerHtml",
         "NamespaceURI",
-        "OwnerDocRoot",
-        "Parent",
         "TextContent",
     ];
 
@@ -99,15 +103,15 @@ public sealed class DomExtractionPhaseZeroTests
         Assert.Equal("html", documentElement.TagName);
         Assert.Equal("Phase Zero", title);
 
-        var head = Assert.Single(documentElement.Children, static child => child.TagName == "head");
-        var body = Assert.Single(documentElement.Children, static child => child.TagName == "body");
-        Assert.Same(documentElement, head.Parent);
-        Assert.Same(documentElement, body.Parent);
+        var head = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "head");
+        var body = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "body");
+        Assert.Same(documentElement, head.ParentNode);
+        Assert.Same(documentElement, body.ParentNode);
 
         var host = Assert.Single(elements, static element => element.Id == "host");
-        Assert.Same(body, host.Parent);
-        Assert.Equal(["span", "span"], host.Children.Select(static child => child.TagName));
-        Assert.All(host.Children, child => Assert.Same(host, child.Parent));
+        Assert.Same(body, host.ParentNode);
+        Assert.Equal(["span", "span"], host.ChildNodes.OfType<Broiler.Dom.DomElement>().Select(static child => child.TagName));
+        Assert.All(host.ChildNodes, child => Assert.Same(host, child.ParentNode));
     }
 
     [Fact]
@@ -156,8 +160,8 @@ public sealed class DomExtractionPhaseZeroTests
         var host = Assert.Single(bridge.Elements, static element => element.Id == "host");
         var created = Assert.Single(bridge.Elements, static element => element.Id == "created");
 
-        Assert.Same(host, created.Parent);
-        Assert.Contains(created, host.Children);
+        Assert.Same(host, created.ParentNode);
+        Assert.Contains(created, host.ChildNodes);
         Assert.Contains("<section id=\"created\"></section>", bridge.SerializeToHtml(), StringComparison.Ordinal);
     }
 }

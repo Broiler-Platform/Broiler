@@ -37,7 +37,7 @@ public sealed class HtmlTreeBuilder
         var allElements = new List<DomElement>();
         var fragment = new DomElement(document, "#document-fragment", null, null, string.Empty);
         foreach (var child in parsed.Fragment.ChildNodes)
-            fragment.Children.Add(ConvertNode(child, document, allElements));
+            fragment.AppendChild(ConvertNode(child, document, allElements));
         return (fragment, allElements);
     }
 
@@ -98,7 +98,7 @@ public sealed class HtmlTreeBuilder
                 structural &&
                 child is Broiler.Dom.DomElement childElement &&
                 childElement.LocalName is "head" or "body";
-            target.Children.Add(ConvertNode(child, targetDocument, allElements, childIsStructural));
+            target.AppendChild(ConvertNode(child, targetDocument, allElements, childIsStructural));
         }
 
         return target;

@@ -94,14 +94,14 @@ public sealed partial class DomBridge
         }
 
         // Individual element validation
-        if (!element.Attributes.ContainsKey("required")) return true;
+        if (!HasAttr(element, "required")) return true;
 
         var tag = element.TagName;
         if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(tag, "textarea", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(tag, "select", StringComparison.OrdinalIgnoreCase))
         {
-            element.Attributes.TryGetValue("value", out var val);
+            TryGetAttribute(element, "value", out var val);
             return !string.IsNullOrEmpty(val);
         }
         return true;
@@ -109,9 +109,9 @@ public sealed partial class DomBridge
 
     private static bool ValidateFormChildren(DomElement form)
     {
-        foreach (var child in form.Children)
+        foreach (var child in ChildElements(form))
         {
-            if (!child.IsTextNode && !CheckElementValidity(child)) return false;
+            if (!IsText(child) && !CheckElementValidity(child)) return false;
             if (!ValidateFormChildren(child)) return false;
         }
         return true;
@@ -129,8 +129,8 @@ public sealed partial class DomBridge
         // Build the path from the root to the target
         var path = new List<DomElement>();
         var visited = new HashSet<DomElement>();
-        var node = target.Parent;
-        while (node != null && visited.Add(node)) { path.Add(node); node = node.Parent; }
+        var node = ParentEl(target);
+        while (node != null && visited.Add(node)) { path.Add(node); node = ParentEl(node); }
         path.Reverse();
 
         // Include the document node at the very beginning of the path
@@ -267,7 +267,7 @@ public sealed partial class DomBridge
         foreach (var eventName in InlineEventNames)
         {
             var attrName = $"on{eventName}";
-            if (element.Attributes.TryGetValue(attrName, out var code) &&
+            if (TryGetAttribute(element, attrName, out var code) &&
                 !string.IsNullOrEmpty(code) &&
                 !GetInlineEventHandlers(element).ContainsKey(eventName))
             {

@@ -14,7 +14,7 @@ public sealed partial class DomBridge
         DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
-        if (!element.IsTextNode)
+        if (!IsText(element))
         {
             var cssProps = GetComputedProps(element);
 
@@ -33,9 +33,9 @@ public sealed partial class DomBridge
                 ResolveAnchorForElement(positionAnchor, element, anchorRegistry) is { } anchor)
             {
                 double elWidth = TryParsePx(cssProps.GetValueOrDefault("width")) ??
-                                 TryParsePx(element.Style.GetValueOrDefault("width")) ?? 0;
+                                 TryParsePx(InlineStyle(element).GetValueOrDefault("width")) ?? 0;
                 double elHeight = TryParsePx(cssProps.GetValueOrDefault("height")) ??
-                                  TryParsePx(element.Style.GetValueOrDefault("height")) ?? 0;
+                                  TryParsePx(InlineStyle(element).GetValueOrDefault("height")) ?? 0;
 
                 // align-self: anchor-center → center vertically on anchor
                 if (alignSelf != null &&
@@ -43,7 +43,7 @@ public sealed partial class DomBridge
                 {
                     double anchorCenterY = anchor.Top + anchor.Height / 2.0;
                     double top = anchorCenterY - elHeight / 2.0;
-                    element.Style["top"] = $"{top.ToString(CultureInfo.InvariantCulture)}px";
+                    InlineStyle(element)["top"] = $"{top.ToString(CultureInfo.InvariantCulture)}px";
                 }
 
                 // justify-self: anchor-center → center horizontally on anchor
@@ -52,14 +52,14 @@ public sealed partial class DomBridge
                 {
                     double anchorCenterX = anchor.Left + anchor.Width / 2.0;
                     double left = anchorCenterX - elWidth / 2.0;
-                    element.Style["left"] = $"{left.ToString(CultureInfo.InvariantCulture)}px";
+                    InlineStyle(element)["left"] = $"{left.ToString(CultureInfo.InvariantCulture)}px";
                 }
 
                 // Ensure the element has position:absolute.
                 if (!cssProps.TryGetValue("position", out var pos) ||
                     pos == "static")
                 {
-                    element.Style["position"] = "absolute";
+                    InlineStyle(element)["position"] = "absolute";
                 }
             }
         }

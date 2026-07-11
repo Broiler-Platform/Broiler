@@ -12,7 +12,7 @@ public sealed partial class DomBridge
         var animations = new List<JSValue>();
         foreach (var element in Elements)
         {
-            if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+            if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
                 continue;
             if (target != null && !ReferenceEquals(element, target))
                 continue;
@@ -35,9 +35,9 @@ public sealed partial class DomBridge
         animationShorthand = null;
         animationDelay = null;
 
-        if (element.Style.TryGetValue("animation", out animationShorthand))
+        if (InlineStyle(element).TryGetValue("animation", out animationShorthand))
         {
-            element.Style.TryGetValue("animation-delay", out animationDelay);
+            InlineStyle(element).TryGetValue("animation-delay", out animationDelay);
             return true;
         }
 

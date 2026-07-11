@@ -109,9 +109,9 @@ public sealed partial class DomBridge
 
     private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
-            if (!child.IsTextNode && MatchesSelector(child, selector, scope))
+            if (!IsText(child) && MatchesSelector(child, selector, scope))
             {
                 results.Add(bridge.ToJSObject(child));
                 if (!all) return;
@@ -126,12 +126,12 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectTextContent(DomElement node, StringBuilder sb)
     {
-        if (node.IsTextNode)
+        if (IsText(node))
         {
             sb.Append(node.TextContent ?? string.Empty);
             return;
         }
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
             CollectTextContent(child, sb);
     }
 
@@ -315,11 +315,11 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsDescendant(DomElement ancestor, DomElement candidate)
     {
-        var current = candidate.Parent;
+        var current = ParentEl(candidate);
         while (current != null)
         {
             if (ReferenceEquals(current, ancestor)) return true;
-            current = current.Parent;
+            current = ParentEl(current);
         }
         return false;
     }
@@ -335,12 +335,12 @@ public sealed partial class DomBridge
             return 0;
 
         var firstAncestors = new List<DomElement>();
-        for (var current = first; current != null; current = current.Parent)
+        for (var current = first; current != null; current = ParentEl(current))
             firstAncestors.Add(current);
         firstAncestors.Reverse();
 
         var secondAncestors = new List<DomElement>();
-        for (var current = second; current != null; current = current.Parent)
+        for (var current = second; current != null; current = ParentEl(current))
             secondAncestors.Add(current);
         secondAncestors.Reverse();
 
@@ -362,8 +362,8 @@ public sealed partial class DomBridge
         var commonAncestor = firstAncestors[divergenceIndex - 1];
         var firstChild = firstAncestors[divergenceIndex];
         var secondChild = secondAncestors[divergenceIndex];
-        var firstIndex = commonAncestor.Children.IndexOf(firstChild);
-        var secondIndex = commonAncestor.Children.IndexOf(secondChild);
+        var firstIndex = ChildIndexOf(commonAncestor, firstChild);
+        var secondIndex = ChildIndexOf(commonAncestor, secondChild);
 
         if (firstIndex == secondIndex)
             return 0;
@@ -379,9 +379,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static void AdoptSubtreeIntoDocument(DomElement node, DomElement? ownerDocRoot)
     {
-        node.OwnerDocRoot = ownerDocRoot;
+        GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
         {
             if (IsSubDocRoot(child))
                 continue;
@@ -396,9 +396,15 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
-        var attrs = new Dictionary<string, string>(source.Attributes, StringComparer.OrdinalIgnoreCase);
-        var style = new Dictionary<string, string>(source.Style, StringComparer.OrdinalIgnoreCase);
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, style, attrs, source.IsTextNode);
+        var attrs = AttributeSnapshot(source);
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, IsText(source));
+        // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
+        // source's live style dict (which may hold JS mutations not yet synced to the
+        // `style=` attribute), replacing the clone's lazily-seeded attribute values.
+        var cloneStyle = InlineStyle(clone);
+        cloneStyle.Clear();
+        foreach (var kv in InlineStyle(source))
+            cloneStyle[kv.Key] = kv.Value;
         clone.TextContent = source.TextContent;
         clone.NamespaceURI = source.NamespaceURI;
         foreach (var kv in source.NsAttrMap)
@@ -411,11 +417,11 @@ public sealed partial class DomBridge
 
         if (deep)
         {
-            foreach (var child in source.Children)
+            foreach (var child in ChildElements(source))
             {
                 var childClone = CloneDomElement(child, true);
-                childClone.Parent = clone;
-                clone.Children.Add(childClone);
+                SetParent(childClone, clone);
+                clone.AppendChild(childClone);
                 _knownNodes.Add(childClone);
             }
         }
@@ -430,29 +436,29 @@ public sealed partial class DomBridge
     {
         var rows = new List<DomElement>();
         // 1. All tr children of thead elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             if (string.Equals(child.TagName, "thead", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             var ctag = child.TagName.ToLowerInvariant();
             if (ctag == "tr")
                 rows.Add(child);
             else if (ctag == "tbody")
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 3. All tr children of tfoot elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             if (string.Equals(child.TagName, "tfoot", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
@@ -489,12 +495,12 @@ public sealed partial class DomBridge
         {
             // Find the last section to append to, or create a tbody
             DomElement? lastSection = null;
-            for (int i = table.Children.Count - 1; i >= 0; i--)
+            for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
             {
-                var ctag = table.Children[i].TagName.ToLowerInvariant();
+                var ctag = ChildAt(table, i).TagName.ToLowerInvariant();
                 if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
                 {
-                    lastSection = table.Children[i];
+                    lastSection = ChildAt(table, i);
                     break;
                 }
             }
@@ -503,28 +509,28 @@ public sealed partial class DomBridge
                 // No sections and no rows at all: create a new tbody per spec
                 var tbody = new DomElement("tbody", null, null, string.Empty);
                 bridge._knownNodes.Add(tbody);
-                tbody.Parent = table;
-                table.Children.Add(tbody);
+                SetParent(tbody, table);
+                table.AppendChild(tbody);
                 lastSection = tbody;
             }
             if (lastSection != null)
             {
-                tr.Parent = lastSection;
-                lastSection.Children.Add(tr);
+                SetParent(tr, lastSection);
+                lastSection.AppendChild(tr);
             }
             else
             {
-                tr.Parent = table;
-                table.Children.Add(tr);
+                SetParent(tr, table);
+                table.AppendChild(tr);
             }
         }
         else if (index >= 0 && index < allRows.Count)
         {
             var refRow = allRows[index];
-            var parent = refRow.Parent ?? table;
-            tr.Parent = parent;
-            var idx = parent.Children.IndexOf(refRow);
-            parent.Children.Insert(idx >= 0 ? idx : parent.Children.Count, tr);
+            var parent = ParentEl(refRow) ?? table;
+            SetParent(tr, parent);
+            var idx = ChildIndexOf(parent, refRow);
+            InsertChildAt(parent, idx >= 0 ? idx : parent.ChildNodes.Count, tr);
         }
         return ToJSObject(tr);
     }
@@ -541,7 +547,7 @@ public sealed partial class DomBridge
 
     private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
             var ctag = child.TagName.ToLowerInvariant();
             if (ctag == "input" || ctag == "select" || ctag == "textarea" || ctag == "button")
@@ -556,14 +562,14 @@ public sealed partial class DomBridge
     /// </summary>
     private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
-        foreach (var child in scope.Children)
+        foreach (var child in ChildElements(scope))
         {
-            if (!child.IsTextNode && !ReferenceEquals(child, except))
+            if (!IsText(child) && !ReferenceEquals(child, except))
             {
                 if (string.Equals(child.TagName, "input", StringComparison.OrdinalIgnoreCase) &&
-                    child.Attributes.TryGetValue("type", out var st) &&
+                    TryGetAttribute(child, "type", out var st) &&
                     string.Equals(st, "radio", StringComparison.OrdinalIgnoreCase) &&
-                    child.Attributes.TryGetValue("name", out var sn) &&
+                    TryGetAttribute(child, "name", out var sn) &&
                     string.Equals(sn, radioName, StringComparison.Ordinal))
                 {
                     GetElementRuntimeState(child).FormControl.Checked.Set(false);
@@ -601,7 +607,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendants(DomElement root, List<DomElement> result)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
@@ -619,7 +625,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectAllDescendantsFlat(DomElement parent, List<DomElement> result)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
             result.Add(child);
             CollectAllDescendantsFlat(child, result);
@@ -631,7 +637,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (tagName == "*" || string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
                 results.Add(bridge.ToJSObject(child));
@@ -655,7 +661,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static int GetNodeType(DomElement element)
     {
-        if (element.IsTextNode) return 3; // TEXT_NODE
+        if (IsText(element)) return 3; // TEXT_NODE
         if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return 8;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
@@ -672,8 +678,8 @@ public sealed partial class DomBridge
     /// A JSObject subclass that intercepts property get/set to sync
     /// JavaScript camelCase style property assignments (e.g.
     /// <c>style.animationDelay = '-100s'</c>) with the DOM element's
-    /// <see cref="DomElement.Style"/> dictionary in CSS kebab-case
-    /// (<c>animation-delay: -100s</c>).
+    /// inline style (<see cref="ElementRuntimeState.Style"/>, reached via
+    /// <c>InlineStyle</c>) in CSS kebab-case (<c>animation-delay: -100s</c>).
     /// </summary>
     private sealed class CssStyleDeclaration : JSObject
     {
@@ -699,13 +705,13 @@ public sealed partial class DomBridge
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
-                    _element.Style.Remove(kebab);
-                    _element.JsSetStyleProps.Remove(kebab);
+                    InlineStyle(_element).Remove(kebab);
+                    GetElementRuntimeState(_element).JsSetStyleProps.Remove(kebab);
                 }
                 else
                 {
-                    _element.Style[kebab] = val;
-                    _element.JsSetStyleProps.Add(kebab);
+                    InlineStyle(_element)[kebab] = val;
+                    GetElementRuntimeState(_element).JsSetStyleProps.Add(kebab);
                 }
 
                 // Invalidate cached position-area resolution when relevant
@@ -727,7 +733,7 @@ public sealed partial class DomBridge
             if (result != null && !result.IsUndefined)
                 return result;
 
-            // Fall back to element.Style lookup (kebab-case)
+            // Fall back to InlineStyle(element) lookup (kebab-case)
             var nameStr = key.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
@@ -795,22 +801,22 @@ public sealed partial class DomBridge
         => style.Keys.ToList();
 
     private static List<string> GetStylePropertyNames(DomElement element)
-        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)element.Style);
+        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)InlineStyle(element));
 
     private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
     {
         var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+        if (TryGetAttribute(element, "style", out var inlineStyle) &&
             !string.IsNullOrEmpty(inlineStyle))
         {
             foreach (var kv in ParseStyle(inlineStyle))
                 declared[kv.Key] = kv.Value;
         }
 
-        foreach (var property in element.JsSetStyleProps)
+        foreach (var property in GetElementRuntimeState(element).JsSetStyleProps)
         {
-            if (element.Style.TryGetValue(property, out var value))
+            if (InlineStyle(element).TryGetValue(property, out var value))
                 declared[property] = value;
         }
 
@@ -862,7 +868,7 @@ public sealed partial class DomBridge
 
     private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
     {
-        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)element.Style, property, out value!))
+        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)InlineStyle(element), property, out value!))
             return true;
 
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
@@ -885,7 +891,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) => JsUtilitiesSetProperty005Core(element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // style.getPropertyValue(property) — checks element.Style dict first, then
+        // style.getPropertyValue(property) — checks InlineStyle(element) dict first, then
         // tries camelCase conversion for kebab-case input (or vice versa),
         // and also checks JSObject properties (set via el.style.camelCase = value).
         style.FastAddValue(
@@ -1079,8 +1085,8 @@ public sealed partial class DomBridge
     {
         var ctx = new JSObject();
         int width = 300, height = 150;
-        if (canvas.Attributes.TryGetValue("width", out var w) && int.TryParse(w, out var pw)) width = pw;
-        if (canvas.Attributes.TryGetValue("height", out var h) && int.TryParse(h, out var ph)) height = ph;
+        if (TryGetAttribute(canvas, "width", out var w) && int.TryParse(w, out var pw)) width = pw;
+        if (TryGetAttribute(canvas, "height", out var h) && int.TryParse(h, out var ph)) height = ph;
 
         var context2d = new CanvasRenderingContext2D(width, height);
 

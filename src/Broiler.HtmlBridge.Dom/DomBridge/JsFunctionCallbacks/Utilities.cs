@@ -19,7 +19,7 @@ public sealed partial class DomBridge
 
     private static JSValue JsUtilitiesGetCssText003Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var parts = element.Style.Select(kv => $"{kv.Key}: {kv.Value}");
+        var parts = InlineStyle(element).Select(kv => $"{kv.Key}: {kv.Value}");
         var text = string.Join("; ", parts);
         return new JSString(text.Length > 0 ? text + ";" : text);
     }
@@ -27,14 +27,14 @@ public sealed partial class DomBridge
 
     private static JSValue JsUtilitiesSetCssText004Core(global::Broiler.HtmlBridge.DomElement element, global::System.Action? onMutation, in Arguments a)
     {
-        element.Style.Clear();
-        element.JsSetStyleProps.Clear();
+        InlineStyle(element).Clear();
+        GetElementRuntimeState(element).JsSetStyleProps.Clear();
         if (a.Length > 0)
         {
             foreach (var kv in ParseStyle(a[0].ToString(), reportDrops: true))
             {
-                element.Style[kv.Key] = kv.Value;
-                element.JsSetStyleProps.Add(kv.Key);
+                InlineStyle(element)[kv.Key] = kv.Value;
+                GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
         }
 
@@ -51,13 +51,13 @@ public sealed partial class DomBridge
             var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
             {
-                element.Style.Remove(prop);
-                element.JsSetStyleProps.Remove(prop);
+                InlineStyle(element).Remove(prop);
+                GetElementRuntimeState(element).JsSetStyleProps.Remove(prop);
             }
             else
             {
-                element.Style[prop] = value;
-                element.JsSetStyleProps.Add(prop);
+                InlineStyle(element)[prop] = value;
+                GetElementRuntimeState(element).JsSetStyleProps.Add(prop);
             }
 
             onMutation?.Invoke();
@@ -94,9 +94,9 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
-            var removed = element.Style.TryGetValue(prop, out var val) ? val : string.Empty;
-            element.Style.Remove(prop);
-            element.JsSetStyleProps.Remove(prop);
+            var removed = InlineStyle(element).TryGetValue(prop, out var val) ? val : string.Empty;
+            InlineStyle(element).Remove(prop);
+            GetElementRuntimeState(element).JsSetStyleProps.Remove(prop);
             onMutation?.Invoke();
             return new JSString(removed);
         }
@@ -107,7 +107,7 @@ public sealed partial class DomBridge
 
     private static JSValue JsUtilitiesGetCssFloat008Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Style.TryGetValue("float", out var val))
+        if (InlineStyle(element).TryGetValue("float", out var val))
             return new JSString(val);
         return new JSString(string.Empty);
     }
@@ -116,7 +116,7 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesSetCssFloat009Core(global::Broiler.HtmlBridge.DomElement element, global::System.Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
-            element.Style["float"] = a[0].ToString();
+            InlineStyle(element)["float"] = a[0].ToString();
         onMutation?.Invoke();
         return JSUndefined.Value;
     }

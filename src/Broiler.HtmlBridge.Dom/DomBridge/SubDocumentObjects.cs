@@ -69,21 +69,21 @@ public sealed partial class DomBridge
         // firstChild
         doc.FastAddProperty(
             (KeyString)"firstChild",
-            new JSFunction((in Arguments _) => docRoot.Children.Count > 0 ? ToJSObject(docRoot.Children[0]) : JSNull.Value, "get firstChild"),
+            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lastChild
         doc.FastAddProperty(
             (KeyString)"lastChild",
-            new JSFunction((in Arguments _) => docRoot.Children.Count > 0 ? ToJSObject(docRoot.Children[^1]) : JSNull.Value, "get lastChild"),
+            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // hasChildNodes()
         doc.FastAddValue(
             (KeyString)"hasChildNodes",
-            new JSFunction((in Arguments _) => docRoot.Children.Count > 0 ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False,
                 "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -296,9 +296,9 @@ public sealed partial class DomBridge
     /// <summary>Finds the first element in a sub-tree matching a predicate.</summary>
     private DomElement? FindInSubTree(DomElement root, Func<DomElement, bool> predicate)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
-            if (!child.IsTextNode && !child.TagName.StartsWith("#") && predicate(child))
+            if (!IsText(child) && !child.TagName.StartsWith("#") && predicate(child))
                 return child;
             var found = FindInSubTree(child, predicate);
             if (found != null) return found;
@@ -310,7 +310,7 @@ public sealed partial class DomBridge
     private static DomElement? FindInTree(DomElement root, Func<DomElement, bool> predicate)
     {
         if (predicate(root)) return root;
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             var found = FindInTree(child, predicate);
             if (found != null) return found;

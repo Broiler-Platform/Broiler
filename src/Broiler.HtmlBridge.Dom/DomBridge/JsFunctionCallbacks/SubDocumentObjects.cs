@@ -16,7 +16,7 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetBody003Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
-        foreach (var child in htmlEl.Children)
+        foreach (var child in ChildElements(htmlEl))
         {
             if (string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase))
                 return ToJSObject(child);
@@ -29,7 +29,7 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetHead004Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
-        foreach (var child in htmlEl.Children)
+        foreach (var child in ChildElements(htmlEl))
         {
             if (string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase))
                 return ToJSObject(child);
@@ -42,15 +42,15 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetTitle005Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
-        var head = htmlEl.Children.FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
+        var head = ChildElements(htmlEl).FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
         if (head != null)
         {
-            var titleEl = head.Children.FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
+            var titleEl = ChildElements(head).FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
             if (titleEl != null)
             {
                 // Two paths: (1) textContent setter clears children and stores text directly
                 // in TextContent, (2) text set via child text nodes (e.g. createTextNode + appendChild).
-                if (titleEl.TextContent != null && titleEl.Children.Count == 0)
+                if (titleEl.TextContent != null && titleEl.ChildNodes.Count == 0)
                     return new JSString(titleEl.TextContent);
                 var sb = new StringBuilder();
                 CollectTextContent(titleEl, sb);
@@ -65,14 +65,14 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsSetTitle006Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
     {
         var htmlEl = GetDocumentElement(docRoot);
-        var head = htmlEl.Children.FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
+        var head = ChildElements(htmlEl).FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
         if (head != null)
         {
-            var titleEl = head.Children.FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
+            var titleEl = ChildElements(head).FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
             if (titleEl != null)
             {
                 titleEl.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
-                titleEl.Children.Clear();
+                ClearChildren(titleEl);
             }
         }
 
@@ -91,7 +91,7 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetChildNodes008Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var arr = new JSArray();
-        foreach (var child in docRoot.Children)
+        foreach (var child in ChildElements(docRoot))
             arr.Add(ToJSObject(child));
         return arr;
     }
@@ -122,7 +122,7 @@ public sealed partial class DomBridge
         ValidateElementName(tagName, _jsContext!);
         tagName = AsciiToLower(tagName);
         var el = new DomElement(_document, tagName, null, null, string.Empty);
-        el.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -133,7 +133,7 @@ public sealed partial class DomBridge
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
         el.TextContent = text;
-        el.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -144,7 +144,7 @@ public sealed partial class DomBridge
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#comment", null, null, string.Empty);
         el.TextContent = data;
-        el.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -158,7 +158,7 @@ public sealed partial class DomBridge
         var el = new DomElement(_document, localName, null, null, string.Empty);
         if (!string.IsNullOrEmpty(ns))
             el.NamespaceURI = ns;
-        el.OwnerDocRoot = docRoot;
+        GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -497,7 +497,7 @@ public sealed partial class DomBridge
 
     private JSValue JsSubDocumentObjectsOpen039Core(global::Broiler.JavaScript.Runtime.JSObject? doc, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
-        docRoot.Children.Clear();
+        ClearChildren(docRoot);
         return doc;
     }
 
@@ -511,19 +511,19 @@ public sealed partial class DomBridge
         var doctype = bridge.ParseDocType(fragment);
         var treeBuilder = new HtmlTreeBuilder();
         var (parsedDoc, allEls, _) = treeBuilder.Build(fragment);
-        if (docRoot.Children.Count == 0)
+        if (docRoot.ChildNodes.Count == 0)
         {
             if (doctype != null)
             {
-                doctype.Parent = docRoot;
-                docRoot.Children.Add(doctype);
+                SetParent(doctype, docRoot);
+                docRoot.AppendChild(doctype);
                 bridge._knownNodes.Add(doctype);
             }
 
             // parsedDoc is the <html> element from HtmlTreeBuilder.
             // Add it directly to docRoot (not its children).
-            parsedDoc.Parent = docRoot;
-            docRoot.Children.Add(parsedDoc);
+            SetParent(parsedDoc, docRoot);
+            docRoot.AppendChild(parsedDoc);
             if (!bridge._knownNodes.Contains(parsedDoc))
                 bridge._knownNodes.Add(parsedDoc);
             foreach (var el in allEls)
@@ -540,10 +540,10 @@ public sealed partial class DomBridge
                 var parsedBody = FindInTree(parsedDoc, el => string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase));
                 if (parsedBody != null)
                 {
-                    foreach (var child in parsedBody.Children)
+                    foreach (var child in ChildElements(parsedBody))
                     {
-                        child.Parent = bodyEl;
-                        bodyEl.Children.Add(child);
+                        SetParent(child, bodyEl);
+                        bodyEl.AppendChild(child);
                     }
                 }
             }
@@ -570,7 +570,7 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsGetLinks042Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
     {
         var results = new List<JSValue>();
-        CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && el.Attributes.ContainsKey("href"), results);
+        CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && HasAttr(el, "href"), results);
         return new JSArray(results);
     }
 
@@ -582,16 +582,16 @@ public sealed partial class DomBridge
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSNull.Value;
-        foreach (var child in docRoot.Children.ToList())
+        foreach (var child in ChildElements(docRoot).ToList())
         {
             if (bridge._jsObjectCache.TryGetValue(child, out var cached) && cached == childObj)
             {
-                var idx = docRoot.Children.IndexOf(child);
+                var idx = ChildIndexOf(docRoot, child);
                 if (idx >= 0)
                 {
                     bridge.NotifyNodeIteratorPreRemoval(child);
-                    docRoot.Children.RemoveAt(idx);
-                    child.Parent = null;
+                    RemoveNthChild(docRoot, idx);
+                    SetParent(child, null);
                     bridge.NotifyChildRemoved(docRoot, child, idx);
                 }
 
@@ -615,11 +615,11 @@ public sealed partial class DomBridge
             if (kvp.Value == childObj)
             {
                 var child = kvp.Key;
-                if (child.Parent != null)
-                    child.Parent.Children.Remove(child);
-                child.Parent = docRoot;
+                if (ParentEl(child) != null)
+                    child.Remove();
+                SetParent(child, docRoot);
                 AdoptSubtreeIntoDocument(child, docRoot);
-                docRoot.Children.Add(child);
+                docRoot.AppendChild(child);
                 return childObj;
             }
         }
@@ -633,7 +633,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSUndefined.Value;
         var nodes = bridge.BuildChildNodeArgumentNodes(a);
-        var insertIndex = docRoot.Children.Count;
+        var insertIndex = docRoot.ChildNodes.Count;
         foreach (var node in nodes)
             bridge.InsertNodeAt(docRoot, node, insertIndex++);
         return JSUndefined.Value;
@@ -687,9 +687,9 @@ public sealed partial class DomBridge
                 if (kvp.Value == dtObj)
                 {
                     var dtEl = kvp.Key;
-                    dtEl.Parent = subDocRoot;
-                    dtEl.OwnerDocRoot = subDocRoot;
-                    subDocRoot.Children.Add(dtEl);
+                    SetParent(dtEl, subDocRoot);
+                    GetElementRuntimeState(dtEl).OwnerDocRoot = subDocRoot;
+                    subDocRoot.AppendChild(dtEl);
                     break;
                 }
             }
@@ -700,9 +700,9 @@ public sealed partial class DomBridge
             var docEl = new DomElement(_document, qName, null, null, string.Empty);
             if (!string.IsNullOrEmpty(ns))
                 docEl.NamespaceURI = ns;
-            docEl.Parent = subDocRoot;
-            docEl.OwnerDocRoot = subDocRoot;
-            subDocRoot.Children.Add(docEl);
+            SetParent(docEl, subDocRoot);
+            GetElementRuntimeState(docEl).OwnerDocRoot = subDocRoot;
+            subDocRoot.AppendChild(docEl);
             _knownNodes.Add(docEl);
         }
 
@@ -721,40 +721,40 @@ public sealed partial class DomBridge
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
         GetElementRuntimeState(dt).DocumentType.SystemId.Set(string.Empty);
         GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
-        dt.Parent = subDocRoot;
-        dt.OwnerDocRoot = subDocRoot;
-        subDocRoot.Children.Add(dt);
+        SetParent(dt, subDocRoot);
+        GetElementRuntimeState(dt).OwnerDocRoot = subDocRoot;
+        subDocRoot.AppendChild(dt);
         _knownNodes.Add(dt);
         var subHtml = new DomElement(_document, "html", null, null, string.Empty);
         subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
-        subHtml.Parent = subDocRoot;
-        subHtml.OwnerDocRoot = subDocRoot;
-        subDocRoot.Children.Add(subHtml);
+        SetParent(subHtml, subDocRoot);
+        GetElementRuntimeState(subHtml).OwnerDocRoot = subDocRoot;
+        subDocRoot.AppendChild(subHtml);
         _knownNodes.Add(subHtml);
         var subHead = new DomElement(_document, "head", null, null, string.Empty);
-        subHead.Parent = subHtml;
-        subHead.OwnerDocRoot = subDocRoot;
-        subHtml.Children.Add(subHead);
+        SetParent(subHead, subHtml);
+        GetElementRuntimeState(subHead).OwnerDocRoot = subDocRoot;
+        subHtml.AppendChild(subHead);
         _knownNodes.Add(subHead);
         if (subTitle != null)
         {
             var subTitleEl = new DomElement(_document, "title", null, null, string.Empty);
-            subTitleEl.Parent = subHead;
-            subTitleEl.OwnerDocRoot = subDocRoot;
-            subHead.Children.Add(subTitleEl);
+            SetParent(subTitleEl, subHead);
+            GetElementRuntimeState(subTitleEl).OwnerDocRoot = subDocRoot;
+            subHead.AppendChild(subTitleEl);
             _knownNodes.Add(subTitleEl);
             var subTitleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             subTitleText.TextContent = subTitle;
-            subTitleText.Parent = subTitleEl;
-            subTitleText.OwnerDocRoot = subDocRoot;
-            subTitleEl.Children.Add(subTitleText);
+            SetParent(subTitleText, subTitleEl);
+            GetElementRuntimeState(subTitleText).OwnerDocRoot = subDocRoot;
+            subTitleEl.AppendChild(subTitleText);
             _knownNodes.Add(subTitleText);
         }
 
         var subBody = new DomElement(_document, "body", null, null, string.Empty);
-        subBody.Parent = subHtml;
-        subBody.OwnerDocRoot = subDocRoot;
-        subHtml.Children.Add(subBody);
+        SetParent(subBody, subHtml);
+        GetElementRuntimeState(subBody).OwnerDocRoot = subDocRoot;
+        subHtml.AppendChild(subBody);
         _knownNodes.Add(subBody);
         return BuildSubDocument(subDocRoot);
     }

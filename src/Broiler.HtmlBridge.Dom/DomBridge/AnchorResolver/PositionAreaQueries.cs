@@ -81,7 +81,7 @@ public sealed partial class DomBridge
 
         // Resolve on-the-fly from CSS properties and inline styles.
         var cssProps = CollectMatchedRuleProperties(element);
-        foreach (var kv in element.Style)
+        foreach (var kv in InlineStyle(element))
             cssProps[kv.Key] = kv.Value;
 
         string? positionArea = cssProps.GetValueOrDefault("position-area");

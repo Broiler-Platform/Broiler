@@ -10099,7 +10099,7 @@ iframe {
     {
         if (found != null) return;
         if (el.Id == id) { found = el; return; }
-        foreach (var c in el.Children)
+        foreach (var c in el.ChildNodes.OfType<Broiler.HtmlBridge.DomElement>())
             FindDomElement(c, id, ref found);
     }
 

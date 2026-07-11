@@ -31,7 +31,7 @@ public sealed partial class DomBridge
 
     private static DomElement? FindContainingShadowRoot(DomElement? element)
     {
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
             if (string.Equals(current.TagName, "#shadow-root", StringComparison.Ordinal))
                 return current;
@@ -43,8 +43,8 @@ public sealed partial class DomBridge
     private DomElement GetTreeRoot(DomElement element)
     {
         var current = element;
-        while (current.Parent != null)
-            current = current.Parent;
+        while (ParentEl(current) != null)
+            current = ParentEl(current);
         return current;
     }
 
@@ -63,8 +63,8 @@ public sealed partial class DomBridge
 
     private static bool SlotAcceptsNode(DomElement slot, DomElement node)
     {
-        var slotName = slot.Attributes.GetValueOrDefault("name");
-        var nodeSlot = node.Attributes.GetValueOrDefault("slot");
+        var slotName = GetAttr(slot, "name");
+        var nodeSlot = GetAttr(node, "slot");
         return string.IsNullOrEmpty(slotName)
             ? string.IsNullOrEmpty(nodeSlot)
             : string.Equals(slotName, nodeSlot, StringComparison.OrdinalIgnoreCase);
@@ -72,9 +72,9 @@ public sealed partial class DomBridge
 
     private DomElement? FindAssignedSlot(DomElement root, DomElement node)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
-            if (child.IsTextNode)
+            if (IsText(child))
                 continue;
 
             if (string.Equals(child.TagName, "slot", StringComparison.OrdinalIgnoreCase) &&
@@ -93,10 +93,10 @@ public sealed partial class DomBridge
 
     private DomElement? GetAssignedSlot(DomElement element)
     {
-        if (element.IsTextNode || element.Parent == null)
+        if (IsText(element) || ParentEl(element) == null)
             return null;
 
-        var shadowRoot = GetShadowRoot(element.Parent);
+        var shadowRoot = GetShadowRoot(ParentEl(element));
         return shadowRoot != null ? FindAssignedSlot(shadowRoot, element) : null;
     }
 
@@ -106,7 +106,7 @@ public sealed partial class DomBridge
         if (assignedSlot != null)
             return assignedSlot;
 
-        var parent = element.Parent;
+        var parent = ParentEl(element);
         return GetShadowHost(parent) ?? parent;
     }
 

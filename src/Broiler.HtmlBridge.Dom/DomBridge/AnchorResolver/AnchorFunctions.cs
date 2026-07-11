@@ -31,7 +31,7 @@ public sealed partial class DomBridge
                 hasAnchorSizeRef = true;
         }
         // Also check inline styles for anchor-size()
-        foreach (var kv in element.Style)
+        foreach (var kv in InlineStyle(element))
         {
             if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
                 hasAnchorSizeRef = true;
@@ -45,14 +45,14 @@ public sealed partial class DomBridge
 
             // Get the implicit anchor name from position-anchor.
             string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
-                                     element.Style.GetValueOrDefault("position-anchor");
+                                     InlineStyle(element).GetValueOrDefault("position-anchor");
 
             // When the target element is fixed-positioned (e.g. top-layer dialog)
             // and the anchor is NOT fixed-positioned, anchor positions must be
             // adjusted by the document scroll offset so the anchor's viewport
             // position is used instead of its document position.
             bool targetIsFixed =
-                (cssProps.GetValueOrDefault("position") ?? element.Style.GetValueOrDefault("position")) == "fixed" ||
+                (cssProps.GetValueOrDefault("position") ?? InlineStyle(element).GetValueOrDefault("position")) == "fixed" ||
                 (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var tModal) && tModal is true);
             double scrollAdjY = 0, scrollAdjX = 0;
             if (targetIsFixed)
@@ -134,7 +134,7 @@ public sealed partial class DomBridge
                 });
 
                 if (resolved != kv.Value)
-                    element.Style[kv.Key] = resolved;
+                    InlineStyle(element)[kv.Key] = resolved;
             }
 
             // Apply non-anchor CSS properties (e.g. position, margin).
@@ -142,15 +142,15 @@ public sealed partial class DomBridge
             {
                 if (!kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
                     !kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase) &&
-                    !element.Style.ContainsKey(kv.Key) &&
+                    !InlineStyle(element).ContainsKey(kv.Key) &&
                     IsLayoutProperty(kv.Key))
                 {
-                    element.Style[kv.Key] = kv.Value;
+                    InlineStyle(element)[kv.Key] = kv.Value;
                 }
             }
 
             // Remove 'inset' shorthand.
-            element.Style.Remove("inset");
+            InlineStyle(element).Remove("inset");
         }
 
         // Resolve anchor-size() function calls in both CSS and inline styles.
@@ -192,7 +192,7 @@ public sealed partial class DomBridge
         // the anchored box off-screen (css-anchor-position anchor-scroll-to-sticky-004).
         bool stickyToNextScroller = IsSticky(GetComputedProps(anchorEl));
 
-        for (var el = anchorEl.Parent; el != null; el = el.Parent)
+        for (var el = ParentEl(anchorEl); el != null; el = ParentEl(el))
         {
             var props = GetComputedProps(el);
             if (!HasOverflowClipping(props))
@@ -236,7 +236,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsDescendantOrSelf(DomElement node, DomElement ancestor)
     {
-        for (var cur = node; cur != null; cur = cur.Parent)
+        for (var cur = node; cur != null; cur = ParentEl(cur))
             if (cur == ancestor)
                 return true;
         return false;
@@ -261,7 +261,7 @@ public sealed partial class DomBridge
     {
         // Get implicit anchor name from position-anchor.
         string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
-                                 element.Style.GetValueOrDefault("position-anchor");
+                                 InlineStyle(element).GetValueOrDefault("position-anchor");
 
         string ResolveValue(string value)
         {
@@ -291,17 +291,17 @@ public sealed partial class DomBridge
         {
             if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
             {
-                element.Style[kv.Key] = ResolveValue(kv.Value);
+                InlineStyle(element)[kv.Key] = ResolveValue(kv.Value);
             }
         }
 
         // Resolve in existing inline styles.
-        var inlineKeys = new List<string>(element.Style.Keys);
+        var inlineKeys = new List<string>(InlineStyle(element).Keys);
         foreach (var key in inlineKeys)
         {
-            if (element.Style[key].Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            if (InlineStyle(element)[key].Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
             {
-                element.Style[key] = ResolveValue(element.Style[key]);
+                InlineStyle(element)[key] = ResolveValue(InlineStyle(element)[key]);
             }
         }
     }

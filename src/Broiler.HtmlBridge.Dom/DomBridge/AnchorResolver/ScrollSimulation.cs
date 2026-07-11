@@ -20,7 +20,7 @@ public sealed partial class DomBridge
     }
     private void ApplyScrollSimulationTree(DomElement el)
     {
-        if (!el.IsTextNode)
+        if (!IsText(el))
         {
             double scrollTop = 0;
             double scrollLeft = 0;
@@ -46,7 +46,7 @@ public sealed partial class DomBridge
                 bool isDocScrollingElement =
                     string.Equals(el.TagName, "html", StringComparison.OrdinalIgnoreCase);
 
-                if ((clips || isDocScrollingElement) && el.Children.Count > 0)
+                if ((clips || isDocScrollingElement) && el.ChildNodes.Count > 0)
                 {
                     // Wrap all children in a positioned div that shifts content
                     // upward / leftward.  Using position:relative + top/left
@@ -55,21 +55,21 @@ public sealed partial class DomBridge
                     // avoiding the rendering artefact where negative-margin
                     // spacers can leak above the container's top edge.
                     var wrapper = new DomElement(_document, "div", null, null, "");
-                    wrapper.Style["position"] = "relative";
+                    InlineStyle(wrapper)["position"] = "relative";
                     if (scrollTop != 0)
-                        wrapper.Style["top"] =
+                        InlineStyle(wrapper)["top"] =
                             $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
                     if (scrollLeft != 0)
-                        wrapper.Style["left"] =
+                        InlineStyle(wrapper)["left"] =
                             $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
 
                     var originalChildren = SnapshotChildren(el);
-                    el.Children.Clear();
-                    el.Children.Add(wrapper);
+                    ClearChildren(el);
+                    el.AppendChild(wrapper);
                     foreach (var child in originalChildren)
                     {
-                        child.Parent = wrapper;
-                        wrapper.Children.Add(child);
+                        SetParent(child, wrapper);
+                        wrapper.AppendChild(child);
                     }
 
                     // For the document scrolling element, extract ALL
@@ -84,9 +84,9 @@ public sealed partial class DomBridge
                         CollectFixedDescendants(wrapper, fixedDescendants);
                         foreach (var fixedEl in fixedDescendants)
                         {
-                            fixedEl.Parent?.Children.Remove(fixedEl);
-                            fixedEl.Parent = el;
-                            el.Children.Add(fixedEl);
+                            fixedEl.Remove();
+                            SetParent(fixedEl, el);
+                            el.AppendChild(fixedEl);
                         }
                     }
 
@@ -103,7 +103,7 @@ public sealed partial class DomBridge
                         double childOffset = 0;
                         foreach (var child in SnapshotChildren(wrapper))
                         {
-                            if (child.IsTextNode) continue;
+                            if (IsText(child)) continue;
                             var cp = GetComputedProps(child);
                             var childPos = cp.GetValueOrDefault("position");
                             if (childPos == "absolute" || childPos == "fixed")
@@ -115,7 +115,7 @@ public sealed partial class DomBridge
                             childOffset += childMT;
                             if (childOffset + childH <= scrollTop)
                             {
-                                child.Style["visibility"] = "hidden";
+                                InlineStyle(child)["visibility"] = "hidden";
                                 childOffset += childH;
                             }
                             else
@@ -130,8 +130,8 @@ public sealed partial class DomBridge
 
         // Use index-based loop because the list may grow during iteration
         // (wrapper insertion above).
-        for (int i = 0; i < el.Children.Count; i++)
-            ApplyScrollSimulationTree(el.Children[i]);
+        for (int i = 0; i < el.ChildNodes.Count; i++)
+            ApplyScrollSimulationTree(ChildAt(el, i));
     }
     /// <summary>
     /// Recursively collects all descendants with <c>position: fixed</c>
@@ -141,7 +141,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in SnapshotChildren(parent))
         {
-            if (child.IsTextNode) continue;
+            if (IsText(child)) continue;
             var cp = GetComputedProps(child);
             var pos = cp.GetValueOrDefault("position");
             if (pos == "fixed")

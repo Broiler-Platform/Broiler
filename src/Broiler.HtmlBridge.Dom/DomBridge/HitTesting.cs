@@ -16,7 +16,7 @@ public sealed partial class DomBridge
 
         var documentElement = IsDocumentElement(docRoot)
             ? docRoot
-            : docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+            : ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
         if (documentElement == null)
             return Array.Empty<DomElement>();
 
@@ -35,10 +35,10 @@ public sealed partial class DomBridge
 
     private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)
     {
-        for (var i = element.Children.Count - 1; i >= 0; i--)
+        for (var i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = element.Children[i];
-            if (!child.IsTextNode && !child.TagName.StartsWith("#", StringComparison.Ordinal))
+            var child = ChildAt(element, i);
+            if (!IsText(child) && !child.TagName.StartsWith("#", StringComparison.Ordinal))
                 CollectHitTestMatches(child, x, y, hits);
         }
 
@@ -200,17 +200,17 @@ public sealed partial class DomBridge
         out (double Left, double Top, double Width, double Height) rect)
     {
         rect = default;
-        var row = element.Parent;
+        var row = ParentEl(element);
         if (row == null || !string.Equals(row.TagName, "tr", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var table = row.Parent;
+        var table = ParentEl(row);
         if (table != null &&
             (string.Equals(table.TagName, "thead", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(table.TagName, "tbody", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(table.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)))
         {
-            table = table.Parent;
+            table = ParentEl(table);
         }
 
         if (table == null || !string.Equals(table.TagName, "table", StringComparison.OrdinalIgnoreCase))
@@ -221,15 +221,15 @@ public sealed partial class DomBridge
         if (rowIndex < 0)
             return false;
 
-        var cells = row.Children
-            .Where(child => !child.IsTextNode && IsTableCellElement(child))
+        var cells = ChildElements(row)
+            .Where(child => !IsText(child) && IsTableCellElement(child))
             .ToList();
         var cellIndex = cells.FindIndex(candidate => ReferenceEquals(candidate, element));
         if (cellIndex < 0)
             return false;
 
         var columnCount = rows
-            .Select(candidate => candidate.Children.Count(child => !child.IsTextNode && IsTableCellElement(child)))
+            .Select(candidate => ChildElements(candidate).Count(child => !IsText(child) && IsTableCellElement(child)))
             .DefaultIfEmpty(0)
             .Max();
         if (columnCount <= 0 || rows.Count <= 0)
@@ -309,13 +309,13 @@ public sealed partial class DomBridge
 
     private DomElement? FindAssociatedImageMapImage(DomElement area)
     {
-        var map = area.Parent;
+        var map = ParentEl(area);
         if (map == null || !string.Equals(map.TagName, "map", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var mapName = map.Attributes.GetValueOrDefault("name");
+        var mapName = GetAttr(map, "name");
         if (string.IsNullOrWhiteSpace(mapName))
-            mapName = map.Attributes.GetValueOrDefault("id");
+            mapName = GetAttr(map, "id");
         if (string.IsNullOrWhiteSpace(mapName))
             return null;
 
@@ -325,7 +325,7 @@ public sealed partial class DomBridge
             if (!string.Equals(candidate.TagName, "img", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var useMap = candidate.Attributes.GetValueOrDefault("usemap")?.Trim();
+            var useMap = GetAttr(candidate, "usemap")?.Trim();
             if (string.Equals(useMap, expectedUseMap, StringComparison.OrdinalIgnoreCase))
                 return candidate;
         }
@@ -335,9 +335,9 @@ public sealed partial class DomBridge
 
     private IEnumerable<DomElement> EnumerateDomDescendants(DomElement root)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
-            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
             yield return child;
@@ -350,8 +350,8 @@ public sealed partial class DomBridge
         DomElement image,
         (double Left, double Top, double Width, double Height) imageRect)
     {
-        var widthBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("width"));
-        var heightBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("height"));
+        var widthBasis = ParsePositiveDouble(GetAttr(image, "width"));
+        var heightBasis = ParsePositiveDouble(GetAttr(image, "height"));
 
         return (
             widthBasis > 0 ? imageRect.Width / widthBasis : 1,
@@ -360,11 +360,11 @@ public sealed partial class DomBridge
 
     private bool IsPointInsideAreaShape(DomElement area, double x, double y)
     {
-        var shape = area.Attributes.GetValueOrDefault("shape")?.Trim().ToLowerInvariant();
+        var shape = GetAttr(area, "shape")?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(shape))
             shape = "rect";
 
-        var coords = ParseAreaCoords(area.Attributes.GetValueOrDefault("coords"));
+        var coords = ParseAreaCoords(GetAttr(area, "coords"));
         return shape switch
         {
             "default" => true,
@@ -506,9 +506,9 @@ public sealed partial class DomBridge
 
     private bool IsElementRenderedForHitTesting(DomElement element)
     {
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
-            if (current.IsTextNode)
+            if (IsText(current))
                 return false;
 
             if (current.TagName.StartsWith("#", StringComparison.Ordinal))
@@ -532,7 +532,7 @@ public sealed partial class DomBridge
 
     private static bool DocumentHasViewport(DomElement documentElement)
     {
-        var docRoot = documentElement.OwnerDocRoot;
+        var docRoot = GetElementRuntimeState(documentElement).OwnerDocRoot;
         if (docRoot == null)
             return true;
 

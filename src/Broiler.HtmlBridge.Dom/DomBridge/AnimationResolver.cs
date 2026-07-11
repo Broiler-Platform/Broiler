@@ -44,8 +44,8 @@ public sealed partial class DomBridge
             // Fall back to concatenating child text nodes when TextContent is not set.
             if (string.IsNullOrEmpty(css))
             {
-                css = string.Concat(root.Children
-                    .Where(c => c.IsTextNode)
+                css = string.Concat(ChildElements(root)
+                    .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
@@ -61,7 +61,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
             CollectKeyframes(child, map);
     }
 
@@ -120,11 +120,11 @@ public sealed partial class DomBridge
         string? animValue = null, delayValue = null, nameValue = null;
         bool hasAnimation = false, hasDelay = false, hasName = false;
 
-        if (element.Style.Count > 0)
+        if (InlineStyle(element).Count > 0)
         {
-            hasAnimation = element.Style.TryGetValue("animation", out animValue);
-            hasDelay = element.Style.TryGetValue("animation-delay", out delayValue);
-            hasName = element.Style.TryGetValue("animation-name", out nameValue);
+            hasAnimation = InlineStyle(element).TryGetValue("animation", out animValue);
+            hasDelay = InlineStyle(element).TryGetValue("animation-delay", out delayValue);
+            hasName = InlineStyle(element).TryGetValue("animation-name", out nameValue);
         }
 
         // Also check stylesheet rules that may apply to this element.
@@ -171,7 +171,7 @@ public sealed partial class DomBridge
     {
         // Walk up to find <style> elements.
         var root = element;
-        while (root.Parent != null) root = root.Parent;
+        while (ParentEl(root) != null) root = ParentEl(root);
 
         Dictionary<string, string>? result = null;
         CollectAnimPropsFromStyleElements(root, element, ref result);
@@ -186,8 +186,8 @@ public sealed partial class DomBridge
             var css = node.TextContent;
             if (string.IsNullOrEmpty(css))
             {
-                css = string.Concat(node.Children
-                    .Where(c => c.IsTextNode)
+                css = string.Concat(ChildElements(node)
+                    .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
 
@@ -213,7 +213,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
             CollectAnimPropsFromStyleElements(child, target, ref result);
     }
 
@@ -320,7 +320,7 @@ public sealed partial class DomBridge
                     if (fillMode is "backwards" or "both")
                     {
                         foreach (var kv in keyframes[0].Properties)
-                            element.Style[kv.Key] = kv.Value;
+                            InlineStyle(element)[kv.Key] = kv.Value;
                     }
                     return;
                 }
@@ -353,13 +353,13 @@ public sealed partial class DomBridge
 
         // Apply resolved values as inline styles and remove animation properties.
         foreach (var kv in resolvedProps)
-            element.Style[kv.Key] = kv.Value;
+            InlineStyle(element)[kv.Key] = kv.Value;
 
-        element.Style.Remove("animation");
-        element.Style.Remove("animation-delay");
-        element.Style.Remove("animation-name");
-        element.Style.Remove("animation-duration");
-        element.Style.Remove("animation-timing-function");
+        InlineStyle(element).Remove("animation");
+        InlineStyle(element).Remove("animation-delay");
+        InlineStyle(element).Remove("animation-name");
+        InlineStyle(element).Remove("animation-duration");
+        InlineStyle(element).Remove("animation-timing-function");
     }
 
     private Dictionary<string, string> ResolveKeyframeProperties(
