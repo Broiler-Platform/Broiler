@@ -51,12 +51,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // widen on the current homogeneous tree.
     private readonly HashSet<Broiler.Dom.DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<(JSObject Observer, DomElement Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
+    private readonly List<(JSObject Observer, Broiler.Dom.DomNode Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
     private readonly DomElement _documentNode;
-    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = [];
+    private static readonly ConditionalWeakTable<Broiler.Dom.DomNode, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -182,8 +182,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             .OfType<DomElement>()
             .Where(element => !ReferenceEquals(element, _documentNode))];
 
-    private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
-        ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
+    private static ElementRuntimeState GetElementRuntimeState(Broiler.Dom.DomNode node) =>
+        ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
 
     /// <summary>
     /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
@@ -217,7 +217,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
-    private static int ChildIndexOf(DomElement element, Broiler.Dom.DomNode child)
+    private static int ChildIndexOf(Broiler.Dom.DomNode element, Broiler.Dom.DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)
         {

@@ -40,20 +40,23 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private DomElement GetTreeRoot(DomElement element)
+    private Broiler.Dom.DomNode GetTreeRoot(Broiler.Dom.DomNode node)
     {
-        var current = element;
-        while (ParentEl(current) != null)
-            current = ParentEl(current);
+        Broiler.Dom.DomNode current = node;
+        // Stop at the topmost element: the facade #document's ParentNode is the canonical
+        // DomDocument (not a DomElement), which is the same stop point the old ParentEl walk had.
+        // A detached text node roots to itself (returned as a DomNode).
+        while (current.ParentNode is DomElement parent)
+            current = parent;
         return current;
     }
 
-    private JSValue ToJSRootNode(DomElement root)
+    private JSValue ToJSRootNode(Broiler.Dom.DomNode root)
     {
         if (ReferenceEquals(root, _documentNode))
             return _documentJSObject ?? JSNull.Value;
 
-        if (IsSubDocRoot(root) && _docRootToDocJSObject.TryGetValue(root, out var subDocument))
+        if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _docRootToDocJSObject.TryGetValue(rootEl, out var subDocument))
             return subDocument;
 
         return ToJSObject(root);

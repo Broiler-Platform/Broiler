@@ -214,19 +214,22 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetIsConnected032Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetIsConnected032Core(global::Broiler.Dom.DomNode node, in Arguments _)
     {
-        var root = GetTreeRoot(element);
+        var root = GetTreeRoot(node);
         return ReferenceEquals(root, _documentNode) ? JSBoolean.True : JSBoolean.False;
     }
 
+    /// <summary>Whether <paramref name="node"/> is a sub-document root element (only elements can be).</summary>
+    private static bool IsSubDocRootNode(global::Broiler.Dom.DomNode node) =>
+        node is DomElement element && IsSubDocRoot(element);
 
-    private JSValue JsJsObjectsGetChildNodes033Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetChildNodes033Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var children = new List<JSValue>();
-        foreach (var child in ChildElements(element))
+        foreach (var child in node.ChildNodes)
         {
-            if (!IsSubDocRoot(child))
+            if (!IsSubDocRootNode(child))
                 children.Add(ToJSObject(child));
         }
 
@@ -234,29 +237,30 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetFirstChild034Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetFirstChild034Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        var first = ChildElements(element).FirstOrDefault(c => !IsSubDocRoot(c));
+        var first = node.ChildNodes.FirstOrDefault(c => !IsSubDocRootNode(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetLastChild035Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetLastChild035Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        var last = ChildElements(element).LastOrDefault(c => !IsSubDocRoot(c));
+        var last = node.ChildNodes.LastOrDefault(c => !IsSubDocRootNode(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetNextSibling036Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNextSibling036Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (ParentEl(element) == null)
+        var parent = node.ParentNode;
+        if (parent == null)
             return JSNull.Value;
-        var siblings = ChildElements(ParentEl(element)).ToList();
-        var idx = siblings.IndexOf(element);
+        var siblings = parent.ChildNodes;
+        var idx = ChildIndexOf(parent, node);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
-            if (!IsSubDocRoot(siblings[i]))
+            if (!IsSubDocRootNode(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 
@@ -264,15 +268,16 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetPreviousSibling037Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetPreviousSibling037Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (ParentEl(element) == null)
+        var parent = node.ParentNode;
+        if (parent == null)
             return JSNull.Value;
-        var siblings = ChildElements(ParentEl(element)).ToList();
-        var idx = siblings.IndexOf(element);
+        var siblings = parent.ChildNodes;
+        var idx = ChildIndexOf(parent, node);
         for (var i = idx - 1; i >= 0; i--)
         {
-            if (!IsSubDocRoot(siblings[i]))
+            if (!IsSubDocRootNode(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 
@@ -280,12 +285,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetNodeType038Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNodeType038Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element))
+        if (IsText(node))
             return new JSNumber(3); // TEXT_NODE
-        if (IsComment(element))
+        if (IsComment(node))
             return new JSNumber(8); // COMMENT_NODE
+        if (node is not DomElement element)
+            return new JSNumber(1); // canonical non-element char-data already handled above
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(9); // DOCUMENT_NODE
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
@@ -296,12 +303,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetNodeName039Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNodeName039Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element))
+        if (IsText(node))
             return new JSString("#text");
-        if (IsComment(element))
+        if (IsComment(node))
             return new JSString("#comment");
+        if (node is not DomElement element)
+            return JSNull.Value;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSString("#document");
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
