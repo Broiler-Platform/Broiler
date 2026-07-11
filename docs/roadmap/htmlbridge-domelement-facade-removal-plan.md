@@ -23,9 +23,12 @@ are done. The facade removal is unblocked.
 
 ## Status at a glance (2026-07-11)
 
-Branch `claude/rf-bridge-1c-domelement-facade-migration`. Each row is its own commit, every one
-regression-free against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) 78-failure
-environmental baseline.
+Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phase C2 on branch
+`claude/htmlbridge-domelement-removal-ucyw5j`. Each row is its own commit, every one regression-free
+against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) environmental baseline —
+Phase C2 verified 0 baseline-passing tests regressed (before/after trx diff; the sole delta is the
+pre-existing `GoogleSearchPolyfillTests` render/scroll environmental failures, confirmed failing on the
+pre-change tree too).
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
@@ -35,14 +38,15 @@ environmental baseline.
 | `Parent` | E1 | canonical `ParentNode` via `ParentEl`/`SetParent` | ~450 |
 | `IsTextNode` | D1 | canonical `NodeType` via `IsText(node)` | 119 |
 | `Children` (+ `LegacyChildList`) | E2 | canonical `ChildNodes` via `ChildElements`/… | 421 |
+| `NsAttrMap` | C2 | canonical namespaced attributes via `TryGetNsAttribute`/`GetAttributeNS` | 18 |
 
-**Facade `DomElement` still carries:** `InnerHtml`, `TextContent`, `NamespaceURI`, `NsAttrMap`.
+**Facade `DomElement` still carries:** `InnerHtml`, `TextContent`, `NamespaceURI`.
 
-**Not yet started:** **Phase C2** (`NsAttrMap` → canonical namespaced attributes) and the **Phase F
-cutover** — flip text/comment construction to canonical `DomText`/`DomComment` (removing `TextContent`),
-which cascades into re-typing `RangeState`, `_knownNodes`, and the JS-object cache, then re-key the
-remaining per-node caches, remove `HtmlTreeBuilder`, and delete the `DomElement` type. `InnerHtml` and
-`NamespaceURI` (ctor-coupled; `SetName` is `protected`) fold into Phase F.
+**Not yet started:** the **Phase F cutover** — flip text/comment construction to canonical
+`DomText`/`DomComment` (removing `TextContent`), which cascades into re-typing `RangeState`,
+`_knownNodes`, and the JS-object cache, then re-key the remaining per-node caches, remove
+`HtmlTreeBuilder`, and delete the `DomElement` type. `InnerHtml` and `NamespaceURI` (ctor-coupled;
+`SetName` is `protected`) fold into Phase F.
 
 ## The facade in one paragraph
 
@@ -151,10 +155,11 @@ safe and is the true prerequisite for canonical text.
 Each phase is one or more PRs, each independently building + green. Gate every phase on
 the **full** validation set (see "Validation" below), baselined first per `CLAUDE.md`.
 
-**Progress (2026-07-10/11):** Phases A + B + C **DONE** on branch
-`claude/rf-bridge-1c-domelement-facade-migration`, each full-`Broiler.Cli.Tests` regression-free
-(78-failure baseline; the only diff is the documented `GoogleSearchPolyfillTests`
-scrollIntoView-% parallel flake, which passes in isolation).
+**Progress (2026-07-10/11):** Phases A + B + C + E1 + D1 + E2 **DONE** on branch
+`claude/rf-bridge-1c-domelement-facade-migration`; **Phase C2 DONE** on branch
+`claude/htmlbridge-domelement-removal-ucyw5j`. Each is full-`Broiler.Cli.Tests` regression-free
+(the only diff is the documented `GoogleSearchPolyfillTests` render/scroll environmental failures,
+confirmed pre-existing on the pre-change tree).
 - **Phase A** — `JsSetStyleProps` + `OwnerDocRoot` → `ElementRuntimeState` (42 sites).
 - **Phase B** — inline `.Style` → ERS via `DomBridge.InlineStyle(element)` (lazy-seeds from the
   `style=` attribute on first access; ~200 sites; clone + dialog-backdrop seed explicitly; facade
@@ -203,6 +208,21 @@ scrollIntoView-% parallel flake, which passes in isolation).
   *notifying* `RemoveChildAt` (raw primitive renamed `RemoveNthChild`; self-recursion fixed). Full
   `Broiler.Cli.Tests` empty-diff vs baseline, before and after removing the member.
 
+- **Phase C2 (`NsAttrMap`) — DONE.** Facade `NsAttrMap` (the `(namespace, localName) → qualifiedName`
+  shadow map) removed; **18 sites** migrated to the canonical namespace-keyed attribute set, which
+  already encodes namespace + local + qualified name + value. A bridge helper
+  `TryGetNsAttribute(element, ns, localName, out qName, out value)` does the direct canonical
+  `Attributes.TryGetValue((ns, localName))` lookup (normalizing `""`→`null` like `SetAttributeNS`/
+  `GetAttributeNS`); the plain `getAttributeNS`/`hasAttributeNS` callbacks route straight through
+  canonical `GetAttributeNS`. `TryGetAttachedAttrNamespace` scans canonical attributes (skipping the
+  no-namespace ones, so the colon-split fallback still governs them); `isEqualNode`'s attribute check
+  collapses to a single `CanonicalAttributesAreEqual`; `cloneNode` copies attributes straight from the
+  canonical set (via `SetAttribute`/`SetAttributeNS`), restoring the namespace fidelity that used to
+  ride on the shadow map. The behaviour change is limited to spec corrections that were previously
+  latent (`getAttributeNS(null, htmlAttr)`/`hasAttributeNS(null, htmlAttr)` now find no-namespace
+  attributes); every existing NS-attribute characterization test still passes and serialization output
+  is byte-identical (it reads `QualifiedName`). Full `Broiler.Cli.Tests` regression-free.
+
 **What remains of D+E2 — the text→canonical construction flip (Phase F territory):** `TextContent`
 (90 sites) → `DomText`/`DomComment`.`Data`, and flipping the ~20 text/comment **construction** sites to
 `document.CreateTextNode`/`CreateComment`. This is deferred because it **cascades beyond the facade**: a
@@ -212,8 +232,8 @@ Phase F cache/RangeState cutover. At that point `ChildElements` narrows to `OfTy
 tree-walk bodies gain `IsText`/`is DomElement` handling. Gate on the WPT range/selection + serialization
 corpus.
 
-Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `TextContent` (Phase F text flip),
-`NamespaceURI` (Phase F). Next: **Phase C2** (`NsAttrMap`) or the **Phase F cutover** (text→`DomText`,
+Facade now retains: `InnerHtml` (Phase F), `TextContent` (Phase F text flip),
+`NamespaceURI` (Phase F). Next: the **Phase F cutover** (text→`DomText`,
 construction flip, cache/`RangeState` re-keying, delete the facade type).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
@@ -282,6 +302,14 @@ ERS; computed-style, anchor, animation, serialization suites green.
 **Risk.** Medium-High. Heaviest in `ElementInterfaces.cs`, `JsObjects.cs`,
 `Attributes.cs`, `Registration.cs`. **Exit.** Attribute access is canonical; XHTML/NS
 attribute WPT + Acid cases green.
+
+**Done (2026-07-11).** Phase C landed the string-keyed side; **Phase C2** then removed
+`NsAttrMap` outright. No residue needed relocating to ERS — the canonical namespace-keyed
+attribute set (`(namespace, localName) → DomAttribute` with `QualifiedName`/`Value`) is a
+strict superset of what the shadow map carried, so every lookup became a direct
+`Attributes.TryGetValue((ns, localName))` (helper `TryGetNsAttribute`) or a canonical
+`GetAttributeNS`, and `cloneNode`/`isEqualNode` read the same canonical set. The frozen
+`"NsAttrMap"` entry is gone; `LegacyMutableCollectionProperties` is now empty.
 
 ### Phase E — Widen tree-shape traversal to `DomNode` (prerequisite for D)
 
