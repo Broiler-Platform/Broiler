@@ -525,7 +525,7 @@ public sealed partial class DomBridge
             // Same container
             if (IsText(startContainer))
             {
-                var text = startContainer.TextContent ?? string.Empty;
+                var text = BridgeText(startContainer);
                 var s = Math.Max(0, Math.Min(startOffset, text.Length));
                 var e = Math.Max(s, Math.Min(endOffset, text.Length));
                 sb.Append(text, s, e - s);
@@ -542,7 +542,7 @@ public sealed partial class DomBridge
         // Start container: collect from startOffset to end
         if (IsText(startContainer))
         {
-            var text = startContainer.TextContent ?? string.Empty;
+            var text = BridgeText(startContainer);
             if (startOffset < text.Length)
                 sb.Append(text.Substring(startOffset));
         }
@@ -569,7 +569,7 @@ public sealed partial class DomBridge
                         continue;
                     // Only collect from top-level nodes
                     if (IsText(node))
-                        sb.Append(node.TextContent ?? string.Empty);
+                        sb.Append(BridgeText(node));
                     else if (node.ChildNodes.Count == 0)
                         continue; // element with no text children
                     // Don't double-collect descendants
@@ -608,7 +608,7 @@ public sealed partial class DomBridge
 
         // Create text node with extracted content
         var extractedTextNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        extractedTextNode.TextContent = extractedText;
+        SetBridgeText(extractedTextNode, extractedText);
         bridge._knownNodes.Add(extractedTextNode);
 
         if (chain.Count == 1)
@@ -722,7 +722,7 @@ public sealed partial class DomBridge
         DomElement node,
         List<(double Left, double Top, double Width, double Height)> rects)
     {
-        if (IsText(node) || string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(node) || IsComment(node))
             return;
 
         var display = GetComputedProps(node).GetValueOrDefault("display");
@@ -808,10 +808,10 @@ public sealed partial class DomBridge
                 // This is the startContainer level
                 if (IsText(original))
                 {
-                    var text = original.TextContent ?? string.Empty;
+                    var text = BridgeText(original);
                     var extractedPart = text.Substring(startOffset);
-                    original.TextContent = text.Substring(0, startOffset);
-                    clone.TextContent = extractedPart;
+                    SetBridgeText(original, text.Substring(0, startOffset));
+                    SetBridgeText(clone, extractedPart);
                 }
                 else
                 {
@@ -891,10 +891,10 @@ public sealed partial class DomBridge
                 // This is the endContainer level
                 if (IsText(original))
                 {
-                    var text = original.TextContent ?? string.Empty;
+                    var text = BridgeText(original);
                     var extractedPart = text.Substring(0, endOffset);
-                    original.TextContent = text.Substring(endOffset);
-                    clone.TextContent = extractedPart;
+                    SetBridgeText(original, text.Substring(endOffset));
+                    SetBridgeText(clone, extractedPart);
                 }
                 else
                 {
@@ -1124,14 +1124,14 @@ public sealed partial class DomBridge
 
     private static void UpdateCharacterData(DomElement target, string? newValue)
     {
-        target.TextContent = newValue ?? string.Empty;
+        SetBridgeText(target, newValue ?? string.Empty);
     }
 
     private void SetCharacterData(DomElement target, string? newValue)
     {
-        var previousValue = target.TextContent;
+        var previousValue = BridgeText(target);
         UpdateCharacterData(target, newValue);
-        if (!string.Equals(previousValue, target.TextContent, StringComparison.Ordinal))
+        if (!string.Equals(previousValue, BridgeText(target), StringComparison.Ordinal))
             NotifyCharacterDataMutationObservers(target, previousValue);
     }
 

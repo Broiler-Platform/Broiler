@@ -24,8 +24,8 @@ public sealed partial class DomBridge
             // copy overflow ("Destination array…"), same idiom as AnchorRegistry.
             foreach (var child in SnapshotChildren(root))
             {
-                if (IsText(child) && !string.IsNullOrEmpty(child.TextContent))
-                    child.TextContent = RemoveUnsupportedCssRules(child.TextContent);
+                if (IsText(child) && !string.IsNullOrEmpty(BridgeText(child)))
+                    SetBridgeText(child, RemoveUnsupportedCssRules(BridgeText(child)));
             }
         }
 

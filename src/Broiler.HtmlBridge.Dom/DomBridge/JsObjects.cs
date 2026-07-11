@@ -19,18 +19,25 @@ public sealed partial class DomBridge
     private const double DefaultBodyMarginPixels = 8;
     private const int MaxScrollContinuationDepth = 16;
 
-    private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
+    // RF-BRIDGE-1c Phase F (F3b): the JS-object cache is keyed by canonical DomNode so
+    // text/comment nodes (which get JS wrappers) can round-trip once they flip to canonical
+    // DomText/DomComment. A facade node IS-A DomNode, so this is a behaviour-preserving widen.
+    private readonly Dictionary<Broiler.Dom.DomNode, JSObject> _jsObjectCache = [];
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
     private int _topLayerCounter;
 
-    internal JSObject ToJSObject(DomElement element)
+    internal JSObject ToJSObject(Broiler.Dom.DomNode node)
     {
-        if (_jsObjectCache.TryGetValue(element, out var cached))
+        if (_jsObjectCache.TryGetValue(node, out var cached))
             return cached;
 
+        // RF-BRIDGE-1c Phase F (F3b): the tree is still homogeneous facade DomElement, so this
+        // cast always succeeds. F3c replaces it with a `node is not DomElement` branch that builds
+        // a minimal Node/CharacterData wrapper for canonical DomText/DomComment.
+        var element = (DomElement)node;
         var obj = new JSObject();
         var bridge = this;
-        _jsObjectCache[element] = obj;
+        _jsObjectCache[node] = obj;
 
         obj.FastAddValue(
             (KeyString)"tagName",
@@ -297,7 +304,7 @@ public sealed partial class DomBridge
         }
 
         // substringData(offset, count) — for text/comment CharacterData nodes
-        if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        if (IsText(element) || IsComment(element))
         {
             obj.FastAddValue(
                 (KeyString)"substringData",

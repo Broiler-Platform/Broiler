@@ -14,21 +14,20 @@ public sealed class DomExtractionPhaseZeroTests
     // RF-BRIDGE-1c relocated bridge runtime state off the facade into
     // ElementRuntimeState (the node model must not own it): Phase A moved
     // JsSetStyleProps + OwnerDocRoot; Phase B moved the inline Style dictionary
-    // (now reached via DomBridge.InlineStyle). They no longer appear on the
-    // DomElement surface below.
-    private static readonly string[] LegacyMutableCollectionProperties =
-    [
-        "NsAttrMap",
-    ];
+    // (now reached via DomBridge.InlineStyle). Phase C2 removed NsAttrMap, whose
+    // (namespace, local name) → qualified-name bookkeeping is now derived from the
+    // canonical namespace-keyed attribute set. No mutable-collection property remains
+    // on the DomElement surface below.
+    private static readonly string[] LegacyMutableCollectionProperties = [];
 
     // RF-BRIDGE-1c Phase E relocated the facade Parent getter/setter to
     // DomBridge.ParentEl / SetParent over canonical ParentNode, so Parent is no
-    // longer a settable scalar on the DomElement surface below.
+    // longer a settable scalar on the DomElement surface below. Phase F relocated
+    // InnerHtml into ElementRuntimeState, so it is no longer a settable scalar either.
     private static readonly string[] LegacySettableScalarProperties =
     [
         "ClassName",
         "Id",
-        "InnerHtml",
         "NamespaceURI",
         "TextContent",
     ];

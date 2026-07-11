@@ -24,7 +24,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
+        if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
         return BuildAttrNode(qName, val, element, ownerObj);
     }
@@ -60,7 +60,7 @@ public sealed partial class DomBridge
         var ns = GetAttrNodeNamespace(attrObj);
         var value = attrObj[(KeyString)"value"].ToString();
         JSValue old = JSNull.Value;
-        if (element.NsAttrMap.TryGetValue((ns, localName), out var oldQName) && TryGetAttribute(element, oldQName, out var oldVal))
+        if (TryGetNsAttribute(element, ns, localName, out var oldQName, out var oldVal))
             old = BuildAttrNode(oldQName, oldVal, element, ownerObj);
         SetAttributeLikeSetAttributeNS(element, ns, name, localName, value);
         return old;
@@ -86,7 +86,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
         var localName = a[1].ToString();
-        if (!element.NsAttrMap.TryGetValue((ns, localName), out var qName) || !TryGetAttribute(element, qName, out var val))
+        if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
         var removed = BuildAttrNode(qName, val, element, ownerObj);
         RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);

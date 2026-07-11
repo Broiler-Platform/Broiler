@@ -329,14 +329,15 @@ other two are gated on prerequisites that are not yet met (documented below).
   change; it is a staged migration, not a deletion.
   `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
   no longer need the facade node type.
-  **Progress (2026-07-11):** Milestone 1.2 is well under way on branch
-  `claude/rf-bridge-1c-domelement-facade-migration` — **7 facade members deleted**
+  **Progress (2026-07-11):** Milestone 1.2 is well under way — **8 facade members deleted**
   (`JsSetStyleProps`, `OwnerDocRoot`, `Style`, `Attributes`+`LegacyAttributeDictionary`,
-  `Parent`, `IsTextNode`, `Children`+`LegacyChildList`; Phases A/B/C/E1/D1/E2), each a
+  `Parent`, `IsTextNode`, `Children`+`LegacyChildList` on branch
+  `claude/rf-bridge-1c-domelement-facade-migration`; `NsAttrMap` on branch
+  `claude/htmlbridge-domelement-removal-ucyw5j`; Phases A/B/C/E1/D1/E2/C2), each a
   behaviour-preserving relocation to `ElementRuntimeState` or canonical DOM, verified
-  regression-free (empty-diff vs the full-`Broiler.Cli.Tests` baseline). Facade remnants
-  `InnerHtml`/`TextContent`/`NamespaceURI`/`NsAttrMap` + the text→`DomText` construction
-  flip and cache/`RangeState` re-keying are the Phase C2/F remainder (see the plan's
+  regression-free vs the full-`Broiler.Cli.Tests` baseline. Facade remnants
+  `InnerHtml`/`TextContent`/`NamespaceURI` + the text→`DomText` construction
+  flip and cache/`RangeState` re-keying are the Phase F remainder (see the plan's
   "Status at a glance").
 
   **Sharpened dependency analysis (2026-07-09).** The four adapters split into two

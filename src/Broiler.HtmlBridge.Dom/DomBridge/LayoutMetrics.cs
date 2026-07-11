@@ -711,8 +711,8 @@ public sealed partial class DomBridge
 
         foreach (var child in ChildElements(element))
         {
-            if (IsText(child) && !string.IsNullOrWhiteSpace(child.TextContent))
-                sb.Append(child.TextContent);
+            if (IsText(child) && !string.IsNullOrWhiteSpace(BridgeText(child)))
+                sb.Append(BridgeText(child));
         }
 
         return sb.ToString();

@@ -623,7 +623,7 @@ public sealed partial class DomBridge
         bodyEl.AppendChild(preEl);
 
         var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        textNode.TextContent = textContent;
+        SetBridgeText(textNode, textContent);
         SetParent(textNode, preEl);
         preEl.AppendChild(textNode);
 
@@ -928,11 +928,11 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            var mergedText = child.TextContent ?? string.Empty;
+            var mergedText = BridgeText(child);
             var nextIndex = index + 1;
             while (nextIndex < node.ChildNodes.Count && IsText(ChildAt(node, nextIndex)))
             {
-                mergedText += ChildAt(node, nextIndex).TextContent ?? string.Empty;
+                mergedText += BridgeText(ChildAt(node, nextIndex));
                 RemoveChildAt(node, nextIndex);
             }
 
@@ -968,13 +968,12 @@ public sealed partial class DomBridge
         if (IsText(first) != IsText(second) ||
             !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
             !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
-            !string.Equals(first.TextContent ?? string.Empty, second.TextContent ?? string.Empty, StringComparison.Ordinal))
+            !string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal))
         {
             return false;
         }
 
-        if (!AttributeMapsAreEqual(AttributeSnapshot(first), AttributeSnapshot(second)) ||
-            !NamespaceAttributeMapsAreEqual(first.NsAttrMap, second.NsAttrMap) ||
+        if (!CanonicalAttributesAreEqual(first, second) ||
             first.ChildNodes.Count != second.ChildNodes.Count)
         {
             return false;
@@ -989,36 +988,24 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool AttributeMapsAreEqual(
-        IReadOnlyDictionary<string, string> first,
-        IReadOnlyDictionary<string, string> second)
+    /// <summary>
+    /// RF-BRIDGE-1c Phase C2: isEqualNode attribute comparison over the canonical
+    /// namespace-keyed attribute set — which encodes namespace, local name, qualified
+    /// name, and value in one place, replacing the former flat-snapshot + NsAttrMap pair.
+    /// Two attribute sets are equal when they have the same count and each (namespace,
+    /// local name) key maps to the same value and qualified name (the qualified-name
+    /// check preserves the prefix sensitivity the snapshot comparison had).
+    /// </summary>
+    private static bool CanonicalAttributesAreEqual(DomElement first, DomElement second)
     {
-        if (first.Count != second.Count)
+        if (first.Attributes.Count != second.Attributes.Count)
             return false;
 
-        foreach (var (name, value) in first)
+        foreach (var (key, attribute) in first.Attributes)
         {
-            if (!second.TryGetValue(name, out var otherValue) ||
-                !string.Equals(value, otherValue, StringComparison.Ordinal))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool NamespaceAttributeMapsAreEqual(
-        Dictionary<(string? Namespace, string LocalName), string> first,
-        Dictionary<(string? Namespace, string LocalName), string> second)
-    {
-        if (first.Count != second.Count)
-            return false;
-
-        foreach (var (key, value) in first)
-        {
-            if (!second.TryGetValue(key, out var otherValue) ||
-                !string.Equals(value, otherValue, StringComparison.Ordinal))
+            if (!second.Attributes.TryGetValue(key, out var other) ||
+                !string.Equals(attribute.Value, other.Value, StringComparison.Ordinal) ||
+                !string.Equals(attribute.QualifiedName, other.QualifiedName, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -1154,7 +1141,7 @@ public sealed partial class DomBridge
     private void SetElementInnerHtml(DomElement element, string html)
     {
         html ??= string.Empty;
-        element.InnerHtml = html;
+        GetElementRuntimeState(element).InnerHtml = html;
         element.TextContent = null;
 
         if (IsText(element))
@@ -1358,7 +1345,7 @@ public sealed partial class DomBridge
             else if (child is System.Xml.Linq.XText childText)
             {
                 var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-                textNode.TextContent = childText.Value;
+                SetBridgeText(textNode, childText.Value);
                 SetParent(textNode, el);
                 el.AppendChild(textNode);
                 _knownNodes.Add(textNode);

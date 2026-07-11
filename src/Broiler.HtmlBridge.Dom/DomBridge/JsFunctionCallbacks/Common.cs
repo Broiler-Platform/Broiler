@@ -29,7 +29,7 @@ public sealed partial class DomBridge
     private JSValue GetNodeTextValue(DomElement element)
     {
         if (IsText(element))
-            return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
+            return new JSString(BridgeText(element));
 
         if (element.TextContent != null && element.ChildNodes.Count == 0)
             return new JSString(element.TextContent);
@@ -41,7 +41,7 @@ public sealed partial class DomBridge
             return new JSString(sb.ToString());
         }
 
-        return new JSString(element.InnerHtml);
+        return new JSString(GetElementRuntimeState(element).InnerHtml);
     }
 
 

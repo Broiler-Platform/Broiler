@@ -128,7 +128,7 @@ public sealed partial class DomBridge
     {
         if (IsText(node))
         {
-            sb.Append(node.TextContent ?? string.Empty);
+            sb.Append(BridgeText(node));
             return;
         }
         foreach (var child in ChildElements(node))
@@ -296,7 +296,16 @@ public sealed partial class DomBridge
     /// Finds the <see cref="DomElement"/> corresponding to a given <see cref="JSObject"/>
     /// by looking up the JS object cache.
     /// </summary>
-    private DomElement? FindDomElementByJSObject(JSObject jsObj)
+    private DomElement? FindDomElementByJSObject(JSObject jsObj) =>
+        FindDomNodeByJSObject(jsObj) as DomElement;
+
+    /// <summary>
+    /// Finds the canonical <see cref="Broiler.Dom.DomNode"/> corresponding to a given
+    /// <see cref="JSObject"/> by reverse-scanning the JS-object cache. Unlike
+    /// <see cref="FindDomElementByJSObject"/> this also resolves text/comment nodes
+    /// (RF-BRIDGE-1c Phase F — needed once ranges/selection carry canonical char-data nodes).
+    /// </summary>
+    private Broiler.Dom.DomNode? FindDomNodeByJSObject(JSObject jsObj)
     {
         foreach (var kvp in _jsObjectCache)
         {
@@ -396,8 +405,23 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement CloneDomElement(DomElement source, bool deep)
     {
-        var attrs = AttributeSnapshot(source);
-        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, null, attrs, IsText(source));
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, string.Empty, null, null, IsText(source));
+        // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
+        // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
+        GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
+        // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
+        // set so namespaced attributes (namespace, prefix, local name) survive the clone —
+        // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
+        // attributes go through SetAttribute (which lowercases, matching the prior snapshot
+        // path); a prefixed qualified name can only exist with a namespace, so it never
+        // reaches the SetAttribute branch (which would throw on the ':').
+        foreach (var attribute in source.Attributes.Values)
+        {
+            if (attribute.NamespaceUri is null)
+                clone.SetAttribute(attribute.QualifiedName, attribute.Value);
+            else
+                clone.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, attribute.Value);
+        }
         // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
         // source's live style dict (which may hold JS mutations not yet synced to the
         // `style=` attribute), replacing the clone's lazily-seeded attribute values.
@@ -407,8 +431,6 @@ public sealed partial class DomBridge
             cloneStyle[kv.Key] = kv.Value;
         clone.TextContent = source.TextContent;
         clone.NamespaceURI = source.NamespaceURI;
-        foreach (var kv in source.NsAttrMap)
-            clone.NsAttrMap[kv.Key] = kv.Value;
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(source).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
@@ -662,7 +684,7 @@ public sealed partial class DomBridge
     private static int GetNodeType(DomElement element)
     {
         if (IsText(element)) return 3; // TEXT_NODE
-        if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return 8;
+        if (IsComment(element)) return 8;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE

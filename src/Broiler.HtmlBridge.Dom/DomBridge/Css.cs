@@ -523,8 +523,8 @@ public sealed partial class DomBridge
         {
             if (IsText(child))
             {
-                if (!string.IsNullOrEmpty(child.TextContent))
-                    builder.Append(child.TextContent);
+                if (BridgeText(child).Length > 0)
+                    builder.Append(BridgeText(child));
                 continue;
             }
 
@@ -566,15 +566,15 @@ public sealed partial class DomBridge
         var cssText = new StringBuilder();
         foreach (var child in ChildElements(styleEl))
         {
-            if (IsText(child) && child.TextContent != null)
-                cssText.Append(child.TextContent);
+            if (IsText(child))
+                cssText.Append(BridgeText(child));
         }
 
         if (cssText.Length == 0 && styleEl.TextContent != null)
             cssText.Append(styleEl.TextContent);
 
-        if (cssText.Length == 0 && !string.IsNullOrEmpty(styleEl.InnerHtml))
-            cssText.Append(styleEl.InnerHtml);
+        if (cssText.Length == 0 && !string.IsNullOrEmpty(GetElementRuntimeState(styleEl).InnerHtml))
+            cssText.Append(GetElementRuntimeState(styleEl).InnerHtml);
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&

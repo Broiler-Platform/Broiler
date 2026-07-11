@@ -1,0 +1,130 @@
+# HtmlBridge `DomElement` Facade Removal — Current State & Handoff
+
+Status: **in progress** — facade thinned to 2 remaining members; the irreversible
+text-node flip (F3c part 2) is teed up but not yet applied.
+Last updated: 2026-07-11.
+
+This is the standalone "where things stand" snapshot for the RF-BRIDGE-1c effort
+(Milestones 1.2/1.3 of the blocked-items roadmap). The *design* lives in
+[`htmlbridge-domelement-facade-removal-plan.md`](htmlbridge-domelement-facade-removal-plan.md);
+this file is the current-state summary a reviewer or the next implementer can read
+on its own.
+
+## 1. What this effort does
+
+`Broiler.HtmlBridge.DomElement` (`src/Broiler.HtmlBridge.Core/Dom/DomElement.cs`) is a
+`public sealed class DomElement : Broiler.Dom.DomElement` — a compatibility facade the
+bridge builds its **entire node tree** from, including text/comment nodes (modeled as a
+facade `DomElement` with a text/comment `NodeType`, not canonical `DomText`/`DomComment`).
+`HtmlTreeBuilder.ConvertNode` re-materializes the canonically-parsed tree back into facade
+instances. The goal is to delete both types so the bridge holds only canonical
+`Broiler.Dom` nodes and bridge-runtime state, by giving every facade member a canonical or
+`ElementRuntimeState` (ERS) home, then flipping construction to canonical factories.
+
+## 2. Facade surface: removed vs remaining
+
+| Facade member | Status | Relocated to |
+| --- | --- | --- |
+| `JsSetStyleProps`, `OwnerDocRoot` | ✅ removed (A) | `ElementRuntimeState` |
+| `Style` | ✅ removed (B) | ERS via `InlineStyle(node)` |
+| `Attributes` (+`LegacyAttributeDictionary`) | ✅ removed (C) | canonical attributes |
+| `Parent` | ✅ removed (E1) | canonical `ParentNode` via `ParentEl`/`SetParent` |
+| `IsTextNode` | ✅ removed (D1) | canonical `NodeType` via `IsText(node)` |
+| `Children` (+`LegacyChildList`) | ✅ removed (E2) | canonical `ChildNodes` |
+| `NsAttrMap` | ✅ removed (C2) | canonical namespaced attributes |
+| `InnerHtml` | ✅ removed (F1) | ERS |
+| **`TextContent`** | ⏳ **remains** | → canonical `DomText`/`DomComment`.`Data` (F3c part 2) |
+| **`NamespaceURI`** | ⏳ **remains** | → canonical read + `CreateElementNS` at construction (F4) |
+
+`DomElement` and `HtmlTreeBuilder` themselves are deleted in **F4**.
+
+## 3. Transitional machinery currently in place
+
+Introduced by the in-progress phases; the next implementer builds on these:
+
+- **Character data:** `BridgeText(DomNode)` / `SetBridgeText(DomNode, string)` read/write a
+  text/comment node's data over canonical `DomCharacterData.Data`, with a facade
+  `TextContent` fallback while the tree is still facade. `IsText(DomNode)` /
+  `IsComment(DomNode)` discriminate by `NodeType`. **All ~80 character-data + comment sites
+  already route through these** (F3a) — so the flip only has to change *construction*.
+- **Attributes:** `TryGetAttribute`/`GetAttr`/`HasAttr`/`SetAttr`/`RemoveAttr`/`AttributeNames`/
+  `AttributeSnapshot`/`RestoreAttributes` (Phase C) and `TryGetNsAttribute` (C2) express the
+  old string-keyed + namespaced surface over the canonical namespace-keyed attribute set.
+- **Inline style:** ERS-backed `InlineStyle(node)` (Phase B).
+- **Node identity (F3b + F3c-part1):** `_knownNodes`, `_jsObjectCache`, `ElementRuntimeStates`
+  (CWT) / `GetElementRuntimeState`, `_mutationObservers` targets, `ChildIndexOf`, `ParentEl`,
+  `SetParent`, `GetTreeRoot`/`ToJSRootNode`, and the JS Node-navigation callbacks
+  (`childNodes`/`firstChild`/`lastChild`/`nextSibling`/`previousSibling`/`isConnected`,
+  `nodeType`/`nodeName`) are all typed on canonical **`DomNode`**. `FindDomNodeByJSObject`
+  resolves any node from its JS wrapper (`FindDomElementByJSObject` narrows with `as DomElement`).
+  `ToJSObject(DomNode)` currently keeps a `(DomElement)node` cast that always succeeds on
+  today's homogeneous tree — F3c part 2 replaces it with the char-data branch.
+
+Everything above is **behaviour-preserving on the current homogeneous facade tree** and
+verified regression-free against the full `Broiler.Cli.Tests` (1699 tests).
+
+## 4. What remains — F3c part 2 (the atomic flip)
+
+This is the one irreversible, **big-bang** step: the moment a canonical `DomText` enters the
+tree, every site below must already handle a non-`DomElement` child, so it cannot be
+decomposed into more build-green commits. Concrete work, roughly in order:
+
+1. **`ChildAt` → `DomNode`** and fix the resulting **~68 tree-heterogeneity sites** (range
+   extraction in `Traversal.cs`/`JsFunctionCallbacks/Traversal.cs`, TreeWalker/NodeIterator,
+   `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`, `Css.cs`,
+   `AnchorResolver/*`) so they handle/skip non-element children correctly. *(Measured: 68
+   compile errors across 9 files when `ChildAt` returns `DomNode`.)*
+2. **`ToJSObject` split** — the blocker. `ToJSObject` is an 823-line method (~110 properties)
+   whose Node-level/CharacterData callbacks are all typed `DomElement`. Split it into
+   node-level (all nodes) + element-only (`if (node is DomElement element)`), giving canonical
+   `DomText`/`DomComment` a proper minimal wrapper (replacing the `(DomElement)node` cast).
+   F3c-part1 already widened the navigation/`nodeType`/`nodeName` callbacks; the CharacterData
+   (`data`/`length`/`splitText`/`substring`/`append`/`delete`/`insert`/`replaceData`),
+   `cloneNode`, `remove`, `before`/`after`/`replaceWith`, EventTarget, `contains`,
+   `compareDocumentPosition`, `isSameNode`, `normalize`, `isEqualNode`, `getRootNode`,
+   `ownerDocument`, `parentElement` callbacks still need widening to `DomNode`.
+3. **`RangeState` cascade** — widen `StartContainer`/`EndContainer`/`Root` and the ~10 range
+   helpers they feed (`GetNodesInRange`, `CollectRangeText`, `CreatePartialCloneForExtract`,
+   `ExtractStartPath`/`EndPath`, `FindCommonAncestor`, `GetDocumentOrderNodes`, …) to `DomNode`.
+4. **Construction flip** — the ~23 `new DomElement("#text"/"#comment", …)` sites →
+   `document.CreateTextNode`/`CreateComment`, including `HtmlTreeBuilder.ConvertNode` (whose
+   `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers).
+5. **Split `TextContent`'s element-aggregation duty** — element `textContent` *set* → clear +
+   append a child `DomText`; *get* → aggregate over child `DomText`. Remove the element-store
+   shortcut (`Common.cs:34`, `SubDocumentObjects.cs:53/74`, `LayoutMetrics.cs:709/1523/1534`,
+   `Css.cs:573`, `SubDocuments.cs:1145/1406`, `AnimationResolver.cs:43/186`,
+   `Serialization.cs:322`, `Utilities.cs` clone).
+6. **`ChildElements` → `OfType<DomElement>()`** and route the text-needing callers
+   (serialization `GetChildren`, JS `childNodes`, `CollectTextContent`, the Range routines) to
+   raw `ChildNodes`.
+7. **`CloneDomElement`** clone canonical char-data via the document factories; fix the three
+   raw casts in `Traversal.cs` (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch
+   serialization `GetKind` to a `NodeType` switch; widen the serialization adapter off
+   `<DomElement>`.
+8. **Remove facade `TextContent` + the `NodeValue` override**; update the frozen scalar guard.
+
+**Gate:** the plan requires the WPT range/selection/serialization + Acid corpus in addition to
+`Broiler.Cli.Tests` for this step (silent `outerHTML`/selection corruption is the failure mode).
+
+## 5. What remains — F4 (final cutover, irreversible)
+
+Flip the ~40 real-element `new DomElement(...)` sites to `document.CreateElement`/
+`CreateElementNS` (this removes the `NamespaceURI` ctor-coupling — canonical `SetName` is
+`protected`, so namespace must be set at construction); retire `HtmlTreeBuilder` (callers use
+`Broiler.Dom.Html.HtmlDocumentParser.ParseDocument(html, _document)` directly); re-key the ~14
+remaining per-node caches to canonical `DomElement`; widen the public seams `DomBridge.Elements`/
+`DocumentElement` + `IDomBridgeRuntime.Elements` to canonical `Broiler.Dom.DomElement` (only
+external consumer needing a touch: `Broiler.Wpt.Tests/WptTestRunnerTests.cs`); remove facade
+`NamespaceURI`; delete `DomElement.cs` + `HtmlTreeBuilder.cs`; update/remove the frozen seam
+guard tests (`DomExtractionPhaseZeroTests`, `HtmlBridgePromotionPhaseZeroTests`,
+`HtmlBridgeBoundaryGuardTests`).
+
+## 6. Verification methodology (used for every landed commit)
+
+Baseline the full `Broiler.Cli.Tests` first (per `CLAUDE.md`), then require **zero
+baseline-passing tests to regress** via a before/after TRX name diff. The
+`ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container` slot-scroll crasher is excluded (it
+stack-overflows and aborts the host). The steady-state environmental baseline is **81 failures /
+1618 passes / 1699 total** — all pre-existing (graphics/Skia, PDF, HTTP, WPT-render,
+flex/grid, `GoogleSearchPolyfillTests` scroll/render), each confirmed failing on the pre-change
+tree. One F3a run aborted mid-suite on a parallel-load OOM flake that cleared on rerun.

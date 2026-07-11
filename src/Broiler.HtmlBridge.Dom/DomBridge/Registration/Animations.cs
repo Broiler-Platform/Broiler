@@ -12,7 +12,7 @@ public sealed partial class DomBridge
         var animations = new List<JSValue>();
         foreach (var element in Elements)
         {
-            if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+            if (IsText(element) || IsComment(element))
                 continue;
             if (target != null && !ReferenceEquals(element, target))
                 continue;

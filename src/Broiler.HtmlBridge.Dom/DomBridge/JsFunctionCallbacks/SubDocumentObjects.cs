@@ -132,7 +132,7 @@ public sealed partial class DomBridge
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        el.TextContent = text;
+        SetBridgeText(el, text);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
@@ -143,7 +143,7 @@ public sealed partial class DomBridge
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = new DomElement(_document, "#comment", null, null, string.Empty);
-        el.TextContent = data;
+        SetBridgeText(el, data);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
@@ -612,9 +612,8 @@ public sealed partial class DomBridge
             return a.Length > 0 ? a[0] : JSNull.Value;
         foreach (var kvp in bridge._jsObjectCache)
         {
-            if (kvp.Value == childObj)
+            if (kvp.Value == childObj && kvp.Key is DomElement child)
             {
-                var child = kvp.Key;
                 if (ParentEl(child) != null)
                     child.Remove();
                 SetParent(child, docRoot);
@@ -684,9 +683,8 @@ public sealed partial class DomBridge
         {
             foreach (var kvp in _jsObjectCache)
             {
-                if (kvp.Value == dtObj)
+                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {
-                    var dtEl = kvp.Key;
                     SetParent(dtEl, subDocRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = subDocRoot;
                     subDocRoot.AppendChild(dtEl);
@@ -744,7 +742,7 @@ public sealed partial class DomBridge
             subHead.AppendChild(subTitleEl);
             _knownNodes.Add(subTitleEl);
             var subTitleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            subTitleText.TextContent = subTitle;
+            SetBridgeText(subTitleText, subTitle);
             SetParent(subTitleText, subTitleEl);
             GetElementRuntimeState(subTitleText).OwnerDocRoot = subDocRoot;
             subTitleEl.AppendChild(subTitleText);

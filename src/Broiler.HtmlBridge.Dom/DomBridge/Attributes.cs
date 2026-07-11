@@ -80,6 +80,30 @@ public sealed partial class DomBridge
         return existing is { } found && element.RemoveAttributeNS(found.NamespaceUri, found.LocalName);
     }
 
+    /// <summary>
+    /// RF-BRIDGE-1c Phase C2: canonical replacement for the removed
+    /// <c>DomElement.NsAttrMap</c> shadow map. Looks up the attribute identified by
+    /// (<paramref name="namespaceUri"/>, <paramref name="localName"/>) directly in the
+    /// canonical namespace-keyed attribute set and yields its qualified (possibly
+    /// prefixed) name plus value — the exact pair <c>NsAttrMap</c> used to carry. The
+    /// namespace is normalized (empty string ≡ null) to match canonical attribute keying,
+    /// the same normalization <c>SetAttributeNS</c>/<c>GetAttributeNS</c> apply.
+    /// </summary>
+    private static bool TryGetNsAttribute(DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
+    {
+        var ns = string.IsNullOrEmpty(namespaceUri) ? null : namespaceUri;
+        if (element.Attributes.TryGetValue((ns, localName), out var attribute))
+        {
+            qualifiedName = attribute.QualifiedName;
+            value = attribute.Value;
+            return true;
+        }
+
+        qualifiedName = string.Empty;
+        value = string.Empty;
+        return false;
+    }
+
     /// <summary>Legacy <c>Attributes.Keys</c>: the qualified names of the element's attributes.</summary>
     private static IEnumerable<string> AttributeNames(DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
@@ -268,13 +292,20 @@ public sealed partial class DomBridge
 
     private static bool TryGetAttachedAttrNamespace(DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
     {
-        foreach (var kv in element.NsAttrMap)
+        // Match a genuinely namespaced attribute (non-null namespace) by qualified name —
+        // the set NsAttrMap used to track. No-namespace attributes are skipped so the
+        // colon-split fallback below governs their local name, exactly as before: a
+        // prefixed qualified name can only carry a namespace, so this never drops one.
+        foreach (var attribute in element.Attributes.Values)
         {
-            if (!string.Equals(kv.Value, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            if (attribute.NamespaceUri is null ||
+                !string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
-            namespaceUri = kv.Key.Namespace;
-            localName = kv.Key.LocalName;
+            namespaceUri = attribute.NamespaceUri;
+            localName = attribute.LocalName;
             return true;
         }
 
@@ -349,8 +380,6 @@ public sealed partial class DomBridge
     {
         TryGetAttribute(element, attrName, out var previousAttrVal);
         var removed = RemoveAttr(element, attrName);
-        foreach (var key in element.NsAttrMap.Where(kv => string.Equals(kv.Value, attrName, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Key).ToList())
-            element.NsAttrMap.Remove(key);
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = null;
         else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
@@ -364,9 +393,12 @@ public sealed partial class DomBridge
     private void SetAttributeLikeSetAttributeNS(DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
     {
         string? previousAttrVal = null;
-        if (element.NsAttrMap.TryGetValue((namespaceUri, localName), out var previousQualifiedName))
+        if (TryGetNsAttribute(element, namespaceUri, localName, out var previousQualifiedName, out var existingAttrVal))
         {
-            TryGetAttribute(element, previousQualifiedName, out previousAttrVal);
+            previousAttrVal = existingAttrVal;
+            // A prefix change keeps the same (namespace, localName) canonical key, so the
+            // SetAttributeNS below replaces the old-prefix attribute in place. The explicit
+            // remove keeps the canonical mutation-record sequence identical to the shadow-map era.
             if (!string.Equals(previousQualifiedName, attrName, StringComparison.OrdinalIgnoreCase))
                 RemoveAttr(element, previousQualifiedName);
         }
@@ -376,7 +408,6 @@ public sealed partial class DomBridge
         }
 
         element.SetAttributeNS(namespaceUri, attrName, attrVal);
-        element.NsAttrMap[(namespaceUri, localName)] = attrName;
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = attrVal;
         else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
@@ -402,12 +433,10 @@ public sealed partial class DomBridge
 
     private void RemoveAttributeLikeRemoveAttributeNS(DomElement element, string? namespaceUri, string localName)
     {
-        if (!element.NsAttrMap.TryGetValue((namespaceUri, localName), out var attrName))
+        if (!TryGetNsAttribute(element, namespaceUri, localName, out var attrName, out var previousAttrVal))
             return;
 
-        TryGetAttribute(element, attrName, out var previousAttrVal);
         var removed = RemoveAttr(element, attrName);
-        element.NsAttrMap.Remove((namespaceUri, localName));
         if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
             element.Id = null;
         else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))

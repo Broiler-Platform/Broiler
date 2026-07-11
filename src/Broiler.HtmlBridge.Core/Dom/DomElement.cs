@@ -51,7 +51,12 @@ public sealed class DomElement : CanonicalElement
                 tagName),
             ResolveNodeType(tagName, isTextNode))
     {
-        InnerHtml = innerHtml;
+        // RF-BRIDGE-1c Phase F: raw inner-HTML is no longer stored on the node. It lives in
+        // ElementRuntimeState and is reached via DomBridge.GetElementRuntimeState(element).InnerHtml,
+        // seeded by the innerHTML setter and copied across cloneNode. The `innerHtml` parameter is
+        // retained only for call-site compatibility until construction flips to canonical factories
+        // (Phase F); it is intentionally not read here.
+        _ = innerHtml;
         // RF-BRIDGE-1c Phase B: inline style is no longer stored on the node. It lives in
         // ElementRuntimeState and is reached via DomBridge.InlineStyle(element), which lazily
         // seeds it from the `style=` attribute (already applied from `attributes` below). The
@@ -90,8 +95,6 @@ public sealed class DomElement : CanonicalElement
         set => base.ClassName = value;
     }
 
-    public string InnerHtml { get; set; }
-
     public string? TextContent
     {
         get => _textContent;
@@ -119,8 +122,6 @@ public sealed class DomElement : CanonicalElement
         get => NamespaceUri;
         set => SetName(new CanonicalName(value, TagName));
     }
-
-    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = [];
 
     private static bool IsSpecialNode(string tagName) => tagName.StartsWith('#');
 

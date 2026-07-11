@@ -491,8 +491,8 @@ public sealed partial class DomBridge
         state.StartOffset = 0;
         state.EndContainer = el;
         // For text/comment nodes, endOffset is the character length
-        if (IsText(el) || string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-            state.EndOffset = (el.TextContent ?? string.Empty).Length;
+        if (IsText(el) || IsComment(el))
+            state.EndOffset = BridgeText(el).Length;
         else
             state.EndOffset = el.ChildNodes.Count;
         state.UpdateCollapsed();
@@ -522,15 +522,15 @@ public sealed partial class DomBridge
         var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
         bridge._knownNodes.Add(fragment);
         // Handle same-container text node case
-        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
+        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || IsComment(state.StartContainer)))
         {
-            var text = state.StartContainer.TextContent ?? string.Empty;
+            var text = BridgeText(state.StartContainer);
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));
             var e2 = Math.Max(s, Math.Min(state.EndOffset, text.Length));
             var extractedText = text.Substring(s, e2 - s);
-            state.StartContainer.TextContent = text.Substring(0, s) + text.Substring(e2);
+            SetBridgeText(state.StartContainer, text.Substring(0, s) + text.Substring(e2));
             var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            textNode.TextContent = extractedText;
+            SetBridgeText(textNode, extractedText);
             SetParent(textNode, fragment);
             fragment.AppendChild(textNode);
             bridge._knownNodes.Add(textNode);
@@ -600,11 +600,11 @@ public sealed partial class DomBridge
                 if (IsText(state.StartContainer))
                 {
                     // Text node: split at startOffset
-                    var text = state.StartContainer.TextContent ?? string.Empty;
+                    var text = BridgeText(state.StartContainer);
                     var extractedPart = text.Substring(state.StartOffset);
-                    state.StartContainer.TextContent = text.Substring(0, state.StartOffset);
+                    SetBridgeText(state.StartContainer, text.Substring(0, state.StartOffset));
                     var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    extractedNode.TextContent = extractedPart;
+                    SetBridgeText(extractedNode, extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
@@ -658,11 +658,11 @@ public sealed partial class DomBridge
             {
                 if (IsText(state.EndContainer))
                 {
-                    var text = state.EndContainer.TextContent ?? string.Empty;
+                    var text = BridgeText(state.EndContainer);
                     var extractedPart = text.Substring(0, state.EndOffset);
-                    state.EndContainer.TextContent = text.Substring(state.EndOffset);
+                    SetBridgeText(state.EndContainer, text.Substring(state.EndOffset));
                     var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    extractedNode.TextContent = extractedPart;
+                    SetBridgeText(extractedNode, extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
@@ -736,7 +736,7 @@ public sealed partial class DomBridge
             var parent = ParentEl(state.StartContainer);
             if (parent == null)
                 return JSUndefined.Value;
-            var text = state.StartContainer.TextContent ?? string.Empty;
+            var text = BridgeText(state.StartContainer);
             var splitOffset = Math.Min(state.StartOffset, text.Length);
             var beforeText = text.Substring(0, splitOffset);
             var afterText = text.Substring(splitOffset);
@@ -745,10 +745,10 @@ public sealed partial class DomBridge
             var originalEndIsSame = ReferenceEquals(state.EndContainer, originalTextNode);
             var originalEndOffset = state.EndOffset;
             // Update original text node
-            state.StartContainer.TextContent = beforeText;
+            SetBridgeText(state.StartContainer, beforeText);
             // Create remainder text node
             var remainder = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            remainder.TextContent = afterText;
+            SetBridgeText(remainder, afterText);
             bridge._knownNodes.Add(remainder);
             // Insert: [before] [insertedNode] [after]
             var textIdx = ChildIndexOf(parent, state.StartContainer);
@@ -795,8 +795,8 @@ public sealed partial class DomBridge
         if (!ReferenceEquals(state.StartContainer, state.EndContainer))
         {
             // Check if start container is partially selected (text/comment node with offset in middle)
-            bool startPartial = (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.StartOffset > 0;
-            bool endPartial = (IsText(state.EndContainer) || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && state.EndOffset < (state.EndContainer.TextContent ?? "").Length;
+            bool startPartial = (IsText(state.StartContainer) || IsComment(state.StartContainer)) && state.StartOffset > 0;
+            bool endPartial = (IsText(state.EndContainer) || IsComment(state.EndContainer)) && state.EndOffset < BridgeText(state.EndContainer).Length;
             // Per spec: if any non-Text node is partially contained, throw HIERARCHY_REQUEST_ERR
             var ancestor = FindCommonAncestor(state.StartContainer, state.EndContainer);
             if (ancestor != null)
@@ -805,7 +805,7 @@ public sealed partial class DomBridge
                 var node = state.StartContainer;
                 while (node != null && !ReferenceEquals(node, ancestor))
                 {
-                    if (!IsText(node) && !string.Equals(node.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    if (!IsText(node) && !IsComment(node))
                     {
                         // Non-text node between start/end — check if partially selected
                         if (!ReferenceEquals(node, state.StartContainer) || !ReferenceEquals(node, state.EndContainer))
@@ -822,7 +822,7 @@ public sealed partial class DomBridge
 
             // If both are comment/text nodes but different, the range spans partially across non-text nodes
             // In Acid3 test 11, both are comment nodes partially selected — per spec this raises an exception
-            if ((IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && (IsText(state.EndContainer) || string.Equals(state.EndContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) && startPartial && endPartial)
+            if ((IsText(state.StartContainer) || IsComment(state.StartContainer)) && (IsText(state.EndContainer) || IsComment(state.EndContainer)) && startPartial && endPartial)
             {
                 // BAD_BOUNDARYPOINTS_ERR / INVALID_STATE_ERR
                 ThrowDOMException(bridge._jsContext!, "Invalid state", "InvalidStateError");
@@ -836,10 +836,10 @@ public sealed partial class DomBridge
         {
             // Count existing element children (minus any that will be moved into newParent)
             var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
-            var elemCount = ChildElements(state.StartContainer).Count(c => !IsText(c) && !string.Equals(c.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
-            var removedElems = nodes.Count(n => !IsText(n) && !string.Equals(n.TagName, "#comment", StringComparison.OrdinalIgnoreCase));
+            var elemCount = ChildElements(state.StartContainer).Count(c => !IsText(c) && !IsComment(c));
+            var removedElems = nodes.Count(n => !IsText(n) && !IsComment(n));
             // After removal + adding newParent, there would be (elemCount - removedElems + 1) element children
-            if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !string.Equals(newParent.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
+            if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !IsComment(newParent)))
             {
                 ThrowDOMException(bridge._jsContext!, "Hierarchy request error", "HierarchyRequestError");
                 return JSUndefined.Value;
@@ -906,9 +906,9 @@ public sealed partial class DomBridge
     {
         var sb = new StringBuilder();
         // Handle case where range is within a single text/comment node
-        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || string.Equals(state.StartContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
+        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || IsComment(state.StartContainer)))
         {
-            var text = state.StartContainer.TextContent ?? string.Empty;
+            var text = BridgeText(state.StartContainer);
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));
             var e = Math.Max(s, Math.Min(state.EndOffset, text.Length));
             sb.Append(text, s, e - s);

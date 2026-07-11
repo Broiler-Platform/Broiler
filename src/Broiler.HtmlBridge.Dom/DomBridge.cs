@@ -45,14 +45,18 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
-    private readonly HashSet<DomElement> _knownNodes =
+    // RF-BRIDGE-1c Phase F (F3b): the registration set is keyed by canonical DomNode so
+    // it can hold text/comment nodes once they flip to canonical DomText/DomComment (which
+    // are not DomElement). A facade node IS-A DomNode, so this is a behaviour-preserving
+    // widen on the current homogeneous tree.
+    private readonly HashSet<Broiler.Dom.DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<(JSObject Observer, DomElement Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
+    private readonly List<(JSObject Observer, Broiler.Dom.DomNode Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
     private readonly DomElement _documentNode;
-    private static readonly ConditionalWeakTable<DomElement, ElementRuntimeState> ElementRuntimeStates = [];
+    private static readonly ConditionalWeakTable<Broiler.Dom.DomNode, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -178,8 +182,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             .OfType<DomElement>()
             .Where(element => !ReferenceEquals(element, _documentNode))];
 
-    private static ElementRuntimeState GetElementRuntimeState(DomElement element) =>
-        ElementRuntimeStates.GetValue(element, static _ => new ElementRuntimeState());
+    private static ElementRuntimeState GetElementRuntimeState(Broiler.Dom.DomNode node) =>
+        ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
 
     /// <summary>
     /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
@@ -213,7 +217,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
-    private static int ChildIndexOf(DomElement element, Broiler.Dom.DomNode child)
+    private static int ChildIndexOf(Broiler.Dom.DomNode element, Broiler.Dom.DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)
         {
@@ -258,16 +262,43 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>Children</c>/text cutover.</summary>
     private static bool IsText(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Text;
 
+    /// <summary>Whether <paramref name="node"/> is a comment node (RF-BRIDGE-1c Phase F).
+    /// NodeType-based, so it holds for the current facade comment nodes and for canonical
+    /// <c>DomComment</c> once construction flips — the replacement for the many
+    /// <c>TagName == "#comment"</c> checks, since a canonical <c>DomComment</c> has no
+    /// <c>TagName</c>.</summary>
+    private static bool IsComment(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Comment;
+
+    /// <summary>Reads a text/comment node's character data (RF-BRIDGE-1c Phase F). Canonical
+    /// <c>DomText</c>/<c>DomComment</c> expose it as <c>Data</c>; the facade text/comment nodes
+    /// (pre-flip) expose it as <c>TextContent</c>. The single accessor both models funnel through
+    /// during the text cutover; returns <c>""</c> (never null) for character-data nodes.</summary>
+    private static string BridgeText(Broiler.Dom.DomNode node) => node switch
+    {
+        Broiler.Dom.DomCharacterData characterData => characterData.Data,
+        DomElement facade => facade.TextContent ?? string.Empty,
+        _ => node.NodeValue ?? string.Empty,
+    };
+
+    /// <summary>Writes a text/comment node's character data (see <see cref="BridgeText"/>).</summary>
+    private static void SetBridgeText(Broiler.Dom.DomNode node, string value)
+    {
+        if (node is Broiler.Dom.DomCharacterData characterData)
+            characterData.Data = value;
+        else if (node is DomElement facade)
+            facade.TextContent = value;
+    }
+
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
     /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
     /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
-    private static DomElement? ParentEl(DomElement element) => element.ParentNode as DomElement;
+    private static DomElement? ParentEl(Broiler.Dom.DomNode node) => node.ParentNode as DomElement;
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
     /// otherwise the child is appended if not already there — matching the old setter exactly.</summary>
-    private static void SetParent(DomElement child, DomElement? parent)
+    private static void SetParent(Broiler.Dom.DomNode child, DomElement? parent)
     {
         if (parent is null)
             child.Remove();
