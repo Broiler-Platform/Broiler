@@ -108,25 +108,34 @@ dead until a canonical `DomText` exists). Concrete work:
   tree/clone leaf helpers widened to `DomNode` (see §3). The wrapper still **omits** the ChildNode
   mixin + EventTarget (folded into 2b, below).
 
-- ⏳ **2b — `RangeState` + tree-mutation cascade → `DomNode`** (green). Widen
-  `RangeState.StartContainer`/`EndContainer`/`Root` and the ~10 range helpers they feed
-  (`GetNodesInRange`, `CollectRangeText`, `CreatePartialCloneForExtract`, `ExtractStartPath`/
-  `EndPath`, `FindCommonAncestor`, `GetDocumentOrderNodes`, `IsPositionAfter`/
-  `CompareBoundaryPosition`, `RangeState.AdjustForRemoval`) and the tree-mutation helpers
-  (`InsertNodeAt`, `NotifyChildAdded`/`NotifyChildRemoved`, `NotifyNodeIteratorPreRemoval`,
-  `AdoptSubtreeIntoDocument`, `BuildChildNodeArgumentNodes`, `DispatchEventOnElement`,
-  `GetEventListeners`). Then **add the deferred `remove`/`before`/`after`/`replaceWith` + EventTarget
-  members to `PopulateCharacterDataJSObject`** so the char-data wrapper is complete.
+- ✅ **2b — `RangeState` + tree-mutation cascade → `DomNode`. DONE + verified** (0 regressions).
+  Widened `RangeState.StartContainer`/`EndContainer`/`Root` + `AdjustForRemoval`/`IsDescendantOf`
+  and the range helpers they feed (`FindCommonAncestor`, `GetNodesInRange`→`List<DomNode>`,
+  `CollectRangeText`, `GetDocumentOrderNodes`/`CollectDescendants`→`List<DomNode>` walking raw
+  `ChildNodes`, `ExtractStartPath`/`EndPath` with `DomNode` ancestor chains, `IsPositionAfter`/
+  `CompareBoundaryPosition`); the NodeIterator surface (`IteratorState`, `GetNextNodeAfter`/
+  `GetPreviousNodeBefore`, `ApplyFilter`, `GetNodeType`); the child-mutation helper family's parent
+  param (`ChildAt`/`InsertChildAt`/`RemoveChildFrom`/`RemoveNthChild`/`ClearChildren`/`SetParent`);
+  and the tree-mutation + EventTarget helpers (`InsertNodeAt`, `NotifyChildAdded`/`NotifyChildRemoved`/
+  `NotifyMutationObservers`, `NotifyNodeIteratorPreRemoval`, `AdoptSubtreeIntoDocument`,
+  `BuildChildNodeArgumentNodes`→`List<DomNode>`, `GetEventListeners`/`GetInlineEventHandlers`,
+  `DispatchEventOnElement`/`FireListeners`/`BuildComposedPathValue`, and the `remove`/`before`/`after`/
+  `replaceWith`/`addEventListener`/`removeEventListener`/`dispatchEvent` JS callbacks). The char-data
+  wrapper (`PopulateCharacterDataJSObject`) now carries the full ChildNode-mixin + EventTarget surface.
+  The four range-clone `(DomElement)` casts from 2a are gone. **Verified:** full `Broiler.Cli.Tests`
+  before/after name-diff — 0 regressions across two commits (one interim run showed a lone flaky
+  `GoogleSearchPolyfillTests` scroll test that passes on rerun; the final run is an exact 81-failure match).
 
-- ⏳ **2c — `ChildAt` → `DomNode`** (green) and fix the resulting **~68 tree-heterogeneity sites**
-  (TreeWalker/NodeIterator, `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`,
+- ⏳ **2c — `ChildAt` *return type* → `DomNode`** (green) and fix the resulting **~68 tree-heterogeneity
+  sites** (TreeWalker/NodeIterator, `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`,
   `Css.cs`, `AnchorResolver/*`) to handle/skip non-element children; **`ChildElements` →
   `OfType<DomElement>()`** and route text-needing callers (serialization `GetChildren`, JS
   `childNodes`, `CollectTextContent`, the Range routines) to raw `ChildNodes`. *(Measured: 68
   compile errors across 9 files when `ChildAt` returns `DomNode`.)* Also fix the three raw casts in
   `Traversal.cs` (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch serialization `GetKind` to a
-  `NodeType` switch; widen the serialization adapter off `<DomElement>`. (`CloneDomElement`'s
-  char-data factory branch already landed in 2a; the four range-clone casts are tagged in-code.)
+  `NodeType` switch; widen the serialization adapter off `<DomElement>`. (`ChildAt`'s *parent* param
+  and `CloneDomElement`'s char-data factory branch already landed in 2a/2b; the four range-clone casts
+  are gone.)
 
 - ⚠️ **2d — the atomic construction flip (irreversible).** The ~23
   `new DomElement("#text"/"#comment", …)` sites → `document.CreateTextNode`/`CreateComment` (via

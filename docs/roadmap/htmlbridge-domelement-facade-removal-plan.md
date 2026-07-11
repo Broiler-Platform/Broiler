@@ -30,12 +30,14 @@ against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) enviro
 F3c part 2a verified via a full before/after TRX **name**-diff (identical 81 env failures, **0
 regressed, 0 newly-failing**), same methodology Phase C2 used.
 
-**F3c part 2 decomposition:** part 2 is now landed as green, `Cli.Tests`-verified type-widening
-commits (2a done; 2b `RangeState`/tree-mutation; 2c `ChildAt`/`ChildElements`) capped by the single
-irreversible construction flip (2d, gated on WPT range/selection/serialization + Acid). Rationale: the
-widening is behaviour-preserving on today's homogeneous facade tree — a canonical `DomText` is not yet
-in the tree, so the widened branches are dead code — and only construction + the `TextContent`
-aggregation split are genuinely atomic. See the current-state doc §4.
+**F3c part 2 decomposition:** part 2 is landing as green, `Cli.Tests`-verified type-widening commits
+(**2a `ToJSObject` split — done; 2b `RangeState`/NodeIterator/tree-mutation + complete char-data
+wrapper — done**; 2c `ChildAt` return type / `ChildElements` — next) capped by the single irreversible
+construction flip (2d, gated on WPT range/selection/serialization + Acid). Each landed commit is a full
+before/after `Broiler.Cli.Tests` name-diff with 0 regressions. Rationale: the widening is
+behaviour-preserving on today's homogeneous facade tree — a canonical `DomText` is not yet in the tree,
+so the widened branches are dead code — and only construction + the `TextContent` aggregation split are
+genuinely atomic. See the current-state doc §4.
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
