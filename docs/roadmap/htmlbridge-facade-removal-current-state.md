@@ -175,18 +175,68 @@ environment — run it and confirm green before merging `72634e02`.
 (silent `outerHTML`/selection corruption is the failure mode). The green steps 2a–2c gate on
 `Broiler.Cli.Tests` before/after name-diff alone.
 
-## 5. What remains — F4 (final cutover, irreversible)
+## 5. What remains — F4 (final cutover, irreversible) — grounded sketch
 
-Flip the ~40 real-element `new DomElement(...)` sites to `document.CreateElement`/
-`CreateElementNS` (this removes the `NamespaceURI` ctor-coupling — canonical `SetName` is
-`protected`, so namespace must be set at construction); retire `HtmlTreeBuilder` (callers use
-`Broiler.Dom.Html.HtmlDocumentParser.ParseDocument(html, _document)` directly); re-key the ~14
-remaining per-node caches to canonical `DomElement`; widen the public seams `DomBridge.Elements`/
-`DocumentElement` + `IDomBridgeRuntime.Elements` to canonical `Broiler.Dom.DomElement` (only
-external consumer needing a touch: `Broiler.Wpt.Tests/WptTestRunnerTests.cs`); remove facade
-`NamespaceURI`; delete `DomElement.cs` + `HtmlTreeBuilder.cs`; update/remove the frozen seam
-guard tests (`DomExtractionPhaseZeroTests`, `HtmlBridgePromotionPhaseZeroTests`,
-`HtmlBridgeBoundaryGuardTests`).
+**Goal:** delete `DomElement.cs` + `HtmlTreeBuilder.cs` so the bridge holds only canonical
+`Broiler.Dom` nodes + bridge-runtime state. After 2d the facade carries **one** real member
+(`NamespaceURI`) plus redundant `Id`/`ClassName` re-exposures — canonical `Broiler.Dom.DomElement`
+already has public settable `Id`/`ClassName`, so those `new` overrides just delete.
+
+**Strategy — the same funnel pattern that made 2d safe.** Introduce one
+`CreateBridgeElement(tagName, namespaceUri?, id?, className?, attributes?)` helper that does
+`CreateElement`/`CreateElementNS` + sets id/className/attributes (the work the facade ctor did
+inline), route all **58** `new DomElement(...)` sites through it, then flip the funnel body to
+canonical factories. Keeps most commits green and isolates the irreversible flip to one place.
+
+**Measured surface (post-2d, on `claude/htmlbridge-domelement-f3c-flip`):**
+
+1. **Construction flip — 58 sites.** All tag literals are lowercase HTML
+   (`html/body/head/div/tr/style/pre/…`) or `#`-sentinels — **no mixed-case/foreign literals**, so
+   `CreateElement` (which `ToLowerInvariant()`s) is safe for the real elements. Funnel gotchas:
+   - **`#`-sentinels** (`#document`, `#document-fragment`, `#subdoc-root`, `#shadow-root`,
+     `#doctype` — ~18 sites): the facade gave these a **null** namespace and preserved the name.
+     `CreateElement` would lowercase + apply the HTML namespace → wrong. Use
+     `CreateElementNS(null, "#subdoc-root")` (preserves name, null ns). They stay canonical
+     `DomElement`s with sentinel tag names — a bridge-internal model, now over canonical types.
+   - **id/className/attributes**: funnel does `CreateElement` then `Id=`/`ClassName=`/`SetAttribute`.
+2. **`NamespaceURI` → construction (removes the last facade member).** ~7 set-sites
+   (`el.NamespaceURI = ns` in `createElementNS` handlers, sub-doc roots, clone) create then
+   `SetName` (protected — unreachable from `DomBridge` once the facade is gone); fold the namespace
+   into the funnel → `CreateElementNS(ns, name)` at construction. The ~12 read-sites become canonical
+   `element.NamespaceUri` (casing change `NamespaceURI` → `NamespaceUri`). Then delete the alias.
+3. **Reconcile `_documentNode` vs `_document`.** The bridge holds both a canonical `DomDocument`
+   (`_document`) *and* a facade element tagged `"#document"` (`_documentNode`). Recommend F4 keep
+   `_documentNode` as a canonical sentinel element (minimal churn) and defer document-node
+   unification — it is orthogonal to deleting the facade type.
+4. **Re-key ~14 caches** `Dictionary/HashSet/CWT<DomElement,…>` → `<Broiler.Dom.DomElement,…>`
+   (`_computedPropsCache`, `_styleSheetCache`, `_subDocument*Cache`, `_computedStyleEngines`,
+   `_docRootToDocJSObject`, `_smoothScrollTokens`, `_zoomSpecifiedStyleCache`, `PositionAreaResolutions`
+   CWT, `_onloadFired`, …). Pure type-widen (facade IS-A canonical, reference identity unchanged);
+   re-check the `SharedLayoutGeometryParityTests` gate after.
+5. **Widen public seams to canonical** `Broiler.Dom.DomElement`: `DomBridge.Elements`
+   (`IReadOnlyList<DomElement>`), `DomBridge.DocumentElement`, `IDomBridgeRuntime.Elements`. Only
+   external consumer to touch: `Broiler.Wpt.Tests/WptTestRunnerTests.cs`.
+6. **Retire `HtmlTreeBuilder` (10 callers).** Post-2d `ConvertNode` already mints canonical
+   text/comment; once elements are canonical too it becomes an identity re-materialization — pure
+   overhead. Callers parse via `Broiler.Dom.Html.HtmlDocumentParser` directly and adopt the tree
+   into `_document`. **Spike first (the one non-mechanical piece):** confirm whether `ParseDocument`
+   can target `_document` or whether the bridge adopts/imports the parsed subtree (today `Build`
+   parses into the parser's own document, then re-parents into `_document`).
+7. **Delete `DomElement.cs` + `HtmlTreeBuilder.cs`; update the frozen guards.**
+   `DomExtractionPhaseZeroTests` flips from "surface is frozen" to "facade is removed";
+   `HtmlBridgePromotionPhaseZeroTests.DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Versioned_And_Frozen`
+   is removed/repurposed (+ any `HtmlBridgeBoundaryGuardTests`).
+
+**Verification & gate.** Same before/after `Broiler.Cli.Tests` name-diff harness. F4 is mostly
+mechanical type/construction widening (lower risk than 2d's text-model change) but **is** the final
+irreversible cutover — gate on the **full WPT + Acid + pixel** baselines before merge. Watch for
+sentinel-namespace regressions (SVG/foreign `createElementNS`) and any reader of a facade element's
+*stored* tag case (all literals lowercase → low risk).
+
+**Sequencing / effort — ~2 PRs.** (a) `CreateBridgeElement` funnel + route all 58 sites +
+NamespaceURI-into-construction + cache re-key + seam widen (green, incremental); (b) flip the funnel
+to canonical, retire `HtmlTreeBuilder`, delete both files, update guards (the irreversible cutover).
+Spike the parser-document-ownership question (item 6) before starting.
 
 ## 6. Verification methodology (used for every landed commit)
 
