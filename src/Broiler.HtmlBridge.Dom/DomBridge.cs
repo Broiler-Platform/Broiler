@@ -286,7 +286,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static string BridgeText(Broiler.Dom.DomNode node) => node switch
     {
         Broiler.Dom.DomCharacterData characterData => characterData.Data,
-        DomElement facade => facade.TextContent ?? string.Empty,
         _ => node.NodeValue ?? string.Empty,
     };
 
@@ -295,20 +294,39 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         if (node is Broiler.Dom.DomCharacterData characterData)
             characterData.Data = value;
-        else if (node is DomElement facade)
-            facade.TextContent = value;
     }
 
-    /// <summary>Mints a bridge text node carrying <paramref name="data"/> (RF-BRIDGE-1c Phase F).
-    /// The single funnel for text-node construction: it builds a facade <c>DomElement</c> text
-    /// node on today's tree, and flips to <c>_document.CreateTextNode(data)</c> (canonical
-    /// <c>DomText</c>) at the F3c construction cutover. Callers treat the result as a
-    /// <see cref="Broiler.Dom.DomNode"/>.</summary>
-    private Broiler.Dom.DomNode CreateBridgeTextNode(string data)
+    /// <summary>Mints a canonical <see cref="Broiler.Dom.DomText"/> carrying <paramref name="data"/>
+    /// (RF-BRIDGE-1c Phase F, F3c part 2d — construction cutover). The single funnel for text-node
+    /// construction; callers treat the result as a <see cref="Broiler.Dom.DomNode"/>.</summary>
+    private Broiler.Dom.DomNode CreateBridgeTextNode(string data) => _document.CreateTextNode(data);
+
+    /// <summary>Mints a canonical <see cref="Broiler.Dom.DomComment"/> carrying <paramref name="data"/>
+    /// (see <see cref="CreateBridgeTextNode"/>).</summary>
+    private Broiler.Dom.DomNode CreateBridgeCommentNode(string data) => _document.CreateComment(data);
+
+    /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
+    /// replaces all children with a single canonical <see cref="Broiler.Dom.DomText"/> (or none when
+    /// <paramref name="value"/> is null/empty). Replaces the former element-store
+    /// <c>DomElement.TextContent</c> scalar.</summary>
+    private void SetElementTextContent(DomElement element, string? value)
     {
-        var node = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(node, data);
-        return node;
+        ClearChildren(element);
+        if (!string.IsNullOrEmpty(value))
+        {
+            var textNode = CreateBridgeTextNode(value);
+            _knownNodes.Add(textNode);
+            element.AppendChild(textNode);
+        }
+    }
+
+    /// <summary>An element's <c>textContent</c> — the concatenation of its descendant text (RF-BRIDGE-1c
+    /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>DomElement.TextContent</c>.</summary>
+    private static string GetElementTextContent(DomElement element)
+    {
+        var sb = new System.Text.StringBuilder();
+        CollectTextContent(element, sb);
+        return sb.ToString();
     }
 
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
@@ -869,7 +887,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         var (docElement, allElements, title) = builder.Build(html, _document);
         Title = title;
         ClearChildren(DocumentElement);
-        foreach (var child in ChildElements(docElement).ToArray())
+        // RF-BRIDGE-1c Phase F (F3c part 2d): reparent ALL children (raw ChildNodes) so any
+        // text/comment nodes directly under the parsed <html> survive — no-op on the old
+        // homogeneous tree where every child was an element.
+        foreach (var child in docElement.ChildNodes.ToArray())
         {
             SetParent(child, DocumentElement);
             DocumentElement.AppendChild(child);

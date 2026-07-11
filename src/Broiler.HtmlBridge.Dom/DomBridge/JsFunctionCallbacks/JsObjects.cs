@@ -115,15 +115,8 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetTextContent021Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        if (IsText(element) || IsComment(element))
-        {
-            bridge.SetCharacterData(element, text);
-            return JSUndefined.Value;
-        }
-
-        element.TextContent = text;
-        // Setting textContent clears all children per DOM spec
-        ClearChildren(element);
+        // Setting textContent replaces all children with a single text node per DOM spec.
+        bridge.SetElementTextContent(element, text);
         return JSUndefined.Value;
     }
 
@@ -786,7 +779,7 @@ public sealed partial class DomBridge
         var newChildObj = a[0] as JSObject;
         if (newChildObj == null)
             return JSUndefined.Value;
-        var newEl = FindDomElementByJSObject(newChildObj);
+        var newEl = FindDomNodeByJSObject(newChildObj);
         if (newEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -801,7 +794,7 @@ public sealed partial class DomBridge
         var refChildObj = a[1] as JSObject;
         if (refChildObj == null)
             return a[0];
-        var refEl = FindDomElementByJSObject(refChildObj);
+        var refEl = FindDomNodeByJSObject(refChildObj);
         if (refEl == null)
             return a[0];
         if (ReferenceEquals(newEl, refEl))
@@ -908,7 +901,7 @@ public sealed partial class DomBridge
         if (childObj == null)
             return JSUndefined.Value;
         // Find the DomElement for this child JSObject
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -950,7 +943,7 @@ public sealed partial class DomBridge
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSUndefined.Value;
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl == null)
             return a[0];
         var idx = ChildIndexOf(element, childEl);
@@ -973,8 +966,8 @@ public sealed partial class DomBridge
         var oldChildObj = a[1] as JSObject;
         if (newChildObj == null || oldChildObj == null)
             return JSUndefined.Value;
-        var newEl = FindDomElementByJSObject(newChildObj);
-        var oldEl = FindDomElementByJSObject(oldChildObj);
+        var newEl = FindDomNodeByJSObject(newChildObj);
+        var oldEl = FindDomNodeByJSObject(oldChildObj);
         if (newEl == null || oldEl == null)
             return a[1];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -1535,10 +1528,7 @@ public sealed partial class DomBridge
         var position = NormalizeInsertAdjacentPosition(a[0]);
         var text = a.Length > 1 ? a[1].ToString() : string.Empty;
         var (parent, index) = GetInsertAdjacentTarget(element, position);
-        var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true)
-        {
-            TextContent = text
-        };
+        var textNode = CreateBridgeTextNode(text);
         _knownNodes.Add(textNode);
         InsertNodeAt(parent, textNode, index);
         return JSUndefined.Value;

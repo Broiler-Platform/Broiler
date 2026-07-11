@@ -283,7 +283,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             throw new JSException("Failed to execute 'setStart': parameter 1 is not of type 'Node'.");
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         var newOffset = (int)a[1].DoubleValue;
@@ -308,7 +308,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             throw new JSException("Failed to execute 'setEnd': parameter 1 is not of type 'Node'.");
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         var newOffset = (int)a[1].DoubleValue;
@@ -333,7 +333,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -361,7 +361,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -389,7 +389,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             // INVALID_NODE_TYPE_ERR — node has no parent
@@ -418,7 +418,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -465,7 +465,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
             return JSUndefined.Value;
         state.StartContainer = ParentEl(el);
@@ -484,7 +484,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         state.StartContainer = el;
@@ -529,8 +529,7 @@ public sealed partial class DomBridge
             var e2 = Math.Max(s, Math.Min(state.EndOffset, text.Length));
             var extractedText = text.Substring(s, e2 - s);
             SetBridgeText(state.StartContainer, text.Substring(0, s) + text.Substring(e2));
-            var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(textNode, extractedText);
+            var textNode = CreateBridgeTextNode(extractedText);
             SetParent(textNode, fragment);
             fragment.AppendChild(textNode);
             bridge._knownNodes.Add(textNode);
@@ -604,8 +603,7 @@ public sealed partial class DomBridge
                     var text = BridgeText(state.StartContainer);
                     var extractedPart = text.Substring(state.StartOffset);
                     SetBridgeText(state.StartContainer, text.Substring(0, state.StartOffset));
-                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    SetBridgeText(extractedNode, extractedPart);
+                    var extractedNode = bridge.CreateBridgeTextNode(extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
@@ -662,8 +660,7 @@ public sealed partial class DomBridge
                     var text = BridgeText(state.EndContainer);
                     var extractedPart = text.Substring(0, state.EndOffset);
                     SetBridgeText(state.EndContainer, text.Substring(state.EndOffset));
-                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    SetBridgeText(extractedNode, extractedPart);
+                    var extractedNode = bridge.CreateBridgeTextNode(extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
@@ -727,7 +724,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         // Remove from old parent if needed
@@ -749,8 +746,7 @@ public sealed partial class DomBridge
             // Update original text node
             SetBridgeText(state.StartContainer, beforeText);
             // Create remainder text node
-            var remainder = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(remainder, afterText);
+            var remainder = bridge.CreateBridgeTextNode(afterText);
             bridge._knownNodes.Add(remainder);
             // Insert: [before] [insertedNode] [after]
             var textIdx = ChildIndexOf(parent, state.StartContainer);
@@ -885,8 +881,8 @@ public sealed partial class DomBridge
             throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
         if (a[1] is not JSObject sourceRangeObj)
             return new JSNumber(0);
-        var sourceStartContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
-        var sourceEndContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
+        var sourceStartContainer = bridge.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
+        var sourceEndContainer = bridge.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
         if (sourceStartContainer == null || sourceEndContainer == null)
             return new JSNumber(0);
         var sourceStartOffsetValue = sourceRangeObj[(KeyString)"startOffset"];

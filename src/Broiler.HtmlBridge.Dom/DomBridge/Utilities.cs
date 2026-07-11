@@ -446,7 +446,8 @@ public sealed partial class DomBridge
         cloneStyle.Clear();
         foreach (var kv in InlineStyle(element))
             cloneStyle[kv.Key] = kv.Value;
-        clone.TextContent = element.TextContent;
+        // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
+        // the deep-clone loop below — no element-store TextContent scalar to copy.
         clone.NamespaceURI = element.NamespaceURI;
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
@@ -670,9 +671,11 @@ public sealed partial class DomBridge
     /// in depth-first pre-order (without skipping sub-document roots).
     /// Used by <c>document.write()</c> to register parsed elements.
     /// </summary>
-    private static void CollectAllDescendantsFlat(DomElement parent, List<DomElement> result)
+    // RF-BRIDGE-1c Phase F (F3c part 2d): flatten the whole subtree (raw ChildNodes) so text/comment
+    // descendants are collected for registration too.
+    private static void CollectAllDescendantsFlat(Broiler.Dom.DomNode parent, List<Broiler.Dom.DomNode> result)
     {
-        foreach (var child in ChildElements(parent))
+        foreach (var child in parent.ChildNodes)
         {
             result.Add(child);
             CollectAllDescendantsFlat(child, result);

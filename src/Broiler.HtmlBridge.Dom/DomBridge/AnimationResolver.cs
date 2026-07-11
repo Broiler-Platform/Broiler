@@ -40,14 +40,9 @@ public sealed partial class DomBridge
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var css = root.TextContent;
-            // Fall back to concatenating child text nodes when TextContent is not set.
-            if (string.IsNullOrEmpty(css))
-            {
-                css = string.Concat(ChildElements(root)
-                    .Where(c => IsText(c))
-                    .Select(c => BridgeText(c)));
-            }
+            var css = string.Concat(root.ChildNodes
+                .Where(c => IsText(c))
+                .Select(c => BridgeText(c)));
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
             foreach (var atRule in styleSheet.Rules.OfType<Broiler.CSS.CssAtRule>())
             {
@@ -183,13 +178,9 @@ public sealed partial class DomBridge
     {
         if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var css = node.TextContent;
-            if (string.IsNullOrEmpty(css))
-            {
-                css = string.Concat(ChildElements(node)
-                    .Where(c => IsText(c))
-                    .Select(c => BridgeText(c)));
-            }
+            var css = string.Concat(node.ChildNodes
+                .Where(c => IsText(c))
+                .Select(c => BridgeText(c)));
 
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
             foreach (var styleRule in styleSheet.Rules.OfType<Broiler.CSS.CssStyleRule>())

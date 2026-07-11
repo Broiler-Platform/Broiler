@@ -14,7 +14,11 @@ public sealed class HtmlTreeBuilder
     public const string CompatibilitySurfaceVersion = "htmlbridge-dom-adapter/v1";
     public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
 
-    public (DomElement DocumentElement, List<DomElement> AllElements, string Title) Build(
+    // RF-BRIDGE-1c Phase F (F3c part 2d): ConvertNode returns canonical DomNode and mints canonical
+    // DomText/DomComment for character data (the facade only re-materializes elements now); AllElements
+    // widens to List<DomNode> so text/comment nodes are registered too. HtmlTreeBuilder itself is
+    // retired in F4 (callers parse via HtmlDocumentParser directly).
+    public (DomElement DocumentElement, List<Broiler.Dom.DomNode> AllElements, string Title) Build(
         string html,
         Broiler.Dom.DomDocument? document = null)
     {
@@ -23,45 +27,40 @@ public sealed class HtmlTreeBuilder
         var parsedRoot = parsed.Document.DocumentElement ??
             throw new InvalidOperationException("The shared HTML parser did not produce a document element.");
 
-        var allElements = new List<DomElement>();
-        var root = ConvertNode(parsedRoot, document, allElements, structural: true);
+        var allElements = new List<Broiler.Dom.DomNode>();
+        // The document element is always an element node.
+        var root = (DomElement)ConvertNode(parsedRoot, document, allElements, structural: true);
         return (root, allElements, parsed.Title);
     }
 
-    public (DomElement Fragment, List<DomElement> AllElements) BuildFragment(
+    public (DomElement Fragment, List<Broiler.Dom.DomNode> AllElements) BuildFragment(
         string html,
         string contextTagName,
         Broiler.Dom.DomDocument document)
     {
         var parsed = new HtmlDocumentParser().ParseFragment(html, contextTagName);
-        var allElements = new List<DomElement>();
+        var allElements = new List<Broiler.Dom.DomNode>();
         var fragment = new DomElement(document, "#document-fragment", null, null, string.Empty);
         foreach (var child in parsed.Fragment.ChildNodes)
             fragment.AppendChild(ConvertNode(child, document, allElements));
         return (fragment, allElements);
     }
 
-    private static DomElement ConvertNode(
+    private static Broiler.Dom.DomNode ConvertNode(
         Broiler.Dom.DomNode source,
         Broiler.Dom.DomDocument targetDocument,
-        List<DomElement> allElements,
+        List<Broiler.Dom.DomNode> allElements,
         bool structural = false)
     {
-        DomElement target;
+        Broiler.Dom.DomNode target;
         switch (source)
         {
             case Broiler.Dom.DomText text:
-                target = new DomElement(targetDocument, "#text", null, null, string.Empty, isTextNode: true)
-                {
-                    TextContent = text.Data
-                };
+                target = targetDocument.CreateTextNode(text.Data);
                 break;
 
             case Broiler.Dom.DomComment comment:
-                target = new DomElement(targetDocument, "#comment", null, null, string.Empty)
-                {
-                    TextContent = comment.Data
-                };
+                target = targetDocument.CreateComment(comment.Data);
                 break;
 
             case Broiler.Dom.DomElement element:

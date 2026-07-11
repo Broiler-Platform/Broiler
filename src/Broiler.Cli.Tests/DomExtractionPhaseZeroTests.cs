@@ -23,13 +23,13 @@ public sealed class DomExtractionPhaseZeroTests
     // RF-BRIDGE-1c Phase E relocated the facade Parent getter/setter to
     // DomBridge.ParentEl / SetParent over canonical ParentNode, so Parent is no
     // longer a settable scalar on the DomElement surface below. Phase F relocated
-    // InnerHtml into ElementRuntimeState, so it is no longer a settable scalar either.
+    // InnerHtml into ElementRuntimeState, and F3c part 2d flipped text/comment to
+    // canonical DomText/DomComment — so TextContent is gone from the facade too.
     private static readonly string[] LegacySettableScalarProperties =
     [
         "ClassName",
         "Id",
         "NamespaceURI",
-        "TextContent",
     ];
 
     [Fact]
@@ -107,7 +107,7 @@ public sealed class DomExtractionPhaseZeroTests
         Assert.Same(documentElement, head.ParentNode);
         Assert.Same(documentElement, body.ParentNode);
 
-        var host = Assert.Single(elements, static element => element.Id == "host");
+        var host = Assert.Single(elements.OfType<Broiler.Dom.DomElement>(), static element => element.Id == "host");
         Assert.Same(body, host.ParentNode);
         Assert.Equal(["span", "span"], host.ChildNodes.OfType<Broiler.Dom.DomElement>().Select(static child => child.TagName));
         Assert.All(host.ChildNodes, child => Assert.Same(host, child.ParentNode));

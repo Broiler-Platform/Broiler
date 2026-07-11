@@ -28,20 +28,13 @@ public sealed partial class DomBridge
 
     private JSValue GetNodeTextValue(Broiler.Dom.DomNode node)
     {
-        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes expose their data as
-        // textContent. Dead on today's homogeneous facade tree (facade text/comment are
-        // DomElement, caught by IsText below); live once construction flips to DomText/DomComment.
+        // RF-BRIDGE-1c Phase F (F3c part 2d): character-data nodes expose their data as textContent;
+        // an element's textContent is the concatenation of its descendant text.
         if (node is Broiler.Dom.DomCharacterData characterData)
             return new JSString(characterData.Data);
 
-        if (IsText(node))
-            return new JSString(BridgeText(node));
-
         if (node is not DomElement element)
             return new JSString(string.Empty);
-
-        if (element.TextContent != null && element.ChildNodes.Count == 0)
-            return new JSString(element.TextContent);
 
         if (element.ChildNodes.Count > 0)
         {
@@ -91,7 +84,7 @@ public sealed partial class DomBridge
     }
 
 
-    private void RegisterMutationObserver(JSObject observerObject, DomElement target, Broiler.Dom.DomMutationObserverOptions options)
+    private void RegisterMutationObserver(JSObject observerObject, Broiler.Dom.DomNode target, Broiler.Dom.DomMutationObserverOptions options)
     {
         _mutationObservers.RemoveAll(entry =>
             ReferenceEquals(entry.Observer, observerObject) &&

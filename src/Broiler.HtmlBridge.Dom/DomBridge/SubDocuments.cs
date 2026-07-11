@@ -622,8 +622,7 @@ public sealed partial class DomBridge
         SetParent(preEl, bodyEl);
         bodyEl.AppendChild(preEl);
 
-        var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(textNode, textContent);
+        var textNode = CreateBridgeTextNode(textContent);
         SetParent(textNode, preEl);
         preEl.AppendChild(textNode);
 
@@ -898,21 +897,25 @@ public sealed partial class DomBridge
     /// Used by <see cref="BuildSubDocumentFromHtml"/> to register structural elements
     /// (html, head, body) that <see cref="HtmlTreeBuilder"/> does not include in its allElements list.
     /// </summary>
-    private void AddElementsRecursive(DomElement element)
+    // RF-BRIDGE-1c Phase F (F3c part 2d): register/unregister the whole node subtree (raw
+    // ChildNodes) so canonical text/comment nodes round-trip through _knownNodes too. No-op on the
+    // old homogeneous tree where every child was an element.
+    private void AddElementsRecursive(Broiler.Dom.DomNode node)
     {
-        if (!_knownNodes.Contains(element))
-            _knownNodes.Add(element);
-        foreach (var child in ChildElements(element))
+        if (!_knownNodes.Contains(node))
+            _knownNodes.Add(node);
+        foreach (var child in node.ChildNodes)
             AddElementsRecursive(child);
     }
 
-    private void RemoveElementsRecursive(DomElement element)
+    private void RemoveElementsRecursive(Broiler.Dom.DomNode node)
     {
-        _knownNodes.Remove(element);
-        _jsObjectCache.Remove(element);
-        _styleSheetCache.Remove(element);
+        _knownNodes.Remove(node);
+        _jsObjectCache.Remove(node);
+        if (node is DomElement element)
+            _styleSheetCache.Remove(element);
 
-        foreach (var child in ChildElements(element))
+        foreach (var child in node.ChildNodes)
             RemoveElementsRecursive(child);
     }
 
@@ -1102,16 +1105,18 @@ public sealed partial class DomBridge
         }
     }
 
-    private List<DomElement> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
+    private List<Broiler.Dom.DomNode> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
     {
-        var nodes = new List<DomElement>();
+        var nodes = new List<Broiler.Dom.DomNode>();
         if (string.IsNullOrEmpty(html))
             return nodes;
 
         if (!TryBuildInnerHtmlFragmentContainer(contextElement, html, out var fragmentContainer))
             return nodes;
 
-        foreach (var child in ChildElements(fragmentContainer).ToArray())
+        // RF-BRIDGE-1c Phase F (F3c part 2d): move ALL children (raw ChildNodes) so text/comment
+        // nodes in the parsed fragment survive.
+        foreach (var child in fragmentContainer.ChildNodes.ToArray())
         {
             RemoveChildFrom(fragmentContainer, child);
             SetParent(child, null);
@@ -1160,15 +1165,8 @@ public sealed partial class DomBridge
     {
         html ??= string.Empty;
         GetElementRuntimeState(element).InnerHtml = html;
-        element.TextContent = null;
 
-        if (IsText(element))
-        {
-            element.TextContent = html;
-            return;
-        }
-
-        foreach (var child in ChildElements(element).ToArray())
+        foreach (var child in element.ChildNodes.ToArray())
             RemoveElementsRecursive(child);
 
         ClearChildren(element);
@@ -1176,7 +1174,8 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(html) &&
             TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
         {
-            foreach (var child in ChildElements(fragmentContainer).ToArray())
+            // RF-BRIDGE-1c Phase F (F3c part 2d): move ALL children so parsed text/comment survive.
+            foreach (var child in fragmentContainer.ChildNodes.ToArray())
             {
                 SetParent(child, element);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
@@ -1222,7 +1221,7 @@ public sealed partial class DomBridge
         if (parsedContainer != null)
         {
             var insertIndex = index;
-            foreach (var child in ChildElements(parsedContainer).ToArray())
+            foreach (var child in parsedContainer.ChildNodes.ToArray())
             {
                 SetParent(child, parent);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
@@ -1362,8 +1361,7 @@ public sealed partial class DomBridge
             }
             else if (child is System.Xml.Linq.XText childText)
             {
-                var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-                SetBridgeText(textNode, childText.Value);
+                var textNode = CreateBridgeTextNode(childText.Value);
                 SetParent(textNode, el);
                 el.AppendChild(textNode);
                 _knownNodes.Add(textNode);
@@ -1420,12 +1418,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static string GetTextContentRecursive(DomElement element)
     {
-        if (IsText(element))
-            return element.TextContent ?? string.Empty;
-
+        // RF-BRIDGE-1c Phase F (F3c part 2d): aggregate descendant text over raw ChildNodes.
         var sb = new StringBuilder();
-        foreach (var child in ChildElements(element))
-            sb.Append(GetTextContentRecursive(child));
+        CollectTextContent(element, sb);
         return sb.ToString();
     }
 

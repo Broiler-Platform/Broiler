@@ -140,8 +140,7 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationCreateTextNode015Core(in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(el, text);
+        var el = CreateBridgeTextNode(text);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -492,7 +491,8 @@ public sealed partial class DomBridge
     {
         if (a.Length < 2 || a[0] is not JSObject observerObject || a[1] is not JSObject targetObject)
             return JSUndefined.Value;
-        var target = FindDomElementByJSObject(targetObject);
+        // A MutationObserver can observe a character-data node (characterData mutations).
+        var target = FindDomNodeByJSObject(targetObject);
         if (target == null)
             return JSUndefined.Value;
         RegisterMutationObserver(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
@@ -537,7 +537,7 @@ public sealed partial class DomBridge
                             currentScript = null;
                     }
 
-                    var writtenChildren = ChildElements(fragmentRoot).ToArray();
+                    var writtenChildren = fragmentRoot.ChildNodes.ToArray();
                     if (currentScript != null)
                     {
                         var insertIdx = ChildIndexOf(mainBody, currentScript) + 1;
@@ -562,7 +562,7 @@ public sealed partial class DomBridge
                     // getElementsByTagName, document.links, etc. return
                     // elements in the correct order relative to the rest of
                     // the document.
-                    var contentEls = new List<DomElement>();
+                    var contentEls = new List<Broiler.Dom.DomNode>();
                     foreach (var tc in writtenChildren)
                     {
                         contentEls.Add(tc);
@@ -625,8 +625,7 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationCreateComment041Core(in Arguments a)
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement(_document, "#comment", null, null, string.Empty, isTextNode: false);
-        SetBridgeText(el, data);
+        var el = CreateBridgeCommentNode(data);
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
@@ -648,7 +647,7 @@ public sealed partial class DomBridge
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSNull.Value;
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl != null)
         {
             var idx = ChildIndexOf(docNodeForMutation, childEl);
@@ -672,7 +671,7 @@ public sealed partial class DomBridge
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSNull.Value;
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl != null)
         {
             if (ParentEl(childEl) != null)
@@ -703,7 +702,7 @@ public sealed partial class DomBridge
         var newObj = a[0] as JSObject;
         if (newObj == null)
             return JSNull.Value;
-        var newEl = FindDomElementByJSObject(newObj);
+        var newEl = FindDomNodeByJSObject(newObj);
         if (newEl == null)
             return a[0];
         if (ParentEl(newEl) != null)
@@ -720,7 +719,7 @@ public sealed partial class DomBridge
 
         if (a.Length > 1 && a[1] is JSObject refObj && !a[1].IsNull)
         {
-            var refEl = FindDomElementByJSObject(refObj);
+            var refEl = FindDomNodeByJSObject(refObj);
             if (refEl != null)
             {
                 var idx = ChildIndexOf(docNodeForMutation, refEl);
@@ -929,8 +928,7 @@ public sealed partial class DomBridge
             GetElementRuntimeState(titleEl).OwnerDocRoot = docRoot;
             headEl.AppendChild(titleEl);
             _knownNodes.Add(titleEl);
-            var titleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(titleText, title);
+            var titleText = CreateBridgeTextNode(title);
             SetParent(titleText, titleEl);
             GetElementRuntimeState(titleText).OwnerDocRoot = docRoot;
             titleEl.AppendChild(titleText);

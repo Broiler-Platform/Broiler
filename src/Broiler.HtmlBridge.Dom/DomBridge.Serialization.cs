@@ -194,10 +194,8 @@ public sealed partial class DomBridge
         if (rules.Count == 0)
             return;
 
-        var styleElement = new DomElement("style", null, null, string.Empty)
-        {
-            TextContent = string.Join(Environment.NewLine, rules)
-        };
+        var styleElement = new DomElement("style", null, null, string.Empty);
+        SetElementTextContent(styleElement, string.Join(Environment.NewLine, rules));
 
         var head = FindFirstElementByTagName(DocumentElement, "head");
         if (head != null)
@@ -320,7 +318,6 @@ public sealed partial class DomBridge
 
         ClearChildren(element);
         GetElementRuntimeState(element).InnerHtml = string.Empty;
-        element.TextContent = null;
 
         var fill = new DomElement("div", null, null, string.Empty);
         SetParent(fill, element);
@@ -885,8 +882,27 @@ public sealed partial class DomBridge
         GetStyles: static node => node is DomElement element
             ? InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
             : [],
-        GetText: static node => BridgeText(node),
+        // RF-BRIDGE-1c Phase F (F3c part 2d): text nodes serialize with the same HTML escaping the
+        // former element-store textContent path applied — except inside raw-text elements
+        // (script/style/…), whose character data must stay literal. The bridge serializes with
+        // EncodeTextNodes:false, so GetText returns the already-escaped form. Comments stay raw.
+        GetText: static node => node switch
+        {
+            Broiler.Dom.DomText text => IsRawTextSerializationParent(text)
+                ? text.Data
+                : SharedHtmlSerializer.Encode(text.Data),
+            Broiler.Dom.DomCharacterData other => other.Data,
+            _ => BridgeText(node),
+        },
         GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
+
+    /// <summary>Whether <paramref name="node"/>'s parent is an HTML raw-text element whose text
+    /// content is serialized literally (not HTML-escaped) — <c>script</c>, <c>style</c>, and the
+    /// other raw-text elements. (RF-BRIDGE-1c Phase F, F3c part 2d.)</summary>
+    private static bool IsRawTextSerializationParent(Broiler.Dom.DomNode node) =>
+        node.ParentNode is DomElement parent &&
+        parent.TagName.ToLowerInvariant() is "script" or "style" or "xmp" or "iframe"
+            or "noembed" or "noframes" or "noscript" or "plaintext";
 
     private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
     {

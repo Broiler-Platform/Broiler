@@ -72,7 +72,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length > 0 && a[0] is JSObject nodeObject &&
-                    FindDomElementByJSObject(nodeObject) is { } node)
+                    FindDomNodeByJSObject(nodeObject) is { } node)
                 {
                     walker.CurrentNode = node;
                 }
@@ -598,21 +598,21 @@ public sealed partial class DomBridge
     /// Creates a partial clone for extractContents when a boundary is in a text node.
     /// Clones the ancestor chain from the text node up to (but not including) the common ancestor.
     /// </summary>
-    private static DomElement? CreatePartialCloneForExtract(DomElement textNode, DomElement commonAncestor, string extractedText, bool isStart, DomBridge bridge)
+    private static Broiler.Dom.DomNode? CreatePartialCloneForExtract(Broiler.Dom.DomNode textNode, DomElement commonAncestor, string extractedText, bool isStart, DomBridge bridge)
     {
-        // Build the chain: textNode → parent → ... → child-of-commonAncestor
-        var chain = new List<DomElement>();
-        var node = textNode;
+        // Build the chain: textNode → parent → ... → child-of-commonAncestor. chain[0] is the
+        // boundary text node; chain[1..] are ancestor elements (RF-BRIDGE-1c Phase F, F3c part 2d).
+        var chain = new List<Broiler.Dom.DomNode>();
+        Broiler.Dom.DomNode? node = textNode;
         while (node != null && !ReferenceEquals(node, commonAncestor))
         {
             chain.Add(node);
-            node = ParentEl(node);
+            node = node.ParentNode;
         }
         if (chain.Count == 0) return null;
 
         // Create text node with extracted content
-        var extractedTextNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(extractedTextNode, extractedText);
+        var extractedTextNode = bridge.CreateBridgeTextNode(extractedText);
         bridge._knownNodes.Add(extractedTextNode);
 
         if (chain.Count == 1)
@@ -626,7 +626,8 @@ public sealed partial class DomBridge
         DomElement? currentParent = null;
         for (var i = chain.Count - 1; i >= 1; i--)
         {
-            var original = chain[i];
+            // chain[i] for i >= 1 is an ancestor element.
+            var original = (DomElement)chain[i];
             var clone = new DomElement(original.TagName, null, null, string.Empty);
             bridge._knownNodes.Add(clone);
 

@@ -21,8 +21,6 @@ public sealed class DomElement : CanonicalElement
     public const string CompatibilitySurfaceVersion = "htmlbridge-dom-adapter/v1";
     public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
 
-    private string? _textContent;
-
     public DomElement(
         string tagName,
         string? id,
@@ -94,28 +92,6 @@ public sealed class DomElement : CanonicalElement
         get => base.ClassName;
         set => base.ClassName = value;
     }
-
-    public string? TextContent
-    {
-        get => _textContent;
-        set
-        {
-            if (string.Equals(_textContent, value, StringComparison.Ordinal))
-                return;
-
-            _textContent = value;
-            MarkChanged();
-        }
-    }
-
-    /// <summary>
-    /// Exposes a text node's content through the canonical <see cref="CanonicalElement.NodeValue"/>
-    /// so engine-neutral consumers (notably the renderer's typed DOM-to-box builder) can read
-    /// bridge text without depending on this facade type. The bridge models text nodes as a
-    /// <see cref="DomElement"/> with a text <see cref="CanonicalNodeType"/> rather than a canonical
-    /// <c>DomText</c>, so <c>NodeValue</c> is the only canonical bridge for that text.
-    /// </summary>
-    public override string? NodeValue => NodeType == CanonicalNodeType.Text ? _textContent : base.NodeValue;
 
     public string? NamespaceURI
     {
