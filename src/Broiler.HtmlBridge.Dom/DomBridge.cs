@@ -293,12 +293,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
     /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
-    private static DomElement? ParentEl(DomElement element) => element.ParentNode as DomElement;
+    private static DomElement? ParentEl(Broiler.Dom.DomNode node) => node.ParentNode as DomElement;
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
     /// otherwise the child is appended if not already there — matching the old setter exactly.</summary>
-    private static void SetParent(DomElement child, DomElement? parent)
+    private static void SetParent(Broiler.Dom.DomNode child, DomElement? parent)
     {
         if (parent is null)
             child.Remove();
