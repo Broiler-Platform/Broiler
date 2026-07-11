@@ -206,13 +206,16 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static IEnumerable<DomElement> ChildElements(DomElement element) =>
         element.ChildNodes.Cast<DomElement>();
 
-    /// <summary>The child at <paramref name="index"/> (old <c>Children[index]</c>).</summary>
-    private static DomElement ChildAt(DomElement element, int index) => (DomElement)element.ChildNodes[index];
+    /// <summary>The child at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
+    /// Phase F (F3c part 2b): the parent is any <see cref="Broiler.Dom.DomNode"/> (range containers
+    /// are widened to <c>DomNode</c>); the return stays <c>DomElement</c> (a safe cast on today's
+    /// homogeneous tree) until F3c part 2c widens it to <c>DomNode</c>.</summary>
+    private static DomElement ChildAt(Broiler.Dom.DomNode element, int index) => (DomElement)element.ChildNodes[index];
 
     /// <summary>The child at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
     /// from-end indexer.</summary>
-    private static DomElement ChildAt(DomElement element, System.Index index) =>
+    private static DomElement ChildAt(Broiler.Dom.DomNode element, System.Index index) =>
         (DomElement)element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
@@ -228,15 +231,20 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return -1;
     }
 
+    // RF-BRIDGE-1c Phase F (F3c part 2b): the child-mutation helpers take a DomNode parent so
+    // range-extract code (whose ancestor-chain clones are DomNode-typed) can reparent without
+    // casts. At runtime the parent is always an element; canonical AppendChild/InsertBefore/
+    // RemoveChild enforce nothing text-specific, so this is a safe widen.
+
     /// <summary>Old <c>Children.Insert(index, child)</c>.</summary>
-    private static void InsertChildAt(DomElement parent, int index, Broiler.Dom.DomNode child)
+    private static void InsertChildAt(Broiler.Dom.DomNode parent, int index, Broiler.Dom.DomNode child)
     {
         var reference = index < parent.ChildNodes.Count ? parent.ChildNodes[index] : null;
         parent.InsertBefore(child, reference);
     }
 
     /// <summary>Old <c>Children.Remove(child)</c> — removes only if actually a child; returns success.</summary>
-    private static bool RemoveChildFrom(DomElement parent, Broiler.Dom.DomNode child)
+    private static bool RemoveChildFrom(Broiler.Dom.DomNode parent, Broiler.Dom.DomNode child)
     {
         if (!ReferenceEquals(child.ParentNode, parent))
             return false;
@@ -247,10 +255,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Old raw <c>Children.RemoveAt(index)</c> (no mutation notifications — matches the
     /// LegacyChildList primitive; distinct from the notifying <c>RemoveChildAt</c> helper).</summary>
-    private static void RemoveNthChild(DomElement parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
+    private static void RemoveNthChild(Broiler.Dom.DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
 
     /// <summary>Old <c>Children.Clear()</c>.</summary>
-    private static void ClearChildren(DomElement parent)
+    private static void ClearChildren(Broiler.Dom.DomNode parent)
     {
         foreach (var child in parent.ChildNodes.ToArray())
             parent.RemoveChild(child);
@@ -309,8 +317,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
-    /// otherwise the child is appended if not already there — matching the old setter exactly.</summary>
-    private static void SetParent(Broiler.Dom.DomNode child, DomElement? parent)
+    /// otherwise the child is appended if not already there — matching the old setter exactly.
+    /// RF-BRIDGE-1c Phase F (F3c part 2b): the parent widened to <c>DomNode?</c> so range-extract
+    /// code can pass DomNode-typed ancestor-chain clones (always elements at runtime).</summary>
+    private static void SetParent(Broiler.Dom.DomNode child, Broiler.Dom.DomNode? parent)
     {
         if (parent is null)
             child.Remove();

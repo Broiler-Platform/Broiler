@@ -571,21 +571,22 @@ public sealed partial class DomBridge
             return bridge.ToJSObject(fragment);
         }
 
-        // Find the child of ancestor that is an ancestor of (or is) startContainer
-        DomElement? startAncestorChild = null;
+        // Find the child of ancestor that is an ancestor of (or is) startContainer.
+        // RF-BRIDGE-1c Phase F (F3c part 2b): a boundary child can be a text node.
+        Broiler.Dom.DomNode? startAncestorChild = null;
         {
-            var node = state.StartContainer;
-            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
-                node = ParentEl(node);
+            Broiler.Dom.DomNode? node = state.StartContainer;
+            while (node != null && !ReferenceEquals(node.ParentNode, ancestor))
+                node = node.ParentNode;
             startAncestorChild = node;
         }
 
         // Find the child of ancestor that is an ancestor of (or is) endContainer
-        DomElement? endAncestorChild = null;
+        Broiler.Dom.DomNode? endAncestorChild = null;
         {
-            var node = state.EndContainer;
-            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
-                node = ParentEl(node);
+            Broiler.Dom.DomNode? node = state.EndContainer;
+            while (node != null && !ReferenceEquals(node.ParentNode, ancestor))
+                node = node.ParentNode;
             endAncestorChild = node;
         }
 
@@ -838,12 +839,15 @@ public sealed partial class DomBridge
         }
 
         // Check: inserting newParent into startContainer — must not violate hierarchy
-        // Document node can only have one element child
-        if (string.Equals(state.StartContainer.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(state.StartContainer.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+        // Document node can only have one element child. RF-BRIDGE-1c Phase F (F3c part 2b):
+        // only an element container carries #document/#subdoc-root TagName; a text container
+        // never enters this branch.
+        if (state.StartContainer is DomElement startContainerElement &&
+            (string.Equals(startContainerElement.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(startContainerElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)))
         {
             // Count existing element children (minus any that will be moved into newParent)
             var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
-            var elemCount = ChildElements(state.StartContainer).Count(c => !IsText(c) && !IsComment(c));
+            var elemCount = ChildElements(startContainerElement).Count(c => !IsText(c) && !IsComment(c));
             var removedElems = nodes.Count(n => !IsText(n) && !IsComment(n));
             // After removal + adding newParent, there would be (elemCount - removedElems + 1) element children
             if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !IsComment(newParent)))

@@ -113,17 +113,17 @@ public sealed partial class DomBridge
     }
 
 
-    private bool IsPositionAfter(DomElement docRoot, DomElement containerA, int offsetA, DomElement containerB, int offsetB)
+    private bool IsPositionAfter(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB))
             return offsetA > offsetB;
 
         if (IsDescendant(containerA, containerB))
         {
-            var node = containerB;
-            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerA))
-                node = ParentEl(node);
-            if (ParentEl(node) != null)
+            Broiler.Dom.DomNode node = containerB;
+            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
+                node = node.ParentNode;
+            if (node.ParentNode != null)
             {
                 var childIdx = ChildIndexOf(containerA, node);
                 return offsetA > childIdx;
@@ -134,10 +134,10 @@ public sealed partial class DomBridge
 
         if (IsDescendant(containerB, containerA))
         {
-            var node = containerA;
-            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerB))
-                node = ParentEl(node);
-            if (ParentEl(node) != null)
+            Broiler.Dom.DomNode node = containerA;
+            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))
+                node = node.ParentNode;
+            if (node.ParentNode != null)
             {
                 var childIdx = ChildIndexOf(containerB, node);
                 return childIdx >= offsetB;
@@ -157,7 +157,7 @@ public sealed partial class DomBridge
     }
 
 
-    private int CompareBoundaryPosition(DomElement docRoot, DomElement containerA, int offsetA, DomElement containerB, int offsetB)
+    private int CompareBoundaryPosition(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB) && offsetA == offsetB)
             return 0;

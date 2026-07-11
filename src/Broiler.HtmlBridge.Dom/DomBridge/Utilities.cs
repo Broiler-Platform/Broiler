@@ -642,13 +642,16 @@ public sealed partial class DomBridge
     /// Collects all descendants of <paramref name="root"/> in document order
     /// (depth-first pre-order).
     /// </summary>
-    private static void CollectDescendants(DomElement root, List<DomElement> result)
+    private static void CollectDescendants(Broiler.Dom.DomNode root, List<Broiler.Dom.DomNode> result)
     {
-        foreach (var child in ChildElements(root))
+        // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so document-order traversal
+        // includes text/comment nodes (range boundary indexing needs them). Behaviour-preserving
+        // on today's homogeneous tree where every child is an element.
+        foreach (var child in root.ChildNodes)
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
-            if (IsSubDocRoot(child))
+            if (child is DomElement childElement && IsSubDocRoot(childElement))
                 continue;
             result.Add(child);
             CollectDescendants(child, result);
@@ -686,9 +689,9 @@ public sealed partial class DomBridge
     /// Returns a flat list of all nodes in the subtree rooted at
     /// <paramref name="root"/> in document order (including the root).
     /// </summary>
-    private static List<DomElement> GetDocumentOrderNodes(DomElement root)
+    private static List<Broiler.Dom.DomNode> GetDocumentOrderNodes(Broiler.Dom.DomNode root)
     {
-        var list = new List<DomElement> { root };
+        var list = new List<Broiler.Dom.DomNode> { root };
         CollectDescendants(root, list);
         return list;
     }
@@ -696,10 +699,11 @@ public sealed partial class DomBridge
     /// <summary>
     /// Returns the node type constant for a <see cref="DomElement"/>.
     /// </summary>
-    private static int GetNodeType(DomElement element)
+    private static int GetNodeType(Broiler.Dom.DomNode node)
     {
-        if (IsText(element)) return 3; // TEXT_NODE
-        if (IsComment(element)) return 8;
+        if (IsText(node)) return 3; // TEXT_NODE
+        if (IsComment(node)) return 8;
+        if (node is not DomElement element) return 1;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE

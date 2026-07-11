@@ -23,7 +23,7 @@ public sealed partial class DomBridge
     /// the <paramref name="whatToShow"/> bitmask, and the optional
     /// <paramref name="filterFn"/> accepts the node.
     /// </summary>
-    private int ApplyFilter(DomElement el, int whatToShow, JSFunction? filterFn)
+    private int ApplyFilter(Broiler.Dom.DomNode el, int whatToShow, JSFunction? filterFn)
     {
         var nodeType = GetNodeType(el);
         var showBit = nodeType switch
@@ -59,7 +59,7 @@ public sealed partial class DomBridge
         var walker = new Broiler.Dom.DomTreeWalker(
             root,
             (Broiler.Dom.DomWhatToShow)(uint)whatToShow,
-            node => (Broiler.Dom.DomFilterResult)ApplyFilter((DomElement)node, whatToShow, filterFn));
+            node => (Broiler.Dom.DomFilterResult)ApplyFilter(node, whatToShow, filterFn));
 
         tw.FastAddValue(
             (KeyString)"root",
@@ -229,7 +229,7 @@ public sealed partial class DomBridge
         var iterator = new Broiler.Dom.DomNodeIterator(
             root,
             (Broiler.Dom.DomWhatToShow)(uint)whatToShow,
-            node => (Broiler.Dom.DomFilterResult)ApplyFilter((DomElement)node, whatToShow, filterFn));
+            node => (Broiler.Dom.DomFilterResult)ApplyFilter(node, whatToShow, filterFn));
         _activeNodeIterators.Add(new WeakReference<Broiler.Dom.DomNodeIterator>(iterator));
 
         iter.FastAddValue(
@@ -461,20 +461,20 @@ public sealed partial class DomBridge
     /// <summary>
     /// Finds the common ancestor of two nodes.
     /// </summary>
-    private static DomElement? FindCommonAncestor(DomElement a, DomElement b)
+    private static Broiler.Dom.DomNode? FindCommonAncestor(Broiler.Dom.DomNode a, Broiler.Dom.DomNode b)
     {
-        var ancestors = new HashSet<DomElement>(ReferenceEqualityComparer.Instance);
-        var current = a;
+        var ancestors = new HashSet<Broiler.Dom.DomNode>(ReferenceEqualityComparer.Instance);
+        Broiler.Dom.DomNode? current = a;
         while (current != null)
         {
             ancestors.Add(current);
-            current = ParentEl(current);
+            current = current.ParentNode;
         }
         current = b;
         while (current != null)
         {
             if (ancestors.Contains(current)) return current;
-            current = ParentEl(current);
+            current = current.ParentNode;
         }
         return null;
     }
@@ -483,9 +483,9 @@ public sealed partial class DomBridge
     /// Returns the list of top-level nodes fully contained within the specified range boundaries.
     /// For element containers, this returns children between the start and end offsets.
     /// </summary>
-    private static List<DomElement> GetNodesInRange(DomElement startContainer, int startOffset, DomElement endContainer, int endOffset)
+    private static List<Broiler.Dom.DomNode> GetNodesInRange(Broiler.Dom.DomNode startContainer, int startOffset, Broiler.Dom.DomNode endContainer, int endOffset)
     {
-        var result = new List<DomElement>();
+        var result = new List<Broiler.Dom.DomNode>();
         if (ReferenceEquals(startContainer, endContainer))
         {
             // Same container — return children between offsets
@@ -518,7 +518,7 @@ public sealed partial class DomBridge
     /// Collects text content from a range that spans across nodes.
     /// Handles start/end offset boundaries properly for text nodes.
     /// </summary>
-    private static void CollectRangeText(StringBuilder sb, DomElement startContainer, int startOffset, DomElement endContainer, int endOffset)
+    private static void CollectRangeText(StringBuilder sb, Broiler.Dom.DomNode startContainer, int startOffset, Broiler.Dom.DomNode endContainer, int endOffset)
     {
         if (ReferenceEquals(startContainer, endContainer))
         {
@@ -719,22 +719,24 @@ public sealed partial class DomBridge
     }
 
     private void CollectClientRectsForRangeNode(
-        DomElement node,
+        Broiler.Dom.DomNode node,
         List<(double Left, double Top, double Width, double Height)> rects)
     {
-        if (IsText(node) || IsComment(node))
+        // Character-data nodes contribute no client rect here (their text runs are measured
+        // elsewhere); after this guard the node is an element.
+        if (IsText(node) || IsComment(node) || node is not DomElement element)
             return;
 
-        var display = GetComputedProps(node).GetValueOrDefault("display");
+        var display = GetComputedProps(element).GetValueOrDefault("display");
         if (string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var child in ChildElements(node))
+            foreach (var child in ChildElements(element))
                 CollectClientRectsForRangeNode(child, rects);
 
             return;
         }
 
-        var rect = GetBoundingClientRectForDomElement(node, isRoot: false);
+        var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
         if (rect.Width > 0 || rect.Height > 0)
             rects.Add(rect);
     }
@@ -767,27 +769,27 @@ public sealed partial class DomBridge
     /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="startContainer"/>,
     /// moving content after the start boundary into the cloned structure.
     /// </summary>
-    private static DomElement ExtractStartPath(DomElement topNode, DomElement startContainer, int startOffset, DomBridge bridge)
+    private static Broiler.Dom.DomNode ExtractStartPath(Broiler.Dom.DomNode topNode, Broiler.Dom.DomNode startContainer, int startOffset, DomBridge bridge)
     {
-        // Build chain: startContainer → parent → ... → topNode
-        var chain = new List<DomElement>();
-        var node = startContainer;
+        // Build chain: startContainer → parent → ... → topNode. RF-BRIDGE-1c Phase F (F3c
+        // part 2b): chain[0] (the boundary container) may be a text node; the rest are ancestor
+        // elements, so the chain is DomNode-typed.
+        var chain = new List<Broiler.Dom.DomNode>();
+        Broiler.Dom.DomNode? node = startContainer;
         while (node != null)
         {
             chain.Add(node);
             if (ReferenceEquals(node, topNode)) break;
-            node = ParentEl(node);
+            node = node.ParentNode;
         }
 
         // Pass 1: Clone the ancestor chain from top to bottom, creating
         // the skeletal tree structure.  Map each chain index to its clone.
-        var clones = new DomElement[chain.Count];
+        var clones = new Broiler.Dom.DomNode[chain.Count];
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
-            // RF-BRIDGE-1c Phase F (F3c): chain holds ancestor elements, so the clone is an
-            // element; narrow the now-DomNode CloneDomElement result.
-            var clone = (DomElement)bridge.CloneDomElement(original, false);
+            var clone = bridge.CloneDomElement(original, false);
             bridge._knownNodes.Add(clone);
             clones[i] = clone;
             if (i < chain.Count - 1)
@@ -859,25 +861,25 @@ public sealed partial class DomBridge
     /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="endContainer"/>,
     /// moving content before the end boundary into the cloned structure.
     /// </summary>
-    private static DomElement ExtractEndPath(DomElement topNode, DomElement endContainer, int endOffset, DomBridge bridge)
+    private static Broiler.Dom.DomNode ExtractEndPath(Broiler.Dom.DomNode topNode, Broiler.Dom.DomNode endContainer, int endOffset, DomBridge bridge)
     {
-        // Build chain: endContainer → parent → ... → topNode
-        var chain = new List<DomElement>();
-        var node = endContainer;
+        // Build chain: endContainer → parent → ... → topNode (chain[0] may be a text node; see
+        // ExtractStartPath).
+        var chain = new List<Broiler.Dom.DomNode>();
+        Broiler.Dom.DomNode? node = endContainer;
         while (node != null)
         {
             chain.Add(node);
             if (ReferenceEquals(node, topNode)) break;
-            node = ParentEl(node);
+            node = node.ParentNode;
         }
 
         // Pass 1: Create clones for the chain
-        var clones = new DomElement[chain.Count];
+        var clones = new Broiler.Dom.DomNode[chain.Count];
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
-            // RF-BRIDGE-1c Phase F (F3c): chain holds ancestor elements; narrow the clone.
-            var clone = (DomElement)bridge.CloneDomElement(original, false);
+            var clone = bridge.CloneDomElement(original, false);
             bridge._knownNodes.Add(clone);
             clones[i] = clone;
         }
@@ -945,14 +947,18 @@ public sealed partial class DomBridge
     /// </summary>
     private sealed class RangeState
     {
-        public DomElement StartContainer;
+        // RF-BRIDGE-1c Phase F (F3c part 2b): range boundary points are canonical DomNode —
+        // a range commonly starts/ends inside a text node. Behaviour-preserving on today's
+        // homogeneous facade tree (facade text nodes are DomElement, so the DomNode fields hold
+        // the same values); forward-correct once text/comment flip to canonical DomText/DomComment.
+        public Broiler.Dom.DomNode StartContainer;
         public int StartOffset;
-        public DomElement EndContainer;
+        public Broiler.Dom.DomNode EndContainer;
         public int EndOffset;
         public bool Collapsed;
-        public DomElement Root { get; }
+        public Broiler.Dom.DomNode Root { get; }
 
-        public RangeState(DomElement root)
+        public RangeState(Broiler.Dom.DomNode root)
         {
             Root = root;
             StartContainer = root;
@@ -969,7 +975,7 @@ public sealed partial class DomBridge
         /// Adjusts boundary points when a child is removed from <paramref name="parent"/>
         /// at <paramref name="index"/>.  Per DOM spec §14.4 "Removing steps".
         /// </summary>
-        public void AdjustForRemoval(DomElement parent, DomElement removedChild, int index)
+        public void AdjustForRemoval(Broiler.Dom.DomNode parent, Broiler.Dom.DomNode removedChild, int index)
         {
             // If startContainer is a descendant of removedChild (or IS removedChild),
             // set start to (parent, index).
@@ -997,13 +1003,13 @@ public sealed partial class DomBridge
             UpdateCollapsed();
         }
 
-        private static bool IsDescendantOf(DomElement node, DomElement potentialAncestor)
+        private static bool IsDescendantOf(Broiler.Dom.DomNode node, Broiler.Dom.DomNode potentialAncestor)
         {
-            var current = ParentEl(node);
+            var current = node.ParentNode;
             while (current != null)
             {
                 if (ReferenceEquals(current, potentialAncestor)) return true;
-                current = ParentEl(current);
+                current = current.ParentNode;
             }
             return false;
         }
@@ -1161,12 +1167,15 @@ public sealed partial class DomBridge
     /// </summary>
     private sealed class IteratorState
     {
-        public DomElement Root;
-        public DomElement? ReferenceNode;
+        // RF-BRIDGE-1c Phase F (F3c part 2b): a NodeIterator's root and reference node are
+        // canonical DomNode — the iterator can reference a text node. Behaviour-preserving on
+        // today's homogeneous tree; forward-correct once text/comment are canonical DomText/DomComment.
+        public Broiler.Dom.DomNode Root;
+        public Broiler.Dom.DomNode? ReferenceNode;
         public bool PointerBeforeReferenceNode;
         public int LastKnownIndex = -1;
 
-        public IteratorState(DomElement root)
+        public IteratorState(Broiler.Dom.DomNode root)
         {
             Root = root;
             ReferenceNode = root;
@@ -1178,7 +1187,7 @@ public sealed partial class DomBridge
         /// (or an inclusive descendant of it), advance the reference node to the
         /// appropriate neighboring node within the iterator's root subtree.
         /// </summary>
-        public void AdjustForRemoval(DomElement removedNode)
+        public void AdjustForRemoval(Broiler.Dom.DomNode removedNode)
         {
             if (ReferenceNode == null) return;
 
@@ -1239,20 +1248,22 @@ public sealed partial class DomBridge
         /// that is an inclusive descendant of <paramref name="root"/>, skipping the
         /// subtree of <paramref name="node"/> (since it's being removed).
         /// </summary>
-        private static DomElement? GetNextNodeAfter(DomElement node, DomElement root)
+        private static Broiler.Dom.DomNode? GetNextNodeAfter(Broiler.Dom.DomNode node, Broiler.Dom.DomNode root)
         {
-            // Look for next sibling, then parent's next sibling, etc.
-            var current = node;
+            // Look for next sibling, then parent's next sibling, etc. RF-BRIDGE-1c Phase F (F3c
+            // part 2b): walk raw ChildNodes so text/comment siblings count in document order.
+            // Behaviour-preserving on today's homogeneous tree (every child is an element).
+            Broiler.Dom.DomNode? current = node;
             while (current != null && !ReferenceEquals(current, root))
             {
-                if (ParentEl(current) != null)
+                var parent = current.ParentNode;
+                if (parent != null)
                 {
-                    var siblings = ChildElements(ParentEl(current)).ToList();
-                    var idx = siblings.IndexOf(current);
-                    if (idx >= 0 && idx + 1 < siblings.Count)
-                        return siblings[idx + 1];
+                    var idx = ChildIndexOf(parent, current);
+                    if (idx >= 0 && idx + 1 < parent.ChildNodes.Count)
+                        return parent.ChildNodes[idx + 1];
                 }
-                current = ParentEl(current);
+                current = current.ParentNode;
             }
             return null;
         }
@@ -1261,32 +1272,32 @@ public sealed partial class DomBridge
         /// Returns the first node preceding <paramref name="node"/> in document order
         /// that is an inclusive descendant of <paramref name="root"/>.
         /// </summary>
-        private static DomElement? GetPreviousNodeBefore(DomElement node, DomElement root)
+        private static Broiler.Dom.DomNode? GetPreviousNodeBefore(Broiler.Dom.DomNode node, Broiler.Dom.DomNode root)
         {
-            if (ParentEl(node) == null) return null;
-            var siblings = ChildElements(ParentEl(node)).ToList();
-            var idx = siblings.IndexOf(node);
+            var parent = node.ParentNode;
+            if (parent == null) return null;
+            var idx = ChildIndexOf(parent, node);
             if (idx > 0)
             {
                 // Go to the deepest last descendant of the previous sibling
-                var prev = siblings[idx - 1];
+                var prev = parent.ChildNodes[idx - 1];
                 while (prev.ChildNodes.Count > 0)
-                    prev = ChildAt(prev, ^1);
+                    prev = prev.ChildNodes[prev.ChildNodes.Count - 1];
                 return prev;
             }
             // No previous sibling — parent is the previous node (unless it's root)
-            if (!ReferenceEquals(ParentEl(node), root))
-                return ParentEl(node);
+            if (!ReferenceEquals(parent, root))
+                return parent;
             return null;
         }
 
-        private static bool IsDescendantOf(DomElement node, DomElement potentialAncestor)
+        private static bool IsDescendantOf(Broiler.Dom.DomNode node, Broiler.Dom.DomNode potentialAncestor)
         {
-            var current = ParentEl(node);
+            var current = node.ParentNode;
             while (current != null)
             {
                 if (ReferenceEquals(current, potentialAncestor)) return true;
-                current = ParentEl(current);
+                current = current.ParentNode;
             }
             return false;
         }
