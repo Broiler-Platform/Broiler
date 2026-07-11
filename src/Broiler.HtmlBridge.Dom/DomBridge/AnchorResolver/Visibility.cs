@@ -139,7 +139,7 @@ public sealed partial class DomBridge
         var targetCB = FindContainingBlockElement(target);
 
         // Walk from the anchor upward looking for scroll containers.
-        var el = anchor.Parent;
+        var el = ParentEl(anchor);
         while (el != null)
         {
             var props = GetComputedProps(el);
@@ -172,7 +172,7 @@ public sealed partial class DomBridge
                 }
             }
 
-            el = el.Parent;
+            el = ParentEl(el);
         }
 
         return true;
@@ -189,7 +189,7 @@ public sealed partial class DomBridge
             if (props.TryGetValue("visibility", out var v) &&
                 v.Equals("hidden", StringComparison.OrdinalIgnoreCase))
                 return true;
-            current = current.Parent;
+            current = ParentEl(current);
         }
         return false;
     }
@@ -207,7 +207,7 @@ public sealed partial class DomBridge
             offset += ComputePrecedingSiblingHeights(current);
             var props = GetComputedProps(current);
             offset += TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
-            current = current.Parent;
+            current = ParentEl(current);
             if (current != null && current != container)
             {
                 var cProps = GetComputedProps(current);
@@ -223,13 +223,13 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement? FindContainingBlockElement(DomElement el)
     {
-        var parent = el.Parent;
+        var parent = ParentEl(el);
         while (parent != null)
         {
             var pProps = GetComputedProps(parent);
             if (EstablishesContainingBlock(pProps))
                 return parent;
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         return null;
     }

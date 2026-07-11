@@ -47,7 +47,7 @@ public sealed partial class DomBridge
     /// </summary>
     private double FindContainingBlockWidth(DomElement element)
     {
-        var parent = element.Parent;
+        var parent = ParentEl(element);
         while (parent != null)
         {
             var parentProps = GetComputedProps(parent);
@@ -78,7 +78,7 @@ public sealed partial class DomBridge
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-right")) ?? 0;
                 return w;
             }
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         // No positioned ancestor found; use viewport width minus default body
         // margin (8px each side) as the effective content width for block layout.
@@ -96,7 +96,7 @@ public sealed partial class DomBridge
     /// </summary>
     private double? ResolveBlockUsedWidthFromAncestors(DomElement blockEl)
     {
-        for (var a = blockEl.Parent; a != null && !a.IsTextNode; a = a.Parent)
+        for (var a = ParentEl(blockEl); a != null && !a.IsTextNode; a = ParentEl(a))
         {
             var ap = GetComputedProps(a);
             double? w = TryParsePx(ap.GetValueOrDefault("width"));
@@ -118,7 +118,7 @@ public sealed partial class DomBridge
     /// </summary>
     private double FindContainingBlockHeight(DomElement element)
     {
-        var parent = element.Parent;
+        var parent = ParentEl(element);
         while (parent != null)
         {
             var parentProps = GetComputedProps(parent);
@@ -136,7 +136,7 @@ public sealed partial class DomBridge
                 h -= TryParsePx(parentProps.GetValueOrDefault("padding-bottom")) ?? 0;
                 return h;
             }
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         return _viewportHeight;
     }
@@ -194,9 +194,9 @@ public sealed partial class DomBridge
         double fontSize = TryParsePx(elProps.GetValueOrDefault("font-size")) ?? 16;
 
         // Check parent font-size as well (inline elements inherit).
-        if (element.Parent != null)
+        if (ParentEl(element) != null)
         {
-            var parentProps = GetComputedProps(element.Parent);
+            var parentProps = GetComputedProps(ParentEl(element));
             double parentFs = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
             if (parentFs > 0) fontSize = parentFs;
         }
@@ -242,9 +242,9 @@ public sealed partial class DomBridge
         double fontSize = TryParsePx(props.GetValueOrDefault("font-size")) ?? 16;
 
         // Check parent for font-size and line-height (inline elements inherit).
-        if (element.Parent != null)
+        if (ParentEl(element) != null)
         {
-            var parentProps = GetComputedProps(element.Parent);
+            var parentProps = GetComputedProps(ParentEl(element));
             double parentFs = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
             if (parentFs > 0) fontSize = parentFs;
 
@@ -402,7 +402,7 @@ public sealed partial class DomBridge
         // - Preceding inline siblings
         // - Line breaks
         // We estimate this from the layout context.
-        var parent = inlineCB.Parent;
+        var parent = ParentEl(inlineCB);
         DomElement? blockAncestor = null;
 
         // Find nearest block-level ancestor.
@@ -418,7 +418,7 @@ public sealed partial class DomBridge
                     break;
                 }
             }
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
 
         if (blockAncestor == null) return (0, 0, null);
@@ -444,13 +444,13 @@ public sealed partial class DomBridge
     private double EstimateInlineOffsetX(DomElement inlineEl, DomElement blockAncestor)
     {
         double offset = 0;
-        var parent = inlineEl.Parent;
+        var parent = ParentEl(inlineEl);
         while (parent != null && parent != blockAncestor)
         {
             // Accumulate horizontal position from parent's preceding content
             offset += EstimatePrecedingInlineWidth(inlineEl, parent);
             inlineEl = parent;
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         // Final level: position within the block ancestor
         if (parent == blockAncestor)
@@ -466,12 +466,12 @@ public sealed partial class DomBridge
     private double EstimateInlineOffsetY(DomElement inlineEl, DomElement blockAncestor)
     {
         double offset = 0;
-        var parent = inlineEl.Parent;
+        var parent = ParentEl(inlineEl);
         while (parent != null && parent != blockAncestor)
         {
             offset += EstimatePrecedingBlockHeight(inlineEl, parent);
             inlineEl = parent;
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         if (parent == blockAncestor)
             offset += EstimatePrecedingBlockHeight(inlineEl, blockAncestor);

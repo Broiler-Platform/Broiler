@@ -200,17 +200,17 @@ public sealed partial class DomBridge
         out (double Left, double Top, double Width, double Height) rect)
     {
         rect = default;
-        var row = element.Parent;
+        var row = ParentEl(element);
         if (row == null || !string.Equals(row.TagName, "tr", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var table = row.Parent;
+        var table = ParentEl(row);
         if (table != null &&
             (string.Equals(table.TagName, "thead", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(table.TagName, "tbody", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(table.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)))
         {
-            table = table.Parent;
+            table = ParentEl(table);
         }
 
         if (table == null || !string.Equals(table.TagName, "table", StringComparison.OrdinalIgnoreCase))
@@ -309,7 +309,7 @@ public sealed partial class DomBridge
 
     private DomElement? FindAssociatedImageMapImage(DomElement area)
     {
-        var map = area.Parent;
+        var map = ParentEl(area);
         if (map == null || !string.Equals(map.TagName, "map", StringComparison.OrdinalIgnoreCase))
             return null;
 
@@ -506,7 +506,7 @@ public sealed partial class DomBridge
 
     private bool IsElementRenderedForHitTesting(DomElement element)
     {
-        for (var current = element; current != null; current = current.Parent)
+        for (var current = element; current != null; current = ParentEl(current))
         {
             if (current.IsTextNode)
                 return false;

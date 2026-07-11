@@ -188,6 +188,23 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// attribute; thereafter it is the source of truth (JS <c>element.style</c> writes,
     /// anchor/form-control styling), synced back to the attribute at serialization.
     /// </summary>
+    /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
+    /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
+    /// A node's parent is always an element, so this is stable when text/comment nodes become
+    /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
+    private static DomElement? ParentEl(DomElement element) => element.ParentNode as DomElement;
+
+    /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
+    /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
+    /// otherwise the child is appended if not already there — matching the old setter exactly.</summary>
+    private static void SetParent(DomElement child, DomElement? parent)
+    {
+        if (parent is null)
+            child.Remove();
+        else if (!ReferenceEquals(child.ParentNode, parent))
+            parent.AppendChild(child);
+    }
+
     private static Dictionary<string, string> InlineStyle(DomElement element)
     {
         var state = GetElementRuntimeState(element);
@@ -709,7 +726,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         var doctype = ParseDocType(html);
         if (doctype != null)
         {
-            doctype.Parent = _documentNode;
+            SetParent(doctype, _documentNode);
             _documentNode.Children.Add(doctype);
             _knownNodes.Add(doctype);
         }
@@ -729,7 +746,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         DocumentElement.Children.Clear();
         foreach (var child in docElement.Children.ToArray())
         {
-            child.Parent = DocumentElement;
+            SetParent(child, DocumentElement);
             DocumentElement.Children.Add(child);
         }
 
@@ -749,7 +766,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
         // Connect DocumentElement to _documentNode so that document.firstChild works
         // and structural pseudo-classes correctly detect the document root boundary
-        DocumentElement.Parent = _documentNode;
+        SetParent(DocumentElement, _documentNode);
         if (!_documentNode.Children.Contains(DocumentElement))
             _documentNode.Children.Add(DocumentElement);
 

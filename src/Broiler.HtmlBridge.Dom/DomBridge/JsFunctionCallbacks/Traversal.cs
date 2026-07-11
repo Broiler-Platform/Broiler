@@ -30,7 +30,7 @@ public sealed partial class DomBridge
         var node = currentNode;
         while (node != null && !ReferenceEquals(node, root))
         {
-            node = node.Parent;
+            node = ParentEl(node);
             if (node == null)
                 break;
             var result = ApplyFilter(node, whatToShow, filterFn);
@@ -117,9 +117,9 @@ public sealed partial class DomBridge
         while (true)
         {
             // Try previous sibling's deepest descendant
-            if (node.Parent != null && !ReferenceEquals(node, root))
+            if (ParentEl(node) != null && !ReferenceEquals(node, root))
             {
-                var siblings = node.Parent.Children;
+                var siblings = ParentEl(node).Children;
                 var idx = siblings.IndexOf(node);
                 if (idx > 0)
                 {
@@ -138,7 +138,7 @@ public sealed partial class DomBridge
                 }
 
                 // Move to parent
-                node = node.Parent;
+                node = ParentEl(node);
                 var r = ApplyFilter(node, whatToShow, filterFn);
                 if (r == 1)
                 {
@@ -334,14 +334,14 @@ public sealed partial class DomBridge
         if (nodeObj == null)
             return JSUndefined.Value;
         var el = bridge.FindDomElementByJSObject(nodeObj);
-        if (el?.Parent == null)
+        if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.StartContainer = el.Parent;
-        state.StartOffset = el.Parent.Children.IndexOf(el);
+        state.StartContainer = ParentEl(el);
+        state.StartOffset = ParentEl(el).Children.IndexOf(el);
         // Per spec: if start is after end, collapse to start
         if (IsPositionAfter(state.Root, state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset))
         {
@@ -362,14 +362,14 @@ public sealed partial class DomBridge
         if (nodeObj == null)
             return JSUndefined.Value;
         var el = bridge.FindDomElementByJSObject(nodeObj);
-        if (el?.Parent == null)
+        if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.StartContainer = el.Parent;
-        state.StartOffset = el.Parent.Children.IndexOf(el) + 1;
+        state.StartContainer = ParentEl(el);
+        state.StartOffset = ParentEl(el).Children.IndexOf(el) + 1;
         // Per spec: if start is after end, collapse to start
         if (IsPositionAfter(state.Root, state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset))
         {
@@ -390,15 +390,15 @@ public sealed partial class DomBridge
         if (nodeObj == null)
             return JSUndefined.Value;
         var el = bridge.FindDomElementByJSObject(nodeObj);
-        if (el?.Parent == null)
+        if (el is null || ParentEl(el) == null)
         {
             // INVALID_NODE_TYPE_ERR — node has no parent
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.EndContainer = el.Parent;
-        state.EndOffset = el.Parent.Children.IndexOf(el);
+        state.EndContainer = ParentEl(el);
+        state.EndOffset = ParentEl(el).Children.IndexOf(el);
         // Per spec: if end is before start, collapse to end
         if (IsPositionAfter(state.Root, state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset))
         {
@@ -419,14 +419,14 @@ public sealed partial class DomBridge
         if (nodeObj == null)
             return JSUndefined.Value;
         var el = bridge.FindDomElementByJSObject(nodeObj);
-        if (el?.Parent == null)
+        if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.EndContainer = el.Parent;
-        state.EndOffset = el.Parent.Children.IndexOf(el) + 1;
+        state.EndContainer = ParentEl(el);
+        state.EndOffset = ParentEl(el).Children.IndexOf(el) + 1;
         // Per spec: if end is before start, collapse to end
         if (IsPositionAfter(state.Root, state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset))
         {
@@ -466,11 +466,11 @@ public sealed partial class DomBridge
         if (nodeObj == null)
             return JSUndefined.Value;
         var el = bridge.FindDomElementByJSObject(nodeObj);
-        if (el?.Parent == null)
+        if (el is null || ParentEl(el) == null)
             return JSUndefined.Value;
-        state.StartContainer = el.Parent;
-        state.StartOffset = el.Parent.Children.IndexOf(el);
-        state.EndContainer = el.Parent;
+        state.StartContainer = ParentEl(el);
+        state.StartOffset = ParentEl(el).Children.IndexOf(el);
+        state.EndContainer = ParentEl(el);
         state.EndOffset = state.StartOffset + 1;
         state.UpdateCollapsed();
         return JSUndefined.Value;
@@ -508,7 +508,7 @@ public sealed partial class DomBridge
         foreach (var node in nodes)
         {
             var clone = bridge.CloneDomElement(node, true);
-            clone.Parent = fragment;
+            SetParent(clone, fragment);
             fragment.Children.Add(clone);
             bridge._knownNodes.Add(clone);
         }
@@ -531,7 +531,7 @@ public sealed partial class DomBridge
             state.StartContainer.TextContent = text.Substring(0, s) + text.Substring(e2);
             var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             textNode.TextContent = extractedText;
-            textNode.Parent = fragment;
+            SetParent(textNode, fragment);
             fragment.Children.Add(textNode);
             bridge._knownNodes.Add(textNode);
             state.EndContainer = state.StartContainer;
@@ -548,7 +548,7 @@ public sealed partial class DomBridge
             {
                 var child = state.StartContainer.Children[state.StartOffset];
                 state.StartContainer.Children.RemoveAt(state.StartOffset);
-                child.Parent = fragment;
+                SetParent(child, fragment);
                 fragment.Children.Add(child);
             }
 
@@ -575,8 +575,8 @@ public sealed partial class DomBridge
         DomElement? startAncestorChild = null;
         {
             var node = state.StartContainer;
-            while (node != null && !ReferenceEquals(node.Parent, ancestor))
-                node = node.Parent;
+            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
+                node = ParentEl(node);
             startAncestorChild = node;
         }
 
@@ -584,8 +584,8 @@ public sealed partial class DomBridge
         DomElement? endAncestorChild = null;
         {
             var node = state.EndContainer;
-            while (node != null && !ReferenceEquals(node.Parent, ancestor))
-                node = node.Parent;
+            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
+                node = ParentEl(node);
             endAncestorChild = node;
         }
 
@@ -606,7 +606,7 @@ public sealed partial class DomBridge
                     var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
                     extractedNode.TextContent = extractedPart;
                     bridge._knownNodes.Add(extractedNode);
-                    extractedNode.Parent = fragment;
+                    SetParent(extractedNode, fragment);
                     fragment.Children.Add(extractedNode);
                 }
                 else
@@ -618,11 +618,11 @@ public sealed partial class DomBridge
                     {
                         var child = state.StartContainer.Children[ci];
                         state.StartContainer.Children.RemoveAt(ci);
-                        child.Parent = clone;
+                        SetParent(child, clone);
                         clone.Children.Add(child);
                     }
 
-                    clone.Parent = fragment;
+                    SetParent(clone, fragment);
                     fragment.Children.Add(clone);
                 }
             }
@@ -632,7 +632,7 @@ public sealed partial class DomBridge
                 var clone = ExtractStartPath(startAncestorChild, state.StartContainer, state.StartOffset, bridge);
                 if (clone != null)
                 {
-                    clone.Parent = fragment;
+                    SetParent(clone, fragment);
                     fragment.Children.Add(clone);
                 }
             }
@@ -646,7 +646,7 @@ public sealed partial class DomBridge
                 var child = ancestor.Children[ci];
                 ancestor.Children.RemoveAt(ci);
                 endIdx2--;
-                child.Parent = fragment;
+                SetParent(child, fragment);
                 fragment.Children.Add(child);
             }
         }
@@ -664,7 +664,7 @@ public sealed partial class DomBridge
                     var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
                     extractedNode.TextContent = extractedPart;
                     bridge._knownNodes.Add(extractedNode);
-                    extractedNode.Parent = fragment;
+                    SetParent(extractedNode, fragment);
                     fragment.Children.Add(extractedNode);
                 }
                 else
@@ -675,11 +675,11 @@ public sealed partial class DomBridge
                     {
                         var child = state.EndContainer.Children[0];
                         state.EndContainer.Children.RemoveAt(0);
-                        child.Parent = clone;
+                        SetParent(child, clone);
                         clone.Children.Add(child);
                     }
 
-                    clone.Parent = fragment;
+                    SetParent(clone, fragment);
                     fragment.Children.Add(clone);
                 }
             }
@@ -688,7 +688,7 @@ public sealed partial class DomBridge
                 var clone = ExtractEndPath(endAncestorChild, state.EndContainer, state.EndOffset, bridge);
                 if (clone != null)
                 {
-                    clone.Parent = fragment;
+                    SetParent(clone, fragment);
                     fragment.Children.Add(clone);
                 }
             }
@@ -707,8 +707,8 @@ public sealed partial class DomBridge
         var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
         foreach (var node in nodes)
         {
-            node.Parent?.Children.Remove(node);
-            node.Parent = null;
+            ParentEl(node)?.Children.Remove(node);
+            SetParent(node, null);
         }
 
         state.EndContainer = state.StartContainer;
@@ -729,11 +729,11 @@ public sealed partial class DomBridge
         if (el == null)
             return JSUndefined.Value;
         // Remove from old parent if needed
-        el.Parent?.Children.Remove(el);
+        ParentEl(el)?.Children.Remove(el);
         // If start container is a text node, split it
         if (state.StartContainer.IsTextNode)
         {
-            var parent = state.StartContainer.Parent;
+            var parent = ParentEl(state.StartContainer);
             if (parent == null)
                 return JSUndefined.Value;
             var text = state.StartContainer.TextContent ?? string.Empty;
@@ -752,9 +752,9 @@ public sealed partial class DomBridge
             bridge._knownNodes.Add(remainder);
             // Insert: [before] [insertedNode] [after]
             var textIdx = parent.Children.IndexOf(state.StartContainer);
-            el.Parent = parent;
+            SetParent(el, parent);
             parent.Children.Insert(textIdx + 1, el);
-            remainder.Parent = parent;
+            SetParent(remainder, parent);
             parent.Children.Insert(textIdx + 2, remainder);
             // Per spec: update range boundary points after text split
             state.StartContainer = parent;
@@ -770,7 +770,7 @@ public sealed partial class DomBridge
         }
         else
         {
-            el.Parent = state.StartContainer;
+            SetParent(el, state.StartContainer);
             var insertIdx = Math.Min(state.StartOffset, state.StartContainer.Children.Count);
             state.StartContainer.Children.Insert(insertIdx, el);
         }
@@ -816,7 +816,7 @@ public sealed partial class DomBridge
                         }
                     }
 
-                    node = node.Parent;
+                    node = ParentEl(node);
                 }
             }
 
@@ -849,13 +849,13 @@ public sealed partial class DomBridge
         var rangeNodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
         foreach (var node in rangeNodes)
         {
-            node.Parent?.Children.Remove(node);
-            node.Parent = newParent;
+            ParentEl(node)?.Children.Remove(node);
+            SetParent(node, newParent);
             newParent.Children.Add(node);
         }
 
-        newParent.Parent?.Children.Remove(newParent);
-        newParent.Parent = state.StartContainer;
+        ParentEl(newParent)?.Children.Remove(newParent);
+        SetParent(newParent, state.StartContainer);
         var idx = Math.Min(state.StartOffset, state.StartContainer.Children.Count);
         state.StartContainer.Children.Insert(idx, newParent);
         return JSUndefined.Value;

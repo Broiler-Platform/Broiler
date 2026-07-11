@@ -244,10 +244,10 @@ public sealed partial class DomBridge
 
                             // Defer the move to avoid collection modification
                             // during tree traversal.
-                            if (blockAncestor != null && element.Parent != blockAncestor
-                                && element.Parent != null)
+                            if (blockAncestor != null && ParentEl(element) != blockAncestor
+                                && ParentEl(element) != null)
                             {
-                                deferredDomMoves.Add((element, element.Parent, blockAncestor));
+                                deferredDomMoves.Add((element, ParentEl(element), blockAncestor));
                             }
                         }
                     }
@@ -648,7 +648,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement? FindNearestScrollContainer(DomElement el)
     {
-        var parent = el.Parent;
+        var parent = ParentEl(el);
         while (parent != null)
         {
             if (!parent.IsTextNode)
@@ -657,7 +657,7 @@ public sealed partial class DomBridge
                 if (HasOverflowClipping(props))
                     return parent;
             }
-            parent = parent.Parent;
+            parent = ParentEl(parent);
         }
         return null;
     }
@@ -667,11 +667,11 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsDescendantOfElement(DomElement el, DomElement potentialAncestor)
     {
-        var current = el.Parent;
+        var current = ParentEl(el);
         while (current != null)
         {
             if (ReferenceEquals(current, potentialAncestor)) return true;
-            current = current.Parent;
+            current = ParentEl(current);
         }
         return false;
     }

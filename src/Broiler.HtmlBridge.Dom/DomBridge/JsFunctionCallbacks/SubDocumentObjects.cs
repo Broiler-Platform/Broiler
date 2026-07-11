@@ -515,14 +515,14 @@ public sealed partial class DomBridge
         {
             if (doctype != null)
             {
-                doctype.Parent = docRoot;
+                SetParent(doctype, docRoot);
                 docRoot.Children.Add(doctype);
                 bridge._knownNodes.Add(doctype);
             }
 
             // parsedDoc is the <html> element from HtmlTreeBuilder.
             // Add it directly to docRoot (not its children).
-            parsedDoc.Parent = docRoot;
+            SetParent(parsedDoc, docRoot);
             docRoot.Children.Add(parsedDoc);
             if (!bridge._knownNodes.Contains(parsedDoc))
                 bridge._knownNodes.Add(parsedDoc);
@@ -542,7 +542,7 @@ public sealed partial class DomBridge
                 {
                     foreach (var child in parsedBody.Children)
                     {
-                        child.Parent = bodyEl;
+                        SetParent(child, bodyEl);
                         bodyEl.Children.Add(child);
                     }
                 }
@@ -591,7 +591,7 @@ public sealed partial class DomBridge
                 {
                     bridge.NotifyNodeIteratorPreRemoval(child);
                     docRoot.Children.RemoveAt(idx);
-                    child.Parent = null;
+                    SetParent(child, null);
                     bridge.NotifyChildRemoved(docRoot, child, idx);
                 }
 
@@ -615,9 +615,9 @@ public sealed partial class DomBridge
             if (kvp.Value == childObj)
             {
                 var child = kvp.Key;
-                if (child.Parent != null)
-                    child.Parent.Children.Remove(child);
-                child.Parent = docRoot;
+                if (ParentEl(child) != null)
+                    ParentEl(child).Children.Remove(child);
+                SetParent(child, docRoot);
                 AdoptSubtreeIntoDocument(child, docRoot);
                 docRoot.Children.Add(child);
                 return childObj;
@@ -687,7 +687,7 @@ public sealed partial class DomBridge
                 if (kvp.Value == dtObj)
                 {
                     var dtEl = kvp.Key;
-                    dtEl.Parent = subDocRoot;
+                    SetParent(dtEl, subDocRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = subDocRoot;
                     subDocRoot.Children.Add(dtEl);
                     break;
@@ -700,7 +700,7 @@ public sealed partial class DomBridge
             var docEl = new DomElement(_document, qName, null, null, string.Empty);
             if (!string.IsNullOrEmpty(ns))
                 docEl.NamespaceURI = ns;
-            docEl.Parent = subDocRoot;
+            SetParent(docEl, subDocRoot);
             GetElementRuntimeState(docEl).OwnerDocRoot = subDocRoot;
             subDocRoot.Children.Add(docEl);
             _knownNodes.Add(docEl);
@@ -721,38 +721,38 @@ public sealed partial class DomBridge
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
         GetElementRuntimeState(dt).DocumentType.SystemId.Set(string.Empty);
         GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
-        dt.Parent = subDocRoot;
+        SetParent(dt, subDocRoot);
         GetElementRuntimeState(dt).OwnerDocRoot = subDocRoot;
         subDocRoot.Children.Add(dt);
         _knownNodes.Add(dt);
         var subHtml = new DomElement(_document, "html", null, null, string.Empty);
         subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
-        subHtml.Parent = subDocRoot;
+        SetParent(subHtml, subDocRoot);
         GetElementRuntimeState(subHtml).OwnerDocRoot = subDocRoot;
         subDocRoot.Children.Add(subHtml);
         _knownNodes.Add(subHtml);
         var subHead = new DomElement(_document, "head", null, null, string.Empty);
-        subHead.Parent = subHtml;
+        SetParent(subHead, subHtml);
         GetElementRuntimeState(subHead).OwnerDocRoot = subDocRoot;
         subHtml.Children.Add(subHead);
         _knownNodes.Add(subHead);
         if (subTitle != null)
         {
             var subTitleEl = new DomElement(_document, "title", null, null, string.Empty);
-            subTitleEl.Parent = subHead;
+            SetParent(subTitleEl, subHead);
             GetElementRuntimeState(subTitleEl).OwnerDocRoot = subDocRoot;
             subHead.Children.Add(subTitleEl);
             _knownNodes.Add(subTitleEl);
             var subTitleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             subTitleText.TextContent = subTitle;
-            subTitleText.Parent = subTitleEl;
+            SetParent(subTitleText, subTitleEl);
             GetElementRuntimeState(subTitleText).OwnerDocRoot = subDocRoot;
             subTitleEl.Children.Add(subTitleText);
             _knownNodes.Add(subTitleText);
         }
 
         var subBody = new DomElement(_document, "body", null, null, string.Empty);
-        subBody.Parent = subHtml;
+        SetParent(subBody, subHtml);
         GetElementRuntimeState(subBody).OwnerDocRoot = subDocRoot;
         subHtml.Children.Add(subBody);
         _knownNodes.Add(subBody);

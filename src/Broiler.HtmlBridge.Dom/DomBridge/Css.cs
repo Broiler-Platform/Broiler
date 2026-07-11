@@ -138,12 +138,12 @@ public sealed partial class DomBridge
     private static DomElement GetDocumentRootFor(DomElement el)
     {
         var root = el;
-        while (root.Parent != null)
+        while (ParentEl(root) != null)
         {
             // If we've reached a document root, stop here
             if (root.TagName.StartsWith("#", StringComparison.Ordinal))
                 return root;
-            root = root.Parent;
+            root = ParentEl(root);
         }
         return root;
     }
@@ -325,10 +325,10 @@ public sealed partial class DomBridge
 
     private void ApplyInheritedProperties(Dictionary<string, string> computed, DomElement element)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return;
 
-        var parentProps = GetComputedProps(element.Parent);
+        var parentProps = GetComputedProps(ParentEl(element));
         foreach (var property in CSS.Dom.CssComputedDefaults.InheritedProperties)
         {
             if (computed.ContainsKey(property))
@@ -1455,7 +1455,7 @@ public sealed partial class DomBridge
 
         // Walk up from docRoot to find the containing iframe/object element
         // The docRoot is typically a #subdoc-root child of the iframe element
-        var parent = docRoot.Parent;
+        var parent = ParentEl(docRoot);
         if (parent != null && !parent.TagName.StartsWith("#", StringComparison.Ordinal))
         {
             // parent is the iframe/object element — check its style for dimensions

@@ -91,18 +91,6 @@ public sealed class DomElement : CanonicalElement
 
     public string InnerHtml { get; set; }
 
-    public DomElement? Parent
-    {
-        get => ParentNode as DomElement;
-        set
-        {
-            if (value is null)
-                Remove();
-            else if (!ReferenceEquals(ParentNode, value))
-                value.AppendChild(this);
-        }
-    }
-
     public LegacyChildList Children => _children;
 
     public bool IsTextNode { get; }

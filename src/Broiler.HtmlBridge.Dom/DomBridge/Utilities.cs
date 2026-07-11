@@ -315,11 +315,11 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsDescendant(DomElement ancestor, DomElement candidate)
     {
-        var current = candidate.Parent;
+        var current = ParentEl(candidate);
         while (current != null)
         {
             if (ReferenceEquals(current, ancestor)) return true;
-            current = current.Parent;
+            current = ParentEl(current);
         }
         return false;
     }
@@ -335,12 +335,12 @@ public sealed partial class DomBridge
             return 0;
 
         var firstAncestors = new List<DomElement>();
-        for (var current = first; current != null; current = current.Parent)
+        for (var current = first; current != null; current = ParentEl(current))
             firstAncestors.Add(current);
         firstAncestors.Reverse();
 
         var secondAncestors = new List<DomElement>();
-        for (var current = second; current != null; current = current.Parent)
+        for (var current = second; current != null; current = ParentEl(current))
             secondAncestors.Add(current);
         secondAncestors.Reverse();
 
@@ -420,7 +420,7 @@ public sealed partial class DomBridge
             foreach (var child in source.Children)
             {
                 var childClone = CloneDomElement(child, true);
-                childClone.Parent = clone;
+                SetParent(childClone, clone);
                 clone.Children.Add(childClone);
                 _knownNodes.Add(childClone);
             }
@@ -509,26 +509,26 @@ public sealed partial class DomBridge
                 // No sections and no rows at all: create a new tbody per spec
                 var tbody = new DomElement("tbody", null, null, string.Empty);
                 bridge._knownNodes.Add(tbody);
-                tbody.Parent = table;
+                SetParent(tbody, table);
                 table.Children.Add(tbody);
                 lastSection = tbody;
             }
             if (lastSection != null)
             {
-                tr.Parent = lastSection;
+                SetParent(tr, lastSection);
                 lastSection.Children.Add(tr);
             }
             else
             {
-                tr.Parent = table;
+                SetParent(tr, table);
                 table.Children.Add(tr);
             }
         }
         else if (index >= 0 && index < allRows.Count)
         {
             var refRow = allRows[index];
-            var parent = refRow.Parent ?? table;
-            tr.Parent = parent;
+            var parent = ParentEl(refRow) ?? table;
+            SetParent(tr, parent);
             var idx = parent.Children.IndexOf(refRow);
             parent.Children.Insert(idx >= 0 ? idx : parent.Children.Count, tr);
         }

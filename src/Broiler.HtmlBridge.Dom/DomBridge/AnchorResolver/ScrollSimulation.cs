@@ -68,7 +68,7 @@ public sealed partial class DomBridge
                     el.Children.Add(wrapper);
                     foreach (var child in originalChildren)
                     {
-                        child.Parent = wrapper;
+                        SetParent(child, wrapper);
                         wrapper.Children.Add(child);
                     }
 
@@ -84,8 +84,8 @@ public sealed partial class DomBridge
                         CollectFixedDescendants(wrapper, fixedDescendants);
                         foreach (var fixedEl in fixedDescendants)
                         {
-                            fixedEl.Parent?.Children.Remove(fixedEl);
-                            fixedEl.Parent = el;
+                            ParentEl(fixedEl)?.Children.Remove(fixedEl);
+                            SetParent(fixedEl, el);
                             el.Children.Add(fixedEl);
                         }
                     }

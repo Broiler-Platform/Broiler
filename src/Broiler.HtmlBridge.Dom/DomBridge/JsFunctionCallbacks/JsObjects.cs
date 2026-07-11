@@ -250,9 +250,9 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetNextSibling036Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = element.Parent.Children;
+        var siblings = ParentEl(element).Children;
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
@@ -266,9 +266,9 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetPreviousSibling037Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = element.Parent.Children;
+        var siblings = ParentEl(element).Children;
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
@@ -406,11 +406,11 @@ public sealed partial class DomBridge
         newNode.TextContent = remainingText;
         _knownNodes.Add(newNode);
         // Insert new node as next sibling
-        if (element.Parent != null)
+        if (ParentEl(element) != null)
         {
-            var idx = element.Parent.Children.IndexOf(element);
-            newNode.Parent = element.Parent;
-            element.Parent.Children.Insert(idx + 1, newNode);
+            var idx = ParentEl(element).Children.IndexOf(element);
+            SetParent(newNode, ParentEl(element));
+            ParentEl(element).Children.Insert(idx + 1, newNode);
         }
 
         // Invalidate cached JSObject so length/data properties reflect the update
@@ -504,11 +504,11 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetParentElement058Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSNull.Value;
-        if (element.Parent.IsTextNode)
+        if (ParentEl(element).IsTextNode)
             return JSNull.Value;
-        return ToJSObject(element.Parent);
+        return ToJSObject(ParentEl(element));
     }
 
 
@@ -827,9 +827,9 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetNextElementSibling085Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = element.Parent.Children;
+        var siblings = ParentEl(element).Children;
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
@@ -843,9 +843,9 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetPreviousElementSibling086Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = element.Parent.Children;
+        var siblings = ParentEl(element).Children;
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
@@ -873,7 +873,7 @@ public sealed partial class DomBridge
 
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
         var shadowRoot = new DomElement(_document, "#shadow-root", null, null, string.Empty);
-        shadowRoot.Parent = element;
+        SetParent(shadowRoot, element);
         GetElementRuntimeState(shadowRoot).OwnerDocRoot = GetElementRuntimeState(element).OwnerDocRoot;
         GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
         GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
@@ -942,7 +942,7 @@ public sealed partial class DomBridge
             return a[0];
         NotifyNodeIteratorPreRemoval(childEl);
         element.Children.RemoveAt(idx);
-        childEl.Parent = null;
+        SetParent(childEl, null);
         bridgeForAppend.InvalidateStyleScope(element);
         NotifyChildRemoved(element, childEl, idx);
         return a[0];
@@ -970,7 +970,7 @@ public sealed partial class DomBridge
         var previousSibling = idx > 0 ? element.Children[idx - 1] : null;
         var nextSibling = idx + 1 < element.Children.Count ? element.Children[idx + 1] : null;
         // If newChild is already in this parent, remove it first and re-find idx
-        if (ReferenceEquals(newEl.Parent, element))
+        if (ReferenceEquals(ParentEl(newEl), element))
         {
             element.Children.Remove(newEl);
             idx = element.Children.IndexOf(oldEl);
@@ -979,9 +979,9 @@ public sealed partial class DomBridge
         }
         else
         {
-            if (newEl.Parent != null)
+            if (ParentEl(newEl) != null)
             {
-                var oldParent = newEl.Parent;
+                var oldParent = ParentEl(newEl);
                 var oldIndex = oldParent.Children.IndexOf(newEl);
                 if (oldIndex >= 0)
                 {
@@ -992,8 +992,8 @@ public sealed partial class DomBridge
             }
         }
 
-        oldEl.Parent = null;
-        newEl.Parent = element;
+        SetParent(oldEl, null);
+        SetParent(newEl, element);
         AdoptSubtreeIntoDocument(newEl, GetElementRuntimeState(element).OwnerDocRoot);
         element.Children[idx] = newEl;
         bridgeForAppend.InvalidateStyleScope(element);
@@ -1005,11 +1005,11 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsRemove093Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        // Capture the parent up front: DomElement.Parent is computed from the canonical
-        // ParentNode, and Children.RemoveAt detaches it — so reading element.Parent after
+        // Capture the parent up front: ParentEl(DomElement) is computed from the canonical
+        // ParentNode, and Children.RemoveAt detaches it — so reading ParentEl(element) after
         // the removal would return null (→ NRE in InvalidateStyleScope). Mirrors the
         // working removeChild path, which holds the parent reference independently.
-        var parent = element.Parent;
+        var parent = ParentEl(element);
         if (parent != null)
         {
             var idx = parent.Children.IndexOf(element);
@@ -1017,7 +1017,7 @@ public sealed partial class DomBridge
             {
                 NotifyNodeIteratorPreRemoval(element);
                 parent.Children.RemoveAt(idx);
-                element.Parent = null;
+                SetParent(element, null);
                 InvalidateStyleScope(parent);
                 NotifyChildRemoved(parent, element, idx);
             }
@@ -1029,45 +1029,45 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsBefore094Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null || a.Length == 0)
+        if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = element.Parent.Children.IndexOf(element);
+        var insertIndex = ParentEl(element).Children.IndexOf(element);
         if (insertIndex < 0)
             return JSUndefined.Value;
         foreach (var node in nodes)
-            InsertNodeAt(element.Parent, node, insertIndex++);
+            InsertNodeAt(ParentEl(element), node, insertIndex++);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsAfter095Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null || a.Length == 0)
+        if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = element.Parent.Children.IndexOf(element);
+        var insertIndex = ParentEl(element).Children.IndexOf(element);
         if (insertIndex < 0)
             return JSUndefined.Value;
         insertIndex++;
         foreach (var node in nodes)
-            InsertNodeAt(element.Parent, node, insertIndex++);
+            InsertNodeAt(ParentEl(element), node, insertIndex++);
         return JSUndefined.Value;
     }
 
 
     private JSValue JsJsObjectsReplaceWith096Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        if (element.Parent == null)
+        if (ParentEl(element) == null)
             return JSUndefined.Value;
-        var parent = element.Parent;
+        var parent = ParentEl(element);
         var replacementIndex = parent.Children.IndexOf(element);
         if (replacementIndex < 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
         NotifyNodeIteratorPreRemoval(element);
         parent.Children.RemoveAt(replacementIndex);
-        element.Parent = null;
+        SetParent(element, null);
         InvalidateStyleScope(parent);
         NotifyChildRemoved(parent, element, replacementIndex);
         foreach (var node in nodes)
@@ -1147,8 +1147,8 @@ public sealed partial class DomBridge
                 if (TryGetAttribute(element, "name", out var radioName) && !string.IsNullOrEmpty(radioName))
                 {
                     var scope = element;
-                    while (scope.Parent != null)
-                        scope = scope.Parent;
+                    while (ParentEl(scope) != null)
+                        scope = ParentEl(scope);
                     UncheckRadioSiblings(scope, element, radioName);
                 }
             }
@@ -1178,9 +1178,9 @@ public sealed partial class DomBridge
             if (btnType == "submit")
             {
                 // Walk up the DOM tree to find the parent <form>
-                var form = element.Parent;
+                var form = ParentEl(element);
                 while (form != null && !string.Equals(form.TagName, "form", StringComparison.OrdinalIgnoreCase))
-                    form = form.Parent;
+                    form = ParentEl(form);
                 if (form != null)
                 {
                     // Dispatch a submit event on the form
@@ -1315,14 +1315,14 @@ public sealed partial class DomBridge
             if (TryGetAttribute(element, "type", out var tp) && string.Equals(tp, "radio", StringComparison.OrdinalIgnoreCase) && TryGetAttribute(element, "name", out var radioName) && !string.IsNullOrEmpty(radioName))
             {
                 // Find the scope for radio group — form parent, or document root if not in a form
-                var scope = element.Parent;
+                var scope = ParentEl(element);
                 while (scope != null && !string.Equals(scope.TagName, "form", StringComparison.OrdinalIgnoreCase))
-                    scope = scope.Parent;
+                    scope = ParentEl(scope);
                 if (scope == null)
                 {
                     scope = element;
-                    while (scope.Parent != null)
-                        scope = scope.Parent;
+                    while (ParentEl(scope) != null)
+                        scope = ParentEl(scope);
                 }
 
                 UncheckRadioSiblings(scope, element, radioName);
@@ -1485,7 +1485,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsClosest129Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = current.Parent)
+        for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = ParentEl(current))
         {
             if (MatchesSelector(current, sel, element))
                 return bridge.ToJSObject(current);
@@ -1542,9 +1542,9 @@ public sealed partial class DomBridge
         {
             case "beforebegin":
             case "afterend":
-                if (element.Parent == null)
+                if (ParentEl(element) == null)
                     ThrowDOMException(_jsContext!, "Cannot insert adjacent HTML without a parent node.", "NoModificationAllowedError");
-                parsingContext = element.Parent!;
+                parsingContext = ParentEl(element)!;
                 break;
             default:
                 parsingContext = element;

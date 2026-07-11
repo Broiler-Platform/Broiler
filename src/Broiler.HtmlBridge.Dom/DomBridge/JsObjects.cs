@@ -185,7 +185,7 @@ public sealed partial class DomBridge
         // parentNode (read-only, dynamic)
         obj.FastAddProperty(
             (KeyString)"parentNode",
-            new JSFunction((in Arguments a) => element.Parent != null ? ToJSObject(element.Parent) : JSNull.Value,
+            new JSFunction((in Arguments a) => ParentEl(element) != null ? ToJSObject(ParentEl(element)) : JSNull.Value,
                 "get parentNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

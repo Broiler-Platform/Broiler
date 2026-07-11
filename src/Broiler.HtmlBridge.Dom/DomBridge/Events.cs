@@ -129,8 +129,8 @@ public sealed partial class DomBridge
         // Build the path from the root to the target
         var path = new List<DomElement>();
         var visited = new HashSet<DomElement>();
-        var node = target.Parent;
-        while (node != null && visited.Add(node)) { path.Add(node); node = node.Parent; }
+        var node = ParentEl(target);
+        while (node != null && visited.Add(node)) { path.Add(node); node = ParentEl(node); }
         path.Reverse();
 
         // Include the document node at the very beginning of the path

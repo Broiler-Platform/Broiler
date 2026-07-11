@@ -201,12 +201,12 @@ public sealed partial class DomBridge
         var head = FindFirstElementByTagName(DocumentElement, "head");
         if (head != null)
         {
-            styleElement.Parent = head;
+            SetParent(styleElement, head);
             head.Children.Add(styleElement);
             return;
         }
 
-        styleElement.Parent = DocumentElement;
+        SetParent(styleElement, DocumentElement);
         DocumentElement.Children.Insert(0, styleElement);
     }
 
@@ -321,7 +321,8 @@ public sealed partial class DomBridge
         element.InnerHtml = string.Empty;
         element.TextContent = null;
 
-        var fill = new DomElement("div", null, null, string.Empty) { Parent = element };
+        var fill = new DomElement("div", null, null, string.Empty);
+        SetParent(fill, element);
         InlineStyle(fill)["position"] = "absolute";
         InlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
@@ -460,16 +461,16 @@ public sealed partial class DomBridge
 
         if (!InlineStyle(element).TryGetValue(property, out var specified) ||
             !string.Equals(specified?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase) ||
-            element.Parent == null)
+            ParentEl(element) == null)
         {
             return false;
         }
 
-        var parentProps = GetComputedProps(element.Parent);
+        var parentProps = GetComputedProps(ParentEl(element));
         if (parentProps.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (InlineStyle(element.Parent!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+        if (InlineStyle(ParentEl(element)!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
         return false;
@@ -682,7 +683,7 @@ public sealed partial class DomBridge
 
     private double ResolveOriginalNearestSpecifiedFontSizePx(DomElement element)
     {
-        for (DomElement? current = element; current != null; current = current.Parent)
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             if (TryGetSpecifiedFontSizePx(current, out var fontSize))
                 return fontSize;
@@ -745,7 +746,7 @@ public sealed partial class DomBridge
 
     private double GetNearestExplicitFontSizeOwnerZoom(DomElement element)
     {
-        for (DomElement? current = element; current != null; current = current.Parent)
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             var props = GetComputedProps(current);
             if (props.TryGetValue("font-size", out var fontSize) && !string.IsNullOrWhiteSpace(fontSize))

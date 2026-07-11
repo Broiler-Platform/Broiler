@@ -112,9 +112,9 @@ public sealed partial class DomBridge
         if (IsDescendant(containerA, containerB))
         {
             var node = containerB;
-            while (node.Parent != null && !ReferenceEquals(node.Parent, containerA))
-                node = node.Parent;
-            if (node.Parent != null)
+            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerA))
+                node = ParentEl(node);
+            if (ParentEl(node) != null)
             {
                 var childIdx = containerA.Children.IndexOf(node);
                 return offsetA > childIdx;
@@ -126,9 +126,9 @@ public sealed partial class DomBridge
         if (IsDescendant(containerB, containerA))
         {
             var node = containerA;
-            while (node.Parent != null && !ReferenceEquals(node.Parent, containerB))
-                node = node.Parent;
-            if (node.Parent != null)
+            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerB))
+                node = ParentEl(node);
+            if (ParentEl(node) != null)
             {
                 var childIdx = containerB.Children.IndexOf(node);
                 return childIdx >= offsetB;

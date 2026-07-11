@@ -129,7 +129,7 @@ public sealed partial class DomBridge
             var backdrop = new DomElement("div", null, null, string.Empty);
             foreach (var kv in backdropStyle)
                 InlineStyle(backdrop)[kv.Key] = kv.Value;
-            backdrop.Parent = parent;
+            SetParent(backdrop, parent);
 
             int idx = parent.Children.IndexOf(dialog);
             if (idx >= 0)
@@ -286,9 +286,9 @@ public sealed partial class DomBridge
             HasAttr(element, "open") &&
             GetElementRuntimeState(element).Dialog.Modal.TryGet(out var isModal) &&
             isModal is bool modal && modal &&
-            element.Parent != null)
+            ParentEl(element) != null)
         {
-            results.Add((element, element.Parent, false));
+            results.Add((element, ParentEl(element), false));
         }
 
         // Snapshot before recursing: the live child list can be mutated mid-walk
@@ -303,11 +303,11 @@ public sealed partial class DomBridge
     // the top layer and generates a ::backdrop, just like a modal dialog.
     private static void FindOpenPopovers(DomElement element, List<(DomElement, DomElement, bool)> results)
     {
-        if (element.Parent != null &&
+        if (ParentEl(element) != null &&
             GetElementRuntimeState(element).Dialog.PopoverOpen.TryGet(out var open) &&
             open is true)
         {
-            results.Add((element, element.Parent, true));
+            results.Add((element, ParentEl(element), true));
         }
 
         foreach (var child in SnapshotChildren(element))

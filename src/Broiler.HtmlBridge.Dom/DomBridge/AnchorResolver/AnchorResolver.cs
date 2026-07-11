@@ -185,7 +185,7 @@ public sealed partial class DomBridge
             {
                 ["src"] = url,
             });
-        img.Parent = body;
+        SetParent(img, body);
         body.Children.Add(img);
     }
 

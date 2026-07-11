@@ -171,7 +171,7 @@ public sealed partial class DomBridge
     {
         // Walk up to find <style> elements.
         var root = element;
-        while (root.Parent != null) root = root.Parent;
+        while (ParentEl(root) != null) root = ParentEl(root);
 
         Dictionary<string, string>? result = null;
         CollectAnimPropsFromStyleElements(root, element, ref result);

@@ -192,7 +192,7 @@ public sealed partial class DomBridge
         // the anchored box off-screen (css-anchor-position anchor-scroll-to-sticky-004).
         bool stickyToNextScroller = IsSticky(GetComputedProps(anchorEl));
 
-        for (var el = anchorEl.Parent; el != null; el = el.Parent)
+        for (var el = ParentEl(anchorEl); el != null; el = ParentEl(el))
         {
             var props = GetComputedProps(el);
             if (!HasOverflowClipping(props))
@@ -236,7 +236,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsDescendantOrSelf(DomElement node, DomElement ancestor)
     {
-        for (var cur = node; cur != null; cur = cur.Parent)
+        for (var cur = node; cur != null; cur = ParentEl(cur))
             if (cur == ancestor)
                 return true;
         return false;

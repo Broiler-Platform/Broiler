@@ -57,7 +57,7 @@ public sealed partial class DomBridge
             return ToJSObject(cap);
         cap = new DomElement(_document, "caption", null, null, string.Empty);
         bridge._knownNodes.Add(cap);
-        cap.Parent = element;
+        SetParent(cap, element);
         element.Children.Insert(0, cap);
         return ToJSObject(cap);
     }
@@ -70,7 +70,7 @@ public sealed partial class DomBridge
             return ToJSObject(th);
         th = new DomElement(_document, "thead", null, null, string.Empty);
         bridge._knownNodes.Add(th);
-        th.Parent = element;
+        SetParent(th, element);
         element.Children.Add(th);
         return ToJSObject(th);
     }
@@ -83,7 +83,7 @@ public sealed partial class DomBridge
             return ToJSObject(tf);
         tf = new DomElement(_document, "tfoot", null, null, string.Empty);
         bridge._knownNodes.Add(tf);
-        tf.Parent = element;
+        SetParent(tf, element);
         element.Children.Add(tf);
         return ToJSObject(tf);
     }
@@ -94,7 +94,7 @@ public sealed partial class DomBridge
         var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
         {
-            cap.Parent = null;
+            SetParent(cap, null);
             element.Children.Remove(cap);
         }
 
@@ -107,7 +107,7 @@ public sealed partial class DomBridge
         var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
         {
-            th.Parent = null;
+            SetParent(th, null);
             element.Children.Remove(th);
         }
 
@@ -120,7 +120,7 @@ public sealed partial class DomBridge
         var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
         {
-            tf.Parent = null;
+            SetParent(tf, null);
             element.Children.Remove(tf);
         }
 
@@ -146,8 +146,8 @@ public sealed partial class DomBridge
         if (index >= 0 && index < rows.Count)
         {
             var row = rows[index];
-            row.Parent?.Children.Remove(row);
-            row.Parent = null;
+            ParentEl(row)?.Children.Remove(row);
+            SetParent(row, null);
         }
 
         return JSUndefined.Value;
@@ -176,7 +176,7 @@ public sealed partial class DomBridge
         var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
         var tr = new DomElement(_document, "tr", null, null, string.Empty);
         bridge._knownNodes.Add(tr);
-        tr.Parent = element;
+        SetParent(tr, element);
         var trRows = element.Children.Where(c => string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
         if (index < 0 || index >= trRows.Count)
             element.Children.Add(tr);
@@ -194,9 +194,9 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesGetRowIndex018Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         // Find parent table
-        var tableEl = element.Parent;
+        var tableEl = ParentEl(element);
         if (tableEl != null && (string.Equals(tableEl.TagName, "thead", StringComparison.OrdinalIgnoreCase) || string.Equals(tableEl.TagName, "tbody", StringComparison.OrdinalIgnoreCase) || string.Equals(tableEl.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)))
-            tableEl = tableEl.Parent;
+            tableEl = ParentEl(tableEl);
         if (tableEl == null || !string.Equals(tableEl.TagName, "table", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(-1);
         var rows = CollectTableRows(tableEl);
@@ -206,7 +206,7 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesGetSectionRowIndex019Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var section = element.Parent;
+        var section = ParentEl(element);
         if (section == null)
             return new JSNumber(-1);
         var idx = 0;
@@ -244,7 +244,7 @@ public sealed partial class DomBridge
         var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
         var td = new DomElement(_document, "td", null, null, string.Empty);
         bridge._knownNodes.Add(td);
-        td.Parent = element;
+        SetParent(td, element);
         var cells = element.Children.Where(c => !c.IsTextNode && IsTableCellElement(c)).ToList();
         if (index < 0 || index >= cells.Count)
         {
@@ -275,7 +275,7 @@ public sealed partial class DomBridge
         if (index < 0 || index >= cells.Count)
             throw new JSException("INDEX_SIZE_ERR");
         var cell = cells[index];
-        cell.Parent = null;
+        SetParent(cell, null);
         element.Children.Remove(cell);
         return JSUndefined.Value;
     }
@@ -397,8 +397,8 @@ public sealed partial class DomBridge
                 refEl = FindDomElementByJSObject(refObj);
         }
 
-        optEl.Parent?.Children.Remove(optEl);
-        optEl.Parent = element;
+        ParentEl(optEl)?.Children.Remove(optEl);
+        SetParent(optEl, element);
         if (refEl != null)
         {
             var idx = element.Children.IndexOf(refEl);

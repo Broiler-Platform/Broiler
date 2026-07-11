@@ -161,7 +161,7 @@ public sealed partial class DomBridge
         accTop += ComputePrecedingSiblingHeights(element);
 
         // Walk up ancestors to accumulate margins, padding, and borders.
-        var ancestor = element.Parent;
+        var ancestor = ParentEl(element);
         while (ancestor != null)
         {
             var ancProps = GetComputedProps(ancestor);
@@ -202,7 +202,7 @@ public sealed partial class DomBridge
             accTop += TryParsePx(ancProps.GetValueOrDefault("border-top-width")) ?? 0;
             accTop += ComputePrecedingSiblingHeights(ancestor);
 
-            ancestor = ancestor.Parent;
+            ancestor = ParentEl(ancestor);
         }
 
         // For block-level elements without explicit width, compute width
@@ -268,7 +268,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement? FindGeometryContainingBlockAncestor(DomElement element)
     {
-        for (var ancestor = element.Parent; ancestor != null; ancestor = ancestor.Parent)
+        for (var ancestor = ParentEl(element); ancestor != null; ancestor = ParentEl(ancestor))
             if (EstablishesContainingBlock(GetComputedProps(ancestor)))
                 return ancestor;
         return null;
@@ -366,9 +366,9 @@ public sealed partial class DomBridge
             if (!string.Equals(value?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (element.Parent != null)
+            if (ParentEl(element) != null)
             {
-                parentProps ??= GetComputedProps(element.Parent);
+                parentProps ??= GetComputedProps(ParentEl(element));
                 if (parentProps.TryGetValue(key, out var parentValue) && !string.IsNullOrWhiteSpace(parentValue))
                 {
                     props[key] = parentValue;
@@ -387,10 +387,10 @@ public sealed partial class DomBridge
     /// </summary>
     private double ComputePrecedingSiblingHeights(DomElement element)
     {
-        if (element.Parent == null) return 0;
+        if (ParentEl(element) == null) return 0;
 
         double totalHeight = 0;
-        // Snapshot the sibling list before walking it: element.Parent.Children
+        // Snapshot the sibling list before walking it: ParentEl(element).Children
         // enumerates the live ChildNodes list, so any mutation of it during the
         // walk (e.g. an anchor-driven DOM move on a node sharing this parent, or
         // a lazy offset query that re-enters anchor resolution) throws
@@ -398,7 +398,7 @@ public sealed partial class DomBridge
         // for the whole document (WPT issue #1131, signature
         // DomBridge.BuildAnchorRegistry). Same defensive snapshot (SnapshotChildren)
         // idiom as ResolveAnchorCenter and InlineContainingBlocks.
-        foreach (var sibling in SnapshotChildren(element.Parent))
+        foreach (var sibling in SnapshotChildren(ParentEl(element)))
         {
             if (sibling == element) break;
             if (sibling.IsTextNode) continue;
