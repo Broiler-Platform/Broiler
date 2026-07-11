@@ -1,9 +1,11 @@
 # HtmlBridge `DomElement` Facade Removal — Current State & Handoff
 
-Status: **in progress** — facade thinned to 2 remaining members. The atomic text-node
-flip (F3c part 2) is now decomposed into a **green type-widening prefix** (behaviour-
-preserving, verifiable against `Broiler.Cli.Tests`) followed by the **irreversible
-construction flip**; **F3c part 2a — the `ToJSObject` split** — is landed and verified.
+Status: **in progress** — the facade now carries only `NamespaceURI`. The atomic text-node
+flip (F3c part 2) is **fully implemented and `Broiler.Cli.Tests`-verified (0 regressions,
+8 fixes)** across the green widening prefix (2a/2b/2c) + the irreversible construction flip
+(2d). **2d is committed but NOT merged** — it awaits the WPT range/selection/serialization +
+Acid gate (see the merge gate in §4). After 2d merges, only **F4** (element construction flip,
+remove `NamespaceURI`, delete `DomElement.cs`/`HtmlTreeBuilder.cs`) remains.
 Last updated: 2026-07-11.
 
 ## Decomposition note (F3c part 2)
@@ -146,18 +148,28 @@ TreeWalker, cloning, adoption, event dispatch, and serialization all handle cano
 `DomComment` correctly. Everything behaviour-preserving is done; only the irreversible flip (2d) —
 which actually puts a canonical `DomText` into the tree — remains.
 
-- ⚠️ **2d — the atomic construction flip (irreversible).** Prep already in place: `CreateBridgeTextNode`
-  is the text-node construction funnel (it flips to `_document.CreateTextNode` in one place), `SplitText`
-  and `BuildChildNodeArgumentNodes` already route through it, and `CloneDomElement`/`NodesAreEqual`/
-  `GetNodeTextValue`/`GetKind`/the char-data JS wrapper already branch on `DomCharacterData`. Remaining:
-  flip `CreateBridgeTextNode` to `_document.CreateTextNode`, add the comment analogue, and convert the
-  remaining ~20 `new DomElement("#text"/"#comment", …)` sites (incl. `HtmlTreeBuilder.ConvertNode`, whose
-  `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers). **Split `TextContent`'s
-  element-aggregation duty** — element `textContent` *set* → clear + append a child `DomText`; *get* →
-  aggregate over child `DomText` (`CollectTextContent` already does this over raw `ChildNodes`). Remove the
-  element-store shortcut (`Common.cs` `GetNodeTextValue`, `SubDocumentObjects.cs`, `LayoutMetrics.cs`,
-  `Css.cs`, `SubDocuments.cs`, `AnimationResolver.cs`, `Serialization.cs`, `CloneDomElement`). **Remove
-  facade `TextContent` + the `NodeValue` override**; update the frozen scalar guard.
+- ✅ **2d — the atomic construction flip. DONE + Cli.Tests-verified; ⚠️ NOT MERGED (awaits WPT gate).**
+  Canonical `DomText`/`DomComment` now enter the tree. `CreateBridgeTextNode`/`CreateBridgeCommentNode`
+  mint `_document.CreateTextNode`/`CreateComment`; all ~17 text/comment construction sites +
+  `HtmlTreeBuilder.ConvertNode` (return + `AllElements` → `List<DomNode>`) route through them. `TextContent`
+  element-aggregation split: set → `SetElementTextContent` (clear + append child `DomText`); get →
+  aggregate over descendant text. Every element-store read/write removed; facade `TextContent` + the
+  `NodeValue` override deleted; frozen guard updated. Text-reading callers routed to raw `ChildNodes`
+  (`<style>`/animation CSS gatherers, `AppendRenderedText`, `GetDirectTextContent`, innerHTML/`document.write`/
+  adjacent-HTML fragment application, and the `AddElementsRecursive`/`RemoveElementsRecursive`/
+  `CollectAllDescendantsFlat` node-registration walks). JS node-arg resolution widened to
+  `FindDomNodeByJSObject` where a Node is valid (append/insert/remove/replaceChild, Range boundary nodes,
+  TreeWalker `currentNode`, `MutationObserver.observe` — characterData observers fire on text now).
+  Serialization escapes text nodes like the old element-store path did, except inside raw-text elements
+  (`script`/`style`/…), which stay literal. **Verified:** full `Broiler.Cli.Tests` before/after name-diff —
+  **0 regressions and 8 fixes** (canonical text nodes correctly re-evaluate `:last-child`/`:has()`/
+  `:nth-child` invalidation on whitespace-text removal); 81 → 73 environmental failures. Commit `72634e02`
+  on branch `claude/htmlbridge-domelement-f3c-flip`.
+
+**⚠️ MERGE GATE:** 2d is regression-free on `Broiler.Cli.Tests` (which includes the Acid3 corpus), but the
+roadmap requires the **WPT range/selection/serialization + Acid** corpus before this irreversible step
+merges (silent `outerHTML`/selection corruption is the failure mode). WPT is dispatch-only in this
+environment — run it and confirm green before merging `72634e02`.
 
 **Gate (2d):** the WPT range/selection/serialization + Acid corpus in addition to `Broiler.Cli.Tests`
 (silent `outerHTML`/selection corruption is the failure mode). The green steps 2a–2c gate on

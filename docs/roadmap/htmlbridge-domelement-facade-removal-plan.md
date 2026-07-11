@@ -30,18 +30,15 @@ against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) enviro
 F3c part 2a verified via a full before/after TRX **name**-diff (identical 81 env failures, **0
 regressed, 0 newly-failing**), same methodology Phase C2 used.
 
-**F3c part 2 decomposition:** part 2 landed as green, `Cli.Tests`-verified type-widening commits
-(**2a `ToJSObject` split; 2b `RangeState`/NodeIterator/tree-mutation + complete char-data wrapper; 2c
-`ChildAt` return type / `ChildElements` narrowing / serialization adapter — ALL DONE + verified**). The
-green widening prefix is complete: the tree, JS wrappers, ranges, NodeIterator/TreeWalker, cloning,
-adoption, event dispatch, and serialization all handle canonical `DomText`/`DomComment`. Each commit is
-a full before/after `Broiler.Cli.Tests` name-diff with 0 regressions. **Only the single irreversible
-construction flip (2d) remains** — it puts a canonical `DomText` into the tree (flip `CreateBridgeTextNode`
-to `_document.CreateTextNode`, convert the ~20 text/comment ctor sites, split `TextContent` aggregation,
-remove facade `TextContent`) and is gated on WPT range/selection/serialization + Acid. Rationale: the
-widening is behaviour-preserving on today's homogeneous facade tree (the widened branches are dead code
-until a `DomText` exists), so only construction + the `TextContent` split are genuinely atomic. See the
-current-state doc §4.
+**F3c part 2 decomposition — ALL IMPLEMENTED + `Cli.Tests`-verified:** green type-widening commits
+(**2a `ToJSObject` split; 2b `RangeState`/NodeIterator/tree-mutation + char-data wrapper; 2c `ChildAt`
+return type / `ChildElements` narrowing / serialization adapter**) capped by the **irreversible
+construction flip 2d** (commit `72634e02`): canonical `DomText`/`DomComment` in the tree, `TextContent`
+element-aggregation split, facade `TextContent` removed. **2d verified regression-free on
+`Broiler.Cli.Tests` (0 regressions, 8 fixes; 81 → 73 env failures) but NOT MERGED** — it awaits the WPT
+range/selection/serialization + Acid gate (silent `outerHTML`/selection corruption is the failure mode;
+WPT is dispatch-only). After 2d merges, only **F4** remains (element ctor flip, remove `NamespaceURI`,
+delete `DomElement.cs`/`HtmlTreeBuilder.cs`). See the current-state doc §4/§5.
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
