@@ -129,7 +129,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             ReflectRenderState(child);
     }
 
@@ -139,7 +139,7 @@ public sealed partial class DomBridge
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(DomElement element) => string.Concat(element.Children.Select(SerializeElementToHtml));
+    private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms()
     {
@@ -172,12 +172,12 @@ public sealed partial class DomBridge
     /// </summary>
     private static void RemoveRenderCommentNodes(DomElement element)
     {
-        for (int i = element.Children.Count - 1; i >= 0; i--)
+        for (int i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = element.Children[i];
+            var child = ChildAt(element, i);
             if (string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             {
-                element.Children.RemoveAt(i);
+                RemoveNthChild(element, i);
                 continue;
             }
 
@@ -202,12 +202,12 @@ public sealed partial class DomBridge
         if (head != null)
         {
             SetParent(styleElement, head);
-            head.Children.Add(styleElement);
+            head.AppendChild(styleElement);
             return;
         }
 
         SetParent(styleElement, DocumentElement);
-        DocumentElement.Children.Insert(0, styleElement);
+        InsertChildAt(DocumentElement, 0, styleElement);
     }
 
     private void CollectZoomPseudoSerializationOverrides(
@@ -229,7 +229,7 @@ public sealed partial class DomBridge
             AppendZoomPseudoSerializationOverride(element, "::after", usedZoom, rules, ref pseudoIndex);
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             CollectZoomPseudoSerializationOverrides(child, usedZoom, rules, ref pseudoIndex);
     }
 
@@ -273,7 +273,7 @@ public sealed partial class DomBridge
         if (string.Equals(root.TagName, tagName, StringComparison.OrdinalIgnoreCase))
             return root;
 
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             var match = FindFirstElementByTagName(child, tagName);
             if (match != null)
@@ -288,7 +288,7 @@ public sealed partial class DomBridge
         if (IsText(element))
             return;
 
-        foreach (var child in element.Children.ToList())
+        foreach (var child in ChildElements(element).ToList())
             ApplyProgressLikeSerializationPlaceholders(child);
 
         var tag = element.TagName.ToLowerInvariant();
@@ -317,7 +317,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrWhiteSpace(height) && !string.Equals(height, "auto", StringComparison.OrdinalIgnoreCase))
             InlineStyle(element)["height"] = height;
 
-        element.Children.Clear();
+        ClearChildren(element);
         element.InnerHtml = string.Empty;
         element.TextContent = null;
 
@@ -345,7 +345,7 @@ public sealed partial class DomBridge
             InlineStyle(fill)["width"] = fillExtentPx;
         }
 
-        element.Children.Add(fill);
+        element.AppendChild(fill);
     }
 
     private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
@@ -428,7 +428,7 @@ public sealed partial class DomBridge
 
         InlineStyle(element).Remove("zoom");
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             ApplyZoomSerializationStyles(child, usedZoom);
     }
 
@@ -869,7 +869,7 @@ public sealed partial class DomBridge
         // embedded p{background:green;height:100%} painted the whole parent green).
         // The renderer rasterises each embedded document in isolation instead
         // (srcdoc content is round-tripped via the srcdoc attribute).
-        GetChildren: static element => element.Children.Where(static child =>
+        GetChildren: static element => ChildElements(element).Where(static child =>
             !string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)),
         GetAttributes: GetSerializableAttributes,
         GetStyles: static element =>
@@ -920,12 +920,12 @@ public sealed partial class DomBridge
             return null;
         }
 
-        var subDocumentRoot = element.Children.FirstOrDefault(child =>
+        var subDocumentRoot = ChildElements(element).FirstOrDefault(child =>
             string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
-        if (subDocumentRoot == null || subDocumentRoot.Children.Count == 0)
+        if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 
-        return string.Concat(subDocumentRoot.Children.Select(SerializeElementToHtml));
+        return string.Concat(ChildElements(subDocumentRoot).Select(SerializeElementToHtml));
     }
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]

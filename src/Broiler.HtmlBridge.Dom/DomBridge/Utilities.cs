@@ -109,7 +109,7 @@ public sealed partial class DomBridge
 
     private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
             if (!IsText(child) && MatchesSelector(child, selector, scope))
             {
@@ -131,7 +131,7 @@ public sealed partial class DomBridge
             sb.Append(node.TextContent ?? string.Empty);
             return;
         }
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
             CollectTextContent(child, sb);
     }
 
@@ -362,8 +362,8 @@ public sealed partial class DomBridge
         var commonAncestor = firstAncestors[divergenceIndex - 1];
         var firstChild = firstAncestors[divergenceIndex];
         var secondChild = secondAncestors[divergenceIndex];
-        var firstIndex = commonAncestor.Children.IndexOf(firstChild);
-        var secondIndex = commonAncestor.Children.IndexOf(secondChild);
+        var firstIndex = ChildIndexOf(commonAncestor, firstChild);
+        var secondIndex = ChildIndexOf(commonAncestor, secondChild);
 
         if (firstIndex == secondIndex)
             return 0;
@@ -381,7 +381,7 @@ public sealed partial class DomBridge
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
         {
             if (IsSubDocRoot(child))
                 continue;
@@ -417,11 +417,11 @@ public sealed partial class DomBridge
 
         if (deep)
         {
-            foreach (var child in source.Children)
+            foreach (var child in ChildElements(source))
             {
                 var childClone = CloneDomElement(child, true);
                 SetParent(childClone, clone);
-                clone.Children.Add(childClone);
+                clone.AppendChild(childClone);
                 _knownNodes.Add(childClone);
             }
         }
@@ -436,29 +436,29 @@ public sealed partial class DomBridge
     {
         var rows = new List<DomElement>();
         // 1. All tr children of thead elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             if (string.Equals(child.TagName, "thead", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             var ctag = child.TagName.ToLowerInvariant();
             if (ctag == "tr")
                 rows.Add(child);
             else if (ctag == "tbody")
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 3. All tr children of tfoot elements (in tree order)
-        foreach (var child in table.Children)
+        foreach (var child in ChildElements(table))
         {
             if (string.Equals(child.TagName, "tfoot", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in child.Children)
+                foreach (var c in ChildElements(child))
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
@@ -495,12 +495,12 @@ public sealed partial class DomBridge
         {
             // Find the last section to append to, or create a tbody
             DomElement? lastSection = null;
-            for (int i = table.Children.Count - 1; i >= 0; i--)
+            for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
             {
-                var ctag = table.Children[i].TagName.ToLowerInvariant();
+                var ctag = ChildAt(table, i).TagName.ToLowerInvariant();
                 if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
                 {
-                    lastSection = table.Children[i];
+                    lastSection = ChildAt(table, i);
                     break;
                 }
             }
@@ -510,18 +510,18 @@ public sealed partial class DomBridge
                 var tbody = new DomElement("tbody", null, null, string.Empty);
                 bridge._knownNodes.Add(tbody);
                 SetParent(tbody, table);
-                table.Children.Add(tbody);
+                table.AppendChild(tbody);
                 lastSection = tbody;
             }
             if (lastSection != null)
             {
                 SetParent(tr, lastSection);
-                lastSection.Children.Add(tr);
+                lastSection.AppendChild(tr);
             }
             else
             {
                 SetParent(tr, table);
-                table.Children.Add(tr);
+                table.AppendChild(tr);
             }
         }
         else if (index >= 0 && index < allRows.Count)
@@ -529,8 +529,8 @@ public sealed partial class DomBridge
             var refRow = allRows[index];
             var parent = ParentEl(refRow) ?? table;
             SetParent(tr, parent);
-            var idx = parent.Children.IndexOf(refRow);
-            parent.Children.Insert(idx >= 0 ? idx : parent.Children.Count, tr);
+            var idx = ChildIndexOf(parent, refRow);
+            InsertChildAt(parent, idx >= 0 ? idx : parent.ChildNodes.Count, tr);
         }
         return ToJSObject(tr);
     }
@@ -547,7 +547,7 @@ public sealed partial class DomBridge
 
     private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
             var ctag = child.TagName.ToLowerInvariant();
             if (ctag == "input" || ctag == "select" || ctag == "textarea" || ctag == "button")
@@ -562,7 +562,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
-        foreach (var child in scope.Children)
+        foreach (var child in ChildElements(scope))
         {
             if (!IsText(child) && !ReferenceEquals(child, except))
             {
@@ -607,7 +607,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendants(DomElement root, List<DomElement> result)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
@@ -625,7 +625,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectAllDescendantsFlat(DomElement parent, List<DomElement> result)
     {
-        foreach (var child in parent.Children)
+        foreach (var child in ChildElements(parent))
         {
             result.Add(child);
             CollectAllDescendantsFlat(child, result);
@@ -637,7 +637,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (tagName == "*" || string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
                 results.Add(bridge.ToJSObject(child));

@@ -69,7 +69,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             CollectCheckLayoutAssertions(child, results);
     }
 

@@ -72,7 +72,7 @@ public sealed partial class DomBridge
 
     private DomElement? FindAssignedSlot(DomElement root, DomElement node)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (IsText(child))
                 continue;

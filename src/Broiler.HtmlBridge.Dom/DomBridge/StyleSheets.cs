@@ -36,7 +36,7 @@ public sealed partial class DomBridge
     /// <summary>Collects all style elements in the sub-tree.</summary>
     private static void CollectStyleElements(DomElement root, List<DomElement> results)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                 results.Add(child);

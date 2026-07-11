@@ -621,7 +621,7 @@ public sealed partial class DomBridge
         var maxRight = 0d;
         var maxBottom = 0d;
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;
@@ -709,7 +709,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrWhiteSpace(element.TextContent))
             sb.Append(element.TextContent);
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (IsText(child) && !string.IsNullOrWhiteSpace(child.TextContent))
                 sb.Append(child.TextContent);
@@ -1415,7 +1415,7 @@ public sealed partial class DomBridge
     private static int CountSelectOptions(DomElement element)
     {
         int count = 0;
-        foreach (var child in element.Children.Where(c => !IsText(c)))
+        foreach (var child in ChildElements(element).Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1452,7 +1452,7 @@ public sealed partial class DomBridge
     private static List<DomElement> CollectSelectOptions(DomElement element)
     {
         var options = new List<DomElement>();
-        foreach (var child in element.Children.Where(c => !IsText(c)))
+        foreach (var child in ChildElements(element).Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
             {
@@ -1561,7 +1561,7 @@ public sealed partial class DomBridge
             if (host == null)
                 yield break;
 
-            foreach (var child in host.Children)
+            foreach (var child in ChildElements(host))
             {
                 if (!IsText(child) && SlotAcceptsNode(element, child))
                     yield return child;
@@ -1570,7 +1570,7 @@ public sealed partial class DomBridge
             yield break;
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (!IsText(child))
                 yield return child;

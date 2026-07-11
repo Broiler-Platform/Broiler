@@ -370,7 +370,7 @@ public sealed partial class DomBridge
         // hasChildNodes()
         obj.FastAddValue(
             (KeyString)"hasChildNodes",
-            new JSFunction((in Arguments a) => element.Children.Count > 0 ? JSBoolean.True : JSBoolean.False,
+            new JSFunction((in Arguments a) => element.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False,
                 "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -508,7 +508,7 @@ public sealed partial class DomBridge
         // childElementCount (read-only)
         obj.FastAddProperty(
             (KeyString)"childElementCount",
-            new JSFunction((in Arguments a) => new JSNumber(element.Children.Count(c => !IsText(c) && !IsSubDocRoot(c))),
+            new JSFunction((in Arguments a) => new JSNumber(ChildElements(element).Count(c => !IsText(c) && !IsSubDocRoot(c))),
                 "get childElementCount"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

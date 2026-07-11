@@ -156,7 +156,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _documentNode = new DomElement(_document, "#document", null, null, string.Empty);
         DocumentElement = new DomElement(_document, "html", null, null, string.Empty);
         _document.AppendChild(_documentNode);
-        _documentNode.Children.Add(DocumentElement);
+        _documentNode.AppendChild(DocumentElement);
     }
 
     /// <summary>
@@ -188,6 +188,70 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// attribute; thereafter it is the source of truth (JS <c>element.style</c> writes,
     /// anchor/form-control styling), synced back to the attribute at serialization.
     /// </summary>
+    // -----------------------------------------------------------------
+    // RF-BRIDGE-1c Phase E2: child-node access over canonical ChildNodes,
+    // replacing the facade DomElement.Children (LegacyChildList). The bridge
+    // tree is homogeneous DomElement today, so ChildElements is a drop-in for
+    // the old enumeration; the Cast/ChildAt casts are safe until text/comment
+    // flip to canonical DomText/DomComment (Phase F), when ChildElements narrows
+    // to OfType and callers gain IsText handling.
+    // -----------------------------------------------------------------
+
+    /// <summary>The element's child nodes as <see cref="DomElement"/> (drop-in for the old
+    /// <c>element.Children</c> enumeration).</summary>
+    private static IEnumerable<DomElement> ChildElements(DomElement element) =>
+        element.ChildNodes.Cast<DomElement>();
+
+    /// <summary>The child at <paramref name="index"/> (old <c>Children[index]</c>).</summary>
+    private static DomElement ChildAt(DomElement element, int index) => (DomElement)element.ChildNodes[index];
+
+    /// <summary>The child at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
+    /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
+    /// from-end indexer.</summary>
+    private static DomElement ChildAt(DomElement element, System.Index index) =>
+        (DomElement)element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
+
+    /// <summary>Index of <paramref name="child"/> among the element's children, or -1
+    /// (old <c>Children.IndexOf</c>, reference equality).</summary>
+    private static int ChildIndexOf(DomElement element, Broiler.Dom.DomNode child)
+    {
+        for (var i = 0; i < element.ChildNodes.Count; i++)
+        {
+            if (ReferenceEquals(element.ChildNodes[i], child))
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Old <c>Children.Insert(index, child)</c>.</summary>
+    private static void InsertChildAt(DomElement parent, int index, Broiler.Dom.DomNode child)
+    {
+        var reference = index < parent.ChildNodes.Count ? parent.ChildNodes[index] : null;
+        parent.InsertBefore(child, reference);
+    }
+
+    /// <summary>Old <c>Children.Remove(child)</c> — removes only if actually a child; returns success.</summary>
+    private static bool RemoveChildFrom(DomElement parent, Broiler.Dom.DomNode child)
+    {
+        if (!ReferenceEquals(child.ParentNode, parent))
+            return false;
+
+        parent.RemoveChild(child);
+        return true;
+    }
+
+    /// <summary>Old raw <c>Children.RemoveAt(index)</c> (no mutation notifications — matches the
+    /// LegacyChildList primitive; distinct from the notifying <c>RemoveChildAt</c> helper).</summary>
+    private static void RemoveNthChild(DomElement parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
+
+    /// <summary>Old <c>Children.Clear()</c>.</summary>
+    private static void ClearChildren(DomElement parent)
+    {
+        foreach (var child in parent.ChildNodes.ToArray())
+            parent.RemoveChild(child);
+    }
+
     /// <summary>Whether <paramref name="node"/> is a text node (RF-BRIDGE-1c Phase D: replaces
     /// the facade <c>IsText(DomElement)</c>). NodeType-based, so it holds for the current
     /// facade text nodes and for canonical <c>DomText</c> once construction flips in the
@@ -575,7 +639,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         DomElement? body = null;
         if (htmlEl != null)
         {
-            body = htmlEl.Children.FirstOrDefault(c =>
+            body = ChildElements(htmlEl).FirstOrDefault(c =>
                 string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
         }
         if (body == null) return;
@@ -676,7 +740,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     private void CollectWindowFrames(DomElement element, List<JSValue> frames)
     {
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (IsText(child))
                 continue;
@@ -725,7 +789,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _knownNodes.Clear();
         _jsObjectCache.Clear();
         _computedPropsCache.Clear();
-        _documentNode.Children.Clear();
+        ClearChildren(_documentNode);
         _serializationTransformsApplied = false;
 
         // Parse DOCTYPE from the HTML and add it as first child of _documentNode
@@ -733,7 +797,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         if (doctype != null)
         {
             SetParent(doctype, _documentNode);
-            _documentNode.Children.Add(doctype);
+            _documentNode.AppendChild(doctype);
             _knownNodes.Add(doctype);
         }
 
@@ -749,11 +813,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         var builder = new HtmlTreeBuilder();
         var (docElement, allElements, title) = builder.Build(html, _document);
         Title = title;
-        DocumentElement.Children.Clear();
-        foreach (var child in docElement.Children.ToArray())
+        ClearChildren(DocumentElement);
+        foreach (var child in ChildElements(docElement).ToArray())
         {
             SetParent(child, DocumentElement);
-            DocumentElement.Children.Add(child);
+            DocumentElement.AppendChild(child);
         }
 
         // Copy attributes from the parsed <html> element to DocumentElement
@@ -773,8 +837,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // Connect DocumentElement to _documentNode so that document.firstChild works
         // and structural pseudo-classes correctly detect the document root boundary
         SetParent(DocumentElement, _documentNode);
-        if (!_documentNode.Children.Contains(DocumentElement))
-            _documentNode.Children.Add(DocumentElement);
+        if (!_documentNode.ChildNodes.Contains(DocumentElement))
+            _documentNode.AppendChild(DocumentElement);
 
         _knownNodes.Add(DocumentElement);
 

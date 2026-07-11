@@ -350,8 +350,8 @@ public sealed partial class DomBridge
                 InlineStyle(child)["background-color"] = bg;
 
             // Move from inline CB to block ancestor.
-            inlineCB.Children.Remove(child);
-            blockAncestor.Children.Add(child);
+            RemoveChildFrom(inlineCB, child);
+            blockAncestor.AppendChild(child);
 
             // Ensure the block ancestor has position:relative.
             var blockProps = GetComputedProps(blockAncestor);

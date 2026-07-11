@@ -46,7 +46,7 @@ public sealed partial class DomBridge
                 bool isDocScrollingElement =
                     string.Equals(el.TagName, "html", StringComparison.OrdinalIgnoreCase);
 
-                if ((clips || isDocScrollingElement) && el.Children.Count > 0)
+                if ((clips || isDocScrollingElement) && el.ChildNodes.Count > 0)
                 {
                     // Wrap all children in a positioned div that shifts content
                     // upward / leftward.  Using position:relative + top/left
@@ -64,12 +64,12 @@ public sealed partial class DomBridge
                             $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
 
                     var originalChildren = SnapshotChildren(el);
-                    el.Children.Clear();
-                    el.Children.Add(wrapper);
+                    ClearChildren(el);
+                    el.AppendChild(wrapper);
                     foreach (var child in originalChildren)
                     {
                         SetParent(child, wrapper);
-                        wrapper.Children.Add(child);
+                        wrapper.AppendChild(child);
                     }
 
                     // For the document scrolling element, extract ALL
@@ -84,9 +84,9 @@ public sealed partial class DomBridge
                         CollectFixedDescendants(wrapper, fixedDescendants);
                         foreach (var fixedEl in fixedDescendants)
                         {
-                            ParentEl(fixedEl)?.Children.Remove(fixedEl);
+                            fixedEl.Remove();
                             SetParent(fixedEl, el);
-                            el.Children.Add(fixedEl);
+                            el.AppendChild(fixedEl);
                         }
                     }
 
@@ -130,8 +130,8 @@ public sealed partial class DomBridge
 
         // Use index-based loop because the list may grow during iteration
         // (wrapper insertion above).
-        for (int i = 0; i < el.Children.Count; i++)
-            ApplyScrollSimulationTree(el.Children[i]);
+        for (int i = 0; i < el.ChildNodes.Count; i++)
+            ApplyScrollSimulationTree(ChildAt(el, i));
     }
     /// <summary>
     /// Recursively collects all descendants with <c>position: fixed</c>

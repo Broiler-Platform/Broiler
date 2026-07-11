@@ -14,21 +14,21 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesGetCaption001Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
+        var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         return cap != null ? ToJSObject(cap) : JSNull.Value;
     }
 
 
     private JSValue JsElementInterfacesGetTHead002Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
+        var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         return th != null ? ToJSObject(th) : JSNull.Value;
     }
 
 
     private JSValue JsElementInterfacesGetTFoot003Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
+        var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         return tf != null ? ToJSObject(tf) : JSNull.Value;
     }
 
@@ -36,7 +36,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesGetTBodies005Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         var bodies = new List<JSValue>();
-        foreach (var c in element.Children)
+        foreach (var c in ChildElements(element))
             if (string.Equals(c.TagName, "tbody", StringComparison.OrdinalIgnoreCase))
                 bodies.Add(ToJSObject(c));
         var arr = new JSArray(bodies);
@@ -52,50 +52,50 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesCreateCaption007Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
+        var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
             return ToJSObject(cap);
         cap = new DomElement(_document, "caption", null, null, string.Empty);
         bridge._knownNodes.Add(cap);
         SetParent(cap, element);
-        element.Children.Insert(0, cap);
+        InsertChildAt(element, 0, cap);
         return ToJSObject(cap);
     }
 
 
     private JSValue JsElementInterfacesCreateTHead008Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
+        var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
             return ToJSObject(th);
         th = new DomElement(_document, "thead", null, null, string.Empty);
         bridge._knownNodes.Add(th);
         SetParent(th, element);
-        element.Children.Add(th);
+        element.AppendChild(th);
         return ToJSObject(th);
     }
 
 
     private JSValue JsElementInterfacesCreateTFoot009Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
+        var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
             return ToJSObject(tf);
         tf = new DomElement(_document, "tfoot", null, null, string.Empty);
         bridge._knownNodes.Add(tf);
         SetParent(tf, element);
-        element.Children.Add(tf);
+        element.AppendChild(tf);
         return ToJSObject(tf);
     }
 
 
     private JSValue JsElementInterfacesDeleteCaption010Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
+        var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
         {
             SetParent(cap, null);
-            element.Children.Remove(cap);
+            RemoveChildFrom(element, cap);
         }
 
         return JSUndefined.Value;
@@ -104,11 +104,11 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesDeleteTHead011Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
+        var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
         {
             SetParent(th, null);
-            element.Children.Remove(th);
+            RemoveChildFrom(element, th);
         }
 
         return JSUndefined.Value;
@@ -117,11 +117,11 @@ public sealed partial class DomBridge
 
     private JSValue JsElementInterfacesDeleteTFoot012Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
-        var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
+        var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
         {
             SetParent(tf, null);
-            element.Children.Remove(tf);
+            RemoveChildFrom(element, tf);
         }
 
         return JSUndefined.Value;
@@ -146,7 +146,7 @@ public sealed partial class DomBridge
         if (index >= 0 && index < rows.Count)
         {
             var row = rows[index];
-            ParentEl(row)?.Children.Remove(row);
+            row.Remove();
             SetParent(row, null);
         }
 
@@ -157,7 +157,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesGetRows016Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         var rows = new List<JSValue>();
-        foreach (var c in element.Children)
+        foreach (var c in ChildElements(element))
             if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                 rows.Add(ToJSObject(c));
         var arr = new JSArray(rows);
@@ -177,14 +177,14 @@ public sealed partial class DomBridge
         var tr = new DomElement(_document, "tr", null, null, string.Empty);
         bridge._knownNodes.Add(tr);
         SetParent(tr, element);
-        var trRows = element.Children.Where(c => string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
+        var trRows = ChildElements(element).Where(c => string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
         if (index < 0 || index >= trRows.Count)
-            element.Children.Add(tr);
+            element.AppendChild(tr);
         else
         {
             var refRow = trRows[index];
-            var idx = element.Children.IndexOf(refRow);
-            element.Children.Insert(idx, tr);
+            var idx = ChildIndexOf(element, refRow);
+            InsertChildAt(element, idx, tr);
         }
 
         return ToJSObject(tr);
@@ -210,7 +210,7 @@ public sealed partial class DomBridge
         if (section == null)
             return new JSNumber(-1);
         var idx = 0;
-        foreach (var c in section.Children)
+        foreach (var c in ChildElements(section))
         {
             if (ReferenceEquals(c, element))
                 return new JSNumber(idx);
@@ -225,7 +225,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesGetCells021Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         var cells = new List<JSValue>();
-        foreach (var c in element.Children)
+        foreach (var c in ChildElements(element))
             if (string.Equals(c.TagName, "td", StringComparison.OrdinalIgnoreCase) || string.Equals(c.TagName, "th", StringComparison.OrdinalIgnoreCase))
                 cells.Add(ToJSObject(c));
         var arr = new JSArray(cells);
@@ -245,19 +245,19 @@ public sealed partial class DomBridge
         var td = new DomElement(_document, "td", null, null, string.Empty);
         bridge._knownNodes.Add(td);
         SetParent(td, element);
-        var cells = element.Children.Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
+        var cells = ChildElements(element).Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
         if (index < 0 || index >= cells.Count)
         {
-            element.Children.Add(td);
+            element.AppendChild(td);
         }
         else
         {
             var referenceCell = cells[index];
-            var childIndex = element.Children.IndexOf(referenceCell);
+            var childIndex = ChildIndexOf(element, referenceCell);
             if (childIndex < 0)
-                element.Children.Add(td);
+                element.AppendChild(td);
             else
-                element.Children.Insert(childIndex, td);
+                InsertChildAt(element, childIndex, td);
         }
 
         return ToJSObject(td);
@@ -269,14 +269,14 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             throw new JSException("Failed to execute 'deleteCell' on 'HTMLTableRowElement': 1 argument required, but only 0 present.");
         var index = (int)Math.Truncate(a[0].DoubleValue);
-        var cells = element.Children.Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
+        var cells = ChildElements(element).Where(c => !IsText(c) && IsTableCellElement(c)).ToList();
         if (index < 0)
             index = cells.Count + index;
         if (index < 0 || index >= cells.Count)
             throw new JSException("INDEX_SIZE_ERR");
         var cell = cells[index];
         SetParent(cell, null);
-        element.Children.Remove(cell);
+        RemoveChildFrom(element, cell);
         return JSUndefined.Value;
     }
 
@@ -397,18 +397,18 @@ public sealed partial class DomBridge
                 refEl = FindDomElementByJSObject(refObj);
         }
 
-        ParentEl(optEl)?.Children.Remove(optEl);
+        optEl.Remove();
         SetParent(optEl, element);
         if (refEl != null)
         {
-            var idx = element.Children.IndexOf(refEl);
+            var idx = ChildIndexOf(element, refEl);
             if (idx >= 0)
-                element.Children.Insert(idx, optEl);
+                InsertChildAt(element, idx, optEl);
             else
-                element.Children.Add(optEl);
+                element.AppendChild(optEl);
         }
         else
-            element.Children.Add(optEl);
+            element.AppendChild(optEl);
         return JSUndefined.Value;
     }
 
@@ -416,7 +416,7 @@ public sealed partial class DomBridge
     private JSValue JsElementInterfacesGetOptions039Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
     {
         var opts = new List<JSValue>();
-        foreach (var c in element.Children)
+        foreach (var c in ChildElements(element))
             if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
                 opts.Add(ToJSObject(c));
         var arr = new JSArray(opts);

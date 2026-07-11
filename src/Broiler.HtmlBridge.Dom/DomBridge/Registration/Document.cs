@@ -147,13 +147,13 @@ public sealed partial class DomBridge
         // document.firstChild (getter — returns first child of document: DOCTYPE if present, else documentElement)
         document.FastAddProperty(
             (KeyString)"firstChild",
-            new JSFunction((in Arguments _) => _documentNode.Children.Count > 0 ? ToJSObject(_documentNode.Children[0]) : JSNull.Value, "get firstChild"),
+            new JSFunction((in Arguments _) => _documentNode.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_documentNode, 0)) : JSNull.Value, "get firstChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // document.lastChild (getter — returns last child of document, typically documentElement)
         document.FastAddProperty(
             (KeyString)"lastChild",
-            new JSFunction((in Arguments _) => _documentNode.Children.Count > 0 ? ToJSObject(_documentNode.Children[^1]) : JSNull.Value, "get lastChild"),
+            new JSFunction((in Arguments _) => _documentNode.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_documentNode, ^1)) : JSNull.Value, "get lastChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // document.childNodes (getter — returns children of document node: [DOCTYPE, documentElement])

@@ -21,7 +21,6 @@ public sealed class DomElement : CanonicalElement
     public const string CompatibilitySurfaceVersion = "htmlbridge-dom-adapter/v1";
     public const string RemovalBoundaryVersion = "htmlbridge-public-surface/v2";
 
-    private readonly LegacyChildList _children;
     private string? _textContent;
 
     public DomElement(
@@ -52,7 +51,6 @@ public sealed class DomElement : CanonicalElement
                 tagName),
             ResolveNodeType(tagName, isTextNode))
     {
-        _children = new LegacyChildList(this);
         InnerHtml = innerHtml;
         // RF-BRIDGE-1c Phase B: inline style is no longer stored on the node. It lives in
         // ElementRuntimeState and is reached via DomBridge.InlineStyle(element), which lazily
@@ -93,8 +91,6 @@ public sealed class DomElement : CanonicalElement
     }
 
     public string InnerHtml { get; set; }
-
-    public LegacyChildList Children => _children;
 
     public string? TextContent
     {
@@ -137,54 +133,4 @@ public sealed class DomElement : CanonicalElement
                     ? CanonicalNodeType.DocumentType
                     : CanonicalNodeType.Element;
 
-    public sealed class LegacyChildList(DomElement owner) : IList<DomElement>
-    {
-        public DomElement this[int index]
-        {
-            get => (DomElement)owner.ChildNodes[index];
-            set => owner.ReplaceChild(value, owner.ChildNodes[index]);
-        }
-
-        public int Count => owner.ChildNodes.Count;
-        public bool IsReadOnly => false;
-
-        public void Add(DomElement item) => owner.AppendChild(item);
-        public void Clear()
-        {
-            foreach (var child in owner.ChildNodes.ToArray())
-                owner.RemoveChild(child);
-        }
-
-        public bool Contains(DomElement item) => owner.ChildNodes.Contains(item);
-        public void CopyTo(DomElement[] array, int arrayIndex) =>
-            owner.ChildNodes.Cast<DomElement>().ToArray().CopyTo(array, arrayIndex);
-        public IEnumerator<DomElement> GetEnumerator() => owner.ChildNodes.Cast<DomElement>().GetEnumerator();
-        public int IndexOf(DomElement item)
-        {
-            for (var index = 0; index < owner.ChildNodes.Count; index++)
-            {
-                if (ReferenceEquals(owner.ChildNodes[index], item))
-                    return index;
-            }
-
-            return -1;
-        }
-        public void Insert(int index, DomElement item)
-        {
-            var reference = index < Count ? owner.ChildNodes[index] : null;
-            owner.InsertBefore(item, reference);
-        }
-
-        public bool Remove(DomElement item)
-        {
-            if (!ReferenceEquals(item.ParentNode, owner))
-                return false;
-            owner.RemoveChild(item);
-            return true;
-        }
-
-        public void RemoveAt(int index) => owner.RemoveChild(owner.ChildNodes[index]);
-        public DomElement? Find(Predicate<DomElement> match) => owner.ChildNodes.Cast<DomElement>().FirstOrDefault(item => match(item));
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    }
 }

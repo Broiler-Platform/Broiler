@@ -17,7 +17,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationGetBody002Core(in Arguments a)
     {
-        foreach (var child in DocumentElement.Children)
+        foreach (var child in ChildElements(DocumentElement))
         {
             if (string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase))
                 return ToJSObject(child);
@@ -29,7 +29,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationGetHead003Core(in Arguments a)
     {
-        foreach (var child in DocumentElement.Children)
+        foreach (var child in ChildElements(DocumentElement))
         {
             if (string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase))
                 return ToJSObject(child);
@@ -517,10 +517,10 @@ public sealed partial class DomBridge
             var fragment = a[0].ToString();
             var builder = new HtmlTreeBuilder();
             var (fragmentRoot, allEls) = builder.BuildFragment(fragment, "body", _document);
-            if (fragmentRoot.Children.Count > 0)
+            if (fragmentRoot.ChildNodes.Count > 0)
             {
                 // Find the <body> element in the main tree
-                var mainBody = DocumentElement.Children.FirstOrDefault(c => string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                var mainBody = ChildElements(DocumentElement).FirstOrDefault(c => string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
                 if (mainBody != null)
                 {
                     // Find the currently executing <script> element so we can
@@ -537,14 +537,14 @@ public sealed partial class DomBridge
                             currentScript = null;
                     }
 
-                    var writtenChildren = fragmentRoot.Children.ToArray();
+                    var writtenChildren = ChildElements(fragmentRoot).ToArray();
                     if (currentScript != null)
                     {
-                        var insertIdx = mainBody.Children.IndexOf(currentScript) + 1;
+                        var insertIdx = ChildIndexOf(mainBody, currentScript) + 1;
                         for (int ci = 0; ci < writtenChildren.Length; ci++)
                         {
                             SetParent(writtenChildren[ci], mainBody);
-                            mainBody.Children.Insert(insertIdx + ci, writtenChildren[ci]);
+                            InsertChildAt(mainBody, insertIdx + ci, writtenChildren[ci]);
                         }
                     }
                     else
@@ -553,7 +553,7 @@ public sealed partial class DomBridge
                         foreach (var child in writtenChildren)
                         {
                             SetParent(child, mainBody);
-                            mainBody.Children.Add(child);
+                            mainBody.AppendChild(child);
                         }
                     }
 
@@ -635,7 +635,7 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationGetChildNodes046Core(in Arguments _)
     {
         var nodes = new List<JSValue>();
-        foreach (var child in _documentNode.Children)
+        foreach (var child in ChildElements(_documentNode))
             nodes.Add(ToJSObject(child));
         return new JSArray(nodes);
     }
@@ -651,11 +651,11 @@ public sealed partial class DomBridge
         var childEl = FindDomElementByJSObject(childObj);
         if (childEl != null)
         {
-            var idx = docNodeForMutation.Children.IndexOf(childEl);
+            var idx = ChildIndexOf(docNodeForMutation, childEl);
             if (idx >= 0)
             {
                 NotifyNodeIteratorPreRemoval(childEl);
-                docNodeForMutation.Children.RemoveAt(idx);
+                RemoveNthChild(docNodeForMutation, idx);
                 SetParent(childEl, null);
                 NotifyChildRemoved(docNodeForMutation, childEl, idx);
             }
@@ -678,18 +678,18 @@ public sealed partial class DomBridge
             if (ParentEl(childEl) != null)
             {
                 var oldParent = ParentEl(childEl);
-                var oldIndex = oldParent.Children.IndexOf(childEl);
+                var oldIndex = ChildIndexOf(oldParent, childEl);
                 if (oldIndex >= 0)
                 {
                     NotifyNodeIteratorPreRemoval(childEl);
-                    oldParent.Children.RemoveAt(oldIndex);
+                    RemoveNthChild(oldParent, oldIndex);
                     NotifyChildRemoved(oldParent, childEl, oldIndex);
                 }
             }
 
             SetParent(childEl, docNodeForMutation);
-            docNodeForMutation.Children.Add(childEl);
-            NotifyChildAdded(docNodeForMutation, childEl, docNodeForMutation.Children.Count - 1);
+            docNodeForMutation.AppendChild(childEl);
+            NotifyChildAdded(docNodeForMutation, childEl, docNodeForMutation.ChildNodes.Count - 1);
         }
 
         return a[0];
@@ -709,11 +709,11 @@ public sealed partial class DomBridge
         if (ParentEl(newEl) != null)
         {
             var oldParent = ParentEl(newEl);
-            var oldIndex = oldParent.Children.IndexOf(newEl);
+            var oldIndex = ChildIndexOf(oldParent, newEl);
             if (oldIndex >= 0)
             {
                 NotifyNodeIteratorPreRemoval(newEl);
-                oldParent.Children.RemoveAt(oldIndex);
+                RemoveNthChild(oldParent, oldIndex);
                 NotifyChildRemoved(oldParent, newEl, oldIndex);
             }
         }
@@ -723,11 +723,11 @@ public sealed partial class DomBridge
             var refEl = FindDomElementByJSObject(refObj);
             if (refEl != null)
             {
-                var idx = docNodeForMutation.Children.IndexOf(refEl);
+                var idx = ChildIndexOf(docNodeForMutation, refEl);
                 if (idx >= 0)
                 {
                     SetParent(newEl, docNodeForMutation);
-                    docNodeForMutation.Children.Insert(idx, newEl);
+                    InsertChildAt(docNodeForMutation, idx, newEl);
                     NotifyChildAdded(docNodeForMutation, newEl, idx);
                     return a[0];
                 }
@@ -736,8 +736,8 @@ public sealed partial class DomBridge
 
         // If refChild is null or not found, append
         SetParent(newEl, docNodeForMutation);
-        docNodeForMutation.Children.Add(newEl);
-        NotifyChildAdded(docNodeForMutation, newEl, docNodeForMutation.Children.Count - 1);
+        docNodeForMutation.AppendChild(newEl);
+        NotifyChildAdded(docNodeForMutation, newEl, docNodeForMutation.ChildNodes.Count - 1);
         return a[0];
     }
 
@@ -872,7 +872,7 @@ public sealed partial class DomBridge
                     var dtEl = kvp.Key;
                     SetParent(dtEl, docRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
-                    docRoot.Children.Add(dtEl);
+                    docRoot.AppendChild(dtEl);
                     break;
                 }
             }
@@ -886,7 +886,7 @@ public sealed partial class DomBridge
                 docEl.NamespaceURI = ns;
             SetParent(docEl, docRoot);
             GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
-            docRoot.Children.Add(docEl);
+            docRoot.AppendChild(docEl);
             _knownNodes.Add(docEl);
         }
 
@@ -909,18 +909,18 @@ public sealed partial class DomBridge
         GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
         SetParent(doctype, docRoot);
         GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
-        docRoot.Children.Add(doctype);
+        docRoot.AppendChild(doctype);
         _knownNodes.Add(doctype);
         var htmlEl = new DomElement(_document, "html", null, null, string.Empty);
         htmlEl.NamespaceURI = "http://www.w3.org/1999/xhtml";
         SetParent(htmlEl, docRoot);
         GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
-        docRoot.Children.Add(htmlEl);
+        docRoot.AppendChild(htmlEl);
         _knownNodes.Add(htmlEl);
         var headEl = new DomElement(_document, "head", null, null, string.Empty);
         SetParent(headEl, htmlEl);
         GetElementRuntimeState(headEl).OwnerDocRoot = docRoot;
-        htmlEl.Children.Add(headEl);
+        htmlEl.AppendChild(headEl);
         _knownNodes.Add(headEl);
         // Add <title> element if title argument is provided
         if (title != null)
@@ -928,20 +928,20 @@ public sealed partial class DomBridge
             var titleEl = new DomElement(_document, "title", null, null, string.Empty);
             SetParent(titleEl, headEl);
             GetElementRuntimeState(titleEl).OwnerDocRoot = docRoot;
-            headEl.Children.Add(titleEl);
+            headEl.AppendChild(titleEl);
             _knownNodes.Add(titleEl);
             var titleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
             titleText.TextContent = title;
             SetParent(titleText, titleEl);
             GetElementRuntimeState(titleText).OwnerDocRoot = docRoot;
-            titleEl.Children.Add(titleText);
+            titleEl.AppendChild(titleText);
             _knownNodes.Add(titleText);
         }
 
         var bodyEl = new DomElement(_document, "body", null, null, string.Empty);
         SetParent(bodyEl, htmlEl);
         GetElementRuntimeState(bodyEl).OwnerDocRoot = docRoot;
-        htmlEl.Children.Add(bodyEl);
+        htmlEl.AppendChild(bodyEl);
         _knownNodes.Add(bodyEl);
         return BuildSubDocument(docRoot);
     }

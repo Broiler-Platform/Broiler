@@ -75,8 +75,8 @@ public sealed partial class DomBridge
         //     to avoid collection modification during traversal.
         foreach (var (el, oldParent, newParent) in deferredDomMoves)
         {
-            oldParent.Children.Remove(el);
-            newParent.Children.Add(el);
+            RemoveChildFrom(oldParent, el);
+            newParent.AppendChild(el);
         }
 
         // 3d2. Promote any remaining absolutely positioned children of
@@ -177,7 +177,7 @@ public sealed partial class DomBridge
         InlineStyle(body)["background"] = "none";
         InlineStyle(body)["background-color"] = "transparent";
 
-        body.Children.Clear();
+        ClearChildren(body);
 
         var img = new DomElement(
             _document, "img", null, null, string.Empty, null,
@@ -186,7 +186,7 @@ public sealed partial class DomBridge
                 ["src"] = url,
             });
         SetParent(img, body);
-        body.Children.Add(img);
+        body.AppendChild(img);
     }
 
     /// <summary>

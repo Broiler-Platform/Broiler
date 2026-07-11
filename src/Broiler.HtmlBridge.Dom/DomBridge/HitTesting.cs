@@ -16,7 +16,7 @@ public sealed partial class DomBridge
 
         var documentElement = IsDocumentElement(docRoot)
             ? docRoot
-            : docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
+            : ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
         if (documentElement == null)
             return Array.Empty<DomElement>();
 
@@ -35,9 +35,9 @@ public sealed partial class DomBridge
 
     private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)
     {
-        for (var i = element.Children.Count - 1; i >= 0; i--)
+        for (var i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
-            var child = element.Children[i];
+            var child = ChildAt(element, i);
             if (!IsText(child) && !child.TagName.StartsWith("#", StringComparison.Ordinal))
                 CollectHitTestMatches(child, x, y, hits);
         }
@@ -221,7 +221,7 @@ public sealed partial class DomBridge
         if (rowIndex < 0)
             return false;
 
-        var cells = row.Children
+        var cells = ChildElements(row)
             .Where(child => !IsText(child) && IsTableCellElement(child))
             .ToList();
         var cellIndex = cells.FindIndex(candidate => ReferenceEquals(candidate, element));
@@ -229,7 +229,7 @@ public sealed partial class DomBridge
             return false;
 
         var columnCount = rows
-            .Select(candidate => candidate.Children.Count(child => !IsText(child) && IsTableCellElement(child)))
+            .Select(candidate => ChildElements(candidate).Count(child => !IsText(child) && IsTableCellElement(child)))
             .DefaultIfEmpty(0)
             .Max();
         if (columnCount <= 0 || rows.Count <= 0)
@@ -335,7 +335,7 @@ public sealed partial class DomBridge
 
     private IEnumerable<DomElement> EnumerateDomDescendants(DomElement root)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
                 continue;

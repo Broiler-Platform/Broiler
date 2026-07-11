@@ -109,7 +109,7 @@ public sealed partial class DomBridge
 
     private static bool ValidateFormChildren(DomElement form)
     {
-        foreach (var child in form.Children)
+        foreach (var child in ChildElements(form))
         {
             if (!IsText(child) && !CheckElementValidity(child)) return false;
             if (!ValidateFormChildren(child)) return false;

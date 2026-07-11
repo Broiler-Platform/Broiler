@@ -123,7 +123,7 @@ public sealed partial class DomBridge
         if (!IsText(element) && !element.TagName.StartsWith("#", StringComparison.Ordinal))
             InvalidateElementStyles(element);
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (!IsText(child) && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
                 InvalidateStyleScopeRecursive(child);
@@ -176,7 +176,7 @@ public sealed partial class DomBridge
     /// sub-document root materialising during the walk).
     /// </summary>
     /// <remarks>
-    /// A plain <c>root.Children.ToList()</c> is NOT thread-safe here.
+    /// A plain <c>ChildElements(root).ToList()</c> is NOT thread-safe here.
     /// <see cref="DomElement.LegacyChildList"/> projects the live
     /// <c>ChildNodes</c> collection: <see cref="Enumerable.ToList{T}"/> reads
     /// <c>Count</c>, allocates a destination array of that size, then calls
@@ -196,7 +196,7 @@ public sealed partial class DomBridge
         {
             try
             {
-                return root.Children.ToList();
+                return ChildElements(root).ToList();
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
@@ -214,9 +214,9 @@ public sealed partial class DomBridge
             DomElement child;
             try
             {
-                if (i >= root.Children.Count)
+                if (i >= root.ChildNodes.Count)
                     break;
-                child = root.Children[i];
+                child = ChildAt(root, i);
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {
@@ -519,7 +519,7 @@ public sealed partial class DomBridge
 
     private static void AppendRenderedText(DomElement element, StringBuilder builder)
     {
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (IsText(child))
             {
@@ -564,7 +564,7 @@ public sealed partial class DomBridge
     private string GetStyleElementSourceText(DomElement styleEl)
     {
         var cssText = new StringBuilder();
-        foreach (var child in styleEl.Children)
+        foreach (var child in ChildElements(styleEl))
         {
             if (IsText(child) && child.TextContent != null)
                 cssText.Append(child.TextContent);
@@ -678,7 +678,7 @@ public sealed partial class DomBridge
         }
 
         // Snapshot: a blocked <style> child removes itself from this collection.
-        foreach (var child in element.Children.ToArray())
+        foreach (var child in ChildElements(element).ToArray())
             ApplyStyleCsp(child, csp, blockStyleAttribute);
     }
 

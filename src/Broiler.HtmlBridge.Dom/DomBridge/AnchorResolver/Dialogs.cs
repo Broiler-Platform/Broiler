@@ -131,9 +131,9 @@ public sealed partial class DomBridge
                 InlineStyle(backdrop)[kv.Key] = kv.Value;
             SetParent(backdrop, parent);
 
-            int idx = parent.Children.IndexOf(dialog);
+            int idx = ChildIndexOf(parent, dialog);
             if (idx >= 0)
-                parent.Children.Insert(idx, backdrop);
+                InsertChildAt(parent, idx, backdrop);
 
             // If the ::backdrop declares position-try-fallbacks and its base
             // geometry overflows the containing block, resolve the fallback

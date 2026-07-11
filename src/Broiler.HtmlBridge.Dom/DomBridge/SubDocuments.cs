@@ -21,12 +21,12 @@ public sealed partial class DomBridge
 
     private void InvalidateCachedSubDocument(DomElement containerElement)
     {
-        var existingDocRoot = containerElement.Children.FirstOrDefault(child =>
+        var existingDocRoot = ChildElements(containerElement).FirstOrDefault(child =>
             string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (existingDocRoot != null)
         {
             RemoveElementsRecursive(existingDocRoot);
-            containerElement.Children.Remove(existingDocRoot);
+            RemoveChildFrom(containerElement, existingDocRoot);
         }
 
         _subDocumentCache.Remove(containerElement);
@@ -134,7 +134,7 @@ public sealed partial class DomBridge
 
         var executeHtmlScripts = false;
         string? htmlToExecute = null;
-        var docRoot = containerElement.Children.FirstOrDefault(c =>
+        var docRoot = ChildElements(containerElement).FirstOrDefault(c =>
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
         {
@@ -363,16 +363,16 @@ public sealed partial class DomBridge
 
     private static DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
     {
-        var docRoot = containerElement.Children.FirstOrDefault(c =>
+        var docRoot = ChildElements(containerElement).FirstOrDefault(c =>
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
             return null;
 
-        return docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
+        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
     }
 
     private static DomElement? FindBodyElement(DomElement documentElement) =>
-        documentElement.Children.FirstOrDefault(c =>
+        ChildElements(documentElement).FirstOrDefault(c =>
             !IsText(c) &&
             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
 
@@ -577,17 +577,17 @@ public sealed partial class DomBridge
 
         var htmlEl = new DomElement("html", null, null, string.Empty);
         SetParent(htmlEl, docRoot);
-        docRoot.Children.Add(htmlEl);
+        docRoot.AppendChild(htmlEl);
 
         var headEl = new DomElement("head", null, null, string.Empty);
         SetParent(headEl, htmlEl);
-        htmlEl.Children.Add(headEl);
+        htmlEl.AppendChild(headEl);
 
         var bodyEl = new DomElement("body", null, null, string.Empty);
         SetParent(bodyEl, htmlEl);
-        htmlEl.Children.Add(bodyEl);
+        htmlEl.AppendChild(bodyEl);
 
-        containerElement.Children.Insert(0, docRoot);
+        InsertChildAt(containerElement, 0, docRoot);
         _knownNodes.Add(docRoot);
         _knownNodes.Add(htmlEl);
         _knownNodes.Add(headEl);
@@ -607,27 +607,27 @@ public sealed partial class DomBridge
 
         var htmlEl = new DomElement("html", null, null, string.Empty);
         SetParent(htmlEl, docRoot);
-        docRoot.Children.Add(htmlEl);
+        docRoot.AppendChild(htmlEl);
 
         var headEl = new DomElement("head", null, null, string.Empty);
         SetParent(headEl, htmlEl);
-        htmlEl.Children.Add(headEl);
+        htmlEl.AppendChild(headEl);
 
         var bodyEl = new DomElement("body", null, null, string.Empty);
         SetParent(bodyEl, htmlEl);
-        htmlEl.Children.Add(bodyEl);
+        htmlEl.AppendChild(bodyEl);
 
         // Wrap text content in <pre> element
         var preEl = new DomElement("pre", null, null, string.Empty);
         SetParent(preEl, bodyEl);
-        bodyEl.Children.Add(preEl);
+        bodyEl.AppendChild(preEl);
 
         var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
         textNode.TextContent = textContent;
         SetParent(textNode, preEl);
-        preEl.Children.Add(textNode);
+        preEl.AppendChild(textNode);
 
-        containerElement.Children.Insert(0, docRoot);
+        InsertChildAt(containerElement, 0, docRoot);
         _knownNodes.Add(docRoot);
         _knownNodes.Add(htmlEl);
         _knownNodes.Add(headEl);
@@ -875,13 +875,13 @@ public sealed partial class DomBridge
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Move it under #subdoc-root as the documentElement.
         SetParent(parsedRoot, docRoot);
-        docRoot.Children.Add(parsedRoot);
+        docRoot.AppendChild(parsedRoot);
 
-        containerElement.Children.Insert(0, docRoot);
+        InsertChildAt(containerElement, 0, docRoot);
         _knownNodes.Add(docRoot);
         _knownNodes.Add(parsedRoot);
         // Add structural children (head, body) that HtmlTreeBuilder does not include in allElements
-        foreach (var child in parsedRoot.Children)
+        foreach (var child in ChildElements(parsedRoot))
             AddElementsRecursive(child);
         // Add non-structural elements from the builder (skip any already registered)
         foreach (var el in allElements)
@@ -902,7 +902,7 @@ public sealed partial class DomBridge
     {
         if (!_knownNodes.Contains(element))
             _knownNodes.Add(element);
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             AddElementsRecursive(child);
     }
 
@@ -912,15 +912,15 @@ public sealed partial class DomBridge
         _jsObjectCache.Remove(element);
         _styleSheetCache.Remove(element);
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             RemoveElementsRecursive(child);
     }
 
     private void NormalizeNode(DomElement node)
     {
-        for (var index = 0; index < node.Children.Count;)
+        for (var index = 0; index < node.ChildNodes.Count;)
         {
-            var child = node.Children[index];
+            var child = ChildAt(node, index);
             if (!IsText(child))
             {
                 NormalizeNode(child);
@@ -930,9 +930,9 @@ public sealed partial class DomBridge
 
             var mergedText = child.TextContent ?? string.Empty;
             var nextIndex = index + 1;
-            while (nextIndex < node.Children.Count && IsText(node.Children[nextIndex]))
+            while (nextIndex < node.ChildNodes.Count && IsText(ChildAt(node, nextIndex)))
             {
-                mergedText += node.Children[nextIndex].TextContent ?? string.Empty;
+                mergedText += ChildAt(node, nextIndex).TextContent ?? string.Empty;
                 RemoveChildAt(node, nextIndex);
             }
 
@@ -949,12 +949,12 @@ public sealed partial class DomBridge
 
     private void RemoveChildAt(DomElement parent, int index)
     {
-        if (index < 0 || index >= parent.Children.Count)
+        if (index < 0 || index >= parent.ChildNodes.Count)
             return;
 
-        var child = parent.Children[index];
+        var child = ChildAt(parent, index);
         NotifyNodeIteratorPreRemoval(child);
-        parent.Children.RemoveAt(index);
+        RemoveNthChild(parent, index);
         SetParent(child, null);
         InvalidateStyleScope(parent);
         NotifyChildRemoved(parent, child, index);
@@ -975,14 +975,14 @@ public sealed partial class DomBridge
 
         if (!AttributeMapsAreEqual(AttributeSnapshot(first), AttributeSnapshot(second)) ||
             !NamespaceAttributeMapsAreEqual(first.NsAttrMap, second.NsAttrMap) ||
-            first.Children.Count != second.Children.Count)
+            first.ChildNodes.Count != second.ChildNodes.Count)
         {
             return false;
         }
 
-        for (var index = 0; index < first.Children.Count; index++)
+        for (var index = 0; index < first.ChildNodes.Count; index++)
         {
-            if (!NodesAreEqual(first.Children[index], second.Children[index]))
+            if (!NodesAreEqual(ChildAt(first, index), ChildAt(second, index)))
                 return false;
         }
 
@@ -1044,18 +1044,18 @@ public sealed partial class DomBridge
             case "beforebegin":
                 if (ParentEl(element) == null)
                     ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
-                return (ParentEl(element)!, ParentEl(element)!.Children.IndexOf(element));
+                return (ParentEl(element)!, ChildIndexOf(ParentEl(element)!, element));
             case "afterbegin":
                 return (element, 0);
             case "beforeend":
-                return (element, element.Children.Count);
+                return (element, element.ChildNodes.Count);
             case "afterend":
                 if (ParentEl(element) == null)
                     ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
-                return (ParentEl(element)!, ParentEl(element)!.Children.IndexOf(element) + 1);
+                return (ParentEl(element)!, ChildIndexOf(ParentEl(element)!, element) + 1);
             default:
                 ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
-                return (element, element.Children.Count);
+                return (element, element.ChildNodes.Count);
         }
     }
 
@@ -1066,27 +1066,27 @@ public sealed partial class DomBridge
 
         if (index < 0)
             index = 0;
-        if (index > parent.Children.Count)
-            index = parent.Children.Count;
+        if (index > parent.ChildNodes.Count)
+            index = parent.ChildNodes.Count;
 
         if (ParentEl(node) != null)
         {
             var oldParent = ParentEl(node);
-            var oldIndex = oldParent.Children.IndexOf(node);
+            var oldIndex = ChildIndexOf(oldParent, node);
             if (oldIndex >= 0)
             {
                 if (ReferenceEquals(oldParent, parent) && oldIndex < index)
                     index--;
 
                 NotifyNodeIteratorPreRemoval(node);
-                oldParent.Children.RemoveAt(oldIndex);
+                RemoveNthChild(oldParent, oldIndex);
                 NotifyChildRemoved(oldParent, node, oldIndex);
             }
         }
 
         SetParent(node, parent);
         AdoptSubtreeIntoDocument(node, GetElementRuntimeState(parent).OwnerDocRoot);
-        parent.Children.Insert(index, node);
+        InsertChildAt(parent, index, node);
         InvalidateStyleScope(parent);
         NotifyChildAdded(parent, node, index);
 
@@ -1106,9 +1106,9 @@ public sealed partial class DomBridge
         if (!TryBuildInnerHtmlFragmentContainer(contextElement, html, out var fragmentContainer))
             return nodes;
 
-        foreach (var child in fragmentContainer.Children.ToArray())
+        foreach (var child in ChildElements(fragmentContainer).ToArray())
         {
-            fragmentContainer.Children.Remove(child);
+            RemoveChildFrom(fragmentContainer, child);
             SetParent(child, null);
             AddElementsRecursive(child);
             nodes.Add(child);
@@ -1130,7 +1130,7 @@ public sealed partial class DomBridge
                 {
                     if (string.Equals(candidateNode.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var fragmentChild in candidateNode.Children.ToArray())
+                        foreach (var fragmentChild in ChildElements(candidateNode).ToArray())
                             nodes.Add(fragmentChild);
                         continue;
                     }
@@ -1163,19 +1163,19 @@ public sealed partial class DomBridge
             return;
         }
 
-        foreach (var child in element.Children.ToArray())
+        foreach (var child in ChildElements(element).ToArray())
             RemoveElementsRecursive(child);
 
-        element.Children.Clear();
+        ClearChildren(element);
 
         if (!string.IsNullOrEmpty(html) &&
             TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
         {
-            foreach (var child in fragmentContainer.Children.ToArray())
+            foreach (var child in ChildElements(fragmentContainer).ToArray())
             {
                 SetParent(child, element);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
-                element.Children.Add(child);
+                element.AppendChild(child);
                 AddElementsRecursive(child);
             }
         }
@@ -1192,12 +1192,12 @@ public sealed partial class DomBridge
         if (parent == null)
             return;
 
-        var index = parent.Children.IndexOf(element);
+        var index = ChildIndexOf(parent, element);
         if (index < 0)
             return;
 
-        var previousSibling = index > 0 ? parent.Children[index - 1] : null;
-        var nextSibling = index + 1 < parent.Children.Count ? parent.Children[index + 1] : null;
+        var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
+        var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
 
         DomElement? parsedContainer = null;
         if (!string.IsNullOrEmpty(html))
@@ -1210,18 +1210,18 @@ public sealed partial class DomBridge
         }
 
         NotifyNodeIteratorPreRemoval(element);
-        parent.Children.RemoveAt(index);
+        RemoveNthChild(parent, index);
         SetParent(element, null);
         NotifyChildRemoved(parent, element, index, previousSibling, nextSibling);
 
         if (parsedContainer != null)
         {
             var insertIndex = index;
-            foreach (var child in parsedContainer.Children.ToArray())
+            foreach (var child in ChildElements(parsedContainer).ToArray())
             {
                 SetParent(child, parent);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
-                parent.Children.Insert(insertIndex, child);
+                InsertChildAt(parent, insertIndex, child);
                 AddElementsRecursive(child);
                 NotifyChildAdded(parent, child, insertIndex);
                 insertIndex++;
@@ -1248,7 +1248,7 @@ public sealed partial class DomBridge
 
     private static DomElement? FindFirstElementByTag(DomElement root, string tag)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (!IsText(child) && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
                 return child;
@@ -1289,7 +1289,7 @@ public sealed partial class DomBridge
             var xdoc = System.Xml.Linq.XDocument.Parse(cleanXml);
             if (xdoc.Root == null)
             {
-                containerElement.Children.Insert(0, docRoot);
+                InsertChildAt(containerElement, 0, docRoot);
                 _knownNodes.Add(docRoot);
                 return docRoot;
             }
@@ -1310,9 +1310,9 @@ public sealed partial class DomBridge
             // Build DOM tree from XML
             var rootEl = BuildDomElementFromXElement(xdoc.Root);
             SetParent(rootEl, docRoot);
-            docRoot.Children.Add(rootEl);
+            docRoot.AppendChild(rootEl);
 
-            containerElement.Children.Insert(0, docRoot);
+            InsertChildAt(containerElement, 0, docRoot);
             _knownNodes.Add(docRoot);
             _knownNodes.Add(rootEl);
 
@@ -1325,7 +1325,7 @@ public sealed partial class DomBridge
         catch (System.Xml.XmlException)
         {
             // XML well-formedness error — return empty document, don't execute scripts
-            containerElement.Children.Insert(0, docRoot);
+            InsertChildAt(containerElement, 0, docRoot);
             _knownNodes.Add(docRoot);
         }
 
@@ -1352,7 +1352,7 @@ public sealed partial class DomBridge
             {
                 var childEl = BuildDomElementFromXElement(childXe);
                 SetParent(childEl, el);
-                el.Children.Add(childEl);
+                el.AppendChild(childEl);
                 _knownNodes.Add(childEl);
             }
             else if (child is System.Xml.Linq.XText childText)
@@ -1360,7 +1360,7 @@ public sealed partial class DomBridge
                 var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
                 textNode.TextContent = childText.Value;
                 SetParent(textNode, el);
-                el.Children.Add(textNode);
+                el.AppendChild(textNode);
                 _knownNodes.Add(textNode);
             }
         }
@@ -1406,7 +1406,7 @@ public sealed partial class DomBridge
             return;
         }
 
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             CollectScriptContent(child, scripts);
     }
 
@@ -1419,7 +1419,7 @@ public sealed partial class DomBridge
             return element.TextContent ?? string.Empty;
 
         var sb = new StringBuilder();
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
             sb.Append(GetTextContentRecursive(child));
         return sb.ToString();
     }

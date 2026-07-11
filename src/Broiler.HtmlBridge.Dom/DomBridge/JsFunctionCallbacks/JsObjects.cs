@@ -123,7 +123,7 @@ public sealed partial class DomBridge
 
         element.TextContent = text;
         // Setting textContent clears all children per DOM spec
-        element.Children.Clear();
+        ClearChildren(element);
         return JSUndefined.Value;
     }
 
@@ -224,7 +224,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetChildNodes033Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var children = new List<JSValue>();
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (!IsSubDocRoot(child))
                 children.Add(ToJSObject(child));
@@ -236,14 +236,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetFirstChild034Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var first = element.Children.FirstOrDefault(c => !IsSubDocRoot(c));
+        var first = ChildElements(element).FirstOrDefault(c => !IsSubDocRoot(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
     private JSValue JsJsObjectsGetLastChild035Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var last = element.Children.LastOrDefault(c => !IsSubDocRoot(c));
+        var last = ChildElements(element).LastOrDefault(c => !IsSubDocRoot(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
@@ -252,7 +252,7 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = ParentEl(element).Children;
+        var siblings = ChildElements(ParentEl(element)).ToList();
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
@@ -268,7 +268,7 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = ParentEl(element).Children;
+        var siblings = ChildElements(ParentEl(element)).ToList();
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
@@ -388,7 +388,7 @@ public sealed partial class DomBridge
     {
         if (IsText(element) || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
             return new JSNumber((element.TextContent ?? string.Empty).Length);
-        return new JSNumber(element.Children.Count);
+        return new JSNumber(element.ChildNodes.Count);
     }
 
 
@@ -408,9 +408,9 @@ public sealed partial class DomBridge
         // Insert new node as next sibling
         if (ParentEl(element) != null)
         {
-            var idx = ParentEl(element).Children.IndexOf(element);
+            var idx = ChildIndexOf(ParentEl(element), element);
             SetParent(newNode, ParentEl(element));
-            ParentEl(element).Children.Insert(idx + 1, newNode);
+            InsertChildAt(ParentEl(element), idx + 1, newNode);
         }
 
         // Invalidate cached JSObject so length/data properties reflect the update
@@ -778,7 +778,7 @@ public sealed partial class DomBridge
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
         {
-            bridgeForInsert.InsertNodeAt(element, newEl, element.Children.Count);
+            bridgeForInsert.InsertNodeAt(element, newEl, element.ChildNodes.Count);
             return a[0];
         }
 
@@ -790,7 +790,7 @@ public sealed partial class DomBridge
             return a[0];
         if (ReferenceEquals(newEl, refEl))
             return a[0];
-        var idx = element.Children.IndexOf(refEl);
+        var idx = ChildIndexOf(element, refEl);
         if (idx < 0)
             throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
         bridgeForInsert.InsertNodeAt(element, newEl, idx);
@@ -801,7 +801,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetChildren081Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
         var result = new List<JSValue>();
-        foreach (var child in element.Children)
+        foreach (var child in ChildElements(element))
         {
             if (!IsText(child) && !IsSubDocRoot(child))
                 result.Add(ToJSObject(child));
@@ -813,14 +813,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetFirstElementChild083Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var first = element.Children.FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+        var first = ChildElements(element).FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
     private JSValue JsJsObjectsGetLastElementChild084Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
     {
-        var last = element.Children.LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+        var last = ChildElements(element).LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
@@ -829,7 +829,7 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = ParentEl(element).Children;
+        var siblings = ChildElements(ParentEl(element)).ToList();
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
@@ -845,7 +845,7 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
-        var siblings = ParentEl(element).Children;
+        var siblings = ChildElements(ParentEl(element)).ToList();
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
@@ -898,7 +898,7 @@ public sealed partial class DomBridge
         // Prevent circular references (HierarchyRequestError per DOM spec)
         if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-        bridgeForAppend.InsertNodeAt(element, childEl, element.Children.Count);
+        bridgeForAppend.InsertNodeAt(element, childEl, element.ChildNodes.Count);
         return a[0];
     }
 
@@ -908,7 +908,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = element.Children.Count;
+        var insertIndex = element.ChildNodes.Count;
         foreach (var node in nodes)
             InsertNodeAt(element, node, insertIndex++);
         return JSUndefined.Value;
@@ -937,11 +937,11 @@ public sealed partial class DomBridge
         var childEl = FindDomElementByJSObject(childObj);
         if (childEl == null)
             return a[0];
-        var idx = element.Children.IndexOf(childEl);
+        var idx = ChildIndexOf(element, childEl);
         if (idx < 0)
             return a[0];
         NotifyNodeIteratorPreRemoval(childEl);
-        element.Children.RemoveAt(idx);
+        RemoveNthChild(element, idx);
         SetParent(childEl, null);
         bridgeForAppend.InvalidateStyleScope(element);
         NotifyChildRemoved(element, childEl, idx);
@@ -964,16 +964,16 @@ public sealed partial class DomBridge
         // Prevent circular references (HierarchyRequestError per DOM spec)
         if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-        var idx = element.Children.IndexOf(oldEl);
+        var idx = ChildIndexOf(element, oldEl);
         if (idx < 0)
             return a[1];
-        var previousSibling = idx > 0 ? element.Children[idx - 1] : null;
-        var nextSibling = idx + 1 < element.Children.Count ? element.Children[idx + 1] : null;
+        var previousSibling = idx > 0 ? ChildAt(element, idx - 1) : null;
+        var nextSibling = idx + 1 < element.ChildNodes.Count ? ChildAt(element, idx + 1) : null;
         // If newChild is already in this parent, remove it first and re-find idx
         if (ReferenceEquals(ParentEl(newEl), element))
         {
-            element.Children.Remove(newEl);
-            idx = element.Children.IndexOf(oldEl);
+            RemoveChildFrom(element, newEl);
+            idx = ChildIndexOf(element, oldEl);
             if (idx < 0)
                 return a[1];
         }
@@ -982,11 +982,11 @@ public sealed partial class DomBridge
             if (ParentEl(newEl) != null)
             {
                 var oldParent = ParentEl(newEl);
-                var oldIndex = oldParent.Children.IndexOf(newEl);
+                var oldIndex = ChildIndexOf(oldParent, newEl);
                 if (oldIndex >= 0)
                 {
                     NotifyNodeIteratorPreRemoval(newEl);
-                    oldParent.Children.RemoveAt(oldIndex);
+                    RemoveNthChild(oldParent, oldIndex);
                     NotifyChildRemoved(oldParent, newEl, oldIndex);
                 }
             }
@@ -995,7 +995,7 @@ public sealed partial class DomBridge
         SetParent(oldEl, null);
         SetParent(newEl, element);
         AdoptSubtreeIntoDocument(newEl, GetElementRuntimeState(element).OwnerDocRoot);
-        element.Children[idx] = newEl;
+        element.ReplaceChild(newEl, element.ChildNodes[idx]);
         bridgeForAppend.InvalidateStyleScope(element);
         NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);
         NotifyChildAdded(element, newEl, idx);
@@ -1012,11 +1012,11 @@ public sealed partial class DomBridge
         var parent = ParentEl(element);
         if (parent != null)
         {
-            var idx = parent.Children.IndexOf(element);
+            var idx = ChildIndexOf(parent, element);
             if (idx >= 0)
             {
                 NotifyNodeIteratorPreRemoval(element);
-                parent.Children.RemoveAt(idx);
+                RemoveNthChild(parent, idx);
                 SetParent(element, null);
                 InvalidateStyleScope(parent);
                 NotifyChildRemoved(parent, element, idx);
@@ -1032,7 +1032,7 @@ public sealed partial class DomBridge
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = ParentEl(element).Children.IndexOf(element);
+        var insertIndex = ChildIndexOf(ParentEl(element), element);
         if (insertIndex < 0)
             return JSUndefined.Value;
         foreach (var node in nodes)
@@ -1046,7 +1046,7 @@ public sealed partial class DomBridge
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = ParentEl(element).Children.IndexOf(element);
+        var insertIndex = ChildIndexOf(ParentEl(element), element);
         if (insertIndex < 0)
             return JSUndefined.Value;
         insertIndex++;
@@ -1061,12 +1061,12 @@ public sealed partial class DomBridge
         if (ParentEl(element) == null)
             return JSUndefined.Value;
         var parent = ParentEl(element);
-        var replacementIndex = parent.Children.IndexOf(element);
+        var replacementIndex = ChildIndexOf(parent, element);
         if (replacementIndex < 0)
             return JSUndefined.Value;
         var nodes = BuildChildNodeArgumentNodes(a);
         NotifyNodeIteratorPreRemoval(element);
-        parent.Children.RemoveAt(replacementIndex);
+        RemoveNthChild(parent, replacementIndex);
         SetParent(element, null);
         InvalidateStyleScope(parent);
         NotifyChildRemoved(parent, element, replacementIndex);

@@ -103,15 +103,15 @@ public sealed class DomExtractionPhaseZeroTests
         Assert.Equal("html", documentElement.TagName);
         Assert.Equal("Phase Zero", title);
 
-        var head = Assert.Single(documentElement.Children, static child => child.TagName == "head");
-        var body = Assert.Single(documentElement.Children, static child => child.TagName == "body");
+        var head = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "head");
+        var body = Assert.Single(documentElement.ChildNodes.OfType<Broiler.Dom.DomElement>(), static child => child.TagName == "body");
         Assert.Same(documentElement, head.ParentNode);
         Assert.Same(documentElement, body.ParentNode);
 
         var host = Assert.Single(elements, static element => element.Id == "host");
         Assert.Same(body, host.ParentNode);
-        Assert.Equal(["span", "span"], host.Children.Select(static child => child.TagName));
-        Assert.All(host.Children, child => Assert.Same(host, child.ParentNode));
+        Assert.Equal(["span", "span"], host.ChildNodes.OfType<Broiler.Dom.DomElement>().Select(static child => child.TagName));
+        Assert.All(host.ChildNodes, child => Assert.Same(host, child.ParentNode));
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public sealed class DomExtractionPhaseZeroTests
         var created = Assert.Single(bridge.Elements, static element => element.Id == "created");
 
         Assert.Same(host, created.ParentNode);
-        Assert.Contains(created, host.Children);
+        Assert.Contains(created, host.ChildNodes);
         Assert.Contains("<section id=\"created\"></section>", bridge.SerializeToHtml(), StringComparison.Ordinal);
     }
 }

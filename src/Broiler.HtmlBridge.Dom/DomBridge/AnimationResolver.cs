@@ -44,7 +44,7 @@ public sealed partial class DomBridge
             // Fall back to concatenating child text nodes when TextContent is not set.
             if (string.IsNullOrEmpty(css))
             {
-                css = string.Concat(root.Children
+                css = string.Concat(ChildElements(root)
                     .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
@@ -61,7 +61,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
             CollectKeyframes(child, map);
     }
 
@@ -186,7 +186,7 @@ public sealed partial class DomBridge
             var css = node.TextContent;
             if (string.IsNullOrEmpty(css))
             {
-                css = string.Concat(node.Children
+                css = string.Concat(ChildElements(node)
                     .Where(c => IsText(c))
                     .Select(c => c.TextContent ?? string.Empty));
             }
@@ -213,7 +213,7 @@ public sealed partial class DomBridge
             }
         }
 
-        foreach (var child in node.Children)
+        foreach (var child in ChildElements(node))
             CollectAnimPropsFromStyleElements(child, target, ref result);
     }
 

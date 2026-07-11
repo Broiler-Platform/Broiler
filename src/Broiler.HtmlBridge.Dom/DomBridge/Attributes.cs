@@ -111,7 +111,7 @@ public sealed partial class DomBridge
 
     private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (!IsText(child) && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
                 results.Add(ToJSObject(child));
@@ -125,7 +125,7 @@ public sealed partial class DomBridge
     /// </summary>
     private void CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (!IsText(child) &&
                 (string.Equals(child.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
@@ -141,7 +141,7 @@ public sealed partial class DomBridge
     /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
     private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
     {
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
         {
             if (!IsText(child) && predicate(child))
                 results.Add(ToJSObject(child));
@@ -153,7 +153,7 @@ public sealed partial class DomBridge
     private static void CollectSubDocElements(DomElement root, List<DomElement> list)
     {
         list.Add(root);
-        foreach (var child in root.Children)
+        foreach (var child in ChildElements(root))
             CollectSubDocElements(child, list);
     }
 

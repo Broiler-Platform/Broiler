@@ -31,10 +31,10 @@ public sealed partial class DomBridge
         if (IsText(element))
             return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
 
-        if (element.TextContent != null && element.Children.Count == 0)
+        if (element.TextContent != null && element.ChildNodes.Count == 0)
             return new JSString(element.TextContent);
 
-        if (element.Children.Count > 0)
+        if (element.ChildNodes.Count > 0)
         {
             var sb = new StringBuilder();
             CollectTextContent(element, sb);
@@ -99,7 +99,7 @@ public sealed partial class DomBridge
 
     private static DomElement GetDocumentElement(DomElement docRoot)
     {
-        return docRoot.Children.FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
+        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
             ?? docRoot;
     }
 
@@ -116,7 +116,7 @@ public sealed partial class DomBridge
                 node = ParentEl(node);
             if (ParentEl(node) != null)
             {
-                var childIdx = containerA.Children.IndexOf(node);
+                var childIdx = ChildIndexOf(containerA, node);
                 return offsetA > childIdx;
             }
 
@@ -130,7 +130,7 @@ public sealed partial class DomBridge
                 node = ParentEl(node);
             if (ParentEl(node) != null)
             {
-                var childIdx = containerB.Children.IndexOf(node);
+                var childIdx = ChildIndexOf(containerB, node);
                 return childIdx >= offsetB;
             }
 
