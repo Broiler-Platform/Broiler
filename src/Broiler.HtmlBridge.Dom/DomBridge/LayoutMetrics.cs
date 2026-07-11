@@ -533,7 +533,7 @@ public sealed partial class DomBridge
     }
 
     private static bool IsSvgElement(DomElement element) =>
-        string.Equals(element.NamespaceURI, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.NamespaceUri, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
         IsSvgViewportElement(element) ||
         IsSvgShapeElement(element);
 
@@ -705,11 +705,9 @@ public sealed partial class DomBridge
 
     private static string GetDirectTextContent(DomElement element)
     {
+        // RF-BRIDGE-1c Phase F (F3c part 2d): a node's direct text is its text-node children.
         var sb = new StringBuilder();
-        if (!string.IsNullOrWhiteSpace(element.TextContent))
-            sb.Append(element.TextContent);
-
-        foreach (var child in ChildElements(element))
+        foreach (var child in element.ChildNodes)
         {
             if (IsText(child) && !string.IsNullOrWhiteSpace(BridgeText(child)))
                 sb.Append(BridgeText(child));
@@ -1520,7 +1518,7 @@ public sealed partial class DomBridge
         if (TryGetAttribute(option, "value", out var attrValue))
             return attrValue;
 
-        return option.TextContent;
+        return GetElementTextContent(option);
     }
 
     private static void SetSelectValue(DomElement element, string value)
@@ -1531,7 +1529,7 @@ public sealed partial class DomBridge
             var option = options[index];
             var optionValue = TryGetAttribute(option, "value", out var attrValue)
                 ? attrValue
-                : option.TextContent;
+                : GetElementTextContent(option);
             if (string.Equals(optionValue, value, StringComparison.Ordinal))
             {
                 GetElementRuntimeState(element).FormControl.SelectedIndex.Set(index);

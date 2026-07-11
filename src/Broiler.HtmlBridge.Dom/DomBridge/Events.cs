@@ -70,9 +70,9 @@ public sealed partial class DomBridge
         }
     }
 
-    private JSValue BuildComposedPathValue(DomElement target, IReadOnlyList<DomElement> path)
+    private JSValue BuildComposedPathValue(Broiler.Dom.DomNode target, IReadOnlyList<DomElement> path)
     {
-        JSValue ToEventPathObject(DomElement node)
+        JSValue ToEventPathObject(Broiler.Dom.DomNode node)
             => node == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(node);
 
         var values = new List<JSValue> { ToEventPathObject(target) };
@@ -121,7 +121,7 @@ public sealed partial class DomBridge
     /// Dispatches a DOM event on the given element with full capture → target → bubble
     /// propagation (DOM Events Level 3).
     /// </summary>
-    private JSValue DispatchEventOnElement(DomElement target, JSObject evt)
+    private JSValue DispatchEventOnElement(Broiler.Dom.DomNode target, JSObject evt)
     {
         var typeVal = evt[(KeyString)"type"];
         var eventType = typeVal != null && typeVal is JSString ? typeVal.ToString() : "unknown";
@@ -223,7 +223,7 @@ public sealed partial class DomBridge
     /// When <c>false</c>, only bubble listeners fire.
     /// When <c>null</c> (unused), all listeners fire in registration order plus the inline handler.
     /// </summary>
-    private static void FireListeners(DomElement el, string eventType, JSObject evt,
+    private static void FireListeners(Broiler.Dom.DomNode el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
     {
         if (GetEventListeners(el).TryGetValue(eventType, out var listeners))

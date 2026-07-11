@@ -13,7 +13,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsJsObjectsSetId002Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetId002Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var val = a.Length > 0 ? a[0].ToString() : string.Empty;
         element.Id = val;
@@ -23,7 +23,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetClassName003Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetClassName003Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         // Prefer Attributes['class'] (synced by setAttribute and className setter).
         // Fall back to element.ClassName for elements created with a class in the constructor
@@ -34,7 +34,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetClassName004Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetClassName004Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var val = a.Length > 0 ? a[0].ToString() : string.Empty;
         element.ClassName = val;
@@ -44,28 +44,28 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetTitle006Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetTitle006Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "title", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetLang008Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetLang008Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "lang", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetAccessKey010Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetAccessKey010Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "accesskey", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetDir012Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetDir012Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "dir", a.Length > 0 ? a[0].ToString() : string.Empty);
         bridge.InvalidateStyleScope(element);
@@ -73,7 +73,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetDraggable013Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetDraggable013Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         if (TryGetAttribute(element, "draggable", out var draggable))
             return string.Equals(draggable, "true", StringComparison.OrdinalIgnoreCase) ? JSBoolean.True : JSBoolean.False;
@@ -81,28 +81,28 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetDraggable014Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetDraggable014Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "draggable", a.Length > 0 && a[0].BooleanValue ? "true" : "false");
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetInnerHTML016Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetInnerHTML016Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         bridge.SetElementInnerHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetOuterHTML018Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetOuterHTML018Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         bridge.SetElementOuterHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsGetShadowRoot019Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetShadowRoot019Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         var shadowRoot = GetShadowRoot(element);
         if (shadowRoot == null)
@@ -112,23 +112,16 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetTextContent021Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetTextContent021Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        if (IsText(element) || IsComment(element))
-        {
-            bridge.SetCharacterData(element, text);
-            return JSUndefined.Value;
-        }
-
-        element.TextContent = text;
-        // Setting textContent clears all children per DOM spec
-        ClearChildren(element);
+        // Setting textContent replaces all children with a single text node per DOM spec.
+        bridge.SetElementTextContent(element, text);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetStyle025Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetStyle025Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSString s)
         {
@@ -148,7 +141,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetAttribute027Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetAttribute027Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length >= 2)
         {
@@ -184,7 +177,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetAttribute028Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetAttribute028Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -193,7 +186,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetAttributeNode029Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsGetAttributeNode029Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -202,7 +195,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetAttributeNodeNS030Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsGetAttributeNodeNS030Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length < 2)
             return JSNull.Value;
@@ -321,15 +314,16 @@ public sealed partial class DomBridge
         }
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
-        if (!string.IsNullOrEmpty(element.NamespaceURI) && !string.Equals(element.NamespaceURI, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
             return new JSString(element.TagName);
         return new JSString(element.TagName.ToUpperInvariant());
     }
 
 
-    private JSValue JsJsObjectsGetLocalName040Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetLocalName040Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element))
+        // localName is null for non-element nodes (text/comment/document).
+        if (node is not DomElement element)
             return JSNull.Value;
         if (element.TagName.StartsWith("#"))
             return JSNull.Value; // #comment, #document, etc.
@@ -341,8 +335,10 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetPrefix041Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetPrefix041Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
+        if (node is not DomElement element)
+            return JSNull.Value;
         var colonIdx = element.TagName.IndexOf(':');
         if (colonIdx >= 0)
             return new JSString(element.TagName[..colonIdx]);
@@ -350,89 +346,91 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetNamespaceURI042Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNamespaceURI042Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (element.NamespaceURI != null)
-            return new JSString(element.NamespaceURI);
+        // namespaceURI is null for non-element nodes (text/comment/document).
+        if (node is not DomElement element)
+            return JSNull.Value;
+        if (element.NamespaceUri != null)
+            return new JSString(element.NamespaceUri);
         // Default namespace for HTML elements
-        if (!IsText(element) && !element.TagName.StartsWith("#"))
+        if (!element.TagName.StartsWith("#"))
             return new JSString("http://www.w3.org/1999/xhtml");
         return JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetNodeValue043Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNodeValue043Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element) || IsComment(element))
-            return new JSString(BridgeText(element));
+        if (IsText(node) || IsComment(node))
+            return new JSString(BridgeText(node));
         return JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsSetNodeValue044Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetNodeValue044Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element) || IsComment(element))
-            bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
+        if (IsText(node) || IsComment(node))
+            bridge.SetCharacterData(node, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsGetData045Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetData045Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element) || IsComment(element))
-            return new JSString(BridgeText(element));
+        if (IsText(node) || IsComment(node))
+            return new JSString(BridgeText(node));
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetData046Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetData046Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element) || IsComment(element))
-            bridge.SetCharacterData(element, a.Length > 0 ? a[0].ToString() : string.Empty);
+        if (IsText(node) || IsComment(node))
+            bridge.SetCharacterData(node, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsGetLength047Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetLength047Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (IsText(element) || IsComment(element))
-            return new JSNumber(BridgeText(element).Length);
-        return new JSNumber(element.ChildNodes.Count);
+        if (IsText(node) || IsComment(node))
+            return new JSNumber(BridgeText(node).Length);
+        return new JSNumber(node.ChildNodes.Count);
     }
 
 
-    private JSValue JsJsObjectsSplitText048Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSplitText048Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'splitText' on 'Text': 1 argument required, but only 0 present.");
         var offset = (int)a[0].DoubleValue;
-        var text = BridgeText(element);
+        var text = BridgeText(node);
         if (offset < 0 || offset > text.Length)
             throw new JSException("Failed to execute 'splitText' on 'Text': The offset " + offset + " is larger than the node's length " + text.Length + ".");
         var remainingText = text.Substring(offset);
-        SetBridgeText(element, text.Substring(0, offset));
-        var newNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(newNode, remainingText);
+        SetBridgeText(node, text.Substring(0, offset));
+        var newNode = CreateBridgeTextNode(remainingText);
         _knownNodes.Add(newNode);
         // Insert new node as next sibling
-        if (ParentEl(element) != null)
+        if (ParentEl(node) != null)
         {
-            var idx = ChildIndexOf(ParentEl(element), element);
-            SetParent(newNode, ParentEl(element));
-            InsertChildAt(ParentEl(element), idx + 1, newNode);
+            var idx = ChildIndexOf(ParentEl(node), node);
+            SetParent(newNode, ParentEl(node));
+            InsertChildAt(ParentEl(node), idx + 1, newNode);
         }
 
         // Invalidate cached JSObject so length/data properties reflect the update
-        _jsObjectCache.Remove(element);
+        _jsObjectCache.Remove(node);
         return ToJSObject(newNode);
     }
 
 
-    private JSValue JsJsObjectsSubstringData049Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSubstringData049Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
         var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
-        var text = BridgeText(element);
+        var text = BridgeText(node);
         if (offset < 0 || offset > text.Length)
             throw new JSException("INDEX_SIZE_ERR");
         var end = (int)Math.Min((long)offset + count, text.Length);
@@ -440,88 +438,89 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAppendData050Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAppendData050Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        bridge.SetCharacterData(element, BridgeText(element) + data);
+        bridge.SetCharacterData(node, BridgeText(node) + data);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsDeleteData051Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsDeleteData051Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
         var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
-        var text = BridgeText(element);
+        var text = BridgeText(node);
         if (offset < 0 || offset > text.Length)
             throw new JSException("INDEX_SIZE_ERR");
         var end = (int)Math.Min((long)offset + count, text.Length);
-        bridge.SetCharacterData(element, text.Remove(offset, end - offset));
+        bridge.SetCharacterData(node, text.Remove(offset, end - offset));
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsInsertData052Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsInsertData052Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
         var data = a.Length > 1 ? a[1].ToString() : string.Empty;
-        var text = BridgeText(element);
+        var text = BridgeText(node);
         if (offset < 0 || offset > text.Length)
             throw new JSException("INDEX_SIZE_ERR");
-        bridge.SetCharacterData(element, text.Insert(offset, data));
+        bridge.SetCharacterData(node, text.Insert(offset, data));
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsReplaceData053Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsReplaceData053Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
         var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
         var data = a.Length > 2 ? a[2].ToString() : string.Empty;
-        var text = BridgeText(element);
+        var text = BridgeText(node);
         if (offset < 0 || offset > text.Length)
             throw new JSException("INDEX_SIZE_ERR");
         var end = (int)Math.Min((long)offset + count, text.Length);
-        bridge.SetCharacterData(element, text.Remove(offset, end - offset).Insert(offset, data));
+        bridge.SetCharacterData(node, text.Remove(offset, end - offset).Insert(offset, data));
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsGetPublicId055Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetPublicId055Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         var pubId = GetElementRuntimeState(element).DocumentType.PublicId.TryGet(out var p) ? p?.ToString() ?? string.Empty : string.Empty;
         return new JSString(pubId);
     }
 
 
-    private JSValue JsJsObjectsGetSystemId056Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetSystemId056Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         var sysId = GetElementRuntimeState(element).DocumentType.SystemId.TryGet(out var s) ? s?.ToString() ?? string.Empty : string.Empty;
         return new JSString(sysId);
     }
 
 
-    private JSValue JsJsObjectsGetOwnerDocument057Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetOwnerDocument057Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         // For elements in sub-documents, return the sub-document JSObject
-        if (GetElementRuntimeState(element).OwnerDocRoot != null && _docRootToDocJSObject.TryGetValue(GetElementRuntimeState(element).OwnerDocRoot, out var subDoc))
+        if (GetElementRuntimeState(node).OwnerDocRoot != null && _docRootToDocJSObject.TryGetValue(GetElementRuntimeState(node).OwnerDocRoot, out var subDoc))
             return subDoc;
         // For main document elements, return the main document JSObject
         return _documentJSObject ?? JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetParentElement058Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetParentElement058Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (ParentEl(element) == null)
+        var parent = ParentEl(node);
+        if (parent == null)
             return JSNull.Value;
-        if (IsText(ParentEl(element)))
+        if (IsText(parent))
             return JSNull.Value;
-        return ToJSObject(ParentEl(element));
+        return ToJSObject(parent);
     }
 
 
-    private JSValue JsJsObjectsHasAttribute060Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsHasAttribute060Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
@@ -529,7 +528,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveAttribute063Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemoveAttribute063Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -550,7 +549,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsToggleAttribute064Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsToggleAttribute064Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
@@ -571,7 +570,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetAttributeNode065Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsSetAttributeNode065Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
@@ -584,7 +583,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetAttributeNodeNS066Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsSetAttributeNodeNS066Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
@@ -601,7 +600,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveAttributeNode067Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsRemoveAttributeNode067Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
@@ -614,7 +613,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveAttributeNodeNS068Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsRemoveAttributeNodeNS068Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
@@ -630,7 +629,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetAttributeNS069Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetAttributeNS069Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length >= 3)
         {
@@ -645,7 +644,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetAttributeNS070Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetAttributeNS070Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length < 2)
             return JSNull.Value;
@@ -656,7 +655,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveAttributeNS071Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemoveAttributeNS071Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSet, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length >= 2)
         {
@@ -669,7 +668,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsHasAttributeNS072Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsHasAttributeNS072Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length < 2)
             return JSBoolean.False;
@@ -679,23 +678,23 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsContains073Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsContains073Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
         var otherObj = a[0] as JSObject;
         if (otherObj == null)
             return JSBoolean.False;
-        var otherEl = FindDomElementByJSObject(otherObj);
-        if (otherEl == null)
+        var other = FindDomNodeByJSObject(otherObj);
+        if (other == null)
             return JSBoolean.False;
-        if (ReferenceEquals(element, otherEl))
+        if (ReferenceEquals(node, other))
             return JSBoolean.True;
-        return IsDescendant(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+        return IsDescendant(node, other) ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private JSValue JsJsObjectsCompareDocumentPosition074Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsCompareDocumentPosition074Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         const int documentPositionDisconnected = 0x01;
         const int documentPositionPreceding = 0x02;
@@ -704,45 +703,47 @@ public sealed partial class DomBridge
         const int documentPositionContainedBy = 0x10;
         if (a.Length == 0 || a[0] is not JSObject otherObj)
             return new JSNumber(0);
-        var otherEl = FindDomElementByJSObject(otherObj);
-        if (otherEl == null || ReferenceEquals(element, otherEl))
+        var other = FindDomNodeByJSObject(otherObj);
+        if (other == null || ReferenceEquals(node, other))
             return new JSNumber(0);
-        if (!ReferenceEquals(GetTreeRoot(element), GetTreeRoot(otherEl)))
+        if (!ReferenceEquals(GetTreeRoot(node), GetTreeRoot(other)))
             return new JSNumber(documentPositionDisconnected);
-        if (IsDescendant(element, otherEl))
+        if (IsDescendant(node, other))
             return new JSNumber(documentPositionFollowing | documentPositionContainedBy);
-        if (IsDescendant(otherEl, element))
+        if (IsDescendant(other, node))
             return new JSNumber(documentPositionPreceding | documentPositionContains);
-        return new JSNumber(CompareTreeOrder(element, otherEl) < 0 ? documentPositionFollowing : documentPositionPreceding);
+        return new JSNumber(CompareTreeOrder(node, other) < 0 ? documentPositionFollowing : documentPositionPreceding);
     }
 
 
-    private JSValue JsJsObjectsIsSameNode075Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsIsSameNode075Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject otherObj)
             return JSBoolean.False;
-        var otherEl = FindDomElementByJSObject(otherObj);
-        return ReferenceEquals(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+        var other = FindDomNodeByJSObject(otherObj);
+        return ReferenceEquals(node, other) ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private JSValue JsJsObjectsNormalize076Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsNormalize076Core(global::Broiler.Dom.DomNode node, in Arguments _)
     {
-        NormalizeNode(element);
+        // normalize() on a character-data node is a no-op (it has no text children to merge).
+        if (node is DomElement element)
+            NormalizeNode(element);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsIsEqualNode077Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsIsEqualNode077Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject otherObj)
             return JSBoolean.False;
-        var otherEl = FindDomElementByJSObject(otherObj);
-        return otherEl != null && NodesAreEqual(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+        var other = FindDomNodeByJSObject(otherObj);
+        return other != null && NodesAreEqual(node, other) ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private JSValue JsJsObjectsGetRootNode078Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetRootNode078Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var composed = false;
         if (a.Length > 0 && a[0] is JSObject options)
@@ -753,32 +754,32 @@ public sealed partial class DomBridge
 
         if (!composed)
         {
-            var shadowRoot = FindContainingShadowRoot(element);
+            var shadowRoot = FindContainingShadowRoot(node);
             if (shadowRoot != null)
                 return ToJSObject(shadowRoot);
         }
 
-        return ToJSRootNode(GetTreeRoot(element));
+        return ToJSRootNode(GetTreeRoot(node));
     }
 
 
-    private JSValue JsJsObjectsCloneNode079Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsCloneNode079Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         var deep = a.Length > 0 && a[0].BooleanValue;
-        var clone = CloneDomElement(element, deep);
+        var clone = CloneDomElement(node, deep);
         _knownNodes.Add(clone);
         return ToJSObject(clone);
     }
 
 
-    private JSValue JsJsObjectsInsertBefore080Core(global::Broiler.HtmlBridge.DomBridge? bridgeForInsert, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsInsertBefore080Core(global::Broiler.HtmlBridge.DomBridge? bridgeForInsert, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
         var newChildObj = a[0] as JSObject;
         if (newChildObj == null)
             return JSUndefined.Value;
-        var newEl = FindDomElementByJSObject(newChildObj);
+        var newEl = FindDomNodeByJSObject(newChildObj);
         if (newEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -793,7 +794,7 @@ public sealed partial class DomBridge
         var refChildObj = a[1] as JSObject;
         if (refChildObj == null)
             return a[0];
-        var refEl = FindDomElementByJSObject(refChildObj);
+        var refEl = FindDomNodeByJSObject(refChildObj);
         if (refEl == null)
             return a[0];
         if (ReferenceEquals(newEl, refEl))
@@ -806,7 +807,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetChildren081Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetChildren081Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var result = new List<JSValue>();
         foreach (var child in ChildElements(element))
@@ -819,21 +820,21 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetFirstElementChild083Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetFirstElementChild083Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var first = ChildElements(element).FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetLastElementChild084Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetLastElementChild084Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var last = ChildElements(element).LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
 
-    private JSValue JsJsObjectsGetNextElementSibling085Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetNextElementSibling085Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
@@ -849,7 +850,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetPreviousElementSibling086Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetPreviousElementSibling086Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (ParentEl(element) == null)
             return JSNull.Value;
@@ -865,7 +866,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAttachShadow087Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAttachShadow087Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (GetShadowRoot(element) != null)
             ThrowDOMException(_jsContext!, "Shadow root already attached.", "NotSupportedError");
@@ -880,7 +881,7 @@ public sealed partial class DomBridge
         }
 
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
-        var shadowRoot = new DomElement(_document, "#shadow-root", null, null, string.Empty);
+        var shadowRoot = CreateBridgeElement("#shadow-root");
         SetParent(shadowRoot, element);
         GetElementRuntimeState(shadowRoot).OwnerDocRoot = GetElementRuntimeState(element).OwnerDocRoot;
         GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
@@ -892,7 +893,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAppendChild088Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAppendChild088Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -900,7 +901,7 @@ public sealed partial class DomBridge
         if (childObj == null)
             return JSUndefined.Value;
         // Find the DomElement for this child JSObject
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -911,7 +912,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAppend089Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAppend089Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -923,7 +924,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsPrepend090Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsPrepend090Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -935,14 +936,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveChild091Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemoveChild091Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSUndefined.Value;
-        var childEl = FindDomElementByJSObject(childObj);
+        var childEl = FindDomNodeByJSObject(childObj);
         if (childEl == null)
             return a[0];
         var idx = ChildIndexOf(element, childEl);
@@ -957,7 +958,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsReplaceChild092Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsReplaceChild092Core(global::Broiler.HtmlBridge.DomBridge? bridgeForAppend, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -965,8 +966,8 @@ public sealed partial class DomBridge
         var oldChildObj = a[1] as JSObject;
         if (newChildObj == null || oldChildObj == null)
             return JSUndefined.Value;
-        var newEl = FindDomElementByJSObject(newChildObj);
-        var oldEl = FindDomElementByJSObject(oldChildObj);
+        var newEl = FindDomNodeByJSObject(newChildObj);
+        var oldEl = FindDomNodeByJSObject(oldChildObj);
         if (newEl == null || oldEl == null)
             return a[1];
         // Prevent circular references (HierarchyRequestError per DOM spec)
@@ -1011,9 +1012,9 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemove093Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemove093Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
-        // Capture the parent up front: ParentEl(DomElement) is computed from the canonical
+        // Capture the parent up front: ParentEl(node) is computed from the canonical
         // ParentNode, and Children.RemoveAt detaches it — so reading ParentEl(element) after
         // the removal would return null (→ NRE in InvalidateStyleScope). Mirrors the
         // working removeChild path, which holds the parent reference independently.
@@ -1035,7 +1036,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsBefore094Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsBefore094Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
@@ -1049,7 +1050,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAfter095Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAfter095Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null || a.Length == 0)
             return JSUndefined.Value;
@@ -1064,7 +1065,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsReplaceWith096Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsReplaceWith096Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (ParentEl(element) == null)
             return JSUndefined.Value;
@@ -1084,7 +1085,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAddEventListener097Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsAddEventListener097Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -1103,7 +1104,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsRemoveEventListener098Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsRemoveEventListener098Core(global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -1126,7 +1127,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsDispatchEvent099Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsDispatchEvent099Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomNode element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.True;
@@ -1137,7 +1138,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsClick101Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsClick101Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
     {
         // Toggle checked state for checkboxes/radio buttons (per HTML spec)
         if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase))
@@ -1218,7 +1219,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsFocus102Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsFocus102Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
     {
         var evt = new JSObject();
         evt.FastAddValue((KeyString)"type", new JSString("focus"), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1239,7 +1240,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsBlur103Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsBlur103Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
     {
         var evt = new JSObject();
         evt.FastAddValue((KeyString)"type", new JSString("blur"), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1260,7 +1261,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsCallback104Core(global::Broiler.HtmlBridge.DomElement element, global::System.String? eventName, in Arguments _)
+    private JSValue JsJsObjectsCallback104Core(global::Broiler.Dom.DomElement element, global::System.String? eventName, in Arguments _)
     {
         if (GetInlineEventHandlers(element).TryGetValue(eventName, out var handler))
             return handler;
@@ -1268,7 +1269,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsCallback105Core(global::Broiler.HtmlBridge.DomElement element, global::System.String? eventName, in Arguments a)
+    private JSValue JsJsObjectsCallback105Core(global::Broiler.Dom.DomElement element, global::System.String? eventName, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSFunction fn)
             GetInlineEventHandlers(element)[eventName] = fn;
@@ -1278,7 +1279,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetValue106Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetValue106Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
             return new JSString(GetSelectValue(element));
@@ -1290,7 +1291,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetValue107Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetValue107Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var tag = element.TagName.ToLowerInvariant();
         var v = a.Length > 0 ? a[0].ToString() : string.Empty;
@@ -1304,7 +1305,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetChecked108Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetChecked108Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         // IDL property takes precedence over content attribute
         if (GetElementRuntimeState(element).FormControl.Checked.TryGet(out var v))
@@ -1313,7 +1314,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetChecked109Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetChecked109Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         bool newVal = a.Length > 0 && a[0].BooleanValue;
         GetElementRuntimeState(element).FormControl.Checked.Set(newVal);
@@ -1341,7 +1342,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetType110Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetType110Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (TryGetAttribute(element, "type", out var t))
             return new JSString(t.ToLowerInvariant());
@@ -1353,14 +1354,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetType111Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetType111Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "type", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsGetName112Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetName112Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (TryGetAttribute(element, "name", out var n))
             return new JSString(n);
@@ -1368,14 +1369,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetName113Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetName113Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "name", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsSetDisabled115Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetDisabled115Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
             SetAttr(element, "disabled", "disabled");
@@ -1386,7 +1387,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetHidden117Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetHidden117Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
             SetAttr(element, "hidden", string.Empty);
@@ -1397,7 +1398,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetTabIndex118Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetTabIndex118Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         if (TryGetAttribute(element, "tabindex", out var rawTabIndex) && int.TryParse(rawTabIndex, out var parsedTabIndex))
         {
@@ -1408,7 +1409,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetTabIndex119Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetTabIndex119Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -1418,7 +1419,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetRequired121Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetRequired121Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
             SetAttr(element, "required", "required");
@@ -1429,7 +1430,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSubmit125Core(global::Broiler.HtmlBridge.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
+    private JSValue JsJsObjectsSubmit125Core(global::Broiler.Dom.DomElement element, global::Broiler.JavaScript.Runtime.JSObject? obj, in Arguments a)
     {
         if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
         {
@@ -1469,28 +1470,28 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsQuerySelector126Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsQuerySelector126Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
         return FindInDescendants(element, sel, false, bridge);
     }
 
 
-    private JSValue JsJsObjectsQuerySelectorAll127Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsQuerySelectorAll127Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
         return FindInDescendants(element, sel, true, bridge);
     }
 
 
-    private JSValue JsJsObjectsMatches128Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsMatches128Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
         return MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private JSValue JsJsObjectsClosest129Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsClosest129Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
         for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = ParentEl(current))
@@ -1503,7 +1504,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsInsertAdjacentElement130Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsInsertAdjacentElement130Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length < 2)
             return JSNull.Value;
@@ -1520,24 +1521,21 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsInsertAdjacentText131Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsInsertAdjacentText131Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
         var position = NormalizeInsertAdjacentPosition(a[0]);
         var text = a.Length > 1 ? a[1].ToString() : string.Empty;
         var (parent, index) = GetInsertAdjacentTarget(element, position);
-        var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true)
-        {
-            TextContent = text
-        };
+        var textNode = CreateBridgeTextNode(text);
         _knownNodes.Add(textNode);
         InsertNodeAt(parent, textNode, index);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsJsObjectsInsertAdjacentHTML132Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsInsertAdjacentHTML132Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -1568,7 +1566,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetElementsByTagName133Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetElementsByTagName133Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var tagSearch = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
         var results = new List<JSValue>();
@@ -1577,7 +1575,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetContext134Core(global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsGetContext134Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -1594,7 +1592,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetContentDocument135Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetContentDocument135Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         // Cross-origin iframes return null for contentDocument (same-origin policy)
         if (IsCurrentIframeCrossOrigin(element))
@@ -1604,7 +1602,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetContentWindow136Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetContentWindow136Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         if (IsCurrentIframeCrossOrigin(element))
             return JSNull.Value;
@@ -1612,7 +1610,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetSVGDocument137Core(global::Broiler.HtmlBridge.DomElement element, in Arguments _)
+    private JSValue JsJsObjectsGetSVGDocument137Core(global::Broiler.Dom.DomElement element, in Arguments _)
     {
         if (IsCurrentIframeCrossOrigin(element))
             return JSNull.Value;
@@ -1620,7 +1618,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetSrc139Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetSrc139Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "src", a.Length > 0 ? a[0].ToString() : string.Empty);
         // Invalidate cached sub-document when src changes
@@ -1632,7 +1630,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsSetSrcdoc141Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.HtmlBridge.DomElement element, in Arguments a)
+    private JSValue JsJsObjectsSetSrcdoc141Core(global::Broiler.HtmlBridge.DomBridge? bridgeForSrc, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         SetAttr(element, "srcdoc", a.Length > 0 ? a[0].ToString() : string.Empty);
         InvalidateCachedSubDocument(element);

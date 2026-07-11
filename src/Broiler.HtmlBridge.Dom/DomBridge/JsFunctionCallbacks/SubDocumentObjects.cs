@@ -13,7 +13,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsSubDocumentObjectsGetBody003Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetBody003Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
         foreach (var child in ChildElements(htmlEl))
@@ -26,7 +26,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetHead004Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetHead004Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
         foreach (var child in ChildElements(htmlEl))
@@ -39,7 +39,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetTitle005Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetTitle005Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var htmlEl = GetDocumentElement(docRoot);
         var head = ChildElements(htmlEl).FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
@@ -48,10 +48,6 @@ public sealed partial class DomBridge
             var titleEl = ChildElements(head).FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
             if (titleEl != null)
             {
-                // Two paths: (1) textContent setter clears children and stores text directly
-                // in TextContent, (2) text set via child text nodes (e.g. createTextNode + appendChild).
-                if (titleEl.TextContent != null && titleEl.ChildNodes.Count == 0)
-                    return new JSString(titleEl.TextContent);
                 var sb = new StringBuilder();
                 CollectTextContent(titleEl, sb);
                 return new JSString(sb.ToString());
@@ -62,7 +58,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsSetTitle006Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsSetTitle006Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var htmlEl = GetDocumentElement(docRoot);
         var head = ChildElements(htmlEl).FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
@@ -70,17 +66,14 @@ public sealed partial class DomBridge
         {
             var titleEl = ChildElements(head).FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
             if (titleEl != null)
-            {
-                titleEl.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
-                ClearChildren(titleEl);
-            }
+                SetElementTextContent(titleEl, a.Length > 0 ? a[0].ToString() : string.Empty);
         }
 
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsSubDocumentObjectsGetForms007Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetForms007Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var results = new List<JSValue>();
         CollectByTagName(docRoot, "form", results);
@@ -88,7 +81,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetChildNodes008Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetChildNodes008Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var arr = new JSArray();
         foreach (var child in ChildElements(docRoot))
@@ -97,7 +90,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetElementById014Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsGetElementById014Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var id = a.Length > 0 ? a[0].ToString() : string.Empty;
         var found = FindInSubTree(docRoot, el => el.Id == id);
@@ -105,7 +98,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetElementsByTagName015Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsGetElementsByTagName015Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var tagName = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
         var results = new List<JSValue>();
@@ -114,50 +107,48 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsCreateElement016Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsCreateElement016Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'createElement': 1 argument required.");
         var tagName = a[0].ToString();
         ValidateElementName(tagName, _jsContext!);
         tagName = AsciiToLower(tagName);
-        var el = new DomElement(_document, tagName, null, null, string.Empty);
+        var el = CreateBridgeElement(tagName);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
 
-    private JSValue JsSubDocumentObjectsCreateTextNode017Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsCreateTextNode017Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(el, text);
+        var el = CreateBridgeTextNode(text);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
 
-    private JSValue JsSubDocumentObjectsCreateComment018Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsCreateComment018Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = new DomElement(_document, "#comment", null, null, string.Empty);
-        SetBridgeText(el, data);
+        var el = CreateBridgeCommentNode(data);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
 
-    private JSValue JsSubDocumentObjectsCreateElementNS019Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsCreateElementNS019Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
         ValidateQualifiedName(localName, ns, _jsContext!);
-        var el = new DomElement(_document, localName, null, null, string.Empty);
-        if (!string.IsNullOrEmpty(ns))
-            el.NamespaceURI = ns;
+        var el = string.IsNullOrEmpty(ns)
+            ? CreateBridgeElement(localName)
+            : CreateBridgeElementNS(ns, localName);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
         _knownNodes.Add(el);
         return ToJSObject(el);
@@ -464,7 +455,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsQuerySelector035Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsQuerySelector035Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
         var found = FindInSubTree(docRoot, el => MatchesSelector(el, selector));
@@ -472,7 +463,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsQuerySelectorAll036Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsQuerySelectorAll036Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
         var results = new List<JSValue>();
@@ -481,36 +472,35 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsElementFromPoint037Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsElementFromPoint037Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var hit = HitTestDocumentPoint(docRoot, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1)).FirstOrDefault();
         return hit != null ? ToJSObject(hit) : JSNull.Value;
     }
 
 
-    private JSValue JsSubDocumentObjectsElementsFromPoint038Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsElementsFromPoint038Core(global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         var hits = HitTestDocumentPoint(docRoot, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1));
         return new JSArray(hits.Select(ToJSObject).ToArray());
     }
 
 
-    private JSValue JsSubDocumentObjectsOpen039Core(global::Broiler.JavaScript.Runtime.JSObject? doc, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsOpen039Core(global::Broiler.JavaScript.Runtime.JSObject? doc, global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         ClearChildren(docRoot);
         return doc;
     }
 
 
-    private JSValue JsSubDocumentObjectsWrite040Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsWrite040Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
         var fragment = a[0].ToString();
         // Parse DOCTYPE if present
         var doctype = bridge.ParseDocType(fragment);
-        var treeBuilder = new HtmlTreeBuilder();
-        var (parsedDoc, allEls, _) = treeBuilder.Build(fragment);
+        var (parsedDoc, allEls, _) = BuildDocumentTree(fragment);
         if (docRoot.ChildNodes.Count == 0)
         {
             if (doctype != null)
@@ -540,7 +530,7 @@ public sealed partial class DomBridge
                 var parsedBody = FindInTree(parsedDoc, el => string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase));
                 if (parsedBody != null)
                 {
-                    foreach (var child in ChildElements(parsedBody))
+                    foreach (var child in parsedBody.ChildNodes.ToArray())
                     {
                         SetParent(child, bodyEl);
                         bodyEl.AppendChild(child);
@@ -559,7 +549,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetImages041Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetImages041Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var results = new List<JSValue>();
         CollectByTagName(docRoot, "img", results);
@@ -567,7 +557,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsGetLinks042Core(global::Broiler.HtmlBridge.DomElement docRoot, in Arguments _)
+    private JSValue JsSubDocumentObjectsGetLinks042Core(global::Broiler.Dom.DomElement docRoot, in Arguments _)
     {
         var results = new List<JSValue>();
         CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && HasAttr(el, "href"), results);
@@ -575,7 +565,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsRemoveChild044Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsRemoveChild044Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -603,7 +593,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsAppendChild045Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsAppendChild045Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -627,7 +617,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsAppend046Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsAppend046Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -639,7 +629,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsSubDocumentObjectsPrepend047Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomElement docRoot, in Arguments a)
+    private JSValue JsSubDocumentObjectsPrepend047Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement docRoot, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -659,7 +649,7 @@ public sealed partial class DomBridge
         var publicId = a[1].ToString();
         var systemId = a[2].ToString();
         ValidateElementName(qualifiedName, _jsContext!);
-        var dt = new DomElement(_document, "#doctype", null, null, string.Empty);
+        var dt = CreateBridgeElement("#doctype");
         GetElementRuntimeState(dt).DocumentType.Name.Set(qualifiedName);
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(publicId);
         GetElementRuntimeState(dt).DocumentType.SystemId.Set(systemId);
@@ -676,7 +666,7 @@ public sealed partial class DomBridge
         var doctypeArg = a.Length > 2 ? a[2] : null;
         if (!string.IsNullOrEmpty(qName))
             ValidateQualifiedName(qName, ns, _jsContext!);
-        var subDocRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        var subDocRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
         _knownNodes.Add(subDocRoot);
         if (doctypeArg is JSObject dtObj)
@@ -695,9 +685,9 @@ public sealed partial class DomBridge
 
         if (!string.IsNullOrEmpty(qName))
         {
-            var docEl = new DomElement(_document, qName, null, null, string.Empty);
-            if (!string.IsNullOrEmpty(ns))
-                docEl.NamespaceURI = ns;
+            var docEl = string.IsNullOrEmpty(ns)
+                ? CreateBridgeElement(qName)
+                : CreateBridgeElementNS(ns, qName);
             SetParent(docEl, subDocRoot);
             GetElementRuntimeState(docEl).OwnerDocRoot = subDocRoot;
             subDocRoot.AppendChild(docEl);
@@ -711,10 +701,10 @@ public sealed partial class DomBridge
     private JSValue JsSubDocumentObjectsCreateHTMLDocument050Core(in Arguments a)
     {
         var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
-        var subDocRoot = new DomElement(_document, "#subdoc-root", null, null, string.Empty);
+        var subDocRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
         _knownNodes.Add(subDocRoot);
-        var dt = new DomElement(_document, "#doctype", null, null, string.Empty);
+        var dt = CreateBridgeElement("#doctype");
         GetElementRuntimeState(dt).DocumentType.Name.Set("html");
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
         GetElementRuntimeState(dt).DocumentType.SystemId.Set(string.Empty);
@@ -723,33 +713,32 @@ public sealed partial class DomBridge
         GetElementRuntimeState(dt).OwnerDocRoot = subDocRoot;
         subDocRoot.AppendChild(dt);
         _knownNodes.Add(dt);
-        var subHtml = new DomElement(_document, "html", null, null, string.Empty);
-        subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
+        // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
+        var subHtml = CreateBridgeElement("html");
         SetParent(subHtml, subDocRoot);
         GetElementRuntimeState(subHtml).OwnerDocRoot = subDocRoot;
         subDocRoot.AppendChild(subHtml);
         _knownNodes.Add(subHtml);
-        var subHead = new DomElement(_document, "head", null, null, string.Empty);
+        var subHead = CreateBridgeElement("head");
         SetParent(subHead, subHtml);
         GetElementRuntimeState(subHead).OwnerDocRoot = subDocRoot;
         subHtml.AppendChild(subHead);
         _knownNodes.Add(subHead);
         if (subTitle != null)
         {
-            var subTitleEl = new DomElement(_document, "title", null, null, string.Empty);
+            var subTitleEl = CreateBridgeElement("title");
             SetParent(subTitleEl, subHead);
             GetElementRuntimeState(subTitleEl).OwnerDocRoot = subDocRoot;
             subHead.AppendChild(subTitleEl);
             _knownNodes.Add(subTitleEl);
-            var subTitleText = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(subTitleText, subTitle);
+            var subTitleText = CreateBridgeTextNode(subTitle);
             SetParent(subTitleText, subTitleEl);
             GetElementRuntimeState(subTitleText).OwnerDocRoot = subDocRoot;
             subTitleEl.AppendChild(subTitleText);
             _knownNodes.Add(subTitleText);
         }
 
-        var subBody = new DomElement(_document, "body", null, null, string.Empty);
+        var subBody = CreateBridgeElement("body");
         SetParent(subBody, subHtml);
         GetElementRuntimeState(subBody).OwnerDocRoot = subDocRoot;
         subHtml.AppendChild(subBody);

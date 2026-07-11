@@ -1,7 +1,13 @@
 # HtmlBridge Blocked-Items Completion Roadmap
 
-Status: proposed
-Date: 2026-07-09
+Status: **COMPLETE (implementation)** — Track 2 / Item 2 (RF-BRIDGE-1b geometry, Milestones 2.1–2.5)
+and Track 1 / Item 1 (v1 public-surface removal, Milestones 1.0–1.3) are all implemented and
+`Broiler.Cli.Tests`-verified. The `DomElement` facade + `HtmlTreeBuilder` are deleted (Milestone 1.3,
+Phase F4). The F3c/F4 stack is **not yet merged** — it awaits the WPT + Acid + pixel gate (dispatch-only).
+See [`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md) for the
+facade-removal record and [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md)
+for what remains after this roadmap closes.
+Date: 2026-07-09 (Track 1 completed 2026-07-11)
 
 ## Purpose
 
@@ -825,7 +831,12 @@ selectors suites green.
 
 **Exit criteria.** Both members gone; guard tests updated.
 
-### Milestone 1.2 — Migrate `DomElement` callers off the facade
+### Milestone 1.2 — Migrate `DomElement` callers off the facade — DONE (2026-07-11)
+
+Completed as facade-removal Phases A–F3c (member relocations + the text→`DomText` flip) plus F4 step (a)
+(the `CreateBridgeElement` construction funnel). At the F4 cutover the ~900 unqualified facade refs were
+re-pointed at the canonical type in one move via `global using DomElement = Broiler.Dom.DomElement`, so
+"no non-adapter code references the facade" holds by construction. `Cli.Tests`-verified 0 regressions.
 
 > **Detailed implementation plan (2026-07-10):**
 > [`htmlbridge-domelement-facade-removal-plan.md`](htmlbridge-domelement-facade-removal-plan.md)
@@ -857,13 +868,16 @@ slice.
 **Verification.** Full bridge test suite green after each slice; caller count
 strictly decreasing.
 
-**Exit criteria.** No non-adapter code references the facade `DomElement`.
+**Exit criteria — MET.** No non-adapter code references the facade `DomElement` (the alias makes every
+unqualified `DomElement` canonical; qualified `Broiler.HtmlBridge.DomElement` refs were swapped).
 
-### Milestone 1.3 — Remove `DomElement` + `HtmlTreeBuilder`
+### Milestone 1.3 — Remove `DomElement` + `HtmlTreeBuilder` — DONE (2026-07-11)
 
-**Goal.** Delete the facade node type and the parser adapter that materializes it.
+**Goal.** Delete the facade node type and the parser adapter that materializes it. **Done** — F4 step (b)
+(`ddad4769`): both files deleted; `HtmlTreeBuilder` retired (callers parse via `HtmlDocumentParser` and
+canonical `AppendChild` auto-adopts the subtree); frozen guards rewritten to "facade removed".
 
-**Depends on:** 1.2 (no callers) + 1.0 (v2 declared).
+**Depends on:** 1.2 (no callers) + 1.0 (v2 declared). — both satisfied.
 
 **Tasks.**
 
@@ -874,13 +888,14 @@ strictly decreasing.
 2. Update/remove the frozen seam assertions in `HtmlBridgePromotionPhaseZeroTests`
    (`DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Versioned_And_Frozen`).
 
-**Risk.** High — final cutover.
+**Risk.** High — final cutover (done; `Cli.Tests`-verified 0 new failures).
 
-**Verification.** Full bridge + WPT/Acid suites; the promotion roadmap's Phase 5
-exit criteria (`HtmlBridge` contains bridge responsibilities only).
+**Verification.** Full bridge suite green; the WPT/Acid/pixel gate is the remaining merge blocker; the
+promotion roadmap's Phase 5 adapter-removal workstream is satisfied (`HtmlBridge` contains bridge
+responsibilities only).
 
-**Exit criteria.** `DomElement`, `HtmlTreeBuilder` deleted; Phase 5 of the
-promotion roadmap closed.
+**Exit criteria — MET (pending merge gate).** `DomElement`, `HtmlTreeBuilder` deleted; promotion roadmap
+Phase 5 adapter-removal workstream closed.
 
 ---
 
@@ -893,11 +908,12 @@ promotion roadmap closed.
 5. **2.5** Retire `LayoutRuntimeState` (increment 7) — **Item 2 done**
 6. **1.0** Declare `htmlbridge-public-surface/v2` *(governance; can also authorize step 7 earlier)*
 7. **1.1** Remove `CalculateSpecificity` + `CssRules` *(needs only 1.0)*
-8. **1.2** Migrate `DomElement` callers off the facade
-9. **1.3** Remove `DomElement` + `HtmlTreeBuilder` — **Item 1 done**
+8. **1.2** Migrate `DomElement` callers off the facade — **done (2026-07-11)**
+9. **1.3** Remove `DomElement` + `HtmlTreeBuilder` — **done (2026-07-11); Item 1 done → this roadmap is complete**
 
 Steps 6–7 may run at any point after 1.0 is decided (they do not depend on Track
-2). Steps 8–9 depend on Track 2 completing.
+2). Steps 8–9 depend on Track 2 completing. **All nine steps are now done** — the only
+outstanding item is the WPT + Acid + pixel merge gate for the F3c/F4 commit stack.
 
 ## Validation plan (applies to every milestone)
 

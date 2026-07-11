@@ -126,7 +126,7 @@ public sealed partial class DomBridge
                 .GetCascadedDeclaredValues(dialog, "::backdrop");
             OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
 
-            var backdrop = new DomElement("div", null, null, string.Empty);
+            var backdrop = CreateBridgeElement("div");
             foreach (var kv in backdropStyle)
                 InlineStyle(backdrop)[kv.Key] = kv.Value;
             SetParent(backdrop, parent);

@@ -12,7 +12,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsTraversalSetCurrentNode002Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, in Arguments a)
+    private JSValue JsTraversalSetCurrentNode002Core(ref global::Broiler.Dom.DomElement? currentNode, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSObject nodeObj)
         {
@@ -25,7 +25,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalParentNode003Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalParentNode003Core(ref global::Broiler.Dom.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         while (node != null && !ReferenceEquals(node, root))
@@ -45,7 +45,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalNextNode008Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalNextNode008Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         // Try children first
@@ -111,19 +111,19 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.HtmlBridge.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
     {
         var node = currentNode;
         while (true)
         {
             // Try previous sibling's deepest descendant
-            if (ParentEl(node) != null && !ReferenceEquals(node, root))
+            var parent = node?.ParentNode;
+            if (parent != null && !ReferenceEquals(node, root))
             {
-                var siblings = ChildElements(ParentEl(node)).ToList();
-                var idx = siblings.IndexOf(node);
+                var idx = ChildIndexOf(parent, node!);
                 if (idx > 0)
                 {
-                    node = siblings[idx - 1];
+                    node = parent.ChildNodes[idx - 1];
                     // Go to deepest last child
                     while (node.ChildNodes.Count > 0)
                         node = ChildAt(node, ^1);
@@ -156,7 +156,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalNextNode012Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalNextNode012Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
     {
         if (detached)
             return JSNull.Value;
@@ -203,7 +203,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalPreviousNode013Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.HtmlBridge.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
+    private JSValue JsTraversalPreviousNode013Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
     {
         if (detached)
             return JSNull.Value;
@@ -283,7 +283,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             throw new JSException("Failed to execute 'setStart': parameter 1 is not of type 'Node'.");
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         var newOffset = (int)a[1].DoubleValue;
@@ -308,7 +308,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             throw new JSException("Failed to execute 'setEnd': parameter 1 is not of type 'Node'.");
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         var newOffset = (int)a[1].DoubleValue;
@@ -333,7 +333,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -361,7 +361,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -389,7 +389,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             // INVALID_NODE_TYPE_ERR — node has no parent
@@ -418,7 +418,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
         {
             ThrowDOMException(bridge._jsContext!, "Invalid node type", "InvalidNodeTypeError");
@@ -465,7 +465,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
             return JSUndefined.Value;
         state.StartContainer = ParentEl(el);
@@ -484,7 +484,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         state.StartContainer = el;
@@ -502,7 +502,7 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalCloneContents032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        var fragment = CreateBridgeElement("#document-fragment");
         bridge._knownNodes.Add(fragment);
         var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
         foreach (var node in nodes)
@@ -519,7 +519,7 @@ public sealed partial class DomBridge
 
     private JSValue JsTraversalExtractContents033Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.HtmlBridge.DomBridge.RangeState? state, in Arguments a)
     {
-        var fragment = new DomElement(_document, "#document-fragment", null, null, string.Empty);
+        var fragment = CreateBridgeElement("#document-fragment");
         bridge._knownNodes.Add(fragment);
         // Handle same-container text node case
         if (ReferenceEquals(state.StartContainer, state.EndContainer) && (IsText(state.StartContainer) || IsComment(state.StartContainer)))
@@ -529,8 +529,7 @@ public sealed partial class DomBridge
             var e2 = Math.Max(s, Math.Min(state.EndOffset, text.Length));
             var extractedText = text.Substring(s, e2 - s);
             SetBridgeText(state.StartContainer, text.Substring(0, s) + text.Substring(e2));
-            var textNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(textNode, extractedText);
+            var textNode = CreateBridgeTextNode(extractedText);
             SetParent(textNode, fragment);
             fragment.AppendChild(textNode);
             bridge._knownNodes.Add(textNode);
@@ -571,21 +570,22 @@ public sealed partial class DomBridge
             return bridge.ToJSObject(fragment);
         }
 
-        // Find the child of ancestor that is an ancestor of (or is) startContainer
-        DomElement? startAncestorChild = null;
+        // Find the child of ancestor that is an ancestor of (or is) startContainer.
+        // RF-BRIDGE-1c Phase F (F3c part 2b): a boundary child can be a text node.
+        Broiler.Dom.DomNode? startAncestorChild = null;
         {
-            var node = state.StartContainer;
-            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
-                node = ParentEl(node);
+            Broiler.Dom.DomNode? node = state.StartContainer;
+            while (node != null && !ReferenceEquals(node.ParentNode, ancestor))
+                node = node.ParentNode;
             startAncestorChild = node;
         }
 
         // Find the child of ancestor that is an ancestor of (or is) endContainer
-        DomElement? endAncestorChild = null;
+        Broiler.Dom.DomNode? endAncestorChild = null;
         {
-            var node = state.EndContainer;
-            while (node != null && !ReferenceEquals(ParentEl(node), ancestor))
-                node = ParentEl(node);
+            Broiler.Dom.DomNode? node = state.EndContainer;
+            while (node != null && !ReferenceEquals(node.ParentNode, ancestor))
+                node = node.ParentNode;
             endAncestorChild = node;
         }
 
@@ -603,15 +603,14 @@ public sealed partial class DomBridge
                     var text = BridgeText(state.StartContainer);
                     var extractedPart = text.Substring(state.StartOffset);
                     SetBridgeText(state.StartContainer, text.Substring(0, state.StartOffset));
-                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    SetBridgeText(extractedNode, extractedPart);
+                    var extractedNode = bridge.CreateBridgeTextNode(extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
                 }
                 else
                 {
-                    // Element: clone and extract children from startOffset
+                    // Element container (text case handled above); clone and extract children.
                     var clone = CloneDomElement(state.StartContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = state.StartOffset; ci < state.StartContainer.ChildNodes.Count;)
@@ -661,14 +660,14 @@ public sealed partial class DomBridge
                     var text = BridgeText(state.EndContainer);
                     var extractedPart = text.Substring(0, state.EndOffset);
                     SetBridgeText(state.EndContainer, text.Substring(state.EndOffset));
-                    var extractedNode = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-                    SetBridgeText(extractedNode, extractedPart);
+                    var extractedNode = bridge.CreateBridgeTextNode(extractedPart);
                     bridge._knownNodes.Add(extractedNode);
                     SetParent(extractedNode, fragment);
                     fragment.AppendChild(extractedNode);
                 }
                 else
                 {
+                    // Element container (text case handled above); clone and extract children.
                     var clone = CloneDomElement(state.EndContainer, false);
                     bridge._knownNodes.Add(clone);
                     for (var ci = 0; ci < state.EndOffset && state.EndContainer.ChildNodes.Count > 0; ci++)
@@ -725,7 +724,7 @@ public sealed partial class DomBridge
         var nodeObj = a[0] as JSObject;
         if (nodeObj == null)
             return JSUndefined.Value;
-        var el = bridge.FindDomElementByJSObject(nodeObj);
+        var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
             return JSUndefined.Value;
         // Remove from old parent if needed
@@ -747,8 +746,7 @@ public sealed partial class DomBridge
             // Update original text node
             SetBridgeText(state.StartContainer, beforeText);
             // Create remainder text node
-            var remainder = new DomElement(_document, "#text", null, null, string.Empty, isTextNode: true);
-            SetBridgeText(remainder, afterText);
+            var remainder = bridge.CreateBridgeTextNode(afterText);
             bridge._knownNodes.Add(remainder);
             // Insert: [before] [insertedNode] [after]
             var textIdx = ChildIndexOf(parent, state.StartContainer);
@@ -831,12 +829,15 @@ public sealed partial class DomBridge
         }
 
         // Check: inserting newParent into startContainer — must not violate hierarchy
-        // Document node can only have one element child
-        if (string.Equals(state.StartContainer.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(state.StartContainer.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+        // Document node can only have one element child. RF-BRIDGE-1c Phase F (F3c part 2b):
+        // only an element container carries #document/#subdoc-root TagName; a text container
+        // never enters this branch.
+        if (state.StartContainer is DomElement startContainerElement &&
+            (string.Equals(startContainerElement.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(startContainerElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)))
         {
             // Count existing element children (minus any that will be moved into newParent)
             var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
-            var elemCount = ChildElements(state.StartContainer).Count(c => !IsText(c) && !IsComment(c));
+            var elemCount = ChildElements(startContainerElement).Count(c => !IsText(c) && !IsComment(c));
             var removedElems = nodes.Count(n => !IsText(n) && !IsComment(n));
             // After removal + adding newParent, there would be (elemCount - removedElems + 1) element children
             if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !IsComment(newParent)))
@@ -880,8 +881,8 @@ public sealed partial class DomBridge
             throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
         if (a[1] is not JSObject sourceRangeObj)
             return new JSNumber(0);
-        var sourceStartContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
-        var sourceEndContainer = bridge.FindDomElementByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
+        var sourceStartContainer = bridge.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
+        var sourceEndContainer = bridge.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
         if (sourceStartContainer == null || sourceEndContainer == null)
             return new JSNumber(0);
         var sourceStartOffsetValue = sourceRangeObj[(KeyString)"startOffset"];

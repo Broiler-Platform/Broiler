@@ -157,8 +157,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public DomBridge()
     {
         _document = new CanonicalDocument();
-        _documentNode = new DomElement(_document, "#document", null, null, string.Empty);
-        DocumentElement = new DomElement(_document, "html", null, null, string.Empty);
+        _documentNode = CreateBridgeElement("#document");
+        DocumentElement = CreateBridgeElement("html");
         _document.AppendChild(_documentNode);
         _documentNode.AppendChild(DocumentElement);
     }
@@ -201,19 +201,24 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // to OfType and callers gain IsText handling.
     // -----------------------------------------------------------------
 
-    /// <summary>The element's child nodes as <see cref="DomElement"/> (drop-in for the old
-    /// <c>element.Children</c> enumeration).</summary>
-    private static IEnumerable<DomElement> ChildElements(DomElement element) =>
-        element.ChildNodes.Cast<DomElement>();
+    /// <summary>The element's <see cref="DomElement"/> children. RF-BRIDGE-1c Phase F (F3c part 2c):
+    /// narrowed from <c>Cast</c> to <c>OfType&lt;DomElement&gt;()</c> so it skips canonical
+    /// <c>DomText</c>/<c>DomComment</c> children once construction flips; a no-op on today's
+    /// homogeneous tree. Callers that need text/comment children walk raw <c>ChildNodes</c> instead.</summary>
+    private static IEnumerable<DomElement> ChildElements(Broiler.Dom.DomNode element) =>
+        element.ChildNodes.OfType<DomElement>();
 
-    /// <summary>The child at <paramref name="index"/> (old <c>Children[index]</c>).</summary>
-    private static DomElement ChildAt(DomElement element, int index) => (DomElement)element.ChildNodes[index];
+    /// <summary>The child node at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
+    /// Phase F (F3c part 2c): returns canonical <see cref="Broiler.Dom.DomNode"/> — a child may be a
+    /// <c>DomText</c>/<c>DomComment</c> once construction flips. Element-only callers narrow with
+    /// <c>as DomElement</c>/<c>is DomElement</c>; on today's homogeneous tree every child is an element.</summary>
+    private static Broiler.Dom.DomNode ChildAt(Broiler.Dom.DomNode element, int index) => element.ChildNodes[index];
 
-    /// <summary>The child at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
+    /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
     /// from-end indexer.</summary>
-    private static DomElement ChildAt(DomElement element, System.Index index) =>
-        (DomElement)element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
+    private static Broiler.Dom.DomNode ChildAt(Broiler.Dom.DomNode element, System.Index index) =>
+        element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
@@ -228,15 +233,20 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return -1;
     }
 
+    // RF-BRIDGE-1c Phase F (F3c part 2b): the child-mutation helpers take a DomNode parent so
+    // range-extract code (whose ancestor-chain clones are DomNode-typed) can reparent without
+    // casts. At runtime the parent is always an element; canonical AppendChild/InsertBefore/
+    // RemoveChild enforce nothing text-specific, so this is a safe widen.
+
     /// <summary>Old <c>Children.Insert(index, child)</c>.</summary>
-    private static void InsertChildAt(DomElement parent, int index, Broiler.Dom.DomNode child)
+    private static void InsertChildAt(Broiler.Dom.DomNode parent, int index, Broiler.Dom.DomNode child)
     {
         var reference = index < parent.ChildNodes.Count ? parent.ChildNodes[index] : null;
         parent.InsertBefore(child, reference);
     }
 
     /// <summary>Old <c>Children.Remove(child)</c> — removes only if actually a child; returns success.</summary>
-    private static bool RemoveChildFrom(DomElement parent, Broiler.Dom.DomNode child)
+    private static bool RemoveChildFrom(Broiler.Dom.DomNode parent, Broiler.Dom.DomNode child)
     {
         if (!ReferenceEquals(child.ParentNode, parent))
             return false;
@@ -247,10 +257,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Old raw <c>Children.RemoveAt(index)</c> (no mutation notifications — matches the
     /// LegacyChildList primitive; distinct from the notifying <c>RemoveChildAt</c> helper).</summary>
-    private static void RemoveNthChild(DomElement parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
+    private static void RemoveNthChild(Broiler.Dom.DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
 
     /// <summary>Old <c>Children.Clear()</c>.</summary>
-    private static void ClearChildren(DomElement parent)
+    private static void ClearChildren(Broiler.Dom.DomNode parent)
     {
         foreach (var child in parent.ChildNodes.ToArray())
             parent.RemoveChild(child);
@@ -276,7 +286,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static string BridgeText(Broiler.Dom.DomNode node) => node switch
     {
         Broiler.Dom.DomCharacterData characterData => characterData.Data,
-        DomElement facade => facade.TextContent ?? string.Empty,
         _ => node.NodeValue ?? string.Empty,
     };
 
@@ -285,8 +294,80 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         if (node is Broiler.Dom.DomCharacterData characterData)
             characterData.Data = value;
-        else if (node is DomElement facade)
-            facade.TextContent = value;
+    }
+
+    /// <summary>Mints a canonical <see cref="Broiler.Dom.DomText"/> carrying <paramref name="data"/>
+    /// (RF-BRIDGE-1c Phase F, F3c part 2d — construction cutover). The single funnel for text-node
+    /// construction; callers treat the result as a <see cref="Broiler.Dom.DomNode"/>.</summary>
+    private Broiler.Dom.DomNode CreateBridgeTextNode(string data) => _document.CreateTextNode(data);
+
+    /// <summary>Mints a canonical <see cref="Broiler.Dom.DomComment"/> carrying <paramref name="data"/>
+    /// (see <see cref="CreateBridgeTextNode"/>).</summary>
+    private Broiler.Dom.DomNode CreateBridgeCommentNode(string data) => _document.CreateComment(data);
+
+    /// <summary>
+    /// The single construction funnel for bridge element nodes (RF-BRIDGE-1c Phase F, F4). Every
+    /// former <c>new DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
+    /// so element construction lives in exactly one place over the canonical <c>Broiler.Dom</c>
+    /// document factories. The tag name may be an HTML element literal (HTML namespace) or a
+    /// <c>#</c>-sentinel (<c>#document</c>, <c>#subdoc-root</c>, …), which keeps a null namespace and
+    /// its preserved name — the bridge-internal document/fragment/shadow model over canonical types.
+    /// </summary>
+    private DomElement CreateBridgeElement(
+        string tagName,
+        string? id = null,
+        string? className = null,
+        Dictionary<string, string>? attributes = null) =>
+        // A leading '#' marks a bridge sentinel (document/fragment/shadow/doctype root): null
+        // namespace, name preserved verbatim. Every other tag is an HTML element. CreateElementNS
+        // preserves the given name's case exactly as the old facade ctor did (no ToLowerInvariant).
+        CreateBridgeElementNS(tagName.StartsWith('#') ? null : Broiler.Dom.DomNamespaces.Html, tagName, id, className, attributes);
+
+    /// <summary>
+    /// Element construction with an explicit namespace used verbatim (may be <c>null</c>), for the
+    /// <c>createElementNS</c> handlers, sub-document roots, and clones (which preserve the source
+    /// element's namespace). See <see cref="CreateBridgeElement"/>.
+    /// </summary>
+    private DomElement CreateBridgeElementNS(
+        string? namespaceUri,
+        string tagName,
+        string? id = null,
+        string? className = null,
+        Dictionary<string, string>? attributes = null)
+    {
+        var element = _document.CreateElementNS(namespaceUri, tagName);
+        if (attributes is not null)
+            foreach (var (name, value) in attributes)
+                element.SetAttribute(name, value);
+        if (id is not null)
+            element.Id = id;
+        if (className is not null)
+            element.ClassName = className;
+        return element;
+    }
+
+    /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
+    /// replaces all children with a single canonical <see cref="Broiler.Dom.DomText"/> (or none when
+    /// <paramref name="value"/> is null/empty). Replaces the former element-store
+    /// <c>DomElement.TextContent</c> scalar.</summary>
+    private void SetElementTextContent(DomElement element, string? value)
+    {
+        ClearChildren(element);
+        if (!string.IsNullOrEmpty(value))
+        {
+            var textNode = CreateBridgeTextNode(value);
+            _knownNodes.Add(textNode);
+            element.AppendChild(textNode);
+        }
+    }
+
+    /// <summary>An element's <c>textContent</c> — the concatenation of its descendant text (RF-BRIDGE-1c
+    /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>DomElement.TextContent</c>.</summary>
+    private static string GetElementTextContent(DomElement element)
+    {
+        var sb = new System.Text.StringBuilder();
+        CollectTextContent(element, sb);
+        return sb.ToString();
     }
 
     /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
@@ -297,8 +378,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
-    /// otherwise the child is appended if not already there — matching the old setter exactly.</summary>
-    private static void SetParent(Broiler.Dom.DomNode child, DomElement? parent)
+    /// otherwise the child is appended if not already there — matching the old setter exactly.
+    /// RF-BRIDGE-1c Phase F (F3c part 2b): the parent widened to <c>DomNode?</c> so range-extract
+    /// code can pass DomNode-typed ancestor-chain clones (always elements at runtime).</summary>
+    private static void SetParent(Broiler.Dom.DomNode child, Broiler.Dom.DomNode? parent)
     {
         if (parent is null)
             child.Remove();
@@ -322,10 +405,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return state.Style;
     }
 
-    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomElement element) =>
+    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).EventListeners;
 
-    private static Dictionary<string, JSValue> GetInlineEventHandlers(DomElement element) =>
+    private static Dictionary<string, JSValue> GetInlineEventHandlers(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
 
     internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
@@ -840,12 +923,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         Layout.DocumentModeContext.CurrentQuirksMode =
             Layout.DocumentModeContext.IsQuirksHtml(html);
 
-        // Use WHATWG-aligned tokeniser & tree builder
-        var builder = new HtmlTreeBuilder();
-        var (docElement, allElements, title) = builder.Build(html, _document);
+        // Use WHATWG-aligned tokeniser & tree builder (shared HtmlDocumentParser).
+        var (docElement, allElements, title) = BuildDocumentTree(html);
         Title = title;
         ClearChildren(DocumentElement);
-        foreach (var child in ChildElements(docElement).ToArray())
+        // RF-BRIDGE-1c Phase F (F3c part 2d): reparent ALL children (raw ChildNodes) so any
+        // text/comment nodes directly under the parsed <html> survive — no-op on the old
+        // homogeneous tree where every child was an element.
+        foreach (var child in docElement.ChildNodes.ToArray())
         {
             SetParent(child, DocumentElement);
             DocumentElement.AppendChild(child);

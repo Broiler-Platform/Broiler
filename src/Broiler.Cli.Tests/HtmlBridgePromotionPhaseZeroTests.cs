@@ -31,15 +31,18 @@ public sealed class HtmlBridgePromotionPhaseZeroTests
     private const string HtmlBridgePrefix = "Broiler.HtmlBridge";
 
     [Fact]
-    public void DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Versioned_And_Frozen()
+    public void DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Removed_At_V2()
     {
-        // htmlbridge-dom-adapter/v1: the DomElement facade + HtmlTreeBuilder
-        // materializer. Both delegate to the canonical node model / Broiler.Dom.Html
-        // and may only be removed at the published removal boundary.
-        Assert.Equal("htmlbridge-dom-adapter/v1", DomElement.CompatibilitySurfaceVersion);
-        Assert.Equal("htmlbridge-public-surface/v2", DomElement.RemovalBoundaryVersion);
-        Assert.Equal("htmlbridge-dom-adapter/v1", HtmlTreeBuilder.CompatibilitySurfaceVersion);
-        Assert.Equal("htmlbridge-public-surface/v2", HtmlTreeBuilder.RemovalBoundaryVersion);
+        // htmlbridge-public-surface/v2 (RF-BRIDGE-1c Phase F4): the DomElement facade +
+        // HtmlTreeBuilder materializer have reached their published removal boundary and
+        // are deleted. The bridge now builds its whole tree from canonical Broiler.Dom
+        // nodes via the shared HtmlDocumentParser; this guard asserts neither type can
+        // silently reappear.
+        var coreAssembly = typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly;
+        var domAssembly = typeof(DomBridge).Assembly;
+
+        Assert.Null(coreAssembly.GetType("Broiler.HtmlBridge.DomElement"));
+        Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.HtmlTreeBuilder"));
     }
 
     [Fact]

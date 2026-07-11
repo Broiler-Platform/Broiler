@@ -10,13 +10,14 @@ public class HtmlBridgeBoundaryGuardTests
         "Broiler.JavaScript.Engine",
     ];
 
+    // RF-BRIDGE-1c Phase F4 removed the DomElement facade, so DomBridge.DocumentElement /
+    // Elements now expose canonical Broiler.Dom.DomElement — no longer an engine-internal
+    // compatibility leak. Only the JSContext-bearing script-attach entry points remain.
     private static readonly string[] AllowedDomBridgeEngineInternalLeaks =
     [
         "Method:Attach(JSContext, String)",
         "Method:Attach(JSContext, String, String)",
         "Method:RegisterNamedElementGlobals(JSContext)",
-        "Property:DocumentElement",
-        "Property:Elements",
     ];
 
     [Fact]
@@ -49,16 +50,19 @@ public class HtmlBridgeBoundaryGuardTests
     }
 
     [Fact]
-    public void DomElement_Remains_Owned_By_Core_During_Phase_Zero()
+    public void Core_And_Dom_Bridge_Assemblies_Are_Split_As_Expected()
     {
-        Assert.Equal("Broiler.HtmlBridge.Core", typeof(DomElement).Assembly.GetName().Name);
+        // RF-BRIDGE-1c Phase F4: the DomElement facade that used to anchor "owned by Core"
+        // is gone. The narrow runtime contract (IDomBridgeRuntime) stays in Core; the
+        // DomBridge implementation stays in the Dom assembly.
+        Assert.Equal("Broiler.HtmlBridge.Core", typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly.GetName().Name);
         Assert.Equal("Broiler.HtmlBridge.Dom", typeof(DomBridge).Assembly.GetName().Name);
     }
 
     [Fact]
     public void Core_JavaScript_Dependencies_Are_Frozen_For_Dom_Extraction()
     {
-        var javaScriptDependencies = typeof(DomElement).Assembly
+        var javaScriptDependencies = typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly
             .GetReferencedAssemblies()
             .Select(static reference => reference.Name)
             .Where(static name => name?.StartsWith("Broiler.JavaScript.", StringComparison.Ordinal) == true)
@@ -66,19 +70,6 @@ public class HtmlBridgeBoundaryGuardTests
             .ToArray();
 
         Assert.Equal(AllowedCoreJavaScriptDependencies, javaScriptDependencies);
-    }
-
-    [Fact]
-    public void DomElement_Does_Not_Expose_JavaScript_State()
-    {
-        var properties = typeof(DomElement)
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(static property => ContainsJavaScriptType(property.PropertyType, []))
-            .Select(static property => property.Name)
-            .OrderBy(static name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Empty(properties);
     }
 
     [Fact]
@@ -103,13 +94,13 @@ public class HtmlBridgeBoundaryGuardTests
     public void Phase_Three_Bridge_Owns_Canonical_Document_Without_A_Flat_Element_List()
     {
         Assert.Equal(typeof(Broiler.Dom.DomDocument), typeof(DomBridge).GetProperty(nameof(DomBridge.Document))?.PropertyType);
-        Assert.True(typeof(Broiler.Dom.DomNode).IsAssignableFrom(typeof(DomElement)));
+        Assert.True(typeof(Broiler.Dom.DomNode).IsAssignableFrom(typeof(Broiler.Dom.DomElement)));
         Assert.DoesNotContain(
             typeof(DomBridge).GetFields(BindingFlags.NonPublic | BindingFlags.Instance),
             static field =>
                 field.FieldType.IsGenericType &&
                 field.FieldType.GetGenericTypeDefinition() == typeof(List<>) &&
-                field.FieldType.GetGenericArguments()[0] == typeof(DomElement));
+                field.FieldType.GetGenericArguments()[0] == typeof(Broiler.Dom.DomElement));
     }
 
     [Fact]
@@ -198,9 +189,9 @@ public class HtmlBridgeBoundaryGuardTests
 
     private static bool HasEngineInternalType(Type type)
     {
-        if (type == typeof(DomElement))
-            return true;
-
+        // RF-BRIDGE-1c Phase F4: the DomElement facade is gone, so the only engine-internal
+        // types the bridge can leak are the JavaScript engine's own. Canonical Broiler.Dom
+        // element/document types on the public surface are the intended contract, not a leak.
         if (type.Namespace?.StartsWith("Broiler.JavaScript.", StringComparison.Ordinal) == true)
             return true;
 
@@ -208,39 +199,6 @@ public class HtmlBridgeBoundaryGuardTests
             return HasEngineInternalType(type.GetElementType()!);
 
         return type.IsGenericType && type.GetGenericArguments().Any(HasEngineInternalType);
-    }
-
-    private static bool ContainsJavaScriptType(Type type, HashSet<Type> visited)
-    {
-        if (type == typeof(DomElement))
-            return false;
-
-        if (!visited.Add(type))
-            return false;
-
-        if (type.Namespace?.StartsWith("Broiler.JavaScript.", StringComparison.Ordinal) == true)
-            return true;
-
-        if (type.IsArray)
-            return ContainsJavaScriptType(type.GetElementType()!, visited);
-
-        if (type.IsGenericType &&
-            type.GetGenericArguments().Any(argument => ContainsJavaScriptType(argument, visited)))
-        {
-            return true;
-        }
-
-        if (type.Assembly != typeof(DomElement).Assembly)
-            return false;
-
-        return type
-            .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-            .Any(member => member switch
-            {
-                PropertyInfo property => ContainsJavaScriptType(property.PropertyType, visited),
-                FieldInfo field => ContainsJavaScriptType(field.FieldType, visited),
-                _ => false,
-            });
     }
 
     private static string FindRepositoryRoot()

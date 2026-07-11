@@ -572,18 +572,18 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildEmptySubDocument(DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var htmlEl = new DomElement("html", null, null, string.Empty);
+        var htmlEl = CreateBridgeElement("html");
         SetParent(htmlEl, docRoot);
         docRoot.AppendChild(htmlEl);
 
-        var headEl = new DomElement("head", null, null, string.Empty);
+        var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         htmlEl.AppendChild(headEl);
 
-        var bodyEl = new DomElement("body", null, null, string.Empty);
+        var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
         htmlEl.AppendChild(bodyEl);
 
@@ -602,28 +602,27 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentWithText(string textContent, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var htmlEl = new DomElement("html", null, null, string.Empty);
+        var htmlEl = CreateBridgeElement("html");
         SetParent(htmlEl, docRoot);
         docRoot.AppendChild(htmlEl);
 
-        var headEl = new DomElement("head", null, null, string.Empty);
+        var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         htmlEl.AppendChild(headEl);
 
-        var bodyEl = new DomElement("body", null, null, string.Empty);
+        var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
         htmlEl.AppendChild(bodyEl);
 
         // Wrap text content in <pre> element
-        var preEl = new DomElement("pre", null, null, string.Empty);
+        var preEl = CreateBridgeElement("pre");
         SetParent(preEl, bodyEl);
         bodyEl.AppendChild(preEl);
 
-        var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-        SetBridgeText(textNode, textContent);
+        var textNode = CreateBridgeTextNode(textContent);
         SetParent(textNode, preEl);
         preEl.AppendChild(textNode);
 
@@ -866,11 +865,10 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
-        var builder = new HtmlTreeBuilder();
-        var (parsedRoot, allElements, _) = builder.Build(html, _document);
+        var (parsedRoot, allElements, _) = BuildDocumentTree(html);
 
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Move it under #subdoc-root as the documentElement.
@@ -898,21 +896,25 @@ public sealed partial class DomBridge
     /// Used by <see cref="BuildSubDocumentFromHtml"/> to register structural elements
     /// (html, head, body) that <see cref="HtmlTreeBuilder"/> does not include in its allElements list.
     /// </summary>
-    private void AddElementsRecursive(DomElement element)
+    // RF-BRIDGE-1c Phase F (F3c part 2d): register/unregister the whole node subtree (raw
+    // ChildNodes) so canonical text/comment nodes round-trip through _knownNodes too. No-op on the
+    // old homogeneous tree where every child was an element.
+    private void AddElementsRecursive(Broiler.Dom.DomNode node)
     {
-        if (!_knownNodes.Contains(element))
-            _knownNodes.Add(element);
-        foreach (var child in ChildElements(element))
+        if (!_knownNodes.Contains(node))
+            _knownNodes.Add(node);
+        foreach (var child in node.ChildNodes)
             AddElementsRecursive(child);
     }
 
-    private void RemoveElementsRecursive(DomElement element)
+    private void RemoveElementsRecursive(Broiler.Dom.DomNode node)
     {
-        _knownNodes.Remove(element);
-        _jsObjectCache.Remove(element);
-        _styleSheetCache.Remove(element);
+        _knownNodes.Remove(node);
+        _jsObjectCache.Remove(node);
+        if (node is DomElement element)
+            _styleSheetCache.Remove(element);
 
-        foreach (var child in ChildElements(element))
+        foreach (var child in node.ChildNodes)
             RemoveElementsRecursive(child);
     }
 
@@ -923,7 +925,9 @@ public sealed partial class DomBridge
             var child = ChildAt(node, index);
             if (!IsText(child))
             {
-                NormalizeNode(child);
+                // Recurse into element children (a comment has no text children to merge).
+                if (child is DomElement childElement)
+                    NormalizeNode(childElement);
                 index++;
                 continue;
             }
@@ -960,28 +964,39 @@ public sealed partial class DomBridge
         NotifyChildRemoved(parent, child, index);
     }
 
-    private static bool NodesAreEqual(DomElement first, DomElement second)
+    private static bool NodesAreEqual(Broiler.Dom.DomNode first, Broiler.Dom.DomNode second)
     {
         if (ReferenceEquals(first, second))
             return true;
 
-        if (IsText(first) != IsText(second) ||
-            !string.Equals(first.TagName, second.TagName, StringComparison.Ordinal) ||
-            !string.Equals(first.NamespaceURI, second.NamespaceURI, StringComparison.Ordinal) ||
-            !string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal))
+        if (first.NodeType != second.NodeType)
+            return false;
+
+        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (text/comment) have no
+        // TagName/attributes — they are equal iff their data matches. Dead on today's homogeneous
+        // facade tree (facade text/comment are DomElement and take the element path below); live
+        // once construction flips to canonical DomText/DomComment.
+        if (first is Broiler.Dom.DomCharacterData || second is Broiler.Dom.DomCharacterData)
+            return string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal);
+
+        var firstEl = (DomElement)first;
+        var secondEl = (DomElement)second;
+        if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
+            !string.Equals(firstEl.NamespaceUri, secondEl.NamespaceUri, StringComparison.Ordinal) ||
+            !string.Equals(BridgeText(firstEl), BridgeText(secondEl), StringComparison.Ordinal))
         {
             return false;
         }
 
-        if (!CanonicalAttributesAreEqual(first, second) ||
-            first.ChildNodes.Count != second.ChildNodes.Count)
+        if (!CanonicalAttributesAreEqual(firstEl, secondEl) ||
+            firstEl.ChildNodes.Count != secondEl.ChildNodes.Count)
         {
             return false;
         }
 
-        for (var index = 0; index < first.ChildNodes.Count; index++)
+        for (var index = 0; index < firstEl.ChildNodes.Count; index++)
         {
-            if (!NodesAreEqual(ChildAt(first, index), ChildAt(second, index)))
+            if (!NodesAreEqual(ChildAt(firstEl, index), ChildAt(secondEl, index)))
                 return false;
         }
 
@@ -1046,7 +1061,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void InsertNodeAt(DomElement parent, DomElement node, int index)
+    private void InsertNodeAt(DomElement parent, Broiler.Dom.DomNode node, int index)
     {
         if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
@@ -1077,23 +1092,30 @@ public sealed partial class DomBridge
         InvalidateStyleScope(parent);
         NotifyChildAdded(parent, node, index);
 
-        var insertedTag = node.TagName?.ToLowerInvariant();
-        if (insertedTag == "iframe" || insertedTag == "object")
-            FireSubDocumentOnload(node);
-        else
-            FireDescendantOnloads(node);
+        // RF-BRIDGE-1c Phase F (F3c part 2b): only elements carry a TagName / fire onloads; a
+        // canonical char-data node inserts with no sub-document side effects.
+        if (node is DomElement insertedElement)
+        {
+            var insertedTag = insertedElement.TagName?.ToLowerInvariant();
+            if (insertedTag == "iframe" || insertedTag == "object")
+                FireSubDocumentOnload(insertedElement);
+            else
+                FireDescendantOnloads(insertedElement);
+        }
     }
 
-    private List<DomElement> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
+    private List<Broiler.Dom.DomNode> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
     {
-        var nodes = new List<DomElement>();
+        var nodes = new List<Broiler.Dom.DomNode>();
         if (string.IsNullOrEmpty(html))
             return nodes;
 
         if (!TryBuildInnerHtmlFragmentContainer(contextElement, html, out var fragmentContainer))
             return nodes;
 
-        foreach (var child in ChildElements(fragmentContainer).ToArray())
+        // RF-BRIDGE-1c Phase F (F3c part 2d): move ALL children (raw ChildNodes) so text/comment
+        // nodes in the parsed fragment survive.
+        foreach (var child in fragmentContainer.ChildNodes.ToArray())
         {
             RemoveChildFrom(fragmentContainer, child);
             SetParent(child, null);
@@ -1104,20 +1126,23 @@ public sealed partial class DomBridge
         return nodes;
     }
 
-    private List<DomElement> BuildChildNodeArgumentNodes(in Arguments arguments)
+    private List<Broiler.Dom.DomNode> BuildChildNodeArgumentNodes(in Arguments arguments)
     {
-        var nodes = new List<DomElement>();
+        // RF-BRIDGE-1c Phase F (F3c part 2b): returns canonical DomNode — an argument may be a
+        // text node (resolved via FindDomNodeByJSObject) and string arguments mint text nodes.
+        var nodes = new List<Broiler.Dom.DomNode>();
         for (var i = 0; i < arguments.Length; i++)
         {
             var value = arguments[i];
             if (value is JSObject candidateObject)
             {
-                var candidateNode = FindDomElementByJSObject(candidateObject);
+                var candidateNode = FindDomNodeByJSObject(candidateObject);
                 if (candidateNode != null)
                 {
-                    if (string.Equals(candidateNode.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+                    if (candidateNode is DomElement candidateElement &&
+                        string.Equals(candidateElement.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var fragmentChild in ChildElements(candidateNode).ToArray())
+                        foreach (var fragmentChild in candidateElement.ChildNodes.ToArray())
                             nodes.Add(fragmentChild);
                         continue;
                     }
@@ -1127,10 +1152,7 @@ public sealed partial class DomBridge
                 }
             }
 
-            var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true)
-            {
-                TextContent = value.ToString()
-            };
+            var textNode = CreateBridgeTextNode(value.ToString());
             _knownNodes.Add(textNode);
             nodes.Add(textNode);
         }
@@ -1142,15 +1164,8 @@ public sealed partial class DomBridge
     {
         html ??= string.Empty;
         GetElementRuntimeState(element).InnerHtml = html;
-        element.TextContent = null;
 
-        if (IsText(element))
-        {
-            element.TextContent = html;
-            return;
-        }
-
-        foreach (var child in ChildElements(element).ToArray())
+        foreach (var child in element.ChildNodes.ToArray())
             RemoveElementsRecursive(child);
 
         ClearChildren(element);
@@ -1158,7 +1173,8 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(html) &&
             TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
         {
-            foreach (var child in ChildElements(fragmentContainer).ToArray())
+            // RF-BRIDGE-1c Phase F (F3c part 2d): move ALL children so parsed text/comment survive.
+            foreach (var child in fragmentContainer.ChildNodes.ToArray())
             {
                 SetParent(child, element);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
@@ -1190,7 +1206,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(html))
         {
             var parsingContext = parent.TagName.StartsWith("#", StringComparison.Ordinal)
-                ? new DomElement("body", null, null, string.Empty)
+                ? CreateBridgeElement("body")
                 : parent;
             if (TryBuildInnerHtmlFragmentContainer(parsingContext, html, out var fragmentContainer))
                 parsedContainer = fragmentContainer;
@@ -1204,7 +1220,7 @@ public sealed partial class DomBridge
         if (parsedContainer != null)
         {
             var insertIndex = index;
-            foreach (var child in ChildElements(parsedContainer).ToArray())
+            foreach (var child in parsedContainer.ChildNodes.ToArray())
             {
                 SetParent(child, parent);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
@@ -1227,8 +1243,7 @@ public sealed partial class DomBridge
         if (IsVoidHtmlElementTag(contextTag))
             return false;
 
-        var builder = new HtmlTreeBuilder();
-        var (fragment, _) = builder.BuildFragment(html, contextTag, _document);
+        var (fragment, _) = BuildFragmentTree(html, contextTag);
         container = fragment;
         return true;
     }
@@ -1259,7 +1274,7 @@ public sealed partial class DomBridge
     /// </summary>
     private DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
     {
-        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
 
         try
@@ -1325,7 +1340,7 @@ public sealed partial class DomBridge
     private DomElement BuildDomElementFromXElement(System.Xml.Linq.XElement xe)
     {
         var tagName = xe.Name.LocalName.ToLowerInvariant();
-        var el = new DomElement(tagName, null, null, string.Empty);
+        var el = CreateBridgeElement(tagName);
 
         foreach (var attr in xe.Attributes())
         {
@@ -1344,8 +1359,7 @@ public sealed partial class DomBridge
             }
             else if (child is System.Xml.Linq.XText childText)
             {
-                var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
-                SetBridgeText(textNode, childText.Value);
+                var textNode = CreateBridgeTextNode(childText.Value);
                 SetParent(textNode, el);
                 el.AppendChild(textNode);
                 _knownNodes.Add(textNode);
@@ -1402,12 +1416,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static string GetTextContentRecursive(DomElement element)
     {
-        if (IsText(element))
-            return element.TextContent ?? string.Empty;
-
+        // RF-BRIDGE-1c Phase F (F3c part 2d): aggregate descendant text over raw ChildNodes.
         var sb = new StringBuilder();
-        foreach (var child in ChildElements(element))
-            sb.Append(GetTextContentRecursive(child));
+        CollectTextContent(element, sb);
         return sb.ToString();
     }
 

@@ -26,13 +26,15 @@ public sealed partial class DomBridge
         Dictionary<string, string> headers);
 
 
-    private JSValue GetNodeTextValue(DomElement element)
+    private JSValue GetNodeTextValue(Broiler.Dom.DomNode node)
     {
-        if (IsText(element))
-            return new JSString(BridgeText(element));
+        // RF-BRIDGE-1c Phase F (F3c part 2d): character-data nodes expose their data as textContent;
+        // an element's textContent is the concatenation of its descendant text.
+        if (node is Broiler.Dom.DomCharacterData characterData)
+            return new JSString(characterData.Data);
 
-        if (element.TextContent != null && element.ChildNodes.Count == 0)
-            return new JSString(element.TextContent);
+        if (node is not DomElement element)
+            return new JSString(string.Empty);
 
         if (element.ChildNodes.Count > 0)
         {
@@ -82,7 +84,7 @@ public sealed partial class DomBridge
     }
 
 
-    private void RegisterMutationObserver(JSObject observerObject, DomElement target, Broiler.Dom.DomMutationObserverOptions options)
+    private void RegisterMutationObserver(JSObject observerObject, Broiler.Dom.DomNode target, Broiler.Dom.DomMutationObserverOptions options)
     {
         _mutationObservers.RemoveAll(entry =>
             ReferenceEquals(entry.Observer, observerObject) &&
@@ -104,17 +106,17 @@ public sealed partial class DomBridge
     }
 
 
-    private bool IsPositionAfter(DomElement docRoot, DomElement containerA, int offsetA, DomElement containerB, int offsetB)
+    private bool IsPositionAfter(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB))
             return offsetA > offsetB;
 
         if (IsDescendant(containerA, containerB))
         {
-            var node = containerB;
-            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerA))
-                node = ParentEl(node);
-            if (ParentEl(node) != null)
+            Broiler.Dom.DomNode node = containerB;
+            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
+                node = node.ParentNode;
+            if (node.ParentNode != null)
             {
                 var childIdx = ChildIndexOf(containerA, node);
                 return offsetA > childIdx;
@@ -125,10 +127,10 @@ public sealed partial class DomBridge
 
         if (IsDescendant(containerB, containerA))
         {
-            var node = containerA;
-            while (ParentEl(node) != null && !ReferenceEquals(ParentEl(node), containerB))
-                node = ParentEl(node);
-            if (ParentEl(node) != null)
+            Broiler.Dom.DomNode node = containerA;
+            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))
+                node = node.ParentNode;
+            if (node.ParentNode != null)
             {
                 var childIdx = ChildIndexOf(containerB, node);
                 return childIdx >= offsetB;
@@ -148,7 +150,7 @@ public sealed partial class DomBridge
     }
 
 
-    private int CompareBoundaryPosition(DomElement docRoot, DomElement containerA, int offsetA, DomElement containerB, int offsetB)
+    private int CompareBoundaryPosition(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB) && offsetA == offsetB)
             return 0;

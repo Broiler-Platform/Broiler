@@ -1,9 +1,14 @@
 # RF-BRIDGE-1b — unify the bridge's live geometry on the renderer's layout engine
 
-**Status:** Design (2026-06-29). Decision ratified in
+**Status:** **COMPLETE (2026-07-10).** Decision ratified in
 [`refactor-gap.md`](refactor-gap.md) RF-BRIDGE-1 (end-state (b), unify). RF-BRIDGE-1a
-(retire the dead paint pipeline) is implemented on `refactor/rf-bridge-1a-retire-dead-paint`.
-This is the large, gated follow-on. No code landed yet.
+(retire the dead paint pipeline) is implemented. All seven increments below landed — the coarse
+estimators and `WithLayoutGeometryCache` are deleted, `UseSharedLayoutGeometry`/
+`UseSharedGeometryExclusively` are both on, and `LayoutRuntimeState` is retired (increments 6/7 unblocked
+and completed — see [`htmlbridge-blocked-items-completion-roadmap.md`](htmlbridge-blocked-items-completion-roadmap.md)
+Milestones 2.4/2.5, PRs #1354/#1355). This unification was the prerequisite that unblocked the
+`DomElement` facade removal (RF-BRIDGE-1c), now also complete. The per-increment "BLOCKED" labels below
+are historical.
 
 ## 1. Problem
 
@@ -175,8 +180,12 @@ natural fit for the existing per-pass `WithLayoutGeometryCache` lifetime. Benchm
    `LayoutMetrics.cs`, keeping only the thin JS-facing wrappers that now call the
    provider. Retire `WithLayoutGeometryCache` (the provider's snapshot cache replaces
    its purpose).
-   **BLOCKED (2026-07-09) — not on position-try sizing (that works now), but on a
-   provider capability gap.** `SharedLayoutGeometryProvider` only supplies static
+   **RESOLVED + DONE (2026-07-10, Milestone 2.4 / PR #1354).** The provider capability gaps below were
+   closed by Track 3 (scroll/sticky/scrollIntoView/position-area now answered from the shared snapshot),
+   `UseSharedGeometryExclusively` was flipped on, and the estimator body was deleted. The blocker
+   analysis is retained as history.
+   ~~**BLOCKED (2026-07-09) — not on position-try sizing (that works now), but on a
+   provider capability gap.**~~ `SharedLayoutGeometryProvider` only supplies static
    box geometry (border/padding/content boxes for laid-out elements). The estimator
    graph is still load-bearing for geometry the provider does **not** supply, so a
    deletion regresses real behavior:
@@ -327,7 +336,10 @@ natural fit for the existing per-pass `WithLayoutGeometryCache` lifetime. Benchm
 7. **Move `LayoutRuntimeState`** (`ElementRuntimeState.cs:102`, four
    `RuntimeValue<double>` slots) out last — most of it becomes obsolete once geometry
    comes from the shared snapshot.
-   **BLOCKED (2026-07-09) — still load-bearing.** `LayoutRuntimeState` is not yet
+   **RESOLVED + DONE (2026-07-10, Milestone 2.5 / PR #1355).** Position-area anchor resolution was routed
+   through shared geometry (the `PositionAreaResolutions` CWT relocation), so `LayoutRuntimeState` became
+   obsolete and was **retired**. The blocker analysis is retained as history.
+   ~~**BLOCKED (2026-07-09) — still load-bearing.**~~ `LayoutRuntimeState` is not yet
    obsolete: the anchor resolver stores resolved position-area geometry in it
    (`AnchorResolver/PositionArea.cs` writes `.Layout.{Left,Top,Width,Height}`,
    `PositionAreaQueries.cs` reads them). Retiring it requires routing position-area

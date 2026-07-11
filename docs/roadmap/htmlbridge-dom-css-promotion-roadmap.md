@@ -292,8 +292,13 @@ Exit criteria:
 
 ### Phase 5: Public-surface cleanup
 
-Status: **in progress** (2026-07-09). One of the three workstreams is done; the
-other two are gated on prerequisites that are not yet met (documented below).
+Status: **adapter-removal complete (implementation), pending merge gate** (2026-07-11). All three
+workstreams — RF-BRIDGE-1a dead-paint removal, RF-BRIDGE-1b geometry unification (Item 2), and the v1
+compatibility-adapter removal (`DomElement`/`HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity`) — are
+done and `Broiler.Cli.Tests`-verified. Phase 5's exit criteria are met; the only outstanding item is the
+WPT + Acid + pixel merge gate for the F3c/F4 commit stack (dispatch-only). Remaining promotion candidates
+beyond this phase are tracked in
+[`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md).
 
 - **DONE — delete the RF-BRIDGE-1a dead paint pipeline.** The bridge's parallel,
   runtime-unused box model + paint pipeline is removed:
@@ -310,9 +315,11 @@ other two are gated on prerequisites that are not yet met (documented below).
   `CssExtractionPhaseZeroTests.Phase7_*` failures are **pre-existing at HEAD**
   (legacy `Broiler.HTML.CSS`/`CssData` environmental state), baselined as unrelated.
 
-- **IN PROGRESS — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
+- **DONE — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
   `Broiler.HtmlBridge.Dom.DomElement`, `HtmlTreeBuilder`, the obsolete `CssRules`
-  tuple view, and the bridge-only `DomBridge.CalculateSpecificity`.
+  tuple view, and the bridge-only `DomBridge.CalculateSpecificity` — all deleted
+  (`CssRules`/`CalculateSpecificity` at Milestone 1.1; the `DomElement` facade +
+  `HtmlTreeBuilder` at Milestones 1.2/1.3 = facade-removal Phase F4, 2026-07-11).
   **Update (2026-07-10, session 95a4149e): the v2 boundary is DECLARED** (Open
   Question #5 answered by the maintainer; see
   `docs/architecture/htmlbridge-engine-boundaries.md`), and the two zero-caller shims
@@ -329,16 +336,13 @@ other two are gated on prerequisites that are not yet met (documented below).
   change; it is a staged migration, not a deletion.
   `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
   no longer need the facade node type.
-  **Progress (2026-07-11):** Milestone 1.2 is well under way — **8 facade members deleted**
-  (`JsSetStyleProps`, `OwnerDocRoot`, `Style`, `Attributes`+`LegacyAttributeDictionary`,
-  `Parent`, `IsTextNode`, `Children`+`LegacyChildList` on branch
-  `claude/rf-bridge-1c-domelement-facade-migration`; `NsAttrMap` on branch
-  `claude/htmlbridge-domelement-removal-ucyw5j`; Phases A/B/C/E1/D1/E2/C2), each a
-  behaviour-preserving relocation to `ElementRuntimeState` or canonical DOM, verified
-  regression-free vs the full-`Broiler.Cli.Tests` baseline. Facade remnants
-  `InnerHtml`/`TextContent`/`NamespaceURI` + the text→`DomText` construction
-  flip and cache/`RangeState` re-keying are the Phase F remainder (see the plan's
-  "Status at a glance").
+  **Complete (2026-07-11):** all facade members were relocated (Phases A/B/C/E1/D1/E2/C2/F1 →
+  `ElementRuntimeState` or canonical DOM), text/comment nodes flipped to canonical `DomText`/`DomComment`
+  (F3c part 2), and element construction flipped to the canonical document factories with the facade +
+  `HtmlTreeBuilder` **deleted** (F4). Each step is behaviour-preserving and regression-free vs the full
+  `Broiler.Cli.Tests` baseline (0 new failures). See
+  [`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md) for the
+  authoritative record and the WPT/Acid/pixel merge gate.
 
   **Sharpened dependency analysis (2026-07-09).** The four adapters split into two
   independent gates, not one:
@@ -436,10 +440,10 @@ Tasks:
 - Delete RF-BRIDGE-1a obsolete rendering pipeline types instead of moving them. **(done)**
 - Finish RF-BRIDGE-1b layout unification by replacing bridge recursive geometry estimators with `Broiler.Layout` read-model access.
 
-Exit criteria:
+Exit criteria — **MET** (implementation; pending the WPT/Acid/pixel merge gate):
 
-- `HtmlBridge` contains bridge responsibilities only: JS integration, compatibility surface, host/resource integration, CSSOM/DOM wrapper identity, and handoff to layout/rendering/media.
-- DOM and CSS components own canonical algorithms and data models without bridge dependencies.
+- `HtmlBridge` contains bridge responsibilities only: JS integration, compatibility surface, host/resource integration, CSSOM/DOM wrapper identity, and handoff to layout/rendering/media. ✅ (the v1 `DomElement`/`HtmlTreeBuilder` adapters are deleted)
+- DOM and CSS components own canonical algorithms and data models without bridge dependencies. ✅ (bridge tree is canonical `Broiler.Dom` nodes)
 
 ## Suggested PR Slices
 

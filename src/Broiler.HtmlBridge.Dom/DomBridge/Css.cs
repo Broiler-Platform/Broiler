@@ -211,12 +211,13 @@ public sealed partial class DomBridge
         var snapshot = new List<DomElement>();
         for (var i = 0; ; i++)
         {
-            DomElement child;
+            DomElement? child;
             try
             {
                 if (i >= root.ChildNodes.Count)
                     break;
-                child = ChildAt(root, i);
+                // Element snapshot: a char-data child (post-flip) is skipped (null).
+                child = ChildAt(root, i) as DomElement;
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {
@@ -519,7 +520,8 @@ public sealed partial class DomBridge
 
     private static void AppendRenderedText(DomElement element, StringBuilder builder)
     {
-        foreach (var child in ChildElements(element))
+        // RF-BRIDGE-1c Phase F (F3c part 2d): iterate raw ChildNodes to read canonical DomText.
+        foreach (var child in element.ChildNodes)
         {
             if (IsText(child))
             {
@@ -528,13 +530,16 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            if (string.Equals(child.TagName, "br", StringComparison.OrdinalIgnoreCase))
+            if (child is not DomElement childElement)
+                continue;
+
+            if (string.Equals(childElement.TagName, "br", StringComparison.OrdinalIgnoreCase))
             {
                 builder.Append('\n');
                 continue;
             }
 
-            AppendRenderedText(child, builder);
+            AppendRenderedText(childElement, builder);
         }
     }
 
@@ -564,14 +569,13 @@ public sealed partial class DomBridge
     private string GetStyleElementSourceText(DomElement styleEl)
     {
         var cssText = new StringBuilder();
-        foreach (var child in ChildElements(styleEl))
+        // RF-BRIDGE-1c Phase F (F3c part 2d): iterate raw ChildNodes — the <style> text is a
+        // canonical DomText child, which ChildElements (OfType) would skip.
+        foreach (var child in styleEl.ChildNodes)
         {
             if (IsText(child))
                 cssText.Append(BridgeText(child));
         }
-
-        if (cssText.Length == 0 && styleEl.TextContent != null)
-            cssText.Append(styleEl.TextContent);
 
         if (cssText.Length == 0 && !string.IsNullOrEmpty(GetElementRuntimeState(styleEl).InnerHtml))
             cssText.Append(GetElementRuntimeState(styleEl).InnerHtml);
