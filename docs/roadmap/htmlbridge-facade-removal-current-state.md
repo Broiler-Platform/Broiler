@@ -126,26 +126,38 @@ dead until a canonical `DomText` exists). Concrete work:
   before/after name-diff — 0 regressions across two commits (one interim run showed a lone flaky
   `GoogleSearchPolyfillTests` scroll test that passes on rerun; the final run is an exact 81-failure match).
 
-- ⏳ **2c — `ChildAt` *return type* → `DomNode`** (green) and fix the resulting **~68 tree-heterogeneity
-  sites** (TreeWalker/NodeIterator, `normalize`, `SubDocuments.cs`, `Utilities.cs`, `HitTesting.cs`,
-  `Css.cs`, `AnchorResolver/*`) to handle/skip non-element children; **`ChildElements` →
-  `OfType<DomElement>()`** and route text-needing callers (serialization `GetChildren`, JS
-  `childNodes`, `CollectTextContent`, the Range routines) to raw `ChildNodes`. *(Measured: 68
-  compile errors across 9 files when `ChildAt` returns `DomNode`.)* Also fix the three raw casts in
-  `Traversal.cs` (`:62`, `:71`, `:232`) + `ToTraversalJsValue`; switch serialization `GetKind` to a
-  `NodeType` switch; widen the serialization adapter off `<DomElement>`. (`ChildAt`'s *parent* param
-  and `CloneDomElement`'s char-data factory branch already landed in 2a/2b; the four range-clone casts
-  are gone.)
+- ✅ **2c — `ChildAt` *return type* → `DomNode`. DONE + verified** (0 regressions). Fixed the
+  heterogeneity sites — **only ~18**, far fewer than the doc's estimated 68 because 2a/2b already
+  absorbed most of the cascade (TreeWalker/NodeIterator traverse helpers, `normalize` recursion,
+  `HitTesting`, `Css` `SnapshotChildren`, table-section scan, `ScrollSimulation`/`StickyPositioning`)
+  narrowing with `is`/`as DomElement`. Narrowed **`ChildElements` → `OfType<DomElement>()`** and
+  routed the text-needing callers to raw `ChildNodes` (`CollectTextContent` — textContent aggregation
+  now includes direct text children; serialization `GetChildren`; the range/clone walks landed in
+  2a/2b). Fixed `ToTraversalJsValue` (returns any non-null node's wrapper) + the `currentNode` cast;
+  dropped the obsolete extractContents range-clone casts. Widened the **serialization adapter to
+  `HtmlSerializationAdapter<DomNode>`**: `GetKind` keys text/comment off `NodeType` and the special
+  kinds off the facade `#document-fragment`/`#subdoc-root`/`#doctype` TagNames; `GetName`/
+  `GetAttributes`/`GetStyles`/`GetRawInnerHtml` narrow to `DomElement` (invoked only for element/
+  doctype nodes). **Verified:** full `Broiler.Cli.Tests` name-diff, 0 regressions (sole delta the
+  known-flaky scroll test), 0 new serialization/range failures.
 
-- ⚠️ **2d — the atomic construction flip (irreversible).** The ~23
-  `new DomElement("#text"/"#comment", …)` sites → `document.CreateTextNode`/`CreateComment` (via
-  `CreateBridgeTextNode`/a comment sibling), including `HtmlTreeBuilder.ConvertNode` (whose
-  `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers). **Split
-  `TextContent`'s element-aggregation duty** — element `textContent` *set* → clear + append a child
-  `DomText`; *get* → aggregate over child `DomText`. Remove the element-store shortcut (`Common.cs`
-  aggregation, `SubDocumentObjects.cs`, `LayoutMetrics.cs`, `Css.cs`, `SubDocuments.cs`,
-  `AnimationResolver.cs`, `Serialization.cs`, `CloneDomElement`). **Remove facade `TextContent` +
-  the `NodeValue` override**; update the frozen scalar guard.
+**The green widening prefix (2a/2b/2c) is COMPLETE.** The tree, JS wrappers, ranges, NodeIterator/
+TreeWalker, cloning, adoption, event dispatch, and serialization all handle canonical `DomText`/
+`DomComment` correctly. Everything behaviour-preserving is done; only the irreversible flip (2d) —
+which actually puts a canonical `DomText` into the tree — remains.
+
+- ⚠️ **2d — the atomic construction flip (irreversible).** Prep already in place: `CreateBridgeTextNode`
+  is the text-node construction funnel (it flips to `_document.CreateTextNode` in one place), `SplitText`
+  and `BuildChildNodeArgumentNodes` already route through it, and `CloneDomElement`/`NodesAreEqual`/
+  `GetNodeTextValue`/`GetKind`/the char-data JS wrapper already branch on `DomCharacterData`. Remaining:
+  flip `CreateBridgeTextNode` to `_document.CreateTextNode`, add the comment analogue, and convert the
+  remaining ~20 `new DomElement("#text"/"#comment", …)` sites (incl. `HtmlTreeBuilder.ConvertNode`, whose
+  `allElements: List<DomElement>` widens to `List<DomNode>`; update its 5 callers). **Split `TextContent`'s
+  element-aggregation duty** — element `textContent` *set* → clear + append a child `DomText`; *get* →
+  aggregate over child `DomText` (`CollectTextContent` already does this over raw `ChildNodes`). Remove the
+  element-store shortcut (`Common.cs` `GetNodeTextValue`, `SubDocumentObjects.cs`, `LayoutMetrics.cs`,
+  `Css.cs`, `SubDocuments.cs`, `AnimationResolver.cs`, `Serialization.cs`, `CloneDomElement`). **Remove
+  facade `TextContent` + the `NodeValue` override**; update the frozen scalar guard.
 
 **Gate (2d):** the WPT range/selection/serialization + Acid corpus in addition to `Broiler.Cli.Tests`
 (silent `outerHTML`/selection corruption is the failure mode). The green steps 2a–2c gate on

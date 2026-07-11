@@ -30,14 +30,18 @@ against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) enviro
 F3c part 2a verified via a full before/after TRX **name**-diff (identical 81 env failures, **0
 regressed, 0 newly-failing**), same methodology Phase C2 used.
 
-**F3c part 2 decomposition:** part 2 is landing as green, `Cli.Tests`-verified type-widening commits
-(**2a `ToJSObject` split — done; 2b `RangeState`/NodeIterator/tree-mutation + complete char-data
-wrapper — done**; 2c `ChildAt` return type / `ChildElements` — next) capped by the single irreversible
-construction flip (2d, gated on WPT range/selection/serialization + Acid). Each landed commit is a full
-before/after `Broiler.Cli.Tests` name-diff with 0 regressions. Rationale: the widening is
-behaviour-preserving on today's homogeneous facade tree — a canonical `DomText` is not yet in the tree,
-so the widened branches are dead code — and only construction + the `TextContent` aggregation split are
-genuinely atomic. See the current-state doc §4.
+**F3c part 2 decomposition:** part 2 landed as green, `Cli.Tests`-verified type-widening commits
+(**2a `ToJSObject` split; 2b `RangeState`/NodeIterator/tree-mutation + complete char-data wrapper; 2c
+`ChildAt` return type / `ChildElements` narrowing / serialization adapter — ALL DONE + verified**). The
+green widening prefix is complete: the tree, JS wrappers, ranges, NodeIterator/TreeWalker, cloning,
+adoption, event dispatch, and serialization all handle canonical `DomText`/`DomComment`. Each commit is
+a full before/after `Broiler.Cli.Tests` name-diff with 0 regressions. **Only the single irreversible
+construction flip (2d) remains** — it puts a canonical `DomText` into the tree (flip `CreateBridgeTextNode`
+to `_document.CreateTextNode`, convert the ~20 text/comment ctor sites, split `TextContent` aggregation,
+remove facade `TextContent`) and is gated on WPT range/selection/serialization + Acid. Rationale: the
+widening is behaviour-preserving on today's homogeneous facade tree (the widened branches are dead code
+until a `DomText` exists), so only construction + the `TextContent` split are genuinely atomic. See the
+current-state doc §4.
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
