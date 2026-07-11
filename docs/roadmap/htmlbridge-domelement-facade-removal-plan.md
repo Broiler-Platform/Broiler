@@ -170,20 +170,28 @@ scrollIntoView-% parallel flake, which passes in isolation).
   `Children`/text cutover builds on. (Sed over-captured `state.StartContainer/EndContainer` member
   chains; corrected + hand-migrated the `ParentEl(...)`/`siblings[i]`/`Children[i]` receivers.)
 
-**Remaining D+E2 cluster (one coordinated cutover — the hardest piece):**
-`Children` (`LegacyChildList : IList<DomElement>`, ~350 sites), `TextContent`→
-`DomText`/`DomComment`.`Data` (90 sites), and flipping text/comment **construction** to
-`document.CreateTextNode`/`CreateComment`. These cannot be sub-sliced: a `DomText` cannot enter an
-`IList<DomElement>`, and text-data storage flips *with* construction. Plan: introduce
-`ChildElements`/`ChildIndexOf`/child-mutation helpers + `TextData`/`SetTextData` (route reads via
-`NodeValue`/`DomCharacterData.Data`), migrate the `Children` reads/mutations and the loop-body
-`TagName`/`#comment` checks (`IsComment(node)`), flip the ~20 text/comment construction sites, then
-delete `Children` + `TextContent` in one commit. Gate on the full WPT range/selection + serialization
-corpus (text boundaries silently corrupt `outerHTML`/selection).
+- **Phase E2 (`Children`) — DONE.** Facade `Children` (`LegacyChildList : IList<DomElement>`) removed;
+  **421 sites** migrated to canonical `ChildNodes` + helpers (`ChildElements`/`ChildAt`/`ChildIndexOf`/
+  `InsertChildAt`/`RemoveNthChild`/`ClearChildren`), each mirroring the old primitive. The tree stays
+  homogeneous `DomElement`, so the `Cast`/`ChildAt` casts are safe today and narrow to `OfType` +
+  `IsText` handling at the text flip. Notable snags handled: `ParentEl(y)?.Children.Remove(y)` →
+  `y.Remove()`; the `state.StartContainer/EndContainer.Children` member chains and a `Children[^1]`
+  from-end index; the one indexer-set → `ReplaceChild`; and a **name collision** with a pre-existing
+  *notifying* `RemoveChildAt` (raw primitive renamed `RemoveNthChild`; self-recursion fixed). Full
+  `Broiler.Cli.Tests` empty-diff vs baseline, before and after removing the member.
 
-Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `TextContent` + `Children`
-(D+E2 cluster above), `NamespaceURI` (Phase F).
-Next: the **D+E2 `Children`/construction cutover** (largest remaining), or **Phase C2** (`NsAttrMap`).
+**What remains of D+E2 — the text→canonical construction flip (Phase F territory):** `TextContent`
+(90 sites) → `DomText`/`DomComment`.`Data`, and flipping the ~20 text/comment **construction** sites to
+`document.CreateTextNode`/`CreateComment`. This is deferred because it **cascades beyond the facade**: a
+`DomText` is not a `DomElement`, so it forces re-typing `RangeState.StartContainer`/`EndContainer`, the
+`_knownNodes` set, and the JS-object cache (text nodes have JS wrappers) — i.e. it belongs with the
+Phase F cache/RangeState cutover. At that point `ChildElements` narrows to `OfType<DomElement>()` and the
+tree-walk bodies gain `IsText`/`is DomElement` handling. Gate on the WPT range/selection + serialization
+corpus.
+
+Facade now retains: `InnerHtml` (Phase F), `NsAttrMap` (Phase C2), `TextContent` (Phase F text flip),
+`NamespaceURI` (Phase F). Next: **Phase C2** (`NsAttrMap`) or the **Phase F cutover** (text→`DomText`,
+construction flip, cache/`RangeState` re-keying, delete the facade type).
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
