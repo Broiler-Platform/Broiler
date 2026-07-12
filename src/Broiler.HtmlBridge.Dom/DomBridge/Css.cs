@@ -519,40 +519,6 @@ public sealed partial class DomBridge
             computed["display"] = display;
     }
 
-    private static int FindMatchingClosingParen(string value, int openParenIndex)
-    {
-        int depth = 0;
-        for (int i = openParenIndex; i < value.Length; i++)
-        {
-            if (value[i] == '(')
-                depth++;
-            else if (value[i] == ')')
-            {
-                depth--;
-                if (depth == 0)
-                    return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static int FindTopLevelChar(string value, char target)
-    {
-        int depth = 0;
-        for (int i = 0; i < value.Length; i++)
-        {
-            if (value[i] == '(')
-                depth++;
-            else if (value[i] == ')')
-                depth--;
-            else if (value[i] == target && depth == 0)
-                return i;
-        }
-
-        return -1;
-    }
-
     /// <summary>
     /// Expands CSS shorthand properties into individual longhand properties (e.g.
     /// <c>margin: 10px 5px</c> → <c>margin-top/right/bottom/left</c>), only setting longhands

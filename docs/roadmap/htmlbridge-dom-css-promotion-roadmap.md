@@ -1,8 +1,11 @@
 # HtmlBridge DOM/CSS Promotion Roadmap
 
 Status: **active** — Phases 0–5 are done; Phase 5's adapter removal merged to `main` (PR #1359,
-2026-07-12). Remaining promotion candidates are tracked in
-[`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md).
+2026-07-12). The in-scope promotion slices that followed (computed-style, Range, scope builder, CSS
+helpers) all merged as PRs #1362–#1367 — see the closed
+[`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md). The residual open-ended
+promotion candidates are tracked in
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
 Date: 2026-07-09 (last updated 2026-07-12)
 
 ## Purpose
@@ -52,9 +55,17 @@ The important consequence is that `Broiler.HtmlBridge.Dom.DomElement` and `HtmlT
 | P3 | HTML serialization policies | `Broiler.Dom.Html` | Move only standard serialization policy helpers | Render-specific or Acid-test compatibility transforms should stay bridge-owned unless they are standard DOM/HTML behavior. |
 | Deferred | Image decoder, SVG parser/renderer, canvas helpers | `Broiler.Media`, `Broiler.Graphics`, or existing media roadmap | Do not move to DOM/CSS | These are shared engine capabilities, but not DOM or CSS component responsibilities. Align with the media/graphics roadmap. |
 
+**Status (2026-07-12).** Both **P0** rows are done (Phase 1 + §2.1/§2.3, PRs #1362/#1365/#1367); both **P1**
+rows are done (Phase 3 CSSOM projection, Phase 4 `DomTokenList`); all three **P2** rows are done (Phase 4
+mutation filtering, §2.2 Range PR #1364, §2.4 scope builder PR #1365). The only promotion candidate not yet
+started is **P3 HTML serialization policies**; the **Deferred** media/graphics row is out of DOM/CSS scope.
+The residue is carried into [`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+
 ## Non-candidates
 
-Do not move these into `Broiler.DOM` or `Broiler.CSS`:
+Do not move these into `Broiler.DOM` or `Broiler.CSS`. Their destinations (media/graphics roadmaps,
+`Broiler.Layout`, or permanent bridge ownership) are routed in
+[`htmlbridge-out-of-scope-routing-roadmap.md`](htmlbridge-out-of-scope-routing-roadmap.md):
 
 - `Broiler.HtmlBridge.Dom.DomElement`: compatibility facade over canonical DOM; remove at the public v2 boundary instead of promoting.
 - `HtmlTreeBuilder`: compatibility adapter over `Broiler.Dom.Html.HtmlDocumentParser`; remove when callers parse into canonical DOM directly.
@@ -505,8 +516,18 @@ Add architecture checks where practical:
 
 ## Open Questions
 
-- Should the CSSOM projection live directly in `Broiler.CSS`, or should it be isolated under a `Broiler.CSS.Cssom` namespace to make the browser-API mapping explicit?
-- Should `DomTokenList` be a public DOM type or an internal helper consumed by bridge and future DOM APIs?
-- Should stylesheet scope assembly include host-provided external stylesheet text in CSS.Dom, or should it remain entirely bridge-owned until more non-bridge consumers exist?
-- How much of current bridge serialization behavior is standard HTML serialization versus compatibility transforms for rendering tests?
-- When is the project ready to declare `htmlbridge-public-surface/v2` and remove the v1 compatibility adapters?
+Four of the five original questions were answered in practice by the completed phases; the serialization
+question is the one still genuinely open and is carried into
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+
+- **Answered (Phase 3):** the CSSOM projection lives isolated under a dedicated `Broiler.CSS.Cssom`
+  namespace (`CssomRuleMetadata`), making the browser-API mapping explicit.
+- **Answered (Phase 4):** `DomTokenList` is a public canonical `Broiler.Dom.DomTokenList` type (the bridge
+  `classList` wrappers delegate to it).
+- **Answered (§2.4, PR #1365):** stylesheet scope assembly *does* take host-supplied external stylesheet
+  text in CSS.Dom — `CssStyleScopeBuilder` owns media-gated, order-preserving engine sync while the host
+  keeps discovery + fetching.
+- **Still open:** how much of current bridge serialization behavior is standard HTML serialization versus
+  compatibility transforms for rendering tests? (Gates the P3 HTML-serialization-policy promotion.)
+- **Answered (2026-07-10):** `htmlbridge-public-surface/v2` was declared and the v1 compatibility adapters
+  removed (Milestones 1.0–1.3, PR #1359).

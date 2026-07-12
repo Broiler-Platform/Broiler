@@ -897,12 +897,12 @@ public sealed partial class DomBridge
         GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
 
     /// <summary>Whether <paramref name="node"/>'s parent is an HTML raw-text element whose text
-    /// content is serialized literally (not HTML-escaped) — <c>script</c>, <c>style</c>, and the
-    /// other raw-text elements. (RF-BRIDGE-1c Phase F, F3c part 2d.)</summary>
+    /// content is serialized literally (not HTML-escaped). The standard raw-text element set is
+    /// owned by <see cref="SharedHtmlSerializer.RawTextElements"/> (§13.3); this bridge predicate
+    /// only applies it to the node's parent. (RF-BRIDGE-1c Phase F, F3c part 2d.)</summary>
     private static bool IsRawTextSerializationParent(Broiler.Dom.DomNode node) =>
         node.ParentNode is Broiler.Dom.DomElement parent &&
-        parent.TagName.ToLowerInvariant() is "script" or "style" or "xmp" or "iframe"
-            or "noembed" or "noframes" or "noscript" or "plaintext";
+        SharedHtmlSerializer.IsRawTextElement(parent.TagName);
 
     private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(Broiler.Dom.DomElement element)
     {

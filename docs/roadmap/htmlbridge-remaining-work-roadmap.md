@@ -1,13 +1,25 @@
 # HtmlBridge — Remaining Work Roadmap (post-facade-removal)
 
-Status: **active** — the consolidated "what's left" list now that the `DomElement` facade removal has landed.
-Date: 2026-07-11 (Section 1 gate closed 2026-07-12).
+Status: **closed** — every in-scope item in this roadmap has merged to `main`. Section 1 (facade-removal
+blockers) and Section 2 (§2.1–2.4 DOM/CSS promotion slices) are all done and merged (PRs #1359, #1362–#1367).
+The residual open-ended promotion-candidate backlog (former §2.5) is tracked forward in
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+Date: 2026-07-11 (all sections closed 2026-07-12).
 
-> **Update (2026-07-12): all of Section 1 has landed on `main`.** The F3c/F4 merge gate (1.1) passed
-> and merged as PR #1359; the CSS-helper promotion (2.1 shorthand + 2.3 casing/`CssPriority`) merged as
-> PR #1362; and the `@position-try` twin follow-up from 1.2 — animation/`@keyframes` collection from
-> InnerHtml-backed `<style>` elements — merged as PR #1363. The remaining open work is entirely in
-> Section 2 (DOM/CSS promotion backlog).
+> **Update (2026-07-12): everything in this roadmap has merged to `main`.**
+> - **Section 1** (facade-removal blockers): the F3c/F4 merge gate (1.1) merged as PR #1359; the
+>   `Broiler.Wpt.Tests` resurrection + `DomElement`-alias retirement + `@position-try` fix + CSS-helper
+>   promotion (1.2/1.3 tail, 2.1 shorthand, 2.3 casing/`CssPriority`) merged as PR #1362; the
+>   animation/`@keyframes` InnerHtml-`<style>` twin follow-up (1.2) merged as PR #1363.
+> - **Section 2** (DOM/CSS promotion slices): §2.2 canonical `DomRange` content operations + the bridge
+>   `Range`/`RangeState` rewire merged as PR #1364; §2.1 sparse computed-style projection + §2.4
+>   `CssStyleScopeBuilder` + §2.3 live-setter validation merged as PR #1365; §2.3 `StripVendorPrefix`
+>   promotion merged as PR #1366; the §2.1 `GetComputedProps` cutover + the dead form-control/logical
+>   helper sweep merged as PR #1367.
+>
+> The section entries below are retained as the record of what each slice did. The only work that remains
+> is the open-ended, low-priority promotion-candidate backlog (former §2.5), now tracked in
+> [`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
 
 ## Purpose
 
@@ -104,12 +116,12 @@ were **deliberately not** part of deleting the facade type. They continue the br
 responsibilities into the canonical `Broiler.Dom`/`Broiler.CSS` components. None are blocked by anything;
 they are prioritized independently.
 
-### 2.1 Promotion Phase 2 — computed style (partially delivered)
+### 2.1 Promotion Phase 2 — computed style — **DONE (merged PRs #1362 / #1365 / #1367)**
 
 - The literal `GetComputedProps → GetComputedStyle` cutover (route the bridge's computed-property reads
-  through the canonical CSSOM computed-style path). **The cutover of the ~98 call sites is still deferred,
-  but the canonical projection it needs now exists and the swap is scoped by a measured parity delta
-  (2026-07-12).**
+  through the canonical CSSOM computed-style path). **DONE and merged (PR #1367).** The subsections below
+  are retained as the record of the enabling projection (PR #1365), the measured parity delta, the final
+  cutover, and the dead-helper sweep.
   - **Additive canonical projection landed.** `Broiler.CSS.Dom.CssStyleEngine.GetSparseComputedStyle`
     (Broiler.CSS submodule) runs the full computed-style pipeline (cascade + inline, custom-property/`var()`,
     CSS-wide keywords, shorthand + `attr()`, relative font-weight, inheritance backfill, form-control size
@@ -193,10 +205,10 @@ they are prioritized independently.
   **Delivery note:** the public `ExpandShorthands` wrapper is in the `Broiler.CSS` submodule — push +
   pointer bump (or patch fallback) at commit time.
 
-### 2.2 Promotion Phase 4 / slice 8 — Range content operations (canonical API landed; bridge rewire remains)
+### 2.2 Promotion Phase 4 / slice 8 — Range content operations — **DONE (merged PR #1364)**
 
-The token-list + mutation-filtering work landed earlier; the content operations are now split into two
-slices — **the canonical algorithms first (done), the bridge rewire second (remaining, higher-risk).**
+The token-list + mutation-filtering work landed earlier; the content operations were split into two
+slices — the canonical algorithms first, the bridge rewire second — **and both merged in PR #1364.**
 
 - **Done (2026-07-12) — canonical `DomRange` content operations.** `Broiler.Dom.DomRange` gains the full
   DOM Standard §4.5 content-operation surface, implemented against canonical `DomNode`/`DomCharacterData`
@@ -239,7 +251,7 @@ slices — **the canonical algorithms first (done), the bridge rewire second (re
   already in the committed failed baseline, so adopting spec behavior can only hold or improve, never add a
   new failure. Like the F3c/F4 cutovers this still wants the full WPT range/selection corpus at merge.
 
-### 2.3 Promotion Phase 1 slice-2 — deferred helpers (casing + `CssPriority` **DONE**; live-setter routing remains)
+### 2.3 Promotion Phase 1 slice-2 — deferred helpers — **DONE (merged PRs #1362 / #1365 / #1366)**
 
 Phase 1's exit criteria were already met; slice-2 left deferred items: casing helpers, `CssPriority`, and
 live-setter routing.
@@ -314,7 +326,7 @@ live-setter routing.
   tests are in the `Broiler.CSS` **submodule** — push + pointer bump (or `patches/` fallback if the push
   403s); the bridge one-line reroute is main-repo.
 
-### 2.4 Promotion Phase 2 slice-2 — stylesheet scope assembly (P2 `CssStyleScopeBuilder`) — **DONE (2026-07-12)**
+### 2.4 Promotion Phase 2 slice-2 — stylesheet scope assembly (P2 `CssStyleScopeBuilder`) — **DONE (merged PR #1365)**
 
 The P2 candidate "stylesheet scope assembly without fetching" — previously **never built** (a whole-repo
 search found only the roadmap mention) — is delivered.
@@ -344,16 +356,17 @@ search found only the roadmap mention) — is delivered.
   fetching, and CSS-text extraction (`GetStyleElementCssText`, InnerHtml/CSSOM/runtime-state) — they need the
   DOM and resource loading, matching the roadmap's "fetching remains bridge/host code" boundary.
 
-### 2.5 Promotion-candidate backlog (P0–P3) + Open Questions
+### 2.5 Promotion-candidate backlog (P0–P3) + Open Questions — **moved to its own roadmap**
 
-- The remaining P0–P3 promotion-candidate rows in the promotion roadmap not covered above (the broader
-  "what else could move to the canonical components" backlog). The two higher-risk behavior changes that were
-  open here — the `GetComputedProps` **cutover** (§2.1) and the live `CSSStyleDeclaration` **setter routing**
-  (§2.3) — are now **both done** (each verified regression-free locally and wanting the dispatch-only WPT/Acid
-  gate at merge). The residual backlog is small: the optional `StripVendorPrefix`-style neutral promotions and
-  a tracked sweep of the now-dead form-control/logical bridge helpers left by the §2.1 cutover.
-- The promotion roadmap's **Open Questions** (Open Question #5 — "declare v2" — is now answered; the rest
-  remain).
+Everything higher-risk that was open here has since merged: the `GetComputedProps` **cutover** (§2.1, PR
+#1367, including the now-dead form-control/logical helper sweep — commits `283fbf58`/`2473a453`), the live
+`CSSStyleDeclaration` **setter routing** (§2.3, PR #1365), and the `StripVendorPrefix` promotion (§2.3, PR
+#1366). What remains is the open-ended, low-priority promotion-candidate backlog (the P0–P3 rows in the
+promotion roadmap not covered above — principally **P3 HTML-serialization policy**) plus the promotion
+roadmap's still-open Open Questions.
+
+Because none of it is urgent or blocked and it no longer belongs to the facade-removal effort, it is tracked
+forward in its own doc: [`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
 
 ---
 
@@ -364,3 +377,8 @@ As of 2026-07-11 the four previously-stale roadmap docs are updated to reflect F
 (Milestones 1.2/1.3 → done, Track 1 complete), `htmlbridge-dom-css-promotion-roadmap.md` (Phase 5
 adapter-removal → done), and `rf-bridge-1b-layout-unification.md` (header + increment 6/7 BLOCKED labels
 cleared). This roadmap is the forward-looking companion.
+
+**Update (2026-07-12):** with §2.1–2.4 all merged (PRs #1364–#1367), this roadmap is **closed**; the
+open-ended promotion residue (former §2.5) was split into
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md), and the promotion
+roadmap's Open Questions section was updated to mark the four now-answered questions.
