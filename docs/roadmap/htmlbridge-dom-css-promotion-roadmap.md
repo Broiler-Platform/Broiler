@@ -235,12 +235,20 @@ Slice 8 findings/work:
   `EndContainer`/`EndOffset`, `Collapsed` — over the range's already-present live
   "removing steps" adjustment (`OnMutation`). Covered by `DomRangeTests` (5). This
   also resolves the Range portion of the pre-existing `DomKernelTests` break.
-- **Still bridge-owned (not yet promoted):** the JS `Range` object's *content*
-  operations (`deleteContents`/`extractContents`/`cloneContents`/`insertNode`/
-  `surroundContents`) and the bridge's `RangeState` — the bridge does not yet route
-  its ranges through canonical `DomRange`. That routing plus content-op promotion
-  is the larger, higher-risk remainder of slice 8, entangled with the bridge's
-  range geometry/client-rect APIs (which stay bridge-owned).
+- **Canonical content operations added (2026-07-12).** `Broiler.Dom.DomRange` now
+  implements the DOM Standard §4.5 content operations directly —
+  `ExtractContents`/`CloneContents`/`DeleteContents`/`InsertNode`/`SurroundContents`,
+  plus `SelectNode`/`SelectNodeContents`/`Collapse` and `CommonAncestorContainer` —
+  over canonical `DomNode`/`DomCharacterData` (no JS-object or layout dependencies),
+  following the spec algorithms rather than the bridge's ad-hoc document-order
+  heuristics. Covered by 13 new `DomRangeTests` (project green 64/64). See
+  [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.2.
+- **Still bridge-owned (the remaining, higher-risk slice):** routing the bridge's JS
+  `Range` object and its `RangeState` (`DomBridge/Traversal.cs`) through the new
+  canonical `DomRange`, so the bridge stops owning its own content-op machinery. This
+  is entangled with the bridge's range geometry/client-rect APIs (which stay
+  bridge-owned) and JS object identity, and — like the F3c/F4 cutovers — needs the WPT
+  range/selection corpus at merge (silent selection/serialization failure mode).
 
 `Broiler.Dom.DomTokenList` is the canonical ordered-set token algorithm
 (ASCII-whitespace parse/serialize, unique-ordered, contains/add/remove/toggle/
