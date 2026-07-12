@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
+    <TargetFrameworks>net10.0-windows;net10.0-windows7.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -24,7 +24,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release-Windows' or '$(Configuration)' == 'Debug-Windows'">
     <OutputType>WinExe</OutputType>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -39,7 +39,7 @@
     <Compile Include="..\..\Broiler.Writer\LinuxWriterInputCoordinator.cs" Link="LinuxBrowserInputCoordinator.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+  <ItemGroup Condition="'$(Configuration)' == 'Release-Windows' or '$(Configuration)' == 'Debug-Windows'">
     <Compile Remove="Program.Linux.cs" />
     <Compile Remove="LinuxBrowserOptions.cs" />
     <Compile Remove="LinuxBrowserRunner.cs" />
@@ -48,6 +48,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <!-- Composition root: supplies the concrete image codecs to Broiler.Graphics via BImageCodecs.Use(...). -->
+    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
@@ -66,7 +68,7 @@
     <!-- Bridge component connecting HTML rendering with JavaScript execution -->
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+  <ItemGroup Condition="'$(Configuration)' == 'Release-Linux' or '$(Configuration)' == 'Debug-Linux'">
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Linux\Broiler.Input.Linux.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj" />
@@ -74,7 +76,7 @@
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+  <ItemGroup Condition="'$(Configuration)' == 'Release-Windows' or '$(Configuration)' == 'Debug-Windows'">
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Windows\Broiler.Input.Windows.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard.Windows\Broiler.Input.Keyboard.Windows.csproj" />

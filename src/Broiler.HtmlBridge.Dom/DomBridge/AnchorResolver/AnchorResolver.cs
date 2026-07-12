@@ -52,8 +52,8 @@ public sealed partial class DomBridge
         //    Collects scroll containers that need position:relative but
         //    defers adding it until after position-visibility resolution,
         //    so IsAnchorVisibleForTarget is not affected by the new CB.
-        var scrollContainersNeedingRelative = new HashSet<DomElement>();
-        var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
+        var scrollContainersNeedingRelative = new HashSet<Broiler.Dom.DomElement>();
+        var deferredDomMoves = new List<(Broiler.Dom.DomElement element, Broiler.Dom.DomElement oldParent, Broiler.Dom.DomElement newParent)>();
         ResolvePositionAreaValues(
             DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
             deferredDomMoves);
@@ -179,9 +179,9 @@ public sealed partial class DomBridge
 
         ClearChildren(body);
 
-        var img = new DomElement(
-            _document, "img", null, null, string.Empty, null,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var img = CreateBridgeElement(
+            "img",
+            attributes: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["src"] = url,
             });

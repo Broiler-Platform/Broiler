@@ -1,7 +1,12 @@
 # HtmlBridge DOM/CSS Promotion Roadmap
 
-Status: proposed
-Date: 2026-07-09
+Status: **active** — Phases 0–5 are done; Phase 5's adapter removal merged to `main` (PR #1359,
+2026-07-12). The in-scope promotion slices that followed (computed-style, Range, scope builder, CSS
+helpers) all merged as PRs #1362–#1367 — see the closed
+[`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md). The residual open-ended
+promotion candidates are tracked in
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+Date: 2026-07-09 (last updated 2026-07-12)
 
 ## Purpose
 
@@ -46,13 +51,21 @@ The important consequence is that `Broiler.HtmlBridge.Dom.DomElement` and `HtmlT
 | P1 | `classList` token parsing and mutation behavior | `Broiler.DOM` | Add a DOMTokenList-style ordered-token helper over attributes | The ordered-set token rules are DOM semantics; the JavaScript wrapper and callback plumbing stay in bridge. |
 | P2 | Mutation observer option matching and record filtering | `Broiler.DOM` | Add neutral filtering over `DomMutationRecord` | Canonical DOM already emits mutation records. Bridge should convert filtered records to JS callbacks, not own the filtering algorithm. |
 | P2 | Range content operations and traversal state | `Broiler.DOM` | Expand canonical `DomRange` and route TreeWalker/NodeIterator wrappers through canonical traversal | `DomRange`, `DomTreeWalker`, and `DomNodeIterator` exist in DOM, but bridge still owns several content/traversal algorithms. Geometry APIs such as `getClientRects()` stay bridge/layout-owned. |
-| P2 | Stylesheet scope assembly without fetching | `Broiler.CSS.Dom` | Add a `CssStyleScopeBuilder` or similar host-driven builder | CSS.Dom can own style/link collection, ordering, media/supports evaluation, and engine synchronization if the host supplies resource text. Fetching remains bridge/host code. |
+| P2 | Stylesheet scope assembly without fetching **(DONE 2026-07-12)** | `Broiler.CSS.Dom` | `CssStyleScopeBuilder` — media-gated, origin/order-preserving, change-detected engine sync (host supplies text). See [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.4. | CSS.Dom can own style/link collection, ordering, media/supports evaluation, and engine synchronization if the host supplies resource text. Fetching remains bridge/host code. |
 | P3 | HTML serialization policies | `Broiler.Dom.Html` | Move only standard serialization policy helpers | Render-specific or Acid-test compatibility transforms should stay bridge-owned unless they are standard DOM/HTML behavior. |
 | Deferred | Image decoder, SVG parser/renderer, canvas helpers | `Broiler.Media`, `Broiler.Graphics`, or existing media roadmap | Do not move to DOM/CSS | These are shared engine capabilities, but not DOM or CSS component responsibilities. Align with the media/graphics roadmap. |
 
+**Status (2026-07-12).** Both **P0** rows are done (Phase 1 + §2.1/§2.3, PRs #1362/#1365/#1367); both **P1**
+rows are done (Phase 3 CSSOM projection, Phase 4 `DomTokenList`); all three **P2** rows are done (Phase 4
+mutation filtering, §2.2 Range PR #1364, §2.4 scope builder PR #1365). The only promotion candidate not yet
+started is **P3 HTML serialization policies**; the **Deferred** media/graphics row is out of DOM/CSS scope.
+The residue is carried into [`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+
 ## Non-candidates
 
-Do not move these into `Broiler.DOM` or `Broiler.CSS`:
+Do not move these into `Broiler.DOM` or `Broiler.CSS`. Their destinations (media/graphics roadmaps,
+`Broiler.Layout`, or permanent bridge ownership) are routed in
+[`htmlbridge-out-of-scope-routing-roadmap.md`](htmlbridge-out-of-scope-routing-roadmap.md):
 
 - `Broiler.HtmlBridge.Dom.DomElement`: compatibility facade over canonical DOM; remove at the public v2 boundary instead of promoting.
 - `HtmlTreeBuilder`: compatibility adapter over `Broiler.Dom.Html.HtmlDocumentParser`; remove when callers parse into canonical DOM directly.
@@ -120,6 +133,16 @@ Exit criteria:
 - Inline style behavior is covered by CSS unit tests and bridge compatibility tests.
 
 ### Phase 2: Promote computed-style projections used by anchor/layout code
+
+> **Update (2026-07-12):** two claims below are superseded — see
+> [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.1 for current state.
+> (a) **Shorthand expansion is now shared** — the bridge's `ExpandCssShorthands` was deleted and delegates
+> to `CssStyleEngine.ExpandShorthands` (the "deliberately still bridge-owned" note below is stale).
+> (b) The **form-control-sizing "needs layout" blocker is stale** — `CssStyleEngine.Computed.cs` already
+> has a layout-free `ApplyApproximateFormControlComputedSizes` inside the CSS.Dom boundary. The additive
+> `CssStyleEngine.GetSparseComputedStyle` projection (the null-for-undeclared view the `GetComputedProps`
+> consumers need) has landed; a differential parity test scoped the remaining cutover to a four-class
+> delta (UA display defaults, full-vs-sparse inheritance, value resolution, custom properties).
 
 Status: **partially delivered** (2026-07-09). The two computed-style *tables*
 that the bridge duplicated verbatim from `CssStyleEngine` — CSS initial values
@@ -235,12 +258,24 @@ Slice 8 findings/work:
   `EndContainer`/`EndOffset`, `Collapsed` — over the range's already-present live
   "removing steps" adjustment (`OnMutation`). Covered by `DomRangeTests` (5). This
   also resolves the Range portion of the pre-existing `DomKernelTests` break.
-- **Still bridge-owned (not yet promoted):** the JS `Range` object's *content*
-  operations (`deleteContents`/`extractContents`/`cloneContents`/`insertNode`/
-  `surroundContents`) and the bridge's `RangeState` — the bridge does not yet route
-  its ranges through canonical `DomRange`. That routing plus content-op promotion
-  is the larger, higher-risk remainder of slice 8, entangled with the bridge's
-  range geometry/client-rect APIs (which stay bridge-owned).
+- **Canonical content operations added (2026-07-12).** `Broiler.Dom.DomRange` now
+  implements the DOM Standard §4.5 content operations directly —
+  `ExtractContents`/`CloneContents`/`DeleteContents`/`InsertNode`/`SurroundContents`,
+  plus `SelectNode`/`SelectNodeContents`/`Collapse` and `CommonAncestorContainer` —
+  over canonical `DomNode`/`DomCharacterData` (no JS-object or layout dependencies),
+  following the spec algorithms rather than the bridge's ad-hoc document-order
+  heuristics. Covered by 13 new `DomRangeTests` (project green 64/64). See
+  [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.2.
+- **Bridge rewire done (2026-07-12).** `RangeState` is deleted; the JS `Range` is backed
+  by a `BridgeDomRange : Broiler.Dom.DomRange` subclass (non-tracking) that overrides the
+  node-creation seams to mint bridge nodes (`#document-fragment` fragments + `CloneDomElement`
+  clones carrying host runtime state, registered in `_knownNodes`). All `Range` callbacks
+  delegate to the canonical boundary/selection/content methods; the bridge's ad-hoc extract
+  helpers and boundary math are removed; external-mutation adjustment still flows through the
+  weak `_activeRanges` registry via `DomRange.NotifyNodeRemoved`. Geometry/client-rects stay
+  bridge-owned. Regression-free vs the `Cli.Tests` range/mutation/Acid suites; still wants the
+  WPT range/selection corpus at merge. See
+  [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.2.
 
 `Broiler.Dom.DomTokenList` is the canonical ordered-set token algorithm
 (ASCII-whitespace parse/serialize, unique-ordered, contains/add/remove/toggle/
@@ -292,8 +327,13 @@ Exit criteria:
 
 ### Phase 5: Public-surface cleanup
 
-Status: **in progress** (2026-07-09). One of the three workstreams is done; the
-other two are gated on prerequisites that are not yet met (documented below).
+Status: **adapter-removal complete and MERGED** (2026-07-12). All three
+workstreams — RF-BRIDGE-1a dead-paint removal, RF-BRIDGE-1b geometry unification (Item 2), and the v1
+compatibility-adapter removal (`DomElement`/`HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity`) — are
+done and `Broiler.Cli.Tests`-verified. Phase 5's exit criteria are met; the F4 facade-removal stack passed
+the WPT + Acid + pixel merge gate and **merged to `main` as PR #1359 (`ecbdf406`, 2026-07-12)**. Remaining
+promotion candidates beyond this phase are tracked in
+[`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md).
 
 - **DONE — delete the RF-BRIDGE-1a dead paint pipeline.** The bridge's parallel,
   runtime-unused box model + paint pipeline is removed:
@@ -310,9 +350,11 @@ other two are gated on prerequisites that are not yet met (documented below).
   `CssExtractionPhaseZeroTests.Phase7_*` failures are **pre-existing at HEAD**
   (legacy `Broiler.HTML.CSS`/`CssData` environmental state), baselined as unrelated.
 
-- **IN PROGRESS — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
+- **DONE — remove the v1 compatibility adapters** (`htmlbridge-public-surface/v2`):
   `Broiler.HtmlBridge.Dom.DomElement`, `HtmlTreeBuilder`, the obsolete `CssRules`
-  tuple view, and the bridge-only `DomBridge.CalculateSpecificity`.
+  tuple view, and the bridge-only `DomBridge.CalculateSpecificity` — all deleted
+  (`CssRules`/`CalculateSpecificity` at Milestone 1.1; the `DomElement` facade +
+  `HtmlTreeBuilder` at Milestones 1.2/1.3 = facade-removal Phase F4, 2026-07-11).
   **Update (2026-07-10, session 95a4149e): the v2 boundary is DECLARED** (Open
   Question #5 answered by the maintainer; see
   `docs/architecture/htmlbridge-engine-boundaries.md`), and the two zero-caller shims
@@ -329,16 +371,13 @@ other two are gated on prerequisites that are not yet met (documented below).
   change; it is a staged migration, not a deletion.
   `HtmlTreeBuilder`/`CssRules`/`CalculateSpecificity` removal follows once callers
   no longer need the facade node type.
-  **Progress (2026-07-11):** Milestone 1.2 is well under way — **8 facade members deleted**
-  (`JsSetStyleProps`, `OwnerDocRoot`, `Style`, `Attributes`+`LegacyAttributeDictionary`,
-  `Parent`, `IsTextNode`, `Children`+`LegacyChildList` on branch
-  `claude/rf-bridge-1c-domelement-facade-migration`; `NsAttrMap` on branch
-  `claude/htmlbridge-domelement-removal-ucyw5j`; Phases A/B/C/E1/D1/E2/C2), each a
-  behaviour-preserving relocation to `ElementRuntimeState` or canonical DOM, verified
-  regression-free vs the full-`Broiler.Cli.Tests` baseline. Facade remnants
-  `InnerHtml`/`TextContent`/`NamespaceURI` + the text→`DomText` construction
-  flip and cache/`RangeState` re-keying are the Phase F remainder (see the plan's
-  "Status at a glance").
+  **Complete (2026-07-11):** all facade members were relocated (Phases A/B/C/E1/D1/E2/C2/F1 →
+  `ElementRuntimeState` or canonical DOM), text/comment nodes flipped to canonical `DomText`/`DomComment`
+  (F3c part 2), and element construction flipped to the canonical document factories with the facade +
+  `HtmlTreeBuilder` **deleted** (F4). Each step is behaviour-preserving and regression-free vs the full
+  `Broiler.Cli.Tests` baseline (0 new failures). See
+  [`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md) for the
+  authoritative record; the WPT/Acid/pixel merge gate passed and the stack merged as PR #1359 (2026-07-12).
 
   **Sharpened dependency analysis (2026-07-09).** The four adapters split into two
   independent gates, not one:
@@ -436,10 +475,10 @@ Tasks:
 - Delete RF-BRIDGE-1a obsolete rendering pipeline types instead of moving them. **(done)**
 - Finish RF-BRIDGE-1b layout unification by replacing bridge recursive geometry estimators with `Broiler.Layout` read-model access.
 
-Exit criteria:
+Exit criteria — **MET** (WPT/Acid/pixel merge gate passed; merged as PR #1359, 2026-07-12):
 
-- `HtmlBridge` contains bridge responsibilities only: JS integration, compatibility surface, host/resource integration, CSSOM/DOM wrapper identity, and handoff to layout/rendering/media.
-- DOM and CSS components own canonical algorithms and data models without bridge dependencies.
+- `HtmlBridge` contains bridge responsibilities only: JS integration, compatibility surface, host/resource integration, CSSOM/DOM wrapper identity, and handoff to layout/rendering/media. ✅ (the v1 `DomElement`/`HtmlTreeBuilder` adapters are deleted)
+- DOM and CSS components own canonical algorithms and data models without bridge dependencies. ✅ (bridge tree is canonical `Broiler.Dom` nodes)
 
 ## Suggested PR Slices
 
@@ -477,8 +516,18 @@ Add architecture checks where practical:
 
 ## Open Questions
 
-- Should the CSSOM projection live directly in `Broiler.CSS`, or should it be isolated under a `Broiler.CSS.Cssom` namespace to make the browser-API mapping explicit?
-- Should `DomTokenList` be a public DOM type or an internal helper consumed by bridge and future DOM APIs?
-- Should stylesheet scope assembly include host-provided external stylesheet text in CSS.Dom, or should it remain entirely bridge-owned until more non-bridge consumers exist?
-- How much of current bridge serialization behavior is standard HTML serialization versus compatibility transforms for rendering tests?
-- When is the project ready to declare `htmlbridge-public-surface/v2` and remove the v1 compatibility adapters?
+Four of the five original questions were answered in practice by the completed phases; the serialization
+question is the one still genuinely open and is carried into
+[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+
+- **Answered (Phase 3):** the CSSOM projection lives isolated under a dedicated `Broiler.CSS.Cssom`
+  namespace (`CssomRuleMetadata`), making the browser-API mapping explicit.
+- **Answered (Phase 4):** `DomTokenList` is a public canonical `Broiler.Dom.DomTokenList` type (the bridge
+  `classList` wrappers delegate to it).
+- **Answered (§2.4, PR #1365):** stylesheet scope assembly *does* take host-supplied external stylesheet
+  text in CSS.Dom — `CssStyleScopeBuilder` owns media-gated, order-preserving engine sync while the host
+  keeps discovery + fetching.
+- **Still open:** how much of current bridge serialization behavior is standard HTML serialization versus
+  compatibility transforms for rendering tests? (Gates the P3 HTML-serialization-policy promotion.)
+- **Answered (2026-07-10):** `htmlbridge-public-surface/v2` was declared and the v1 compatibility adapters
+  removed (Milestones 1.0–1.3, PR #1359).

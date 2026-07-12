@@ -12,7 +12,7 @@ public sealed partial class DomBridge
 {
     // -----------------------------------------------------------------
     // RF-BRIDGE-1c Phase C: string-keyed attribute access over canonical
-    // Broiler.Dom attributes, replacing the removed DomElement.Attributes
+    // Broiler.Dom attributes, replacing the removed Broiler.Dom.DomElement.Attributes
     // (LegacyAttributeDictionary) facade. Each helper mirrors the legacy
     // dictionary's semantics exactly — a case-insensitive scan by qualified
     // name over the canonical (namespace-keyed) attribute set — so the
@@ -21,7 +21,7 @@ public sealed partial class DomBridge
 
     /// <summary>Legacy <c>Attributes.TryGetValue</c>: case-insensitive lookup by
     /// qualified name; <paramref name="value"/> is <c>""</c> when absent.</summary>
-    private static bool TryGetAttribute(DomElement element, string qualifiedName, out string value)
+    private static bool TryGetAttribute(Broiler.Dom.DomElement element, string qualifiedName, out string value)
     {
         foreach (var attribute in element.Attributes.Values)
         {
@@ -37,16 +37,16 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.GetValueOrDefault</c> / null-returning indexer get.</summary>
-    private static string? GetAttr(DomElement element, string qualifiedName) =>
+    private static string? GetAttr(Broiler.Dom.DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out var value) ? value : null;
 
     /// <summary>Legacy <c>Attributes.ContainsKey</c>.</summary>
-    private static bool HasAttr(DomElement element, string qualifiedName) =>
+    private static bool HasAttr(Broiler.Dom.DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out _);
 
     /// <summary>Legacy string-keyed <c>Attributes[name] = value</c> setter: updates an
     /// existing attribute in place (preserving its namespace) or creates a no-namespace one.</summary>
-    private static void SetAttr(DomElement element, string qualifiedName, string value)
+    private static void SetAttr(Broiler.Dom.DomElement element, string qualifiedName, string value)
     {
         Broiler.Dom.DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)
@@ -65,7 +65,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Remove</c>: removes the attribute matched by qualified name.</summary>
-    private static bool RemoveAttr(DomElement element, string qualifiedName)
+    private static bool RemoveAttr(Broiler.Dom.DomElement element, string qualifiedName)
     {
         Broiler.Dom.DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)
@@ -82,14 +82,14 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// RF-BRIDGE-1c Phase C2: canonical replacement for the removed
-    /// <c>DomElement.NsAttrMap</c> shadow map. Looks up the attribute identified by
+    /// <c>Broiler.Dom.DomElement.NsAttrMap</c> shadow map. Looks up the attribute identified by
     /// (<paramref name="namespaceUri"/>, <paramref name="localName"/>) directly in the
     /// canonical namespace-keyed attribute set and yields its qualified (possibly
     /// prefixed) name plus value — the exact pair <c>NsAttrMap</c> used to carry. The
     /// namespace is normalized (empty string ≡ null) to match canonical attribute keying,
     /// the same normalization <c>SetAttributeNS</c>/<c>GetAttributeNS</c> apply.
     /// </summary>
-    private static bool TryGetNsAttribute(DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
+    private static bool TryGetNsAttribute(Broiler.Dom.DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
     {
         var ns = string.IsNullOrEmpty(namespaceUri) ? null : namespaceUri;
         if (element.Attributes.TryGetValue((ns, localName), out var attribute))
@@ -105,13 +105,13 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Keys</c>: the qualified names of the element's attributes.</summary>
-    private static IEnumerable<string> AttributeNames(DomElement element) =>
+    private static IEnumerable<string> AttributeNames(Broiler.Dom.DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
 
     /// <summary>Legacy enumeration/snapshot of the string-keyed attribute map (qualified
     /// name → value, case-insensitive, last-wins on collision — matching the old
     /// <c>LegacyAttributeDictionary.Snapshot</c>).</summary>
-    private static Dictionary<string, string> AttributeSnapshot(DomElement element)
+    private static Dictionary<string, string> AttributeSnapshot(Broiler.Dom.DomElement element)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in element.Attributes.Values)
@@ -121,7 +121,7 @@ public sealed partial class DomBridge
 
     /// <summary>Restores the element's attribute set to <paramref name="saved"/> — the
     /// attribute-map equivalent of <c>RestoreStringMap</c> (remove extras, then set saved).</summary>
-    private static void RestoreAttributes(DomElement element, Dictionary<string, string> saved)
+    private static void RestoreAttributes(Broiler.Dom.DomElement element, Dictionary<string, string> saved)
     {
         foreach (var name in AttributeNames(element).ToList())
         {
@@ -133,7 +133,7 @@ public sealed partial class DomBridge
             SetAttr(element, kv.Key, kv.Value);
     }
 
-    private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
+    private void CollectByTagName(Broiler.Dom.DomElement root, string tag, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -147,7 +147,7 @@ public sealed partial class DomBridge
     /// Collects all <c>&lt;a&gt;</c> and <c>&lt;area&gt;</c> elements with an
     /// <c>href</c> attribute in document tree order.
     /// </summary>
-    private void CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
+    private void CollectLinksInTreeOrder(Broiler.Dom.DomElement root, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -163,7 +163,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
-    private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
+    private void CollectMatching(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -173,8 +173,8 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>Collects all DomElement nodes in a sub-tree for tracking.</summary>
-    private static void CollectSubDocElements(DomElement root, List<DomElement> list)
+    /// <summary>Collects all Broiler.Dom.DomElement nodes in a sub-tree for tracking.</summary>
+    private static void CollectSubDocElements(Broiler.Dom.DomElement root, List<Broiler.Dom.DomElement> list)
     {
         list.Add(root);
         foreach (var child in ChildElements(root))
@@ -191,7 +191,7 @@ public sealed partial class DomBridge
     /// Builds a NamedNodeMap-like JSObject for element.attributes, with
     /// getNamedItem, setNamedItem, removeNamedItem, item, and length.
     /// </summary>
-    private JSObject BuildNamedNodeMapObject(DomElement element, JSObject ownerObj)
+    private JSObject BuildNamedNodeMapObject(Broiler.Dom.DomElement element, JSObject ownerObj)
     {
         var map = new JSObject();
 
@@ -259,7 +259,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds an Attr-like JSObject with name, value, specified, ownerElement, nodeType, nodeName.
     /// </summary>
-    private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
+    private static JSObject BuildAttrNode(string name, string value, Broiler.Dom.DomElement element, JSObject ownerObj)
     {
         var namespaceUri = TryGetAttachedAttrNamespace(element, name, out var ns, out var localName)
             ? ns
@@ -290,7 +290,7 @@ public sealed partial class DomBridge
         return attr;
     }
 
-    private static bool TryGetAttachedAttrNamespace(DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
+    private static bool TryGetAttachedAttrNamespace(Broiler.Dom.DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
     {
         // Match a genuinely namespaced attribute (non-null namespace) by qualified name —
         // the set NsAttrMap used to track. No-namespace attributes are skipped so the
@@ -349,7 +349,7 @@ public sealed partial class DomBridge
             : null;
     }
 
-    private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
+    private void SetAttributeLikeSetAttribute(Broiler.Dom.DomElement element, string attrName, string attrVal)
     {
         TryGetAttribute(element, attrName, out var previousAttrVal);
         SetAttr(element, attrName, attrVal);
@@ -376,7 +376,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
+    private void RemoveAttributeLikeRemoveAttribute(Broiler.Dom.DomElement element, string attrName)
     {
         TryGetAttribute(element, attrName, out var previousAttrVal);
         var removed = RemoveAttr(element, attrName);
@@ -390,7 +390,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void SetAttributeLikeSetAttributeNS(DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
+    private void SetAttributeLikeSetAttributeNS(Broiler.Dom.DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
     {
         string? previousAttrVal = null;
         if (TryGetNsAttribute(element, namespaceUri, localName, out var previousQualifiedName, out var existingAttrVal))
@@ -431,7 +431,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void RemoveAttributeLikeRemoveAttributeNS(DomElement element, string? namespaceUri, string localName)
+    private void RemoveAttributeLikeRemoveAttributeNS(Broiler.Dom.DomElement element, string? namespaceUri, string localName)
     {
         if (!TryGetNsAttribute(element, namespaceUri, localName, out var attrName, out var previousAttrVal))
             return;

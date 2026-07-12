@@ -22,6 +22,10 @@ internal static class Program
         // Fall back to loading any such assembly directly from the application directory.
         AssemblyLoadContext.Default.Resolving += ResolveFromAppDirectory;
 
+        // Composition root: register the concrete image codecs Broiler.Graphics decodes/encodes with.
+        Broiler.Graphics.BImageCodecs.Use(
+            new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
+
         if (!ConfirmPreviewSafetyNotice())
             return 0;
 

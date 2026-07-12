@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     // by element identity mirrors ElementRuntimeStates' lifetime, so a detached element's
     // memo is collected with it, and the invalidation (position-area / position-anchor
     // mutation) and clone-copy semantics are unchanged from the old .Layout slots.
-    private static readonly ConditionalWeakTable<DomElement, PositionAreaResolution>
+    private static readonly ConditionalWeakTable<Broiler.Dom.DomElement, PositionAreaResolution>
         PositionAreaResolutions = [];
 
     private sealed class PositionAreaResolution
@@ -30,7 +30,7 @@ public sealed partial class DomBridge
     }
 
     private static bool TryGetPositionAreaResolution(
-        DomElement element, out (double left, double top, double width, double height) rect)
+        Broiler.Dom.DomElement element, out (double left, double top, double width, double height) rect)
     {
         if (PositionAreaResolutions.TryGetValue(element, out var r))
         {
@@ -43,7 +43,7 @@ public sealed partial class DomBridge
     }
 
     private static void SetPositionAreaResolution(
-        DomElement element, double left, double top, double width, double height) =>
+        Broiler.Dom.DomElement element, double left, double top, double width, double height) =>
         PositionAreaResolutions.AddOrUpdate(element, new PositionAreaResolution
         {
             Left = left,
@@ -52,10 +52,10 @@ public sealed partial class DomBridge
             Height = height,
         });
 
-    private static void ClearPositionAreaResolution(DomElement element) =>
+    private static void ClearPositionAreaResolution(Broiler.Dom.DomElement element) =>
         PositionAreaResolutions.Remove(element);
 
-    private static void CopyPositionAreaResolution(DomElement source, DomElement target)
+    private static void CopyPositionAreaResolution(Broiler.Dom.DomElement source, Broiler.Dom.DomElement target)
     {
         if (PositionAreaResolutions.TryGetValue(source, out var r))
             PositionAreaResolutions.AddOrUpdate(target, new PositionAreaResolution
@@ -73,7 +73,7 @@ public sealed partial class DomBridge
     /// Called lazily when offsetLeft/offsetTop/etc. are queried.
     /// </summary>
     internal (double left, double top, double width, double height)?
-        ResolvePositionAreaForElement(DomElement element)
+        ResolvePositionAreaForElement(Broiler.Dom.DomElement element)
     {
         // Check for pre-resolved values first.
         if (TryGetPositionAreaResolution(element, out var cached))

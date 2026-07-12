@@ -1,20 +1,21 @@
-using Broiler.HtmlBridge;
-using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
-
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Phase 10 Acid3 compliance: computed-style and image-decoding behavior —
+/// Phase 10 Acid3 compliance: computed-style behavior —
 /// text-shadow / @font-face / visibility / display:inline-block / position /
-/// border-style as observed through <c>getComputedStyle</c>, plus data: URI and
-/// image-format detection.
+/// border-style as observed through <c>getComputedStyle</c>.
 ///
 /// RF-BRIDGE-1a: the tests that exercised the bridge's parallel paint pipeline
 /// (<c>CssBoxModel.BuildLayoutTree</c>, <c>Painter</c>, <c>Compositor</c>,
 /// <c>RenderOutput</c>, <c>CssFontFaceCollection</c>) were removed — that pipeline is
 /// unused at runtime (the renderer's CssLayoutEngine paints) and is deprecated for
-/// removal at the next htmlbridge-public-surface major. The live computed-style and
-/// image-decoder coverage is retained below.
+/// removal at the next htmlbridge-public-surface major.
+///
+/// The bridge's parallel image-format detector (<c>ImageDecoder</c> / <c>DecodedImage</c>
+/// / <c>ImageFormat</c> in the former <c>ImagePipeline.cs</c>) was likewise removed once
+/// raster decoding was consolidated onto the Broiler.Media codec catalog; its data-URI
+/// and format-detection assertions went with it. SVG detection now asserts against the
+/// live <c>BSvgRasterizer.IsSvgData</c> primitive in <see cref="SvgImageRenderingTests"/>.
 /// </summary>
 public class RenderingPipelineTests
 {
@@ -218,63 +219,4 @@ document.getElementById('result').textContent = d.style.getPropertyValue('conten
         Assert.Contains("hello", result);
     }
 
-    // ────────────────────── 10.8 data: URI / image-format detection ──────────────────────
-
-    [Fact]
-    public void DataUri_Detected_As_Png()
-    {
-        var format = ImageDecoder.DetectFormat("data:image/png;base64,iVBOR");
-        Assert.Equal(RenderImageFormat.Png, format);
-    }
-
-    [Fact]
-    public void DataUri_Decode_Base64()
-    {
-        // "AQID" is base64 for bytes [1, 2, 3]
-        var bytes = ImageDecoder.DecodeDataUri("data:image/png;base64,AQID");
-        Assert.NotNull(bytes);
-        Assert.Equal([1, 2, 3], bytes);
-    }
-
-    [Fact]
-    public void DataUri_Decode_Invalid_Returns_Null()
-    {
-        var bytes = ImageDecoder.DecodeDataUri("not-a-data-uri");
-        Assert.Null(bytes);
-    }
-
-    [Fact]
-    public void DataUri_Decode_No_Base64_Returns_Null()
-    {
-        var bytes = ImageDecoder.DecodeDataUri("data:text/plain,hello");
-        Assert.Null(bytes);
-    }
-
-    [Fact]
-    public void ImageDecoder_DetectFormat_Png_Extension()
-    {
-        Assert.Equal(RenderImageFormat.Png, ImageDecoder.DetectFormat("image.png"));
-    }
-
-    [Fact]
-    public void ImageDecoder_DetectFormat_Jpeg_Extension()
-    {
-        Assert.Equal(RenderImageFormat.Jpeg, ImageDecoder.DetectFormat("photo.jpg"));
-    }
-
-    [Fact]
-    public void ImageDecoder_DetectFormatFromBytes_Png()
-    {
-        var pngHeader = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 };
-        Assert.Equal(RenderImageFormat.Png, ImageDecoder.DetectFormatFromBytes(pngHeader));
-    }
-
-    [Fact]
-    public void ImageDecoder_CreatePlaceholder_Correct_Size()
-    {
-        var img = ImageDecoder.CreatePlaceholder(10, 10, RenderImageFormat.Png);
-        Assert.Equal(10, img.Width);
-        Assert.Equal(10, img.Height);
-        Assert.Equal(400, img.PixelData.Length); // 10*10*4
-    }
 }

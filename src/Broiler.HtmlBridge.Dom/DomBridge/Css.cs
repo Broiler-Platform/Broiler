@@ -19,7 +19,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     private int _styleInvalidationBatchDepth;
-    private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+    private HashSet<Broiler.Dom.DomElement>? _pendingStyleInvalidationRoots;
     // These caches/reentrancy guards are read and written while computing
     // getComputedStyle / element geometry. That work is re-entered from JS
     // Promise/async/generator and scroll/timer continuations that the JS engine
@@ -31,8 +31,21 @@ public sealed partial class DomBridge
     // the whole process (SIGABRT/exit 134), taking out an entire WPT shard
     // (issue #1143). Use concurrent collections, the same defensive idiom as the
     // timer/raf maps.
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsCache = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsCache = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
+
+    /// <summary>
+    /// Clears the bridge's <c>GetComputedProps</c> memo <em>and</em> the per-document engines'
+    /// cascade/computed-style caches together. The two must invalidate as one now that
+    /// <c>GetComputedProps</c> routes through the engine's sparse projection, which reads inline
+    /// style from the live ElementRuntimeState map (an ERS mutation is invisible to the engine's
+    /// own DOM-mutation subscription).
+    /// </summary>
+    private void ClearComputedPropsCache()
+    {
+        _computedPropsCache.Clear();
+        InvalidateScopedEngineComputedCaches();
+    }
 
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
@@ -53,7 +66,7 @@ public sealed partial class DomBridge
     /// by the shared style engine; only inline declarations and JavaScript-set values
     /// remain in the bridge-owned declaration map.
     /// </summary>
-    internal void InvalidateElementStyles(DomElement element)
+    internal void InvalidateElementStyles(Broiler.Dom.DomElement element)
     {
         // 1. Collect property names that come from the inline style attribute.
         //    These must never be cleared or overwritten by the cascade.
@@ -93,9 +106,9 @@ public sealed partial class DomBridge
             FlushPendingStyleInvalidations();
     }
 
-    internal void InvalidateStyleScope(DomElement anchor)
+    internal void InvalidateStyleScope(Broiler.Dom.DomElement anchor)
     {
-        _computedPropsCache.Clear();
+        ClearComputedPropsCache();
         var docRoot = GetDocumentRootFor(anchor);
         if (_styleInvalidationBatchDepth > 0)
         {
@@ -118,7 +131,7 @@ public sealed partial class DomBridge
         _pendingStyleInvalidationRoots.Clear();
     }
 
-    private void InvalidateStyleScopeRecursive(DomElement element)
+    private void InvalidateStyleScopeRecursive(Broiler.Dom.DomElement element)
     {
         if (!IsText(element) && !element.TagName.StartsWith("#", StringComparison.Ordinal))
             InvalidateElementStyles(element);
@@ -135,7 +148,7 @@ public sealed partial class DomBridge
     /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
     /// Returns the topmost node within the element's document scope.
     /// </summary>
-    private static DomElement GetDocumentRootFor(DomElement el)
+    private static Broiler.Dom.DomElement GetDocumentRootFor(Broiler.Dom.DomElement el)
     {
         var root = el;
         while (ParentEl(root) != null)
@@ -152,7 +165,7 @@ public sealed partial class DomBridge
     /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
     /// Does not descend into sub-document boundaries (<c>#subdoc-root</c>).
     /// </summary>
-    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
+    private static void CollectStyleElementsInTree(Broiler.Dom.DomElement root, List<Broiler.Dom.DomElement> styleElements)
     {
         foreach (var child in SnapshotChildren(root))
         {
@@ -177,7 +190,7 @@ public sealed partial class DomBridge
     /// </summary>
     /// <remarks>
     /// A plain <c>ChildElements(root).ToList()</c> is NOT thread-safe here.
-    /// <see cref="DomElement.LegacyChildList"/> projects the live
+    /// <see cref="Broiler.Dom.DomElement.LegacyChildList"/> projects the live
     /// <c>ChildNodes</c> collection: <see cref="Enumerable.ToList{T}"/> reads
     /// <c>Count</c>, allocates a destination array of that size, then calls
     /// <c>CopyTo</c>, which materialises the <em>current</em> (possibly larger)
@@ -190,7 +203,7 @@ public sealed partial class DomBridge
     /// for the whole tree, leaving the document unstyled. Retry a bounded number
     /// of times, then fall back to a tolerant index walk.
     /// </remarks>
-    private static List<DomElement> SnapshotChildren(DomElement root)
+    private static List<Broiler.Dom.DomElement> SnapshotChildren(Broiler.Dom.DomElement root)
     {
         for (var attempt = 0; attempt < 4; attempt++)
         {
@@ -208,15 +221,16 @@ public sealed partial class DomBridge
 
         // Sustained contention: copy element-by-element, re-checking bounds each
         // step so a shrinking list can only truncate the snapshot, never throw.
-        var snapshot = new List<DomElement>();
+        var snapshot = new List<Broiler.Dom.DomElement>();
         for (var i = 0; ; i++)
         {
-            DomElement child;
+            Broiler.Dom.DomElement? child;
             try
             {
                 if (i >= root.ChildNodes.Count)
                     break;
-                child = ChildAt(root, i);
+                // Element snapshot: a char-data child (post-flip) is skipped (null).
+                child = ChildAt(root, i) as Broiler.Dom.DomElement;
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {
@@ -230,31 +244,17 @@ public sealed partial class DomBridge
         return snapshot;
     }
 
-    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
+    private JSObject BuildComputedStyleObject(Broiler.Dom.DomElement? element, string? pseudoElement = null)
     {
         var computed = BuildComputedStyleMap(element, pseudoElement);
         var propertyNames = computed.Keys.ToList();
         var obj = new JSObject();
 
-        // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
-        static string ToCamelCase(string cssName)
-        {
-            var sb = new StringBuilder();
-            bool upper = false;
-            foreach (char c in cssName)
-            {
-                if (c == '-') { upper = true; continue; }
-                sb.Append(upper ? char.ToUpperInvariant(c) : c);
-                upper = false;
-            }
-            return sb.ToString();
-        }
-
         // Expose all computed properties as both camelCase and kebab-case
         foreach (var kv in computed)
         {
-            var camel = ToCamelCase(kv.Key);
-            var normalized = StripCssPriority(kv.Value);
+            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(kv.Key);
+            var normalized = Broiler.CSS.CssPriority.Strip(kv.Value);
             obj.FastAddValue((KeyString)kv.Key, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
             if (camel != kv.Key)
                 obj.FastAddValue((KeyString)camel, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -291,7 +291,7 @@ public sealed partial class DomBridge
         return obj;
     }
 
-    private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
+    private Dictionary<string, string> BuildComputedStyleMap(Broiler.Dom.DomElement? element, string? pseudoElement = null)
     {
         // getComputedStyle() resolves through the shared Broiler.CSS.Dom.CssStyleEngine
         // (BuildComputedStyleMapViaEngine, see DomBridge.ComputedStyleEngine.cs). The legacy
@@ -305,7 +305,7 @@ public sealed partial class DomBridge
         return BuildComputedStyleMapViaEngine(element, pseudoElement);
     }
 
-    private Dictionary<string, string> BuildSpecifiedStyleMap(DomElement element, string? pseudoElement = null)
+    private Dictionary<string, string> BuildSpecifiedStyleMap(Broiler.Dom.DomElement element, string? pseudoElement = null)
     {
         pseudoElement = NormalizePseudoElement(pseudoElement);
         var specified = new Dictionary<string, string>(
@@ -321,25 +321,6 @@ public sealed partial class DomBridge
         }
 
         return specified;
-    }
-
-    private void ApplyInheritedProperties(Dictionary<string, string> computed, DomElement element)
-    {
-        if (ParentEl(element) == null)
-            return;
-
-        var parentProps = GetComputedProps(ParentEl(element));
-        foreach (var property in CSS.Dom.CssComputedDefaults.InheritedProperties)
-        {
-            if (computed.ContainsKey(property))
-                continue;
-
-            if (parentProps.TryGetValue(property, out var inheritedValue) &&
-                !string.IsNullOrWhiteSpace(inheritedValue))
-            {
-                computed[property] = inheritedValue;
-            }
-        }
     }
 
     private static string? NormalizePseudoElement(string? pseudoElement)
@@ -364,128 +345,9 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static void ApplyApproximateFormControlComputedSizes(
-        Dictionary<string, string> computed,
-        DomElement element)
-    {
-        string tag = element.TagName.ToLowerInvariant();
-        if (tag is not ("input" or "button" or "select" or "textarea" or "progress" or "meter"))
-            return;
+    private static bool IsSelectListBox(Broiler.Dom.DomElement element) => GetSelectVisibleRowCount(element) > 1;
 
-        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = IsVerticalWritingMode(writingMode);
-
-        double logicalInlineSize = 60;
-        double logicalBlockSize = 20;
-
-        switch (tag)
-        {
-            case "input":
-                string type = GetAttr(element, "type")?.ToLowerInvariant() ?? "text";
-                switch (type)
-                {
-                    case "hidden":
-                        logicalInlineSize = 0;
-                        logicalBlockSize = 0;
-                        break;
-                    case "checkbox":
-                    case "radio":
-                        logicalInlineSize = 13;
-                        logicalBlockSize = 13;
-                        break;
-                    case "submit":
-                    case "button":
-                    case "reset":
-                        logicalInlineSize = 72;
-                        logicalBlockSize = 20;
-                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetAttr(element, "value"));
-                        break;
-                    default:
-                        logicalInlineSize = 173;
-                        logicalBlockSize = 16;
-                        break;
-                }
-                break;
-            case "button":
-                logicalInlineSize = 72;
-                logicalBlockSize = 20;
-                ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetElementRenderedText(element));
-                break;
-            case "select":
-                logicalInlineSize = 60;
-                logicalBlockSize = 19;
-                ApplySelectListBoxSizing(ref logicalInlineSize, ref logicalBlockSize, element);
-                break;
-            case "textarea":
-                logicalInlineSize = 170;
-                logicalBlockSize = 40;
-                break;
-            case "progress":
-            case "meter":
-                logicalInlineSize = 120;
-                logicalBlockSize = 16;
-                break;
-        }
-
-        double physicalWidth = vertical ? logicalBlockSize : logicalInlineSize;
-        double physicalHeight = vertical ? logicalInlineSize : logicalBlockSize;
-
-        if (!HasExplicitPhysicalOrLogicalSize(computed, "width", vertical ? "block-size" : "inline-size") && physicalWidth > 0)
-            computed["width"] = FormatPx(physicalWidth);
-        if (!HasExplicitPhysicalOrLogicalSize(computed, "height", vertical ? "inline-size" : "block-size") && physicalHeight > 0)
-            computed["height"] = FormatPx(physicalHeight);
-    }
-
-    private static void ApplyLogicalSizeAliases(Dictionary<string, string> computed)
-    {
-        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = IsVerticalWritingMode(writingMode);
-
-        string width = computed.GetValueOrDefault("width") ?? "auto";
-        string height = computed.GetValueOrDefault("height") ?? "auto";
-        string inlineSize = computed.GetValueOrDefault("inline-size") ?? "auto";
-        string blockSize = computed.GetValueOrDefault("block-size") ?? "auto";
-
-        if (!HasExplicitSpecifiedSize(width))
-            width = ResolveLogicalPhysicalFallback(width, vertical ? blockSize : inlineSize);
-
-        if (!HasExplicitSpecifiedSize(height))
-            height = ResolveLogicalPhysicalFallback(height, vertical ? inlineSize : blockSize);
-
-        computed["width"] = width;
-        computed["height"] = height;
-        computed["block-size"] = HasExplicitSpecifiedSize(blockSize) ? blockSize : (vertical ? width : height);
-        computed["inline-size"] = HasExplicitSpecifiedSize(inlineSize) ? inlineSize : (vertical ? height : width);
-    }
-
-    private static bool HasExplicitPhysicalOrLogicalSize(Dictionary<string, string> computed, string physicalProperty, string logicalProperty) =>
-        HasExplicitSpecifiedSize(computed.GetValueOrDefault(physicalProperty)) ||
-        HasExplicitSpecifiedSize(computed.GetValueOrDefault(logicalProperty));
-
-    private static void ApplyButtonLikeMultilineSizing(ref double logicalInlineSize, ref double logicalBlockSize, string? rawText)
-    {
-        int lineCount = CountRenderedLines(rawText);
-        if (lineCount <= 1)
-            return;
-
-        logicalBlockSize = 20 * lineCount;
-    }
-
-    private static void ApplySelectListBoxSizing(ref double logicalInlineSize, ref double logicalBlockSize, DomElement element)
-    {
-        int visibleRows = GetSelectVisibleRowCount(element);
-        if (visibleRows <= 1)
-            return;
-
-        const double rowBlockSize = 16;
-        const double chromeBlockSize = 4;
-        logicalInlineSize = Math.Max(logicalInlineSize, 72);
-        logicalBlockSize = (visibleRows * rowBlockSize) + chromeBlockSize;
-    }
-
-    private static bool IsSelectListBox(DomElement element) => GetSelectVisibleRowCount(element) > 1;
-
-    private static int GetSelectVisibleRowCount(DomElement element)
+    private static int GetSelectVisibleRowCount(Broiler.Dom.DomElement element)
     {
         bool isMultiple = HasAttr(element, "multiple");
         if (TryGetAttribute(element, "size", out var rawSize) &&
@@ -498,60 +360,10 @@ public sealed partial class DomBridge
         return isMultiple ? 4 : 1;
     }
 
-    private static int CountRenderedLines(string? rawText)
-    {
-        if (string.IsNullOrEmpty(rawText))
-            return 1;
-
-        return WebUtility.HtmlDecode(rawText)
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n')
-            .Split('\n')
-            .Length;
-    }
-
-    private static string GetElementRenderedText(DomElement element)
-    {
-        var builder = new StringBuilder();
-        AppendRenderedText(element, builder);
-        return builder.ToString();
-    }
-
-    private static void AppendRenderedText(DomElement element, StringBuilder builder)
-    {
-        foreach (var child in ChildElements(element))
-        {
-            if (IsText(child))
-            {
-                if (BridgeText(child).Length > 0)
-                    builder.Append(BridgeText(child));
-                continue;
-            }
-
-            if (string.Equals(child.TagName, "br", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.Append('\n');
-                continue;
-            }
-
-            AppendRenderedText(child, builder);
-        }
-    }
-
-    private static string ResolveLogicalPhysicalFallback(string currentPhysicalValue, string mappedLogicalValue) =>
-        HasExplicitSpecifiedSize(mappedLogicalValue) ? mappedLogicalValue : currentPhysicalValue;
-
     private static bool IsVerticalWritingMode(string? writingMode)
     {
         var normalized = writingMode?.Trim().ToLowerInvariant();
         return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
-    }
-
-    private static bool HasExplicitSpecifiedSize(string? value)
-    {
-        value = value?.Trim() ?? string.Empty;
-        return value.Length > 0 &&
-               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -561,17 +373,16 @@ public sealed partial class DomBridge
     /// mutations applied. This is the input from which the shared rule model is
     /// (re)parsed; <see cref="GetStyleElementCssText"/> applies mutations on top.
     /// </summary>
-    private string GetStyleElementSourceText(DomElement styleEl)
+    private string GetStyleElementSourceText(Broiler.Dom.DomElement styleEl)
     {
         var cssText = new StringBuilder();
-        foreach (var child in ChildElements(styleEl))
+        // RF-BRIDGE-1c Phase F (F3c part 2d): iterate raw ChildNodes — the <style> text is a
+        // canonical DomText child, which ChildElements (OfType) would skip.
+        foreach (var child in styleEl.ChildNodes)
         {
             if (IsText(child))
                 cssText.Append(BridgeText(child));
         }
-
-        if (cssText.Length == 0 && styleEl.TextContent != null)
-            cssText.Append(styleEl.TextContent);
 
         if (cssText.Length == 0 && !string.IsNullOrEmpty(GetElementRuntimeState(styleEl).InnerHtml))
             cssText.Append(GetElementRuntimeState(styleEl).InnerHtml);
@@ -616,7 +427,7 @@ public sealed partial class DomBridge
     /// the source text and thus discards prior <c>insertRule</c>/<c>deleteRule</c>
     /// mutations, matching CSSOM semantics.
     /// </summary>
-    private List<Broiler.CSS.CssRule> EnsureStyleSheetRulesCurrent(DomElement styleEl)
+    private List<Broiler.CSS.CssRule> EnsureStyleSheetRulesCurrent(Broiler.Dom.DomElement styleEl)
     {
         var state = GetElementRuntimeState(styleEl).StyleSheet;
         var sourceText = GetStyleElementSourceText(styleEl);
@@ -655,7 +466,7 @@ public sealed partial class DomBridge
         ApplyStyleCsp(DocumentElement, csp, blockStyleAttribute: !csp.AllowsInlineStyleAttribute());
     }
 
-    private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
+    private void ApplyStyleCsp(Broiler.Dom.DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
     {
         if (!IsText(element))
         {
@@ -682,7 +493,7 @@ public sealed partial class DomBridge
             ApplyStyleCsp(child, csp, blockStyleAttribute);
     }
 
-    private string GetStyleElementCssText(DomElement styleEl)
+    private string GetStyleElementCssText(Broiler.Dom.DomElement styleEl)
     {
         var rules = EnsureStyleSheetRulesCurrent(styleEl);
         var state = GetElementRuntimeState(styleEl).StyleSheet;
@@ -691,12 +502,9 @@ public sealed partial class DomBridge
             : state.RulesSourceText ?? string.Empty;
     }
 
-    private static string FormatPx(double value) =>
-        $"{Math.Round(value).ToString(CultureInfo.InvariantCulture)}px";
-
     private static void ApplyUserAgentDisplayDefaults(
         Dictionary<string, string> computed,
-        DomElement element)
+        Broiler.Dom.DomElement element)
     {
         if (computed.ContainsKey("display"))
             return;
@@ -711,545 +519,16 @@ public sealed partial class DomBridge
             computed["display"] = display;
     }
 
-    private static int FindMatchingClosingParen(string value, int openParenIndex)
-    {
-        int depth = 0;
-        for (int i = openParenIndex; i < value.Length; i++)
-        {
-            if (value[i] == '(')
-                depth++;
-            else if (value[i] == ')')
-            {
-                depth--;
-                if (depth == 0)
-                    return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static int FindTopLevelChar(string value, char target)
-    {
-        int depth = 0;
-        for (int i = 0; i < value.Length; i++)
-        {
-            if (value[i] == '(')
-                depth++;
-            else if (value[i] == ')')
-                depth--;
-            else if (value[i] == target && depth == 0)
-                return i;
-        }
-
-        return -1;
-    }
-
     /// <summary>
-    /// Expands CSS shorthand properties into individual longhand properties.
-    /// For example, <c>margin: 10px 5px</c> expands to <c>margin-top: 10px</c>,
-    /// <c>margin-right: 5px</c>, <c>margin-bottom: 10px</c>, <c>margin-left: 5px</c>.
-    /// Only sets longhands that are not already explicitly set.
+    /// Expands CSS shorthand properties into individual longhand properties (e.g.
+    /// <c>margin: 10px 5px</c> → <c>margin-top/right/bottom/left</c>), only setting longhands
+    /// not already present. DOM/CSS promotion Phase 2: this now delegates to the single canonical
+    /// <see cref="Broiler.CSS.Dom.CssStyleEngine.ExpandShorthands"/> — the bridge's own copy (which
+    /// had drifted to a narrower subset: no <c>outline</c>, no <c>font</c> slash line-height, and a
+    /// single-layer <c>background</c> parser) is deleted so it can no longer drift from the engine.
     /// </summary>
     private static void ExpandCssShorthands(Dictionary<string, string> computed)
-    {
-        if (computed.TryGetValue("font", out var fontVal))
-            ExpandFontShorthand(computed, fontVal);
-
-        // Expand margin shorthand → margin-top, margin-right, margin-bottom, margin-left
-        if (computed.TryGetValue("margin", out var marginVal))
-            ExpandBoxShorthand(computed, marginVal, "margin-top", "margin-right", "margin-bottom", "margin-left");
-
-        // Expand padding shorthand → padding-top, padding-right, padding-bottom, padding-left
-        if (computed.TryGetValue("padding", out var paddingVal))
-            ExpandBoxShorthand(computed, paddingVal, "padding-top", "padding-right", "padding-bottom", "padding-left");
-
-        // Expand border-width shorthand → individual sides
-        if (computed.TryGetValue("border-width", out var bwVal))
-            ExpandBoxShorthand(computed, bwVal, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width");
-
-        // Expand border-style shorthand → individual sides
-        if (computed.TryGetValue("border-style", out var bsVal))
-            ExpandBoxShorthand(computed, bsVal, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
-
-        // Expand border-color shorthand → individual sides
-        if (computed.TryGetValue("border-color", out var bcVal))
-            ExpandBoxShorthand(computed, bcVal, "border-top-color", "border-right-color", "border-bottom-color", "border-left-color");
-
-        // Expand border shorthand (e.g. "2cm solid gray") → border-width, border-style, border-color
-        if (computed.TryGetValue("border", out var borderVal))
-            ExpandBorderShorthand(computed, borderVal);
-
-        if (computed.TryGetValue("border-left", out var borderLeftVal))
-            ExpandBorderSideShorthand(computed, borderLeftVal, "left");
-        if (computed.TryGetValue("border-top", out var borderTopVal))
-            ExpandBorderSideShorthand(computed, borderTopVal, "top");
-        if (computed.TryGetValue("border-right", out var borderRightVal))
-            ExpandBorderSideShorthand(computed, borderRightVal, "right");
-        if (computed.TryGetValue("border-bottom", out var borderBottomVal))
-            ExpandBorderSideShorthand(computed, borderBottomVal, "bottom");
-
-        // Expand border-inline shorthand → border-left and border-right
-        // CSS Logical Properties §5.1: border-inline applies to both
-        // inline-start and inline-end (left and right in LTR).
-        if (computed.TryGetValue("border-inline", out var biVal))
-        {
-            if (!computed.ContainsKey("border-left")) computed["border-left"] = biVal;
-            if (!computed.ContainsKey("border-right")) computed["border-right"] = biVal;
-            ExpandBorderSideShorthand(computed, biVal, "left");
-            ExpandBorderSideShorthand(computed, biVal, "right");
-        }
-
-        // Expand border-block shorthand → border-top and border-bottom
-        if (computed.TryGetValue("border-block", out var bbVal))
-        {
-            if (!computed.ContainsKey("border-top")) computed["border-top"] = bbVal;
-            if (!computed.ContainsKey("border-bottom")) computed["border-bottom"] = bbVal;
-            ExpandBorderSideShorthand(computed, bbVal, "top");
-            ExpandBorderSideShorthand(computed, bbVal, "bottom");
-        }
-
-        // Expand margin-block shorthand → margin-top and margin-bottom
-        if (computed.TryGetValue("margin-block", out var mbVal))
-        {
-            var parts = SplitCssValues(mbVal);
-            if (parts.Length >= 1)
-            {
-                if (!computed.ContainsKey("margin-top")) computed["margin-top"] = parts[0];
-                if (!computed.ContainsKey("margin-bottom")) computed["margin-bottom"] = parts.Length > 1 ? parts[1] : parts[0];
-            }
-        }
-
-        // Expand margin-inline shorthand → margin-left and margin-right
-        if (computed.TryGetValue("margin-inline", out var miVal))
-        {
-            var parts = SplitCssValues(miVal);
-            if (parts.Length >= 1)
-            {
-                if (!computed.ContainsKey("margin-left")) computed["margin-left"] = parts[0];
-                if (!computed.ContainsKey("margin-right")) computed["margin-right"] = parts.Length > 1 ? parts[1] : parts[0];
-            }
-        }
-
-        // Expand padding-block shorthand → padding-top and padding-bottom
-        if (computed.TryGetValue("padding-block", out var pbVal))
-        {
-            var parts = SplitCssValues(pbVal);
-            if (parts.Length >= 1)
-            {
-                if (!computed.ContainsKey("padding-top")) computed["padding-top"] = parts[0];
-                if (!computed.ContainsKey("padding-bottom")) computed["padding-bottom"] = parts.Length > 1 ? parts[1] : parts[0];
-            }
-        }
-
-        // Expand padding-inline shorthand → padding-left and padding-right
-        if (computed.TryGetValue("padding-inline", out var piVal))
-        {
-            var parts = SplitCssValues(piVal);
-            if (parts.Length >= 1)
-            {
-                if (!computed.ContainsKey("padding-left")) computed["padding-left"] = parts[0];
-                if (!computed.ContainsKey("padding-right")) computed["padding-right"] = parts.Length > 1 ? parts[1] : parts[0];
-            }
-        }
-
-        // Expand inset shorthand → top, right, bottom, left (CSS Logical Properties)
-        if (computed.TryGetValue("inset", out var insetVal))
-        {
-            // inset is a shorthand that maps to top, right, bottom, left using
-            // the same 1-4 value pattern as margin/padding.  Only set longhands
-            // that are not already explicitly specified to avoid clobbering
-            // author-provided overrides.
-            var insetParts = SplitCssValues(insetVal);
-            if (insetParts.Length > 0)
-            {
-                string iTop = insetParts[0];
-                string iRight = insetParts.Length > 1 ? insetParts[1] : iTop;
-                string iBottom = insetParts.Length > 2 ? insetParts[2] : iTop;
-                string iLeft = insetParts.Length > 3 ? insetParts[3] : iRight;
-
-                if (!computed.ContainsKey("top")) computed["top"] = iTop;
-                if (!computed.ContainsKey("right")) computed["right"] = iRight;
-                if (!computed.ContainsKey("bottom")) computed["bottom"] = iBottom;
-                if (!computed.ContainsKey("left")) computed["left"] = iLeft;
-            }
-        }
-
-        // Expand background shorthand → background-color, background-image, background-repeat,
-        // background-attachment, background-position (CSS2.1 §14.2.1)
-        if (computed.TryGetValue("background", out var bgVal))
-            ExpandBackgroundShorthand(computed, bgVal);
-    }
-
-    private static void ExpandFontShorthand(Dictionary<string, string> computed, string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return;
-
-        if (value.Trim().Equals("inherit", StringComparison.OrdinalIgnoreCase))
-        {
-            // Keep any longhands that were already assigned by more specific
-            // declarations; only use the inherited font shorthand to backfill
-            // missing longhands in the computed map.
-            if (!computed.ContainsKey("font-style")) computed["font-style"] = "inherit";
-            if (!computed.ContainsKey("font-variant")) computed["font-variant"] = "inherit";
-            if (!computed.ContainsKey("font-weight")) computed["font-weight"] = "inherit";
-            if (!computed.ContainsKey("font-size")) computed["font-size"] = "inherit";
-            if (!computed.ContainsKey("line-height")) computed["line-height"] = "inherit";
-            if (!computed.ContainsKey("font-family")) computed["font-family"] = "inherit";
-            return;
-        }
-
-        var tokens = SplitCssValues(value);
-        if (tokens.Length == 0)
-            return;
-
-        string fontStyle = "normal";
-        string fontVariant = "normal";
-        string fontWeight = "normal";
-        string? fontSize = null;
-        string? lineHeight = null;
-        int fontSizeIndex = -1;
-
-        for (int i = 0; i < tokens.Length; i++)
-        {
-            var token = tokens[i];
-            var lower = token.ToLowerInvariant();
-
-            if (TryParseFontSizeAndLineHeight(lower, token, out var parsedFontSize, out var parsedLineHeight))
-            {
-                fontSize = parsedFontSize;
-                lineHeight = parsedLineHeight;
-                fontSizeIndex = i;
-                break;
-            }
-
-            if (lower is "normal" or "italic" or "oblique")
-                fontStyle = lower;
-            else if (lower == "small-caps")
-                fontVariant = lower;
-            else if (lower is "bold" or "bolder" or "lighter" or "100" or "200" or "300" or "400" or "500" or "600" or "700" or "800" or "900")
-                fontWeight = lower;
-        }
-
-        if (fontSizeIndex < 0 || fontSizeIndex >= tokens.Length - 1 || string.IsNullOrWhiteSpace(fontSize))
-            return;
-
-        var fontFamily = string.Join(" ", tokens[(fontSizeIndex + 1)..]).Trim();
-        if (string.IsNullOrWhiteSpace(fontFamily))
-            return;
-
-        bool hasNonEmptyFamily = fontFamily
-            .Split(',', StringSplitOptions.TrimEntries)
-            .Any(part => !string.IsNullOrWhiteSpace(part.Trim('"', '\'', ' ')));
-        if (!hasNonEmptyFamily)
-            return;
-
-        // Respect longhands that already won in the cascade; the shorthand only
-        // populates values that are still absent from the computed map.
-        if (!computed.ContainsKey("font-style")) computed["font-style"] = fontStyle;
-        if (!computed.ContainsKey("font-variant")) computed["font-variant"] = fontVariant;
-        if (!computed.ContainsKey("font-weight")) computed["font-weight"] = fontWeight;
-        if (!computed.ContainsKey("font-size")) computed["font-size"] = fontSize;
-        var resolvedLineHeight = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
-        if (!computed.ContainsKey("line-height")) computed["line-height"] = resolvedLineHeight;
-        if (!computed.ContainsKey("font-family")) computed["font-family"] = fontFamily;
-    }
-
-    private static bool TryParseFontSizeAndLineHeight(string lowerToken, string originalToken, out string fontSize, out string lineHeight)
-    {
-        fontSize = string.Empty;
-        lineHeight = string.Empty;
-
-        string sizeToken = lowerToken;
-        string? lineHeightToken = null;
-        int slashIndex = lowerToken.IndexOf('/', StringComparison.Ordinal);
-        if (slashIndex >= 0)
-        {
-            sizeToken = lowerToken[..slashIndex];
-            lineHeightToken = originalToken[(slashIndex + 1)..];
-        }
-
-        if (!IsFontSizeToken(sizeToken))
-            return false;
-
-        if (lineHeightToken != null)
-        {
-            var trimmedLineHeight = lineHeightToken.Trim();
-            if (!IsFontLineHeightToken(trimmedLineHeight))
-                return false;
-            lineHeight = trimmedLineHeight;
-        }
-
-        fontSize = originalToken;
-        if (slashIndex >= 0)
-            fontSize = originalToken[..slashIndex];
-
-        return true;
-    }
-
-    private static bool IsFontSizeToken(string token) =>
-        token is "xx-small" or "x-small" or "small" or "medium" or "large" or "x-large" or "xx-large" or "larger" or "smaller"
-        || IsLengthOrPercentage(token);
-
-    private static bool IsFontLineHeightToken(string token) =>
-        token.Equals("normal", StringComparison.OrdinalIgnoreCase)
-        || IsLengthOrPercentage(token)
-        || double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
-
-    /// <summary>
-    /// Expands a 1–4 value CSS box shorthand (margin, padding, border-width, etc.)
-    /// into four individual properties using CSS box-model order: top, right, bottom, left.
-    /// </summary>
-    private static void ExpandBoxShorthand(Dictionary<string, string> computed, string value,
-        string topProp, string rightProp, string bottomProp, string leftProp)
-    {
-        var parts = SplitCssValues(value);
-        if (parts.Length == 0) return;
-
-        string top, right, bottom, left;
-        switch (parts.Length)
-        {
-            case 1:
-                top = right = bottom = left = parts[0];
-                break;
-            case 2:
-                top = bottom = parts[0];
-                right = left = parts[1];
-                break;
-            case 3:
-                top = parts[0];
-                right = left = parts[1];
-                bottom = parts[2];
-                break;
-            default: // 4+
-                top = parts[0];
-                right = parts[1];
-                bottom = parts[2];
-                left = parts[3];
-                break;
-        }
-
-        if (!computed.ContainsKey(topProp)) computed[topProp] = top;
-        if (!computed.ContainsKey(rightProp)) computed[rightProp] = right;
-        if (!computed.ContainsKey(bottomProp)) computed[bottomProp] = bottom;
-        if (!computed.ContainsKey(leftProp)) computed[leftProp] = left;
-    }
-
-    /// <summary>
-    /// Expands the <c>border</c> shorthand (e.g. "2cm solid gray") into
-    /// <c>border-width</c>, <c>border-style</c>, and <c>border-color</c>.
-    /// </summary>
-    private static void ExpandBorderShorthand(Dictionary<string, string> computed, string value)
-    {
-        var parts = SplitCssValues(value);
-
-        string? width = null, style = null, color = null;
-
-        foreach (var part in parts)
-        {
-            var lower = part.ToLowerInvariant();
-            if (lower is "none" or "hidden" or "dotted" or "dashed" or "solid"
-                or "double" or "groove" or "ridge" or "inset" or "outset")
-            {
-                style ??= part;
-            }
-            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower))
-            {
-                width ??= part;
-            }
-            else
-            {
-                color ??= part;
-            }
-        }
-
-        if (width != null && !computed.ContainsKey("border-width")) computed["border-width"] = width;
-        if (style != null && !computed.ContainsKey("border-style")) computed["border-style"] = style;
-        if (color != null && !computed.ContainsKey("border-color")) computed["border-color"] = color;
-
-        // Further expand border-width, border-style, and border-color into individual sides
-        if (width != null)
-            ExpandBoxShorthand(computed, width, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width");
-        if (style != null)
-            ExpandBoxShorthand(computed, style, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
-        if (color != null)
-            ExpandBoxShorthand(computed, color, "border-top-color", "border-right-color", "border-bottom-color", "border-left-color");
-    }
-
-    /// <summary>
-    /// Expands a border shorthand value (e.g. "solid black 1em") into
-    /// individual longhands for a specific side (top, right, bottom, left).
-    /// </summary>
-    private static void ExpandBorderSideShorthand(
-        Dictionary<string, string> computed, string value, string side)
-    {
-        var parts = SplitCssValues(value);
-        string? width = null, style = null, color = null;
-        foreach (var part in parts)
-        {
-            var lower = part.ToLowerInvariant();
-            if (lower is "none" or "hidden" or "dotted" or "dashed" or "solid"
-                or "double" or "groove" or "ridge" or "inset" or "outset")
-                style ??= part;
-            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower))
-                width ??= part;
-            else
-                color ??= part;
-        }
-
-        if (width != null && !computed.ContainsKey($"border-{side}-width"))
-            computed[$"border-{side}-width"] = width;
-        if (style != null && !computed.ContainsKey($"border-{side}-style"))
-            computed[$"border-{side}-style"] = style;
-        if (color != null && !computed.ContainsKey($"border-{side}-color"))
-            computed[$"border-{side}-color"] = color;
-    }
-
-    /// <summary>
-    /// Expands the CSS <c>background</c> shorthand into its five longhand properties:
-    /// <c>background-color</c>, <c>background-image</c>, <c>background-repeat</c>,
-    /// <c>background-attachment</c>, and <c>background-position</c>.
-    /// CSS2.1 §14.2.1: tokens can appear in any order; unspecified longhands
-    /// receive their initial values.
-    /// </summary>
-    /// <remarks>
-    /// Implements TODO-24 (acid3-compliance.md §11.5): correctly handles data-URI
-    /// images with percent-encoded characters, non-integer percentage positions
-    /// (e.g. <c>99.8392283%</c>), and trailing color keywords (e.g. <c>white</c>).
-    /// See also: <c>CssParser.ParseBackgroundShorthand()</c> for the rendering-path
-    /// counterpart.  Tests: <c>Acid3Todo24_28Tests.cs</c>.
-    /// </remarks>
-    private static void ExpandBackgroundShorthand(Dictionary<string, string> computed, string value)
-    {
-        var tokens = SplitCssValues(value);
-
-        string? color = null;
-        string? image = null;
-        string? repeat = null;
-        string? attachment = null;
-        var positionParts = new List<string>();
-
-        foreach (var token in tokens)
-        {
-            var lower = token.ToLowerInvariant();
-
-            // background-image: url(...) or none
-            if (lower.StartsWith("url("))
-            {
-                image ??= token;
-                continue;
-            }
-
-            // CSS gradient functions (linear-gradient, radial-gradient, etc.)
-            if (lower.StartsWith("linear-gradient(") ||
-                lower.StartsWith("radial-gradient(") ||
-                lower.StartsWith("conic-gradient(") ||
-                lower.StartsWith("repeating-linear-gradient(") ||
-                lower.StartsWith("repeating-radial-gradient(") ||
-                lower.StartsWith("repeating-conic-gradient("))
-            {
-                image ??= token;
-                continue;
-            }
-
-            if (lower == "none")
-            {
-                image ??= "none";
-                continue;
-            }
-
-            // background-attachment (CSS3 adds 'local')
-            if (lower is "scroll" or "fixed" or "local")
-            {
-                attachment ??= lower;
-                continue;
-            }
-
-            // CSS3 background-origin / background-clip box values —
-            // accept but don't change rendering (not yet implemented).
-            if (lower is "content-box" or "padding-box" or "border-box" or "border-area")
-            {
-                continue;
-            }
-
-            // CSS3 background-size separator — skip '/' and size tokens
-            if (lower == "/")
-                continue;
-
-            // background-repeat (CSS3 adds 'space' and 'round')
-            if (lower is "repeat" or "repeat-x" or "repeat-y" or "no-repeat" or "space" or "round")
-            {
-                repeat ??= lower;
-                continue;
-            }
-
-            // background-position keywords
-            if (lower is "left" or "right" or "top" or "bottom" or "center")
-            {
-                positionParts.Add(lower);
-                continue;
-            }
-
-            // Length or percentage values → position
-            if (IsLengthOrPercentage(lower))
-            {
-                positionParts.Add(token);
-                continue;
-            }
-
-            // inherit — skip
-            if (lower == "inherit")
-                continue;
-
-            // CSS3 background-size keywords — accept but don't render
-            if (lower is "auto" or "cover" or "contain")
-                continue;
-
-            // Remaining token → treat as color (named color, hex, rgb(), etc.)
-            color ??= token;
-        }
-
-        if (!computed.ContainsKey("background-color"))
-            computed["background-color"] = color ?? "transparent";
-        if (!computed.ContainsKey("background-image"))
-            computed["background-image"] = image ?? "none";
-        if (!computed.ContainsKey("background-repeat"))
-            computed["background-repeat"] = repeat ?? "repeat";
-        if (!computed.ContainsKey("background-attachment"))
-            computed["background-attachment"] = attachment ?? "scroll";
-        if (!computed.ContainsKey("background-position"))
-            computed["background-position"] = positionParts.Count > 0
-                ? string.Join(" ", positionParts) : "0% 0%";
-    }
-
-    /// <summary>
-    /// Splits a CSS value into whitespace-separated tokens, respecting
-    /// parenthesised groups (e.g. <c>rgba(0, 0, 0, 0.5)</c>).
-    /// </summary>
-    private static string[] SplitCssValues(string value)
-    {
-        var parts = new List<string>();
-        var sb = new StringBuilder();
-        int depth = 0;
-        foreach (char c in value)
-        {
-            if (c == '(') depth++;
-            else if (c == ')' && depth > 0) depth--;
-
-            if (char.IsWhiteSpace(c) && depth == 0 && sb.Length > 0)
-            {
-                parts.Add(sb.ToString());
-                sb.Clear();
-            }
-            else if (!char.IsWhiteSpace(c) || depth > 0)
-            {
-                sb.Append(c);
-            }
-        }
-        if (sb.Length > 0) parts.Add(sb.ToString());
-        return parts.ToArray();
-    }
+        => Broiler.CSS.Dom.CssStyleEngine.ExpandShorthands(computed);
 
     /// <summary>
     /// Evaluates a media query string. Supports basic queries needed for Acid3.
@@ -1447,7 +726,7 @@ public sealed partial class DomBridge
     /// the viewport is the iframe container's CSS dimensions. For the main
     /// document, the viewport is 0×0 (headless).
     /// </summary>
-    private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
+    private (int Width, int Height) GetViewportForDocRoot(Broiler.Dom.DomElement docRoot)
     {
         if (ReferenceEquals(docRoot, DocumentElement) ||
             string.Equals(docRoot.TagName, "#document", StringComparison.OrdinalIgnoreCase))

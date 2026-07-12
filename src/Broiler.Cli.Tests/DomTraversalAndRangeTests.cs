@@ -1303,9 +1303,11 @@ r.push(p.childNodes[0].textContent);       // '12'
 r.push(p.childNodes[1].textContent);       // 'ABCDE'
 r.push(p.childNodes[2].textContent);       // '345'
 
-// Range boundaries should be updated to parent after text split
-r.push(range.startContainer === p);        // true (parent of split)
-r.push(range.startOffset);                 // 1 (index of inserted node)
+// Per the DOM Standard, insertNode splits the start text node but leaves the start
+// boundary in the (now truncated) original text node — it does NOT normalize to the
+// parent (the pre-rewire bridge's non-spec behaviour). t1 is now '12', offset 2.
+r.push(range.startContainer === t1);       // true (start stays in the original text node)
+r.push(range.startOffset);                 // 2 (end of '12')
 
 var out = document.createElement('div');
 out.id = 'result';
@@ -1316,7 +1318,7 @@ document.body.appendChild(out);
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains("3|12|ABCDE|345|true|1", result);
+        Assert.Contains("3|12|ABCDE|345|true|2", result);
     }
 
     /// <summary>
@@ -1691,8 +1693,10 @@ r.push(p.childNodes.length);              // 3
 r.push(p.childNodes[0].textContent);      // 'A'
 r.push(p.childNodes[1].textContent);      // 'XYZ'
 r.push(p.childNodes[2].textContent);      // 'BCDE'
-r.push(range.startContainer === p);       // true
-r.push(range.startOffset);               // 1 (index of inserted node)
+// Per the DOM Standard the start boundary stays in the (now 'A') original text node,
+// not the parent (the pre-rewire bridge's non-spec normalization).
+r.push(range.startContainer === t);       // true (start stays in the original text node)
+r.push(range.startOffset);               // 1
 var out = document.createElement('div');
 out.id = 'result';
 out.textContent = r.join('|');

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.Playback</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Application/HTML-layer media playback engine: an HTMLMediaElement-shaped state machine over Broiler.Media audio decoding and video sessions. Playback clock, pause/seek/end state, and capability policy live here — never in Broiler.Media (roadmap §4/§7.5).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Abstractions only. Concrete codecs (managed audio, MediaFoundation video) and the
+         Graphics.Windows HWND target are supplied by the composition root via IMediaOutputProvider
+         and the MediaCodecCatalog handed to MediaPlayer. -->
+    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media\Broiler.Media.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Audio\Broiler.Media.Audio.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Video\Broiler.Media.Video.csproj" />
+  </ItemGroup>
+
+</Project>

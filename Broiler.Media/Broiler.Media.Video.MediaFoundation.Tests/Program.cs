@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
+using Broiler.Graphics.Windows;
 
 namespace Broiler.Media.Video.MediaFoundation.Tests;
 
@@ -25,7 +26,7 @@ internal static class Program
             ("Codec validates source policy before native startup", SourcePolicyValidation),
             ("Codec honors cancellation before native startup", CancellationBeforeNativeStartup),
             ("Video abstractions stay MediaFoundation and HWND free", AbstractionsStayBackendFree),
-            ("MediaFoundation runtime avoids Graphics, HTML, surfaces and swap chains", RuntimeDependencyBoundary),
+            ("MediaFoundation runtime borrows only the Graphics.Windows HWND target, not the Graphics core/surfaces/HTML", RuntimeDependencyBoundary),
         };
 
         int passed = 0;
@@ -91,10 +92,10 @@ internal static class Program
 
     private static ValueTask BorrowedTargetLifecycle()
     {
-        Assert.Throws<ArgumentException>(() => _ = new MediaFoundationBorrowedHwndVideoOutput(0, "zero", 1, 1, validateNativeWindow: false));
+        Assert.Throws<ArgumentException>(() => _ = new HwndVideoOutput(0, "zero", 1, 1, validateNativeWindow: false));
 
-        MediaFoundationBorrowedHwndVideoOutput target = CreateTarget();
-        var changes = new List<MediaFoundationVideoTargetChangeKind>();
+        HwndVideoOutput target = CreateTarget();
+        var changes = new List<HwndVideoTargetChangeKind>();
         target.TargetChanged += (_, e) => changes.Add(e.Kind);
 
         target.Resize(800, 450);
@@ -108,9 +109,9 @@ internal static class Program
         Assert.SequenceEqual(
             new[]
             {
-                MediaFoundationVideoTargetChangeKind.Resized,
-                MediaFoundationVideoTargetChangeKind.VisibilityChanged,
-                MediaFoundationVideoTargetChangeKind.Destroyed,
+                HwndVideoTargetChangeKind.Resized,
+                HwndVideoTargetChangeKind.VisibilityChanged,
+                HwndVideoTargetChangeKind.Destroyed,
             },
             changes);
         Assert.Throws<ObjectDisposedException>(() => target.Resize(1, 1));
@@ -124,7 +125,7 @@ internal static class Program
     private static async ValueTask SessionLifecycle()
     {
         FakeMediaEngine engine = new();
-        MediaFoundationBorrowedHwndVideoOutput target = CreateTarget();
+        HwndVideoOutput target = CreateTarget();
         await using var session = new MediaFoundationVideoSession(engine, target);
         var events = new List<VideoSessionEventKind>();
         session.StateChanged += (_, e) => events.Add(e.Kind);
@@ -162,7 +163,7 @@ internal static class Program
     private static async ValueTask TargetChangesReachSession()
     {
         FakeMediaEngine engine = new();
-        MediaFoundationBorrowedHwndVideoOutput target = CreateTarget();
+        HwndVideoOutput target = CreateTarget();
         await using var session = new MediaFoundationVideoSession(engine, target);
         var events = new List<VideoSessionEventKind>();
         session.StateChanged += (_, e) => events.Add(e.Kind);
@@ -181,7 +182,7 @@ internal static class Program
     private static async ValueTask TargetDestructionFailsSession()
     {
         FakeMediaEngine engine = new();
-        MediaFoundationBorrowedHwndVideoOutput target = CreateTarget();
+        HwndVideoOutput target = CreateTarget();
         await using var session = new MediaFoundationVideoSession(engine, target);
         var events = new List<VideoSessionEventKind>();
         session.StateChanged += (_, e) => events.Add(e.Kind);
@@ -200,7 +201,7 @@ internal static class Program
     private static async ValueTask DisposeDisconnectsCallbacks()
     {
         FakeMediaEngine engine = new();
-        MediaFoundationBorrowedHwndVideoOutput target = CreateTarget();
+        HwndVideoOutput target = CreateTarget();
         var session = new MediaFoundationVideoSession(engine, target);
         await session.LoadAsync("file:///C:/video.mp4", CancellationToken.None).ConfigureAwait(false);
         await session.DisposeAsync().ConfigureAwait(false);
@@ -262,16 +263,29 @@ internal static class Program
         foreach (string file in Directory.EnumerateFiles(runtimeRoot, "*.cs", SearchOption.AllDirectories))
         {
             string text = File.ReadAllText(file);
-            Assert.DoesNotContain("Broiler.Graphics", text, file);
+
+            // The one approved Graphics edge (media roadmap §6.6) is the Windows HWND video
+            // target declared by Broiler.Graphics.Windows, which the backend borrows. Any
+            // OTHER Broiler.Graphics reference — the rendering core, surfaces, devices, image
+            // stores, swap chains — is forbidden. Strip the sanctioned namespace, then assert
+            // no remaining Graphics reference survives.
+            string withoutWindowsTarget = text.Replace("Broiler.Graphics.Windows", string.Empty);
+            Assert.DoesNotContain("Broiler.Graphics", withoutWindowsTarget, file);
+
             Assert.DoesNotContain("Broiler.Html", text, file);
             Assert.DoesNotContain("SwapChain", text, file);
             Assert.DoesNotContain("Direct3D", text, file);
+
+            // Borrow the HWND target only — never a rendering surface / GPU presentation backend.
+            Assert.DoesNotContain("Direct2DSurface", text, file);
+            Assert.DoesNotContain("Direct2DDevice", text, file);
+            Assert.DoesNotContain("Direct2DImageStore", text, file);
         }
 
         return ValueTask.CompletedTask;
     }
 
-    private static MediaFoundationBorrowedHwndVideoOutput CreateTarget() =>
+    private static HwndVideoOutput CreateTarget() =>
         new((nint)1234, "test hwnd", 640, 360, validateNativeWindow: false);
 
     private static string FindMediaRoot()
@@ -331,7 +345,7 @@ internal static class Program
 
         public VideoStreamInfo GetStreamInfo() => _info;
 
-        public void OnTargetChanged(MediaFoundationBorrowedHwndVideoOutput target)
+        public void OnTargetChanged(HwndVideoOutput target)
         {
             TargetChangeCount++;
             LastTargetWidth = target.Width;

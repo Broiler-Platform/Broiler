@@ -10,7 +10,7 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private JSObject BuildSubDocument(DomElement docRoot)
+    private JSObject BuildSubDocument(Broiler.Dom.DomElement docRoot)
     {
         var doc = new JSObject();
         _docRootToDocJSObject[docRoot] = doc;
@@ -294,7 +294,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Finds the first element in a sub-tree matching a predicate.</summary>
-    private DomElement? FindInSubTree(DomElement root, Func<DomElement, bool> predicate)
+    private Broiler.Dom.DomElement? FindInSubTree(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate)
     {
         foreach (var child in ChildElements(root))
         {
@@ -307,7 +307,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Finds the first element in a tree matching a predicate (includes the root).</summary>
-    private static DomElement? FindInTree(DomElement root, Func<DomElement, bool> predicate)
+    private static Broiler.Dom.DomElement? FindInTree(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate)
     {
         if (predicate(root)) return root;
         foreach (var child in ChildElements(root))

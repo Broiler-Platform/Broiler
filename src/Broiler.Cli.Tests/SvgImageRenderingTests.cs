@@ -1,45 +1,44 @@
-using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
-using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
 
 namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// Tests for SVG image detection and rendering.
-/// Verifies that SVG data is properly detected by <see cref="ImageDecoder.DetectFormatFromBytes"/>
+/// Verifies that SVG data is properly detected by <see cref="BSvgRasterizer.IsSvgData"/>
+/// (the live, bridge-owned SVG-vs-raster discriminator — SVG stays out of Broiler.Media)
 /// and that <c>StubImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
 /// via the Broiler-owned SVG rasterizer instead of silently returning null.
 /// </summary>
 public class SvgImageRenderingTests
 {
-    // ────────────────────── SVG byte-level detection ──────────────────────
+    // ────────────────────── SVG byte-level detection (BSvgRasterizer.IsSvgData) ──────────────────────
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Svg_For_Xml_Declaration_With_SvgTag()
+    public void IsSvgData_Returns_True_For_Xml_Declaration_With_SvgTag()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+        Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Svg_For_Direct_SvgTag()
+    public void IsSvgData_Returns_True_For_Direct_SvgTag()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\"><rect fill=\"red\"/></svg>");
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+        Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Svg_With_Leading_Whitespace()
+    public void IsSvgData_Returns_True_With_Leading_Whitespace()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
             "  \n\t<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+        Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Svg_With_Utf8_Bom()
+    public void IsSvgData_Returns_True_With_Utf8_Bom()
     {
         var bom = new byte[] { 0xEF, 0xBB, 0xBF };
         var svgBytes = System.Text.Encoding.UTF8.GetBytes(
@@ -48,45 +47,33 @@ public class SvgImageRenderingTests
         Buffer.BlockCopy(bom, 0, data, 0, bom.Length);
         Buffer.BlockCopy(svgBytes, 0, data, bom.Length, svgBytes.Length);
 
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(data));
+        Assert.True(BSvgRasterizer.IsSvgData(data));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Svg_With_Comment_And_Doctype_Preamble()
+    public void IsSvgData_Returns_True_With_Comment_And_Doctype_Preamble()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
             "<!-- generated --><!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" " +
             "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">" +
             "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>");
 
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormatFromBytes(svg));
+        Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Unknown_For_NonSvg_Xml()
+    public void IsSvgData_Returns_False_For_NonSvg_Xml()
     {
         var xml = System.Text.Encoding.UTF8.GetBytes(
             "<?xml version=\"1.0\"?><root><item/></root>");
-        Assert.Equal(RenderImageFormat.Unknown, ImageDecoder.DetectFormatFromBytes(xml));
+        Assert.False(BSvgRasterizer.IsSvgData(xml));
     }
 
     [Fact]
-    public void DetectFormatFromBytes_Returns_Png_Not_Svg_For_Png_Bytes()
+    public void IsSvgData_Returns_False_For_Png_Bytes()
     {
         var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
-        Assert.Equal(RenderImageFormat.Png, ImageDecoder.DetectFormatFromBytes(png));
-    }
-
-    [Fact]
-    public void DetectFormat_Returns_Svg_For_DotSvg_Extension()
-    {
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormat("https://example.com/logo.svg"));
-    }
-
-    [Fact]
-    public void DetectFormat_Returns_Svg_For_DataUri_SvgXml()
-    {
-        Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormat("data:image/svg+xml;base64,PHN2Zw=="));
+        Assert.False(BSvgRasterizer.IsSvgData(png));
     }
 
     // ────────────────────── SVG rasterization via BSvgRasterizer ──────────────────────
@@ -225,7 +212,6 @@ public class SvgImageRenderingTests
             "<!-- mentions <svg> but is not svg --><root></root>");
 
         Assert.False(BSvgRasterizer.IsSvgData(xmlBytes));
-        Assert.Equal(RenderImageFormat.Unknown, ImageDecoder.DetectFormatFromBytes(xmlBytes));
     }
 
     [Fact]

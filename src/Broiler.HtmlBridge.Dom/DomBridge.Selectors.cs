@@ -9,16 +9,16 @@ public sealed partial class DomBridge
         new(new BridgeSelectorStateProvider());
 
     private static bool MatchesSelector(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         string selector,
-        DomElement? scope = null) =>
+        Broiler.Dom.DomElement? scope = null) =>
         SharedSelectorMatcher.Matches(element, selector, scope);
 
     private sealed class BridgeSelectorStateProvider : CSS.Dom.ICssSelectorStateProvider
     {
         public bool? IsChecked(Broiler.Dom.DomElement element)
         {
-            if (element is not DomElement bridgeElement)
+            if (element is not Broiler.Dom.DomElement bridgeElement)
                 return null;
 
             return GetElementRuntimeState(bridgeElement).FormControl.Checked.TryGet(out var value)

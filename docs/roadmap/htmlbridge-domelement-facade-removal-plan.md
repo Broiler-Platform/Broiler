@@ -1,7 +1,12 @@
 # HtmlBridge `DomElement` Facade Removal — Implementation Plan
 
-Status: proposed
-Date: 2026-07-10
+Status: **implemented and MERGED** — all phases (A–F4) landed, `Broiler.Cli.Tests`-verified on
+`claude/htmlbridge-domelement-f3c-flip`, and **merged to `main` as PR #1359 (`ecbdf406`, 2026-07-12)**
+after passing the WPT + Acid + pixel gate; the facade + `HtmlTreeBuilder` are deleted. The authoritative
+"where things stand" record is
+[`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md); this
+plan is retained as the "how it was staged" design history.
+Date: 2026-07-10 (implemented 2026-07-11, merged 2026-07-12)
 
 ## Purpose
 
@@ -21,14 +26,29 @@ Track 3 renderer prerequisites in `Broiler.Layout`. Governance Milestone 1.0
 (`htmlbridge-public-surface/v2` declared) and Milestone 1.1 (zero-caller shim removal)
 are done. The facade removal is unblocked.
 
-## Status at a glance (2026-07-11)
+## Status at a glance (2026-07-11) — COMPLETE
 
-Phases A–E2 on branch `claude/rf-bridge-1c-domelement-facade-migration`; Phases C2 + F1 + F3a + F3b + F3c-part1 on branch
-`claude/htmlbridge-domelement-removal-ucyw5j`. Each row is its own commit, every one regression-free
-against the full `Broiler.Cli.Tests` (1699, slot-scroll crasher excluded) environmental baseline —
-Phase C2 verified 0 baseline-passing tests regressed (before/after trx diff; the sole delta is the
-pre-existing `GoogleSearchPolyfillTests` render/scroll environmental failures, confirmed failing on the
-pre-change tree too).
+**All phases (A–E2, C2, F1, F3a/b/c, F4) are implemented on branch
+`claude/htmlbridge-domelement-f3c-flip` and `Broiler.Cli.Tests`-verified.** The `Broiler.HtmlBridge.DomElement`
+facade and `HtmlTreeBuilder` are **deleted**; the bridge holds only canonical `Broiler.Dom` nodes + bridge
+runtime state. Each phase is its own commit, every one regression-free against the full `Broiler.Cli.Tests`
+(slot-scroll crasher excluded) environmental baseline via before/after TRX **name**-diff. **Merged** to
+`main` as PR #1359 (`ecbdf406`, 2026-07-12) after the F3c/F4 stack passed the WPT range/selection/
+serialization + Acid + pixel gate (dispatch-only). The live record is the
+[current-state doc](htmlbridge-facade-removal-current-state.md) §4/§5.
+
+**F3c part 2 decomposition — ALL DONE + `Cli.Tests`-verified:** green type-widening commits
+(**2a `ToJSObject` split; 2b `RangeState`/NodeIterator/tree-mutation + char-data wrapper; 2c `ChildAt`
+return type / `ChildElements` narrowing / serialization adapter**) capped by the **irreversible
+construction flip 2d** (commit `72634e02`): canonical `DomText`/`DomComment` in the tree, `TextContent`
+element-aggregation split, facade `TextContent` removed (0 regressions, 8 fixes; 81 → 73 env failures).
+
+**F4 — DONE + `Cli.Tests`-verified (0 new failures):** the element construction flip via the
+`CreateBridgeElement` funnel (step a, `aa00ecf5`) then the atomic cutover (step b, `ddad4769`) — funnel
+bodies → `_document.CreateElementNS`, `global using DomElement = Broiler.Dom.DomElement` alias,
+`HtmlTreeBuilder` retired (callers parse via `HtmlDocumentParser` + auto-adopt), `NamespaceURI` removed,
+`DomElement.cs` + `HtmlTreeBuilder.cs` **deleted**, frozen guards rewritten to "facade removed". See
+current-state doc §5 for the completion record.
 
 | Facade member removed | Phase | Moved to | Sites |
 | --- | --- | --- | --- |
@@ -41,7 +61,7 @@ pre-change tree too).
 | `NsAttrMap` | C2 | canonical namespaced attributes via `TryGetNsAttribute`/`GetAttributeNS` | 18 |
 | `InnerHtml` | F1 | `ElementRuntimeState` via `GetElementRuntimeState(el).InnerHtml` | ~7 |
 
-**Facade `DomElement` still carries:** `TextContent`, `NamespaceURI`.
+**Facade `DomElement` carries nothing — it is deleted (F3c 2d removed `TextContent`; F4 removed `NamespaceURI`).**
 
 **Phase F progress:**
 - **F1 — `InnerHtml` → ERS.** Done (see table).
@@ -70,11 +90,26 @@ pre-change tree too).
   `ChildNodes`) + `nodeType`/`nodeName` to canonical `DomNode`. Full `Broiler.Cli.Tests` regression-free
   (caught + fixed a `GetTreeRoot` over-walk that mis-rooted isConnected/getRootNode/compareDocumentPosition).
 
-**Phase F remaining (staged):**
-- **F3c part 2 — the atomic flip (big-bang; not cleanly green-steppable).** Widening `ChildAt` to return
-  `DomNode` opens the full tree-heterogeneity cascade (~68 range/tree-walker/normalize/serialization
-  sites that must handle non-element children) — coupled with the construction flip, so it lands
-  atomically. **The `ToJSObject` blocker:** today `ToJSObject` gives every node
+**Phase F — COMPLETE.** All of F3c part 2 (2a–2d) and F4 have landed and are `Cli.Tests`-verified; the
+facade + `HtmlTreeBuilder` are deleted. The staged breakdown below is retained as design history — see the
+[current-state doc](htmlbridge-facade-removal-current-state.md) §4/§5 for the authoritative completion
+record and the merge gate.
+
+- **F3c part 2a — `ToJSObject` split. DONE + verified** (branch `claude/htmlbridge-domelement-f3c-flip`).
+  Canonical `DomText`/`DomComment` now get their own minimal Node/CharacterData wrapper
+  (`PopulateCharacterDataJSObject`) via a `node is not DomElement` branch that replaces the F3b
+  `(DomElement)node` cast; ~25 node-level `*Core` helpers + the tree/clone leaf helpers (`IsDescendant`,
+  `CompareTreeOrder`, `CloneDomElement` w/ char-data factory branch, `NodesAreEqual`,
+  `FindContainingShadowRoot`, `SetCharacterData` family) widened to `DomNode`; text-node construction
+  funnels through `CreateBridgeTextNode`. Dead on today's homogeneous tree (facade text/comment keep the
+  full element wrapper); full `Broiler.Cli.Tests` before/after name-diff regression-free. The wrapper
+  omits the ChildNode mixin + EventTarget, folded into 2b (they entangle with `RangeState`).
+- **F3c part 2 remainder — reframed as green widening (2b `RangeState`/tree-mutation, 2c `ChildAt`/
+  `ChildElements`) then the atomic construction flip (2d).** The type-widening is behaviour-preserving on
+  today's homogeneous tree, so it lands as `Cli.Tests`-verified green commits; only 2d (construction flip
+  + `TextContent` aggregation split + facade-member removal) is irreversible. Original framing follows;
+  see the current-state doc §4 for the current step breakdown. **The `ToJSObject` blocker (now resolved by
+  2a):** today `ToJSObject` gives every node
   — text/comment included — the full element wrapper; a canonical `DomText`/`DomComment` (not a
   `DomElement`) needs its own minimal Node/CharacterData wrapper (replacing the `(DomElement)node` cast
   F3b left in place). Then: widen `RangeState.StartContainer`/`EndContainer`/`Root` + the ~10 range
@@ -89,17 +124,22 @@ pre-change tree too).
   switch serialization `GetKind` to a `NodeType` switch; remove facade `TextContent` + the `NodeValue`
   override. Gate on WPT range/selection/serialization + Acid. (`IsComment`/`BridgeText`/`SetBridgeText`,
   the ~80 character-data sites, and the `DomNode` node-identity widening are already done in F3a+F3b.)
-- **F4 — construction flip + cache re-key + delete facade:** flip the ~40 real-element
-  `new DomElement(...)` sites to `document.CreateElement`/`CreateElementNS` (removes the `NamespaceURI`
-  ctor-coupling — `SetName` is `protected`, so the namespace must be set at construction); retire
-  `HtmlTreeBuilder` (callers parse via `HtmlDocumentParser.ParseDocument(html, _document)` directly);
-  re-key the ~14 remaining per-node caches to canonical `DomElement`; widen the public seams
-  `DomBridge.Elements`/`DocumentElement` + `IDomBridgeRuntime.Elements` to canonical (update the
-  `WptTestRunnerTests` helper); remove facade `NamespaceURI`; delete `DomElement.cs` +
-  `HtmlTreeBuilder.cs`; update/remove the frozen seam guard tests.
+- **F4 — construction flip + cache re-key + delete facade. DONE + `Cli.Tests`-verified** (commits
+  `aa00ecf5` step a, `ddad4769` step b). Routed all 58 `new DomElement(...)` sites through a single
+  `CreateBridgeElement`/`CreateBridgeElementNS` funnel, then flipped the funnel bodies to
+  `_document.CreateElementNS` (`SetName` is `protected`, so the namespace is set at construction;
+  `#`-sentinels → null namespace + preserved name). Added `global using DomElement = Broiler.Dom.DomElement`
+  so the ~900 unqualified element sites resolve canonical en masse (caches re-key for free). Retired
+  `HtmlTreeBuilder` — the spike proved re-materialization was pure overhead (`HtmlDocumentParser` yields
+  canonical nodes; canonical `AppendChild` auto-adopts the reparented subtree into `_document`), so new
+  `DomBridge.BuildDocumentTree`/`BuildFragmentTree` just parse and hand the tree back. Widened
+  `IDomBridgeRuntime.Elements` to canonical (`Elements`/`DocumentElement` follow via the alias); removed
+  `NamespaceURI`; **deleted `DomElement.cs` + `HtmlTreeBuilder.cs`**; rewrote the frozen seam guards to
+  "facade removed". (`Broiler.Wpt.Tests` was already non-compiling pre-F4 — facade `.Style`/`.Parent`
+  refs removed in B/E1 — and is a separate follow-up.)
 
-Dependency: F1 (done) is independent; **F3 gates F4** (element construction flips last, once no facade
-instances or facade-only members remain). F4 is the only irreversible step.
+Dependency: F1 (done) was independent; **F3 gated F4** (element construction flipped last, once no facade
+instances or facade-only members remained). F4 was the only irreversible step and is now done.
 
 ## The facade in one paragraph
 
@@ -286,9 +326,9 @@ Phase F cache/RangeState cutover. At that point `ChildElements` narrows to `OfTy
 tree-walk bodies gain `IsText`/`is DomElement` handling. Gate on the WPT range/selection + serialization
 corpus.
 
-Facade now retains: `InnerHtml` (Phase F), `TextContent` (Phase F text flip),
-`NamespaceURI` (Phase F). Next: the **Phase F cutover** (text→`DomText`,
-construction flip, cache/`RangeState` re-keying, delete the facade type).
+Facade now retains **nothing** — `InnerHtml` (F1), `TextContent` (F3c 2d text flip), and `NamespaceURI`
+(F4) are all removed and the facade type is deleted. The Phase F cutover (text→`DomText`, element
+construction flip, cache/`RangeState` re-keying, delete `DomElement`/`HtmlTreeBuilder`) is **done**.
 
 ### Phase A — Relocate facade-only bridge state into `ElementRuntimeState`
 
@@ -407,7 +447,10 @@ Now safe because traversal is `DomNode`-based (Phase E).
 serialization, and inline layout. Gate hard on WPT text/range/selection + Acid.
 **Exit.** Text/comment are canonical `DomText`/`DomComment`; no `IsTextNode` on the node.
 
-### Phase F — Flip element construction, re-key caches, delete the facade (Milestone 1.3)
+### Phase F — Flip element construction, re-key caches, delete the facade (Milestone 1.3) — DONE
+
+Landed as F4 steps (a) `aa00ecf5` + (b) `ddad4769`; the plan below is what shipped (the cache re-key
+happened via the `global using DomElement = Broiler.Dom.DomElement` alias rather than per-cache edits).
 
 - Route the remaining element `new DomElement(...)` sites to
   `document.CreateElement`/`CreateElementNS`.
@@ -430,8 +473,9 @@ serialization, and inline layout. Gate hard on WPT text/range/selection + Acid.
   (`DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Versioned_And_Frozen`) and
   `DomExtractionPhaseZeroTests` (now asserting removal, not the frozen surface).
 
-**Risk.** High — final cutover. **Exit.** `DomElement`/`HtmlTreeBuilder` gone; promotion
-roadmap Phase 5 exit criteria met ("HtmlBridge contains bridge responsibilities only").
+**Risk.** High — final cutover. **Exit — MET.** `DomElement`/`HtmlTreeBuilder` deleted; promotion
+roadmap Phase 5 adapter-removal workstream satisfied ("HtmlBridge contains bridge responsibilities
+only"); the WPT/Acid/pixel merge gate passed and the stack merged as PR #1359 (2026-07-12).
 
 ## Dependency graph
 
@@ -477,12 +521,13 @@ failures by name:
   canonical nodes use reference equality (no `Equals` override), so declared key type
   does not change runtime behaviour — but verify the parity gate after re-key.
 
-## Effort estimate
+## Effort estimate (historical — the work is now complete)
 
 A: ~1 small PR. B: 2–3 PRs. C: 2 PRs. E: 3–4 PRs (LayoutMetrics/HitTesting/Traversal are
 large). D: 3–4 PRs (hardest). F: 2 PRs (construction flip; then delete + guard flip).
-**Order of ~13–16 PRs total.** This matches the roadmap's "High risk, staged, 58 files"
-framing; it is not a single-session cutover.
+**Order of ~13–16 PRs total.** This matched the roadmap's "High risk, staged, 58 files"
+framing. In the event the phases landed across the three F-phase branches as planned, with F4
+itself as the two-commit closer (`aa00ecf5` + `ddad4769`).
 
 ## Design decisions (resolved 2026-07-10)
 

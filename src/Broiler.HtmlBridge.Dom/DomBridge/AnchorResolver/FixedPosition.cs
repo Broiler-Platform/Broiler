@@ -17,7 +17,7 @@ public sealed partial class DomBridge
     {
         ResolveFixedPositionSizingInTree(DocumentElement, vpW, vpH);
     }
-    private void ResolveFixedPositionSizingInTree(DomElement el, int vpW, int vpH)
+    private void ResolveFixedPositionSizingInTree(Broiler.Dom.DomElement el, int vpW, int vpH)
     {
         if (!IsText(el))
         {

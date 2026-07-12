@@ -13,7 +13,7 @@ public sealed partial class DomBridge
     /// Must be called <em>before</em> anchor resolution so that anchor()
     /// function values are resolved with the correct positioning context.
     /// </summary>
-    private void ApplyDialogUAPositioning(DomElement root)
+    private void ApplyDialogUAPositioning(Broiler.Dom.DomElement root)
     {
         foreach (var el in Elements)
         {
@@ -54,7 +54,7 @@ public sealed partial class DomBridge
     // so the counter has headroom.
     private const int TopLayerZIndexBase = 2_000_000_000;
 
-    private void ApplyPopoverUAPositioning(DomElement root)
+    private void ApplyPopoverUAPositioning(Broiler.Dom.DomElement root)
     {
         foreach (var el in Elements)
         {
@@ -86,11 +86,11 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private void InsertDialogBackdrops(
-        DomElement root, int vpW, int vpH,
+        Broiler.Dom.DomElement root, int vpW, int vpH,
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
-        var modals = new List<(DomElement dialog, DomElement parent, bool isPopover)>();
+        var modals = new List<(Broiler.Dom.DomElement dialog, Broiler.Dom.DomElement parent, bool isPopover)>();
         FindModalDialogs(root, modals);
         FindOpenPopovers(root, modals);
 
@@ -126,7 +126,7 @@ public sealed partial class DomBridge
                 .GetCascadedDeclaredValues(dialog, "::backdrop");
             OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
 
-            var backdrop = new DomElement("div", null, null, string.Empty);
+            var backdrop = CreateBridgeElement("div");
             foreach (var kv in backdropStyle)
                 InlineStyle(backdrop)[kv.Key] = kv.Value;
             SetParent(backdrop, parent);
@@ -221,7 +221,7 @@ public sealed partial class DomBridge
     /// pseudo-element by checking CSS rules for <c>::backdrop</c> selectors
     /// that match the given dialog element.
     /// </summary>
-    private string GetBackdropBackground(DomElement dialog, string defaultBg = "rgb(229, 229, 229)")
+    private string GetBackdropBackground(Broiler.Dom.DomElement dialog, string defaultBg = "rgb(229, 229, 229)")
     {
         // Default modal-dialog backdrop color: pre-composited rgba(0,0,0,0.1) over
         // white (255*(1-0.1) + 0*0.1 = 229.5 ≈ 229). Callers pass "transparent"
@@ -259,7 +259,7 @@ public sealed partial class DomBridge
     /// <item>Non-top-layer anchors are always accessible.</item>
     /// </list>
     /// </remarks>
-    private static bool IsAnchorAccessible(DomElement? anchorElement, DomElement targetElement)
+    private static bool IsAnchorAccessible(Broiler.Dom.DomElement? anchorElement, Broiler.Dom.DomElement targetElement)
     {
         if (anchorElement == null) return true;
 
@@ -280,7 +280,7 @@ public sealed partial class DomBridge
 
         return anchorOrder < targetOrder;
     }
-    private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement, bool)> results)
+    private static void FindModalDialogs(Broiler.Dom.DomElement element, List<(Broiler.Dom.DomElement, Broiler.Dom.DomElement, bool)> results)
     {
         if (string.Equals(element.TagName, "dialog", StringComparison.OrdinalIgnoreCase) &&
             HasAttr(element, "open") &&
@@ -301,7 +301,7 @@ public sealed partial class DomBridge
     // Popover API (HTML §popover): an element whose showPopover() ran (and whose
     // hidePopover() did not tear it down — see PopoverKeepsOverlayOnHide) is in
     // the top layer and generates a ::backdrop, just like a modal dialog.
-    private static void FindOpenPopovers(DomElement element, List<(DomElement, DomElement, bool)> results)
+    private static void FindOpenPopovers(Broiler.Dom.DomElement element, List<(Broiler.Dom.DomElement, Broiler.Dom.DomElement, bool)> results)
     {
         if (ParentEl(element) != null &&
             GetElementRuntimeState(element).Dialog.PopoverOpen.TryGet(out var open) &&
@@ -318,7 +318,7 @@ public sealed partial class DomBridge
     // layer because its `overlay` is being transitioned out with
     // `transition-behavior: allow-discrete`. A static render snapshots
     // mid-transition, so such a popover (and its ::backdrop) stays rendered.
-    private bool PopoverKeepsOverlayOnHide(DomElement element)
+    private bool PopoverKeepsOverlayOnHide(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
 

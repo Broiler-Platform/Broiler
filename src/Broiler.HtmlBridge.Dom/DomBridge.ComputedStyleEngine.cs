@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Broiler.HtmlBridge;
 
 /// <summary>
@@ -18,13 +16,49 @@ public sealed partial class DomBridge
     // across calls, instead of leaking a subscription per getComputedStyle() call.
     // The scoped stylesheet set is re-synced only when the collected
     // <style>/<link>/inserted-rule text actually changes.
-    private readonly Dictionary<DomElement, ComputedStyleEngineScope> _computedStyleEngines = [];
+    private readonly Dictionary<Broiler.Dom.DomElement, ComputedStyleEngineScope> _computedStyleEngines = [];
 
     private sealed class ComputedStyleEngineScope
     {
+        public required Broiler.CSS.Dom.CssStyleScopeBuilder ScopeBuilder { get; init; }
+        // The wrapped engine, held directly so ERS-inline mutations (which the engine's
+        // DOM-mutation subscription does not observe) can invalidate its computed caches.
         public required Broiler.CSS.Dom.CssStyleEngine Engine { get; init; }
+    }
 
-        public int StyleSheetHash { get; set; } = -1;
+    /// <summary>
+    /// Invalidates every per-document engine's cascade/computed-style caches. Called
+    /// alongside clearing <c>_computedPropsCache</c> because those engines now read inline
+    /// style from the bridge's live ElementRuntimeState map (via
+    /// <see cref="Broiler.CSS.Dom.CssStyleEngine.SetInlineStyleSource"/>), whose mutations
+    /// are not DOM mutations and so do not trigger the engine's own invalidation.
+    /// </summary>
+    private void InvalidateScopedEngineComputedCaches()
+    {
+        foreach (var scope in _computedStyleEngines.Values)
+            scope.Engine.InvalidateComputedStyleCaches();
+    }
+
+    /// <summary>
+    /// Serializes an element's live inline-style map (ElementRuntimeState) to a CSS
+    /// declaration string for the canonical engine's cascade — the bridge's authoritative
+    /// inline source, which includes JS <c>el.style.X=</c> writes and anchor-resolver-written
+    /// geometry that never reach the DOM <c>style</c> attribute the engine would otherwise read.
+    /// Returns <c>null</c> when there is no inline style.
+    /// </summary>
+    private static string? SerializeInlineStyleForEngine(Broiler.Dom.DomElement element)
+    {
+        var inline = InlineStyle(element);
+        if (inline.Count == 0)
+            return null;
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in inline)
+        {
+            if (sb.Length > 0)
+                sb.Append(';');
+            sb.Append(kv.Key).Append(':').Append(kv.Value);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -39,42 +73,40 @@ public sealed partial class DomBridge
     /// re-syncing its scoped stylesheet set (the same <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c>/
     /// inserted-CSSOM text the legacy cascade saw) whenever that text changes.
     /// </summary>
-    private Broiler.CSS.Dom.CssStyleEngine GetSyncedScopedEngine(DomElement element)
+    private Broiler.CSS.Dom.CssStyleEngine GetSyncedScopedEngine(Broiler.Dom.DomElement element)
     {
         var docRoot = GetDocumentRootFor(element);
         if (!_computedStyleEngines.TryGetValue(docRoot, out var scope))
         {
+            var engine = new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider());
+            // Feed the bridge's live ElementRuntimeState inline map as the cascade's inline
+            // source (see SerializeInlineStyleForEngine) so the engine sees JS-set and
+            // anchor-resolver-written inline that never reaches the DOM style attribute.
+            engine.SetInlineStyleSource(SerializeInlineStyleForEngine);
             scope = new ComputedStyleEngineScope
             {
-                Engine = new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider()),
+                ScopeBuilder = new Broiler.CSS.Dom.CssStyleScopeBuilder(engine),
+                Engine = engine,
             };
             _computedStyleEngines[docRoot] = scope;
         }
 
-        var styleElements = new List<DomElement>();
+        var styleElements = new List<Broiler.Dom.DomElement>();
         CollectStyleElementsInTree(docRoot, styleElements);
 
-        var combined = new StringBuilder();
+        // Hand the collected sheets to the canonical scope builder in document order; it
+        // gates each on the element's `media` attribute against the viewport and re-syncs the
+        // engine only when the effective set changes. Text extraction (InnerHtml / CSSOM rule
+        // text / external-sheet runtime state) stays here because it needs the DOM and loading.
+        var sources = new List<Broiler.CSS.Dom.CssStyleScopeBuilder.StyleSource>(styleElements.Count);
         foreach (var styleEl in styleElements)
-            combined.Append(GetStyleElementCssText(styleEl)).Append('\n');
-        var combinedText = combined.ToString();
-
-        var hash = combinedText.GetHashCode(StringComparison.Ordinal);
-        if (hash != scope.StyleSheetHash)
-        {
-            scope.Engine.ClearStyleSheets();
-            if (combinedText.Length > 0)
-            {
-                var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(combinedText);
-                scope.Engine.AddStyleSheet(sheet, CSS.Dom.CssOrigin.Author);
-            }
-
-            scope.StyleSheetHash = hash;
-        }
+            sources.Add(new Broiler.CSS.Dom.CssStyleScopeBuilder.StyleSource(
+                GetStyleElementCssText(styleEl),
+                CSS.Dom.CssOrigin.Author,
+                GetAttr(styleEl, "media")));
 
         var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
-        scope.Engine.UpdateEnvironment(new Broiler.CSS.Dom.CssEnvironment(vpWidth, vpHeight));
-        return scope.Engine;
+        return scope.ScopeBuilder.Sync(sources, new Broiler.CSS.Dom.CssEnvironment(vpWidth, vpHeight));
     }
 
     /// <summary>
@@ -82,7 +114,7 @@ public sealed partial class DomBridge
     /// shared <see cref="Broiler.CSS.Dom.CssStyleEngine"/>, scoped to the
     /// element's document root.
     /// </summary>
-    private Dictionary<string, string> BuildComputedStyleMapViaEngine(DomElement element, string? pseudoElement)
+    private Dictionary<string, string> BuildComputedStyleMapViaEngine(Broiler.Dom.DomElement element, string? pseudoElement)
     {
         var computed = GetSyncedScopedEngine(element).GetComputedStyle(element, pseudoElement: pseudoElement);
 
@@ -100,6 +132,6 @@ public sealed partial class DomBridge
     /// replaces the legacy <c>foreach (… in CssRules) if (MatchesSelector(…))</c>
     /// collection loops; callers still merge <c>InlineStyle(element)</c> on top as before.
     /// </summary>
-    private Dictionary<string, string> CollectMatchedRuleProperties(DomElement element) =>
+    private Dictionary<string, string> CollectMatchedRuleProperties(Broiler.Dom.DomElement element) =>
         new(GetSyncedScopedEngine(element).GetCascadedDeclaredValues(element), StringComparer.OrdinalIgnoreCase);
 }

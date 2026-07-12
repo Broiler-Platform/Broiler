@@ -13,6 +13,10 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // Composition root: register the concrete image codecs Broiler.Graphics decodes/encodes with.
+        Broiler.Graphics.BImageCodecs.Use(
+            new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
+
         string? pdfInputPath = null;
         string? convertDocInput = null;
         string? url = null;

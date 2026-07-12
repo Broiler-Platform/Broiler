@@ -15,10 +15,10 @@ public sealed partial class DomBridge
     /// region specified by position-area and sets explicit inline styles.
     /// </summary>
     private void ResolvePositionAreaValues(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry,
-        HashSet<DomElement> scrollContainersNeedingRelative,
-        List<(DomElement element, DomElement oldParent, DomElement newParent)> deferredDomMoves)
+        HashSet<Broiler.Dom.DomElement> scrollContainersNeedingRelative,
+        List<(Broiler.Dom.DomElement element, Broiler.Dom.DomElement oldParent, Broiler.Dom.DomElement newParent)> deferredDomMoves)
     {
         if (!IsText(element))
         {
@@ -409,8 +409,8 @@ public sealed partial class DomBridge
     /// rather than the target element's normal containing block.
     /// </summary>
     private PositionAreaRect? ComputePositionAreaRect(
-        DomElement element, AnchorInfo anchor, string positionArea,
-        DomElement? scrollContainer = null)
+        Broiler.Dom.DomElement element, AnchorInfo anchor, string positionArea,
+        Broiler.Dom.DomElement? scrollContainer = null)
     {
         double cbWidth, cbHeight;
         double anchorLeft, anchorRight, anchorTop, anchorBottom;
@@ -576,7 +576,7 @@ public sealed partial class DomBridge
     /// Falls back to the container's own width if no explicit child widths
     /// are found.
     /// </summary>
-    private double FindScrollContentWidth(DomElement scrollContainer, double containerWidth)
+    private double FindScrollContentWidth(Broiler.Dom.DomElement scrollContainer, double containerWidth)
     {
         double maxWidth = containerWidth;
         foreach (var child in SnapshotChildren(scrollContainer))
@@ -603,7 +603,7 @@ public sealed partial class DomBridge
     /// the block-axis scroll extent.  The result is clamped to at least the
     /// container's own height (scrollHeight ≥ clientHeight).
     /// </summary>
-    private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
+    private double FindScrollContentHeight(Broiler.Dom.DomElement scrollContainer, double containerHeight)
     {
         double stackedHeight = 0;
         foreach (var child in SnapshotChildren(scrollContainer))
@@ -628,7 +628,7 @@ public sealed partial class DomBridge
     /// Otherwise, both are in document coordinates and we subtract.
     /// </summary>
     private (double Left, double Top) ComputeAnchorRelativeToContainer(
-        AnchorInfo anchor, DomElement container)
+        AnchorInfo anchor, Broiler.Dom.DomElement container)
     {
         // Check if the container establishes a CB. If it does, the anchor's
         // ComputeElementBox walk will have stopped at the container, and
@@ -646,7 +646,7 @@ public sealed partial class DomBridge
     /// Finds the nearest ancestor of <paramref name="el"/> that is a scroll
     /// container (has <c>overflow: hidden/scroll/auto/clip</c>).
     /// </summary>
-    private DomElement? FindNearestScrollContainer(DomElement el)
+    private Broiler.Dom.DomElement? FindNearestScrollContainer(Broiler.Dom.DomElement el)
     {
         var parent = ParentEl(el);
         while (parent != null)
@@ -665,7 +665,7 @@ public sealed partial class DomBridge
     /// Returns <c>true</c> when <paramref name="el"/> is a descendant of
     /// <paramref name="potentialAncestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendantOfElement(DomElement el, DomElement potentialAncestor)
+    private static bool IsDescendantOfElement(Broiler.Dom.DomElement el, Broiler.Dom.DomElement potentialAncestor)
     {
         var current = ParentEl(el);
         while (current != null)

@@ -12,13 +12,13 @@ public sealed partial class DomBridge
     /// CSS <c>visibility: hidden</c>) or does not exist.
     /// </summary>
     private void ResolvePositionVisibility(
-        DomElement root,
+        Broiler.Dom.DomElement root,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         ResolvePositionVisibilityTree(root, anchorRegistry);
     }
     private void ResolvePositionVisibilityTree(
-        DomElement el,
+        Broiler.Dom.DomElement el,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         if (!IsText(el))
@@ -96,10 +96,10 @@ public sealed partial class DomBridge
             ResolvePositionVisibilityTree(child, anchorRegistry);
     }
     /// <summary>
-    /// Finds the <see cref="DomElement"/> that has the given
+    /// Finds the <see cref="Broiler.Dom.DomElement"/> that has the given
     /// <c>anchor-name</c> (from CSS rules or inline styles).
     /// </summary>
-    private DomElement? FindElementByAnchorName(string anchorName)
+    private Broiler.Dom.DomElement? FindElementByAnchorName(string anchorName)
     {
         foreach (var el in Elements)
         {
@@ -129,7 +129,7 @@ public sealed partial class DomBridge
     /// the scroll container is the containing block for the target element,
     /// the anchor is considered visible (per spec § position-visibility).
     /// </summary>
-    private bool IsAnchorVisibleForTarget(DomElement anchor, DomElement target)
+    private bool IsAnchorVisibleForTarget(Broiler.Dom.DomElement anchor, Broiler.Dom.DomElement target)
     {
         // Check CSS visibility on the anchor and its ancestors.
         if (HasInheritedVisibilityHidden(anchor))
@@ -180,7 +180,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Checks whether the element or any ancestor has <c>visibility: hidden</c>.
     /// </summary>
-    private bool HasInheritedVisibilityHidden(DomElement el)
+    private bool HasInheritedVisibilityHidden(Broiler.Dom.DomElement el)
     {
         var current = el;
         while (current != null)
@@ -198,7 +198,7 @@ public sealed partial class DomBridge
     /// <paramref name="container"/> by summing heights of preceding siblings
     /// and ancestor margins/padding up to the container.
     /// </summary>
-    private double ComputeNaturalOffsetInContainer(DomElement el, DomElement container)
+    private double ComputeNaturalOffsetInContainer(Broiler.Dom.DomElement el, Broiler.Dom.DomElement container)
     {
         double offset = 0;
         var current = el;
@@ -221,7 +221,7 @@ public sealed partial class DomBridge
     /// Finds the nearest positioned ancestor that serves as the containing
     /// block for an absolutely positioned element.
     /// </summary>
-    private DomElement? FindContainingBlockElement(DomElement el)
+    private Broiler.Dom.DomElement? FindContainingBlockElement(Broiler.Dom.DomElement el)
     {
         var parent = ParentEl(el);
         while (parent != null)
@@ -238,7 +238,7 @@ public sealed partial class DomBridge
     /// The anchor's CB is typically the same as the target's CB when both are
     /// inside the same positioned ancestor.
     /// </summary>
-    private DomElement? FindAnchorContainingBlock(DomElement target, DomElement targetCB)
+    private Broiler.Dom.DomElement? FindAnchorContainingBlock(Broiler.Dom.DomElement target, Broiler.Dom.DomElement targetCB)
     {
         // Find the anchor element by looking at the target's position-anchor.
         var cssProps = GetComputedProps(target);
