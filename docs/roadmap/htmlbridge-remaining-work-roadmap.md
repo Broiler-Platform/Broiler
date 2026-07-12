@@ -280,9 +280,21 @@ live-setter routing.
   with a `!important` string suffix + vendor-prefix mapping; the engine adds cascade winners). The named
   "third copy" `HtmlCss.ParseDeclarations` (`Broiler.Documents.Html`) is a **different, naive parser**
   (HtmlDecode + split on `;`/`:`, no CssParser, no validation, no `!important`) serving document conversion —
-  forcing it onto the canonical parser would change Documents behavior, out of scope. The one genuinely-clean
-  remaining duplicate is the **byte-identical `StripVendorPrefix`** in `DomBridge.cs:1101` and
-  `CssStyleEngine.cs:682` (promote to `Broiler.CSS.CssPropertyNames`) — a small, optional follow-up.
+  forcing it onto the canonical parser would change Documents behavior, out of scope.
+- **Done (2026-07-12) — `StripVendorPrefix` promoted.** The one genuinely-clean remaining duplicate — the
+  **byte-identical `StripVendorPrefix`** that lived privately in both `DomBridge.cs` (bridge `ParseStyle`
+  vendor→unprefixed inline-style aliasing) and `CssStyleEngine.cs` (cascade-slot vendor→unprefixed alias) —
+  is promoted to the canonical `Broiler.CSS.CssPropertyNames.StripVendorPrefix` (its natural home alongside
+  the kebab↔camel `To*PropertyName` mapping). Both private copies are deleted and route through the shared
+  static; the move is a compile-time identity (a pure, dependency-free string function called identically),
+  so behaviour is provably unchanged. Covered by 9 new `CssPropertyNamesTests` cases (known prefixes,
+  case-insensitive prefix match with verbatim remainder, `--custom`/unprefixed pass-through, empty). Verified
+  regression-free: `Broiler.CSS.Tests` `CssPropertyNames` 26/26; `Broiler.CSS.Dom.Tests` 213/214 (the 1 =
+  the pre-existing `Public_Surface_Does_Not_Expose_Mutable_Collections` arch guard, baseline per §2.4); the
+  bridge end-to-end `GoogleSearchPolyfillTests.Webkit_Prefixed_Property_Mapped_To_Unprefixed` + the
+  style-declaration-validation / inline-style cluster 16/16. **Delivery note:** `CssPropertyNames.cs` + its
+  tests are in the `Broiler.CSS` **submodule** — push + pointer bump (or `patches/` fallback if the push
+  403s); the bridge one-line reroute is main-repo.
 
 ### 2.4 Promotion Phase 2 slice-2 — stylesheet scope assembly (P2 `CssStyleScopeBuilder`) — **DONE (2026-07-12)**
 
