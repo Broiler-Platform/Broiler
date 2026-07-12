@@ -291,11 +291,13 @@ public sealed partial class DomBridge
     {
         var range = new JSObject();
         var docRoot = documentRoot ?? _documentNode;
-        var state = new RangeState(docRoot);
+        var state = new BridgeDomRange(this, docRoot);
         var bridge = this;
 
-        // Register this range for mutation tracking
-        _activeRanges.Add(new WeakReference<RangeState>(state));
+        // Register this range for mutation tracking. The range is non-tracking (it does not
+        // subscribe to the document mutation event), so a script-abandoned range stays
+        // weakly held here and is GC-collectable; NotifyChildRemoved drives its adjustment.
+        _activeRanges.Add(new WeakReference<Broiler.Dom.DomRange>(state));
 
         // startContainer
         range.FastAddProperty(
@@ -594,109 +596,6 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Creates a partial clone for extractContents when a boundary is in a text node.
-    /// Clones the ancestor chain from the text node up to (but not including) the common ancestor.
-    /// </summary>
-    private static Broiler.Dom.DomNode? CreatePartialCloneForExtract(Broiler.Dom.DomNode textNode, Broiler.Dom.DomElement commonAncestor, string extractedText, bool isStart, DomBridge bridge)
-    {
-        // Build the chain: textNode → parent → ... → child-of-commonAncestor. chain[0] is the
-        // boundary text node; chain[1..] are ancestor elements (RF-BRIDGE-1c Phase F, F3c part 2d).
-        var chain = new List<Broiler.Dom.DomNode>();
-        Broiler.Dom.DomNode? node = textNode;
-        while (node != null && !ReferenceEquals(node, commonAncestor))
-        {
-            chain.Add(node);
-            node = node.ParentNode;
-        }
-        if (chain.Count == 0) return null;
-
-        // Create text node with extracted content
-        var extractedTextNode = bridge.CreateBridgeTextNode(extractedText);
-        bridge._knownNodes.Add(extractedTextNode);
-
-        if (chain.Count == 1)
-        {
-            // Text node is direct child of common ancestor
-            return extractedTextNode;
-        }
-
-        // Clone the chain (from top to bottom)
-        Broiler.Dom.DomElement? topClone = null;
-        Broiler.Dom.DomElement? currentParent = null;
-        for (var i = chain.Count - 1; i >= 1; i--)
-        {
-            // chain[i] for i >= 1 is an ancestor element.
-            var original = (Broiler.Dom.DomElement)chain[i];
-            var clone = bridge.CreateBridgeElement(original.TagName);
-            bridge._knownNodes.Add(clone);
-
-            if (topClone == null) topClone = clone;
-            if (currentParent != null)
-            {
-                SetParent(clone, currentParent);
-                currentParent.AppendChild(clone);
-            }
-
-            // For start boundary: include siblings after the text node within this element
-            // For end boundary: include siblings before the text node within this element
-            if (i == 1) // direct parent of text node
-            {
-                var childIdx = ChildIndexOf(original, chain[0]);
-                if (isStart)
-                {
-                    // Include the extracted text + remaining siblings
-                    SetParent(extractedTextNode, clone);
-                    clone.AppendChild(extractedTextNode);
-                    // Move siblings after the text node into the clone
-                    for (var j = childIdx + 1; j < original.ChildNodes.Count; )
-                    {
-                        var sibling = ChildAt(original, j);
-                        RemoveNthChild(original, j);
-                        SetParent(sibling, clone);
-                        clone.AppendChild(sibling);
-                    }
-                }
-                else
-                {
-                    // Move siblings before the text node into the clone
-                    for (var j = 0; j < childIdx; )
-                    {
-                        var sibling = ChildAt(original, 0);
-                        RemoveNthChild(original, 0);
-                        childIdx--;
-                        SetParent(sibling, clone);
-                        clone.AppendChild(sibling);
-                    }
-                    SetParent(extractedTextNode, clone);
-                    clone.AppendChild(extractedTextNode);
-                }
-            }
-            currentParent = clone;
-        }
-
-        return topClone;
-    }
-
-    /// <summary>
-    /// Checks if a node is fully contained between start and end containers in the range.
-    /// </summary>
-    private static bool IsContainedInRange(Broiler.Dom.DomElement node, Broiler.Dom.DomElement ancestor, Broiler.Dom.DomElement startContainer, Broiler.Dom.DomElement endContainer, List<Broiler.Dom.DomElement> allNodes)
-    {
-        // A node is fully contained if it and all its descendants are between start and end
-        var nodeIdx = allNodes.IndexOf(node);
-        var startIdx = allNodes.IndexOf(startContainer);
-        var endIdx = allNodes.IndexOf(endContainer);
-
-        if (nodeIdx <= startIdx || nodeIdx >= endIdx) return false;
-
-        // Check that the node is not an ancestor of start or end container
-        if (IsDescendant(node, startContainer) || IsDescendant(node, endContainer))
-            return false;
-
-        return true;
-    }
-
     private JSObject CreateDomRectObject((double Left, double Top, double Width, double Height) rectData)
     {
         var rect = new JSObject();
@@ -711,7 +610,7 @@ public sealed partial class DomBridge
         return rect;
     }
 
-    private List<(double Left, double Top, double Width, double Height)> GetClientRectsForRange(RangeState state)
+    private List<(double Left, double Top, double Width, double Height)> GetClientRectsForRange(Broiler.Dom.DomRange state)
     {
         var rects = new List<(double Left, double Top, double Width, double Height)>();
         if (state.Collapsed)
@@ -770,254 +669,43 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Extracts the start-side path for cross-node extractContents.
-    /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="startContainer"/>,
-    /// moving content after the start boundary into the cloned structure.
+    /// The bridge's live <c>Range</c> boundary store and content-operation engine — the
+    /// canonical <see cref="Broiler.Dom.DomRange"/> with the node-creation seams overridden so
+    /// content operations mint bridge nodes: <c>#document-fragment</c> result fragments and
+    /// <see cref="DomBridge.CloneDomElement"/> clones that carry host runtime state (form-control
+    /// value/checked, scroll, dialog/shadow, live inline style), all registered in
+    /// <see cref="DomBridge._knownNodes"/> so <see cref="DomBridge.ToJSObject"/> can wrap them.
+    /// Constructed <c>trackMutations: false</c> — the bridge already drives boundary adjustment
+    /// from <see cref="DomBridge.NotifyChildRemoved"/> via its weak <see cref="DomBridge._activeRanges"/>
+    /// registry, so the range must not also self-subscribe to the document mutation event (which
+    /// would double-adjust and root the range for the document's lifetime).
     /// </summary>
-    private static Broiler.Dom.DomNode ExtractStartPath(Broiler.Dom.DomNode topNode, Broiler.Dom.DomNode startContainer, int startOffset, DomBridge bridge)
+    private sealed class BridgeDomRange(DomBridge bridge, Broiler.Dom.DomNode root)
+        : Broiler.Dom.DomRange(root, trackMutations: false)
     {
-        // Build chain: startContainer → parent → ... → topNode. RF-BRIDGE-1c Phase F (F3c
-        // part 2b): chain[0] (the boundary container) may be a text node; the rest are ancestor
-        // elements, so the chain is DomNode-typed.
-        var chain = new List<Broiler.Dom.DomNode>();
-        Broiler.Dom.DomNode? node = startContainer;
-        while (node != null)
+        protected override Broiler.Dom.DomNode CreateResultFragment()
         {
-            chain.Add(node);
-            if (ReferenceEquals(node, topNode)) break;
-            node = node.ParentNode;
+            var fragment = bridge.CreateBridgeElement("#document-fragment");
+            bridge._knownNodes.Add(fragment);
+            return fragment;
         }
 
-        // Pass 1: Clone the ancestor chain from top to bottom, creating
-        // the skeletal tree structure.  Map each chain index to its clone.
-        var clones = new Broiler.Dom.DomNode[chain.Count];
-        for (var i = chain.Count - 1; i >= 0; i--)
+        protected override Broiler.Dom.DomNode CloneForRange(Broiler.Dom.DomNode node, bool deep)
         {
-            var original = chain[i];
-            var clone = bridge.CloneDomElement(original, false);
+            var clone = bridge.CloneDomElement(node, deep);
             bridge._knownNodes.Add(clone);
-            clones[i] = clone;
-            if (i < chain.Count - 1)
-            {
-                SetParent(clone, clones[i + 1]);
-                // Will position correctly in Pass 2
-            }
+            return clone;
         }
 
-        // Pass 2: Process each level bottom-up so that each clone's
-        // child list is built in the correct order:
-        //   [next-in-chain clone, siblings moved from original]
-        for (var i = 0; i < chain.Count; i++)
+        protected override Broiler.Dom.DomText CreateTextForRange(string data)
         {
-            var original = chain[i];
-            var clone = clones[i];
-
-            if (i == 0)
-            {
-                // This is the startContainer level
-                if (IsText(original))
-                {
-                    var text = BridgeText(original);
-                    var extractedPart = text.Substring(startOffset);
-                    SetBridgeText(original, text.Substring(0, startOffset));
-                    SetBridgeText(clone, extractedPart);
-                }
-                else
-                {
-                    for (var ci = startOffset; ci < original.ChildNodes.Count; )
-                    {
-                        var child = ChildAt(original, ci);
-                        RemoveNthChild(original, ci);
-                        SetParent(child, clone);
-                        clone.AppendChild(child);
-                    }
-                }
-            }
-            else
-            {
-                var parentClone = clones[i];
-                var childClone = clones[i - 1]; // next-in-chain clone
-
-                // First add the deeper clone (already populated from previous iterations)
-                SetParent(childClone, parentClone);
-                parentClone.AppendChild(childClone);
-
-                // Then move siblings after the chain child in the original
-                var nextInChain = chain[i - 1];
-                var childIdx = ChildIndexOf(original, nextInChain);
-                if (childIdx >= 0)
-                {
-                    for (var ci = childIdx + 1; ci < original.ChildNodes.Count; )
-                    {
-                        var child = ChildAt(original, ci);
-                        RemoveNthChild(original, ci);
-                        SetParent(child, parentClone);
-                        parentClone.AppendChild(child);
-                    }
-                }
-            }
+            var text = (Broiler.Dom.DomText)bridge.CreateBridgeTextNode(data);
+            bridge._knownNodes.Add(text);
+            return text;
         }
 
-        return clones[chain.Count - 1];
-    }
-
-    /// <summary>
-    /// Extracts the end-side path for cross-node extractContents.
-    /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="endContainer"/>,
-    /// moving content before the end boundary into the cloned structure.
-    /// </summary>
-    private static Broiler.Dom.DomNode ExtractEndPath(Broiler.Dom.DomNode topNode, Broiler.Dom.DomNode endContainer, int endOffset, DomBridge bridge)
-    {
-        // Build chain: endContainer → parent → ... → topNode (chain[0] may be a text node; see
-        // ExtractStartPath).
-        var chain = new List<Broiler.Dom.DomNode>();
-        Broiler.Dom.DomNode? node = endContainer;
-        while (node != null)
-        {
-            chain.Add(node);
-            if (ReferenceEquals(node, topNode)) break;
-            node = node.ParentNode;
-        }
-
-        // Pass 1: Create clones for the chain
-        var clones = new Broiler.Dom.DomNode[chain.Count];
-        for (var i = chain.Count - 1; i >= 0; i--)
-        {
-            var original = chain[i];
-            var clone = bridge.CloneDomElement(original, false);
-            bridge._knownNodes.Add(clone);
-            clones[i] = clone;
-        }
-
-        // Pass 2: Process bottom-up. For end-side, siblings before the
-        // chain child are moved, then the deeper clone is appended.
-        for (var i = 0; i < chain.Count; i++)
-        {
-            var original = chain[i];
-            var clone = clones[i];
-
-            if (i == 0)
-            {
-                // This is the endContainer level
-                if (IsText(original))
-                {
-                    var text = BridgeText(original);
-                    var extractedPart = text.Substring(0, endOffset);
-                    SetBridgeText(original, text.Substring(endOffset));
-                    SetBridgeText(clone, extractedPart);
-                }
-                else
-                {
-                    for (var ci = 0; ci < endOffset && original.ChildNodes.Count > 0; ci++)
-                    {
-                        var child = ChildAt(original, 0);
-                        RemoveNthChild(original, 0);
-                        SetParent(child, clone);
-                        clone.AppendChild(child);
-                    }
-                }
-            }
-            else
-            {
-                var parentClone = clones[i];
-                var childClone = clones[i - 1]; // next-in-chain clone
-
-                // First move siblings before the chain child in the original
-                var nextInChain = chain[i - 1];
-                var childIdx = ChildIndexOf(original, nextInChain);
-                if (childIdx >= 0)
-                {
-                    for (var ci = 0; ci < childIdx; )
-                    {
-                        var child = ChildAt(original, 0);
-                        RemoveNthChild(original, 0);
-                        childIdx--;
-                        SetParent(child, parentClone);
-                        parentClone.AppendChild(child);
-                    }
-                }
-
-                // Then add the deeper clone (already populated)
-                SetParent(childClone, parentClone);
-                parentClone.AppendChild(childClone);
-            }
-        }
-
-        return clones[chain.Count - 1];
-    }
-
-    /// <summary>
-    /// Tracks the boundary-point state of a live <c>Range</c> object so that
-    /// DOM mutations can adjust boundaries per the DOM Living Standard.
-    /// </summary>
-    private sealed class RangeState
-    {
-        // RF-BRIDGE-1c Phase F (F3c part 2b): range boundary points are canonical DomNode —
-        // a range commonly starts/ends inside a text node. Behaviour-preserving on today's
-        // homogeneous facade tree (facade text nodes are Broiler.Dom.DomElement, so the DomNode fields hold
-        // the same values); forward-correct once text/comment flip to canonical DomText/DomComment.
-        public Broiler.Dom.DomNode StartContainer;
-        public int StartOffset;
-        public Broiler.Dom.DomNode EndContainer;
-        public int EndOffset;
-        public bool Collapsed;
-        public Broiler.Dom.DomNode Root { get; }
-
-        public RangeState(Broiler.Dom.DomNode root)
-        {
-            Root = root;
-            StartContainer = root;
-            EndContainer = root;
-            Collapsed = true;
-        }
-
-        public void UpdateCollapsed()
-        {
-            Collapsed = ReferenceEquals(StartContainer, EndContainer) && StartOffset == EndOffset;
-        }
-
-        /// <summary>
-        /// Adjusts boundary points when a child is removed from <paramref name="parent"/>
-        /// at <paramref name="index"/>.  Per DOM spec §14.4 "Removing steps".
-        /// </summary>
-        public void AdjustForRemoval(Broiler.Dom.DomNode parent, Broiler.Dom.DomNode removedChild, int index)
-        {
-            // If startContainer is a descendant of removedChild (or IS removedChild),
-            // set start to (parent, index).
-            if (ReferenceEquals(StartContainer, removedChild) || IsDescendantOf(StartContainer, removedChild))
-            {
-                StartContainer = parent;
-                StartOffset = index;
-            }
-            else if (ReferenceEquals(StartContainer, parent) && StartOffset > index)
-            {
-                StartOffset--;
-            }
-
-            // Same for endContainer
-            if (ReferenceEquals(EndContainer, removedChild) || IsDescendantOf(EndContainer, removedChild))
-            {
-                EndContainer = parent;
-                EndOffset = index;
-            }
-            else if (ReferenceEquals(EndContainer, parent) && EndOffset > index)
-            {
-                EndOffset--;
-            }
-
-            UpdateCollapsed();
-        }
-
-        private static bool IsDescendantOf(Broiler.Dom.DomNode node, Broiler.Dom.DomNode potentialAncestor)
-        {
-            var current = node.ParentNode;
-            while (current != null)
-            {
-                if (ReferenceEquals(current, potentialAncestor)) return true;
-                current = current.ParentNode;
-            }
-            return false;
-        }
+        protected override Broiler.Dom.DomRange CreateSubRange(Broiler.Dom.DomNode root) =>
+            new BridgeDomRange(bridge, root);
     }
 
     /// <summary>
@@ -1036,7 +724,7 @@ public sealed partial class DomBridge
         for (var i = _activeRanges.Count - 1; i >= 0; i--)
         {
             if (_activeRanges[i].TryGetTarget(out var state))
-                state.AdjustForRemoval(parent, removedChild, index);
+                state.NotifyNodeRemoved(parent, removedChild, index);
             else
                 _activeRanges.RemoveAt(i); // GC'd — prune
         }

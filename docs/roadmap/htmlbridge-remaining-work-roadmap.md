@@ -1,7 +1,13 @@
 # HtmlBridge — Remaining Work Roadmap (post-facade-removal)
 
-Status: **active** — the consolidated "what's left" list once the `DomElement` facade removal lands.
-Date: 2026-07-11.
+Status: **active** — the consolidated "what's left" list now that the `DomElement` facade removal has landed.
+Date: 2026-07-11 (Section 1 gate closed 2026-07-12).
+
+> **Update (2026-07-12): all of Section 1 has landed on `main`.** The F3c/F4 merge gate (1.1) passed
+> and merged as PR #1359; the CSS-helper promotion (2.1 shorthand + 2.3 casing/`CssPriority`) merged as
+> PR #1362; and the `@position-try` twin follow-up from 1.2 — animation/`@keyframes` collection from
+> InnerHtml-backed `<style>` elements — merged as PR #1363. The remaining open work is entirely in
+> Section 2 (DOM/CSS promotion backlog).
 
 ## Purpose
 
@@ -27,21 +33,15 @@ Authoritative records referenced below:
 
 ## 1. Blockers to landing the facade removal (in-scope, do these to merge)
 
-### 1.1 WPT + Acid + pixel merge gate — **the one hard blocker**
+### 1.1 WPT + Acid + pixel merge gate — **DONE (merged)**
 
 The F3c/F4 stack (`72634e02`, `aa00ecf5`, `ddad4769` on `claude/htmlbridge-domelement-f3c-flip`, PR
-#1359) is **Cli.Tests-verified regression-free** (0 new failures; F3c added 8 fixes) but is **not merged**.
-Both irreversible cutovers — the text→`DomText` flip (2d) and the element-construction flip + facade
-delete (F4) — are gated on the **full WPT range/selection/serialization + Acid + pixel** corpus before
-merge, because the failure mode is *silent* `outerHTML`/selection/render corruption that `Cli.Tests` does
-not catch. WPT is **dispatch-only** in this environment (the `WPT Tests` GitHub Actions workflow,
-`workflow_dispatch`).
-
-- **Action:** dispatch the WPT workflow on the branch, confirm the failing set is a **subset** of the
-  committed WPT baseline (`tests/wpt-baseline/failed-tests.json`) — i.e. **0 new failures** — then mark
-  PR #1359 ready and merge. Watch specifically for SVG/foreign `createElementNS` namespace regressions
-  and range/selection/serialization regressions.
-- **Status:** WPT run dispatched 2026-07-11; awaiting results + baseline diff.
+#1359) — both irreversible cutovers, the text→`DomText` flip (2d) and the element-construction flip +
+facade delete (F4) — passed the **full WPT range/selection/serialization + Acid + pixel** gate and
+**merged (`ecbdf406`, 2026-07-12)**. The failing WPT set was confirmed a subset of the committed baseline
+(`tests/wpt-baseline/failed-tests.json`, updated `[skip ci]` in `2b9b1319`); no new SVG/foreign
+`createElementNS` namespace or range/selection/serialization regressions. The `DomElement` facade and
+`HtmlTreeBuilder` are gone from `main`; the bridge tree is canonical `Broiler.Dom` nodes.
 
 ### 1.2 Resurrect `Broiler.Wpt.Tests` (pre-existing, out of `Cli.Tests` scope) — **DONE**
 
@@ -72,9 +72,10 @@ the whole solution would not build until it was fixed.
   `@position-try` rules, so every fallback silently no-op'd (both resolve-only and full-render paths). Fix:
   read via the canonical `GetStyleElementSourceText(el)` accessor (the same source the cascade uses; covers the
   InnerHtml-fallback case). Both tests now pass; the 7 nearby `PositionArea*`/`PositionTryGrid*` pixel reftests
-  fail **identically with and without the fix** (baseline-verified environmental, 0 regressions). A latent
-  twin of the same bug in `AnimationResolver.CollectAnimPropsFromStyleElements` (static, so needs its own
-  InnerHtml fallback + a reproducing test) is tracked as a separate follow-up.
+  fail **identically with and without the fix** (baseline-verified environmental, 0 regressions). The latent
+  twin of the same bug in `AnimationResolver.CollectAnimPropsFromStyleElements` (static InnerHtml fallback)
+  is now **fixed and merged** (PR #1363, `d383b371`): animation/`@keyframes` collection reads
+  InnerHtml-backed `<style>` source via the same canonical accessor, with a reproducing test.
 - **Priority:** low; independent of the merge gate.
 
 ### 1.3 Optional cleanup — retire the `DomElement` alias — **DONE**
@@ -127,14 +128,51 @@ they are prioritized independently.
   **Delivery note:** the public `ExpandShorthands` wrapper is in the `Broiler.CSS` submodule — push +
   pointer bump (or patch fallback) at commit time.
 
-### 2.2 Promotion Phase 4 / slice 8 — Range content operations (partially done)
+### 2.2 Promotion Phase 4 / slice 8 — Range content operations (canonical API landed; bridge rewire remains)
 
-The token-list + mutation-filtering work landed; the higher-risk remainder is still bridge-owned:
+The token-list + mutation-filtering work landed earlier; the content operations are now split into two
+slices — **the canonical algorithms first (done), the bridge rewire second (remaining, higher-risk).**
 
-- The JS `Range` **content** operations — `deleteContents` / `extractContents` / `cloneContents` /
-  `insertNode` / `surroundContents` — and the bridge's `RangeState`, routed through the canonical
-  `Broiler.Dom.DomRange` instead of the bridge's own range machinery. (F3c already widened `RangeState` to
-  canonical `DomNode`, which de-risks this.)
+- **Done (2026-07-12) — canonical `DomRange` content operations.** `Broiler.Dom.DomRange` gains the full
+  DOM Standard §4.5 content-operation surface, implemented against canonical `DomNode`/`DomCharacterData`
+  (no JS-object or layout dependencies): `ExtractContents` / `CloneContents` / `DeleteContents` /
+  `InsertNode` / `SurroundContents`, plus the selection helpers `SelectNode` / `SelectNodeContents` /
+  `Collapse` and the `CommonAncestorContainer` accessor. These follow the spec algorithms literally
+  (partially-contained-child recursion via sub-ranges, `contained`/`partially contained` boundary-point
+  tests over the existing `CompareBoundaryPoints`, text-node split for `InsertNode`), rather than porting
+  the bridge's ad-hoc document-order-`IndexOf` heuristics. Two new `DomException` factories
+  (`InvalidStateError` / `InvalidNodeTypeError`) back `surroundContents`/`selectNode`. Covered by 13 new
+  `DomRangeTests` cases (extract/clone/delete within one text node and across nodes, insert at an element
+  offset + inside-text split + comment-container rejection, surround wrap + partial-non-text throw,
+  select/collapse); the whole `Broiler.Dom.Tests` project is green (64/64) and the bridge consumer builds
+  clean. **Delivery note:** the new code is in the `Broiler.DOM` **submodule** — push + pointer bump (or
+  `patches/` fallback if the push 403s) at commit time.
+- **Done (2026-07-12) — the bridge `Range`/`RangeState` rewire.** The bridge's `RangeState` class is
+  **deleted**; the live JS `Range` is now backed by a `BridgeDomRange : Broiler.Dom.DomRange` (a private
+  bridge subclass constructed `trackMutations: false`) that overrides the four node-creation seams so the
+  canonical content operations mint bridge nodes — `#document-fragment` result fragments and
+  `CloneDomElement` clones that carry host runtime state (form-control value/checked, scroll, dialog/shadow,
+  live inline style), all registered in `_knownNodes`. Every `Range` JS callback in
+  `JsFunctionCallbacks/Traversal.cs` now delegates: the content ops (`extract`/`clone`/`delete`/`insert`/
+  `surround`) to the canonical methods; the boundary/selection ops (`setStart`/`setEnd`/`setStartBefore`…/
+  `collapse`/`selectNode`/`selectNodeContents`) to `SetStart`/`SetEnd`/`Collapse`/`SelectNode`. The bridge's
+  hand-rolled algorithms are removed: `RangeState.AdjustForRemoval`/`UpdateCollapsed`, the ad-hoc
+  `ExtractStartPath`/`ExtractEndPath`/`CreatePartialCloneForExtract`/`IsContainedInRange` extract helpers,
+  and the manual boundary collapse math. Boundary adjustment for external tree mutations still runs through
+  the bridge's weak `_activeRanges` registry (preserving the no-leak `WeakReference` design), which now calls
+  the canonical `DomRange.NotifyNodeRemoved`. Geometry stays bridge-owned: `GetClientRectsForRange` /
+  `getBoundingClientRect` / `getClientRects` and `toString`/`compareBoundaryPoints` read boundary points off
+  the `DomRange` but keep their bridge geometry/text helpers.
+  **Verification:** `Broiler.Cli.Tests` range/traversal suite 56/57 (the 1 failure —
+  `Range_GetBoundingClientRect_Includes_DisplayContents_Descendants` — is **pre-existing/environmental**,
+  baseline-confirmed: a `display:contents` layout that produces zero height in the bare container, fails
+  identically without this change); mutation-observer / boundary-guard / DOM-interface suites 90/90; Acid3 /
+  DOM-events / DOM-edge suites 120/120; canonical `Broiler.Dom.Tests` 69/69. The two `insertNode`
+  boundary-after-split tests were updated to the **spec-correct** result (the start boundary stays in the
+  truncated original text node rather than the pre-rewire bridge's non-spec normalization to the parent) —
+  gate-safe because `dom/ranges/Range-insertNode.html` (and all five `Range-*` content-op WPT tests) are
+  already in the committed failed baseline, so adopting spec behavior can only hold or improve, never add a
+  new failure. Like the F3c/F4 cutovers this still wants the full WPT range/selection corpus at merge.
 
 ### 2.3 Promotion Phase 1 slice-2 — deferred helpers (casing + `CssPriority` **DONE**; live-setter routing remains)
 
