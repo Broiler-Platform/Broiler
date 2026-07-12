@@ -1108,28 +1108,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue(
             property, Broiler.CSS.CssPriority.Strip(value));
 
-    /// <summary>Checks whether <paramref name="v"/> looks like a CSS length or percentage.</summary>
-    private static bool IsLengthOrPercentage(string v)
-    {
-        if (v == "0") return true;
-
-        // Known CSS length/percentage units and their suffix lengths
-        ReadOnlySpan<string> units = ["vmin", "vmax", "rem", "px", "em", "vh", "vw", "pt", "cm", "mm", "in", "ex", "ch", "%"];
-
-        foreach (var unit in units)
-        {
-            if (v.EndsWith(unit, StringComparison.Ordinal) && v.Length > unit.Length)
-            {
-                var numPart = v[..^unit.Length];
-                if (double.TryParse(numPart, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out _))
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
     [GeneratedRegex(@"<title[^>]*>(?<content>[\s\S]*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
     private static partial Regex TitlePatternRegex();
     [GeneratedRegex(@"<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b(?<attrs>[^>]*)\/?>", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
