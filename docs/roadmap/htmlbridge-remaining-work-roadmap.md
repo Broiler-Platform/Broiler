@@ -107,9 +107,56 @@ they are prioritized independently.
 ### 2.1 Promotion Phase 2 — computed style (partially delivered)
 
 - The literal `GetComputedProps → GetComputedStyle` cutover (route the bridge's computed-property reads
-  through the canonical CSSOM computed-style path). **Still deliberately deferred** — the sparse-map vs
-  full-initials contract mismatch and the layout-dependent form-control sizing make it unsafe as a blind
-  swap (see the promotion roadmap Phase 2 for the analysis).
+  through the canonical CSSOM computed-style path). **The cutover of the ~98 call sites is still deferred,
+  but the canonical projection it needs now exists and the swap is scoped by a measured parity delta
+  (2026-07-12).**
+  - **Additive canonical projection landed.** `Broiler.CSS.Dom.CssStyleEngine.GetSparseComputedStyle`
+    (Broiler.CSS submodule) runs the full computed-style pipeline (cascade + inline, custom-property/`var()`,
+    CSS-wide keywords, shorthand + `attr()`, relative font-weight, inheritance backfill, form-control size
+    synthesis, logical-size aliases) **without** the initial-value backfill, so an undeclared non-inherited
+    property reads back absent — the null-for-undeclared contract the ~98 `GetComputedProps` consumers rely
+    on. It is the `ComputeStyle` pass gated by a new `backfillInitials:false` flag; the full
+    `GetComputedStyle`/`GetCascadedStyle` paths are unchanged. Covered by 5 `CssStyleEngineTests`. This is
+    additive — **zero call-site changes**, so it cannot regress anything on its own.
+  - **Stale blocker corrected.** The roadmap's second blocker — "layout-dependent form-control sizing" —
+    is **not** a blocker: `ApplyApproximateFormControlComputedSizes` already has a layout-free copy inside
+    `CssStyleEngine.Computed.cs` (it counts `<br>`-split text lines and reads `size`/`rows` attributes, no
+    glyph/box measurement), living within the `CssDomArchitectureTests` boundary. The only real remaining
+    contract issue is sparse-vs-full, addressed by the flag above.
+  - **Parity measured, and it is bigger than "a short reconciliation list."** A differential characterization
+    test (`SparseComputedStyleParityTests` in `Broiler.Cli.Tests`, via two internal `*ForParity` bridge
+    accessors) compares the canonical projection against the bridge's `GetComputedProps` over a corpus and
+    pins the delta to **four structural classes** — everything else matches exactly, and the test fails on any
+    *uncategorised* drift:
+    1. **UA display defaults** — the bridge injects a UA `display` for block elements
+       (`ApplyUserAgentDisplayDefaults`); the canonical projection leaves `display` to the renderer, so it is
+       present-in-bridge / absent-in-sparse. (Real gap — a swap must reconcile it.)
+    2. **Inheritance model** — the canonical projection backfills inheritance from the parent's *full*
+       computed style (every inherited property materialises from the root's initials down); the bridge
+       propagates from the parent's *sparse* map (an inherited property never declared anywhere stays absent).
+       The whole inherited-property set therefore diverges on elements that declare none of it. (Real gap.)
+    3. **Value resolution (bidirectional)** — the engine resolves `var()`/`initial`/`unset`/`bold`→`700` that
+       the bridge leaves raw; conversely the engine's `ComputeStyle` has no inherit-fold, so it emits a raw
+       `inherit` the bridge resolves. (Mostly improvements; audit at swap.)
+    4. **Custom properties** — the engine surfaces `--*`; the bridge omits them. (Benign.)
+  - **What remains (the actual cutover, still deferred) — attempt made 2026-07-12, confirmed not a
+    drop-in, reverted.** The swap was tried directly: `GetComputedProps` (`AnchorRegistry.cs`) rewritten to
+    delegate to `GetSyncedScopedEngine(el).GetSparseComputedStyle(el)` + `ApplyUserAgentDisplayDefaults`
+    (reconciling class 1), keeping the physical-inset backfill. Against a same-state baseline (3 pre-existing
+    fails) the anchor/geometry/serialization/scrollIntoView consumer clusters showed **4 new regressions**,
+    exactly the class-2/3 impact the parity delta predicted:
+    `GoogleSearchPolyfillTests.ScrollIntoView_Clamps_Fixed_Scrollers_To_Their_Scroll_Bounds` and
+    `…ScrollIntoView_Legacy_False_Aligns_To_Block_End`, plus the zoom-serialization pair
+    `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Scales_ExplicitInherited_Zoom_Properties` and
+    `…Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties`. The zoom-serialization path scales specific
+    computed properties, and the canonical projection's fuller inheritance + resolved values change *which*
+    properties are present and their form — so the swap is genuinely observable, not a no-op. **Reverted**
+    (`git checkout AnchorRegistry.cs`); clusters returned to the 3-fail baseline. **Conclusion:** the cutover
+    needs the inheritance model reconciled (sparse-inheritance projection, or a per-site audit of the
+    zoom-serialization + scrollIntoView readers) and must run behind the full WPT/Acid/pixel gate — it is not
+    a safe local-only slice. The additive projection + parity test remain the foundation for it. **Delivery
+    note:** the `GetSparseComputedStyle` API is in the `Broiler.CSS` submodule — push + pointer bump (or
+    `patches/` fallback) at commit time; the parity test + accessors are main-repo.
 - **Shorthand expansion — DONE (2026-07-12).** The bridge's `ExpandCssShorthands` (+ its private
   `ExpandFontShorthand` / `ExpandBoxShorthand` / `ExpandBorderShorthand` / `ExpandBorderSideShorthand` /
   `ExpandBackgroundShorthand` / `SplitCssValues` helpers, ~500 lines in `DomBridge/Css.cs`) is deleted and
@@ -197,13 +244,82 @@ live-setter routing.
   - **Delivery note:** the new files live in the `Broiler.CSS` **submodule** — the submodule commit must be
     pushed and the parent pointer bumped (or a `patches/` fallback if the push 403s) as part of committing
     this work.
-- **Still deferred:** routing the live `CSSStyleDeclaration` setters / stylesheet-mutation paths through
-  shared CSS APIs (higher-risk, entangled with live CSSOM object identity — a separate slice).
+- **Done (2026-07-12) — live per-property setter validation.** The remaining "live-setter routing" gap:
+  the per-property `CSSStyleDeclaration` setters (`el.style.X = …`, `setProperty(…)`, the rule-side twins,
+  `cssFloat`) wrote their value **raw** into the inline-style map with **no validation**, while the
+  attribute/`cssText` path (`el.style = "color: bogus"`) already dropped invalid declarations via
+  `ParseStyle` → the shared `CssDeclarationValidator`. That asymmetry meant `el.style.color = "bogus"`
+  *stored* the invalid value. All six live setter sites now gate through a shared
+  `DomBridge.IsAcceptableInlineValue` helper (= `CssDeclarationValidator.IsAcceptableDeclarationValue` on the
+  `!important`-stripped value) — the same closed-keyword error-recovery the attribute path uses. An invalid
+  value is now ignored (prior value kept), matching CSSOM error handling; custom (`--*`) and unknown
+  properties still pass (the validator default), and `!important` is validated on the stripped value.
+  - **Nuance found (the "live CSSOM object identity" entanglement the roadmap warned about):** the IDL
+    `SetValue` path stores the value in **two** places — the ERS inline-style map *and*, via the trailing
+    `base.SetValue`, a plain JS property on the style object that the getter reads **first**. Gating only the
+    map was silently bypassed; the fix returns early on an invalid value so `base.SetValue` never stores it
+    either. Separately, `el.style.cssFloat = …` is a **pre-existing dead path** (`cssFloat` is in
+    `NonCssNames`, so `SetValue` delegates to `base.SetValue` and never reaches the `Set009`/`Set020`
+    accessor); the gate there is harmless defensive code, and `float` set via the reachable
+    `setProperty('float', …)` path is validated.
+  - **Verified regression-free (Cli-scope):** 10 `CssStyleDeclarationValidationTests`; the CSSOM /
+    inline-style / computed-style / Acid3 clusters show **0 new failures** — the 9 residual fails all
+    **pre-existing**, confirmed by stashing the whole change set and re-running at clean HEAD (`:root`/`:lang`,
+    `HttpClientMigration`, `Acid3CascadeDebug`, `Border_Shorthand`, and the environmental Acid3 render/score/
+    image-capture + `PhaseC_NodeIterator` tests fail identically without the change). Because it changes
+    observed CSSOM behavior (invalid values now rejected), it wants the full **WPT css/cssom + Acid** gate at merge.
+  - **Delivery:** entirely main-repo (bridge `DomBridge.cs` helper + the six setter sites in
+    `DomBridge/Utilities.cs` and `DomBridge/JsFunctionCallbacks/Utilities.cs`); no submodule change.
+- **Still deferred:** the live stylesheet-**mutation** paths are already largely shared (`insertRule`/
+  `deleteRule`/`cssText` parse through `CssParser`, per Phases 3/6).
+- **Assessed, low value (2026-07-12) — `CssInlineStyleParser.ParseDeclarations` consolidation.** The
+  Phase-1 "add a shared inline-declaration parser" idea turns out **marginal**: both `DomBridge.ParseStyle`
+  and the engine's inline loop (`CssStyleEngine.cs:482`, `Computed.cs:131`) *already* use the canonical
+  `CssParser().ParseDeclarations()` + `CssDeclarationValidator.IsAcceptableDeclarationValue`, so the only
+  shared code is a ~4-line orchestration loop with **different output shapes** (the bridge formats a dict
+  with a `!important` string suffix + vendor-prefix mapping; the engine adds cascade winners). The named
+  "third copy" `HtmlCss.ParseDeclarations` (`Broiler.Documents.Html`) is a **different, naive parser**
+  (HtmlDecode + split on `;`/`:`, no CssParser, no validation, no `!important`) serving document conversion —
+  forcing it onto the canonical parser would change Documents behavior, out of scope. The one genuinely-clean
+  remaining duplicate is the **byte-identical `StripVendorPrefix`** in `DomBridge.cs:1101` and
+  `CssStyleEngine.cs:682` (promote to `Broiler.CSS.CssPropertyNames`) — a small, optional follow-up.
 
-### 2.4 Promotion-candidate backlog (P0–P3) + Open Questions
+### 2.4 Promotion Phase 2 slice-2 — stylesheet scope assembly (P2 `CssStyleScopeBuilder`) — **DONE (2026-07-12)**
 
-- The P0–P3 promotion-candidate table in the promotion roadmap (the broader "what else could move to the
-  canonical components" backlog).
+The P2 candidate "stylesheet scope assembly without fetching" — previously **never built** (a whole-repo
+search found only the roadmap mention) — is delivered.
+
+- **Canonical `Broiler.CSS.Dom.CssStyleScopeBuilder`** (Broiler.CSS submodule) owns the neutral scope
+  assembly the bridge previously did ad-hoc in `DomBridge.GetSyncedScopedEngine`: given a host-supplied,
+  document-ordered list of `StyleSource(cssText, origin, media?)`, it evaluates each source's `media`
+  attribute against the environment, keeps only the matches (in cascade-origin/document order), parses each
+  as its own sheet, and re-syncs the `CssStyleEngine` only when the effective (media-filtered) set changes.
+  The host keeps the parts that need the DOM + resource loading — discovering `<style>`/`<link>` elements,
+  fetching external sheets, extracting each sheet's CSS text. 9 `CssStyleScopeBuilderTests`.
+- **Real correctness fix, not just a move.** The old bridge path concatenated every collected sheet into one
+  blob and applied it **unconditionally**, ignoring per-element `media` — so `<style media="print">` (and
+  any non-matching `<link media>`) wrongly took effect on screen. Routing `GetSyncedScopedEngine` through the
+  builder (extracting `GetAttr(styleEl, "media")` per source) fixes this; parsing each source separately also
+  isolates a malformed sheet from the next and scopes `@import`/`@namespace` per-sheet. Pinned by
+  `StyleScopeMediaTests` (a non-matching-media sheet is excluded; matching/no-media applies).
+- **Verified regression-free (Cli-scope):** full `Broiler.CSS.Dom.Tests` 213/214 (the 1 = the pre-existing
+  `Public_Surface_Does_Not_Expose_Mutable_Collections` arch guard, baseline-confirmed via stash); bridge
+  StyleSheet/Cssom/ComputedStyle/MediaQuery/Cascade clusters 140/144 — the 4 fails all **pre-existing**
+  (`:root`/`:lang` selector, `HttpClientMigration` reflection/assembly-load, `Acid3CascadeDebug` render-pixel
+  known-limitation; the latter two confirmed failing at HEAD with the bridge change reverted). Because it
+  changes observed behavior for media-gated sheets, it still wants the full **WPT/Acid/pixel** gate at merge.
+- **Delivery note:** `CssStyleScopeBuilder.cs` + its tests are in the `Broiler.CSS` **submodule** — push +
+  pointer bump (or `patches/` fallback) at commit time; the bridge rewire + `StyleScopeMediaTests` are main-repo.
+- **Not moved (correctly host-owned):** `<style>`/`<link>` discovery (`CollectStyleElementsInTree`), external
+  fetching, and CSS-text extraction (`GetStyleElementCssText`, InnerHtml/CSSOM/runtime-state) — they need the
+  DOM and resource loading, matching the roadmap's "fetching remains bridge/host code" boundary.
+
+### 2.5 Promotion-candidate backlog (P0–P3) + Open Questions
+
+- The remaining P0–P3 promotion-candidate rows in the promotion roadmap not covered above (the broader
+  "what else could move to the canonical components" backlog). After §2.1–2.4, the notable open ones are the
+  literal `GetComputedProps`→`GetComputedStyle` **cutover** (§2.1 Slice 4, scoped by the measured delta) and
+  the live `CSSStyleDeclaration` **setter routing** (§2.3), both higher-risk behavior changes wanting the WPT gate.
 - The promotion roadmap's **Open Questions** (Open Question #5 — "declare v2" — is now answered; the rest
   remain).
 

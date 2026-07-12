@@ -54,11 +54,12 @@ public sealed partial class DomBridge
                 InlineStyle(element).Remove(prop);
                 GetElementRuntimeState(element).JsSetStyleProps.Remove(prop);
             }
-            else
+            else if (IsAcceptableInlineValue(prop, value))
             {
                 InlineStyle(element)[prop] = value;
                 GetElementRuntimeState(element).JsSetStyleProps.Add(prop);
             }
+            // setProperty with an invalid value is a no-op per CSSOM (the value is not set).
 
             onMutation?.Invoke();
         }
@@ -116,7 +117,11 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesSetCssFloat009Core(global::Broiler.Dom.DomElement element, global::System.Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
-            InlineStyle(element)["float"] = a[0].ToString();
+        {
+            var val = a[0].ToString();
+            if (string.IsNullOrEmpty(val) || IsAcceptableInlineValue("float", val))
+                InlineStyle(element)["float"] = val;
+        }
         onMutation?.Invoke();
         return JSUndefined.Value;
     }
@@ -172,8 +177,9 @@ public sealed partial class DomBridge
             var value = Broiler.CSS.CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
                 styleMap.Remove(prop);
-            else
+            else if (IsAcceptableInlineValue(prop, value))
                 styleMap[prop] = value;
+            // setProperty with an invalid value is a no-op per CSSOM.
         }
 
         return JSUndefined.Value;
@@ -226,7 +232,11 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesSetCssFloat020Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
     {
         if (a.Length > 0)
-            styleMap["float"] = a[0].ToString();
+        {
+            var val = a[0].ToString();
+            if (string.IsNullOrEmpty(val) || IsAcceptableInlineValue("float", val))
+                styleMap["float"] = val;
+        }
         return JSUndefined.Value;
     }
 

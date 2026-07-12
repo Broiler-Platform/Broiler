@@ -1,11 +1,12 @@
 # HtmlBridge `DomElement` Facade Removal — Implementation Plan
 
-Status: **implemented** — all phases (A–F4) landed and `Broiler.Cli.Tests`-verified on
-`claude/htmlbridge-domelement-f3c-flip`; the facade + `HtmlTreeBuilder` are deleted. NOT merged —
-awaits the WPT + Acid + pixel gate. The authoritative "where things stand" record is
+Status: **implemented and MERGED** — all phases (A–F4) landed, `Broiler.Cli.Tests`-verified on
+`claude/htmlbridge-domelement-f3c-flip`, and **merged to `main` as PR #1359 (`ecbdf406`, 2026-07-12)**
+after passing the WPT + Acid + pixel gate; the facade + `HtmlTreeBuilder` are deleted. The authoritative
+"where things stand" record is
 [`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md); this
 plan is retained as the "how it was staged" design history.
-Date: 2026-07-10 (implemented 2026-07-11)
+Date: 2026-07-10 (implemented 2026-07-11, merged 2026-07-12)
 
 ## Purpose
 
@@ -31,9 +32,10 @@ are done. The facade removal is unblocked.
 `claude/htmlbridge-domelement-f3c-flip` and `Broiler.Cli.Tests`-verified.** The `Broiler.HtmlBridge.DomElement`
 facade and `HtmlTreeBuilder` are **deleted**; the bridge holds only canonical `Broiler.Dom` nodes + bridge
 runtime state. Each phase is its own commit, every one regression-free against the full `Broiler.Cli.Tests`
-(slot-scroll crasher excluded) environmental baseline via before/after TRX **name**-diff. **NOT merged** —
-the F3c/F4 stack awaits the WPT range/selection/serialization + Acid + pixel gate (dispatch-only). The live
-record is the [current-state doc](htmlbridge-facade-removal-current-state.md) §4/§5.
+(slot-scroll crasher excluded) environmental baseline via before/after TRX **name**-diff. **Merged** to
+`main` as PR #1359 (`ecbdf406`, 2026-07-12) after the F3c/F4 stack passed the WPT range/selection/
+serialization + Acid + pixel gate (dispatch-only). The live record is the
+[current-state doc](htmlbridge-facade-removal-current-state.md) §4/§5.
 
 **F3c part 2 decomposition — ALL DONE + `Cli.Tests`-verified:** green type-widening commits
 (**2a `ToJSObject` split; 2b `RangeState`/NodeIterator/tree-mutation + char-data wrapper; 2c `ChildAt`
@@ -473,7 +475,7 @@ happened via the `global using DomElement = Broiler.Dom.DomElement` alias rather
 
 **Risk.** High — final cutover. **Exit — MET.** `DomElement`/`HtmlTreeBuilder` deleted; promotion
 roadmap Phase 5 adapter-removal workstream satisfied ("HtmlBridge contains bridge responsibilities
-only") — pending the WPT/Acid/pixel merge gate.
+only"); the WPT/Acid/pixel merge gate passed and the stack merged as PR #1359 (2026-07-12).
 
 ## Dependency graph
 

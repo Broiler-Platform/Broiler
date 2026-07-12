@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Broiler.HtmlBridge;
 
 /// <summary>
@@ -22,9 +20,7 @@ public sealed partial class DomBridge
 
     private sealed class ComputedStyleEngineScope
     {
-        public required Broiler.CSS.Dom.CssStyleEngine Engine { get; init; }
-
-        public int StyleSheetHash { get; set; } = -1;
+        public required Broiler.CSS.Dom.CssStyleScopeBuilder ScopeBuilder { get; init; }
     }
 
     /// <summary>
@@ -46,7 +42,8 @@ public sealed partial class DomBridge
         {
             scope = new ComputedStyleEngineScope
             {
-                Engine = new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider()),
+                ScopeBuilder = new Broiler.CSS.Dom.CssStyleScopeBuilder(
+                    new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider())),
             };
             _computedStyleEngines[docRoot] = scope;
         }
@@ -54,27 +51,19 @@ public sealed partial class DomBridge
         var styleElements = new List<Broiler.Dom.DomElement>();
         CollectStyleElementsInTree(docRoot, styleElements);
 
-        var combined = new StringBuilder();
+        // Hand the collected sheets to the canonical scope builder in document order; it
+        // gates each on the element's `media` attribute against the viewport and re-syncs the
+        // engine only when the effective set changes. Text extraction (InnerHtml / CSSOM rule
+        // text / external-sheet runtime state) stays here because it needs the DOM and loading.
+        var sources = new List<Broiler.CSS.Dom.CssStyleScopeBuilder.StyleSource>(styleElements.Count);
         foreach (var styleEl in styleElements)
-            combined.Append(GetStyleElementCssText(styleEl)).Append('\n');
-        var combinedText = combined.ToString();
-
-        var hash = combinedText.GetHashCode(StringComparison.Ordinal);
-        if (hash != scope.StyleSheetHash)
-        {
-            scope.Engine.ClearStyleSheets();
-            if (combinedText.Length > 0)
-            {
-                var sheet = new Broiler.CSS.CssParser().ParseStyleSheet(combinedText);
-                scope.Engine.AddStyleSheet(sheet, CSS.Dom.CssOrigin.Author);
-            }
-
-            scope.StyleSheetHash = hash;
-        }
+            sources.Add(new Broiler.CSS.Dom.CssStyleScopeBuilder.StyleSource(
+                GetStyleElementCssText(styleEl),
+                CSS.Dom.CssOrigin.Author,
+                GetAttr(styleEl, "media")));
 
         var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
-        scope.Engine.UpdateEnvironment(new Broiler.CSS.Dom.CssEnvironment(vpWidth, vpHeight));
-        return scope.Engine;
+        return scope.ScopeBuilder.Sync(sources, new Broiler.CSS.Dom.CssEnvironment(vpWidth, vpHeight));
     }
 
     /// <summary>

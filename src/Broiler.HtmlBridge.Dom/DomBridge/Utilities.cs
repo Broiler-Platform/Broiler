@@ -728,10 +728,18 @@ public sealed partial class DomBridge
                     InlineStyle(_element).Remove(kebab);
                     GetElementRuntimeState(_element).JsSetStyleProps.Remove(kebab);
                 }
-                else
+                else if (IsAcceptableInlineValue(kebab, val))
                 {
                     InlineStyle(_element)[kebab] = val;
                     GetElementRuntimeState(_element).JsSetStyleProps.Add(kebab);
+                }
+                else
+                {
+                    // Invalid value: ignore it completely (CSSOM error handling). Return
+                    // without falling through to base.SetValue — the getter reads the JS
+                    // property first, so letting the base object keep the value would
+                    // resurface the rejected value. Any existing valid value is left intact.
+                    return true;
                 }
 
                 // Invalidate cached position-area resolution when relevant
@@ -781,8 +789,10 @@ public sealed partial class DomBridge
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                     _style.Remove(kebab);
-                else
+                else if (IsAcceptableInlineValue(kebab, val))
                     _style[kebab] = val;
+                else
+                    return true;   // invalid value ignored; don't store it as a JS property either
             }
 
             return base.SetValue(name, value, receiver, throwError);

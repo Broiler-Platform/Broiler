@@ -1,13 +1,14 @@
 # HtmlBridge Blocked-Items Completion Roadmap
 
-Status: **COMPLETE (implementation)** — Track 2 / Item 2 (RF-BRIDGE-1b geometry, Milestones 2.1–2.5)
+Status: **COMPLETE and MERGED** — Track 2 / Item 2 (RF-BRIDGE-1b geometry, Milestones 2.1–2.5)
 and Track 1 / Item 1 (v1 public-surface removal, Milestones 1.0–1.3) are all implemented and
 `Broiler.Cli.Tests`-verified. The `DomElement` facade + `HtmlTreeBuilder` are deleted (Milestone 1.3,
-Phase F4). The F3c/F4 stack is **not yet merged** — it awaits the WPT + Acid + pixel gate (dispatch-only).
+Phase F4). The F3c/F4 stack passed the WPT + Acid + pixel gate and **merged to `main` as PR #1359
+(`ecbdf406`, 2026-07-12)**.
 See [`htmlbridge-facade-removal-current-state.md`](htmlbridge-facade-removal-current-state.md) for the
 facade-removal record and [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md)
 for what remains after this roadmap closes.
-Date: 2026-07-09 (Track 1 completed 2026-07-11)
+Date: 2026-07-09 (Track 1 completed 2026-07-11; stack merged 2026-07-12)
 
 ## Purpose
 
@@ -890,12 +891,12 @@ canonical `AppendChild` auto-adopts the subtree); frozen guards rewritten to "fa
 
 **Risk.** High — final cutover (done; `Cli.Tests`-verified 0 new failures).
 
-**Verification.** Full bridge suite green; the WPT/Acid/pixel gate is the remaining merge blocker; the
-promotion roadmap's Phase 5 adapter-removal workstream is satisfied (`HtmlBridge` contains bridge
-responsibilities only).
+**Verification.** Full bridge suite green; the WPT/Acid/pixel gate passed and the stack merged (PR #1359,
+2026-07-12); the promotion roadmap's Phase 5 adapter-removal workstream is satisfied (`HtmlBridge` contains
+bridge responsibilities only).
 
-**Exit criteria — MET (pending merge gate).** `DomElement`, `HtmlTreeBuilder` deleted; promotion roadmap
-Phase 5 adapter-removal workstream closed.
+**Exit criteria — MET (merged).** `DomElement`, `HtmlTreeBuilder` deleted; promotion roadmap
+Phase 5 adapter-removal workstream closed; merged as PR #1359 (2026-07-12).
 
 ---
 
@@ -912,8 +913,8 @@ Phase 5 adapter-removal workstream closed.
 9. **1.3** Remove `DomElement` + `HtmlTreeBuilder` — **done (2026-07-11); Item 1 done → this roadmap is complete**
 
 Steps 6–7 may run at any point after 1.0 is decided (they do not depend on Track
-2). Steps 8–9 depend on Track 2 completing. **All nine steps are now done** — the only
-outstanding item is the WPT + Acid + pixel merge gate for the F3c/F4 commit stack.
+2). Steps 8–9 depend on Track 2 completing. **All nine steps are now done** — and the
+F3c/F4 commit stack passed the WPT + Acid + pixel merge gate and merged as PR #1359 (2026-07-12).
 
 ## Validation plan (applies to every milestone)
 
