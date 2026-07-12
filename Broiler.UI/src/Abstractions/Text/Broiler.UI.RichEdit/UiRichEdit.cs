@@ -163,7 +163,7 @@ public abstract class UiRichEdit : UiElement
         bool editable = _isEnabled && !_isReadOnly;
         bool hasSelection = !_editor.Selection.IsEmpty;
         bool clipboard = HasClipboard;
-        InlineStyle inline = _editor.CaretInlineStyle;
+        InlineStyle inline = CurrentInlineStyle;
         ParagraphStyle paragraph = CurrentParagraphStyle;
 
         return command switch
@@ -289,10 +289,10 @@ public abstract class UiRichEdit : UiElement
         RichEditCommand.InsertText => _editor.InsertText(parameter as string ?? string.Empty),
         RichEditCommand.InsertParagraphBreak => _editor.SplitParagraph(),
         RichEditCommand.InsertLineBreak => _editor.InsertLineBreak(),
-        RichEditCommand.Bold => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleBold(!_editor.CaretInlineStyle.Bold)),
-        RichEditCommand.Italic => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleItalic(!_editor.CaretInlineStyle.Italic)),
-        RichEditCommand.Underline => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleUnderline(!_editor.CaretInlineStyle.Underline)),
-        RichEditCommand.Strikethrough => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleStrikethrough(!_editor.CaretInlineStyle.Strikethrough)),
+        RichEditCommand.Bold => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleBold(!CurrentInlineStyle.Bold)),
+        RichEditCommand.Italic => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleItalic(!CurrentInlineStyle.Italic)),
+        RichEditCommand.Underline => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleUnderline(!CurrentInlineStyle.Underline)),
+        RichEditCommand.Strikethrough => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleStrikethrough(!CurrentInlineStyle.Strikethrough)),
         RichEditCommand.SetForeground => parameter is BColor foreground && _editor.ApplyInlineStyle(InlineStyleDelta.WithForeground(foreground)),
         RichEditCommand.SetBackground => parameter is BColor background && _editor.ApplyInlineStyle(InlineStyleDelta.WithBackground(background)),
         RichEditCommand.SetFontFamily => _editor.ApplyInlineStyle(InlineStyleDelta.WithFontFamily(NormalizeFontFamily(parameter as string))),
@@ -314,6 +314,10 @@ public abstract class UiRichEdit : UiElement
         _editor.SelectAll();
         return true;
     }
+
+    private InlineStyle CurrentInlineStyle => _editor.Selection.IsEmpty
+        ? _editor.CaretInlineStyle
+        : _editor.Document.InlineStyleAt(_editor.Selection.End);
 
     private bool ToggleList(ListKind kind)
     {

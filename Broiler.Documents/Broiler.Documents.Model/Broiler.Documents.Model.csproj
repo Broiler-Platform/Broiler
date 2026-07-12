@@ -35,6 +35,7 @@
     <InternalsVisibleTo Include="Broiler.UI.RichEdit.Tests" />
     <InternalsVisibleTo Include="Broiler.UI.RichEdit.Standard.Tests" />
     <InternalsVisibleTo Include="Broiler.Documents.Model.Tests" />
+    <InternalsVisibleTo Include="Broiler.Documents.FormatCodes" />
   </ItemGroup>
 
 </Project>

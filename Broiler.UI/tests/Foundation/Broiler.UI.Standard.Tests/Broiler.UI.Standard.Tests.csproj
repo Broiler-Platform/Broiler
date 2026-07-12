@@ -18,6 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Implementations\Standard\Shell\Broiler.UI.FileDialog.Standard\Broiler.UI.FileDialog.Standard.csproj" />
     <ProjectReference Include="..\..\..\src\Implementations\Standard\Shell\Broiler.UI.FontDialog.Standard\Broiler.UI.FontDialog.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Layout\Broiler.UI.ScrollView.Standard\Broiler.UI.ScrollView.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\ValueAndSelection\Broiler.UI.ComboBox.Standard\Broiler.UI.ComboBox.Standard.csproj" />
     <ProjectReference Include="..\..\..\src\Implementations\Standard\ValueAndSelection\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj" />
     <ProjectReference Include="..\..\..\src\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
   </ItemGroup>

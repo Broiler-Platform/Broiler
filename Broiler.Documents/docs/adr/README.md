@@ -5,6 +5,8 @@ decision") requirement from `docs/roadmap/broiler-documents-component.md` §9 fo
 the document-formats component. All are accepted for Phase 1 scaffolding and may
 be superseded only by later ADRs. The model-placement decision is mirrored on the
 UI side by `Broiler.UI/docs/adr/0018-richedit-document-model-promotion.md`.
+ADR 0006 freezes the model-side projection, grammar, mapping, and edit-scope
+decisions for the public Formatting Codes roadmap.
 
 | ADR | Topic |
 |---|---|
@@ -13,3 +15,4 @@ UI side by `Broiler.UI/docs/adr/0018-richedit-document-model-promotion.md`.
 | [0003](0003-codec-contract-and-signature-probe.md) | Codec contract and signature probe |
 | [0004](0004-document-read-limits-and-rtf-sanitization.md) | Document read limits and RTF sanitization policy |
 | [0005](0005-rtf-first-release-subset-and-text-encoding.md) | RTF first-release subset and text encoding |
+| [0006](0006-formatting-codes-projection-and-grammar.md) | Formatting Codes projection and grammar |

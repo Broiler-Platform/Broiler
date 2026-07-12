@@ -66,11 +66,11 @@ public sealed class StandardComboBox : UiComboBox, IStandardThemedControl
             context.RenderList.DrawText(new BTextRun(text, Font, Foreground), new BPoint(Bounds.Left + 8, Bounds.Top + Math.Max(0, (Bounds.Height - BTextMeasurer.GetLineHeight(Font)) / 2)));
         context.RenderList.DrawText(new BTextRun(IsDropDownOpen ? "^" : "v", Font, Foreground), new BPoint(Bounds.Right - 18, Bounds.Top + Math.Max(0, (Bounds.Height - BTextMeasurer.GetLineHeight(Font)) / 2)));
 
-        if (IsDropDownOpen)
-            RenderPopup(context);
-
         if (Session?.FocusedElement == this)
             StandardControlPaint.StrokeRounded(context.RenderList, StandardControlPaint.Inset(Bounds, 2), FocusRing, Math.Max(0, CornerRadius - 2), 1);
+
+        if (IsDropDownOpen)
+            context.Defer(RenderPopup);
     }
 
     protected override bool OnInput(UiInputEvent input)

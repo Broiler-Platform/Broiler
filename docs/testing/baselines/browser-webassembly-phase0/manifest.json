@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "baseline": "browser-webassembly-phase0",
+  "captureDate": "2026-07-11",
+  "width": 320,
+  "height": 180,
+  "rgbaSha256": "0724aed9b9f5f7dab4b52780bb718965359a5da7e0ecd7881b15c6ccaf901394",
+  "files": {
+    "cpu-render-baseline.png": "f160ab0b8ef0c55123abae8a34bb6575a3dd74d1697758ab50df05851a3fbf63",
+    "render-list.json": "2aabb79f3d94df876b6d165ad9a20f676bc014ddc40170df8dae2cf508423d5b",
+    "input-trace.json": "0edd7a53d65360c2b99b6415549c80f0d1730f5ed80b25da19263eead78053f0"
+  }
+}

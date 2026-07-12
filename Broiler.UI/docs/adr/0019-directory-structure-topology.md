@@ -57,11 +57,11 @@ The approved initial categories are:
 | Category | Abstractions |
 |---|---|
 | `Shell` | Window, Dialog, Tooltip, FileDialog, FontDialog |
-| `Layout` | Panel, ScrollView, TabView |
+| `Layout` | Panel, ScrollView, TabView, Splitter |
 | `Content` | Label, ImageView, ProgressBar |
 | `Commands` | Button, ToggleButton, Toolbar, Menu |
 | `ValueAndSelection` | CheckBox, RadioButton, Slider, ListView, ComboBox |
-| `Text` | Edit, RichEdit |
+| `Text` | Edit, RichEdit, FormatCodeView |
 
 The standard implementation tree mirrors those category names exactly.
 

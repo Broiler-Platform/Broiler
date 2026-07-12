@@ -17,12 +17,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />
-    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
-    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Camera\Broiler.Input.Camera.csproj" />
     <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Camera.Windows\Broiler.Input.Camera.Windows.csproj" />
-    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
-    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Microphone\Broiler.Input.Microphone.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Camera\Broiler.Input.Camera.csproj" />
     <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Microphone.Windows\Broiler.Input.Microphone.Windows.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Microphone\Broiler.Input.Microphone.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input\Broiler.Input.csproj" />
+    <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
     <ProjectReference Include="..\..\..\..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
     <ProjectReference Include="..\..\..\src\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
     <ProjectReference Include="..\..\..\src\Implementations\Standard\Shell\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj" />

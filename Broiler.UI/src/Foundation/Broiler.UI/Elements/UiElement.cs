@@ -182,6 +182,11 @@ public abstract class UiElement : IDisposable
         return false;
     }
 
+    protected internal virtual bool ShouldHitTestChildren(BPoint point)
+    {
+        return true;
+    }
+
     protected virtual UiSemanticNode GetSemanticNodeCore() =>
         new(
             UiSemanticRole.Generic,

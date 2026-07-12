@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "coordinateSpace": "client-dip",
+  "purpose": "Normalized T2 input and synthetic pointer-cancel compatibility baseline",
+  "knownProjectionLoss": [
+    "keyboard-repeat-count",
+    "keyboard-location",
+    "composition-selection-start",
+    "composition-selection-length"
+  ],
+  "events": [
+    {
+      "kind": "pointerMove",
+      "sequence": 1,
+      "timestampTicks": 100,
+      "deviceId": "phase0-pointer",
+      "source": {
+        "x": 32,
+        "y": 24,
+        "buttons": "None"
+      },
+      "uiProjection": {
+        "kind": "PointerMove",
+        "x": 32,
+        "y": 24,
+        "text": null,
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "pointerButton",
+      "sequence": 2,
+      "timestampTicks": 200,
+      "deviceId": "phase0-pointer",
+      "source": {
+        "x": 32,
+        "y": 24,
+        "button": "Left",
+        "transition": "Down"
+      },
+      "uiProjection": {
+        "kind": "PointerButton",
+        "x": 32,
+        "y": 24,
+        "text": null,
+        "keyName": null,
+        "mouseButton": "Left",
+        "mouseTransition": "Down",
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "syntheticCancelMoveOutside",
+      "sequence": 3,
+      "timestampTicks": 300,
+      "deviceId": "phase0-pointer",
+      "source": {
+        "x": -1,
+        "y": -1,
+        "buttons": "Left",
+        "source": "Synthetic"
+      },
+      "uiProjection": {
+        "kind": "PointerMove",
+        "x": -1,
+        "y": -1,
+        "text": null,
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "syntheticCancelReleaseOutside",
+      "sequence": 4,
+      "timestampTicks": 400,
+      "deviceId": "phase0-pointer",
+      "source": {
+        "x": -1,
+        "y": -1,
+        "button": "Left",
+        "transition": "Up",
+        "source": "Synthetic"
+      },
+      "uiProjection": {
+        "kind": "PointerButton",
+        "x": -1,
+        "y": -1,
+        "text": null,
+        "keyName": null,
+        "mouseButton": "Left",
+        "mouseTransition": "Up",
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "keyDown",
+      "sequence": 5,
+      "timestampTicks": 500,
+      "deviceId": "phase0-keyboard",
+      "source": {
+        "key": "B",
+        "transition": "Down",
+        "modifiers": "Control",
+        "repeatCount": 1,
+        "location": "Standard"
+      },
+      "uiProjection": {
+        "kind": "KeyboardKey",
+        "x": 0,
+        "y": 0,
+        "text": null,
+        "keyName": "B",
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": "Down",
+        "modifiers": "Control",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "keyUp",
+      "sequence": 6,
+      "timestampTicks": 600,
+      "deviceId": "phase0-keyboard",
+      "source": {
+        "key": "B",
+        "transition": "Up",
+        "modifiers": "Control",
+        "repeatCount": 1,
+        "location": "Standard"
+      },
+      "uiProjection": {
+        "kind": "KeyboardKey",
+        "x": 0,
+        "y": 0,
+        "text": null,
+        "keyName": "B",
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": "Up",
+        "modifiers": "Control",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "committedText",
+      "sequence": 7,
+      "timestampTicks": 700,
+      "deviceId": "phase0-text",
+      "source": {
+        "text": "B"
+      },
+      "uiProjection": {
+        "kind": "TextInput",
+        "x": 0,
+        "y": 0,
+        "text": "B",
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "compositionStarted",
+      "sequence": 8,
+      "timestampTicks": 800,
+      "deviceId": "phase0-text",
+      "source": {
+        "text": "",
+        "state": "Started",
+        "selectionStart": 0,
+        "selectionLength": 0
+      },
+      "uiProjection": {
+        "kind": "TextComposition",
+        "x": 0,
+        "y": 0,
+        "text": "",
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": "Started",
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "compositionUpdated",
+      "sequence": 9,
+      "timestampTicks": 900,
+      "deviceId": "phase0-text",
+      "source": {
+        "text": "\u306B",
+        "state": "Updated",
+        "selectionStart": 1,
+        "selectionLength": 0
+      },
+      "uiProjection": {
+        "kind": "TextComposition",
+        "x": 0,
+        "y": 0,
+        "text": "\u306B",
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": "Updated",
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "compositionCommitted",
+      "sequence": 10,
+      "timestampTicks": 1000,
+      "deviceId": "phase0-text",
+      "source": {
+        "text": "\u65E5\u672C",
+        "state": "Committed",
+        "selectionStart": 2,
+        "selectionLength": 0
+      },
+      "uiProjection": {
+        "kind": "TextComposition",
+        "x": 0,
+        "y": 0,
+        "text": "\u65E5\u672C",
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": "Committed",
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": 0
+      }
+    },
+    {
+      "kind": "wheel",
+      "sequence": 11,
+      "timestampTicks": 1100,
+      "deviceId": "phase0-pointer",
+      "source": {
+        "x": 80,
+        "y": 96,
+        "axis": "Vertical",
+        "deltaNotches": -1
+      },
+      "uiProjection": {
+        "kind": "PointerWheel",
+        "x": 80,
+        "y": 96,
+        "text": null,
+        "keyName": null,
+        "mouseButton": "None",
+        "mouseTransition": null,
+        "keyTransition": null,
+        "modifiers": "None",
+        "compositionState": null,
+        "wheelAxis": "Vertical",
+        "wheelDeltaNotches": -1
+      }
+    }
+  ]
+}

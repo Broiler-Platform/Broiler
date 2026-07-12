@@ -106,6 +106,32 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
+    [Fact]
+    public void Overflowing_Content_Draws_A_Vertical_Scrollbar()
+    {
+        RichEditScene scene = RichEditStandardHarness.Create(new BSize(180, 70),
+            string.Join('\n', Enumerable.Repeat("overflow", 12)));
+
+        BRenderList list = scene.Session.RenderFrame();
+
+        Assert.True(scene.Edit.HasVerticalScrollbar);
+        Assert.Contains(list.Commands.OfType<BRenderCommand.FillRoundedRect>(), c => c.Color == scene.Edit.ScrollbarTrack);
+        Assert.Contains(list.Commands.OfType<BRenderCommand.FillRoundedRect>(), c => c.Color == scene.Edit.ScrollbarThumb);
+        scene.Session.Dispose();
+    }
+
+    [Fact]
+    public void Fitting_Content_Does_Not_Draw_An_Auto_Scrollbar()
+    {
+        RichEditScene scene = RichEditStandardHarness.Create(new BSize(180, 100), "fits");
+
+        BRenderList list = scene.Session.RenderFrame();
+
+        Assert.False(scene.Edit.HasVerticalScrollbar);
+        Assert.DoesNotContain(list.Commands.OfType<BRenderCommand.FillRoundedRect>(), c => c.Color == scene.Edit.ScrollbarThumb);
+        scene.Session.Dispose();
+    }
+
     private static IEnumerable<BColor> StrokeColors(BRenderList list) =>
         list.Commands.OfType<BRenderCommand.StrokeRoundedRect>().Select(c => c.Color)
             .Concat(list.Commands.OfType<BRenderCommand.StrokeRect>().Select(c => c.Color));

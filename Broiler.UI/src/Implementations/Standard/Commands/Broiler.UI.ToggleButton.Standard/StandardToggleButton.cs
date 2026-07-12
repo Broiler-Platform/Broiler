@@ -135,6 +135,7 @@ public sealed class StandardToggleButton : UiToggleButton, IStandardThemedContro
         {
             bool shouldClick = _isPressed && Bounds.Contains(input.Position);
             _isPressed = false;
+            _isHovering = Bounds.Contains(input.Position);
             Session?.ReleaseInputCapture(this);
             Invalidate(UiInvalidationKind.Render);
             if (shouldClick)
@@ -191,14 +192,15 @@ public sealed class StandardToggleButton : UiToggleButton, IStandardThemedContro
             return StandardControlPaint.SurfaceDisabled;
         if (_isPressed)
             return PressedBackground;
-        if (_isHovering)
-            return HoverBackground;
-        return ToggleState switch
+        BColor toggledBackground = ToggleState switch
         {
             UiToggleState.On => CheckedBackground,
             UiToggleState.Indeterminate => IndeterminateBackground,
             _ => Background,
         };
+        return ToggleState == UiToggleState.Off && _isHovering
+            ? HoverBackground
+            : toggledBackground;
     }
 
     private static bool IsKey(UiInputEvent input, int nativeKeyCode, string name) =>

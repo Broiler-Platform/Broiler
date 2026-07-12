@@ -13,6 +13,9 @@ approximated constructs. There is no hidden global codec registration.
 
 - `Broiler.Documents.Model` - platform-neutral rich-text document model,
   promoted out of `Broiler.UI.RichEdit`; depends only on `Broiler.Graphics`.
+- `Broiler.Documents.FormatCodes` - deterministic, versioned Formatting Codes
+  projection, typed tokens, source mappings, diagnostics, and resource policy;
+  references only `Broiler.Documents.Model`.
 - `Broiler.Documents` - codec contract, catalog, descriptors, source hints,
   read/write options, limits, diagnostics, and probe results.
 - `Broiler.Documents.Rtf` - RTF reader/writer for the documented first-release
@@ -45,6 +48,7 @@ Matching headless test projects live beside each runtime project.
 - [DOCX conformance](docs/docx-conformance.md)
 - [HTML conformance](docs/html-conformance.md)
 - [Markdown conformance](docs/markdown-conformance.md)
+- [Formatting Codes grammar version 1](Broiler.Documents.FormatCodes/GRAMMAR.md)
 
 ## Records
 
@@ -55,3 +59,4 @@ Matching headless test projects live beside each runtime project.
   - [ADR 0003: Codec Contract And Signature Probe](docs/adr/0003-codec-contract-and-signature-probe.md)
   - [ADR 0004: Document Read Limits And RTF Sanitization Policy](docs/adr/0004-document-read-limits-and-rtf-sanitization.md)
   - [ADR 0005: RTF First-Release Subset And Text Encoding](docs/adr/0005-rtf-first-release-subset-and-text-encoding.md)
+  - [ADR 0006: Formatting Codes Projection And Grammar](docs/adr/0006-formatting-codes-projection-and-grammar.md)

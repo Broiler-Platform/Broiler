@@ -1,0 +1,108 @@
+name: Browser WebAssembly Phase 2 Presenter
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-wasm-phase2.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Media/**'
+      - 'Broiler.UI/samples/WebAssembly/**'
+      - 'tests/browser-wasm-phase2/**'
+      - 'docs/roadmap/browser-webassembly-graphics-ui-roadmap.md'
+      - 'docs/roadmap/browser-webassembly-phase2/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/browser-wasm-phase2.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Media/**'
+      - 'Broiler.UI/samples/WebAssembly/**'
+      - 'tests/browser-wasm-phase2/**'
+      - 'docs/roadmap/browser-webassembly-graphics-ui-roadmap.md'
+      - 'docs/roadmap/browser-webassembly-phase2/**'
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DEMO_PROJECT: Broiler.UI/samples/WebAssembly/Broiler.UI.WebAssembly.Demo/Broiler.UI.WebAssembly.Demo.csproj
+
+jobs:
+  phase2:
+    name: Publish and execute persistent CPU presenter
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tests/browser-wasm-phase2/package-lock.json
+
+      - name: Install WebAssembly and browser test dependencies
+        run: |
+          dotnet workload install wasm-tools
+          npm ci --prefix tests/browser-wasm-phase2
+          npm exec --prefix tests/browser-wasm-phase2 -- playwright install --with-deps chromium firefox
+
+      - name: Build presenter
+        run: dotnet build "$DEMO_PROJECT" --configuration Release
+
+      - name: Publish trimmed and AOT modes
+        run: |
+          dotnet publish "$DEMO_PROJECT" --configuration Release \
+            -p:PublishTrimmed=true -p:RunAOTCompilation=false \
+            --output "$RUNNER_TEMP/phase2/trimmed"
+          dotnet publish "$DEMO_PROJECT" --configuration Release \
+            -p:PublishTrimmed=true -p:RunAOTCompilation=true \
+            --output "$RUNNER_TEMP/phase2/aot"
+
+      - name: Reject platform-specific Broiler assets and record payloads
+        shell: bash
+        run: |
+          report="$RUNNER_TEMP/phase2/payloads.txt"
+          for mode in trimmed aot; do
+            output="$RUNNER_TEMP/phase2/$mode/wwwroot"
+            test -d "$output"
+            if find "$output" -type f -printf '%f\n' | grep -E 'Broiler.*(\.Windows|\.Linux|Direct2D|OpenGL|Vulkan)'; then
+              echo "Platform-specific Broiler asset found in $mode publish." >&2
+              exit 1
+            fi
+            total_bytes=$(find "$output" -type f -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+            brotli_bytes=$(find "$output" -type f -name '*.br' -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+            echo "$mode wwwroot_bytes=$total_bytes brotli_bytes=$brotli_bytes" | tee -a "$report"
+          done
+
+      - name: Execute AOT presenter in Chromium and Firefox
+        shell: bash
+        env:
+          BROILER_PHASE2_URL: http://127.0.0.1:8767/
+          BROILER_PHASE2_EVIDENCE: artifacts/browser-wasm-phase2/browser-evidence
+        run: |
+          python3 -m http.server 8767 --bind 127.0.0.1 \
+            --directory "$RUNNER_TEMP/phase2/aot/wwwroot" &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          npm --prefix tests/browser-wasm-phase2 run smoke
+
+      - name: Upload Phase 2 evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: broiler-wasm-phase2-evidence
+          path: |
+            artifacts/browser-wasm-phase2/browser-evidence
+            ${{ runner.temp }}/phase2/payloads.txt
+          if-no-files-found: error

@@ -20,9 +20,11 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\Abstractions\Text\Broiler.UI.RichEdit\Broiler.UI.RichEdit.csproj" />
-    <ProjectReference Include="..\..\..\..\..\Broiler.Documents\Broiler.Documents\Broiler.Documents.csproj" />
-    <ProjectReference Include="..\..\..\..\..\Broiler.Documents\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" />
-    <ProjectReference Include="..\..\..\..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
+    <!-- Resolve cross-component edges here so this project's references remain
+         stable when consumed transitively by the Broiler.UI.All meta-project. -->
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\..\..\..\..\Broiler.Documents\Broiler.Documents\Broiler.Documents.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\..\..\..\..\Broiler.Documents\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\..\..\..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
   </ItemGroup>
 
   <ItemGroup>
