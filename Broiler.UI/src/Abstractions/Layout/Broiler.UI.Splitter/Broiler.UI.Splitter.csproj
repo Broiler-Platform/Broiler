@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.Splitter</RootNamespace>
+    <AssemblyName>Broiler.UI.Splitter</AssemblyName>
+    <PackageId>Broiler.UI.Splitter</PackageId>
+    <Description>Platform-neutral keyboard-operable splitter abstraction.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Foundation\Broiler.UI\Broiler.UI.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.UI.Splitter.Standard" />
+    <InternalsVisibleTo Include="Broiler.UI.Splitter.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -35,6 +35,26 @@ public sealed class UiRichEditCommandTests
     }
 
     [Fact]
+    public void Bold_Command_Toggles_A_Right_To_Left_Selection_Twice()
+    {
+        var edit = new FakeRichEdit();
+        edit.ExecuteCommand(RichEditCommand.InsertText, "Hello");
+        edit.Selection = new RichTextRange(Doc.Pos(0, 5), Doc.Pos(0, 0));
+
+        edit.ExecuteCommand(RichEditCommand.Bold);
+
+        Assert.True(edit.Document.Paragraphs[0].Runs[0].Style.Bold);
+        Assert.True(edit.GetCommandState(RichEditCommand.Bold).IsToggled);
+
+        edit.ExecuteCommand(RichEditCommand.Bold);
+
+        Assert.False(edit.Document.Paragraphs[0].Runs[0].Style.Bold);
+        Assert.False(edit.GetCommandState(RichEditCommand.Bold).IsToggled);
+        Assert.Equal(Doc.Pos(0, 5), edit.Selection.Anchor);
+        Assert.Equal(Doc.Pos(0, 0), edit.Selection.Focus);
+    }
+
+    [Fact]
     public void Font_Commands_Apply_Family_Size_And_Font_Style()
     {
         var edit = new FakeRichEdit();

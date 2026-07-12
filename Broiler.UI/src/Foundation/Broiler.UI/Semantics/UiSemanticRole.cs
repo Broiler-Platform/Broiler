@@ -23,4 +23,6 @@ public enum UiSemanticRole
     Dialog,
     Toolbar,
     RichEdit,
+    FormatCodeView,
+    Splitter,
 }

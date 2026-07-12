@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.FormatCodeView.Standard</RootNamespace>
+    <AssemblyName>Broiler.UI.FormatCodeView.Standard</AssemblyName>
+    <PackageId>Broiler.UI.FormatCodeView.Standard</PackageId>
+    <Description>Standard virtualized read-only Formatting Codes view.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\Broiler.Documents\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj" />
+    <ProjectReference Include="..\..\..\..\Abstractions\Text\Broiler.UI.FormatCodeView\Broiler.UI.FormatCodeView.csproj" />
+    <ProjectReference Include="..\..\..\..\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

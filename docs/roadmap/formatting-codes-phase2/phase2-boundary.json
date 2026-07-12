@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "phase": 2,
+  "status": "complete",
+  "completedOn": "2026-07-12",
+  "assemblies": [
+    {
+      "name": "Broiler.UI.FormatCodeView",
+      "role": "platform-neutral read-only control abstraction",
+      "projectDependencies": [
+        "Broiler.Documents.FormatCodes",
+        "Broiler.UI",
+        "Broiler.Graphics"
+      ],
+      "forbiddenDependencies": ["Broiler.UI.Standard", "DOM", "codec", "platform"]
+    },
+    {
+      "name": "Broiler.UI.FormatCodeView.Standard",
+      "role": "virtualized render-list, layout, input, scrolling, and theme implementation",
+      "projectDependencies": [
+        "Broiler.Documents.FormatCodes",
+        "Broiler.UI.FormatCodeView",
+        "Broiler.UI.Standard",
+        "Broiler.Graphics"
+      ],
+      "forbiddenDependencies": ["DOM", "codec", "native UI", "platform"]
+    },
+    {
+      "name": "Broiler.UI.Splitter",
+      "role": "platform-neutral normalized splitter abstraction",
+      "projectDependencies": ["Broiler.UI", "Broiler.Graphics"]
+    },
+    {
+      "name": "Broiler.UI.Splitter.Standard",
+      "role": "keyboard and pointer splitter grip",
+      "projectDependencies": ["Broiler.UI.Splitter", "Broiler.UI.Standard", "Broiler.Graphics"]
+    }
+  ],
+  "invariants": {
+    "readOnly": true,
+    "parsesVisibleBracketText": false,
+    "documentMutationApi": false,
+    "oneChildPerToken": false,
+    "canonicalCopyOnly": true,
+    "pendingTokensExcludedFromCanonicalCopy": true,
+    "typedSourceMappings": true,
+    "desktopAndWebAssemblyShared": true
+  },
+  "verifiedTests": {
+    "phase2Focused": 24,
+    "uiSolution": 226,
+    "documentsSolution": 256,
+    "richEditRtfIntegration": 6,
+    "total": 488,
+    "failed": 0
+  }
+}

@@ -9,6 +9,7 @@ public sealed class UiSession : IDisposable
     private readonly List<UiElement> _roots = [];
     private readonly List<UiInvalidation> _invalidations = [];
     private readonly List<UiElement> _modalElements = [];
+    private UiElement? _lastPointerTarget;
     private bool _isDisposed;
 
     public UiSession(IUiHost host, IUiDispatcher dispatcher, IUiClock clock, UiFactorySet? factories = null)
@@ -67,6 +68,8 @@ public sealed class UiSession : IDisposable
             FocusedElement = null;
         if (CapturedElement is not null && (ReferenceEquals(CapturedElement, root) || CapturedElement.IsDescendantOf(root)))
             CapturedElement = null;
+        if (_lastPointerTarget is not null && (ReferenceEquals(_lastPointerTarget, root) || _lastPointerTarget.IsDescendantOf(root)))
+            _lastPointerTarget = null;
         RemoveModalElements(root);
 
         root.DetachFromSession();
@@ -183,20 +186,14 @@ public sealed class UiSession : IDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(input);
 
+        if (input.Kind == UiInputEventKind.PointerMove)
+            return DispatchPointerMove(input);
+
         UiElement? target = ResolveDispatchTarget(input);
-        if (target is null)
-            return false;
+        if (input.Kind == UiInputEventKind.PointerButton)
+            _lastPointerTarget = target;
 
-        UiElement? current = target;
-        while (current is not null)
-        {
-            if (current.DispatchInput(input))
-                return true;
-
-            current = current.Parent;
-        }
-
-        return false;
+        return DispatchToTarget(input, target);
     }
 
     private UiElement? ResolveDispatchTarget(UiInputEvent input)
@@ -245,11 +242,42 @@ public sealed class UiSession : IDisposable
         FocusedElement = null;
         CapturedElement = null;
         _modalElements.Clear();
+        _lastPointerTarget = null;
         _isDisposed = true;
+    }
+
+    private bool DispatchPointerMove(UiInputEvent input)
+    {
+        UiElement? previous = _lastPointerTarget;
+        UiElement? target = ResolveDispatchTarget(input);
+        _lastPointerTarget = target;
+
+        bool handled = false;
+        if (previous is not null && !ReferenceEquals(previous, target) && previous.Session == this)
+            handled = previous.DispatchInput(input);
+
+        return DispatchToTarget(input, target) || handled;
+    }
+
+    private static bool DispatchToTarget(UiInputEvent input, UiElement? target)
+    {
+        UiElement? current = target;
+        while (current is not null)
+        {
+            if (current.DispatchInput(input))
+                return true;
+
+            current = current.Parent;
+        }
+
+        return false;
     }
 
     private static UiElement? HitTest(UiElement element, BPoint point)
     {
+        if (!element.ShouldHitTestChildren(point))
+            return null;
+
         for (int index = element.Children.Count - 1; index >= 0; index--)
         {
             UiElement child = element.Children[index];

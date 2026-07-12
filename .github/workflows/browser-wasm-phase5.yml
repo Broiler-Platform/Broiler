@@ -1,0 +1,121 @@
+name: Browser WebAssembly Phase 5 Direct-Canvas Backend
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-wasm-phase5.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/samples/WebAssembly/**'
+      - 'Broiler.UI/src/**'
+      - 'tests/browser-wasm-phase5/**'
+      - 'docs/roadmap/browser-webassembly-graphics-ui-roadmap.md'
+      - 'docs/roadmap/browser-webassembly-phase5/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/browser-wasm-phase5.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/samples/WebAssembly/**'
+      - 'Broiler.UI/src/**'
+      - 'tests/browser-wasm-phase5/**'
+      - 'docs/roadmap/browser-webassembly-graphics-ui-roadmap.md'
+      - 'docs/roadmap/browser-webassembly-phase5/**'
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DEMO_PROJECT: Broiler.UI/samples/WebAssembly/Broiler.UI.WebAssembly.Demo/Broiler.UI.WebAssembly.Demo.csproj
+  BACKEND_TESTS: Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj
+
+jobs:
+  phase5:
+    name: Direct-Canvas backend conformance, publish, and browser replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tests/browser-wasm-phase5/package-lock.json
+
+      - name: Install WebAssembly and browser test dependencies
+        run: |
+          dotnet workload install wasm-tools
+          npm ci --prefix tests/browser-wasm-phase5
+          npm exec --prefix tests/browser-wasm-phase5 -- playwright install --with-deps chromium firefox
+
+      - name: Run headless backend conformance suite (CPU oracle)
+        run: dotnet run --project "$BACKEND_TESTS" --configuration Release
+
+      - name: Build the backend for the browser-wasm runtime
+        run: dotnet build Broiler.Graphics/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj --configuration Release -r browser-wasm
+
+      - name: Build UI host
+        run: dotnet build "$DEMO_PROJECT" --configuration Release
+
+      - name: Publish trimmed and AOT modes
+        run: |
+          dotnet publish "$DEMO_PROJECT" --configuration Release \
+            -p:PublishTrimmed=true -p:RunAOTCompilation=false \
+            --output "$RUNNER_TEMP/phase5/trimmed"
+          dotnet publish "$DEMO_PROJECT" --configuration Release \
+            -p:PublishTrimmed=true -p:RunAOTCompilation=true \
+            --output "$RUNNER_TEMP/phase5/aot"
+
+      - name: Reject platform-specific Broiler assets and confirm replay module
+        shell: bash
+        run: |
+          report="$RUNNER_TEMP/phase5/payloads.txt"
+          for mode in trimmed aot; do
+            output="$RUNNER_TEMP/phase5/$mode/wwwroot"
+            test -d "$output"
+            if find "$output" -type f -printf '%f\n' | grep -E 'Broiler.*(\.Windows|\.Linux|Direct2D|OpenGL|Vulkan)'; then
+              echo "Platform-specific Broiler asset found in $mode publish." >&2
+              exit 1
+            fi
+            if [ ! -f "$output/broiler.graphics.webassembly.js" ]; then
+              echo "Direct-Canvas replay module missing from $mode publish." >&2
+              exit 1
+            fi
+            total_bytes=$(find "$output" -type f -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+            brotli_bytes=$(find "$output" -type f -name '*.br' -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+            echo "$mode wwwroot_bytes=$total_bytes brotli_bytes=$brotli_bytes" | tee -a "$report"
+          done
+
+      - name: Execute AOT direct-Canvas host in Chromium and Firefox
+        shell: bash
+        env:
+          BROILER_PHASE5_URL: http://127.0.0.1:8770/
+          BROILER_PHASE5_EVIDENCE: artifacts/browser-wasm-phase5/browser-evidence
+        run: |
+          python3 -m http.server 8770 --bind 127.0.0.1 \
+            --directory "$RUNNER_TEMP/phase5/aot/wwwroot" &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          npm --prefix tests/browser-wasm-phase5 run smoke
+
+      - name: Upload Phase 5 evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: broiler-wasm-phase5-evidence
+          path: |
+            artifacts/browser-wasm-phase5/browser-evidence
+            ${{ runner.temp }}/phase5/payloads.txt
+          if-no-files-found: error

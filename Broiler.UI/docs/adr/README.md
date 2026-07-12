@@ -8,6 +8,8 @@ family. ADR 0018 records the RichEdit document-model promotion for the
 `Broiler.Documents` component (`docs/roadmap/broiler-documents-component.md`),
 superseding the model *placement* in ADRs 0013 and 0014. ADR 0019 records the
 approved filesystem taxonomy for the Broiler.UI directory-structure refactor.
+ADR 0020 freezes the control-family and Writer-integration decisions for the
+public Formatting Codes roadmap.
 All are approved for their respective Phase 1 scaffolding and may be superseded
 only by later ADRs.
 
@@ -32,3 +34,4 @@ only by later ADRs.
 | [0017](0017-richedit-accessibility-semantics.md) | RichEdit accessibility semantics |
 | [0018](0018-richedit-document-model-promotion.md) | RichEdit document model promotion (to `Broiler.Documents.Model`) |
 | [0019](0019-directory-structure-topology.md) | Directory structure topology |
+| [0020](0020-formatting-code-view-and-writer-integration.md) | Formatting Code view and Writer integration |

@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "width": 320,
+  "height": 180,
+  "pixelFormat": "straight-alpha-rgba8",
+  "textIncluded": false,
+  "commands": [
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 180
+      },
+      "color": "#F7F9FCFF"
+    },
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 12,
+        "y": 12,
+        "width": 296,
+        "height": 28
+      },
+      "color": "#16324FFF"
+    },
+    {
+      "kind": "strokeRect",
+      "rect": {
+        "x": 12,
+        "y": 12,
+        "width": 296,
+        "height": 156
+      },
+      "color": "#6B7C93FF",
+      "thickness": 2
+    },
+    {
+      "kind": "fillRoundedRect",
+      "rect": {
+        "x": 28,
+        "y": 58,
+        "width": 92,
+        "height": 54
+      },
+      "color": "#DBEAFEFF",
+      "radiusX": 10,
+      "radiusY": 10
+    },
+    {
+      "kind": "strokeRoundedRect",
+      "rect": {
+        "x": 28,
+        "y": 58,
+        "width": 92,
+        "height": 54
+      },
+      "color": "#166FB7FF",
+      "radiusX": 10,
+      "radiusY": 10,
+      "thickness": 2
+    },
+    {
+      "kind": "pushClip",
+      "rect": {
+        "x": 142,
+        "y": 52,
+        "width": 116,
+        "height": 72
+      }
+    },
+    {
+      "kind": "pushTransform",
+      "matrix": {
+        "m11": 1,
+        "m12": 0,
+        "m21": 0,
+        "m22": 1,
+        "m31": 12,
+        "m32": 8
+      }
+    },
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 124,
+        "y": 62,
+        "width": 116,
+        "height": 48
+      },
+      "color": "#F9731699"
+    },
+    {
+      "kind": "popClip"
+    },
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 252,
+        "y": 54,
+        "width": 34,
+        "height": 34
+      },
+      "color": "#16A34AFF"
+    },
+    {
+      "kind": "popTransform"
+    },
+    {
+      "kind": "drawImage",
+      "resource": "checker-2x2",
+      "source": {
+        "x": 0,
+        "y": 0,
+        "width": 2,
+        "height": 2
+      },
+      "destination": {
+        "x": 274,
+        "y": 124,
+        "width": 24,
+        "height": 24
+      },
+      "opacity": 0.85
+    },
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 28,
+        "y": 132,
+        "width": 216,
+        "height": 14
+      },
+      "color": "#CBD5E1FF"
+    },
+    {
+      "kind": "fillRect",
+      "rect": {
+        "x": 28,
+        "y": 132,
+        "width": 132,
+        "height": 14
+      },
+      "color": "#2563EBFF"
+    }
+  ]
+}

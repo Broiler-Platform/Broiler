@@ -118,6 +118,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Abstractions/Layout/">
+    <Project Path="src/Abstractions/Layout/Broiler.UI.Splitter/Broiler.UI.Splitter.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Abstractions/Layout/Broiler.UI.Panel/Broiler.UI.Panel.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -216,6 +222,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Abstractions/Text/">
+    <Project Path="src/Abstractions/Text/Broiler.UI.FormatCodeView/Broiler.UI.FormatCodeView.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Abstractions/Text/Broiler.UI.Edit/Broiler.UI.Edit.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -262,6 +274,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Implementations/Standard/Layout/">
+    <Project Path="src/Implementations/Standard/Layout/Broiler.UI.Splitter.Standard/Broiler.UI.Splitter.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Implementations/Standard/Layout/Broiler.UI.Panel.Standard/Broiler.UI.Panel.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -360,6 +378,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Implementations/Standard/Text/">
+    <Project Path="src/Implementations/Standard/Text/Broiler.UI.FormatCodeView.Standard/Broiler.UI.FormatCodeView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Implementations/Standard/Text/Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -417,6 +441,14 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/tests/Layout/">
+    <Project Path="tests/Layout/Broiler.UI.Splitter.Tests/Broiler.UI.Splitter.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
   <Folder Name="/tests/Commands/">
     <Project Path="tests/Commands/Broiler.UI.Toolbar.Tests/Broiler.UI.Toolbar.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -426,6 +458,18 @@
     </Project>
   </Folder>
   <Folder Name="/tests/Text/">
+    <Project Path="tests/Text/Broiler.UI.FormatCodeView.Tests/Broiler.UI.FormatCodeView.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="tests/Text/Broiler.UI.FormatCodeView.Standard.Tests/Broiler.UI.FormatCodeView.Standard.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="tests/Text/Broiler.UI.RichEdit.Tests/Broiler.UI.RichEdit.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />

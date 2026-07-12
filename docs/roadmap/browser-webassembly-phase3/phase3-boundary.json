@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "phase": "browser-webassembly-3",
+  "status": "local-complete-cross-browser-ci-pending",
+  "date": "2026-07-11",
+  "coreChanges": [],
+  "hostOwner": "Broiler.UI.WebAssembly.Demo application host",
+  "implementedPorts": [
+    "IUiHost",
+    "IUiTextInputHost",
+    "IUiCursorHost",
+    "IUiSystemSettingsHost",
+    "IUiDispatcher",
+    "IUiClock"
+  ],
+  "selectedControls": [
+    "Window",
+    "Panel",
+    "Label",
+    "Button",
+    "Edit",
+    "Slider",
+    "ScrollView",
+    "ListView",
+    "Menu",
+    "ImageView"
+  ],
+  "tooltipDecision": "deferred-no-primary-phase3-workflow",
+  "input": {
+    "pointer": ["move", "down", "up", "wheel", "cancel-cleanup", "dom-capture"],
+    "keyboard": ["down", "up", "modifiers", "canonical-name", "neutral-repeat", "neutral-location"],
+    "text": "basic-committed-text-only",
+    "compositionIme": false,
+    "clipboard": false
+  },
+  "localChromium": {
+    "initialRafCallbacks": 1,
+    "initialScheduleRequests": 7,
+    "initialCoalescedRequests": 6,
+    "idleFrames": 0,
+    "recursiveFrames": 0,
+    "buttonClicks": 1,
+    "editText": "WASM-Browser",
+    "sliderKeyboardBefore": 35,
+    "sliderKeyboardAfter": 36,
+    "scrollBefore": 0,
+    "scrollAfter": 24,
+    "listSelection": "panel",
+    "menuInvocations": 1
+  },
+  "graphicsDecision": "no-phase3-core-change; phase2-direct-canvas-gate-remains-phase5",
+  "remainingGate": "successful committed CI run in Chromium and Firefox"
+}

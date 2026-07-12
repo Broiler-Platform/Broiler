@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../Broiler.Graphics/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj" />
+  <Project Path="Broiler.Writer.WebAssembly.csproj" />
+</Solution>

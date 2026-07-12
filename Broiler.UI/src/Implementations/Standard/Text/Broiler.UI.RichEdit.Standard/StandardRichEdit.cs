@@ -43,6 +43,8 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     private BPoint _lastClickPosition;
     private bool _hasClicked;
     private string _compositionText = string.Empty;
+    private bool _isDraggingScrollbar;
+    private double _scrollbarDragOffset;
 
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
@@ -57,6 +59,14 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     public BColor SelectionBackground { get; set; } = BColor.FromArgb(0xFF, 0xC7, 0xDD, 0xFA);
 
     public BColor CaretColor { get; set; } = BColor.Black;
+
+    public BColor ScrollbarTrack { get; set; } = BColor.FromArgb(0x33, 0x94, 0xA3, 0xB8);
+
+    public BColor ScrollbarThumb { get; set; } = BColor.FromArgb(0xAA, 0x7D, 0x8D, 0xA3);
+
+    public double ScrollbarThickness { get; set; } = 12;
+
+    public double MinimumScrollbarThumbLength { get; set; } = 18;
 
     public BFontStyle Font { get; set; } = BFontStyle.Default;
 
@@ -105,6 +115,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
         DrawCaret(renderList, focused);
         renderList.PopClip();
+        DrawScrollbar(renderList);
         PublishCaret(focused);
     }
 
@@ -134,6 +145,17 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     }
 
     // --- Rendering ---------------------------------------------------------
+
+    private void DrawScrollbar(BRenderList renderList)
+    {
+        if (!HasVerticalScrollbar)
+            return;
+
+        BRect track = ScrollbarTrackBounds;
+        BRect thumb = ScrollbarThumbBounds;
+        StandardControlPaint.FillRounded(renderList, track, ScrollbarTrack, StandardControlPaint.PillRadius);
+        StandardControlPaint.FillRounded(renderList, thumb, ScrollbarThumb, StandardControlPaint.PillRadius);
+    }
 
     private void DrawSelection(BRenderList renderList, BRect inner)
     {
@@ -348,6 +370,9 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         {
             Session?.SetFocus(this);
             Session?.CaptureInput(this);
+            if (TryBeginScrollbarInteraction(input.Position))
+                return true;
+
             RichTextPosition position = PositionFromPoint(input.Position);
             if (IsDoubleClick(input.Position))
             {
@@ -365,6 +390,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
         if (input.MouseButtonTransition == MouseButtonTransition.Up)
         {
+            _isDraggingScrollbar = false;
             Session?.ReleaseInputCapture(this);
             return true;
         }
@@ -377,6 +403,12 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         if (Session?.CapturedElement != this)
             return false;
 
+        if (_isDraggingScrollbar)
+        {
+            DragScrollbar(input.Position.Y);
+            return true;
+        }
+
         RichTextPosition position = PositionFromPoint(input.Position);
         Selection = new RichTextRange(Selection.Anchor, position);
         EnsureCaretVisible();
@@ -385,6 +417,9 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private bool HandleWheel(UiInputEvent input)
     {
+        if (VerticalScrollPolicy == RichEditScrollPolicy.Never)
+            return false;
+
         double newScroll = ClampScroll(_scrollY - input.WheelDeltaNotches * DefaultLineHeight * 3);
         if (newScroll == _scrollY)
             return false;
@@ -392,6 +427,48 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         _scrollY = newScroll;
         Invalidate(UiInvalidationKind.Render);
         return true;
+    }
+
+    private bool TryBeginScrollbarInteraction(BPoint position)
+    {
+        if (!HasVerticalScrollbar || !ScrollbarTrackBounds.Contains(position))
+            return false;
+
+        BRect thumb = ScrollbarThumbBounds;
+        if (thumb.Contains(position))
+        {
+            _isDraggingScrollbar = true;
+            _scrollbarDragOffset = position.Y - thumb.Top;
+        }
+        else
+        {
+            double page = ContentHeight * 0.85;
+            SetVerticalScroll(_scrollY + (position.Y < thumb.Top ? -page : page));
+        }
+
+        return true;
+    }
+
+    private void DragScrollbar(double pointerY)
+    {
+        BRect track = ScrollbarTrackBounds;
+        BRect thumb = ScrollbarThumbBounds;
+        double travel = track.Height - thumb.Height;
+        if (travel <= 0)
+            return;
+
+        double normalized = (pointerY - _scrollbarDragOffset - track.Top) / travel;
+        SetVerticalScroll(Math.Clamp(normalized, 0, 1) * MaxScroll);
+    }
+
+    private void SetVerticalScroll(double value)
+    {
+        double newScroll = ClampScroll(value);
+        if (newScroll == _scrollY)
+            return;
+
+        _scrollY = newScroll;
+        Invalidate(UiInvalidationKind.Render);
     }
 
     private bool HandleKeyboard(UiInputEvent input)
@@ -782,7 +859,40 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private double ContentHeight => Math.Max(0, Bounds.Height - (PaddingY * 2));
 
-    private double MaxScroll => Math.Max(0, _contentHeight - ContentHeight);
+    public bool HasVerticalScrollbar => VerticalScrollPolicy == RichEditScrollPolicy.Always ||
+                                        (VerticalScrollPolicy == RichEditScrollPolicy.Auto && MaxScroll > 0);
+
+    private double MaxScroll => VerticalScrollPolicy == RichEditScrollPolicy.Never
+        ? 0
+        : Math.Max(0, _contentHeight - ContentHeight);
+
+    private BRect ScrollbarTrackBounds
+    {
+        get
+        {
+            double thickness = Math.Clamp(ScrollbarThickness, 0, InnerBounds.Width);
+            return new BRect(InnerBounds.Right - thickness, InnerBounds.Top, thickness, InnerBounds.Height);
+        }
+    }
+
+    private BRect ScrollbarThumbBounds
+    {
+        get
+        {
+            BRect track = ScrollbarTrackBounds;
+            if (track.Height <= 0)
+                return BRect.Empty;
+
+            double thumbHeight = MaxScroll <= 0
+                ? track.Height
+                : Math.Clamp(track.Height * (ContentHeight / Math.Max(ContentHeight, _contentHeight)),
+                    Math.Min(MinimumScrollbarThumbLength, track.Height), track.Height);
+            double top = track.Top;
+            if (MaxScroll > 0)
+                top += (track.Height - thumbHeight) * (_scrollY / MaxScroll);
+            return new BRect(track.Left, top, track.Width, thumbHeight);
+        }
+    }
 
     private double ClampScroll(double value) => Math.Clamp(value, 0, MaxScroll);
 

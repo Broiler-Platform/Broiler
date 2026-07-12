@@ -20,6 +20,12 @@
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
+    <Project Path="Broiler.Documents.FormatCodes/Broiler.Documents.FormatCodes.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="Broiler.Documents.Rtf/Broiler.Documents.Rtf.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -53,6 +59,12 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
     <Project Path="Broiler.Documents.Model.Tests/Broiler.Documents.Model.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.Documents.FormatCodes.Tests/Broiler.Documents.FormatCodes.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />

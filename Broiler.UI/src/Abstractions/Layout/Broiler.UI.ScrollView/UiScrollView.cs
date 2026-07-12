@@ -11,6 +11,8 @@ public abstract class UiScrollView : UiElement
     private BSize _preferredSize = new(160, 120);
     private double _lineScrollAmount = 32;
     private double _pageScrollFraction = 0.85;
+    private UiScrollBarVisibility _horizontalScrollBarVisibility = UiScrollBarVisibility.Auto;
+    private UiScrollBarVisibility _verticalScrollBarVisibility = UiScrollBarVisibility.Auto;
 
     public event EventHandler<UiScrollOffsetChangedEventArgs>? OffsetChanged;
 
@@ -88,6 +90,36 @@ public abstract class UiScrollView : UiElement
         }
     }
 
+    public UiScrollBarVisibility HorizontalScrollBarVisibility
+    {
+        get => _horizontalScrollBarVisibility;
+        set
+        {
+            ThrowIfDisposed();
+            ValidateScrollBarVisibility(value, nameof(value));
+            if (_horizontalScrollBarVisibility == value)
+                return;
+
+            _horizontalScrollBarVisibility = value;
+            Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        }
+    }
+
+    public UiScrollBarVisibility VerticalScrollBarVisibility
+    {
+        get => _verticalScrollBarVisibility;
+        set
+        {
+            ThrowIfDisposed();
+            ValidateScrollBarVisibility(value, nameof(value));
+            if (_verticalScrollBarVisibility == value)
+                return;
+
+            _verticalScrollBarVisibility = value;
+            Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        }
+    }
+
     public bool SetOffset(BPoint offset)
     {
         ThrowIfDisposed();
@@ -143,5 +175,11 @@ public abstract class UiScrollView : UiElement
         if (double.IsPositiveInfinity(value))
             return double.MaxValue;
         return value;
+    }
+
+    private static void ValidateScrollBarVisibility(UiScrollBarVisibility value, string parameterName)
+    {
+        if (value is not UiScrollBarVisibility.Auto and not UiScrollBarVisibility.Visible and not UiScrollBarVisibility.Hidden)
+            throw new ArgumentOutOfRangeException(parameterName);
     }
 }

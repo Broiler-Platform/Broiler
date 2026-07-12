@@ -18,6 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Implementations\Standard\Commands\Broiler.UI.Toolbar.Standard\Broiler.UI.Toolbar.Standard.csproj" />
     <ProjectReference Include="..\..\..\src\Implementations\Standard\Commands\Broiler.UI.Button.Standard\Broiler.UI.Button.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Implementations\Standard\Commands\Broiler.UI.ToggleButton.Standard\Broiler.UI.ToggleButton.Standard.csproj" />
+    <ProjectReference Include="..\..\..\src\Abstractions\Commands\Broiler.UI.ToggleButton\Broiler.UI.ToggleButton.csproj" />
     <ProjectReference Include="..\..\..\src\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj" />
   </ItemGroup>
 

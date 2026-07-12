@@ -1463,7 +1463,6 @@ internal sealed class Win32DemoWindow : Direct2DWindow
             CameraPixelFormat.Gray8 => ConvertGray8(frame),
             CameraPixelFormat.Nv12 => ConvertNv12(frame),
             CameraPixelFormat.Yuy2 => ConvertYuy2(frame),
-            CameraPixelFormat.Mjpeg => BImageCodec.Decode(frame.Memory.Span),
             _ => throw new NotSupportedException("Camera preview does not support " + format.PixelFormat + " frames."),
         };
     }

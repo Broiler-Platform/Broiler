@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Broiler.UI WebAssembly Demo</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif;
+            --page-bg: #eef3f8;
+            --page-fg: #16324f;
+            --muted-fg: #52677e;
+            --host-bg: #d8e1eb;
+            --status-bg: #dbeafe;
+            --status-fg: #1d4ed8;
+            --border: #cbd5e1;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --page-bg: #0d1520;
+                --page-fg: #e6edf5;
+                --muted-fg: #93a4b8;
+                --host-bg: #16202e;
+                --status-bg: #1e2f4a;
+                --status-fg: #93c5fd;
+                --border: #2b3a4d;
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; padding: 24px 18px 40px; background: var(--page-bg); color: var(--page-fg); }
+        main { width: min(1500px, 100%); margin: 0 auto; }
+        h1 { margin: 0 0 6px; font-size: clamp(1.7rem, 4vw, 2.4rem); letter-spacing: -.03em; }
+        .lede { margin: 0 0 18px; color: var(--muted-fg); max-width: 70ch; }
+        .hint { margin: 0 0 18px; color: var(--muted-fg); font-size: .9rem; }
+        .hint kbd { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--host-bg); }
+        #gallery-status {
+            display: inline-flex; align-items: center; min-height: 34px; margin: 0 0 16px;
+            padding: 7px 14px; border-radius: 999px; font-weight: 600;
+            background: var(--status-bg); color: var(--status-fg);
+        }
+        #gallery-status[data-state="failed"] { background: #fee2e2; color: #991b1b; }
+        #gallery-host {
+            position: relative; width: 100%; height: min(860px, calc(100vh - 220px)); min-height: 480px;
+            overflow: hidden; border-radius: 14px; border: 1px solid var(--border);
+            background: var(--host-bg); box-shadow: 0 14px 34px rgba(15, 30, 50, .12);
+        }
+        #gallery-canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+        #gallery-canvas:focus-visible { box-shadow: inset 0 0 0 3px rgba(37, 99, 235, .45); }
+        /* A single hidden native editor funnels keyboard, IME composition, and trusted clipboard
+           events to the managed edit that currently holds focus. */
+        #gallery-text-input {
+            position: absolute; z-index: -1; opacity: .01; border: 0; padding: 0; margin: 0;
+            resize: none; overflow: hidden; color: transparent; background: transparent;
+            caret-color: transparent; white-space: pre; pointer-events: none;
+        }
+        #error-panel { margin-top: 16px; padding: 14px 16px; border-radius: 12px; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; }
+        #error { white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Broiler.UI in WebAssembly</h1>
+    <p class="lede">
+        The same Standard control gallery as the Win32 sample — window, panel, toolbar, label,
+        button, edit, check box, radio button, toggle button, slider, progress bar, image view,
+        combo box, list view, tab view, scroll view, tooltip, dialog, and menu — hosted on the real
+        managed <code>UiSession</code> and presented through the Phase&nbsp;5 direct-Canvas&nbsp;2D backend.
+    </p>
+    <p class="hint">
+        Scroll the gallery, open the menu and combo box, drag the slider, edit text and press
+        <kbd>Enter</kbd>, launch the dialog, and press <kbd>Ctrl</kbd>+<kbd>D</kbd> to toggle light/dark.
+    </p>
+    <div id="gallery-status" role="status">Loading the Broiler.UI gallery…</div>
+
+    <div id="gallery-host">
+        <canvas id="gallery-canvas" width="1280" height="800" tabindex="0" role="application"
+                aria-label="Broiler.UI WebAssembly control gallery"></canvas>
+        <textarea id="gallery-text-input" aria-label="Text editor" autocomplete="off"
+                  autocapitalize="off" spellcheck="false"></textarea>
+    </div>
+
+    <div id="error-panel" hidden>
+        <strong>Managed failure</strong>
+        <div id="error"></div>
+    </div>
+</main>
+<script type="importmap"></script>
+<script type="module" src="main#[.{fingerprint}].js"></script>
+</body>
+</html>

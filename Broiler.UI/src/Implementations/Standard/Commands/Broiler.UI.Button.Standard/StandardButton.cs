@@ -141,6 +141,7 @@ public sealed class StandardButton : UiButton, IStandardThemedControl
         {
             bool shouldClick = _isPressed && Bounds.Contains(input.Position);
             _isPressed = false;
+            _isHovering = Bounds.Contains(input.Position);
             Session?.ReleaseInputCapture(this);
             Invalidate(UiInvalidationKind.Render);
             if (shouldClick)

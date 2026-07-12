@@ -1,0 +1,133 @@
+name: Browser WebAssembly Phase 0 Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/browser-wasm-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.Media/**'
+      - 'Broiler.Documents/Broiler.Documents.Model/**'
+      - 'Broiler.UI/**'
+      - 'tests/browser-wasm-phase0/**'
+      - 'docs/roadmap/browser-webassembly-*.md'
+      - 'docs/roadmap/browser-webassembly-phase0/**'
+      - 'docs/testing/baselines/browser-webassembly-phase0/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/browser-wasm-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.Media/**'
+      - 'Broiler.Documents/Broiler.Documents.Model/**'
+      - 'Broiler.UI/**'
+      - 'tests/browser-wasm-phase0/**'
+      - 'docs/roadmap/browser-webassembly-*.md'
+      - 'docs/roadmap/browser-webassembly-phase0/**'
+      - 'docs/testing/baselines/browser-webassembly-phase0/**'
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  CONFIGURATION: Release
+  PHASE0_PROJECT: tests/browser-wasm-phase0/Broiler.BrowserWasm.Phase0/Broiler.BrowserWasm.Phase0.csproj
+  EMPTY_PROJECT: tests/browser-wasm-phase0/Broiler.Wasm.EmptyBaseline/Broiler.Wasm.EmptyBaseline.csproj
+
+jobs:
+  browser-wasm-phase0:
+    name: Build browser RID closure and empty runtime baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install .NET WebAssembly workload
+        run: dotnet workload install wasm-tools
+
+      - name: Record toolchain
+        run: |
+          dotnet --info
+          dotnet workload list
+
+      - name: Restore exact selected T2 closure
+        run: dotnet restore "$PHASE0_PROJECT" --runtime browser-wasm
+
+      - name: Build browser-RID foundations
+        run: |
+          dotnet build Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime browser-wasm
+          dotnet build Broiler.UI/src/Foundation/Broiler.UI/Broiler.UI.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime browser-wasm
+          dotnet build Broiler.UI/src/Foundation/Broiler.UI.Standard/Broiler.UI.Standard.csproj \
+            --configuration "$CONFIGURATION" \
+            --runtime browser-wasm
+
+      - name: Build exact selected T2 closure for browser RID
+        run: |
+          dotnet build "$PHASE0_PROJECT" \
+            --configuration "$CONFIGURATION" \
+            --runtime browser-wasm \
+            --no-restore
+
+      - name: Reject desktop platform assemblies in browser closure
+        shell: bash
+        run: |
+          output="tests/browser-wasm-phase0/Broiler.BrowserWasm.Phase0/bin/$CONFIGURATION/net10.0/browser-wasm"
+          test -d "$output"
+          if find "$output" -type f -printf '%f\n' | grep -E '(\.Windows|\.Linux|Direct2D|OpenGL|Vulkan).*\.dll$'; then
+            echo 'Desktop platform assembly found in browser closure.' >&2
+            exit 1
+          fi
+
+      - name: Verify committed CPU and input baselines
+        run: |
+          dotnet run --project "$PHASE0_PROJECT" \
+            --configuration "$CONFIGURATION" \
+            -- --verify
+
+      - name: Validate Phase 0 JSON records
+        run: |
+          python -m json.tool docs/roadmap/browser-webassembly-phase0/phase0-boundary.json > /dev/null
+          python -m json.tool docs/testing/baselines/browser-webassembly-phase0/manifest.json > /dev/null
+          python -m json.tool docs/testing/baselines/browser-webassembly-phase0/render-list.json > /dev/null
+          python -m json.tool docs/testing/baselines/browser-webassembly-phase0/input-trace.json > /dev/null
+
+      - name: Publish official empty .NET WebAssembly baseline
+        run: |
+          dotnet publish "$EMPTY_PROJECT" \
+            --configuration "$CONFIGURATION" \
+            --output "$RUNNER_TEMP/broiler-wasm-empty-baseline"
+
+      - name: Record empty baseline payload
+        shell: bash
+        run: |
+          output="$RUNNER_TEMP/broiler-wasm-empty-baseline"
+          total_bytes=$(find "$output" -type f -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+          wwwroot_bytes=$(find "$output/wwwroot" -type f -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+          brotli_bytes=$(find "$output/wwwroot" -type f -name '*.br' -printf '%s\n' | awk '{ total += $1 } END { print total + 0 }')
+          {
+            echo "total_bytes=$total_bytes"
+            echo "wwwroot_bytes=$wwwroot_bytes"
+            echo "brotli_bytes=$brotli_bytes"
+          } | tee "$output/phase0-payload.txt"
+
+      - name: Upload empty runtime baseline
+        uses: actions/upload-artifact@v6
+        with:
+          name: broiler-wasm-phase0-empty-runtime
+          path: ${{ runner.temp }}/broiler-wasm-empty-baseline
+          if-no-files-found: error

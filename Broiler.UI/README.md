@@ -9,7 +9,7 @@ dialogs and host-service parity. It defines the platform-neutral root, shared
 Standard infrastructure, and type-specific control pairs through Window, Panel,
 Label, Button, Edit, CheckBox, RadioButton, ToggleButton, Slider, ProgressBar,
 ImageView, ScrollView, ListView, ComboBox, TabView, Menu, Tooltip, Dialog,
-FileDialog, FontDialog, and Toolbar.
+FileDialog, FontDialog, Toolbar, and the read-only Formatting Codes view.
 
 ## Projects
 
@@ -28,6 +28,7 @@ src/Abstractions/Shell
 src/Abstractions/Layout
   Broiler.UI.Panel
   Broiler.UI.ScrollView
+  Broiler.UI.Splitter
   Broiler.UI.TabView
 
 src/Abstractions/Content
@@ -50,6 +51,7 @@ src/Abstractions/ValueAndSelection
 
 src/Abstractions/Text
   Broiler.UI.Edit
+  Broiler.UI.FormatCodeView
   Broiler.UI.RichEdit
 
 src/Implementations/Standard/Shell
@@ -62,6 +64,7 @@ src/Implementations/Standard/Shell
 src/Implementations/Standard/Layout
   Broiler.UI.Panel.Standard
   Broiler.UI.ScrollView.Standard
+  Broiler.UI.Splitter.Standard
   Broiler.UI.TabView.Standard
 
 src/Implementations/Standard/Content
@@ -84,6 +87,7 @@ src/Implementations/Standard/ValueAndSelection
 
 src/Implementations/Standard/Text
   Broiler.UI.Edit.Standard
+  Broiler.UI.FormatCodeView.Standard
   Broiler.UI.RichEdit.Standard
 
 src/Integrations/RichEdit
@@ -101,6 +105,9 @@ tests
   Broiler.UI.Tests
   Broiler.UI.Standard.Tests
   Broiler.UI.Toolbar.Tests
+  Broiler.UI.Splitter.Tests
+  Broiler.UI.FormatCodeView.Tests
+  Broiler.UI.FormatCodeView.Standard.Tests
   Broiler.UI.RichEdit.Tests
   Broiler.UI.RichEdit.Standard.Tests
   Broiler.UI.RichEdit.Rtf.Tests
