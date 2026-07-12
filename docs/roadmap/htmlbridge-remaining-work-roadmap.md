@@ -168,9 +168,11 @@ they are prioritized independently.
       are pre-existing parallel-flaky / order-dependent, confirmed at clean HEAD); the full local WPT corpus
       (171 tests: CSS2, css-align, css-anchor-position, css-animations, css-backgrounds) is **pixel-identical**
       (same 38 failures, **zero** matchPercent drift across every test); engine unit tests + the parity test
-      pass. Still wants the dispatch-only full WPT/Acid gate at merge. **Follow-up:** the now-dead
-      form-control/logical bridge helpers (`ApplyApproximateFormControlComputedSizes`, `ApplyLogicalSizeAliases`
-      + orphaned helpers) are left for a separate sweep (tracked). **Delivery:** the engine changes
+      pass. Still wants the dispatch-only full WPT/Acid gate at merge. The now-dead form-control/logical
+      bridge helpers this cutover orphaned (`ApplyApproximateFormControlComputedSizes`, `ApplyLogicalSizeAliases`,
+      + 9 transitive helpers, 176 lines — the engine's `ComputeStyle` performs that work now) are **swept in the
+      same PR** (each verified 0-caller; the shared `IsVerticalWritingMode`/`IsSelectListBox`/
+      `GetSelectVisibleRowCount` kept). **Delivery:** the engine changes
       (`sparseInheritance`, `SetInlineStyleSource`, cache) are in the `Broiler.CSS` submodule — push + pointer
       bump; the bridge rewire + parity-accessor repoint are main-repo.
 - **Shorthand expansion — DONE (2026-07-12).** The bridge's `ExpandCssShorthands` (+ its private
