@@ -309,45 +309,30 @@ public sealed partial class DomBridge
         if (_computedPropsInProgress.TryGetValue(element, out var inProgress))
             return inProgress;
 
-        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Route the whole computed-style pipeline — cascade + inline, custom-property/
+        // var() and CSS-wide-keyword resolution, shorthand expansion (incl. inset →
+        // top/right/bottom/left), attr() length substitution, relative font-weight,
+        // form-control size synthesis, and logical-size aliases — through the canonical
+        // engine's sparse projection. The engine reads inline style from the bridge's live
+        // ElementRuntimeState map (SetInlineStyleSource in GetSyncedScopedEngine), so it
+        // sees JS-set and anchor-resolver-written inline that never reaches the DOM style
+        // attribute. `sparseInheritance: true` reproduces the bridge's inheritance model:
+        // inherited properties propagate only from explicitly-declared ancestor values, so
+        // a nowhere-declared inherited property stays absent — the null-for-undeclared
+        // contract the ~90 layout/anchor/serialization/scroll consumers of this map depend on.
+        var props = new Dictionary<string, string>(
+            GetSyncedScopedEngine(element).GetSparseComputedStyle(element, sparseInheritance: true),
+            StringComparer.OrdinalIgnoreCase);
         _computedPropsInProgress[element] = props;
         try
         {
-            ApplyUserAgentDisplayDefaults(props, element);
-
-            foreach (var kv in CollectMatchedRuleProperties(element))
-                props[kv.Key] = kv.Value;
-            foreach (var kv in InlineStyle(element))
-                props[kv.Key] = kv.Value;
-
-            ExpandCssShorthands(props);
-            CSS.Dom.CssStyleEngine.ResolveLengthAttrFunctions(props, element);
+            // Two reconciliations the engine's sparse projection deliberately does not do:
+            // fold the explicit `inherit` keyword to the parent's value (ComputeStyle keeps
+            // it raw), and seed the user-agent `display` default (a renderer policy). Both
+            // are non-clobbering, so applying them after the projection preserves the prior
+            // seed-first ordering (an author `display` still wins).
             ResolveExplicitInheritedValues(props, element);
-            ApplyInheritedProperties(props, element);
-
-            // Expand the inset shorthand → top, right, bottom, left so that
-            // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
-            // read the individual inset properties directly.
-            if (props.TryGetValue("inset", out var insetVal2))
-            {
-                var parts = insetVal2.Split([' ', '\t'],
-                    StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 0)
-                {
-                    string iTop = parts[0];
-                    string iRight = parts.Length > 1 ? parts[1] : iTop;
-                    string iBottom = parts.Length > 2 ? parts[2] : iTop;
-                    string iLeft = parts.Length > 3 ? parts[3] : iRight;
-
-                    if (!props.ContainsKey("top")) props["top"] = iTop;
-                    if (!props.ContainsKey("right")) props["right"] = iRight;
-                    if (!props.ContainsKey("bottom")) props["bottom"] = iBottom;
-                    if (!props.ContainsKey("left")) props["left"] = iLeft;
-                }
-            }
-
-            ApplyApproximateFormControlComputedSizes(props, element);
-            ApplyLogicalSizeAliases(props);
+            ApplyUserAgentDisplayDefaults(props, element);
 
             _computedPropsCache[element] = props;
             return props;

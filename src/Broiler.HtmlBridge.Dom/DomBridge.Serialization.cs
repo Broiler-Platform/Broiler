@@ -88,7 +88,7 @@ public sealed partial class DomBridge
         }
 
         // Reverted styles must not read back the baked values from the computed cache.
-        _computedPropsCache.Clear();
+        ClearComputedPropsCache();
     }
 
     private static void RestoreStringMap(IDictionary<string, string> target, Dictionary<string, string> saved)
