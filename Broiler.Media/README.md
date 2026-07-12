@@ -1,44 +1,107 @@
 # Broiler.Media
 
-Broiler.Media is the planned decode-first media component for Broiler.
+Broiler.Media is the decode-first media component for Broiler. It owns image, audio,
+and video **decoding**, format **probing**, and codec **selection**, behind small
+abstraction assemblies with one concrete implementation assembly per media kind.
+Rendering, windowing, networking, and HTML media-element behaviour deliberately live
+outside this component.
 
-This folder contains the Phase 1 component scaffold. Phase 0 records are kept in
-`docs/`; Phase 1 adds the runtime and test project graph plus the first public
-abstraction contracts. Concrete decoders are intentionally still placeholders
-until the later roadmap phases move or implement real codec behavior.
+## Assemblies
 
-## Component constraints
+| Assembly | Role |
+| --- | --- |
+| `Broiler.Media` | Shared base: `MediaCodec`, the immutable `MediaCodecCatalog`, probing, `MediaInput`, limits, diagnostics, and the base output lifecycle. |
+| `Broiler.Media.Audio` | Audio abstraction: `AudioCodec`, `AudioBuffer`, `AudioStreamInfo`, `IAudioOutput`. |
+| `Broiler.Media.Audio.Managed` | Managed audio decoders (RIFF/WAVE PCM). |
+| `Broiler.Media.Video` | Video abstraction: `VideoCodec`, `IVideoSession`, `IVideoOutput`, session state/events. |
+| `Broiler.Media.Video.MediaFoundation` | Windows-only video via `IMFMediaEngine`, presenting to an HWND owned by `Broiler.Graphics.Windows`. |
+| `Broiler.Media.Image` | Image abstraction: `ImageCodec`, `ImageBuffer`, `ImageFrame`, `ImageSequence`. |
+| `Broiler.Media.Image.Managed` | Managed image codecs (PNG/APNG, JPEG, BMP, GIF, WebP). |
 
-- Target .NET 10 only.
-- Do not add third-party runtime dependencies.
-- Keep abstraction assemblies platform-neutral, safe-code compatible,
-  trimming-friendly, and AOT-friendly.
-- Put OS-dependent code in OS-specific implementation projects only.
-- Use `LibraryImport` or `DllImport` for native OS entry points. The first
-  OS-specific implementation target is Windows.
-- Do not add hidden global codec registration or module-initializer side effects.
-- Do not modify Graphics, HTML, UI, Input, or other existing components during
-  Phase 0.
+Each runtime assembly ships as its own NuGet package; applications opt into the media
+kinds and implementations they need. `Broiler.Media` is the base, not an everything-bundle.
 
-## Runtime projects
+### Dependency direction
 
-- `Broiler.Media`
-- `Broiler.Media.Audio`
-- `Broiler.Media.Audio.Managed`
-- `Broiler.Media.Video`
-- `Broiler.Media.Video.MediaFoundation`
-- `Broiler.Media.Image`
-- `Broiler.Media.Image.Managed`
+```text
+Broiler.Media.Audio.Managed          -> Broiler.Media.Audio -> Broiler.Media
+Broiler.Media.Video.MediaFoundation  -> Broiler.Media.Video -> Broiler.Media
+Broiler.Media.Video.MediaFoundation  -> Broiler.Graphics.Windows   (borrows the HWND video target only)
+Broiler.Media.Image.Managed          -> Broiler.Media.Image -> Broiler.Media
 
-Matching dependency-free console test projects live beside the runtime projects.
+Broiler.Graphics                     -> Broiler.Media.Image          (abstraction only)
+Broiler.Graphics.Windows             -> Broiler.Media.Video          (declares the HWND video target)
+```
 
-## Phase 0 contents
+The abstraction assemblies are platform-neutral, safe-code, trimming- and AOT-friendly,
+and reference no implementation, no Graphics/HTML, and no native/Media Foundation package.
 
-- [Phase 0 Record](docs/phase-0.md)
-- [Graphics Image API Inventory](docs/api/graphics-image-api-inventory.md)
-- [Image Baseline Record](docs/baselines/image-baseline-record.md)
-- [ADR 0001: Component Topology And Consumption Policy](docs/adr/0001-component-topology-and-consumption-policy.md)
-- [ADR 0002: Buffer Ownership And Limits](docs/adr/0002-buffer-ownership-and-limits.md)
-- [ADR 0003: Image Pixel And Alpha Format](docs/adr/0003-image-pixel-and-alpha-format.md)
-- [ADR 0004: Compatibility Window](docs/adr/0004-compatibility-window.md)
-- [ADR 0005: Windows Media Foundation Borrowed HWND](docs/adr/0005-windows-media-foundation-borrowed-hwnd.md)
+## Supported formats
+
+| Kind | Format | Decode | Encode | Notes | Assembly |
+| --- | --- | :---: | :---: | --- | --- |
+| Image | PNG / APNG | ✅ | ✅ | animation (frame blend/dispose, loop) | `.Image.Managed` |
+| Image | JPEG | ✅ | ✅ | baseline + progressive decode; baseline encode | `.Image.Managed` |
+| Image | BMP | ✅ | ✅ | 24/32-bit decode; 32-bit encode | `.Image.Managed` |
+| Image | GIF | ✅ | ✅ | animation | `.Image.Managed` |
+| Image | WebP | ✅ | ✅ | lossless + animation | `.Image.Managed` |
+| Audio | RIFF/WAVE PCM | ✅ | — | streaming; 8/16/24/32-bit PCM + IEEE float | `.Audio.Managed` |
+| Video | MP4 (H.264/AAC) | ✅ | — | Windows-only, direct `IMFMediaEngine` presentation to an HWND | `.Video.MediaFoundation` |
+
+GIF/WebP encode, additional audio codecs (MP3/AAC/Vorbis/Opus/FLAC), and non-Media-Foundation
+video providers are future work; the stack reports a deterministic capability error for
+formats it does not support rather than a misleading placeholder.
+
+## Selecting and using a codec
+
+Codec selection is explicit — there is **no** process-wide mutable `Current` singleton and no
+module-initializer side effects. The application composition root builds one immutable catalog
+and reuses it:
+
+```csharp
+var catalog = new MediaCodecCatalog(ManagedImageCodecs.CreateCodecs());   // or audio/video codecs
+using var input = new MediaInput(stream, new MediaSourceHints(mimeType: "image/png"));
+MediaCodecMatch? match = await catalog.SelectAsync(MediaKind.Image, input);
+if (match?.Codec is ImageCodec codec)
+    ImageSequence decoded = await codec.DecodeAsync(input);
+```
+
+Selection is content-probe first: MIME type, file extension, and URL are hints only.
+
+Consumers register the codec set at their own composition root:
+
+- **Graphics** decodes images through an injected catalog via `Broiler.Graphics.BImageCodecs.Use(...)`
+  (Graphics references only `Broiler.Media.Image`, never the implementation).
+- **Browser/app playback** (the `<audio>`/`<video>` playback clock, transport, and element
+  state machine) lives in the application/HTML layer — see `src/Broiler.Playback` — never in
+  this component.
+
+## Security and reliability
+
+All media is untrusted input. Decoders enforce configurable `MediaLimits` (encoded byte count,
+image/video dimensions and pixel/frame counts, audio channels/sample-rate/duration, probe bytes
+and time, queued/decoded memory) and use checked arithmetic for dimensions, strides, and
+allocation sizes. Malformed data produces a bounded `MediaException` carrying a `MediaError`
+(codec id and byte offset where safe) — never unbounded allocation, hangs, silent partial
+success, or arbitrary exception leakage. See [ADR 0002](docs/adr/0002-buffer-ownership-and-limits.md)
+for buffer ownership and limits, and the roadmap's security section for the full list.
+
+## Packaging
+
+Packages are published per assembly with lockstep suite versioning during preview
+(`0.1.0-preview.1`), Apache-2.0 licensed, with symbol packages (`.snupkg`) and SourceLink.
+Metadata is vendored from `eng/Broiler.Packaging.props` so each component packs standalone.
+`Broiler.Media.Video.MediaFoundation` targets `net10.0-windows`; the rest are `net10.0` and
+platform-neutral.
+
+## Design records
+
+- [Phase 0 Record](docs/phase-0.md) · [Graphics Image API Inventory](docs/api/graphics-image-api-inventory.md) · [Image Baseline Record](docs/baselines/image-baseline-record.md)
+- ADRs: [0001 Topology & consumption](docs/adr/0001-component-topology-and-consumption-policy.md) ·
+  [0002 Buffer ownership & limits](docs/adr/0002-buffer-ownership-and-limits.md) ·
+  [0003 Image pixel & alpha format](docs/adr/0003-image-pixel-and-alpha-format.md) ·
+  [0004 Compatibility window](docs/adr/0004-compatibility-window.md) ·
+  [0005 Windows Media Foundation borrowed HWND](docs/adr/0005-windows-media-foundation-borrowed-hwnd.md)
+
+The full component plan and phase-by-phase status live in
+[`docs/roadmap/broiler-media-component.md`](../docs/roadmap/broiler-media-component.md).

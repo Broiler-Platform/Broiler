@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Broiler.Graphics.Windows;
 
 namespace Broiler.Media.Video.MediaFoundation;
 
@@ -39,7 +40,7 @@ internal sealed class MediaFoundationMediaEngine : IMediaFoundationMediaEngine
     }
 
     public static MediaFoundationMediaEngine Create(
-        MediaFoundationBorrowedHwndVideoOutput? target,
+        HwndVideoOutput? target,
         VideoSessionOptions options)
     {
         MediaFoundationFaults.ThrowIfFailed(
@@ -162,7 +163,7 @@ internal sealed class MediaFoundationMediaEngine : IMediaFoundationMediaEngine
         return new VideoStreamInfo((int)width, (int)height, (int)width, (int)height, duration);
     }
 
-    public void OnTargetChanged(MediaFoundationBorrowedHwndVideoOutput target)
+    public void OnTargetChanged(HwndVideoOutput target)
     {
         if (target.IsDestroyed)
             Shutdown();

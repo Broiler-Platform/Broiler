@@ -56,10 +56,6 @@ internal static class MediaFoundationNative
         ref Guid riid,
         out IntPtr ppv);
 
-    [DllImport("user32.dll", ExactSpelling = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool IsWindow(nint hwnd);
-
     internal static void ReleaseIUnknown(IntPtr value)
     {
         if (value != IntPtr.Zero)

@@ -42,8 +42,13 @@ internal static class ArchitectureTests
                 ["../Broiler.Media.Audio/Broiler.Media.Audio.csproj"],
             ["Broiler.Media.Video/Broiler.Media.Video.csproj"] =
                 ["../Broiler.Media/Broiler.Media.csproj"],
+            // §6.6: the Media Foundation backend borrows the HWND presentation target owned
+            // by Broiler.Graphics.Windows — the one approved Graphics edge.
             ["Broiler.Media.Video.MediaFoundation/Broiler.Media.Video.MediaFoundation.csproj"] =
-                ["../Broiler.Media.Video/Broiler.Media.Video.csproj"],
+                [
+                    "../Broiler.Media.Video/Broiler.Media.Video.csproj",
+                    "../../Broiler.Graphics/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj",
+                ],
             ["Broiler.Media.Image/Broiler.Media.Image.csproj"] =
                 ["../Broiler.Media/Broiler.Media.csproj"],
             ["Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj"] =

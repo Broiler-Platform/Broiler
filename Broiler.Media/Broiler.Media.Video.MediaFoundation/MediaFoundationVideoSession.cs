@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Broiler.Graphics.Windows;
 
 namespace Broiler.Media.Video.MediaFoundation;
 
@@ -8,7 +9,7 @@ public sealed class MediaFoundationVideoSession : IVideoSession
 {
     private readonly object _gate = new();
     private readonly IMediaFoundationMediaEngine _engine;
-    private readonly MediaFoundationBorrowedHwndVideoOutput _target;
+    private readonly HwndVideoOutput _target;
     private readonly IDisposable? _platformScope;
     private readonly TaskCompletionSource<VideoStreamInfo> _metadataReady =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -17,7 +18,7 @@ public sealed class MediaFoundationVideoSession : IVideoSession
 
     internal MediaFoundationVideoSession(
         IMediaFoundationMediaEngine engine,
-        MediaFoundationBorrowedHwndVideoOutput target,
+        HwndVideoOutput target,
         IDisposable? platformScope = null)
     {
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
@@ -49,7 +50,7 @@ public sealed class MediaFoundationVideoSession : IVideoSession
 
     internal static async ValueTask<MediaFoundationVideoSession> OpenAsync(
         IMediaFoundationMediaEngine engine,
-        MediaFoundationBorrowedHwndVideoOutput target,
+        HwndVideoOutput target,
         string sourceUri,
         VideoSessionOptions options,
         CancellationToken cancellationToken)
@@ -180,12 +181,12 @@ public sealed class MediaFoundationVideoSession : IVideoSession
         }
     }
 
-    private void OnTargetChanged(object? sender, MediaFoundationVideoTargetChangedEventArgs e)
+    private void OnTargetChanged(object? sender, HwndVideoTargetChangedEventArgs e)
     {
         if (_disposed)
             return;
 
-        if (e.Kind == MediaFoundationVideoTargetChangeKind.Destroyed)
+        if (e.Kind == HwndVideoTargetChangeKind.Destroyed)
         {
             Fail(new MediaError(MediaErrorCode.OutputFailed, "The borrowed video HWND was destroyed by its owner."));
             _engine.Shutdown();
