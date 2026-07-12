@@ -345,125 +345,6 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static void ApplyApproximateFormControlComputedSizes(
-        Dictionary<string, string> computed,
-        Broiler.Dom.DomElement element)
-    {
-        string tag = element.TagName.ToLowerInvariant();
-        if (tag is not ("input" or "button" or "select" or "textarea" or "progress" or "meter"))
-            return;
-
-        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = IsVerticalWritingMode(writingMode);
-
-        double logicalInlineSize = 60;
-        double logicalBlockSize = 20;
-
-        switch (tag)
-        {
-            case "input":
-                string type = GetAttr(element, "type")?.ToLowerInvariant() ?? "text";
-                switch (type)
-                {
-                    case "hidden":
-                        logicalInlineSize = 0;
-                        logicalBlockSize = 0;
-                        break;
-                    case "checkbox":
-                    case "radio":
-                        logicalInlineSize = 13;
-                        logicalBlockSize = 13;
-                        break;
-                    case "submit":
-                    case "button":
-                    case "reset":
-                        logicalInlineSize = 72;
-                        logicalBlockSize = 20;
-                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetAttr(element, "value"));
-                        break;
-                    default:
-                        logicalInlineSize = 173;
-                        logicalBlockSize = 16;
-                        break;
-                }
-                break;
-            case "button":
-                logicalInlineSize = 72;
-                logicalBlockSize = 20;
-                ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetElementRenderedText(element));
-                break;
-            case "select":
-                logicalInlineSize = 60;
-                logicalBlockSize = 19;
-                ApplySelectListBoxSizing(ref logicalInlineSize, ref logicalBlockSize, element);
-                break;
-            case "textarea":
-                logicalInlineSize = 170;
-                logicalBlockSize = 40;
-                break;
-            case "progress":
-            case "meter":
-                logicalInlineSize = 120;
-                logicalBlockSize = 16;
-                break;
-        }
-
-        double physicalWidth = vertical ? logicalBlockSize : logicalInlineSize;
-        double physicalHeight = vertical ? logicalInlineSize : logicalBlockSize;
-
-        if (!HasExplicitPhysicalOrLogicalSize(computed, "width", vertical ? "block-size" : "inline-size") && physicalWidth > 0)
-            computed["width"] = FormatPx(physicalWidth);
-        if (!HasExplicitPhysicalOrLogicalSize(computed, "height", vertical ? "inline-size" : "block-size") && physicalHeight > 0)
-            computed["height"] = FormatPx(physicalHeight);
-    }
-
-    private static void ApplyLogicalSizeAliases(Dictionary<string, string> computed)
-    {
-        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = IsVerticalWritingMode(writingMode);
-
-        string width = computed.GetValueOrDefault("width") ?? "auto";
-        string height = computed.GetValueOrDefault("height") ?? "auto";
-        string inlineSize = computed.GetValueOrDefault("inline-size") ?? "auto";
-        string blockSize = computed.GetValueOrDefault("block-size") ?? "auto";
-
-        if (!HasExplicitSpecifiedSize(width))
-            width = ResolveLogicalPhysicalFallback(width, vertical ? blockSize : inlineSize);
-
-        if (!HasExplicitSpecifiedSize(height))
-            height = ResolveLogicalPhysicalFallback(height, vertical ? inlineSize : blockSize);
-
-        computed["width"] = width;
-        computed["height"] = height;
-        computed["block-size"] = HasExplicitSpecifiedSize(blockSize) ? blockSize : (vertical ? width : height);
-        computed["inline-size"] = HasExplicitSpecifiedSize(inlineSize) ? inlineSize : (vertical ? height : width);
-    }
-
-    private static bool HasExplicitPhysicalOrLogicalSize(Dictionary<string, string> computed, string physicalProperty, string logicalProperty) =>
-        HasExplicitSpecifiedSize(computed.GetValueOrDefault(physicalProperty)) ||
-        HasExplicitSpecifiedSize(computed.GetValueOrDefault(logicalProperty));
-
-    private static void ApplyButtonLikeMultilineSizing(ref double logicalInlineSize, ref double logicalBlockSize, string? rawText)
-    {
-        int lineCount = CountRenderedLines(rawText);
-        if (lineCount <= 1)
-            return;
-
-        logicalBlockSize = 20 * lineCount;
-    }
-
-    private static void ApplySelectListBoxSizing(ref double logicalInlineSize, ref double logicalBlockSize, Broiler.Dom.DomElement element)
-    {
-        int visibleRows = GetSelectVisibleRowCount(element);
-        if (visibleRows <= 1)
-            return;
-
-        const double rowBlockSize = 16;
-        const double chromeBlockSize = 4;
-        logicalInlineSize = Math.Max(logicalInlineSize, 72);
-        logicalBlockSize = (visibleRows * rowBlockSize) + chromeBlockSize;
-    }
-
     private static bool IsSelectListBox(Broiler.Dom.DomElement element) => GetSelectVisibleRowCount(element) > 1;
 
     private static int GetSelectVisibleRowCount(Broiler.Dom.DomElement element)
@@ -479,64 +360,10 @@ public sealed partial class DomBridge
         return isMultiple ? 4 : 1;
     }
 
-    private static int CountRenderedLines(string? rawText)
-    {
-        if (string.IsNullOrEmpty(rawText))
-            return 1;
-
-        return WebUtility.HtmlDecode(rawText)
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n')
-            .Split('\n')
-            .Length;
-    }
-
-    private static string GetElementRenderedText(Broiler.Dom.DomElement element)
-    {
-        var builder = new StringBuilder();
-        AppendRenderedText(element, builder);
-        return builder.ToString();
-    }
-
-    private static void AppendRenderedText(Broiler.Dom.DomElement element, StringBuilder builder)
-    {
-        // RF-BRIDGE-1c Phase F (F3c part 2d): iterate raw ChildNodes to read canonical DomText.
-        foreach (var child in element.ChildNodes)
-        {
-            if (IsText(child))
-            {
-                if (BridgeText(child).Length > 0)
-                    builder.Append(BridgeText(child));
-                continue;
-            }
-
-            if (child is not Broiler.Dom.DomElement childElement)
-                continue;
-
-            if (string.Equals(childElement.TagName, "br", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.Append('\n');
-                continue;
-            }
-
-            AppendRenderedText(childElement, builder);
-        }
-    }
-
-    private static string ResolveLogicalPhysicalFallback(string currentPhysicalValue, string mappedLogicalValue) =>
-        HasExplicitSpecifiedSize(mappedLogicalValue) ? mappedLogicalValue : currentPhysicalValue;
-
     private static bool IsVerticalWritingMode(string? writingMode)
     {
         var normalized = writingMode?.Trim().ToLowerInvariant();
         return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
-    }
-
-    private static bool HasExplicitSpecifiedSize(string? value)
-    {
-        value = value?.Trim() ?? string.Empty;
-        return value.Length > 0 &&
-               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -674,9 +501,6 @@ public sealed partial class DomBridge
             ? string.Join("\n", rules.Select(CSS.CssSerializer.Serialize))
             : state.RulesSourceText ?? string.Empty;
     }
-
-    private static string FormatPx(double value) =>
-        $"{Math.Round(value).ToString(CultureInfo.InvariantCulture)}px";
 
     private static void ApplyUserAgentDisplayDefaults(
         Dictionary<string, string> computed,
