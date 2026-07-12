@@ -34,6 +34,19 @@ public sealed partial class DomBridge
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsCache = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
 
+    /// <summary>
+    /// Clears the bridge's <c>GetComputedProps</c> memo <em>and</em> the per-document engines'
+    /// cascade/computed-style caches together. The two must invalidate as one now that
+    /// <c>GetComputedProps</c> routes through the engine's sparse projection, which reads inline
+    /// style from the live ElementRuntimeState map (an ERS mutation is invisible to the engine's
+    /// own DOM-mutation subscription).
+    /// </summary>
+    private void ClearComputedPropsCache()
+    {
+        _computedPropsCache.Clear();
+        InvalidateScopedEngineComputedCaches();
+    }
+
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
     // ------------------------------------------------------------------
@@ -95,7 +108,7 @@ public sealed partial class DomBridge
 
     internal void InvalidateStyleScope(Broiler.Dom.DomElement anchor)
     {
-        _computedPropsCache.Clear();
+        ClearComputedPropsCache();
         var docRoot = GetDocumentRootFor(anchor);
         if (_styleInvalidationBatchDepth > 0)
         {
@@ -308,25 +321,6 @@ public sealed partial class DomBridge
         }
 
         return specified;
-    }
-
-    private void ApplyInheritedProperties(Dictionary<string, string> computed, Broiler.Dom.DomElement element)
-    {
-        if (ParentEl(element) == null)
-            return;
-
-        var parentProps = GetComputedProps(ParentEl(element));
-        foreach (var property in CSS.Dom.CssComputedDefaults.InheritedProperties)
-        {
-            if (computed.ContainsKey(property))
-                continue;
-
-            if (parentProps.TryGetValue(property, out var inheritedValue) &&
-                !string.IsNullOrWhiteSpace(inheritedValue))
-            {
-                computed[property] = inheritedValue;
-            }
-        }
     }
 
     private static string? NormalizePseudoElement(string? pseudoElement)

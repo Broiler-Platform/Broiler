@@ -21,6 +21,44 @@ public sealed partial class DomBridge
     private sealed class ComputedStyleEngineScope
     {
         public required Broiler.CSS.Dom.CssStyleScopeBuilder ScopeBuilder { get; init; }
+        // The wrapped engine, held directly so ERS-inline mutations (which the engine's
+        // DOM-mutation subscription does not observe) can invalidate its computed caches.
+        public required Broiler.CSS.Dom.CssStyleEngine Engine { get; init; }
+    }
+
+    /// <summary>
+    /// Invalidates every per-document engine's cascade/computed-style caches. Called
+    /// alongside clearing <c>_computedPropsCache</c> because those engines now read inline
+    /// style from the bridge's live ElementRuntimeState map (via
+    /// <see cref="Broiler.CSS.Dom.CssStyleEngine.SetInlineStyleSource"/>), whose mutations
+    /// are not DOM mutations and so do not trigger the engine's own invalidation.
+    /// </summary>
+    private void InvalidateScopedEngineComputedCaches()
+    {
+        foreach (var scope in _computedStyleEngines.Values)
+            scope.Engine.InvalidateComputedStyleCaches();
+    }
+
+    /// <summary>
+    /// Serializes an element's live inline-style map (ElementRuntimeState) to a CSS
+    /// declaration string for the canonical engine's cascade — the bridge's authoritative
+    /// inline source, which includes JS <c>el.style.X=</c> writes and anchor-resolver-written
+    /// geometry that never reach the DOM <c>style</c> attribute the engine would otherwise read.
+    /// Returns <c>null</c> when there is no inline style.
+    /// </summary>
+    private static string? SerializeInlineStyleForEngine(Broiler.Dom.DomElement element)
+    {
+        var inline = InlineStyle(element);
+        if (inline.Count == 0)
+            return null;
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in inline)
+        {
+            if (sb.Length > 0)
+                sb.Append(';');
+            sb.Append(kv.Key).Append(':').Append(kv.Value);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -40,10 +78,15 @@ public sealed partial class DomBridge
         var docRoot = GetDocumentRootFor(element);
         if (!_computedStyleEngines.TryGetValue(docRoot, out var scope))
         {
+            var engine = new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider());
+            // Feed the bridge's live ElementRuntimeState inline map as the cascade's inline
+            // source (see SerializeInlineStyleForEngine) so the engine sees JS-set and
+            // anchor-resolver-written inline that never reaches the DOM style attribute.
+            engine.SetInlineStyleSource(SerializeInlineStyleForEngine);
             scope = new ComputedStyleEngineScope
             {
-                ScopeBuilder = new Broiler.CSS.Dom.CssStyleScopeBuilder(
-                    new Broiler.CSS.Dom.CssStyleEngine(new BridgeSelectorStateProvider())),
+                ScopeBuilder = new Broiler.CSS.Dom.CssStyleScopeBuilder(engine),
+                Engine = engine,
             };
             _computedStyleEngines[docRoot] = scope;
         }

@@ -139,24 +139,40 @@ they are prioritized independently.
        the bridge leaves raw; conversely the engine's `ComputeStyle` has no inherit-fold, so it emits a raw
        `inherit` the bridge resolves. (Mostly improvements; audit at swap.)
     4. **Custom properties** — the engine surfaces `--*`; the bridge omits them. (Benign.)
-  - **What remains (the actual cutover, still deferred) — attempt made 2026-07-12, confirmed not a
-    drop-in, reverted.** The swap was tried directly: `GetComputedProps` (`AnchorRegistry.cs`) rewritten to
-    delegate to `GetSyncedScopedEngine(el).GetSparseComputedStyle(el)` + `ApplyUserAgentDisplayDefaults`
-    (reconciling class 1), keeping the physical-inset backfill. Against a same-state baseline (3 pre-existing
-    fails) the anchor/geometry/serialization/scrollIntoView consumer clusters showed **4 new regressions**,
-    exactly the class-2/3 impact the parity delta predicted:
-    `GoogleSearchPolyfillTests.ScrollIntoView_Clamps_Fixed_Scrollers_To_Their_Scroll_Bounds` and
-    `…ScrollIntoView_Legacy_False_Aligns_To_Block_End`, plus the zoom-serialization pair
-    `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Scales_ExplicitInherited_Zoom_Properties` and
-    `…Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties`. The zoom-serialization path scales specific
-    computed properties, and the canonical projection's fuller inheritance + resolved values change *which*
-    properties are present and their form — so the swap is genuinely observable, not a no-op. **Reverted**
-    (`git checkout AnchorRegistry.cs`); clusters returned to the 3-fail baseline. **Conclusion:** the cutover
-    needs the inheritance model reconciled (sparse-inheritance projection, or a per-site audit of the
-    zoom-serialization + scrollIntoView readers) and must run behind the full WPT/Acid/pixel gate — it is not
-    a safe local-only slice. The additive projection + parity test remain the foundation for it. **Delivery
-    note:** the `GetSparseComputedStyle` API is in the `Broiler.CSS` submodule — push + pointer bump (or
-    `patches/` fallback) at commit time; the parity test + accessors are main-repo.
+  - **The cutover — DONE (2026-07-12) via the engine inline-provider approach.** `GetComputedProps`
+    (`AnchorRegistry.cs`) now routes through `GetSyncedScopedEngine(el).GetSparseComputedStyle(el,
+    sparseInheritance: true)` + the two thin reconciliations (`ResolveExplicitInheritedValues` for the
+    class-3c inherit-fold, `ApplyUserAgentDisplayDefaults` for class 1). The bridge's private
+    `ApplyInheritedProperties` (class-2 inheritance duplication) is **deleted**; the inset/form-control/logical
+    tail steps are gone from the path (the engine's `ComputeStyle` already does them). Two enabling changes
+    made it work where the earlier blind swap failed:
+    1. **Sparse-inheritance projection** (`Broiler.CSS` submodule): `GetSparseComputedStyle` gains a
+       `sparseInheritance` flag that sources inheritance from the parent's *sparse* projection (via a cached
+       `GetSparseComputedStyleInternal` recursion) instead of the parent's full computed style — reconciling
+       class 2 (nowhere-declared inherited props stay absent).
+    2. **Inline-style provider** (`CssStyleEngine.SetInlineStyleSource`, submodule): the earlier attempt
+       failed because the engine reads inline from the DOM `style` **attribute**, but the bridge's
+       authoritative inline is its live **ElementRuntimeState** map — JS `el.style.X=` and the anchor
+       resolver write ERS and *never* the attribute (verified: `getAttribute("style")` stays null,
+       `getComputedStyle` returned defaults). The bridge now feeds the engine the ERS map as the cascade's
+       inline source (`SerializeInlineStyleForEngine`), so the engine sees JS-set and resolver-written inline
+       for both the element's cascade and its inheritance recursion. Cache coordination: the per-document
+       engines' caches are invalidated together with `_computedPropsCache` (new `ClearComputedPropsCache`
+       routing the three clear sites through `InvalidateScopedEngineComputedCaches`), since an ERS mutation is
+       not a DOM mutation.
+    - **Side effect (a fix):** `getComputedStyle` now also reflects JS-set/resolver-written inline (it
+      previously did not), since it shares the same provider-fed engine.
+    - **Verified regression-free + pixel-neutral (2026-07-12):** the 4 previously-regressing tests pass; the
+      full `Broiler.Cli.Tests` suite has **0 new deterministic failures** vs a same-state baseline (the two
+      apparent deltas — `FixedChild_DoesNot_Inflate_Parent_AutoHeight` and a `NetworkAndHttpTests` fetch case —
+      are pre-existing parallel-flaky / order-dependent, confirmed at clean HEAD); the full local WPT corpus
+      (171 tests: CSS2, css-align, css-anchor-position, css-animations, css-backgrounds) is **pixel-identical**
+      (same 38 failures, **zero** matchPercent drift across every test); engine unit tests + the parity test
+      pass. Still wants the dispatch-only full WPT/Acid gate at merge. **Follow-up:** the now-dead
+      form-control/logical bridge helpers (`ApplyApproximateFormControlComputedSizes`, `ApplyLogicalSizeAliases`
+      + orphaned helpers) are left for a separate sweep (tracked). **Delivery:** the engine changes
+      (`sparseInheritance`, `SetInlineStyleSource`, cache) are in the `Broiler.CSS` submodule — push + pointer
+      bump; the bridge rewire + parity-accessor repoint are main-repo.
 - **Shorthand expansion — DONE (2026-07-12).** The bridge's `ExpandCssShorthands` (+ its private
   `ExpandFontShorthand` / `ExpandBoxShorthand` / `ExpandBorderShorthand` / `ExpandBorderSideShorthand` /
   `ExpandBackgroundShorthand` / `SplitCssValues` helpers, ~500 lines in `DomBridge/Css.cs`) is deleted and
@@ -329,9 +345,11 @@ search found only the roadmap mention) — is delivered.
 ### 2.5 Promotion-candidate backlog (P0–P3) + Open Questions
 
 - The remaining P0–P3 promotion-candidate rows in the promotion roadmap not covered above (the broader
-  "what else could move to the canonical components" backlog). After §2.1–2.4, the notable open ones are the
-  literal `GetComputedProps`→`GetComputedStyle` **cutover** (§2.1 Slice 4, scoped by the measured delta) and
-  the live `CSSStyleDeclaration` **setter routing** (§2.3), both higher-risk behavior changes wanting the WPT gate.
+  "what else could move to the canonical components" backlog). The two higher-risk behavior changes that were
+  open here — the `GetComputedProps` **cutover** (§2.1) and the live `CSSStyleDeclaration` **setter routing**
+  (§2.3) — are now **both done** (each verified regression-free locally and wanting the dispatch-only WPT/Acid
+  gate at merge). The residual backlog is small: the optional `StripVendorPrefix`-style neutral promotions and
+  a tracked sweep of the now-dead form-control/logical bridge helpers left by the §2.1 cutover.
 - The promotion roadmap's **Open Questions** (Open Question #5 — "declare v2" — is now answered; the rest
   remain).
 

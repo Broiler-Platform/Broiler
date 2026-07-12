@@ -427,7 +427,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>CssStyleEngine.GetSparseComputedStyle</c> over the element's synced scoped engine —
     /// the candidate replacement for <see cref="GetComputedPropsForParity"/>.</summary>
     internal IReadOnlyDictionary<string, string> GetSparseComputedStyleForParity(Broiler.Dom.DomElement element) =>
-        GetSyncedScopedEngine(element).GetSparseComputedStyle(element);
+        GetSyncedScopedEngine(element).GetSparseComputedStyle(element, sparseInheritance: true);
 
     private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).EventListeners;
@@ -926,7 +926,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         _knownNodes.Clear();
         _jsObjectCache.Clear();
-        _computedPropsCache.Clear();
+        ClearComputedPropsCache();
         ClearChildren(_documentNode);
         _serializationTransformsApplied = false;
 
