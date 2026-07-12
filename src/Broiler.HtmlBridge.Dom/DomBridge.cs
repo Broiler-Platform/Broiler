@@ -1079,7 +1079,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
                 var val = declaration.Important ? rawValue + " !important" : rawValue;
                 result[prop] = val;
                 // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
-                var unprefixed = StripVendorPrefix(prop);
+                var unprefixed = Broiler.CSS.CssPropertyNames.StripVendorPrefix(prop);
                 if (unprefixed != prop && !result.ContainsKey(unprefixed))
                     result[unprefixed] = val;
             }
@@ -1107,24 +1107,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static bool IsAcceptableInlineValue(string property, string value) =>
         CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue(
             property, Broiler.CSS.CssPriority.Strip(value));
-
-    /// <summary>
-    /// Strips vendor prefixes (<c>-webkit-</c>, <c>-moz-</c>, <c>-ms-</c>, <c>-o-</c>)
-    /// from a CSS property name, returning the unprefixed equivalent.
-    /// Returns the original name unchanged if it has no vendor prefix.
-    /// </summary>
-    private static string StripVendorPrefix(string property)
-    {
-        if (property.StartsWith("-webkit-", StringComparison.OrdinalIgnoreCase))
-            return property[8..];
-        if (property.StartsWith("-moz-", StringComparison.OrdinalIgnoreCase))
-            return property[5..];
-        if (property.StartsWith("-ms-", StringComparison.OrdinalIgnoreCase))
-            return property[4..];
-        if (property.StartsWith("-o-", StringComparison.OrdinalIgnoreCase))
-            return property[3..];
-        return property;
-    }
 
     /// <summary>Checks whether <paramref name="v"/> looks like a CSS length or percentage.</summary>
     private static bool IsLengthOrPercentage(string v)
