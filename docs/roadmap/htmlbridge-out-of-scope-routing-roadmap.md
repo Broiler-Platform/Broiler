@@ -41,18 +41,26 @@ pipeline); SVG and canvas rasterization paths reached through the bridge's rende
 
 | Concern | Destination | Owning roadmap | Status |
 | --- | --- | --- | --- |
-| Image decode (PNG/APNG/JPEG/BMP) | `Broiler.Media.Image.Managed` | [`broiler-media-component.md`](broiler-media-component.md) | **Proposed** — the plan explicitly moves the existing managed image codecs out of `Broiler.Graphics` into `Broiler.Media.Image.Managed`. |
-| Audio / video decode | `Broiler.Media.Audio` / `Broiler.Media.Video.MediaFoundation` | [`broiler-media-component.md`](broiler-media-component.md) | **Proposed** (decode-first; `IMFMediaEngine` is the fixed first video provider). |
+| Image decode (PNG/APNG/JPEG/BMP, + GIF/WebP) | `Broiler.Media.Image.Managed` | [`broiler-media-component.md`](broiler-media-component.md) | **Landed** — the managed codecs were moved out of `Broiler.Graphics` into `Broiler.Media.Image.Managed`; GIF and WebP (roadmap "future") are now implemented too. Graphics/HTML decode through the shared `MediaCodecCatalog`. |
+| Audio / video decode | `Broiler.Media.Audio` / `Broiler.Media.Video.MediaFoundation` | [`broiler-media-component.md`](broiler-media-component.md) | **Landed (decode-side)** — real RIFF/WAVE PCM audio codec + real `IMFMediaEngine` COM video implementation exist; browser `<audio>`/`<video>` playback wiring (media Phase 7) is still open. |
 | SVG parse / render, canvas rasterization | `Broiler.Graphics` (+ `Broiler.Graphics.Windows` surface) | media/graphics + [`skia-replacement-roadmap.md`](skia-replacement-roadmap.md) | Graphics-owned; not DOM/CSS. |
 
 **HtmlBridge's stake.** The bridge keeps the **DOM/JS element behavior** (`HTMLImageElement`,
 `HTMLCanvasElement`, `<svg>` element wiring, `viewBox` IDL, network/loading policy) and hands pixels/decoding
-to Media/Graphics through their host seams. When `Broiler.Media` lands, `ImagePipeline` should consume the
-`Broiler.Media.Image` codec contract instead of `Broiler.Graphics` image types — tracked **there**, gated on
-the media roadmap leaving "Proposed."
+to Media/Graphics through their host seams. This has now happened: the live raster decode path routes bytes
+through the `Broiler.Media` codec catalog (`Broiler.HTML.Image.BBitmap.Decode` → `MediaCodecCatalog`), so the
+bridge no longer owns any raster codec. The former parallel detector in
+`src/Broiler.HtmlBridge.Rendering/ImagePipeline.cs` (its own `ImageFormat` enum + `DetectFormat` /
+`DetectFormatFromBytes` magic-byte sniffing + `DecodedImage` + a dead `FetchExternalImageBytes` + a superseded
+`SvgParser`/`SvgRenderer`) was **dead or test-only** and has been **removed** (2026-07-12); only the live
+HTML5 Canvas 2D command recorder (`CanvasRenderingContext2D`, backing JS `getContext("2d")`) remains, now in
+`CanvasCommandRecorder.cs`. SVG-vs-raster discrimination stays bridge/HTML-owned via
+`Broiler.HTML.Image.BSvgRasterizer.IsSvgData` (SVG deliberately stays out of `Broiler.Media`).
 
-**Action for this program:** none. Do not promote to DOM/CSS. Revisit `ImagePipeline`'s codec dependency when
-`broiler-media-component.md` starts implementation.
+**Action for this program:** **done.** This is exactly media roadmap Phase 4 ("HTML has one raster codec
+authority") and the Phase 8 "no duplicate image model/format detector remains in the HTML bridge" cleanup.
+Do not promote to DOM/CSS. Remaining Bucket-1 work is owned by `broiler-media-component.md` (Phase 7 browser
+playback; Phases 3 and 6 exit gates both closed 2026-07-12), not by this program.
 
 ---
 
@@ -110,11 +118,12 @@ candidate for the backlog doc — the *wrapper* around it still stays here.
 
 | Bucket | Items | Destination | Actionable here? |
 | --- | --- | --- | --- |
-| 1 | image/audio/video decode, SVG, canvas | `Broiler.Media` / `Broiler.Graphics` | No — tracked in the media/graphics roadmaps (Media is *Proposed*). |
+| 1 | image/audio/video decode, SVG, canvas | `Broiler.Media` / `Broiler.Graphics` | No — Media has landed (image/audio/video decode-side); the bridge's duplicate raster detector was removed 2026-07-12. Remaining work (browser playback; Phases 3 and 6 exit gates both closed 2026-07-12) is owned by `broiler-media-component.md`. |
 | 2 | layout metrics, hit-testing, scroll/paint geometry | `Broiler.Layout` (via the provider seam) | No — geometry read-model already unified (RF-BRIDGE-1b done); JS wrappers stay bridge-owned. |
 | 3 | JS wrappers, `ElementRuntimeState`, resource loading, host integration | none — permanent bridge residents | No — never promote (extract only a neutral algorithm if one surfaces). |
 
-**Net:** there is **no open DOM/CSS-promotion work in any of these buckets.** Bucket 1's only future move is
-gated on the `Broiler.Media` roadmap starting implementation; Buckets 2 and 3 are settled boundaries. The only
-open *promotion* item across the whole HtmlBridge program remains **P3 HTML-serialization policy**, tracked in
-[`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).
+**Net:** there is **no open DOM/CSS-promotion work in any of these buckets.** Bucket 1's bridge-side action
+(route raster decode through the `Broiler.Media` catalog and delete the duplicate detector) is now **done**;
+its residual work is `Broiler.Media`-roadmap-owned, not DOM/CSS-promotion. Buckets 2 and 3 are settled
+boundaries. The only open *promotion* item across the whole HtmlBridge program remains **P3 HTML-serialization
+policy**, tracked in [`htmlbridge-promotion-backlog-roadmap.md`](htmlbridge-promotion-backlog-roadmap.md).

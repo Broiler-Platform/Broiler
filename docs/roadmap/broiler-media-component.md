@@ -1,8 +1,56 @@
 # Broiler.Media Component Roadmap
 
-**Status:** Proposed  
-**Date:** 2026-06-27  
-**Scope:** Architecture and migration plan only; no implementation is part of this document.
+**Status:** In progress — foundation, image, and audio phases landed; see the
+implementation-status tracker below.  
+**Date:** 2026-06-27 (plan) · reconciled with the codebase 2026-07-12  
+**Scope:** Architecture and migration plan. Sections 1–16 are the original plan and remain the
+design of record; the tracker in section 0 records what has actually shipped, so the plan's
+"no implementation" framing in §2/§5 is historical.
+
+## 0. Implementation status (reconciled 2026-07-12)
+
+`Broiler.Media` now exists at `Broiler.Media/` with all **7 runtime assemblies + 7 test projects**
+(~11.7k LOC, no `NotImplementedException`/TODO stubs), wired into `Broiler.slnx`. The original
+header ("Proposed / no implementation") was stale. Actual per-phase state:
+
+| Phase | State | Evidence / notes |
+| --- | --- | --- |
+| 0 — Freeze / ADRs | **Done** | 5 ADRs in `Broiler.Media/docs/adr/0001…0005`, baselines + API inventory under `Broiler.Media/docs/`. |
+| 1 — Scaffold 7 assemblies + shared contracts | **Done** | Base `MediaCodec`/immutable `MediaCodecCatalog`/probe/input/limits/output; arch + catalog tests. Dependency graph matches §6.1. |
+| 2 — Image contracts + managed codecs | **Done (exceeded)** | `ImageBuffer`/`ImageFrame`/`ImageSequence` + real PNG/APNG, JPEG (baseline+progressive), BMP. **GIF and WebP — listed "future" in §6.8 — are now implemented** and registered by `ManagedImageCodecs.CreateCodecs()` (five codecs). Update `ImageEncodeFormat` expectations accordingly. |
+| 3 — Graphics consumes decoded `ImageBuffer` | **Done (2026-07-12)** | No PNG/JPEG/BMP parser or `BImageCodec`/`UseManagedIfUnset` remains in Graphics. Exit gate now met: `Broiler.Graphics.csproj` references only the `Broiler.Media.Image` **abstraction**; `Imaging/MediaImageBridge.cs` no longer constructs a catalog or names concrete codecs — it reads an injected catalog via the new `Imaging/BImageCodecs.cs` registration seam and selects encoders by MIME through the abstraction-only `ImageCodecCatalogExtensions.FindEncoder`. The application composition root registers codecs explicitly (`BImageCodecs.Use(new MediaCodecCatalog(ManagedImageCodecs.CreateCodecs()))`) at each entry point (Cli/Wpt/DevSite/App.Graphics + the Graphics/Windows/Linux test harnesses + Cli.Tests). Verified: Graphics builds abstraction-only; Graphics.Tests 55/55, Graphics.Windows.Tests (Direct2D) 10/10, HTML-render decode path 31/31. |
+| 4 — HTML image consolidation | **Done (2026-07-12)** | The bridge's parallel detector in `src/Broiler.HtmlBridge.Rendering/ImagePipeline.cs` (own `ImageFormat` enum, `DetectFormat`/`DetectFormatFromBytes`, `DecodedImage`, dead `FetchExternalImageBytes`, superseded `SvgParser`/`SvgRenderer`) was dead/test-only and has been removed; the live raster path already routes through `MediaCodecCatalog` via `Broiler.HTML.Image.BBitmap.Decode`. Only the live Canvas 2D recorder remains (`CanvasCommandRecorder.cs`). SVG-vs-raster sniffing stays bridge-owned via `BSvgRasterizer.IsSvgData`. This also satisfies the Phase 8 "no duplicate image model/format detector in the HTML bridge" item. |
+| 5 — Audio abstraction + WAVE PCM | **Done** | `Broiler.Media.Audio` abstraction + real streaming RIFF/WAVE PCM decoder (`WaveAudioCodec`, 8/16/24/32-bit, chunk validation, limits/backpressure). Only PCM advertised. |
+| 6 — Video + `IMFMediaEngine` | **Done (2026-07-12)** | Real COM implementation (`MediaFoundationNative`/`…MediaEngine`/`…VideoSession`, `net10.0-windows`). §6.6 ownership now correct: the HWND presentation target is **declared and owned by `Broiler.Graphics.Windows`** as `HwndVideoOutput` (+ `HwndVideoTargetChanged*`), implementing `Broiler.Media.Video.IVideoOutput`; `Broiler.Graphics.Windows → Broiler.Media.Video` (abstraction only) and `Broiler.Media.Video.MediaFoundation → Broiler.Graphics.Windows` (borrows the target, drives `IMFMediaEngine`, never creates/destroys the window) are the two mandated edges. Verified: Graphics.Windows 10/10, MediaFoundation 11/11 (incl. arch-boundary test rewritten to allow the sanctioned edge), Media architecture allowlist 12/12. |
+| 7 — Browser playback integration | **In progress (2026-07-12)** | Foundational app/HTML-layer **playback engine** landed as new `src/Broiler.Playback` (references only the Media abstractions — no impl/HTML deps): `IMediaPlaybackSession`, an HTMLMediaElement-shaped state machine (readyState / paused / currentTime / duration / ended; play/pause/seek/stop); `AudioPlaybackSession` (eager WAVE decode → real `BufferedAudioOutput` sink + an `Advance`-driven clock); `VideoPlaybackSession` (adapter over the `IVideoSession`/`IMFMediaEngine` session); and `MediaPlayer` (probe-based audio/video routing, `CanPlayType`, deterministic `UnsupportedFormat` capability error). 17 tests green: audio decode→output end-to-end, pause halts the clock, seek repositions/clamps, replay-after-end, dispose idempotent + blocks transport, video-adapter state/event mapping, and capability errors. **Remaining:** HTML DOM media-element classes (`HTMLMediaElement`/`Video`/`Audio`/`Source`) + JS bindings + `<source>` selection; wire the engine into `<audio>`/`<video>` rendering (replace the `DomParser` black-box placeholder); a real audio-device sink + real-time driver; a real MediaFoundation video→HWND end-to-end; and removing the WPT media skips one format at a time. |
+| 8 — Compatibility cleanup / release | **In progress (2026-07-12)** | **Cleanup done:** no duplicate image model/format detector remains in Graphics or the HTML bridge, and no expired/obsolete codec adapters exist (both verified); dependency architecture tests 12/12 pass. **Release hardening advanced:** the component `README.md` was rewritten to release quality (assemblies + dependency direction, supported-format table, security guidance, packaging notes, ADR links — this README is packed into every package); per-assembly packaging verified — all 7 runtime assemblies `dotnet pack` cleanly into `0.1.0-preview.1` packages with correct dependency metadata (including the cross-repo `Broiler.Graphics.Windows` dependency), Apache-2.0, symbol packages + SourceLink. **Remaining:** end-to-end package consumption from a feed without the aggregate repo (needs the whole `Broiler.*` suite published), formal performance gates (§12.6 — conformance + malformed-input gates already exist, perf benchmarks do not), a public-name / XML-doc freeze after consumer review, and the actual version bump + publish. |
+
+**Open follow-ups:** (a) finish Phase 7 — DOM media-element classes + JS bindings + `<source>` selection,
+wire `src/Broiler.Playback` into `<audio>`/`<video>` rendering, a real audio-device sink + real-time driver,
+a real MediaFoundation video→HWND end-to-end, and incremental WPT media-skip removal (the playback **engine**
+already landed, see the §0 tracker); (b) finish Phase 8 release hardening — feed-based package consumption
+validation, performance gates (§12.6), public-name/XML-doc freeze after consumer review, and the version
+bump + publish (cleanup, README, and per-assembly `dotnet pack` are done); (c) optional: apply the same
+explicit-catalog seam to the parallel `Broiler.HTML.Image.BBitmap`, which still builds its own managed
+catalog (legitimate today — it directly owns the impl reference — but the same smell as the now-closed
+Graphics case).
+
+**Phase 6 exit-gate closure note (2026-07-12).** The HWND video target (formerly
+`MediaFoundationBorrowedHwndVideoOutput`, internal to the backend) was relocated to
+`Broiler.Graphics.Windows` as `HwndVideoOutput` — where the window lifetime already lives (`Direct2DWindow`)
+— and its change-notification types became `HwndVideoTargetChangeKind` / `HwndVideoTargetChangedEventArgs`.
+The type is MF-agnostic (its only native call, `IsWindow`, is a Win32 user32 P/Invoke that now lives with the
+other Graphics.Windows interop; the orphaned copy in `MediaFoundationNative` was removed). Dependency
+direction is a clean DAG: `MediaFoundation → {Media.Video, Graphics.Windows}`, `Graphics.Windows →
+{Graphics, Media.Video}` — no cycle. The abstraction stays HWND/Graphics-free (enforced by
+`Broiler.Media.Tests` neutrality + allowlist tests, both updated).
+
+**Phase 3 exit-gate closure note (2026-07-12).** Graphics is now decoupled from the codec implementation via
+an explicit registration seam rather than by threading a catalog through every renderer/`BBitmap` call. This
+matches §8.5 ("composition root registers concrete codecs explicitly"): `BImageCodecs.Use(...)` is an explicit,
+application-owned registration with **no** auto-populating default and no managed fallback, so it does not
+reintroduce the `BImageCodec.Current`/`UseManagedIfUnset` global the roadmap prohibits — an unregistered
+process fails fast with an actionable error instead of silently self-selecting managed codecs.
 
 ## 1. Executive decision
 
@@ -429,8 +477,9 @@ aggregate `ManagedImageCodec`, selects the winning codec. A managed default set
 may expose a helper that returns all three codecs without installing process-wide
 state.
 
-GIF and WebP are future additions. Existing HTML detection of those names does
-not count as decoding support.
+GIF and WebP — originally staged as future additions — are now implemented and registered
+by `ManagedImageCodecs.CreateCodecs()` (decode + encode, with animation for both). The
+managed default set therefore exposes five image codecs: PNG/APNG, JPEG, BMP, GIF, WebP.
 
 ## 7. Abstract class hierarchy and contract rules
 
@@ -691,6 +740,10 @@ Exit gate:
 
 ### Phase 3 - Cut Graphics over to decoded media images
 
+**Status: Done (2026-07-12)** — see the section 0 tracker. Graphics references only the
+`Broiler.Media.Image` abstraction; codec selection is delegated to an injected catalog registered by the
+composition root through `BImageCodecs.Use(...)`.
+
 **Objective:** Make Graphics a consumer of decoded pixels, not an image codec owner.
 
 Tasks:
@@ -716,6 +769,11 @@ Exit gate:
 - Graphics references only `Broiler.Media.Image`, not its implementation.
 
 ### Phase 4 - Consolidate HTML image loading and probing
+
+**Status: Done (2026-07-12)** — see the section 0 tracker. The live raster path already decodes
+through `MediaCodecCatalog` (`Broiler.HTML.Image.BBitmap.Decode`); the bridge's parallel
+`ImagePipeline.cs` detector was dead/test-only and was removed, leaving `BSvgRasterizer.IsSvgData`
+as the bridge-owned SVG-vs-raster discriminator and the Media catalog as the sole raster authority.
 
 **Objective:** Route browser raster images through Media while preserving browser
 policy boundaries.
@@ -764,6 +822,11 @@ Exit gate:
 
 ### Phase 6 - Deliver the video abstraction and first backend
 
+**Status: Done (2026-07-12)** — see the section 0 tracker. The HWND presentation target is declared and
+owned by `Broiler.Graphics.Windows` (`HwndVideoOutput : Broiler.Media.Video.IVideoOutput`); the Media
+Foundation backend borrows it via the sanctioned `MediaFoundation → Broiler.Graphics.Windows` edge. Browser
+playback (§Phase 7) and multi-format fixtures remain future work.
+
 **Objective:** Deliver the first real video path through `IMFMediaEngine` and an
 HWND owned by `Broiler.Graphics.Windows`.
 
@@ -799,6 +862,15 @@ Exit gate:
 
 ### Phase 7 - Add output and browser playback integration
 
+**Status: In progress (2026-07-12)** — the app/HTML-layer playback engine (`src/Broiler.Playback`) landed:
+the `IMediaPlaybackSession` state machine, `AudioPlaybackSession` (decode→real output + clock),
+`VideoPlaybackSession` (adapter over the IMFMediaEngine session), `MediaPlayer` (routing + `CanPlayType` +
+deterministic capability errors), and a reusable `BufferedAudioOutput` sink. This satisfies the "playback
+clock, pause/resume, seek, buffering, end/error state, and cancellation in the application/HTML layer" task
+and keeps all playback policy out of Broiler.Media. Still open: the DOM media-element surface + JS bindings,
+wiring the engine into `<audio>`/`<video>` rendering, a real audio-device/real-time driver, a real
+MediaFoundation video→HWND path, and removing the WPT media skips incrementally. See the §0 tracker.
+
 **Objective:** Connect typed outputs and the Media Foundation HWND session to
 application/browser behavior.
 
@@ -824,6 +896,13 @@ Exit gate:
 - unsupported formats continue to report deterministic capability errors.
 
 ### Phase 8 - Compatibility cleanup and release hardening
+
+**Status: In progress (2026-07-12)** — see the §0 tracker. Done: duplicate image model/format detectors are
+gone from Graphics and the HTML bridge, no expired adapters remain, dependency architecture tests pass, the
+component README is release-quality (supported-format table + security guidance, packed into every package),
+and all 7 runtime assemblies `dotnet pack` into per-assembly `0.1.0-preview.1` packages with correct
+dependency metadata. Remaining: feed-based consumption validation, performance gates, a name/XML-doc freeze
+after consumer review, and the actual publish.
 
 **Objective:** Remove temporary ownership and publish stable component boundaries.
 

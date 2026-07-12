@@ -52,6 +52,10 @@ public class Program
 
     public static int Main(string[] args)
     {
+        // Composition root: register the concrete image codecs Broiler.Graphics decodes/encodes with.
+        Broiler.Graphics.BImageCodecs.Use(
+            new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
+
         string? wptPath = null;
         string? referenceDir = null;
         string? jsonOutputPath = null;
