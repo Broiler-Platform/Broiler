@@ -36,13 +36,16 @@ public sealed partial class DomBridge
 
     private sealed record KeyframeEntry(float Position, Dictionary<string, string> Properties);
 
-    private static void CollectKeyframes(Broiler.Dom.DomElement root, Dictionary<string, List<KeyframeEntry>> map)
+    // Instance (not static): reads <style> source through the canonical
+    // GetStyleElementSourceText accessor rather than hand-walking child text nodes, so
+    // @keyframes are still collected when the CSS lives in the element's InnerHtml runtime
+    // state with no DomText child (RF-BRIDGE-1c Phase F / F3c — same fix as @position-try and
+    // CollectAnimPropsFromStyleElements).
+    private void CollectKeyframes(Broiler.Dom.DomElement root, Dictionary<string, List<KeyframeEntry>> map)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var css = string.Concat(root.ChildNodes
-                .Where(c => IsText(c))
-                .Select(c => BridgeText(c)));
+            var css = GetStyleElementSourceText(root);
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
             foreach (var atRule in styleSheet.Rules.OfType<Broiler.CSS.CssAtRule>())
             {
@@ -162,7 +165,9 @@ public sealed partial class DomBridge
     /// whose selectors match the given element.  This is a simplified matcher
     /// that handles tag selectors (e.g. <c>body</c>, <c>html</c>).
     /// </summary>
-    private static Dictionary<string, string>? CollectStylesheetAnimationProperties(Broiler.Dom.DomElement element)
+    // Instance (not static) so it can read <style> source through the canonical
+    // GetStyleElementSourceText accessor — see CollectAnimPropsFromStyleElements.
+    private Dictionary<string, string>? CollectStylesheetAnimationProperties(Broiler.Dom.DomElement element)
     {
         // Walk up to find <style> elements.
         var root = element;
@@ -173,14 +178,20 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private static void CollectAnimPropsFromStyleElements(
+    private void CollectAnimPropsFromStyleElements(
         Broiler.Dom.DomElement node, Broiler.Dom.DomElement target, ref Dictionary<string, string>? result)
     {
         if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var css = string.Concat(node.ChildNodes
-                .Where(c => IsText(c))
-                .Select(c => BridgeText(c)));
+            // RF-BRIDGE-1c Phase F (F3c) follow-up: read the <style> source through the canonical
+            // GetStyleElementSourceText accessor rather than hand-walking child text nodes. After
+            // Attach, a <style> element's CSS can live in its InnerHtml runtime state with no DomText
+            // child (childCount == 0) in some parse paths — the raw child walk then saw nothing, so
+            // stylesheet-declared animation / @keyframes properties were silently missed (the same
+            // failure mode that broke @position-try; fixed in AnchorResolver/PositionTry.cs).
+            // GetStyleElementSourceText covers the DomText-child, InnerHtml-fallback, and linked-href
+            // stylesheet cases uniformly.
+            var css = GetStyleElementSourceText(node);
 
             var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
             foreach (var styleRule in styleSheet.Rules.OfType<Broiler.CSS.CssStyleRule>())
