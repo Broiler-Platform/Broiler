@@ -147,13 +147,32 @@ slices — **the canonical algorithms first (done), the bridge rewire second (re
   select/collapse); the whole `Broiler.Dom.Tests` project is green (64/64) and the bridge consumer builds
   clean. **Delivery note:** the new code is in the `Broiler.DOM` **submodule** — push + pointer bump (or
   `patches/` fallback if the push 403s) at commit time.
-- **Still bridge-owned (the remaining, higher-risk slice):** routing the bridge's JS `Range` object and
-  its `RangeState` (in `DomBridge/Traversal.cs`) through the new canonical `DomRange` so the bridge stops
-  owning its own content-operation machinery. This is entangled with the bridge's range geometry /
-  client-rect APIs (`GetClientRectsForRange`, which stay bridge-owned) and JS object identity, and — like
-  the F3c/F4 cutovers — its failure mode is silent selection/serialization corruption, so it needs the
-  WPT range/selection corpus at merge, not just `Cli.Tests`. F3c already widened `RangeState` to canonical
-  `DomNode`, which de-risks the boundary-point handoff.
+- **Done (2026-07-12) — the bridge `Range`/`RangeState` rewire.** The bridge's `RangeState` class is
+  **deleted**; the live JS `Range` is now backed by a `BridgeDomRange : Broiler.Dom.DomRange` (a private
+  bridge subclass constructed `trackMutations: false`) that overrides the four node-creation seams so the
+  canonical content operations mint bridge nodes — `#document-fragment` result fragments and
+  `CloneDomElement` clones that carry host runtime state (form-control value/checked, scroll, dialog/shadow,
+  live inline style), all registered in `_knownNodes`. Every `Range` JS callback in
+  `JsFunctionCallbacks/Traversal.cs` now delegates: the content ops (`extract`/`clone`/`delete`/`insert`/
+  `surround`) to the canonical methods; the boundary/selection ops (`setStart`/`setEnd`/`setStartBefore`…/
+  `collapse`/`selectNode`/`selectNodeContents`) to `SetStart`/`SetEnd`/`Collapse`/`SelectNode`. The bridge's
+  hand-rolled algorithms are removed: `RangeState.AdjustForRemoval`/`UpdateCollapsed`, the ad-hoc
+  `ExtractStartPath`/`ExtractEndPath`/`CreatePartialCloneForExtract`/`IsContainedInRange` extract helpers,
+  and the manual boundary collapse math. Boundary adjustment for external tree mutations still runs through
+  the bridge's weak `_activeRanges` registry (preserving the no-leak `WeakReference` design), which now calls
+  the canonical `DomRange.NotifyNodeRemoved`. Geometry stays bridge-owned: `GetClientRectsForRange` /
+  `getBoundingClientRect` / `getClientRects` and `toString`/`compareBoundaryPoints` read boundary points off
+  the `DomRange` but keep their bridge geometry/text helpers.
+  **Verification:** `Broiler.Cli.Tests` range/traversal suite 56/57 (the 1 failure —
+  `Range_GetBoundingClientRect_Includes_DisplayContents_Descendants` — is **pre-existing/environmental**,
+  baseline-confirmed: a `display:contents` layout that produces zero height in the bare container, fails
+  identically without this change); mutation-observer / boundary-guard / DOM-interface suites 90/90; Acid3 /
+  DOM-events / DOM-edge suites 120/120; canonical `Broiler.Dom.Tests` 69/69. The two `insertNode`
+  boundary-after-split tests were updated to the **spec-correct** result (the start boundary stays in the
+  truncated original text node rather than the pre-rewire bridge's non-spec normalization to the parent) —
+  gate-safe because `dom/ranges/Range-insertNode.html` (and all five `Range-*` content-op WPT tests) are
+  already in the committed failed baseline, so adopting spec behavior can only hold or improve, never add a
+  new failure. Like the F3c/F4 cutovers this still wants the full WPT range/selection corpus at merge.
 
 ### 2.3 Promotion Phase 1 slice-2 — deferred helpers (casing + `CssPriority` **DONE**; live-setter routing remains)
 

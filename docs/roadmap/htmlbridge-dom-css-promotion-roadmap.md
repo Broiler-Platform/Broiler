@@ -243,12 +243,16 @@ Slice 8 findings/work:
   following the spec algorithms rather than the bridge's ad-hoc document-order
   heuristics. Covered by 13 new `DomRangeTests` (project green 64/64). See
   [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.2.
-- **Still bridge-owned (the remaining, higher-risk slice):** routing the bridge's JS
-  `Range` object and its `RangeState` (`DomBridge/Traversal.cs`) through the new
-  canonical `DomRange`, so the bridge stops owning its own content-op machinery. This
-  is entangled with the bridge's range geometry/client-rect APIs (which stay
-  bridge-owned) and JS object identity, and — like the F3c/F4 cutovers — needs the WPT
-  range/selection corpus at merge (silent selection/serialization failure mode).
+- **Bridge rewire done (2026-07-12).** `RangeState` is deleted; the JS `Range` is backed
+  by a `BridgeDomRange : Broiler.Dom.DomRange` subclass (non-tracking) that overrides the
+  node-creation seams to mint bridge nodes (`#document-fragment` fragments + `CloneDomElement`
+  clones carrying host runtime state, registered in `_knownNodes`). All `Range` callbacks
+  delegate to the canonical boundary/selection/content methods; the bridge's ad-hoc extract
+  helpers and boundary math are removed; external-mutation adjustment still flows through the
+  weak `_activeRanges` registry via `DomRange.NotifyNodeRemoved`. Geometry/client-rects stay
+  bridge-owned. Regression-free vs the `Cli.Tests` range/mutation/Acid suites; still wants the
+  WPT range/selection corpus at merge. See
+  [`htmlbridge-remaining-work-roadmap.md`](htmlbridge-remaining-work-roadmap.md) §2.2.
 
 `Broiler.Dom.DomTokenList` is the canonical ordered-set token algorithm
 (ASCII-whitespace parse/serialize, unique-ordered, contains/add/remove/toggle/

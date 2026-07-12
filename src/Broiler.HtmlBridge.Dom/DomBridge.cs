@@ -52,7 +52,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly HashSet<Broiler.Dom.DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
     private readonly List<(JSObject Observer, Broiler.Dom.DomNode Target, Broiler.Dom.DomMutationObserverOptions Options)> _mutationObservers = [];
-    private readonly List<WeakReference<RangeState>> _activeRanges = [];
+    private readonly List<WeakReference<Broiler.Dom.DomRange>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
     private readonly Broiler.Dom.DomElement _documentNode;
