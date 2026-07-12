@@ -1,11 +1,12 @@
 # HtmlBridge `DomElement` Facade Removal — Current State & Handoff
 
-Status: **facade removed — F4 implemented and `Broiler.Cli.Tests`-verified (0 regressions).**
+Status: **facade removed — F4 implemented, `Broiler.Cli.Tests`-verified (0 regressions), and MERGED.**
 The `DomElement` facade and `HtmlTreeBuilder` are **deleted**; the bridge holds only canonical
-`Broiler.Dom` nodes. F3c part 2 (2a–2d) and F4 are all committed on
-`claude/htmlbridge-domelement-f3c-flip` but **NOT merged** — the whole F3c/F4 stack awaits the
-WPT range/selection/serialization + Acid + pixel gate (WPT is dispatch-only here; see §4/§5 gates).
-Last updated: 2026-07-11.
+`Broiler.Dom` nodes. F3c part 2 (2a–2d) and F4 (all committed on `claude/htmlbridge-domelement-f3c-flip`)
+**merged to `main` as PR #1359 (`ecbdf406`, 2026-07-12)** after passing the WPT range/selection/serialization
++ Acid + pixel gate (the failing WPT set was confirmed a subset of the committed baseline; no new namespace
+or range/selection/serialization regressions). The merge-gate discussion below is retained as history.
+Last updated: 2026-07-12.
 
 ## Decomposition note (F3c part 2)
 
@@ -148,7 +149,7 @@ TreeWalker, cloning, adoption, event dispatch, and serialization all handle cano
 `DomComment` correctly. Everything behaviour-preserving is done; only the irreversible flip (2d) —
 which actually puts a canonical `DomText` into the tree — remains.
 
-- ✅ **2d — the atomic construction flip. DONE + Cli.Tests-verified; ⚠️ NOT MERGED (awaits WPT gate).**
+- ✅ **2d — the atomic construction flip. DONE + Cli.Tests-verified; MERGED (PR #1359, 2026-07-12).**
   Canonical `DomText`/`DomComment` now enter the tree. `CreateBridgeTextNode`/`CreateBridgeCommentNode`
   mint `_document.CreateTextNode`/`CreateComment`; all ~17 text/comment construction sites +
   `HtmlTreeBuilder.ConvertNode` (return + `AllElements` → `List<DomNode>`) route through them. `TextContent`
@@ -166,10 +167,11 @@ which actually puts a canonical `DomText` into the tree — remains.
   `:nth-child` invalidation on whitespace-text removal); 81 → 73 environmental failures. Commit `72634e02`
   on branch `claude/htmlbridge-domelement-f3c-flip`.
 
-**⚠️ MERGE GATE:** 2d is regression-free on `Broiler.Cli.Tests` (which includes the Acid3 corpus), but the
-roadmap requires the **WPT range/selection/serialization + Acid** corpus before this irreversible step
-merges (silent `outerHTML`/selection corruption is the failure mode). WPT is dispatch-only in this
-environment — run it and confirm green before merging `72634e02`.
+**✅ MERGE GATE PASSED:** 2d is regression-free on `Broiler.Cli.Tests` (which includes the Acid3 corpus),
+and the **WPT range/selection/serialization + Acid** corpus was run green (dispatch-only) before this
+irreversible step merged — the failing WPT set was a subset of the committed baseline, no new
+`outerHTML`/selection/serialization regressions. Merged as part of PR #1359 (`72634e02` → `ecbdf406`,
+2026-07-12).
 
 **Gate (2d):** the WPT range/selection/serialization + Acid corpus in addition to `Broiler.Cli.Tests`
 (silent `outerHTML`/selection corruption is the failure mode). The green steps 2a–2c gate on
@@ -238,7 +240,7 @@ NamespaceURI-into-construction + cache re-key + seam widen (green, incremental);
 to canonical, retire `HtmlTreeBuilder`, delete both files, update guards (the irreversible cutover).
 Spike the parser-document-ownership question (item 6) before starting.
 
-### F4 — DONE + `Broiler.Cli.Tests`-verified (0 regressions); ⚠️ NOT MERGED (awaits WPT/pixel gate)
+### F4 — DONE + `Broiler.Cli.Tests`-verified (0 regressions); MERGED (PR #1359, 2026-07-12)
 
 Landed on `claude/htmlbridge-domelement-f3c-flip` as the two commits the sketch predicted:
 
@@ -275,10 +277,10 @@ excluded): **0 new failures** — after-failures (73) are a strict subset of the
 lone dropped failure is a pre-existing flaky render test (`VerticalTextPositioningTests`). Same
 environmental baseline as post-2d.
 
-**⚠️ MERGE GATE (F4 + the whole F3c stack).** Regression-free on `Broiler.Cli.Tests` (incl. Acid3), but
-the irreversible cutover still requires the **full WPT + Acid + pixel** corpus before merge (silent
-`outerHTML`/selection/render corruption is the failure mode; watch SVG/foreign `createElementNS`). WPT is
-dispatch-only in this environment — run it green before merging `aa00ecf5`/`ddad4769`.
+**✅ MERGE GATE PASSED (F4 + the whole F3c stack).** Regression-free on `Broiler.Cli.Tests` (incl. Acid3),
+and the **full WPT + Acid + pixel** corpus was run green (dispatch-only) before the irreversible cutover
+merged — no new `outerHTML`/selection/render or SVG/foreign `createElementNS` regressions; the failing WPT
+set was a subset of the committed baseline. `aa00ecf5`/`ddad4769` merged in PR #1359 (`ecbdf406`, 2026-07-12).
 
 ## 6. Verification methodology (used for every landed commit)
 

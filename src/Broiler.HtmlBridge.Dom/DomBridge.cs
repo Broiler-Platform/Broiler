@@ -414,6 +414,21 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     internal static IReadOnlyDictionary<string, string> GetInlineStyleView(Broiler.Dom.DomElement element) =>
         InlineStyle(element);
 
+    /// <summary>Parity-test hook (DOM/CSS promotion §2.1): the bridge's own sparse
+    /// computed-style projection. Paired with <see cref="GetSparseComputedStyleForParity"/>
+    /// (the canonical engine's candidate replacement over the SAME synced engine) so a
+    /// differential test can measure how close the canonical projection is before the
+    /// higher-risk swap of the ~98 <c>GetComputedProps</c> call sites. Visible only to
+    /// <c>InternalsVisibleTo</c> assemblies — not a public seam.</summary>
+    internal Dictionary<string, string> GetComputedPropsForParity(Broiler.Dom.DomElement element) =>
+        GetComputedProps(element);
+
+    /// <summary>Parity-test hook (DOM/CSS promotion §2.1): the canonical engine's
+    /// <c>CssStyleEngine.GetSparseComputedStyle</c> over the element's synced scoped engine —
+    /// the candidate replacement for <see cref="GetComputedPropsForParity"/>.</summary>
+    internal IReadOnlyDictionary<string, string> GetSparseComputedStyleForParity(Broiler.Dom.DomElement element) =>
+        GetSyncedScopedEngine(element).GetSparseComputedStyle(element);
+
     private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).EventListeners;
 
@@ -1077,6 +1092,21 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         }
         return result;
     }
+
+    /// <summary>
+    /// Whether <paramref name="value"/> is an acceptable declared value for
+    /// <paramref name="property"/> per the shared <see cref="CSS.Dom.CssDeclarationValidator"/> —
+    /// the same closed-keyword error-recovery the inline-style <em>attribute</em> path
+    /// (<see cref="ParseStyle"/>) applies. A live <c>CSSStyleDeclaration</c> per-property setter
+    /// (<c>el.style.color = …</c>, <c>setProperty(…)</c>, <c>cssFloat = …</c>) must <em>reject</em>
+    /// an invalid value rather than store it, matching the attribute path (where
+    /// <c>el.style = "color: bogus"</c> already drops the declaration) and CSSOM error handling.
+    /// The value may carry a trailing <c>!important</c>, which is stripped before validation;
+    /// unknown and custom (<c>--*</c>) properties are always accepted (the validator's default).
+    /// </summary>
+    private static bool IsAcceptableInlineValue(string property, string value) =>
+        CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue(
+            property, Broiler.CSS.CssPriority.Strip(value));
 
     /// <summary>
     /// Strips vendor prefixes (<c>-webkit-</c>, <c>-moz-</c>, <c>-ms-</c>, <c>-o-</c>)
