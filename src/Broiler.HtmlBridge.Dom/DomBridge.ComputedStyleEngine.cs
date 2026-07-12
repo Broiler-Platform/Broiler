@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     // across calls, instead of leaking a subscription per getComputedStyle() call.
     // The scoped stylesheet set is re-synced only when the collected
     // <style>/<link>/inserted-rule text actually changes.
-    private readonly Dictionary<DomElement, ComputedStyleEngineScope> _computedStyleEngines = [];
+    private readonly Dictionary<Broiler.Dom.DomElement, ComputedStyleEngineScope> _computedStyleEngines = [];
 
     private sealed class ComputedStyleEngineScope
     {
@@ -39,7 +39,7 @@ public sealed partial class DomBridge
     /// re-syncing its scoped stylesheet set (the same <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c>/
     /// inserted-CSSOM text the legacy cascade saw) whenever that text changes.
     /// </summary>
-    private Broiler.CSS.Dom.CssStyleEngine GetSyncedScopedEngine(DomElement element)
+    private Broiler.CSS.Dom.CssStyleEngine GetSyncedScopedEngine(Broiler.Dom.DomElement element)
     {
         var docRoot = GetDocumentRootFor(element);
         if (!_computedStyleEngines.TryGetValue(docRoot, out var scope))
@@ -51,7 +51,7 @@ public sealed partial class DomBridge
             _computedStyleEngines[docRoot] = scope;
         }
 
-        var styleElements = new List<DomElement>();
+        var styleElements = new List<Broiler.Dom.DomElement>();
         CollectStyleElementsInTree(docRoot, styleElements);
 
         var combined = new StringBuilder();
@@ -82,7 +82,7 @@ public sealed partial class DomBridge
     /// shared <see cref="Broiler.CSS.Dom.CssStyleEngine"/>, scoped to the
     /// element's document root.
     /// </summary>
-    private Dictionary<string, string> BuildComputedStyleMapViaEngine(DomElement element, string? pseudoElement)
+    private Dictionary<string, string> BuildComputedStyleMapViaEngine(Broiler.Dom.DomElement element, string? pseudoElement)
     {
         var computed = GetSyncedScopedEngine(element).GetComputedStyle(element, pseudoElement: pseudoElement);
 
@@ -100,6 +100,6 @@ public sealed partial class DomBridge
     /// replaces the legacy <c>foreach (… in CssRules) if (MatchesSelector(…))</c>
     /// collection loops; callers still merge <c>InlineStyle(element)</c> on top as before.
     /// </summary>
-    private Dictionary<string, string> CollectMatchedRuleProperties(DomElement element) =>
+    private Dictionary<string, string> CollectMatchedRuleProperties(Broiler.Dom.DomElement element) =>
         new(GetSyncedScopedEngine(element).GetCascadedDeclaredValues(element), StringComparer.OrdinalIgnoreCase);
 }

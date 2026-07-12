@@ -8166,9 +8166,10 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.NotNull(targetEl);
 
         // Target should be hidden because anchor is scrolled out
+        var targetStyle = Broiler.HtmlBridge.DomBridge.GetInlineStyleView(targetEl!);
         Assert.True(
-            targetEl!.Style.TryGetValue("display", out var d) && d == "none",
-            $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
+            targetStyle.TryGetValue("display", out var d) && d == "none",
+            $"Expected target display:none but styles = [{string.Join(", ", targetStyle.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
     [Fact]
@@ -8201,8 +8202,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         // The abspos child is promoted out of the inline containing block (#ic) to
         // its nearest block-level ancestor (#block), since Broiler's renderer cannot
         // place an abspos box inside an inline box.
-        Assert.NotNull(abs!.Parent);
-        Assert.Equal("block", abs!.Parent!.Id);
+        var absParent = abs!.ParentNode as Broiler.Dom.DomElement;
+        Assert.NotNull(absParent);
+        Assert.Equal("block", absParent!.Id);
     }
 
     [Fact]
@@ -9981,10 +9983,11 @@ iframe {
         if (bridge.TryGetResolvedLayout(el, out var left, out var top, out var width, out var height))
             return (left, top, width, height);
 
-        left = el.Style.TryGetValue("left", out var ls) && double.TryParse(ls.Replace("px", ""), out var lv) ? lv : 0;
-        top = el.Style.TryGetValue("top", out var ts) && double.TryParse(ts.Replace("px", ""), out var tv) ? tv : 0;
-        width = el.Style.TryGetValue("width", out var ws) && double.TryParse(ws.Replace("px", ""), out var wv) ? wv : 0;
-        height = el.Style.TryGetValue("height", out var hs) && double.TryParse(hs.Replace("px", ""), out var hv) ? hv : 0;
+        var style = Broiler.HtmlBridge.DomBridge.GetInlineStyleView(el);
+        left = style.TryGetValue("left", out var ls) && double.TryParse(ls.Replace("px", ""), out var lv) ? lv : 0;
+        top = style.TryGetValue("top", out var ts) && double.TryParse(ts.Replace("px", ""), out var tv) ? tv : 0;
+        width = style.TryGetValue("width", out var ws) && double.TryParse(ws.Replace("px", ""), out var wv) ? wv : 0;
+        height = style.TryGetValue("height", out var hs) && double.TryParse(hs.Replace("px", ""), out var hv) ? hv : 0;
 
         return (left, top, width, height);
     }
@@ -10049,7 +10052,7 @@ iframe {
         // The anchor has right:-50px, top:-50px, width:100, height:100
         // in a 400x400 container → left = 400 - (-50) - 100 = 350, top = -50
         var anchorProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in anchor!.Style)
+        foreach (var kv in Broiler.HtmlBridge.DomBridge.GetInlineStyleView(anchor!))
             anchorProps[kv.Key] = kv.Value;
 
         // Debug: show the anchor's resolved styles
@@ -10062,7 +10065,7 @@ iframe {
         FindDomElement(bridge.DocumentElement, "anchored", ref anchored);
 
         var anchoredStyleStr = anchored != null
-            ? string.Join(", ", anchored.Style.Select(kv => $"{kv.Key}:{kv.Value}"))
+            ? string.Join(", ", Broiler.HtmlBridge.DomBridge.GetInlineStyleView(anchored).Select(kv => $"{kv.Key}:{kv.Value}"))
             : "not found";
 
         // Since the test uses JS to set position-area dynamically, the
@@ -10087,8 +10090,9 @@ iframe {
         // The fallback should set left:50, top:50
         if (absTry != null)
         {
-            var left = absTry.Style.GetValueOrDefault("left") ?? "0px";
-            var top = absTry.Style.GetValueOrDefault("top") ?? "0px";
+            var absTryStyle = Broiler.HtmlBridge.DomBridge.GetInlineStyleView(absTry);
+            var left = absTryStyle.GetValueOrDefault("left") ?? "0px";
+            var top = absTryStyle.GetValueOrDefault("top") ?? "0px";
             // Accept test pass if the fallback was applied
             Assert.True(left.Contains("50") || top.Contains("50"),
                 $"Expected position-try fallback to apply. left={left} top={top}");

@@ -215,7 +215,7 @@ public sealed partial class DomBridge
 
     /// <summary>Whether <paramref name="node"/> is a sub-document root element (only elements can be).</summary>
     private static bool IsSubDocRootNode(global::Broiler.Dom.DomNode node) =>
-        node is DomElement element && IsSubDocRoot(element);
+        node is Broiler.Dom.DomElement element && IsSubDocRoot(element);
 
     private JSValue JsJsObjectsGetChildNodes033Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
@@ -284,7 +284,7 @@ public sealed partial class DomBridge
             return new JSNumber(3); // TEXT_NODE
         if (IsComment(node))
             return new JSNumber(8); // COMMENT_NODE
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return new JSNumber(1); // canonical non-element char-data already handled above
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(9); // DOCUMENT_NODE
@@ -302,7 +302,7 @@ public sealed partial class DomBridge
             return new JSString("#text");
         if (IsComment(node))
             return new JSString("#comment");
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return JSNull.Value;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSString("#document");
@@ -323,7 +323,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetLocalName040Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         // localName is null for non-element nodes (text/comment/document).
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return JSNull.Value;
         if (element.TagName.StartsWith("#"))
             return JSNull.Value; // #comment, #document, etc.
@@ -337,7 +337,7 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetPrefix041Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return JSNull.Value;
         var colonIdx = element.TagName.IndexOf(':');
         if (colonIdx >= 0)
@@ -349,7 +349,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetNamespaceURI042Core(global::Broiler.Dom.DomNode node, in Arguments a)
     {
         // namespaceURI is null for non-element nodes (text/comment/document).
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return JSNull.Value;
         if (element.NamespaceUri != null)
             return new JSString(element.NamespaceUri);
@@ -728,7 +728,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsNormalize076Core(global::Broiler.Dom.DomNode node, in Arguments _)
     {
         // normalize() on a character-data node is a no-op (it has no text children to merge).
-        if (node is DomElement element)
+        if (node is Broiler.Dom.DomElement element)
             NormalizeNode(element);
         return JSUndefined.Value;
     }
@@ -900,7 +900,7 @@ public sealed partial class DomBridge
         var childObj = a[0] as JSObject;
         if (childObj == null)
             return JSUndefined.Value;
-        // Find the DomElement for this child JSObject
+        // Find the Broiler.Dom.DomElement for this child JSObject
         var childEl = FindDomNodeByJSObject(childObj);
         if (childEl == null)
             return a[0];
@@ -1494,7 +1494,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsClosest129Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        for (DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = ParentEl(current))
+        for (Broiler.Dom.DomElement? current = element; current != null && !current.TagName.StartsWith("#", StringComparison.Ordinal); current = ParentEl(current))
         {
             if (MatchesSelector(current, sel, element))
                 return bridge.ToJSObject(current);
@@ -1543,7 +1543,7 @@ public sealed partial class DomBridge
         var html = a.Length > 1 ? a[1].ToString() : string.Empty;
         if (string.IsNullOrEmpty(html))
             return JSUndefined.Value;
-        DomElement parsingContext;
+        Broiler.Dom.DomElement parsingContext;
         switch (position)
         {
             case "beforebegin":

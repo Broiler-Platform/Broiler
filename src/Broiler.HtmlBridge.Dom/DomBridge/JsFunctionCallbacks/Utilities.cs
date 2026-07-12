@@ -48,7 +48,7 @@ public sealed partial class DomBridge
         if (a.Length >= 2)
         {
             var prop = a[0].ToString();
-            var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+            var value = Broiler.CSS.CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
             {
                 InlineStyle(element).Remove(prop);
@@ -73,9 +73,9 @@ public sealed partial class DomBridge
         {
             var prop = a[0].ToString();
             if (TryGetStylePropertyRawValue(element, prop, out var val))
-                return new JSString(StripCssPriority(val));
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
             // Try camelCase version of kebab-case input
-            var camel = ToCamelCaseStatic(prop);
+            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(prop);
             // Check JSObject properties (set via el.style.propertyName = value)
             var jsVal = a.This?[(KeyString)camel];
             if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
@@ -138,7 +138,7 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesGetPropertyPriority012Core(global::Broiler.Dom.DomElement element, in Arguments a)
     {
         if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
-            return new JSString(GetCssPriority(value));
+            return new JSString(Broiler.CSS.CssPriority.Parse(value));
         return new JSString(string.Empty);
     }
 
@@ -169,7 +169,7 @@ public sealed partial class DomBridge
         if (a.Length >= 2)
         {
             var prop = a[0].ToString();
-            var value = ApplyCssPriority(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+            var value = Broiler.CSS.CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
                 styleMap.Remove(prop);
             else
@@ -186,8 +186,8 @@ public sealed partial class DomBridge
         {
             var prop = a[0].ToString();
             if (TryGetStylePropertyRawValue(styleMap, prop, out var val))
-                return new JSString(StripCssPriority(val));
-            var camel = ToCamelCaseStatic(prop);
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(prop);
             var jsVal = a.This?[(KeyString)camel];
             if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
                 return jsVal;
@@ -205,9 +205,9 @@ public sealed partial class DomBridge
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
-            var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? StripCssPriority(val) : string.Empty;
+            var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? Broiler.CSS.CssPriority.Strip(val) : string.Empty;
             styleMap.Remove(prop);
-            styleMap.Remove(ToKebabCase(prop));
+            styleMap.Remove(Broiler.CSS.CssPropertyNames.ToCssPropertyName(prop));
             return new JSString(removed);
         }
 
@@ -247,7 +247,7 @@ public sealed partial class DomBridge
     private static JSValue JsUtilitiesGetPropertyPriority023Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
     {
         if (a.Length > 0 && TryGetStylePropertyRawValue(styleMap, a[0].ToString(), out var value))
-            return new JSString(GetCssPriority(value));
+            return new JSString(Broiler.CSS.CssPriority.Parse(value));
         return new JSString(string.Empty);
     }
 

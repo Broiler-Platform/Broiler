@@ -832,7 +832,7 @@ public sealed partial class DomBridge
         // Document node can only have one element child. RF-BRIDGE-1c Phase F (F3c part 2b):
         // only an element container carries #document/#subdoc-root TagName; a text container
         // never enters this branch.
-        if (state.StartContainer is DomElement startContainerElement &&
+        if (state.StartContainer is Broiler.Dom.DomElement startContainerElement &&
             (string.Equals(startContainerElement.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(startContainerElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)))
         {
             // Count existing element children (minus any that will be moved into newParent)

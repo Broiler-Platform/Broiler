@@ -12,15 +12,15 @@ public sealed partial class DomBridge
         {
             var name = a[0].ToString();
             if (computed.TryGetValue(name, out var val))
-                return new JSString(StripCssPriority(val));
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
             // Try kebab-case conversion for camelCase input
-            var kebab = ToKebabCase(name);
+            var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(name);
             if (kebab != name && computed.TryGetValue(kebab, out val))
-                return new JSString(StripCssPriority(val));
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
             // Try camelCase conversion for kebab-case input
-            var camel = ToCamelCaseStatic(name);
+            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(name);
             if (camel != name && computed.TryGetValue(camel, out val))
-                return new JSString(StripCssPriority(val));
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
         }
 
         return new JSString(string.Empty);

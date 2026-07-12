@@ -389,7 +389,7 @@ public sealed partial class DomBridge
         var optEl = FindDomElementByJSObject(optObj);
         if (optEl == null)
             return JSUndefined.Value;
-        DomElement? refEl = null;
+        Broiler.Dom.DomElement? refEl = null;
         if (a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined)
         {
             var refObj = a[1] as JSObject;

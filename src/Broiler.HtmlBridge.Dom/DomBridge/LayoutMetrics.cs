@@ -66,7 +66,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private double GetClientWidthForDomElement(DomElement element, bool isRoot) =>
+    private double GetClientWidthForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (isRoot)
@@ -82,7 +82,7 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private double GetClientHeightForDomElement(DomElement element, bool isRoot) =>
+    private double GetClientHeightForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (isRoot)
@@ -97,19 +97,19 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private double GetClientTopForDomElement(DomElement element)
+    private double GetClientTopForDomElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element);
     }
 
-    private double GetClientLeftForDomElement(DomElement element)
+    private double GetClientLeftForDomElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
     }
 
-    private double GetOffsetWidthForDomElement(DomElement element, bool isRoot) =>
+    private double GetOffsetWidthForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (isRoot)
@@ -128,7 +128,7 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private double GetOffsetHeightForDomElement(DomElement element, bool isRoot) =>
+    private double GetOffsetHeightForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (isRoot)
@@ -147,10 +147,10 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private static bool ShouldReportZeroOffsetMetrics(DomElement element) =>
+    private static bool ShouldReportZeroOffsetMetrics(Broiler.Dom.DomElement element) =>
         string.Equals(element.TagName, "map", StringComparison.OrdinalIgnoreCase);
 
-    private double GetOffsetTopForDomElement(DomElement element) =>
+    private double GetOffsetTopForDomElement(Broiler.Dom.DomElement element) =>
         WithLayoutGeometryCache(() =>
         {
             var resolved = ResolvePositionAreaForElement(element);
@@ -164,7 +164,7 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private double GetOffsetLeftForDomElement(DomElement element) =>
+    private double GetOffsetLeftForDomElement(Broiler.Dom.DomElement element) =>
         WithLayoutGeometryCache(() =>
         {
             var resolved = ResolvePositionAreaForElement(element);
@@ -188,7 +188,7 @@ public sealed partial class DomBridge
     /// (<c>align-self</c>/<c>justify-self</c>) in vertical writing modes. Returns
     /// <c>false</c> (fall back to the estimator) when either box is missing from the snapshot.
     /// </summary>
-    private bool TryGetSharedOffset(DomElement element, DomElement offsetParent, bool vertical, out double offset)
+    private bool TryGetSharedOffset(Broiler.Dom.DomElement element, Broiler.Dom.DomElement offsetParent, bool vertical, out double offset)
     {
         offset = 0;
         if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var elementGeometry))
@@ -215,7 +215,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private DomElement? GetOffsetParentForDomElement(DomElement element)
+    private Broiler.Dom.DomElement? GetOffsetParentForDomElement(Broiler.Dom.DomElement element)
     {
         if (ParentEl(element) == null ||
             ReferenceEquals(element, DocumentElement) ||
@@ -251,7 +251,7 @@ public sealed partial class DomBridge
         return fallbackBody ?? documentElement;
     }
 
-    private DomElement? GetScrollParentForDomElement(DomElement element)
+    private Broiler.Dom.DomElement? GetScrollParentForDomElement(Broiler.Dom.DomElement element)
     {
         var documentElement = GetOwningDocumentElement(element);
         if (!HasAssociatedLayoutBox(element))
@@ -286,9 +286,9 @@ public sealed partial class DomBridge
         return FindNearestScrollParent(ParentEl(element), documentElement);
     }
 
-    private DomElement GetDocumentScrollingElement(DomElement documentElement) => documentElement;
+    private Broiler.Dom.DomElement GetDocumentScrollingElement(Broiler.Dom.DomElement documentElement) => documentElement;
 
-    private DomElement FindNearestScrollParent(DomElement? start, DomElement documentElement)
+    private Broiler.Dom.DomElement FindNearestScrollParent(Broiler.Dom.DomElement? start, Broiler.Dom.DomElement documentElement)
     {
         for (var current = start; current != null; current = ParentEl(current))
         {
@@ -305,7 +305,7 @@ public sealed partial class DomBridge
         return GetDocumentScrollingElement(documentElement);
     }
 
-    private DomElement? FindFixedPositionContainingBlock(DomElement element, DomElement documentElement)
+    private Broiler.Dom.DomElement? FindFixedPositionContainingBlock(Broiler.Dom.DomElement element, Broiler.Dom.DomElement documentElement)
     {
         for (var current = ParentEl(element); current != null; current = ParentEl(current))
         {
@@ -319,7 +319,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private bool EstablishesFixedPositionContainingBlock(DomElement element)
+    private bool EstablishesFixedPositionContainingBlock(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         var transform = props.GetValueOrDefault("transform");
@@ -340,7 +340,7 @@ public sealed partial class DomBridge
                normalized.Contains("content");
     }
 
-    private bool HasAssociatedLayoutBox(DomElement element)
+    private bool HasAssociatedLayoutBox(Broiler.Dom.DomElement element)
     {
         if (IsText(element))
             return false;
@@ -369,7 +369,7 @@ public sealed partial class DomBridge
     /// element's own unzoomed CSS pixels; a zoomed descendant keeps its larger baked
     /// extent, which correctly counts as scrollable overflow.</para>
     /// </summary>
-    private bool TryGetSharedScrollExtent(DomElement element, bool vertical, out double extent)
+    private bool TryGetSharedScrollExtent(Broiler.Dom.DomElement element, bool vertical, out double extent)
     {
         extent = 0;
         if (!TryGetSharedLayoutGeometry(element, out var box))
@@ -408,7 +408,7 @@ public sealed partial class DomBridge
     /// snapshot pass restores after building (see the render-doc/live-doc separation),
     /// so the true zoom is readable here.
     /// </summary>
-    private double UnzoomSharedExtent(double extent, DomElement element)
+    private double UnzoomSharedExtent(double extent, Broiler.Dom.DomElement element)
     {
         var zoom = GetUsedZoomForElement(element);
         return zoom > 0.0001 ? extent / zoom : extent;
@@ -420,7 +420,7 @@ public sealed partial class DomBridge
     /// <c>false</c> (caller falls back to the estimator) when the shared path is off or the
     /// element has no box.
     /// </summary>
-    private bool TrySharedBorderBoxExtent(DomElement element, bool vertical, out double extent)
+    private bool TrySharedBorderBoxExtent(Broiler.Dom.DomElement element, bool vertical, out double extent)
     {
         extent = 0;
         if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var box))
@@ -435,7 +435,7 @@ public sealed partial class DomBridge
     /// box), in the element's own unzoomed CSS pixels. Returns <c>false</c> (caller falls
     /// back to the estimator) when the shared path is off or the element has no box.
     /// </summary>
-    private bool TrySharedContentBoxExtent(DomElement element, bool vertical, out double extent)
+    private bool TrySharedContentBoxExtent(Broiler.Dom.DomElement element, bool vertical, out double extent)
     {
         extent = 0;
         if (!UseSharedLayoutGeometry || !TryGetSharedLayoutGeometry(element, out var box))
@@ -444,7 +444,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private double GetScrollWidthForDomElement(DomElement element, bool isRoot) =>
+    private double GetScrollWidthForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
@@ -460,7 +460,7 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private double GetScrollHeightForDomElement(DomElement element, bool isRoot) =>
+    private double GetScrollHeightForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
@@ -474,7 +474,7 @@ public sealed partial class DomBridge
             return 0;
         });
 
-    private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot) =>
+    private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(Broiler.Dom.DomElement element, bool isRoot) =>
         WithLayoutGeometryCache(() =>
         {
             if (isRoot)
@@ -483,7 +483,7 @@ public sealed partial class DomBridge
             return ComputeRenderedRect(element);
         });
 
-    private (double Left, double Top, double Width, double Height) ComputeRenderedRect(DomElement element)
+    private (double Left, double Top, double Width, double Height) ComputeRenderedRect(Broiler.Dom.DomElement element)
     {
         var layoutRect = ComputeUnzoomedLayoutRect(element);
         var zoom = GetUsedZoomForElement(element);
@@ -491,7 +491,7 @@ public sealed partial class DomBridge
         return (layoutRect.Left, layoutRect.Top, layoutRect.Width * zoom * transformScale, layoutRect.Height * zoom * transformScale);
     }
 
-    private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
+    private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(Broiler.Dom.DomElement element)
     {
         // RF-BRIDGE-1b: the element's rect comes from the renderer's real layout (border
         // box, document coords), which powers getBoundingClientRect and offset top/left.
@@ -514,7 +514,7 @@ public sealed partial class DomBridge
         return (0, 0, 0, 0);
     }
 
-    private static bool IsSvgShapeElement(DomElement element)
+    private static bool IsSvgShapeElement(Broiler.Dom.DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "rect", StringComparison.OrdinalIgnoreCase) ||
@@ -525,19 +525,19 @@ public sealed partial class DomBridge
                string.Equals(tag, "svg:foreignobject", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsSvgViewportElement(DomElement element)
+    private static bool IsSvgViewportElement(Broiler.Dom.DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "svg", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "svg:svg", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsSvgElement(DomElement element) =>
+    private static bool IsSvgElement(Broiler.Dom.DomElement element) =>
         string.Equals(element.NamespaceUri, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
         IsSvgViewportElement(element) ||
         IsSvgShapeElement(element);
 
-    private double GetUsedZoomForElement(DomElement element)
+    private double GetUsedZoomForElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
@@ -561,7 +561,7 @@ public sealed partial class DomBridge
         return parentZoom;
     }
 
-    private double GetTransformScale(DomElement element)
+    private double GetTransformScale(Broiler.Dom.DomElement element)
     {
         var transform = GetElementTransformValue(element);
         if (string.IsNullOrWhiteSpace(transform))
@@ -578,7 +578,7 @@ public sealed partial class DomBridge
         return 1;
     }
 
-    private string? GetElementTransformValue(DomElement element)
+    private string? GetElementTransformValue(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         var transform = props.GetValueOrDefault("transform");
@@ -593,14 +593,14 @@ public sealed partial class DomBridge
             : null;
     }
 
-    private static bool IsSvgGroupElement(DomElement element)
+    private static bool IsSvgGroupElement(Broiler.Dom.DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "g", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "svg:g", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsSvgTextContentElement(DomElement element)
+    private static bool IsSvgTextContentElement(Broiler.Dom.DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "text", StringComparison.OrdinalIgnoreCase) ||
@@ -612,7 +612,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryGetSvgChildrenUnionRect(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         out (double Left, double Top, double Width, double Height) rect)
     {
         var found = false;
@@ -653,7 +653,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryGetSvgTextHitTestRect(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         out (double Left, double Top, double Width, double Height) rect)
     {
         var text = GetDirectTextContent(element);
@@ -703,7 +703,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static string GetDirectTextContent(DomElement element)
+    private static string GetDirectTextContent(Broiler.Dom.DomElement element)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2d): a node's direct text is its text-node children.
         var sb = new StringBuilder();
@@ -716,7 +716,7 @@ public sealed partial class DomBridge
         return sb.ToString();
     }
 
-    private double ResolveSvgTextCoordinate(DomElement element, string attributeName)
+    private double ResolveSvgTextCoordinate(Broiler.Dom.DomElement element, string attributeName)
     {
         for (var current = element; current != null; current = ParentEl(current))
         {
@@ -757,11 +757,11 @@ public sealed partial class DomBridge
         return 0;
     }
 
-    private static bool HasOwnSvgCoordinate(DomElement element, string attributeName) =>
+    private static bool HasOwnSvgCoordinate(Broiler.Dom.DomElement element, string attributeName) =>
         TryGetAttribute(element, attributeName, out var rawValue) &&
         !string.IsNullOrWhiteSpace(rawValue);
 
-    private bool TryResolveSvgTextPathStart(DomElement element, out (double X, double Y) point)
+    private bool TryResolveSvgTextPathStart(Broiler.Dom.DomElement element, out (double X, double Y) point)
     {
         point = default;
         if (!TryGetAttribute(element, "href", out var href) &&
@@ -802,14 +802,14 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool IsSvgTextPathElement(DomElement element)
+    private static bool IsSvgTextPathElement(Broiler.Dom.DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "textpath", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "svg:textpath", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static DomElement? FindNearestSvgViewportAncestor(DomElement element)
+    private static Broiler.Dom.DomElement? FindNearestSvgViewportAncestor(Broiler.Dom.DomElement element)
     {
         for (var current = ParentEl(element); current != null; current = ParentEl(current))
         {
@@ -820,7 +820,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
+    private double GetBorderBoxWidth(Dictionary<string, string> props, Broiler.Dom.DomElement? element = null)
     {
         var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
         return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
@@ -830,7 +830,7 @@ public sealed partial class DomBridge
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"), element);
     }
 
-    private double GetBorderBoxHeight(Dictionary<string, string> props, DomElement? element = null)
+    private double GetBorderBoxHeight(Dictionary<string, string> props, Broiler.Dom.DomElement? element = null)
     {
         var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
         var containingBlockHeight = element != null ? ResolveContainingBlockReferenceLength(element, vertical: true) : (double?)null;
@@ -842,7 +842,7 @@ public sealed partial class DomBridge
     }
 
     private void ScrollElementIntoView(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         string? block = null,
         string? inline = null,
         string? behavior = null)
@@ -965,7 +965,7 @@ public sealed partial class DomBridge
     }
 
     private (string Horizontal, string Vertical) ResolvePhysicalScrollIntoViewAlignments(
-        DomElement scrollContainer,
+        Broiler.Dom.DomElement scrollContainer,
         string? block,
         string? inline)
     {
@@ -1004,7 +1004,7 @@ public sealed partial class DomBridge
         };
     }
 
-    private double GetElementScrollOffset(DomElement element, bool vertical)
+    private double GetElementScrollOffset(Broiler.Dom.DomElement element, bool vertical)
     {
         if (!CanProgrammaticallyScroll(element, vertical))
             return 0;
@@ -1014,14 +1014,14 @@ public sealed partial class DomBridge
             : 0;
     }
 
-    private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
+    private void SetElementScrollOffsets(Broiler.Dom.DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
     {
         var (nextLeft, nextTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
         GetElementRuntimeState(element).Scroll.Left.Set(nextLeft);
         GetElementRuntimeState(element).Scroll.Top.Set(nextTop);
     }
 
-    private (double Left, double Top) ResolveElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
+    private (double Left, double Top) ResolveElementScrollOffsets(Broiler.Dom.DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
     {
         var currentLeft = GetElementScrollOffset(element, vertical: false);
         var currentTop = GetElementScrollOffset(element, vertical: true);
@@ -1045,7 +1045,7 @@ public sealed partial class DomBridge
     }
 
     private void SetElementScrollOffsetsWithBehavior(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         double? left = null,
         double? top = null,
         bool relative = false,
@@ -1106,12 +1106,12 @@ public sealed partial class DomBridge
         _frameActions[Interlocked.Increment(ref _frameActionIdCounter)] = callback;
     }
 
-    private void CancelSmoothScroll(DomElement element)
+    private void CancelSmoothScroll(Broiler.Dom.DomElement element)
     {
         _smoothScrollTokens.TryRemove(element, out _);
     }
 
-    private void DispatchScrollEventIfNeeded(DomElement element, double previousLeft, double previousTop)
+    private void DispatchScrollEventIfNeeded(Broiler.Dom.DomElement element, double previousLeft, double previousTop)
     {
         if (AreClose(previousLeft, GetElementScrollOffset(element, vertical: false)) &&
             AreClose(previousTop, GetElementScrollOffset(element, vertical: true)))
@@ -1120,7 +1120,7 @@ public sealed partial class DomBridge
         DispatchElementEvent(element, "scroll");
     }
 
-    private void DispatchScrollEndEventIfNeeded(DomElement element, double previousLeft, double previousTop)
+    private void DispatchScrollEndEventIfNeeded(Broiler.Dom.DomElement element, double previousLeft, double previousTop)
     {
         if (AreClose(previousLeft, GetElementScrollOffset(element, vertical: false)) &&
             AreClose(previousTop, GetElementScrollOffset(element, vertical: true)))
@@ -1129,7 +1129,7 @@ public sealed partial class DomBridge
         DispatchElementEvent(element, "scrollend");
     }
 
-    private void DispatchElementEvent(DomElement element, string eventType)
+    private void DispatchElementEvent(Broiler.Dom.DomElement element, string eventType)
     {
         var evt = new JSObject();
         evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1137,7 +1137,7 @@ public sealed partial class DomBridge
         DispatchEventOnElement(element, evt);
     }
 
-    private string ResolveScrollBehavior(DomElement element, string? requestedBehavior)
+    private string ResolveScrollBehavior(Broiler.Dom.DomElement element, string? requestedBehavior)
     {
         var normalizedRequested = NormalizeScrollBehavior(requestedBehavior);
         if (normalizedRequested == "instant" || normalizedRequested == "smooth")
@@ -1179,8 +1179,8 @@ public sealed partial class DomBridge
     }
 
     private void ScrollFixedElementIntoVisualViewport(
-        DomElement element,
-        DomElement scrollContainer,
+        Broiler.Dom.DomElement element,
+        Broiler.Dom.DomElement scrollContainer,
         string? block,
         string? inline)
     {
@@ -1293,7 +1293,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private bool CanProgrammaticallyScroll(DomElement element, bool vertical)
+    private bool CanProgrammaticallyScroll(Broiler.Dom.DomElement element, bool vertical)
     {
         if (IsDocumentElement(element) ||
             IsViewportBodyElement(element, GetOwningDocumentElement(element)))
@@ -1310,7 +1310,7 @@ public sealed partial class DomBridge
         return EnablesScrollingBox(axisValue);
     }
 
-    private bool CanProgrammaticallyScrollRoot(DomElement rootElement, bool vertical)
+    private bool CanProgrammaticallyScrollRoot(Broiler.Dom.DomElement rootElement, bool vertical)
     {
         var documentElement = GetOwningDocumentElement(rootElement);
         var htmlOverflow = GetOverflowAxisValue(GetComputedProps(documentElement), vertical);
@@ -1349,7 +1349,7 @@ public sealed partial class DomBridge
         return value.Contains("hidden") || value.Contains("scroll") || value.Contains("auto") || value.Contains("clip");
     }
 
-    private (double MinLeft, double MaxLeft, double MinTop, double MaxTop) GetScrollBounds(DomElement element)
+    private (double MinLeft, double MaxLeft, double MinTop, double MaxTop) GetScrollBounds(Broiler.Dom.DomElement element)
     {
         var isRoot = IsViewportElementForMetrics(element);
         var maxLeft = Math.Max(0, GetScrollWidthForDomElement(element, isRoot) - GetClientWidthForDomElement(element, isRoot));
@@ -1371,7 +1371,7 @@ public sealed partial class DomBridge
         return (minLeft, boundedMaxLeft, minTop, boundedMaxTop);
     }
 
-    private bool CanProgrammaticallyScrollSelectListBox(DomElement element, bool vertical)
+    private bool CanProgrammaticallyScrollSelectListBox(Broiler.Dom.DomElement element, bool vertical)
     {
         var props = GetComputedProps(element);
         bool verticalWritingMode = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
@@ -1384,7 +1384,7 @@ public sealed partial class DomBridge
         return scrollExtent > clientExtent + 0.5;
     }
 
-    private bool TryGetSelectListBoxScrollExtent(DomElement element, bool verticalAxis, out double extent)
+    private bool TryGetSelectListBoxScrollExtent(Broiler.Dom.DomElement element, bool verticalAxis, out double extent)
     {
         if (!IsSelectListBox(element))
         {
@@ -1410,7 +1410,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static int CountSelectOptions(DomElement element)
+    private static int CountSelectOptions(Broiler.Dom.DomElement element)
     {
         int count = 0;
         foreach (var child in ChildElements(element).Where(c => !IsText(c)))
@@ -1447,9 +1447,9 @@ public sealed partial class DomBridge
         return svgLength;
     }
 
-    private static List<DomElement> CollectSelectOptions(DomElement element)
+    private static List<Broiler.Dom.DomElement> CollectSelectOptions(Broiler.Dom.DomElement element)
     {
-        var options = new List<DomElement>();
+        var options = new List<Broiler.Dom.DomElement>();
         foreach (var child in ChildElements(element).Where(c => !IsText(c)))
         {
             if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
@@ -1464,7 +1464,7 @@ public sealed partial class DomBridge
         return options;
     }
 
-    private static int GetSelectSelectedIndex(DomElement element)
+    private static int GetSelectSelectedIndex(Broiler.Dom.DomElement element)
     {
         var options = CollectSelectOptions(element);
         if (options.Count == 0)
@@ -1489,7 +1489,7 @@ public sealed partial class DomBridge
         return 0;
     }
 
-    private static void SetSelectSelectedIndex(DomElement element, int index)
+    private static void SetSelectSelectedIndex(Broiler.Dom.DomElement element, int index)
     {
         var options = CollectSelectOptions(element);
         if (options.Count == 0)
@@ -1504,7 +1504,7 @@ public sealed partial class DomBridge
         GetElementRuntimeState(element).FormControl.SelectedIndex.Set(index);
     }
 
-    private static string GetSelectValue(DomElement element)
+    private static string GetSelectValue(Broiler.Dom.DomElement element)
     {
         var options = CollectSelectOptions(element);
         var selectedIndex = GetSelectSelectedIndex(element);
@@ -1521,7 +1521,7 @@ public sealed partial class DomBridge
         return GetElementTextContent(option);
     }
 
-    private static void SetSelectValue(DomElement element, string value)
+    private static void SetSelectValue(Broiler.Dom.DomElement element, string value)
     {
         var options = CollectSelectOptions(element);
         for (var index = 0; index < options.Count; index++)
@@ -1540,7 +1540,7 @@ public sealed partial class DomBridge
         GetElementRuntimeState(element).FormControl.SelectedIndex.Set(-1);
     }
 
-    private IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)
+    private IEnumerable<Broiler.Dom.DomElement> EnumerateRenderedDescendants(Broiler.Dom.DomElement element)
     {
         foreach (var child in EnumerateRenderedChildren(element))
         {
@@ -1551,7 +1551,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private IEnumerable<DomElement> EnumerateRenderedChildren(DomElement element)
+    private IEnumerable<Broiler.Dom.DomElement> EnumerateRenderedChildren(Broiler.Dom.DomElement element)
     {
         if (string.Equals(element.TagName, "slot", StringComparison.OrdinalIgnoreCase))
         {
@@ -1575,7 +1575,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private DomElement? FindScrollContainer(DomElement element)
+    private Broiler.Dom.DomElement? FindScrollContainer(Broiler.Dom.DomElement element)
     {
         var documentElement = GetOwningDocumentElement(element);
         for (var current = GetScrollTraversalParent(element); current != null; current = GetScrollTraversalParent(current))
@@ -1594,7 +1594,7 @@ public sealed partial class DomBridge
         return documentElement;
     }
 
-    private bool HasFixedPositionAncestorBefore(DomElement element, DomElement ancestor)
+    private bool HasFixedPositionAncestorBefore(Broiler.Dom.DomElement element, Broiler.Dom.DomElement ancestor)
     {
         for (var current = GetScrollTraversalParent(element);
              current != null && !ReferenceEquals(current, ancestor);
@@ -1608,20 +1608,20 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static bool IsDocumentElement(DomElement element) =>
+    private static bool IsDocumentElement(Broiler.Dom.DomElement element) =>
         string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase);
 
-    private bool IsViewportElementForMetrics(DomElement element)
+    private bool IsViewportElementForMetrics(Broiler.Dom.DomElement element)
     {
         var documentElement = GetOwningDocumentElement(element);
         return IsDocumentElement(element) || IsViewportBodyElement(element, documentElement);
     }
 
-    private static bool IsViewportBodyElement(DomElement element, DomElement documentElement) =>
+    private static bool IsViewportBodyElement(Broiler.Dom.DomElement element, Broiler.Dom.DomElement documentElement) =>
         string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) &&
         ReferenceEquals(ParentEl(element), documentElement);
 
-    private DomElement GetOwningDocumentElement(DomElement element)
+    private Broiler.Dom.DomElement GetOwningDocumentElement(Broiler.Dom.DomElement element)
     {
         for (var current = element; current != null; current = ParentEl(current)!)
         {
@@ -1632,7 +1632,7 @@ public sealed partial class DomBridge
         return DocumentElement;
     }
 
-    private bool HasFixedPositionInDocument(DomElement element, DomElement documentElement)
+    private bool HasFixedPositionInDocument(Broiler.Dom.DomElement element, Broiler.Dom.DomElement documentElement)
     {
         if (IsFixedPositionElement(element))
             return true;
@@ -1640,13 +1640,13 @@ public sealed partial class DomBridge
         return HasFixedPositionAncestorBefore(element, documentElement);
     }
 
-    private bool IsFixedPositionElement(DomElement element)
+    private bool IsFixedPositionElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         return string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static DomElement? GetOuterFrameElement(DomElement documentElement)
+    private static Broiler.Dom.DomElement? GetOuterFrameElement(Broiler.Dom.DomElement documentElement)
     {
         var docRoot = ParentEl(documentElement);
         return docRoot != null &&
@@ -1655,7 +1655,7 @@ public sealed partial class DomBridge
             : null;
     }
 
-    private DomElement? GetOuterScrollContinuationElement(DomElement scrollContainer)
+    private Broiler.Dom.DomElement? GetOuterScrollContinuationElement(Broiler.Dom.DomElement scrollContainer)
     {
         if (IsDocumentElement(scrollContainer))
             return GetOuterFrameElement(scrollContainer);
@@ -1673,7 +1673,7 @@ public sealed partial class DomBridge
     /// <c>false</c> — so the caller reports zero — when either box is missing, or zoom is in
     /// play (a zoomed cross-ancestor delta is not reconciled against the baked snapshot).
     /// </summary>
-    private bool TrySharedOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical, out double offset,
+    private bool TrySharedOffsetWithinAncestor(Broiler.Dom.DomElement element, Broiler.Dom.DomElement ancestor, bool vertical, out double offset,
         bool viewportAnchored = false)
     {
         offset = 0;
@@ -1740,7 +1740,7 @@ public sealed partial class DomBridge
     /// subtraction for a viewport-anchored scrollIntoView target
     /// (<see cref="TrySharedOffsetWithinAncestor"/>).
     /// </summary>
-    private DomElement? FindNearestFixedAncestorOrSelf(DomElement element)
+    private Broiler.Dom.DomElement? FindNearestFixedAncestorOrSelf(Broiler.Dom.DomElement element)
     {
         for (var current = element; current != null; current = ParentEl(current))
         {
@@ -1750,7 +1750,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static bool IsDomDescendantOrSelf(DomElement node, DomElement potentialAncestor)
+    private static bool IsDomDescendantOrSelf(Broiler.Dom.DomElement node, Broiler.Dom.DomElement potentialAncestor)
     {
         for (var current = node; current != null; current = ParentEl(current))
         {
@@ -1768,7 +1768,7 @@ public sealed partial class DomBridge
     /// the estimator. Used by the visual-viewport fixed-element scrollIntoView sites so
     /// they no longer call the estimator directly.
     /// </summary>
-    private double OffsetWithinAncestorForFixedPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
+    private double OffsetWithinAncestorForFixedPreferShared(Broiler.Dom.DomElement element, Broiler.Dom.DomElement ancestor, bool vertical) =>
         TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared, viewportAnchored: true)
             ? shared
             : 0;
@@ -1780,14 +1780,14 @@ public sealed partial class DomBridge
     /// shared-unavailable element (cross-origin / non-materialised frame) reports 0 — real
     /// in-flow sticky/scrollIntoView targets are always present in the snapshot.
     /// </summary>
-    private double OffsetWithinAncestorPreferShared(DomElement element, DomElement ancestor, bool vertical) =>
+    private double OffsetWithinAncestorPreferShared(Broiler.Dom.DomElement element, Broiler.Dom.DomElement ancestor, bool vertical) =>
         TrySharedOffsetWithinAncestor(element, ancestor, vertical, out var shared)
             ? shared
             : 0;
 
     private double ResolveScrollIntoViewOffset(
-        DomElement element,
-        DomElement scrollContainer,
+        Broiler.Dom.DomElement element,
+        Broiler.Dom.DomElement scrollContainer,
         bool vertical,
         string? alignment,
         double? viewportSizeOverride = null,
@@ -1862,7 +1862,7 @@ public sealed partial class DomBridge
     }
 
     private double ConvertPhysicalScrollPosition(
-        DomElement scrollContainer,
+        Broiler.Dom.DomElement scrollContainer,
         bool vertical,
         double physicalPosition,
         bool coordinateSpaceIsPhysical)
@@ -1870,7 +1870,7 @@ public sealed partial class DomBridge
             ? physicalPosition
             : ConvertPhysicalPositionToScrollCoordinate(scrollContainer, vertical, physicalPosition);
 
-    private double ConvertScrollCoordinateToPhysicalPosition(DomElement scrollContainer, bool vertical, double coordinate)
+    private double ConvertScrollCoordinateToPhysicalPosition(Broiler.Dom.DomElement scrollContainer, bool vertical, double coordinate)
     {
         if (!UsesNegativeScrollCoordinates(scrollContainer, vertical))
             return coordinate;
@@ -1878,7 +1878,7 @@ public sealed partial class DomBridge
         return coordinate + GetPositiveScrollExtent(scrollContainer, vertical);
     }
 
-    private double ConvertPhysicalPositionToScrollCoordinate(DomElement scrollContainer, bool vertical, double physicalPosition)
+    private double ConvertPhysicalPositionToScrollCoordinate(Broiler.Dom.DomElement scrollContainer, bool vertical, double physicalPosition)
     {
         if (!UsesNegativeScrollCoordinates(scrollContainer, vertical))
             return physicalPosition;
@@ -1886,13 +1886,13 @@ public sealed partial class DomBridge
         return physicalPosition - GetPositiveScrollExtent(scrollContainer, vertical);
     }
 
-    private bool UsesNegativeScrollCoordinates(DomElement scrollContainer, bool vertical)
+    private bool UsesNegativeScrollCoordinates(Broiler.Dom.DomElement scrollContainer, bool vertical)
     {
         var (minLeft, _, minTop, _) = GetScrollBounds(scrollContainer);
         return vertical ? minTop < 0 : minLeft < 0;
     }
 
-    private double GetPositiveScrollExtent(DomElement scrollContainer, bool vertical)
+    private double GetPositiveScrollExtent(Broiler.Dom.DomElement scrollContainer, bool vertical)
     {
         var (minLeft, maxLeft, minTop, maxTop) = GetScrollBounds(scrollContainer);
         return vertical
@@ -1900,7 +1900,7 @@ public sealed partial class DomBridge
             : (minLeft < 0 ? maxLeft - minLeft : maxLeft);
     }
 
-    private (double Value, DomElement Owner) ResolveScrollIntoViewInset(DomElement element, string propertyName)
+    private (double Value, Broiler.Dom.DomElement Owner) ResolveScrollIntoViewInset(Broiler.Dom.DomElement element, string propertyName)
     {
         var props = GetComputedProps(element);
         var value = props.GetValueOrDefault(propertyName);
@@ -1910,7 +1910,7 @@ public sealed partial class DomBridge
         return (ParseCssLengthToPixelsWithViewport(value, element), element);
     }
 
-    private double ConvertInsetToScrollContainerCoordinates(double inset, DomElement insetOwner, DomElement scrollContainer)
+    private double ConvertInsetToScrollContainerCoordinates(double inset, Broiler.Dom.DomElement insetOwner, Broiler.Dom.DomElement scrollContainer)
     {
         if (!double.IsFinite(inset) || AreClose(inset, 0))
             return 0;
@@ -1928,7 +1928,7 @@ public sealed partial class DomBridge
 
     private double ParseCssLengthToPixelsWithViewport(
         string? value,
-        DomElement? referenceElement = null,
+        Broiler.Dom.DomElement? referenceElement = null,
         bool forLineHeight = false,
         double? percentageBasis = null,
         bool forFontSize = false)
@@ -1943,7 +1943,7 @@ public sealed partial class DomBridge
 
     private bool TryEvaluateCssLengthWithViewport(
         string value,
-        DomElement? referenceElement,
+        Broiler.Dom.DomElement? referenceElement,
         bool forLineHeight,
         double? percentageBasis,
         out double result,
@@ -2062,7 +2062,7 @@ public sealed partial class DomBridge
 
     private bool TryEvaluateMathLengthFunction(
         string value,
-        DomElement? referenceElement,
+        Broiler.Dom.DomElement? referenceElement,
         bool forLineHeight,
         double? percentageBasis,
         out double result,
@@ -2186,7 +2186,7 @@ public sealed partial class DomBridge
         return parts;
     }
 
-    private double ResolveContainingBlockReferenceLength(DomElement element, bool vertical)
+    private double ResolveContainingBlockReferenceLength(Broiler.Dom.DomElement element, bool vertical)
     {
         if (ParentEl(element) == null ||
             string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
@@ -2202,7 +2202,7 @@ public sealed partial class DomBridge
         return reference > 0 ? reference : GetViewportReferenceLength(element, vertical);
     }
 
-    private double GetViewportReferenceLength(DomElement? element, bool vertical)
+    private double GetViewportReferenceLength(Broiler.Dom.DomElement? element, bool vertical)
     {
         if (element != null)
         {
@@ -2236,21 +2236,21 @@ public sealed partial class DomBridge
                !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
-    private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)
+    private double ResolveLineHeightForLength(Broiler.Dom.DomElement element, bool rootRelative, bool forLineHeight = false)
     {
         var target = rootRelative ? GetRootElement(element) : (forLineHeight ? ParentEl(element) ?? element : element);
         return ResolveLineHeightForElement(target);
     }
 
-    private double ResolveFontSizeForLength(DomElement element, bool rootRelative)
+    private double ResolveFontSizeForLength(Broiler.Dom.DomElement element, bool rootRelative)
     {
         var target = rootRelative ? GetRootElement(element) : element;
         return ResolveFontSizeForElement(target);
     }
 
-    private DomElement GetRootElement(DomElement element)
+    private Broiler.Dom.DomElement GetRootElement(Broiler.Dom.DomElement element)
     {
-        DomElement? htmlElement = null;
+        Broiler.Dom.DomElement? htmlElement = null;
         var current = element;
         while (ParentEl(current) != null)
         {
@@ -2262,7 +2262,7 @@ public sealed partial class DomBridge
         return htmlElement ?? current;
     }
 
-    private double ResolveLineHeightForElement(DomElement element)
+    private double ResolveLineHeightForElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         var fontSize = ResolveFontSizeForElement(element);
@@ -2283,7 +2283,7 @@ public sealed partial class DomBridge
         return ParseCssLengthToPixelsWithViewport(lineHeight, element, forLineHeight: true);
     }
 
-    private double ResolveFontSizeForElement(DomElement element)
+    private double ResolveFontSizeForElement(Broiler.Dom.DomElement element)
     {
         var props = GetComputedProps(element);
         var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element, forFontSize: true);

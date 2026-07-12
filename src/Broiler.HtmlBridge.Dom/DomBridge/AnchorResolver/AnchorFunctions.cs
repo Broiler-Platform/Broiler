@@ -16,7 +16,7 @@ public sealed partial class DomBridge
         @"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private void ResolveAnchorFunctions(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var cssProps = CollectMatchedRuleProperties(element);
@@ -178,7 +178,7 @@ public sealed partial class DomBridge
     /// is scaled to match <c>ApplyScrollSimulation</c> under an active visual viewport.
     /// </summary>
     private void ComputeInterveningScrollOffset(
-        DomElement anchorEl, DomElement targetEl, out double offX, out double offY)
+        Broiler.Dom.DomElement anchorEl, Broiler.Dom.DomElement targetEl, out double offX, out double offY)
     {
         offX = 0;
         offY = 0;
@@ -234,7 +234,7 @@ public sealed partial class DomBridge
     /// True when <paramref name="node"/> is <paramref name="ancestor"/> or a
     /// descendant of it.
     /// </summary>
-    private static bool IsDescendantOrSelf(DomElement node, DomElement ancestor)
+    private static bool IsDescendantOrSelf(Broiler.Dom.DomElement node, Broiler.Dom.DomElement ancestor)
     {
         for (var cur = node; cur != null; cur = ParentEl(cur))
             if (cur == ancestor)
@@ -255,7 +255,7 @@ public sealed partial class DomBridge
     /// dimensions.
     /// </summary>
     private static void ResolveAnchorSizeFunctions(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {

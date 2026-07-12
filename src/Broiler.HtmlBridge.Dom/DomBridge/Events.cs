@@ -70,7 +70,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private JSValue BuildComposedPathValue(Broiler.Dom.DomNode target, IReadOnlyList<DomElement> path)
+    private JSValue BuildComposedPathValue(Broiler.Dom.DomNode target, IReadOnlyList<Broiler.Dom.DomElement> path)
     {
         JSValue ToEventPathObject(Broiler.Dom.DomNode node)
             => node == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(node);
@@ -86,7 +86,7 @@ public sealed partial class DomBridge
         return new JSArray(values.ToArray());
     }
 
-    private static bool CheckElementValidity(DomElement element)
+    private static bool CheckElementValidity(Broiler.Dom.DomElement element)
     {
         if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
         {
@@ -107,7 +107,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool ValidateFormChildren(DomElement form)
+    private static bool ValidateFormChildren(Broiler.Dom.DomElement form)
     {
         foreach (var child in ChildElements(form))
         {
@@ -127,8 +127,8 @@ public sealed partial class DomBridge
         var eventType = typeVal != null && typeVal is JSString ? typeVal.ToString() : "unknown";
 
         // Build the path from the root to the target
-        var path = new List<DomElement>();
-        var visited = new HashSet<DomElement>();
+        var path = new List<Broiler.Dom.DomElement>();
+        var visited = new HashSet<Broiler.Dom.DomElement>();
         var node = ParentEl(target);
         while (node != null && visited.Add(node)) { path.Add(node); node = ParentEl(node); }
         path.Reverse();
@@ -262,7 +262,7 @@ public sealed partial class DomBridge
     /// element into <see cref="JSFunction"/> instances stored in <see cref="bridge-owned inline event handler state"/>.
     /// Only compiles attributes that have not already been compiled.
     /// </summary>
-    private void CompileInlineEventAttributes(DomElement element)
+    private void CompileInlineEventAttributes(Broiler.Dom.DomElement element)
     {
         foreach (var eventName in InlineEventNames)
         {
@@ -280,7 +280,7 @@ public sealed partial class DomBridge
     /// Compiles a single <c>on*</c> attribute value into a <see cref="JSFunction"/>
     /// and stores it in <see cref="bridge-owned inline event handler state"/>.
     /// </summary>
-    internal void CompileInlineEventAttribute(DomElement element, string attrName, string code)
+    internal void CompileInlineEventAttribute(Broiler.Dom.DomElement element, string attrName, string code)
     {
         if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
         var eventName = attrName[2..].ToLowerInvariant();

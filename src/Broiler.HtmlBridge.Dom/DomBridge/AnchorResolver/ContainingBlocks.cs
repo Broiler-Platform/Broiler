@@ -13,11 +13,11 @@ public sealed partial class DomBridge
     /// styles so the renderer treats them as containing blocks for absolutely
     /// positioned descendants.
     /// </summary>
-    private void EnsureContainingBlockPositioning(DomElement root)
+    private void EnsureContainingBlockPositioning(Broiler.Dom.DomElement root)
     {
         EnsureContainingBlockPositioningTree(root);
     }
-    private void EnsureContainingBlockPositioningTree(DomElement el)
+    private void EnsureContainingBlockPositioningTree(Broiler.Dom.DomElement el)
     {
         if (!IsText(el) && !IsComment(el))
         {

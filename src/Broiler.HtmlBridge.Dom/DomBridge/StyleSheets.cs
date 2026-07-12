@@ -16,11 +16,11 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>Cache for stylesheet objects, keyed by the owning style element.</summary>
-    private readonly Dictionary<DomElement, JSObject> _styleSheetCache = [];
+    private readonly Dictionary<Broiler.Dom.DomElement, JSObject> _styleSheetCache = [];
 
-    private JSArray BuildStyleSheetsCollection(DomElement docRoot)
+    private JSArray BuildStyleSheetsCollection(Broiler.Dom.DomElement docRoot)
     {
-        var styleEls = new List<DomElement>();
+        var styleEls = new List<Broiler.Dom.DomElement>();
         CollectStyleElements(docRoot, styleEls);
 
         var arr = new JSArray();
@@ -34,7 +34,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all style elements in the sub-tree.</summary>
-    private static void CollectStyleElements(DomElement root, List<DomElement> results)
+    private static void CollectStyleElements(Broiler.Dom.DomElement root, List<Broiler.Dom.DomElement> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -49,7 +49,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Returns <c>true</c> if the element is a <c>&lt;link rel="stylesheet" href="..."&gt;</c>.
     /// </summary>
-    private static bool IsExternalStylesheet(DomElement element)
+    private static bool IsExternalStylesheet(Broiler.Dom.DomElement element)
     {
         if (!string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
             return false;
@@ -64,7 +64,7 @@ public sealed partial class DomBridge
     /// Cached per style element to ensure identity (the same object is returned
     /// each time, making cssRules a live collection per the CSSOM spec).
     /// </summary>
-    private JSObject BuildStyleSheetObject(DomElement styleElement)
+    private JSObject BuildStyleSheetObject(Broiler.Dom.DomElement styleElement)
     {
         if (_styleSheetCache.TryGetValue(styleElement, out var cached))
             return cached;

@@ -5,10 +5,10 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private static DomElement? GetShadowRoot(DomElement element)
+    private static Broiler.Dom.DomElement? GetShadowRoot(Broiler.Dom.DomElement element)
     {
         if (GetElementRuntimeState(element).Shadow.Root.TryGet(out var rawShadowRoot) &&
-            rawShadowRoot is DomElement root)
+            rawShadowRoot is Broiler.Dom.DomElement root)
         {
             return root;
         }
@@ -16,12 +16,12 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static DomElement? GetShadowHost(DomElement? shadowRoot)
+    private static Broiler.Dom.DomElement? GetShadowHost(Broiler.Dom.DomElement? shadowRoot)
     {
         if (shadowRoot != null &&
             string.Equals(shadowRoot.TagName, "#shadow-root", StringComparison.Ordinal) &&
             GetElementRuntimeState(shadowRoot).Shadow.Host.TryGet(out var rawHost) &&
-            rawHost is DomElement host)
+            rawHost is Broiler.Dom.DomElement host)
         {
             return host;
         }
@@ -29,11 +29,11 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static DomElement? FindContainingShadowRoot(Broiler.Dom.DomNode? node)
+    private static Broiler.Dom.DomElement? FindContainingShadowRoot(Broiler.Dom.DomNode? node)
     {
         for (var current = node; current != null; current = current.ParentNode)
         {
-            if (current is DomElement element && string.Equals(element.TagName, "#shadow-root", StringComparison.Ordinal))
+            if (current is Broiler.Dom.DomElement element && string.Equals(element.TagName, "#shadow-root", StringComparison.Ordinal))
                 return element;
         }
 
@@ -44,9 +44,9 @@ public sealed partial class DomBridge
     {
         Broiler.Dom.DomNode current = node;
         // Stop at the topmost element: the facade #document's ParentNode is the canonical
-        // DomDocument (not a DomElement), which is the same stop point the old ParentEl walk had.
+        // DomDocument (not a Broiler.Dom.DomElement), which is the same stop point the old ParentEl walk had.
         // A detached text node roots to itself (returned as a DomNode).
-        while (current.ParentNode is DomElement parent)
+        while (current.ParentNode is Broiler.Dom.DomElement parent)
             current = parent;
         return current;
     }
@@ -56,15 +56,15 @@ public sealed partial class DomBridge
         if (ReferenceEquals(root, _documentNode))
             return _documentJSObject ?? JSNull.Value;
 
-        if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _docRootToDocJSObject.TryGetValue(rootEl, out var subDocument))
+        if (root is Broiler.Dom.DomElement rootEl && IsSubDocRoot(rootEl) && _docRootToDocJSObject.TryGetValue(rootEl, out var subDocument))
             return subDocument;
 
         return ToJSObject(root);
     }
 
-    private DomElement? GetSlotHost(DomElement slot) => GetShadowHost(FindContainingShadowRoot(slot));
+    private Broiler.Dom.DomElement? GetSlotHost(Broiler.Dom.DomElement slot) => GetShadowHost(FindContainingShadowRoot(slot));
 
-    private static bool SlotAcceptsNode(DomElement slot, DomElement node)
+    private static bool SlotAcceptsNode(Broiler.Dom.DomElement slot, Broiler.Dom.DomElement node)
     {
         var slotName = GetAttr(slot, "name");
         var nodeSlot = GetAttr(node, "slot");
@@ -73,7 +73,7 @@ public sealed partial class DomBridge
             : string.Equals(slotName, nodeSlot, StringComparison.OrdinalIgnoreCase);
     }
 
-    private DomElement? FindAssignedSlot(DomElement root, DomElement node)
+    private Broiler.Dom.DomElement? FindAssignedSlot(Broiler.Dom.DomElement root, Broiler.Dom.DomElement node)
     {
         foreach (var child in ChildElements(root))
         {
@@ -94,7 +94,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private DomElement? GetAssignedSlot(DomElement element)
+    private Broiler.Dom.DomElement? GetAssignedSlot(Broiler.Dom.DomElement element)
     {
         if (IsText(element) || ParentEl(element) == null)
             return null;
@@ -103,7 +103,7 @@ public sealed partial class DomBridge
         return shadowRoot != null ? FindAssignedSlot(shadowRoot, element) : null;
     }
 
-    private DomElement? GetScrollTraversalParent(DomElement element)
+    private Broiler.Dom.DomElement? GetScrollTraversalParent(Broiler.Dom.DomElement element)
     {
         var assignedSlot = GetAssignedSlot(element);
         if (assignedSlot != null)

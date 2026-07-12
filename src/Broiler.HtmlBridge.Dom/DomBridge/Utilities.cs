@@ -19,8 +19,6 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static readonly System.Text.RegularExpressions.Regex ImportantSuffixPattern = new(@"\s*!\s*important\s*$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly HashSet<string> CssStyleDeclarationNonCssNames = new(StringComparer.Ordinal)
     {
         "setProperty", "getPropertyValue", "removeProperty",
@@ -28,42 +26,10 @@ public sealed partial class DomBridge
         "item", "getPropertyPriority",
     };
 
-    private static string ToCamelCaseStatic(string cssName)
-    {
-        var sb = new StringBuilder();
-        bool upper = false;
-        foreach (char c in cssName)
-        {
-            if (c == '-') { upper = true; continue; }
-            sb.Append(upper ? char.ToUpperInvariant(c) : c);
-            upper = false;
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>Converts JS camelCase property names to CSS kebab-case.</summary>
-    private static string ToKebabCase(string camelName)
-    {
-        var sb = new StringBuilder();
-        foreach (char c in camelName)
-        {
-            if (char.IsUpper(c))
-            {
-                sb.Append('-');
-                sb.Append(char.ToLowerInvariant(c));
-            }
-            else
-            {
-                sb.Append(c);
-            }
-        }
-        return sb.ToString();
-    }
-
     /// <summary>
-    /// Parses a DOCTYPE declaration and creates a DomElement representing the DocumentType node.
+    /// Parses a DOCTYPE declaration and creates a Broiler.Dom.DomElement representing the DocumentType node.
     /// </summary>
-    private DomElement? ParseDocType(string html)
+    private Broiler.Dom.DomElement? ParseDocType(string html)
     {
         var match = DocTypePattern.Match(html);
         if (!match.Success) return null;
@@ -81,8 +47,8 @@ public sealed partial class DomBridge
         return doctype;
     }
 
-    /// <summary>Gets the lowercase name from a DOCTYPE DomElement.</summary>
-    private static string GetDocTypeName(DomElement element)
+    /// <summary>Gets the lowercase name from a DOCTYPE Broiler.Dom.DomElement.</summary>
+    private static string GetDocTypeName(Broiler.Dom.DomElement element)
     {
         var dtName = GetElementRuntimeState(element).DocumentType.Name.TryGet(out var n) ? n?.ToString() ?? "html" : "html";
         return dtName.ToLowerInvariant();
@@ -91,7 +57,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Searches descendants of an element using a CSS selector.
     /// </summary>
-    private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
+    private static JSValue FindInDescendants(Broiler.Dom.DomElement root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
         if (selector.IndexOf(":scope", StringComparison.Ordinal) >= 0 &&
@@ -107,7 +73,7 @@ public sealed partial class DomBridge
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
+    private static void SearchDescendants(Broiler.Dom.DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, Broiler.Dom.DomElement scope)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -296,11 +262,11 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Finds the <see cref="DomElement"/> corresponding to a given <see cref="JSObject"/>
+    /// Finds the <see cref="Broiler.Dom.DomElement"/> corresponding to a given <see cref="JSObject"/>
     /// by looking up the JS object cache.
     /// </summary>
-    private DomElement? FindDomElementByJSObject(JSObject jsObj) =>
-        FindDomNodeByJSObject(jsObj) as DomElement;
+    private Broiler.Dom.DomElement? FindDomElementByJSObject(JSObject jsObj) =>
+        FindDomNodeByJSObject(jsObj) as Broiler.Dom.DomElement;
 
     /// <summary>
     /// Finds the canonical <see cref="Broiler.Dom.DomNode"/> corresponding to a given
@@ -318,7 +284,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static bool IsSubDocRoot(DomElement element) =>
+    private static bool IsSubDocRoot(Broiler.Dom.DomElement element) =>
         string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
 
     /// <summary>
@@ -389,7 +355,7 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(Broiler.Dom.DomNode node, DomElement? ownerDocRoot)
+    private static void AdoptSubtreeIntoDocument(Broiler.Dom.DomNode node, Broiler.Dom.DomElement? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
@@ -397,7 +363,7 @@ public sealed partial class DomBridge
         // too. Behaviour-preserving on today's homogeneous tree (every child is an element).
         foreach (var child in node.ChildNodes)
         {
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
+            if (child is Broiler.Dom.DomElement childElement && IsSubDocRoot(childElement))
                 continue;
 
             AdoptSubtreeIntoDocument(child, ownerDocRoot);
@@ -405,14 +371,14 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
+    /// Clones a <see cref="Broiler.Dom.DomElement"/>. When <paramref name="deep"/> is true,
     /// all descendants are recursively cloned.
     /// </summary>
     private Broiler.Dom.DomNode CloneDomElement(Broiler.Dom.DomNode source, bool deep)
     {
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes clone via the document
         // factories (DomText/DomComment ctors are internal). Dead on today's homogeneous facade
-        // tree — facade text/comment nodes are DomElement and take the element path below; live
+        // tree — facade text/comment nodes are Broiler.Dom.DomElement and take the element path below; live
         // once text/comment construction flips to canonical DomText/DomComment.
         if (source is Broiler.Dom.DomCharacterData sourceCharData)
         {
@@ -421,7 +387,7 @@ public sealed partial class DomBridge
                 : _document.CreateTextNode(sourceCharData.Data);
         }
 
-        var element = (DomElement)source;
+        var element = (Broiler.Dom.DomElement)source;
         // Preserve the source element's exact namespace (folds the old post-construction
         // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
         // their namespace rather than defaulting to HTML.
@@ -478,9 +444,9 @@ public sealed partial class DomBridge
     /// Collects all &lt;tr&gt; elements in a table in HTML spec order:
     /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows.
     /// </summary>
-    private static List<DomElement> CollectTableRows(DomElement table)
+    private static List<Broiler.Dom.DomElement> CollectTableRows(Broiler.Dom.DomElement table)
     {
-        var rows = new List<DomElement>();
+        var rows = new List<Broiler.Dom.DomElement>();
         // 1. All tr children of thead elements (in tree order)
         foreach (var child in ChildElements(table))
         {
@@ -514,7 +480,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a JSArray of table rows for the 'rows' property.
     /// </summary>
-    private JSArray BuildTableRows(DomElement table)
+    private JSArray BuildTableRows(Broiler.Dom.DomElement table)
     {
         var rows = CollectTableRows(table);
         var jsRows = new List<JSValue>();
@@ -531,7 +497,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Inserts a row into a table at the given index, per HTMLTableElement.insertRow() spec.
     /// </summary>
-    private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
+    private JSValue InsertTableRow(Broiler.Dom.DomElement table, int index, DomBridge bridge)
     {
         var tr = CreateBridgeElement("tr");
         bridge._knownNodes.Add(tr);
@@ -540,10 +506,10 @@ public sealed partial class DomBridge
         if (allRows.Count == 0 || index == -1 || index == allRows.Count)
         {
             // Find the last section to append to, or create a tbody
-            DomElement? lastSection = null;
+            Broiler.Dom.DomElement? lastSection = null;
             for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
             {
-                if (ChildAt(table, i) is not DomElement childElement)
+                if (ChildAt(table, i) is not Broiler.Dom.DomElement childElement)
                     continue;
                 var ctag = childElement.TagName.ToLowerInvariant();
                 if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
@@ -586,14 +552,14 @@ public sealed partial class DomBridge
     /// <summary>
     /// Collects form control elements (input, select, textarea, button) from a form.
     /// </summary>
-    internal static List<DomElement> CollectFormControls(DomElement form)
+    internal static List<Broiler.Dom.DomElement> CollectFormControls(Broiler.Dom.DomElement form)
     {
-        var controls = new List<DomElement>();
+        var controls = new List<Broiler.Dom.DomElement>();
         CollectFormControlsRecursive(form, controls);
         return controls;
     }
 
-    private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
+    private static void CollectFormControlsRecursive(Broiler.Dom.DomElement parent, List<Broiler.Dom.DomElement> controls)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -608,7 +574,7 @@ public sealed partial class DomBridge
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
-    private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+    private static void UncheckRadioSiblings(Broiler.Dom.DomElement scope, Broiler.Dom.DomElement except, string radioName)
     {
         foreach (var child in ChildElements(scope))
         {
@@ -630,7 +596,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a form.elements collection (JSObject with indexed + named access).
     /// </summary>
-    private JSValue BuildFormElementsCollection(DomElement form, DomBridge bridge)
+    private JSValue BuildFormElementsCollection(Broiler.Dom.DomElement form, DomBridge bridge)
     {
         var controls = CollectFormControls(form);
 
@@ -662,7 +628,7 @@ public sealed partial class DomBridge
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
+            if (child is Broiler.Dom.DomElement childElement && IsSubDocRoot(childElement))
                 continue;
             result.Add(child);
             CollectDescendants(child, result);
@@ -688,7 +654,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).
     /// </summary>
-    private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
+    private static void CollectDescendantsByTag(Broiler.Dom.DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
         foreach (var child in ChildElements(root))
         {
@@ -710,13 +676,13 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Returns the node type constant for a <see cref="DomElement"/>.
+    /// Returns the node type constant for a <see cref="Broiler.Dom.DomElement"/>.
     /// </summary>
     private static int GetNodeType(Broiler.Dom.DomNode node)
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
-        if (node is not DomElement element) return 1;
+        if (node is not Broiler.Dom.DomElement element) return 1;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE
@@ -737,13 +703,13 @@ public sealed partial class DomBridge
     /// </summary>
     private sealed class CssStyleDeclaration : JSObject
     {
-        private readonly DomElement _element;
+        private readonly Broiler.Dom.DomElement _element;
         private readonly Action? _onMutation;
 
         // Names that are JS methods / special properties, not CSS properties.
         private static HashSet<string> NonCssNames => CssStyleDeclarationNonCssNames;
 
-        public CssStyleDeclaration(DomElement element, Action? onMutation = null)
+        public CssStyleDeclaration(Broiler.Dom.DomElement element, Action? onMutation = null)
         {
             _element = element;
             _onMutation = onMutation;
@@ -755,7 +721,7 @@ public sealed partial class DomBridge
             var nameStr = name.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                var kebab = ToKebabCase(nameStr);
+                var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
@@ -792,7 +758,7 @@ public sealed partial class DomBridge
             if (!NonCssNames.Contains(nameStr))
             {
                 if (TryGetStylePropertyRawValue(_element, nameStr, out var val))
-                    return new JSString(StripCssPriority(val));
+                    return new JSString(Broiler.CSS.CssPriority.Strip(val));
             }
 
             return new JSString(string.Empty);
@@ -811,7 +777,7 @@ public sealed partial class DomBridge
             var nameStr = name.ToString();
             if (!CssStyleDeclarationNonCssNames.Contains(nameStr))
             {
-                var kebab = ToKebabCase(nameStr);
+                var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                     _style.Remove(kebab);
@@ -833,31 +799,20 @@ public sealed partial class DomBridge
             if (!CssStyleDeclarationNonCssNames.Contains(nameStr) &&
                 TryGetStylePropertyRawValue(_style, nameStr, out var val))
             {
-                return new JSString(StripCssPriority(val));
+                return new JSString(Broiler.CSS.CssPriority.Strip(val));
             }
 
             return new JSString(string.Empty);
         }
     }
 
-    private static string StripCssPriority(string? value)
-        => string.IsNullOrEmpty(value) ? string.Empty : ImportantSuffixPattern.Replace(value, string.Empty).Trim();
-
-    private static string GetCssPriority(string? value)
-        => !string.IsNullOrEmpty(value) && ImportantSuffixPattern.IsMatch(value) ? "important" : string.Empty;
-
-    private static string ApplyCssPriority(string value, string priority)
-        => string.Equals(priority?.Trim(), "important", StringComparison.OrdinalIgnoreCase)
-            ? $"{StripCssPriority(value)} !important".Trim()
-            : StripCssPriority(value);
-
     private static List<string> GetStylePropertyNames(IReadOnlyDictionary<string, string> style)
         => style.Keys.ToList();
 
-    private static List<string> GetStylePropertyNames(DomElement element)
+    private static List<string> GetStylePropertyNames(Broiler.Dom.DomElement element)
         => GetStylePropertyNames((IReadOnlyDictionary<string, string>)InlineStyle(element));
 
-    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
+    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(Broiler.Dom.DomElement element)
     {
         var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -877,7 +832,7 @@ public sealed partial class DomBridge
         return declared;
     }
 
-    private static bool TryGetExpandedInlineStyleRawValue(DomElement element, string property, out string value)
+    private static bool TryGetExpandedInlineStyleRawValue(Broiler.Dom.DomElement element, string property, out string value)
     {
         var declared = BuildDeclaredInlineStyleMap(element);
         if (declared.Count == 0)
@@ -891,11 +846,11 @@ public sealed partial class DomBridge
         if (declared.TryGetValue(property, out value!))
             return true;
 
-        var camel = ToCamelCaseStatic(property);
+        var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(property);
         if (camel != property && declared.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = ToKebabCase(property);
+        var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(property);
         if (kebab != property && declared.TryGetValue(kebab, out value!))
             return true;
 
@@ -908,11 +863,11 @@ public sealed partial class DomBridge
         if (style.TryGetValue(property, out value!))
             return true;
 
-        var camel = ToCamelCaseStatic(property);
+        var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(property);
         if (camel != property && style.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = ToKebabCase(property);
+        var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(property);
         if (kebab != property && style.TryGetValue(kebab, out value!))
             return true;
 
@@ -920,7 +875,7 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
+    private static bool TryGetStylePropertyRawValue(Broiler.Dom.DomElement element, string property, out string value)
     {
         if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)InlineStyle(element), property, out value!))
             return true;
@@ -928,7 +883,7 @@ public sealed partial class DomBridge
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
     }
 
-    private static JSObject BuildStyleObject(DomElement element, Action? onMutation = null, JSValue? parentRule = null)
+    private static JSObject BuildStyleObject(Broiler.Dom.DomElement element, Action? onMutation = null, JSValue? parentRule = null)
     {
         var style = new CssStyleDeclaration(element, onMutation);
 
@@ -1054,7 +1009,7 @@ public sealed partial class DomBridge
     /// Builds a <c>classList</c> object exposing <c>add</c>, <c>remove</c>,
     /// <c>toggle</c>, and <c>contains</c>.
     /// </summary>
-    private static JSObject BuildClassListObject(DomElement element, Action<DomElement>? onClassChanged = null)
+    private static JSObject BuildClassListObject(Broiler.Dom.DomElement element, Action<Broiler.Dom.DomElement>? onClassChanged = null)
     {
         var classList = new JSObject();
 
@@ -1135,7 +1090,7 @@ public sealed partial class DomBridge
     /// operations as defined in the HTML Canvas 2D Context specification.
     /// Drawing commands are recorded but not rasterised in the current implementation.
     /// </summary>
-    private static JSObject BuildCanvas2DContext(DomElement canvas)
+    private static JSObject BuildCanvas2DContext(Broiler.Dom.DomElement canvas)
     {
         var ctx = new JSObject();
         int width = 300, height = 150;

@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// The element backing <c>document.documentElement</c> (the &lt;html&gt; element).
     /// </summary>
-    public DomElement DocumentElement { get; }
+    public Broiler.Dom.DomElement DocumentElement { get; }
 
     private void RegisterDocument(JSContext context)
     {
