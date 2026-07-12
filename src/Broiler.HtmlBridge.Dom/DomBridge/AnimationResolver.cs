@@ -36,7 +36,7 @@ public sealed partial class DomBridge
 
     private sealed record KeyframeEntry(float Position, Dictionary<string, string> Properties);
 
-    private static void CollectKeyframes(DomElement root, Dictionary<string, List<KeyframeEntry>> map)
+    private static void CollectKeyframes(Broiler.Dom.DomElement root, Dictionary<string, List<KeyframeEntry>> map)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
@@ -108,7 +108,7 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private void ResolveAnimationsOnTree(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, List<KeyframeEntry>> keyframesMap)
     {
         // Check if this element has animation properties set (inline styles).
@@ -162,7 +162,7 @@ public sealed partial class DomBridge
     /// whose selectors match the given element.  This is a simplified matcher
     /// that handles tag selectors (e.g. <c>body</c>, <c>html</c>).
     /// </summary>
-    private static Dictionary<string, string>? CollectStylesheetAnimationProperties(DomElement element)
+    private static Dictionary<string, string>? CollectStylesheetAnimationProperties(Broiler.Dom.DomElement element)
     {
         // Walk up to find <style> elements.
         var root = element;
@@ -174,7 +174,7 @@ public sealed partial class DomBridge
     }
 
     private static void CollectAnimPropsFromStyleElements(
-        DomElement node, DomElement target, ref Dictionary<string, string>? result)
+        Broiler.Dom.DomElement node, Broiler.Dom.DomElement target, ref Dictionary<string, string>? result)
     {
         if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
@@ -212,7 +212,7 @@ public sealed partial class DomBridge
     /// Very simple CSS selector matcher — handles tag names, classes, IDs,
     /// and <c>:root</c> pseudo-class.  Sufficient for WPT body/html selectors.
     /// </summary>
-    private static bool SimpleMatchesElement(string selector, DomElement element)
+    private static bool SimpleMatchesElement(string selector, Broiler.Dom.DomElement element)
     {
         var selTrimmed = selector.Trim().ToLowerInvariant();
 
@@ -244,7 +244,7 @@ public sealed partial class DomBridge
     }
 
     private void TryResolveAnimation(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, List<KeyframeEntry>> keyframesMap,
         string? animationShorthand,
         string? animationDelay,
@@ -354,7 +354,7 @@ public sealed partial class DomBridge
     }
 
     private Dictionary<string, string> ResolveKeyframeProperties(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         List<KeyframeEntry> keyframes, float progress, string timingFunction)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -631,7 +631,7 @@ public sealed partial class DomBridge
     /// Supports color values (rgb, rgba, named colors) and numeric values.
     /// Falls back to discrete stepping for unsupported value types.
     /// </summary>
-    private string TryInterpolateValue(DomElement element, string prop, string fromValue, string toValue, float progress)
+    private string TryInterpolateValue(Broiler.Dom.DomElement element, string prop, string fromValue, string toValue, float progress)
     {
         // Try color interpolation for color-related properties.
         if (IsColorProperty(prop))
@@ -662,7 +662,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryInterpolateLengthValue(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         string prop,
         string fromValue,
         string toValue,
@@ -685,7 +685,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private double? GetInterpolationPercentageBasis(DomElement element, string prop)
+    private double? GetInterpolationPercentageBasis(Broiler.Dom.DomElement element, string prop)
     {
         return prop switch
         {

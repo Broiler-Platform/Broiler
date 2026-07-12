@@ -21,12 +21,12 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private void ResolveStickyPositioning(DomElement root)
+    private void ResolveStickyPositioning(Broiler.Dom.DomElement root)
     {
         ResolveStickyPositioningTree(root);
     }
 
-    private void ResolveStickyPositioningTree(DomElement el)
+    private void ResolveStickyPositioningTree(Broiler.Dom.DomElement el)
     {
         if (!IsText(el) && IsSticky(GetComputedProps(el)))
             ApplyStickyOffset(el);
@@ -34,11 +34,11 @@ public sealed partial class DomBridge
         // Index-based: ApplyStickyOffset only mutates el's own style, not the
         // child list, but stay defensive.
         for (int i = 0; i < el.ChildNodes.Count; i++)
-            if (ChildAt(el, i) is DomElement child)
+            if (ChildAt(el, i) is Broiler.Dom.DomElement child)
                 ResolveStickyPositioningTree(child);
     }
 
-    private void ApplyStickyOffset(DomElement el)
+    private void ApplyStickyOffset(Broiler.Dom.DomElement el)
     {
         var props = GetComputedProps(el);
 
@@ -69,8 +69,8 @@ public sealed partial class DomBridge
     }
 
     private double ComputeStickyShift(
-        DomElement el, Dictionary<string, string> props,
-        DomElement scrollContainer, DomElement containingBlock, bool vertical)
+        Broiler.Dom.DomElement el, Dictionary<string, string> props,
+        Broiler.Dom.DomElement scrollContainer, Broiler.Dom.DomElement containingBlock, bool vertical)
     {
         string startInset = vertical ? "top" : "left";
         string endInset = vertical ? "bottom" : "right";
@@ -122,7 +122,7 @@ public sealed partial class DomBridge
         return Math.Clamp(shift, minShift, maxShift);
     }
 
-    private double StickyBorderBoxSize(DomElement el, Dictionary<string, string> props, bool vertical)
+    private double StickyBorderBoxSize(Broiler.Dom.DomElement el, Dictionary<string, string> props, bool vertical)
     {
         // RF-BRIDGE-1b: the renderer's real border-box size from the shared snapshot
         // (scroll-independent). With the estimators deleted, an explicit CSS border-box from
@@ -138,7 +138,7 @@ public sealed partial class DomBridge
         !string.IsNullOrWhiteSpace(value) &&
         !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
 
-    private double ParseStickyInset(string? value, DomElement el, DomElement scrollContainer, bool vertical)
+    private double ParseStickyInset(string? value, Broiler.Dom.DomElement el, Broiler.Dom.DomElement scrollContainer, bool vertical)
     {
         // Percentage insets on a sticky box resolve against the scroll
         // container's content-box size along the axis.
@@ -152,7 +152,7 @@ public sealed partial class DomBridge
     /// The containing block used to clamp a sticky box: its nearest ancestor
     /// that establishes a block-level box (skips inline/anonymous wrappers).
     /// </summary>
-    private DomElement? GetStickyContainingBlock(DomElement el)
+    private Broiler.Dom.DomElement? GetStickyContainingBlock(Broiler.Dom.DomElement el)
     {
         for (var current = GetScrollTraversalParent(el); current != null; current = GetScrollTraversalParent(current))
         {

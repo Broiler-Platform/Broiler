@@ -7,7 +7,7 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private JSArray BuildAnimationList(DomElement? target)
+    private JSArray BuildAnimationList(Broiler.Dom.DomElement? target)
     {
         var animations = new List<JSValue>();
         foreach (var element in Elements)
@@ -28,7 +28,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryGetAnimationProperties(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         out string? animationShorthand,
         out string? animationDelay)
     {
@@ -51,7 +51,7 @@ public sealed partial class DomBridge
     }
 
     private void EnsureAnimationCurrentTime(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         string? animationShorthand,
         string? animationDelay)
     {
@@ -81,7 +81,7 @@ public sealed partial class DomBridge
         GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(currentTimeMs);
     }
 
-    private static JSObject BuildAnimationObject(DomElement element)
+    private static JSObject BuildAnimationObject(Broiler.Dom.DomElement element)
     {
         var animation = new JSObject();
         animation.FastAddProperty(

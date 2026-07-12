@@ -53,7 +53,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a DOM <c>TreeWalker</c> object.
     /// </summary>
-    private JSObject BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn)
+    private JSObject BuildTreeWalker(Broiler.Dom.DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var tw = new JSObject();
         var walker = new Broiler.Dom.DomTreeWalker(
@@ -133,7 +133,7 @@ public sealed partial class DomBridge
     // RF-BRIDGE-1c Phase F (F3c part 2c): a TreeWalker/NodeIterator result may be a text/comment
     // node (SHOW_TEXT/SHOW_COMMENT), so convert any non-null node — not just elements — to its JS
     // wrapper. Behaviour-preserving today: walker results over the homogeneous facade tree are all
-    // DomElement (text/comment are facade elements); forward-correct once they flip to canonical.
+    // Broiler.Dom.DomElement (text/comment are facade elements); forward-correct once they flip to canonical.
     private JSValue ToTraversalJsValue(Broiler.Dom.DomNode? node) =>
         node is not null ? ToJSObject(node) : JSNull.Value;
 
@@ -227,7 +227,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a DOM <c>NodeIterator</c> object.
     /// </summary>
-    private JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn)
+    private JSObject BuildNodeIterator(Broiler.Dom.DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var iter = new JSObject();
         var iterator = new Broiler.Dom.DomNodeIterator(
@@ -287,7 +287,7 @@ public sealed partial class DomBridge
     /// Builds a DOM <c>Range</c> object. The <paramref name="documentRoot"/>
     /// is the document node that owns this range (main or sub-document).
     /// </summary>
-    private JSObject BuildRange(DomElement? documentRoot = null)
+    private JSObject BuildRange(Broiler.Dom.DomElement? documentRoot = null)
     {
         var range = new JSObject();
         var docRoot = documentRoot ?? _documentNode;
@@ -598,7 +598,7 @@ public sealed partial class DomBridge
     /// Creates a partial clone for extractContents when a boundary is in a text node.
     /// Clones the ancestor chain from the text node up to (but not including) the common ancestor.
     /// </summary>
-    private static Broiler.Dom.DomNode? CreatePartialCloneForExtract(Broiler.Dom.DomNode textNode, DomElement commonAncestor, string extractedText, bool isStart, DomBridge bridge)
+    private static Broiler.Dom.DomNode? CreatePartialCloneForExtract(Broiler.Dom.DomNode textNode, Broiler.Dom.DomElement commonAncestor, string extractedText, bool isStart, DomBridge bridge)
     {
         // Build the chain: textNode → parent → ... → child-of-commonAncestor. chain[0] is the
         // boundary text node; chain[1..] are ancestor elements (RF-BRIDGE-1c Phase F, F3c part 2d).
@@ -622,12 +622,12 @@ public sealed partial class DomBridge
         }
 
         // Clone the chain (from top to bottom)
-        DomElement? topClone = null;
-        DomElement? currentParent = null;
+        Broiler.Dom.DomElement? topClone = null;
+        Broiler.Dom.DomElement? currentParent = null;
         for (var i = chain.Count - 1; i >= 1; i--)
         {
             // chain[i] for i >= 1 is an ancestor element.
-            var original = (DomElement)chain[i];
+            var original = (Broiler.Dom.DomElement)chain[i];
             var clone = bridge.CreateBridgeElement(original.TagName);
             bridge._knownNodes.Add(clone);
 
@@ -681,7 +681,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Checks if a node is fully contained between start and end containers in the range.
     /// </summary>
-    private static bool IsContainedInRange(DomElement node, DomElement ancestor, DomElement startContainer, DomElement endContainer, List<DomElement> allNodes)
+    private static bool IsContainedInRange(Broiler.Dom.DomElement node, Broiler.Dom.DomElement ancestor, Broiler.Dom.DomElement startContainer, Broiler.Dom.DomElement endContainer, List<Broiler.Dom.DomElement> allNodes)
     {
         // A node is fully contained if it and all its descendants are between start and end
         var nodeIdx = allNodes.IndexOf(node);
@@ -729,7 +729,7 @@ public sealed partial class DomBridge
     {
         // Character-data nodes contribute no client rect here (their text runs are measured
         // elsewhere); after this guard the node is an element.
-        if (IsText(node) || IsComment(node) || node is not DomElement element)
+        if (IsText(node) || IsComment(node) || node is not Broiler.Dom.DomElement element)
             return;
 
         var display = GetComputedProps(element).GetValueOrDefault("display");
@@ -954,7 +954,7 @@ public sealed partial class DomBridge
     {
         // RF-BRIDGE-1c Phase F (F3c part 2b): range boundary points are canonical DomNode —
         // a range commonly starts/ends inside a text node. Behaviour-preserving on today's
-        // homogeneous facade tree (facade text nodes are DomElement, so the DomNode fields hold
+        // homogeneous facade tree (facade text nodes are Broiler.Dom.DomElement, so the DomNode fields hold
         // the same values); forward-correct once text/comment flip to canonical DomText/DomComment.
         public Broiler.Dom.DomNode StartContainer;
         public int StartOffset;
@@ -1024,14 +1024,14 @@ public sealed partial class DomBridge
     /// Notifies all active ranges that a child was removed from <paramref name="parent"/>
     /// at the given <paramref name="index"/>.
     /// </summary>
-    private void NotifyChildAdded(DomElement parent, Broiler.Dom.DomNode addedChild, int index)
+    private void NotifyChildAdded(Broiler.Dom.DomElement parent, Broiler.Dom.DomNode addedChild, int index)
     {
         var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
         var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
         NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
     }
 
-    private void NotifyChildRemoved(DomElement parent, Broiler.Dom.DomNode removedChild, int index, Broiler.Dom.DomNode? previousSibling = null, Broiler.Dom.DomNode? nextSibling = null)
+    private void NotifyChildRemoved(Broiler.Dom.DomElement parent, Broiler.Dom.DomNode removedChild, int index, Broiler.Dom.DomNode? previousSibling = null, Broiler.Dom.DomNode? nextSibling = null)
     {
         for (var i = _activeRanges.Count - 1; i >= 0; i--)
         {
@@ -1047,7 +1047,7 @@ public sealed partial class DomBridge
     }
 
     private void NotifyMutationObservers(
-        DomElement target,
+        Broiler.Dom.DomElement target,
         Broiler.Dom.DomNode? addedChild,
         Broiler.Dom.DomNode? removedChild,
         Broiler.Dom.DomNode? previousSibling,
@@ -1085,7 +1085,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue)
+    private void NotifyAttributeMutationObservers(Broiler.Dom.DomElement target, string attributeName, string? oldValue)
     {
         if (_mutationObservers.Count == 0)
             return;

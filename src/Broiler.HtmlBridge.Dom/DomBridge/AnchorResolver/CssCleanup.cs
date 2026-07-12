@@ -14,7 +14,7 @@ public sealed partial class DomBridge
     /// properties.  This prevents the renderer from applying unsupported CSS
     /// that would conflict with the resolved inline styles.
     /// </summary>
-    private static void NeutralizeStyleElementsForAnchorRules(DomElement root)
+    private static void NeutralizeStyleElementsForAnchorRules(Broiler.Dom.DomElement root)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {

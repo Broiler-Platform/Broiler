@@ -27,36 +27,44 @@ public sealed partial class DomBridge
         return result;
     }
     private void CollectPositionTryRulesFromTree(
-        DomElement el,
+        Broiler.Dom.DomElement el,
         Dictionary<string, Dictionary<string, string>> result)
     {
         if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var child in SnapshotChildren(el))
+            // RF-BRIDGE-1c Phase F (F3c) follow-up: read the <style> source through the
+            // canonical GetStyleElementSourceText accessor rather than hand-walking child
+            // text nodes. After Attach, a <style> element's CSS can live in its InnerHtml
+            // runtime state with no DomText child at all (childCount == 0) — the raw child
+            // walk then saw nothing, so @position-try rules were never collected and every
+            // fallback silently failed to apply (in both the resolve-only and full-render
+            // paths). GetStyleElementSourceText is the same source the cascade reads and
+            // covers both the DomText-child and InnerHtml-fallback cases. Use the raw source
+            // (not the serialized rule model): the CSS rule serializer does not round-trip
+            // the @position-try at-rule.
+            var raw = GetStyleElementSourceText(el);
+            if (!string.IsNullOrEmpty(raw))
             {
-                if (IsText(child) && !string.IsNullOrEmpty(BridgeText(child)))
+                // Strip CSS comments first: a comment inside a @position-try
+                // body (common in WPT, e.g. "/* 2: position right */") contains
+                // ':' and ';' that would otherwise corrupt declaration parsing.
+                var styleText = CssCommentPattern.Replace(raw, " ");
+                foreach (Match m in PositionTryParsePattern.Matches(styleText))
                 {
-                    // Strip CSS comments first: a comment inside a @position-try
-                    // body (common in WPT, e.g. "/* 2: position right */") contains
-                    // ':' and ';' that would otherwise corrupt declaration parsing.
-                    var styleText = CssCommentPattern.Replace(BridgeText(child), " ");
-                    foreach (Match m in PositionTryParsePattern.Matches(styleText))
+                    var name = m.Groups["name"].Value;
+                    var body = m.Groups["body"].Value;
+                    var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var decl in body.Split(';'))
                     {
-                        var name = m.Groups["name"].Value;
-                        var body = m.Groups["body"].Value;
-                        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var decl in body.Split(';'))
-                        {
-                            var trimmed = decl.Trim();
-                            if (string.IsNullOrEmpty(trimmed)) continue;
-                            var colonIdx = trimmed.IndexOf(':');
-                            if (colonIdx < 0) continue;
-                            var propName = trimmed[..colonIdx].Trim();
-                            var propValue = trimmed[(colonIdx + 1)..].Trim();
-                            props[propName] = propValue;
-                        }
-                        result[name] = props;
+                        var trimmed = decl.Trim();
+                        if (string.IsNullOrEmpty(trimmed)) continue;
+                        var colonIdx = trimmed.IndexOf(':');
+                        if (colonIdx < 0) continue;
+                        var propName = trimmed[..colonIdx].Trim();
+                        var propValue = trimmed[(colonIdx + 1)..].Trim();
+                        props[propName] = propValue;
                     }
+                    result[name] = props;
                 }
             }
         }
@@ -70,14 +78,14 @@ public sealed partial class DomBridge
     /// non-overflowing fallback from the <c>@position-try</c> rules.
     /// </summary>
     private void ResolvePositionTryFallbacks(
-        DomElement root,
+        Broiler.Dom.DomElement root,
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
         ResolvePositionTryFallbacksTree(root, anchorRegistry, positionTryRules);
     }
     private void ResolvePositionTryFallbacksTree(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
@@ -104,7 +112,7 @@ public sealed partial class DomBridge
             ResolvePositionTryFallbacksTree(child, anchorRegistry, positionTryRules);
     }
     private void TryApplyFallback(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, string> baseProps,
         Dictionary<string, AnchorInfo> anchorRegistry,
         Dictionary<string, Dictionary<string, string>> positionTryRules,
@@ -277,7 +285,7 @@ public sealed partial class DomBridge
     /// children's explicit widths. This is a heuristic for elements
     /// with <c>width: min-content</c>.
     /// </summary>
-    private double EstimateMinContentWidth(DomElement element)
+    private double EstimateMinContentWidth(Broiler.Dom.DomElement element)
     {
         double maxWidth = 0;
         foreach (var child in SnapshotChildren(element))

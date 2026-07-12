@@ -47,7 +47,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         "scrollend"];
     // RF-BRIDGE-1c Phase F (F3b): the registration set is keyed by canonical DomNode so
     // it can hold text/comment nodes once they flip to canonical DomText/DomComment (which
-    // are not DomElement). A facade node IS-A DomNode, so this is a behaviour-preserving
+    // are not Broiler.Dom.DomElement). A facade node IS-A DomNode, so this is a behaviour-preserving
     // widen on the current homogeneous tree.
     private readonly HashSet<Broiler.Dom.DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
@@ -55,12 +55,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
     private readonly List<WeakReference<Broiler.Dom.DomNodeIterator>> _activeNodeIterators = [];
     private readonly CanonicalDocument _document;
-    private readonly DomElement _documentNode;
+    private readonly Broiler.Dom.DomElement _documentNode;
     private static readonly ConditionalWeakTable<Broiler.Dom.DomNode, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
-    private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
+    private readonly Dictionary<Broiler.Dom.DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
     // Timer & async execution queues.
@@ -83,7 +83,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Action> _frameActions = new();
     // Touched by the same scroll/frame-action callbacks that can run on
     // ThreadPool threads (see the timer-map note above), so keep it concurrent.
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, int> _smoothScrollTokens = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, int> _smoothScrollTokens = new();
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners =
         new(StringComparer.OrdinalIgnoreCase);
@@ -91,7 +91,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows =
         new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, DomElement> _subWindowContainers =
+    private readonly Dictionary<JSObject, Broiler.Dom.DomElement> _subWindowContainers =
         new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, JSObject> _messagePortPeers =
         new(ReferenceEqualityComparer.Instance);
@@ -176,10 +176,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>
     /// All elements parsed from the HTML source.
     /// </summary>
-    public IReadOnlyList<DomElement> Elements =>
+    public IReadOnlyList<Broiler.Dom.DomElement> Elements =>
         [.. _documentNode
             .InclusiveDescendants()
-            .OfType<DomElement>()
+            .OfType<Broiler.Dom.DomElement>()
             .Where(element => !ReferenceEquals(element, _documentNode))];
 
     private static ElementRuntimeState GetElementRuntimeState(Broiler.Dom.DomNode node) =>
@@ -187,31 +187,31 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>
     /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
-    /// relocated off the <c>DomElement</c> facade into <see cref="ElementRuntimeState"/>
+    /// relocated off the <c>Broiler.Dom.DomElement</c> facade into <see cref="ElementRuntimeState"/>
     /// (RF-BRIDGE-1c Phase B). Lazily seeded once from the element's <c>style=</c>
     /// attribute; thereafter it is the source of truth (JS <c>element.style</c> writes,
     /// anchor/form-control styling), synced back to the attribute at serialization.
     /// </summary>
     // -----------------------------------------------------------------
     // RF-BRIDGE-1c Phase E2: child-node access over canonical ChildNodes,
-    // replacing the facade DomElement.Children (LegacyChildList). The bridge
-    // tree is homogeneous DomElement today, so ChildElements is a drop-in for
+    // replacing the facade Broiler.Dom.DomElement.Children (LegacyChildList). The bridge
+    // tree is homogeneous Broiler.Dom.DomElement today, so ChildElements is a drop-in for
     // the old enumeration; the Cast/ChildAt casts are safe until text/comment
     // flip to canonical DomText/DomComment (Phase F), when ChildElements narrows
     // to OfType and callers gain IsText handling.
     // -----------------------------------------------------------------
 
-    /// <summary>The element's <see cref="DomElement"/> children. RF-BRIDGE-1c Phase F (F3c part 2c):
-    /// narrowed from <c>Cast</c> to <c>OfType&lt;DomElement&gt;()</c> so it skips canonical
+    /// <summary>The element's <see cref="Broiler.Dom.DomElement"/> children. RF-BRIDGE-1c Phase F (F3c part 2c):
+    /// narrowed from <c>Cast</c> to <c>OfType&lt;Broiler.Dom.DomElement&gt;()</c> so it skips canonical
     /// <c>DomText</c>/<c>DomComment</c> children once construction flips; a no-op on today's
     /// homogeneous tree. Callers that need text/comment children walk raw <c>ChildNodes</c> instead.</summary>
-    private static IEnumerable<DomElement> ChildElements(Broiler.Dom.DomNode element) =>
-        element.ChildNodes.OfType<DomElement>();
+    private static IEnumerable<Broiler.Dom.DomElement> ChildElements(Broiler.Dom.DomNode element) =>
+        element.ChildNodes.OfType<Broiler.Dom.DomElement>();
 
     /// <summary>The child node at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
     /// Phase F (F3c part 2c): returns canonical <see cref="Broiler.Dom.DomNode"/> — a child may be a
     /// <c>DomText</c>/<c>DomComment</c> once construction flips. Element-only callers narrow with
-    /// <c>as DomElement</c>/<c>is DomElement</c>; on today's homogeneous tree every child is an element.</summary>
+    /// <c>as Broiler.Dom.DomElement</c>/<c>is Broiler.Dom.DomElement</c>; on today's homogeneous tree every child is an element.</summary>
     private static Broiler.Dom.DomNode ChildAt(Broiler.Dom.DomNode element, int index) => element.ChildNodes[index];
 
     /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
@@ -267,7 +267,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     }
 
     /// <summary>Whether <paramref name="node"/> is a text node (RF-BRIDGE-1c Phase D: replaces
-    /// the facade <c>IsText(DomElement)</c>). NodeType-based, so it holds for the current
+    /// the facade <c>IsText(Broiler.Dom.DomElement)</c>). NodeType-based, so it holds for the current
     /// facade text nodes and for canonical <c>DomText</c> once construction flips in the
     /// <c>Children</c>/text cutover.</summary>
     private static bool IsText(Broiler.Dom.DomNode node) => node.NodeType == Broiler.Dom.DomNodeType.Text;
@@ -307,13 +307,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>
     /// The single construction funnel for bridge element nodes (RF-BRIDGE-1c Phase F, F4). Every
-    /// former <c>new DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
+    /// former <c>new Broiler.Dom.DomElement(...)</c> site routes through here (or <see cref="CreateBridgeElementNS"/>)
     /// so element construction lives in exactly one place over the canonical <c>Broiler.Dom</c>
     /// document factories. The tag name may be an HTML element literal (HTML namespace) or a
     /// <c>#</c>-sentinel (<c>#document</c>, <c>#subdoc-root</c>, …), which keeps a null namespace and
     /// its preserved name — the bridge-internal document/fragment/shadow model over canonical types.
     /// </summary>
-    private DomElement CreateBridgeElement(
+    private Broiler.Dom.DomElement CreateBridgeElement(
         string tagName,
         string? id = null,
         string? className = null,
@@ -328,7 +328,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>createElementNS</c> handlers, sub-document roots, and clones (which preserve the source
     /// element's namespace). See <see cref="CreateBridgeElement"/>.
     /// </summary>
-    private DomElement CreateBridgeElementNS(
+    private Broiler.Dom.DomElement CreateBridgeElementNS(
         string? namespaceUri,
         string tagName,
         string? id = null,
@@ -349,8 +349,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
     /// replaces all children with a single canonical <see cref="Broiler.Dom.DomText"/> (or none when
     /// <paramref name="value"/> is null/empty). Replaces the former element-store
-    /// <c>DomElement.TextContent</c> scalar.</summary>
-    private void SetElementTextContent(DomElement element, string? value)
+    /// <c>Broiler.Dom.DomElement.TextContent</c> scalar.</summary>
+    private void SetElementTextContent(Broiler.Dom.DomElement element, string? value)
     {
         ClearChildren(element);
         if (!string.IsNullOrEmpty(value))
@@ -362,22 +362,22 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     }
 
     /// <summary>An element's <c>textContent</c> — the concatenation of its descendant text (RF-BRIDGE-1c
-    /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>DomElement.TextContent</c>.</summary>
-    private static string GetElementTextContent(DomElement element)
+    /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>Broiler.Dom.DomElement.TextContent</c>.</summary>
+    private static string GetElementTextContent(Broiler.Dom.DomElement element)
     {
         var sb = new System.Text.StringBuilder();
         CollectTextContent(element, sb);
         return sb.ToString();
     }
 
-    /// <summary>The element's parent as a <see cref="DomElement"/> (RF-BRIDGE-1c Phase E:
-    /// replaces the facade <c>ParentEl(DomElement)</c> getter — <c>ParentNode as DomElement</c>).
+    /// <summary>The element's parent as a <see cref="Broiler.Dom.DomElement"/> (RF-BRIDGE-1c Phase E:
+    /// replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> getter — <c>ParentNode as Broiler.Dom.DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
     /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
-    private static DomElement? ParentEl(Broiler.Dom.DomNode node) => node.ParentNode as DomElement;
+    private static Broiler.Dom.DomElement? ParentEl(Broiler.Dom.DomNode node) => node.ParentNode as Broiler.Dom.DomElement;
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
-    /// Phase E: replaces the facade <c>ParentEl(DomElement)</c> setter). A null parent detaches;
+    /// Phase E: replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> setter). A null parent detaches;
     /// otherwise the child is appended if not already there — matching the old setter exactly.
     /// RF-BRIDGE-1c Phase F (F3c part 2b): the parent widened to <c>DomNode?</c> so range-extract
     /// code can pass DomNode-typed ancestor-chain clones (always elements at runtime).</summary>
@@ -389,7 +389,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             parent.AppendChild(child);
     }
 
-    private static Dictionary<string, string> InlineStyle(DomElement element)
+    private static Dictionary<string, string> InlineStyle(Broiler.Dom.DomElement element)
     {
         var state = GetElementRuntimeState(element);
         if (!state.StyleSeeded)
@@ -405,13 +405,22 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return state.Style;
     }
 
+    /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
+    /// dictionary the anchor resolver reads and writes (display:none, resolved left/top/width/height,
+    /// …). RF-BRIDGE-1c Phase F4 removed the <c>Broiler.Dom.DomElement.Style</c> facade member; internal test and
+    /// tooling callers that need to inspect post-resolution inline styles route through this accessor
+    /// instead. Visible only to <c>InternalsVisibleTo</c> assemblies — not part of the public surface,
+    /// so it does not re-open a public facade seam.</summary>
+    internal static IReadOnlyDictionary<string, string> GetInlineStyleView(Broiler.Dom.DomElement element) =>
+        InlineStyle(element);
+
     private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).EventListeners;
 
     private static Dictionary<string, JSValue> GetInlineEventHandlers(Broiler.Dom.DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
 
-    internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
+    internal bool TryGetStoredScrollOffset(Broiler.Dom.DomElement element, bool vertical, out double offset)
     {
         var slot = vertical
             ? GetElementRuntimeState(element).Scroll.Top
@@ -426,11 +435,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return false;
     }
 
-    internal double? GetStoredScrollOffsetOrDefault(DomElement element, bool vertical) =>
+    internal double? GetStoredScrollOffsetOrDefault(Broiler.Dom.DomElement element, bool vertical) =>
         TryGetStoredScrollOffset(element, vertical, out var offset) ? offset : null;
 
     internal bool TryGetResolvedLayout(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         out double left,
         out double top,
         out double width,
@@ -750,7 +759,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // child of the document node. It may not appear in the flat
         // _knownNodes list because html/head/body are structural elements
         // pre-created by HtmlTreeBuilder.
-        DomElement? body = null;
+        Broiler.Dom.DomElement? body = null;
         if (htmlEl != null)
         {
             body = ChildElements(htmlEl).FirstOrDefault(c =>
@@ -852,7 +861,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return new JSArray([.. frames]);
     }
 
-    private void CollectWindowFrames(DomElement element, List<JSValue> frames)
+    private void CollectWindowFrames(Broiler.Dom.DomElement element, List<JSValue> frames)
     {
         foreach (var child in ChildElements(element))
         {
@@ -1127,7 +1136,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 /// Custom JSObject subclass for HTMLFormControlsCollection that returns null
 /// (not undefined) for named property lookups that don't match any control.
 /// </summary>
-internal sealed class FormElementsCollection(DomElement form, DomBridge bridge) : JSObject()
+internal sealed class FormElementsCollection(Broiler.Dom.DomElement form, DomBridge bridge) : JSObject()
 {
     protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
     {

@@ -5,7 +5,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     // RF-BRIDGE-1c Phase F4: HtmlTreeBuilder is retired. It used to re-materialize the shared
-    // HtmlDocumentParser's canonical tree into facade DomElement nodes; with the facade gone the
+    // HtmlDocumentParser's canonical tree into facade Broiler.Dom.DomElement nodes; with the facade gone the
     // parser already produces the canonical nodes the bridge holds, so these helpers parse and hand
     // the tree straight back. Callers reparent the returned root/fragment children into the
     // _document-owned tree, and canonical AppendChild auto-adopts the subtree into _document (see
@@ -17,7 +17,7 @@ public sealed partial class DomBridge
     /// canonical <c>&lt;html&gt;</c> root, the non-structural node registration list, and the title.
     /// Replaces the retired <c>HtmlTreeBuilder.Build</c>.
     /// </summary>
-    private static (DomElement DocumentElement, List<Broiler.Dom.DomNode> AllElements, string Title) BuildDocumentTree(string html)
+    private static (Broiler.Dom.DomElement DocumentElement, List<Broiler.Dom.DomNode> AllElements, string Title) BuildDocumentTree(string html)
     {
         var parsed = new HtmlDocumentParser().ParseDocument(html);
         var root = parsed.Document.DocumentElement ??
@@ -32,7 +32,7 @@ public sealed partial class DomBridge
     /// Parses an HTML fragment in <paramref name="contextTagName"/>'s context and wraps its children
     /// in a bridge <c>#document-fragment</c> sentinel element. Replaces <c>HtmlTreeBuilder.BuildFragment</c>.
     /// </summary>
-    private (DomElement Fragment, List<Broiler.Dom.DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
+    private (Broiler.Dom.DomElement Fragment, List<Broiler.Dom.DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
     {
         var parsed = new HtmlDocumentParser().ParseFragment(html, contextTagName);
         var fragment = CreateBridgeElement("#document-fragment");

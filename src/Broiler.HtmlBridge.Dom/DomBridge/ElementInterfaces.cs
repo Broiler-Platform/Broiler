@@ -9,7 +9,7 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private void AddElementSpecificMembers(JSObject obj, DomElement element)
+    private void AddElementSpecificMembers(JSObject obj, Broiler.Dom.DomElement element)
     {
         var bridge = this;
         // -- Phase 5: HTML DOM Interfaces --

@@ -23,24 +23,24 @@ internal sealed class ElementRuntimeState
     /// <summary>
     /// Inline-style property names last written through the JS <c>element.style</c> /
     /// <c>setAttribute("style", …)</c> path, tracked so serialization and computed-style
-    /// invalidation preserve author-set intent. Relocated off the <c>DomElement</c> facade
+    /// invalidation preserve author-set intent. Relocated off the <c>Broiler.Dom.DomElement</c> facade
     /// (RF-BRIDGE-1c Phase A — the node model does not own this bridge state).
     /// </summary>
     public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The document-root element that owns this node's (sub)document — iframe / nested
-    /// browsing-context bookkeeping. Relocated off the <c>DomElement</c> facade
+    /// browsing-context bookkeeping. Relocated off the <c>Broiler.Dom.DomElement</c> facade
     /// (RF-BRIDGE-1c Phase A). Not carried across <c>cloneNode</c> (matching the prior
     /// facade behaviour: a clone re-derives its owner on adoption).
     /// </summary>
-    public DomElement? OwnerDocRoot { get; set; }
+    public Broiler.Dom.DomElement? OwnerDocRoot { get; set; }
 
     /// <summary>
     /// The element's raw inner-HTML/inner-text string — the source text for raw-text
     /// elements (<c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>/<c>&lt;textarea&gt;</c>), an
     /// <c>innerHTML</c>-getter fallback, and the value round-tripped by serialization.
-    /// Relocated off the <c>DomElement</c> facade (RF-BRIDGE-1c Phase F — the node model
+    /// Relocated off the <c>Broiler.Dom.DomElement</c> facade (RF-BRIDGE-1c Phase F — the node model
     /// does not own this bridge state). Empty by default; seeded by the <c>innerHTML</c>
     /// setter and copied across <c>cloneNode</c>.
     /// </summary>
@@ -50,7 +50,7 @@ internal sealed class ElementRuntimeState
     /// The node's inline style in CSS kebab-case — the authoritative in-memory inline
     /// style (mutated by JS <c>element.style</c>, the anchor resolver, and synthetic
     /// form-control styling; synced back to the <c>style=</c> attribute at serialization).
-    /// Relocated off the <c>DomElement</c> facade (RF-BRIDGE-1c Phase B); reached through
+    /// Relocated off the <c>Broiler.Dom.DomElement</c> facade (RF-BRIDGE-1c Phase B); reached through
     /// <c>DomBridge.InlineStyle(element)</c>, which lazily seeds it from the <c>style=</c>
     /// attribute on first access (see <see cref="StyleSeeded"/>).
     /// </summary>
@@ -136,8 +136,8 @@ internal sealed class DialogRuntimeState
 
 internal sealed class ShadowRuntimeState
 {
-    public RuntimeValue<DomElement> Root { get; } = new();
-    public RuntimeValue<DomElement> Host { get; } = new();
+    public RuntimeValue<Broiler.Dom.DomElement> Root { get; } = new();
+    public RuntimeValue<Broiler.Dom.DomElement> Host { get; } = new();
     public RuntimeValue<string> Mode { get; } = new();
 }
 

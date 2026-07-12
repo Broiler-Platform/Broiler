@@ -44,7 +44,7 @@ public sealed partial class DomBridge
     /// the caller falls back to the estimator. Active only when
     /// <see cref="UseSharedLayoutGeometry"/> is set; the live entry points gate on that.
     /// </summary>
-    private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)
+    private bool TryGetSharedLayoutGeometry(Broiler.Dom.DomElement element, out BoxGeometry geometry)
     {
         var snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
         return snapshot.TryGetValue(element, out geometry);

@@ -33,7 +33,7 @@ public sealed partial class DomBridge
         if (node is Broiler.Dom.DomCharacterData characterData)
             return new JSString(characterData.Data);
 
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
             return new JSString(string.Empty);
 
         if (element.ChildNodes.Count > 0)
@@ -47,7 +47,7 @@ public sealed partial class DomBridge
     }
 
 
-    private bool IsCurrentIframeCrossOrigin(DomElement element)
+    private bool IsCurrentIframeCrossOrigin(Broiler.Dom.DomElement element)
     {
         if (HasAttr(element, "srcdoc"))
             return false;
@@ -99,7 +99,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static DomElement GetDocumentElement(DomElement docRoot)
+    private static Broiler.Dom.DomElement GetDocumentElement(Broiler.Dom.DomElement docRoot)
     {
         return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
             ?? docRoot;

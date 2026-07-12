@@ -10,7 +10,7 @@ using Broiler.JavaScript.BuiltIns.Function;
 namespace Broiler.HtmlBridge;
 
 /// <summary>
-/// Conversion of <see cref="DomElement"/> instances to YantraJS
+/// Conversion of <see cref="Broiler.Dom.DomElement"/> instances to YantraJS
 /// <see cref="JSObject"/> representations, including sub-document
 /// construction and tree-search helpers.
 /// </summary>
@@ -35,12 +35,12 @@ public sealed partial class DomBridge
         _jsObjectCache[node] = obj;
 
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
-        // DomElement, so they receive a minimal Node/CharacterData wrapper instead of the full
+        // Broiler.Dom.DomElement, so they receive a minimal Node/CharacterData wrapper instead of the full
         // element surface below. This branch is dead on today's homogeneous facade tree — facade
-        // text/comment nodes are DomElement and fall through to the element wrapper, preserving
+        // text/comment nodes are Broiler.Dom.DomElement and fall through to the element wrapper, preserving
         // behaviour — and goes live once text/comment construction flips to canonical
         // DomText/DomComment (F3c construction cutover).
-        if (node is not DomElement element)
+        if (node is not Broiler.Dom.DomElement element)
         {
             PopulateCharacterDataJSObject(obj, node);
             return obj;

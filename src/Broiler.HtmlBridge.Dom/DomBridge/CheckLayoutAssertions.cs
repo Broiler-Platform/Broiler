@@ -57,7 +57,7 @@ public sealed partial class DomBridge
         });
     }
 
-    private void CollectCheckLayoutAssertions(DomElement element, List<CheckLayoutAssertion> results)
+    private void CollectCheckLayoutAssertions(Broiler.Dom.DomElement element, List<CheckLayoutAssertion> results)
     {
         foreach (var (attribute, property) in CheckLayoutAttributeMap)
         {
@@ -73,7 +73,7 @@ public sealed partial class DomBridge
             CollectCheckLayoutAssertions(child, results);
     }
 
-    private double ComputeCheckLayoutMetric(DomElement element, string property)
+    private double ComputeCheckLayoutMetric(Broiler.Dom.DomElement element, string property)
     {
         var isRoot = IsViewportElementForMetrics(element);
         return property switch
@@ -92,7 +92,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Concise CSS-ish descriptor for reporting (tag + id/first-class + title).</summary>
-    private static string DescribeElement(DomElement element)
+    private static string DescribeElement(Broiler.Dom.DomElement element)
     {
         var builder = new StringBuilder(element.TagName.ToLowerInvariant());
         if (!string.IsNullOrEmpty(element.Id))

@@ -11,7 +11,7 @@ public sealed partial class DomBridge
     /// Centers the element on the anchor in the appropriate axis.
     /// </summary>
     private void ResolveAnchorCenter(
-        DomElement element,
+        Broiler.Dom.DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         if (!IsText(element))

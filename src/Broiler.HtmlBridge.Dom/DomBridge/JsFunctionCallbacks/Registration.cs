@@ -526,7 +526,7 @@ public sealed partial class DomBridge
                     // insert the new nodes right after it (matching real browser
                     // behaviour where document.write() inserts at the parser
                     // insertion point).
-                    DomElement? currentScript = null;
+                    Broiler.Dom.DomElement? currentScript = null;
                     var documentElements = Elements;
                     if (CurrentScriptIndex >= 0 && CurrentScriptIndex < documentElements.Count)
                     {
@@ -812,7 +812,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationGetStyleSheets055Core(in Arguments _)
     {
-        var styleEls = new List<DomElement>();
+        var styleEls = new List<Broiler.Dom.DomElement>();
         foreach (var el in Elements)
         {
             if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
@@ -862,10 +862,10 @@ public sealed partial class DomBridge
         // Append doctype if provided
         if (doctypeArg is JSObject dtObj)
         {
-            // Find the DomElement for the doctype JSObject
+            // Find the Broiler.Dom.DomElement for the doctype JSObject
             foreach (var kvp in _jsObjectCache)
             {
-                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
+                if (kvp.Value == dtObj && kvp.Key is Broiler.Dom.DomElement dtEl)
                 {
                     SetParent(dtEl, docRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
