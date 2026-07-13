@@ -909,6 +909,13 @@ public sealed partial class DomBridge
         if (first is DomCharacterData || second is DomCharacterData)
             return string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal);
 
+        // Phase 4 item 1: two DocumentType nodes are equal iff their name/publicId/systemId match
+        // (per DOM isEqualNode). Both have NodeType == DocumentType by the check above.
+        if (first is DomDocumentType firstDocType && second is DomDocumentType secondDocType)
+            return string.Equals(firstDocType.Name, secondDocType.Name, StringComparison.Ordinal) &&
+                   string.Equals(firstDocType.PublicId, secondDocType.PublicId, StringComparison.Ordinal) &&
+                   string.Equals(firstDocType.SystemId, secondDocType.SystemId, StringComparison.Ordinal);
+
         var firstEl = (DomElement)first;
         var secondEl = (DomElement)second;
         if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||

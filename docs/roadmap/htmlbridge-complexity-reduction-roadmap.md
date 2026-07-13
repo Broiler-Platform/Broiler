@@ -778,6 +778,41 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.2 completed** 2026-07-13 (same branch) — work item 1, first of four sentinels. The
+`#doctype` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentType`. The doctype
+was a fake-tag `DomElement` (null namespace, `TagName == "#doctype"`) whose name/publicId/systemId
+lived in a parallel `ElementRuntimeState.DocumentType` state class (`DocumentTypeRuntimeState`); it
+now IS a canonical DocumentType node that carries those natively — so `DocumentTypeRuntimeState` and
+its `CopyRuntimeValuesTo` copy are deleted. Construction funnels through a new
+`CreateBridgeDocumentType(name, publicId, systemId)` over the existing `DomDocument.CreateDocumentType`
+factory (name lowercased once at construction to preserve the old read-time `GetDocTypeName`
+lowercasing; the always-`null` `internalSubset` is dropped — canonical has no such field and the JS
+getter already returned `null`). All five creation sites (main-parse `ParseDocType`, `document.write`,
+`createDocumentType` × main+sub, `createHTMLDocument` × main+sub) use the funnel. The reads move to the
+canonical node: a dedicated `PopulateDocumentTypeJSObject` wrapper gives the doctype the correct
+minimal DocumentType surface (Node base + ChildNode mixin + EventTarget + name/publicId/systemId,
+**not** the element surface it used to inherit); `GetNodeType`/`GetNodeName`, the serialization adapter
+(`GetKind`/`GetName`), `NodesAreEqual` (isEqualNode) and `CloneDomElement` all gained a
+`DomDocumentType` branch and shed their `#doctype` TagName special-cases. The canonical
+`HtmlSerializer`/`HtmlDocumentParser` already speak `DomDocumentType`, so no submodule change was
+needed. **One regression found and fixed during the slice:** the sub-document `childNodes` handler
+used `ChildElements` (element-only), which silently dropped the now-non-element doctype — switched to
+raw `ChildNodes` (matching `firstChild` and DOM `childNodes` semantics). Behaviour-preserving; no
+public-API change. Tests: `Broiler.Cli.Tests/DoctypeSentinelMigrationTests.cs` (parsed doctype,
+`createDocumentType`, `createHTMLDocument`, `cloneNode`, serialization). Regression check vs the P4.1
+baseline: the DOM / sub-document / cross-document / HTML-DOM-interface / serializer / namespace /
+traversal / lifetime / guard suites pass unchanged (595 in the wide sweep); the Acid pixel/layout
+suite fails the same **count** (8) on baseline and change with the differing test passing in isolation
+(known container flakiness), plus the standing headless-geometry failure → zero regressions.
+
+The remaining three sentinels — `#document-fragment` → `DomDocumentFragment`, `#subdoc-root` →
+browsing-context root, and `#document` → `DomDocument` — are separate sub-slices (P4.3+). They are
+harder than doctype: a fragment/subdoc-root/document is a **container** whose JS surface (appendChild,
+querySelector, children) the element wrapper currently supplies, and a canonical `DomDocumentType` may
+only be a child of a canonical `DomDocument` — so once the document/subdoc roots also become canonical,
+the doctype's `SetParent`/`AppendChild` will run under canonical pre-insert validity (today it is
+allowed because the parent is still an element).
+
 Status: **P4.1 completed** 2026-07-13 (branch `htmlbridge-phase4-remove-knownnodes`) — work item 6.
 The `_knownNodes` parallel node set is deleted. It was a process-instance
 `HashSet<DomNode>` populated on **every** node-construction path (`createElement`, `cloneNode`,

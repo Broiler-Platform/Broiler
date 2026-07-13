@@ -73,8 +73,6 @@ internal sealed class ElementRuntimeState
 
     public AnimationRuntimeState Animation { get; } = new();
 
-    public DocumentTypeRuntimeState DocumentType { get; } = new();
-
     public void CopyRuntimeValuesTo(ElementRuntimeState target)
     {
         FormControl.Value.CopyTo(target.FormControl.Value);
@@ -96,10 +94,6 @@ internal sealed class ElementRuntimeState
         target.StyleSheet.RulesMutated = StyleSheet.RulesMutated;
         Document.HasViewport.CopyTo(target.Document.HasViewport);
         Animation.CurrentTimeMilliseconds.CopyTo(target.Animation.CurrentTimeMilliseconds);
-        DocumentType.Name.CopyTo(target.DocumentType.Name);
-        DocumentType.PublicId.CopyTo(target.DocumentType.PublicId);
-        DocumentType.SystemId.CopyTo(target.DocumentType.SystemId);
-        DocumentType.InternalSubset.CopyTo(target.DocumentType.InternalSubset);
     }
 }
 
@@ -175,14 +169,6 @@ internal sealed class DocumentRuntimeState
 internal sealed class AnimationRuntimeState
 {
     public RuntimeValue<double> CurrentTimeMilliseconds { get; } = new();
-}
-
-internal sealed class DocumentTypeRuntimeState
-{
-    public RuntimeValue<string> Name { get; } = new();
-    public RuntimeValue<string> PublicId { get; } = new();
-    public RuntimeValue<string> SystemId { get; } = new();
-    public RuntimeValue<object> InternalSubset { get; } = new();
 }
 
 internal sealed class RuntimeValue<T>

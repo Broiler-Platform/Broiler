@@ -348,6 +348,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return element;
     }
 
+    /// <summary>Mints a canonical <see cref="DomDocumentType"/> (Phase 4 item 1 — the former
+    /// <c>#doctype</c> sentinel element). The doctype name is lowercased to preserve the historical
+    /// bridge behaviour (doctype name was always surfaced lowercase via the old <c>GetDocTypeName</c>);
+    /// publicId/systemId keep their case. The single funnel for doctype construction over the
+    /// canonical document factory.</summary>
+    private DomDocumentType CreateBridgeDocumentType(string name, string publicId, string systemId) =>
+        _document.CreateDocumentType(name.ToLowerInvariant(), publicId, systemId);
+
     /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
     /// replaces all children with a single canonical <see cref="DomText"/> (or none when
     /// <paramref name="value"/> is null/empty). Replaces the former element-store

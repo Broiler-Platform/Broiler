@@ -84,8 +84,11 @@ public sealed partial class DomBridge
 
     private JSValue JsSubDocumentObjectsGetChildNodes008Core(DomElement docRoot, in Arguments _)
     {
+        // childNodes includes ALL node types (per DOM), notably the canonical DomDocumentType — which
+        // is no longer a DomElement after Phase 4 item 1, so ChildElements would wrongly drop it. This
+        // matches the sub-document's firstChild (raw first child) and the document childNodes semantics.
         var arr = new JSArray();
-        foreach (var child in ChildElements(docRoot))
+        foreach (var child in docRoot.ChildNodes)
             arr.Add(ToJSObject(child));
         return arr;
     }
@@ -630,11 +633,7 @@ public sealed partial class DomBridge
         var publicId = a[1].ToString();
         var systemId = a[2].ToString();
         ValidateElementName(qualifiedName, _jsContext!);
-        var dt = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(dt).DocumentType.Name.Set(qualifiedName);
-        GetElementRuntimeState(dt).DocumentType.PublicId.Set(publicId);
-        GetElementRuntimeState(dt).DocumentType.SystemId.Set(systemId);
-        GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
+        var dt = CreateBridgeDocumentType(qualifiedName, publicId, systemId);
         return ToJSObject(dt);
     }
 
@@ -681,11 +680,7 @@ public sealed partial class DomBridge
         var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var subDocRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
-        var dt = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(dt).DocumentType.Name.Set("html");
-        GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
-        GetElementRuntimeState(dt).DocumentType.SystemId.Set(string.Empty);
-        GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
+        var dt = CreateBridgeDocumentType("html", string.Empty, string.Empty);
         SetParent(dt, subDocRoot);
         GetElementRuntimeState(dt).OwnerDocRoot = subDocRoot;
         subDocRoot.AppendChild(dt);

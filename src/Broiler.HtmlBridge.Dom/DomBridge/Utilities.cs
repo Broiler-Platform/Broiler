@@ -29,9 +29,9 @@ public sealed partial class DomBridge
     };
 
     /// <summary>
-    /// Parses a DOCTYPE declaration and creates a Broiler.Dom.DomElement representing the DocumentType node.
+    /// Parses a DOCTYPE declaration and creates the canonical <see cref="DomDocumentType"/> node.
     /// </summary>
-    private DomElement? ParseDocType(string html)
+    private DomDocumentType? ParseDocType(string html)
     {
         var match = DocTypePattern.Match(html);
         if (!match.Success) return null;
@@ -40,20 +40,7 @@ public sealed partial class DomBridge
         var publicId = match.Groups[2].Success ? match.Groups[2].Value : string.Empty;
         var systemId = match.Groups[3].Success ? match.Groups[3].Value : string.Empty;
 
-        var doctype = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(doctype).DocumentType.Name.Set(name);
-        GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
-        GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
-        GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
-
-        return doctype;
-    }
-
-    /// <summary>Gets the lowercase name from a DOCTYPE Broiler.Dom.DomElement.</summary>
-    private static string GetDocTypeName(DomElement element)
-    {
-        var dtName = GetElementRuntimeState(element).DocumentType.Name.TryGet(out var n) ? n?.ToString() ?? "html" : "html";
-        return dtName.ToLowerInvariant();
+        return CreateBridgeDocumentType(name, publicId, systemId);
     }
 
     /// <summary>
@@ -352,6 +339,10 @@ public sealed partial class DomBridge
                 ? _document.CreateComment(sourceCharData.Data)
                 : _document.CreateTextNode(sourceCharData.Data);
         }
+
+        // Phase 4 item 1: a canonical DomDocumentType clones its immutable name/publicId/systemId.
+        if (source is DomDocumentType sourceDocType)
+            return _document.CreateDocumentType(sourceDocType.Name, sourceDocType.PublicId, sourceDocType.SystemId);
 
         var element = (DomElement)source;
         // Preserve the source element's exact namespace (folds the old post-construction

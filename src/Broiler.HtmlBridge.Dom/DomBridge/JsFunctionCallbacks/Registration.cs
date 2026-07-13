@@ -766,11 +766,7 @@ public sealed partial class DomBridge
             ValidateQualifiedName(qualifiedName, null, context);
         else
             ValidateElementName(qualifiedName, context);
-        var doctype = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(doctype).DocumentType.Name.Set(qualifiedName);
-        GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
-        GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
-        GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
+        var doctype = CreateBridgeDocumentType(qualifiedName, publicId, systemId);
         return ToJSObject(doctype);
     }
 
@@ -823,11 +819,7 @@ public sealed partial class DomBridge
         var docRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(docRoot).Document.HasViewport.Set(false);
         // Add DOCTYPE
-        var doctype = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(doctype).DocumentType.Name.Set("html");
-        GetElementRuntimeState(doctype).DocumentType.PublicId.Set(string.Empty);
-        GetElementRuntimeState(doctype).DocumentType.SystemId.Set(string.Empty);
-        GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
+        var doctype = CreateBridgeDocumentType("html", string.Empty, string.Empty);
         SetParent(doctype, docRoot);
         GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         docRoot.AppendChild(doctype);
