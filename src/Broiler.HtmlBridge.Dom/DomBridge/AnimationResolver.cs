@@ -1,7 +1,10 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Broiler.CSS;
+using Broiler.Dom;
+using System.Text;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// Resolves CSS animation snapshots — for elements with <c>animation</c> and a
@@ -41,13 +44,13 @@ public sealed partial class DomBridge
     // @keyframes are still collected when the CSS lives in the element's InnerHtml runtime
     // state with no DomText child (RF-BRIDGE-1c Phase F / F3c — same fix as @position-try and
     // CollectAnimPropsFromStyleElements).
-    private void CollectKeyframes(Broiler.Dom.DomElement root, Dictionary<string, List<KeyframeEntry>> map)
+    private void CollectKeyframes(DomElement root, Dictionary<string, List<KeyframeEntry>> map)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
             var css = GetStyleElementSourceText(root);
-            var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
-            foreach (var atRule in styleSheet.Rules.OfType<Broiler.CSS.CssAtRule>())
+            var styleSheet = new CssParser().ParseStyleSheet(css);
+            foreach (var atRule in styleSheet.Rules.OfType<CssAtRule>())
             {
                 if (!atRule.Name.Equals("keyframes", StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -63,14 +66,14 @@ public sealed partial class DomBridge
             CollectKeyframes(child, map);
     }
 
-    private static List<KeyframeEntry> ParseKeyframeEntries(Broiler.CSS.CssAtRule keyframesRule)
+    private static List<KeyframeEntry> ParseKeyframeEntries(CssAtRule keyframesRule)
     {
         var entries = new List<KeyframeEntry>();
 
-        foreach (var styleRule in keyframesRule.Rules.OfType<Broiler.CSS.CssStyleRule>())
+        foreach (var styleRule in keyframesRule.Rules.OfType<CssStyleRule>())
         {
             var declarations = ParseDeclarations(
-                CSS.CssSerializer.Serialize(styleRule.Declarations));
+                CssSerializer.Serialize(styleRule.Declarations));
 
             foreach (var selector in styleRule.Selectors.Selectors)
             {
@@ -79,8 +82,7 @@ public sealed partial class DomBridge
                 {
                     "from" => 0f,
                     "to" => 1f,
-                    _ when s.EndsWith('%') && float.TryParse(s.TrimEnd('%'),
-                        NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) => pct / 100f,
+                    _ when s.EndsWith('%') && float.TryParse(s.TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) => pct / 100f,
                     _ => null,
                 };
 
@@ -89,13 +91,13 @@ public sealed partial class DomBridge
             }
         }
 
-        return entries.OrderBy(e => e.Position).ToList();
+        return [.. entries.OrderBy(e => e.Position)];
     }
 
     private static Dictionary<string, string> ParseDeclarations(string text)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var declarations = new Broiler.CSS.CssParser().ParseDeclarations(text);
+        var declarations = new CssParser().ParseDeclarations(text);
         foreach (var declaration in declarations.Declarations)
         {
             var value = declaration.Value.Text;
@@ -110,9 +112,7 @@ public sealed partial class DomBridge
     // Animation resolution
     // -----------------------------------------------------------------
 
-    private void ResolveAnimationsOnTree(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, List<KeyframeEntry>> keyframesMap)
+    private void ResolveAnimationsOnTree(DomElement element, Dictionary<string, List<KeyframeEntry>> keyframesMap)
     {
         // Check if this element has animation properties set (inline styles).
         string? animValue = null, delayValue = null, nameValue = null;
@@ -132,11 +132,11 @@ public sealed partial class DomBridge
             if (sheetProps != null)
             {
                 if (!hasAnimation && sheetProps.TryGetValue("animation", out var sv))
-                    { hasAnimation = true; animValue = sv; }
+                { hasAnimation = true; animValue = sv; }
                 if (!hasDelay && sheetProps.TryGetValue("animation-delay", out var dv))
-                    { hasDelay = true; delayValue = dv; }
+                { hasDelay = true; delayValue = dv; }
                 if (!hasName && sheetProps.TryGetValue("animation-name", out var nv))
-                    { hasName = true; nameValue = nv; }
+                { hasName = true; nameValue = nv; }
             }
         }
 
@@ -167,7 +167,7 @@ public sealed partial class DomBridge
     /// </summary>
     // Instance (not static) so it can read <style> source through the canonical
     // GetStyleElementSourceText accessor — see CollectAnimPropsFromStyleElements.
-    private Dictionary<string, string>? CollectStylesheetAnimationProperties(Broiler.Dom.DomElement element)
+    private Dictionary<string, string>? CollectStylesheetAnimationProperties(DomElement element)
     {
         // Walk up to find <style> elements.
         var root = element;
@@ -178,8 +178,7 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private void CollectAnimPropsFromStyleElements(
-        Broiler.Dom.DomElement node, Broiler.Dom.DomElement target, ref Dictionary<string, string>? result)
+    private void CollectAnimPropsFromStyleElements(DomElement node, DomElement target, ref Dictionary<string, string>? result)
     {
         if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
@@ -193,8 +192,8 @@ public sealed partial class DomBridge
             // stylesheet cases uniformly.
             var css = GetStyleElementSourceText(node);
 
-            var styleSheet = new Broiler.CSS.CssParser().ParseStyleSheet(css);
-            foreach (var styleRule in styleSheet.Rules.OfType<Broiler.CSS.CssStyleRule>())
+            var styleSheet = new CssParser().ParseStyleSheet(css);
+            foreach (var styleRule in styleSheet.Rules.OfType<CssStyleRule>())
             {
                 foreach (var selector in styleRule.Selectors.Selectors)
                 {
@@ -202,7 +201,7 @@ public sealed partial class DomBridge
                         continue;
 
                     var declarations = ParseDeclarations(
-                        CSS.CssSerializer.Serialize(styleRule.Declarations));
+                        CssSerializer.Serialize(styleRule.Declarations));
                     foreach (var kv in declarations)
                     {
                         if (kv.Key.StartsWith("animation", StringComparison.OrdinalIgnoreCase))
@@ -223,7 +222,7 @@ public sealed partial class DomBridge
     /// Very simple CSS selector matcher — handles tag names, classes, IDs,
     /// and <c>:root</c> pseudo-class.  Sufficient for WPT body/html selectors.
     /// </summary>
-    private static bool SimpleMatchesElement(string selector, Broiler.Dom.DomElement element)
+    private static bool SimpleMatchesElement(string selector, DomElement element)
     {
         var selTrimmed = selector.Trim().ToLowerInvariant();
 
@@ -239,27 +238,22 @@ public sealed partial class DomBridge
         // ID selector (e.g. "#myid")
         if (selTrimmed.StartsWith('#'))
         {
-            var id = selTrimmed.Substring(1);
+            var id = selTrimmed[1..];
             return string.Equals(element.Id, id, StringComparison.OrdinalIgnoreCase);
         }
 
         // Class selector (e.g. ".myclass")
         if (selTrimmed.StartsWith('.'))
         {
-            var cls = selTrimmed.Substring(1);
-            return element.ClassName?.Split(' ')
-                .Any(c => string.Equals(c, cls, StringComparison.OrdinalIgnoreCase)) == true;
+            var cls = selTrimmed[1..];
+            return element.ClassName?.Split(' ').Any(c => string.Equals(c, cls, StringComparison.OrdinalIgnoreCase)) == true;
         }
 
         return false;
     }
 
-    private void TryResolveAnimation(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, List<KeyframeEntry>> keyframesMap,
-        string? animationShorthand,
-        string? animationDelay,
-        string? animationName)
+    private void TryResolveAnimation(DomElement element, Dictionary<string, List<KeyframeEntry>> keyframesMap,
+        string? animationShorthand, string? animationDelay, string? animationName)
     {
         // Parse animation parameters from the shorthand.
         string? name = null;
@@ -364,8 +358,7 @@ public sealed partial class DomBridge
         InlineStyle(element).Remove("animation-timing-function");
     }
 
-    private Dictionary<string, string> ResolveKeyframeProperties(
-        Broiler.Dom.DomElement element,
+    private Dictionary<string, string> ResolveKeyframeProperties(DomElement element,
         List<KeyframeEntry> keyframes, float progress, string timingFunction)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -432,13 +425,9 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private static readonly System.Text.RegularExpressions.Regex StepsPattern = new(
-        @"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)",
-        RegexOptions.Compiled);
+    private static readonly Regex StepsPattern = StepsPatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex CubicBezierPattern = new(
-        @"cubic-bezier\(\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*\)",
-        RegexOptions.Compiled);
+    private static readonly Regex CubicBezierPattern = CubicBezierPatternRegex();
 
     private static double ApplyTimingFunction(double progress, string timingFunction)
     {
@@ -541,7 +530,7 @@ public sealed partial class DomBridge
                 break;
             case "jump-both":
                 currentStep = Math.Floor(progress * (steps + 1));
-                steps = steps + 1;
+                steps++;
                 break;
         }
 
@@ -562,7 +551,7 @@ public sealed partial class DomBridge
                 return true;
             }
         }
-        else if (lower.EndsWith("s"))
+        else if (lower.EndsWith('s'))
         {
             if (double.TryParse(lower.AsSpan(0, lower.Length - 1),
                 NumberStyles.Float, CultureInfo.InvariantCulture, out var s))
@@ -578,7 +567,7 @@ public sealed partial class DomBridge
     private static IReadOnlyList<string> TokenizeAnimationShorthand(string shorthand)
     {
         var tokens = new List<string>();
-        var current = new System.Text.StringBuilder();
+        var current = new StringBuilder();
         var depth = 0;
 
         foreach (var ch in shorthand.Trim())
@@ -629,20 +618,16 @@ public sealed partial class DomBridge
     // Value interpolation
     // -----------------------------------------------------------------
 
-    private static readonly System.Text.RegularExpressions.Regex RgbPattern = new(
-        @"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex RgbPattern = RgbPatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex RgbaPattern = new(
-        @"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex RgbaPattern = RgbaPatternRegex();
 
     /// <summary>
     /// Attempts to interpolate between two CSS values at the given progress.
     /// Supports color values (rgb, rgba, named colors) and numeric values.
     /// Falls back to discrete stepping for unsupported value types.
     /// </summary>
-    private string TryInterpolateValue(Broiler.Dom.DomElement element, string prop, string fromValue, string toValue, float progress)
+    private string TryInterpolateValue(DomElement element, string prop, string fromValue, string toValue, float progress)
     {
         // Try color interpolation for color-related properties.
         if (IsColorProperty(prop))
@@ -673,7 +658,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryInterpolateLengthValue(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         string prop,
         string fromValue,
         string toValue,
@@ -696,7 +681,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private double? GetInterpolationPercentageBasis(Broiler.Dom.DomElement element, string prop)
+    private double? GetInterpolationPercentageBasis(DomElement element, string prop)
     {
         return prop switch
         {
@@ -768,4 +753,13 @@ public sealed partial class DomBridge
             default: return false;
         }
     }
+
+    [GeneratedRegex(@"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)", RegexOptions.Compiled)]
+    private static partial Regex StepsPatternRegex();
+    [GeneratedRegex(@"cubic-bezier\(\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*\)", RegexOptions.Compiled)]
+    private static partial Regex CubicBezierPatternRegex();
+    [GeneratedRegex(@"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex RgbPatternRegex();
+    [GeneratedRegex(@"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex RgbaPatternRegex();
 }

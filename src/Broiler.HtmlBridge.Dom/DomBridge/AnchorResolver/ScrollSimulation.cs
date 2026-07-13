@@ -1,6 +1,7 @@
 using System.Globalization;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -14,11 +15,9 @@ public sealed partial class DomBridge
     /// with negative margins.  Combined with <c>overflow: hidden</c>, this
     /// produces the same visual output as a real browser scroll.
     /// </summary>
-    private void ApplyScrollSimulation(Broiler.Dom.DomElement root)
-    {
-        ApplyScrollSimulationTree(root);
-    }
-    private void ApplyScrollSimulationTree(Broiler.Dom.DomElement el)
+    private void ApplyScrollSimulation(DomElement root) => ApplyScrollSimulationTree(root);
+
+    private void ApplyScrollSimulationTree(DomElement el)
     {
         if (!IsText(el))
         {
@@ -80,7 +79,7 @@ public sealed partial class DomBridge
                     // offset applied to the wrapper.
                     if (isDocScrollingElement)
                     {
-                        var fixedDescendants = new List<Broiler.Dom.DomElement>();
+                        var fixedDescendants = new List<DomElement>();
                         CollectFixedDescendants(wrapper, fixedDescendants);
                         foreach (var fixedEl in fixedDescendants)
                         {
@@ -131,14 +130,15 @@ public sealed partial class DomBridge
         // Use index-based loop because the list may grow during iteration
         // (wrapper insertion above).
         for (int i = 0; i < el.ChildNodes.Count; i++)
-            if (ChildAt(el, i) is Broiler.Dom.DomElement child)
+            if (ChildAt(el, i) is DomElement child)
                 ApplyScrollSimulationTree(child);
     }
+
     /// <summary>
     /// Recursively collects all descendants with <c>position: fixed</c>
     /// (including generated backdrop divs) from the given subtree.
     /// </summary>
-    private void CollectFixedDescendants(Broiler.Dom.DomElement parent, List<Broiler.Dom.DomElement> results)
+    private void CollectFixedDescendants(DomElement parent, List<DomElement> results)
     {
         foreach (var child in SnapshotChildren(parent))
         {
@@ -156,8 +156,9 @@ public sealed partial class DomBridge
             }
         }
     }
-    private double GetScrollSimulationScaleFactor() =>
-        HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
+    
+    private double GetScrollSimulationScaleFactor() => HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
+
     private static bool HasOverflowClipping(Dictionary<string, string> props)
     {
         if (props.TryGetValue("overflow", out var ov))

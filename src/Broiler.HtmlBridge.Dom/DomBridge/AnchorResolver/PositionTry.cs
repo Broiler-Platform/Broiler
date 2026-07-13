@@ -1,7 +1,8 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -9,12 +10,10 @@ public sealed partial class DomBridge
     // @position-try parsing and fallback resolution
     // -----------------------------------------------------------------
 
-    private static readonly System.Text.RegularExpressions.Regex PositionTryParsePattern = new(
-        @"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PositionTryParsePattern = PositionTryParsePatternRegex();
 
-    private static readonly System.Text.RegularExpressions.Regex CssCommentPattern = new(
-        @"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex CssCommentPattern = CssCommentPatternRegex();
+
     /// <summary>
     /// Parses all <c>@position-try</c> at-rules from <c>&lt;style&gt;</c>
     /// elements, returning a dictionary mapping rule name to its property
@@ -26,9 +25,8 @@ public sealed partial class DomBridge
         CollectPositionTryRulesFromTree(DocumentElement, result);
         return result;
     }
-    private void CollectPositionTryRulesFromTree(
-        Broiler.Dom.DomElement el,
-        Dictionary<string, Dictionary<string, string>> result)
+
+    private void CollectPositionTryRulesFromTree(DomElement el, Dictionary<string, Dictionary<string, string>> result)
     {
         if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
@@ -77,17 +75,10 @@ public sealed partial class DomBridge
     /// the base style overflows the containing block and applies the first
     /// non-overflowing fallback from the <c>@position-try</c> rules.
     /// </summary>
-    private void ResolvePositionTryFallbacks(
-        Broiler.Dom.DomElement root,
-        Dictionary<string, AnchorInfo> anchorRegistry,
-        Dictionary<string, Dictionary<string, string>> positionTryRules)
-    {
+    private void ResolvePositionTryFallbacks(DomElement root, Dictionary<string, AnchorInfo> anchorRegistry, Dictionary<string, Dictionary<string, string>> positionTryRules) =>
         ResolvePositionTryFallbacksTree(root, anchorRegistry, positionTryRules);
-    }
-    private void ResolvePositionTryFallbacksTree(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, AnchorInfo> anchorRegistry,
-        Dictionary<string, Dictionary<string, string>> positionTryRules)
+
+    private void ResolvePositionTryFallbacksTree(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry, Dictionary<string, Dictionary<string, string>> positionTryRules)
     {
         if (!IsText(element) && !IsComment(element))
         {
@@ -111,12 +102,9 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(element))
             ResolvePositionTryFallbacksTree(child, anchorRegistry, positionTryRules);
     }
-    private void TryApplyFallback(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, string> baseProps,
-        Dictionary<string, AnchorInfo> anchorRegistry,
-        Dictionary<string, Dictionary<string, string>> positionTryRules,
-        string fallbackList)
+
+    private void TryApplyFallback(DomElement element, Dictionary<string, string> baseProps, Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules, string fallbackList)
     {
         // Get the containing block dimensions.
         double cbWidth = FindContainingBlockWidth(element);
@@ -280,12 +268,13 @@ public sealed partial class DomBridge
             }
         }
     }
+
     /// <summary>
     /// Estimates the min-content width of an element by examining its
     /// children's explicit widths. This is a heuristic for elements
     /// with <c>width: min-content</c>.
     /// </summary>
-    private double EstimateMinContentWidth(Broiler.Dom.DomElement element)
+    private double EstimateMinContentWidth(DomElement element)
     {
         double maxWidth = 0;
         foreach (var child in SnapshotChildren(element))
@@ -301,10 +290,8 @@ public sealed partial class DomBridge
         }
         return maxWidth;
     }
-    private static string ResolveAnchorEdge(
-        Match m, Dictionary<string, AnchorInfo> registry,
-        string contextProp, double cbWidth, double cbHeight,
-        string? implicitAnchor = null)
+    private static string ResolveAnchorEdge(Match m, Dictionary<string, AnchorInfo> registry,
+        string contextProp, double cbWidth, double cbHeight, string? implicitAnchor = null)
     {
         var anchorName = m.Groups["name"].Value;
         if (string.IsNullOrEmpty(anchorName))
@@ -334,4 +321,9 @@ public sealed partial class DomBridge
 
         return $"{value.ToString(CultureInfo.InvariantCulture)}px";
     }
+
+    [GeneratedRegex(@"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex PositionTryParsePatternRegex();
+    [GeneratedRegex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Singleline)]
+    private static partial Regex CssCommentPatternRegex();
 }

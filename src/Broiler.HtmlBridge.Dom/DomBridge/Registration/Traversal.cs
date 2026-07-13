@@ -4,7 +4,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -35,17 +35,17 @@ public sealed partial class DomBridge
         var bridgeForTraversal = this;
         document.FastAddValue(
             (KeyString)"createTreeWalker",
-            new JSFunction((in Arguments a) => JsRegistrationCreateTreeWalker038Core(bridgeForTraversal, in a), "createTreeWalker", 3),
+            new JSFunction((in a) => JsRegistrationCreateTreeWalker038Core(bridgeForTraversal, in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createNodeIterator(root, whatToShow, filter)
         document.FastAddValue(
             (KeyString)"createNodeIterator",
-            new JSFunction((in Arguments a) => JsRegistrationCreateNodeIterator039Core(bridgeForTraversal, in a), "createNodeIterator", 3),
+            new JSFunction((in a) => JsRegistrationCreateNodeIterator039Core(bridgeForTraversal, in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createRange()
         document.FastAddValue(
             (KeyString)"createRange",
-            new JSFunction((in Arguments a) => bridgeForTraversal.BuildRange(), "createRange", 0),
+            new JSFunction((in a) => bridgeForTraversal.BuildRange(), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createComment(data)
         document.FastAddValue(

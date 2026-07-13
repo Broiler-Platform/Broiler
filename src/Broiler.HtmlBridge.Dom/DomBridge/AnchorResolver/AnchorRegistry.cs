@@ -1,4 +1,6 @@
-namespace Broiler.HtmlBridge;
+using Broiler.Dom;
+
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -6,9 +8,7 @@ public sealed partial class DomBridge
     // Anchor registry
     // -----------------------------------------------------------------
 
-    private sealed record AnchorInfo(
-        double Top, double Left, double Width, double Height,
-        Broiler.Dom.DomElement? SourceElement = null)
+    private sealed record AnchorInfo(double Top, double Left, double Width, double Height, DomElement? SourceElement = null)
     {
         public double Right => Left + Width;
         public double Bottom => Top + Height;
@@ -54,8 +54,7 @@ public sealed partial class DomBridge
     /// name→single registry when duplicates exist <em>and</em> an in-CB candidate
     /// is found, so unique-name lookups (the overwhelming majority) are unchanged.
     /// </summary>
-    private AnchorInfo? ResolveAnchorForElement(
-        string name, Broiler.Dom.DomElement queryEl, Dictionary<string, AnchorInfo> registry)
+    private AnchorInfo? ResolveAnchorForElement(string name, DomElement queryEl, Dictionary<string, AnchorInfo> registry)
     {
         if (_anchorCandidates != null &&
             _anchorCandidates.TryGetValue(name, out var list) && list.Count > 1)
@@ -72,9 +71,10 @@ public sealed partial class DomBridge
                     return scoped;
             }
         }
-        return registry.TryGetValue(name, out var global) ? global : (AnchorInfo?)null;
+        return registry.TryGetValue(name, out var global) ? global : null;
     }
-    private AnchorInfo? ComputeElementBox(Broiler.Dom.DomElement element)
+
+    private AnchorInfo? ComputeElementBox(DomElement element)
     {
         var props = GetComputedProps(element);
 
@@ -224,6 +224,7 @@ public sealed partial class DomBridge
 
         return new AnchorInfo(accTop, accLeft, width, height);
     }
+
     /// <summary>
     /// Tries to source the anchor's box from the renderer's real layout
     /// (RF-BRIDGE-1b), returning it in the same containing-block-relative frame the
@@ -234,7 +235,7 @@ public sealed partial class DomBridge
     /// or the element produced no usable box, keeping this a no-op until the parity
     /// gate enables real-layout geometry.
     /// </summary>
-    private bool TryGetAnchorLayoutBox(Broiler.Dom.DomElement element, out AnchorInfo box)
+    private bool TryGetAnchorLayoutBox(DomElement element, out AnchorInfo box)
     {
         box = default!;
         if (!UseSharedLayoutGeometry)
@@ -266,7 +267,7 @@ public sealed partial class DomBridge
     /// Walks up from <paramref name="element"/> to the nearest ancestor that
     /// establishes a containing block (the frame the estimator measures against).
     /// </summary>
-    private Broiler.Dom.DomElement? FindGeometryContainingBlockAncestor(Broiler.Dom.DomElement element)
+    private DomElement? FindGeometryContainingBlockAncestor(DomElement element)
     {
         for (var ancestor = ParentEl(element); ancestor != null; ancestor = ParentEl(ancestor))
             if (EstablishesContainingBlock(GetComputedProps(ancestor)))
@@ -301,7 +302,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets computed CSS properties for an element (CSS rules + inline styles).
     /// </summary>
-    private Dictionary<string, string> GetComputedProps(Broiler.Dom.DomElement element)
+    private Dictionary<string, string> GetComputedProps(DomElement element)
     {
         if (_computedPropsCache.TryGetValue(element, out var cached))
             return cached;
@@ -342,7 +343,8 @@ public sealed partial class DomBridge
             _computedPropsInProgress.TryRemove(element, out _);
         }
     }
-    private void ResolveExplicitInheritedValues(Dictionary<string, string> props, Broiler.Dom.DomElement element)
+
+    private void ResolveExplicitInheritedValues(Dictionary<string, string> props, DomElement element)
     {
         Dictionary<string, string>? parentProps = null;
         foreach (var key in props.Keys.ToList())
@@ -367,10 +369,11 @@ public sealed partial class DomBridge
                 props.Remove(key);
         }
     }
+
     /// <summary>
     /// Computes the total height of preceding siblings in normal flow.
     /// </summary>
-    private double ComputePrecedingSiblingHeights(Broiler.Dom.DomElement element)
+    private double ComputePrecedingSiblingHeights(DomElement element)
     {
         if (ParentEl(element) == null) return 0;
 

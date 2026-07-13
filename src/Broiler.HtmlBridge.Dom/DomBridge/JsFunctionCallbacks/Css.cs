@@ -1,33 +1,36 @@
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.CSS;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsCssGetPropertyValue001Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String>? computed, in Arguments a)
+    private JSValue JsCssGetPropertyValue001Core(Dictionary<string, string>? computed, in Arguments a)
     {
         if (a.Length > 0)
         {
             var name = a[0].ToString();
             if (computed.TryGetValue(name, out var val))
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                return new JSString(CssPriority.Strip(val));
+            
             // Try kebab-case conversion for camelCase input
-            var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(name);
+            var kebab = CssPropertyNames.ToCssPropertyName(name);
             if (kebab != name && computed.TryGetValue(kebab, out val))
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                return new JSString(CssPriority.Strip(val));
+            
             // Try camelCase conversion for kebab-case input
-            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(name);
+            var camel = CssPropertyNames.ToDomPropertyName(name);
             if (camel != name && computed.TryGetValue(camel, out val))
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                return new JSString(CssPriority.Strip(val));
         }
 
         return new JSString(string.Empty);
     }
 
 
-    private JSValue JsCssItem003Core(global::System.Collections.Generic.List<global::System.String>? propertyNames, in Arguments a)
+    private JSValue JsCssItem003Core(List<string>? propertyNames, in Arguments a)
     {
         if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
         {

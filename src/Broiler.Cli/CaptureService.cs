@@ -13,6 +13,7 @@ using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 using Broiler.Media.Image;
+using Broiler.HtmlBridge.Dom;
 
 namespace Broiler.Cli;
 

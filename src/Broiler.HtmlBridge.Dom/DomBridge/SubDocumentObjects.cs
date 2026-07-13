@@ -5,12 +5,13 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
-    private JSObject BuildSubDocument(Broiler.Dom.DomElement docRoot)
+    private JSObject BuildSubDocument(DomElement docRoot)
     {
         var doc = new JSObject();
         _docRootToDocJSObject[docRoot] = doc;
@@ -19,217 +20,168 @@ public sealed partial class DomBridge
         _jsObjectCache[docRoot] = doc;
         var bridge = this;
 
-        doc.FastAddProperty(
-            (KeyString)"documentElement",
-            new JSFunction((in Arguments _) => ToJSObject(GetDocumentElement(docRoot)), "get documentElement"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"documentElement",
+            new JSFunction((in _) => ToJSObject(GetDocumentElement(docRoot)), "get documentElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        doc.FastAddProperty(
-            (KeyString)"scrollingElement",
-            new JSFunction((in Arguments _) => ToJSObject(GetDocumentElement(docRoot)), "get scrollingElement"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"scrollingElement",
+            new JSFunction((in _) => ToJSObject(GetDocumentElement(docRoot)), "get scrollingElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // body
-        doc.FastAddProperty(
-            (KeyString)"body",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetBody003Core(docRoot, in _), "get body"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"body",
+            new JSFunction((in _) => JsSubDocumentObjectsGetBody003Core(docRoot, in _), "get body"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // head
-        doc.FastAddProperty(
-            (KeyString)"head",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetHead004Core(docRoot, in _), "get head"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"head",
+            new JSFunction((in _) => JsSubDocumentObjectsGetHead004Core(docRoot, in _), "get head"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // title (dynamic getter from <title> element in <head>)
-        doc.FastAddProperty(
-            (KeyString)"title",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetTitle005Core(docRoot, in _), "get title"),
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsSetTitle006Core(docRoot, in a), "set title"),
+        doc.FastAddProperty((KeyString)"title",
+            new JSFunction((in _) => JsSubDocumentObjectsGetTitle005Core(docRoot, in _), "get title"),
+            new JSFunction((in a) => JsSubDocumentObjectsSetTitle006Core(docRoot, in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // forms (dynamic collection of <form> elements)
-        doc.FastAddProperty(
-            (KeyString)"forms",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetForms007Core(docRoot, in _), "get forms"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"forms",
+            new JSFunction((in _) => JsSubDocumentObjectsGetForms007Core(docRoot, in _), "get forms"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // childNodes
-        doc.FastAddProperty(
-            (KeyString)"childNodes",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetChildNodes008Core(docRoot, in _), "get childNodes"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"childNodes",
+            new JSFunction((in _) => JsSubDocumentObjectsGetChildNodes008Core(docRoot, in _), "get childNodes"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // firstChild
-        doc.FastAddProperty(
-            (KeyString)"firstChild",
-            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"firstChild",
+            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lastChild
-        doc.FastAddProperty(
-            (KeyString)"lastChild",
-            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"lastChild",
+            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? ToJSObject(ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // hasChildNodes()
-        doc.FastAddValue(
-            (KeyString)"hasChildNodes",
-            new JSFunction((in Arguments _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False,
-                "hasChildNodes", 0),
+        doc.FastAddValue((KeyString)"hasChildNodes",
+            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // nodeType = DOCUMENT_NODE (9)
-        doc.FastAddProperty(
-            (KeyString)"nodeType",
-            new JSFunction((in Arguments _) => new JSNumber(9), "get nodeType"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"nodeType",
+            new JSFunction((in _) => new JSNumber(9), "get nodeType"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // nodeName = "#document"
-        doc.FastAddProperty(
-            (KeyString)"nodeName",
-            new JSFunction((in Arguments _) => new JSString("#document"), "get nodeName"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"nodeName",
+            new JSFunction((in _) => new JSString("#document"), "get nodeName"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // localName = null for document
-        doc.FastAddProperty(
-            (KeyString)"localName",
+        doc.FastAddProperty((KeyString)"localName",
             NullFunction("get localName"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getElementById(id)
-        doc.FastAddValue(
-            (KeyString)"getElementById",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsGetElementById014Core(docRoot, in a), "getElementById", 1),
+        doc.FastAddValue((KeyString)"getElementById",
+            new JSFunction((in a) => JsSubDocumentObjectsGetElementById014Core(docRoot, in a), "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getElementsByTagName(tag)
-        doc.FastAddValue(
-            (KeyString)"getElementsByTagName",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsGetElementsByTagName015Core(docRoot, in a), "getElementsByTagName", 1),
+        doc.FastAddValue((KeyString)"getElementsByTagName",
+            new JSFunction((in a) => JsSubDocumentObjectsGetElementsByTagName015Core(docRoot, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElement(tag)
-        doc.FastAddValue(
-            (KeyString)"createElement",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateElement016Core(docRoot, in a), "createElement", 1),
+        doc.FastAddValue((KeyString)"createElement",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateElement016Core(docRoot, in a), "createElement", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createTextNode(text)
-        doc.FastAddValue(
-            (KeyString)"createTextNode",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateTextNode017Core(docRoot, in a), "createTextNode", 1),
+        doc.FastAddValue((KeyString)"createTextNode",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateTextNode017Core(docRoot, in a), "createTextNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createComment(data)
-        doc.FastAddValue(
-            (KeyString)"createComment",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateComment018Core(docRoot, in a), "createComment", 1),
+        doc.FastAddValue((KeyString)"createComment",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateComment018Core(docRoot, in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElementNS(ns, localName)
-        doc.FastAddValue(
-            (KeyString)"createElementNS",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateElementNS019Core(docRoot, in a), "createElementNS", 2),
+        doc.FastAddValue((KeyString)"createElementNS",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateElementNS019Core(docRoot, in a), "createElementNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createEvent(type)
-        doc.FastAddValue(
-            (KeyString)"createEvent",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateEvent034Core(in a), "createEvent", 1),
+        doc.FastAddValue((KeyString)"createEvent",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateEvent034Core(in a), "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelector / querySelectorAll
-        doc.FastAddValue(
-            (KeyString)"querySelector",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsQuerySelector035Core(docRoot, in a), "querySelector", 1),
+        doc.FastAddValue((KeyString)"querySelector",
+            new JSFunction((in a) => JsSubDocumentObjectsQuerySelector035Core(docRoot, in a), "querySelector", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue(
-            (KeyString)"querySelectorAll",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsQuerySelectorAll036Core(docRoot, in a), "querySelectorAll", 1),
+        doc.FastAddValue((KeyString)"querySelectorAll",
+            new JSFunction((in a) => JsSubDocumentObjectsQuerySelectorAll036Core(docRoot, in a), "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue(
-            (KeyString)"elementFromPoint",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsElementFromPoint037Core(docRoot, in a), "elementFromPoint", 2),
+        doc.FastAddValue((KeyString)"elementFromPoint",
+            new JSFunction((in a) => JsSubDocumentObjectsElementFromPoint037Core(docRoot, in a), "elementFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue(
-            (KeyString)"elementsFromPoint",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsElementsFromPoint038Core(docRoot, in a), "elementsFromPoint", 2),
+        doc.FastAddValue((KeyString)"elementsFromPoint",
+            new JSFunction((in a) => JsSubDocumentObjectsElementsFromPoint038Core(docRoot, in a), "elementsFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.open()
-        doc.FastAddValue(
-            (KeyString)"open",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsOpen039Core(doc, docRoot, in _), "open", 0),
+        doc.FastAddValue((KeyString)"open",
+            new JSFunction((in _) => JsSubDocumentObjectsOpen039Core(doc, docRoot, in _), "open", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.close()
-        doc.FastAddValue(
-            (KeyString)"close",
+        doc.FastAddValue((KeyString)"close",
             UndefinedFunction("close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.write(html)
-        doc.FastAddValue(
-            (KeyString)"write",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsWrite040Core(bridge, docRoot, in a), "write", 1),
+        doc.FastAddValue((KeyString)"write",
+            new JSFunction((in a) => JsSubDocumentObjectsWrite040Core(bridge, docRoot, in a), "write", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images
-        doc.FastAddProperty(
-            (KeyString)"images",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetImages041Core(docRoot, in _), "get images"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"images",
+            new JSFunction((in _) => JsSubDocumentObjectsGetImages041Core(docRoot, in _), "get images"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links
-        doc.FastAddProperty(
-            (KeyString)"links",
-            new JSFunction((in Arguments _) => JsSubDocumentObjectsGetLinks042Core(docRoot, in _), "get links"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"links",
+            new JSFunction((in _) => JsSubDocumentObjectsGetLinks042Core(docRoot, in _), "get links"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.styleSheets
-        doc.FastAddProperty(
-            (KeyString)"styleSheets",
-            new JSFunction((in Arguments _) => bridge.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        doc.FastAddProperty((KeyString)"styleSheets",
+            new JSFunction((in _) => bridge.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // removeChild on document
-        doc.FastAddValue(
-            (KeyString)"removeChild",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsRemoveChild044Core(bridge, docRoot, in a), "removeChild", 1),
+        doc.FastAddValue((KeyString)"removeChild",
+            new JSFunction((in a) => JsSubDocumentObjectsRemoveChild044Core(bridge, docRoot, in a), "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild on document
-        doc.FastAddValue(
-            (KeyString)"appendChild",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsAppendChild045Core(bridge, docRoot, in a), "appendChild", 1),
+        doc.FastAddValue((KeyString)"appendChild",
+            new JSFunction((in a) => JsSubDocumentObjectsAppendChild045Core(bridge, docRoot, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue(
-            (KeyString)"append",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsAppend046Core(bridge, docRoot, in a), "append", 0),
+        doc.FastAddValue((KeyString)"append",
+            new JSFunction((in a) => JsSubDocumentObjectsAppend046Core(bridge, docRoot, in a), "append", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue(
-            (KeyString)"prepend",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsPrepend047Core(bridge, docRoot, in a), "prepend", 0),
+        doc.FastAddValue((KeyString)"prepend",
+            new JSFunction((in a) => JsSubDocumentObjectsPrepend047Core(bridge, docRoot, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants
@@ -242,59 +194,48 @@ public sealed partial class DomBridge
 
         // document.implementation on sub-documents
         var subImpl = new JSObject();
-        subImpl.FastAddValue(
-            (KeyString)"hasFeature",
+        subImpl.FastAddValue((KeyString)"hasFeature",
             TrueFunction("hasFeature", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue(
-            (KeyString)"createDocumentType",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateDocumentType048Core(in a), "createDocumentType", 3),
+        subImpl.FastAddValue((KeyString)"createDocumentType",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateDocumentType048Core(in a), "createDocumentType", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue(
-            (KeyString)"createDocument",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateDocument049Core(in a), "createDocument", 3),
+        subImpl.FastAddValue((KeyString)"createDocument",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateDocument049Core(in a), "createDocument", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue(
-            (KeyString)"createHTMLDocument",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateHTMLDocument050Core(in a), "createHTMLDocument", 1),
+        subImpl.FastAddValue((KeyString)"createHTMLDocument",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateHTMLDocument050Core(in a), "createHTMLDocument", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue(
-            (KeyString)"implementation",
-            subImpl,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"implementation",
+            subImpl, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // defaultView — return the main window object so getComputedStyle is accessible
         if (_windowJSObject != null)
         {
-            doc.FastAddValue(
-                (KeyString)"defaultView",
-                _windowJSObject,
-                JSPropertyAttributes.EnumerableConfigurableValue);
+            doc.FastAddValue((KeyString)"defaultView",
+                _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // createTreeWalker(root, whatToShow, filter)
-        doc.FastAddValue(
-            (KeyString)"createTreeWalker",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateTreeWalker051Core(bridge, in a), "createTreeWalker", 3),
+        doc.FastAddValue((KeyString)"createTreeWalker",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateTreeWalker051Core(bridge, in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createNodeIterator(root, whatToShow, filter)
-        doc.FastAddValue(
-            (KeyString)"createNodeIterator",
-            new JSFunction((in Arguments a) => JsSubDocumentObjectsCreateNodeIterator052Core(bridge, in a), "createNodeIterator", 3),
+        doc.FastAddValue((KeyString)"createNodeIterator",
+            new JSFunction((in a) => JsSubDocumentObjectsCreateNodeIterator052Core(bridge, in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createRange()
-        doc.FastAddValue(
-            (KeyString)"createRange",
-            new JSFunction((in Arguments a) => bridge.BuildRange(docRoot), "createRange", 0),
+        doc.FastAddValue((KeyString)"createRange",
+            new JSFunction((in a) => bridge.BuildRange(docRoot), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return doc;
     }
 
     /// <summary>Finds the first element in a sub-tree matching a predicate.</summary>
-    private Broiler.Dom.DomElement? FindInSubTree(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate)
+    private DomElement? FindInSubTree(DomElement root, Func<DomElement, bool> predicate)
     {
         foreach (var child in ChildElements(root))
         {
@@ -307,7 +248,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Finds the first element in a tree matching a predicate (includes the root).</summary>
-    private static Broiler.Dom.DomElement? FindInTree(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate)
+    private static DomElement? FindInTree(DomElement root, Func<DomElement, bool> predicate)
     {
         if (predicate(root)) return root;
         foreach (var child in ChildElements(root))

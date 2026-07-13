@@ -4,7 +4,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -34,8 +34,8 @@ public sealed partial class DomBridge
         var cookieStore = "";
         document.FastAddProperty(
             (KeyString)"cookie",
-            new JSFunction((in Arguments _) => new JSString(cookieStore), "get cookie"),
-            new JSFunction((in Arguments a) => JsRegistrationSetCookie149Core(ref cookieStore, in a), "set cookie"),
+            new JSFunction((in _) => new JSString(cookieStore), "get cookie"),
+            new JSFunction((in a) => JsRegistrationSetCookie149Core(ref cookieStore, in a), "set cookie"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // ---------------------------------------------------------------
         //  Google Search Compliance: Phase 3 (P2) — Fidelity polyfills
@@ -293,23 +293,18 @@ public sealed partial class DomBridge
     {
         // TODO-G18: window.crypto.getRandomValues() — cryptographically secure
         var cryptoObj = new JSObject();
-        cryptoObj.FastAddValue(
-            (KeyString)"getRandomValues",
-            new JSFunction(JsRegistrationGetRandomValues150Core, "getRandomValues", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        cryptoObj.FastAddValue(
-            (KeyString)"randomUUID",
-            new JSFunction((in Arguments _) => new JSString(Guid.NewGuid().ToString()), "randomUUID", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue(
-            (KeyString)"crypto",
-            cryptoObj,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        cryptoObj.FastAddValue((KeyString)"getRandomValues", new JSFunction(JsRegistrationGetRandomValues150Core, "getRandomValues", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        cryptoObj.FastAddValue((KeyString)"randomUUID", new JSFunction((in _) => new JSString(Guid.NewGuid().ToString()), "randomUUID", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        window.FastAddValue((KeyString)"crypto", cryptoObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["crypto"] = cryptoObj;
+
         // DOMException constructor
         RegisterDOMException(context);
+
         // Node constructor with type constants
         RegisterNodeConstructor(context);
+
         // SVGLength interface constants
         RegisterSVGLength(context);
     }

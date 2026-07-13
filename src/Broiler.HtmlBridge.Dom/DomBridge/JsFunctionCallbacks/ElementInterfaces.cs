@@ -6,34 +6,36 @@ using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
+using System.Globalization;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsElementInterfacesGetCaption001Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetCaption001Core(DomElement element, in Arguments _)
     {
         var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         return cap != null ? ToJSObject(cap) : JSNull.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetTHead002Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetTHead002Core(DomElement element, in Arguments _)
     {
         var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         return th != null ? ToJSObject(th) : JSNull.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetTFoot003Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetTFoot003Core(DomElement element, in Arguments _)
     {
         var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         return tf != null ? ToJSObject(tf) : JSNull.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetTBodies005Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetTBodies005Core(DomElement element, in Arguments _)
     {
         var bodies = new List<JSValue>();
         foreach (var c in ChildElements(element))
@@ -50,7 +52,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesCreateCaption007Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesCreateCaption007Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
@@ -63,7 +65,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesCreateTHead008Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesCreateTHead008Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
@@ -76,7 +78,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesCreateTFoot009Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesCreateTFoot009Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
@@ -89,7 +91,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesDeleteCaption010Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesDeleteCaption010Core(DomElement element, in Arguments _)
     {
         var cap = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
         if (cap != null)
@@ -102,7 +104,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesDeleteTHead011Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesDeleteTHead011Core(DomElement element, in Arguments _)
     {
         var th = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
         if (th != null)
@@ -115,7 +117,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesDeleteTFoot012Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesDeleteTFoot012Core(DomElement element, in Arguments _)
     {
         var tf = ChildElements(element).FirstOrDefault(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
         if (tf != null)
@@ -128,14 +130,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesInsertRow013Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesInsertRow013Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
         return InsertTableRow(element, index, bridge);
     }
 
 
-    private JSValue JsElementInterfacesDeleteRow014Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesDeleteRow014Core(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -154,7 +156,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetRows016Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetRows016Core(DomElement element, in Arguments _)
     {
         var rows = new List<JSValue>();
         foreach (var c in ChildElements(element))
@@ -171,7 +173,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesInsertRow017Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesInsertRow017Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
         var tr = CreateBridgeElement("tr");
@@ -191,7 +193,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetRowIndex018Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetRowIndex018Core(DomElement element, in Arguments _)
     {
         // Find parent table
         var tableEl = ParentEl(element);
@@ -204,7 +206,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetSectionRowIndex019Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetSectionRowIndex019Core(DomElement element, in Arguments _)
     {
         var section = ParentEl(element);
         if (section == null)
@@ -222,7 +224,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetCells021Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetCells021Core(DomElement element, in Arguments _)
     {
         var cells = new List<JSValue>();
         foreach (var c in ChildElements(element))
@@ -239,7 +241,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesInsertCell022Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesInsertCell022Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         var index = a.Length > 0 ? (int)Math.Truncate(a[0].DoubleValue) : -1;
         var td = CreateBridgeElement("td");
@@ -264,7 +266,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesDeleteCell023Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesDeleteCell023Core(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'deleteCell' on 'HTMLTableRowElement': 1 argument required, but only 0 present.");
@@ -281,21 +283,21 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetLength025Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetLength025Core(DomElement element, in Arguments _)
     {
         var controls = CollectFormControls(element);
         return new JSNumber(controls.Count);
     }
 
 
-    private JSValue JsElementInterfacesSetAction027Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetAction027Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "action", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesSetOpen029Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetOpen029Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
             SetAttr(element, "open", "");
@@ -306,7 +308,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesShowModal030Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesShowModal030Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         SetAttr(element, "open", "");
         GetElementRuntimeState(element).Dialog.Modal.Set(true);
@@ -316,7 +318,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesShow031Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesShow031Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         SetAttr(element, "open", "");
         bridge.InvalidateStyleScope(element);
@@ -327,7 +329,7 @@ public sealed partial class DomBridge
     // Popover API (HTML §popover): showPopover() promotes the element to the top
     // layer (so its ::backdrop renders). Modeled with the same runtime flag +
     // top-layer order the modal-dialog path uses.
-    private JSValue JsElementInterfacesShowPopoverCore(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesShowPopoverCore(DomBridge? bridge, DomElement element, in Arguments _)
     {
         GetElementRuntimeState(element).Dialog.PopoverOpen.Set(true);
         GetElementRuntimeState(element).Dialog.TopLayerOrder.Set(++bridge._topLayerCounter);
@@ -336,7 +338,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesHidePopoverCore(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesHidePopoverCore(DomBridge? bridge, DomElement element, in Arguments _)
     {
         // CSS Position §overlay: hiding a popover whose `overlay` is transitioned
         // with `transition-behavior: allow-discrete` keeps it in the top layer for
@@ -350,7 +352,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesClose032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesClose032Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         RemoveAttr(element, "open");
         GetElementRuntimeState(element).Dialog.Modal.Remove();
@@ -361,7 +363,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetOpen034Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetOpen034Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         if (a.Length > 0 && a[0].BooleanValue)
             SetAttr(element, "open", "");
@@ -372,28 +374,29 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetReturnValue036Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetReturnValue036Core(DomElement element, in Arguments a)
     {
         GetElementRuntimeState(element).FormControl.ReturnValue.Set(a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesAdd037Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesAdd037Core(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
-        var optObj = a[0] as JSObject;
-        if (optObj == null)
+
+        if (a[0] is not JSObject optObj)
             return JSUndefined.Value;
+
         var optEl = FindDomElementByJSObject(optObj);
         if (optEl == null)
             return JSUndefined.Value;
-        Broiler.Dom.DomElement? refEl = null;
+
+        DomElement? refEl = null;
         if (a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined)
         {
-            var refObj = a[1] as JSObject;
-            if (refObj != null)
+            if (a[1] is JSObject refObj)
                 refEl = FindDomElementByJSObject(refObj);
         }
 
@@ -413,7 +416,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetOptions039Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetOptions039Core(DomElement element, in Arguments _)
     {
         var opts = new List<JSValue>();
         foreach (var c in ChildElements(element))
@@ -430,7 +433,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetSelectedIndex041Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetSelectedIndex041Core(DomElement element, in Arguments a)
     {
         var index = a.Length == 0 ? -1 : (int)Math.Truncate(a[0].DoubleValue);
         SetSelectSelectedIndex(element, index);
@@ -438,7 +441,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetSize042Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetSize042Core(DomElement element, in Arguments _)
     {
         if (TryGetAttribute(element, "size", out var rawSize) && int.TryParse(rawSize, out var parsedSize) && parsedSize > 0)
         {
@@ -449,7 +452,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetSize043Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetSize043Core(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSUndefined.Value;
@@ -462,28 +465,28 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetDefaultSelected045Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetDefaultSelected045Core(DomElement element, in Arguments a)
     {
         GetElementRuntimeState(element).FormControl.DefaultSelected.Set(a.Length > 0 && a[0].BooleanValue);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesSetHtmlFor047Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetHtmlFor047Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "for", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesSetHttpEquiv049Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetHttpEquiv049Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "http-equiv", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetData050Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetData050Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         if (!TryGetAttribute(element, "data", out var d))
             return new JSString(string.Empty);
@@ -494,7 +497,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetData051Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetData051Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         SetAttr(element, "data", a.Length > 0 ? a[0].ToString() : string.Empty);
         // Invalidate cached sub-document when data changes
@@ -503,14 +506,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetType053Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetType053Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "type", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetContentDocument054Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetContentDocument054Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
         if (IsCrossOrigin(dataUrl, bridge._pageUrl))
@@ -522,7 +525,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetSVGDocument055Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetSVGDocument055Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
         if (IsCrossOrigin(dataUrl, bridge._pageUrl))
@@ -531,7 +534,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetHref056Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetHref056Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         if (!TryGetAttribute(element, "href", out var h))
             return new JSString(string.Empty);
@@ -541,21 +544,21 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetHref057Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetHref057Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesCallback059Core(global::System.String? captured, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesCallback059Core(string? captured, DomElement element, in Arguments a)
     {
         SetAttr(element, captured, a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetHref060Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetHref060Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
         if (!TryGetAttribute(element, "href", out var h))
             return new JSString(string.Empty);
@@ -565,14 +568,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetHref061Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetHref061Core(DomElement element, in Arguments a)
     {
         SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesCallback062Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::System.String? dimName, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesCallback062Core(DomBridge? bridge, string? dimName, DomElement element, in Arguments _)
     {
         // First check computed style for this element
         var computed = bridge.BuildComputedStyleObject(element);
@@ -595,14 +598,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesCallback063Core(global::System.String? dimName, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesCallback063Core(string? dimName, DomElement element, in Arguments a)
     {
         SetAttr(element, dimName, a.Length > 0 ? a[0].ToString() : "0");
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetScrollTop072Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetScrollTop072Core(DomBridge? bridgeForOffset, DomElement element, in Arguments _)
     {
         if (bridgeForOffset.GetElementScrollOffset(element, vertical: true) is double sv)
             return new JSNumber(sv);
@@ -610,7 +613,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetScrollTop073Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetScrollTop073Core(DomBridge? bridgeForOffset, DomElement element, in Arguments a)
     {
         if (a.Length > 0)
             bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, top: a[0].DoubleValue);
@@ -618,7 +621,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetScrollLeft074Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetScrollLeft074Core(DomBridge? bridgeForOffset, DomElement element, in Arguments _)
     {
         if (bridgeForOffset.GetElementScrollOffset(element, vertical: false) is double sv)
             return new JSNumber(sv);
@@ -626,7 +629,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetScrollLeft075Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesSetScrollLeft075Core(DomBridge? bridgeForOffset, DomElement element, in Arguments a)
     {
         if (a.Length > 0)
             bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left: a[0].DoubleValue);
@@ -634,62 +637,58 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetOffsetParent078Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement? elForOffset, in Arguments _)
+    private JSValue JsElementInterfacesGetOffsetParent078Core(DomBridge? bridgeForOffset, DomElement? elForOffset, in Arguments _)
     {
         var offsetParent = bridgeForOffset.GetOffsetParentForDomElement(elForOffset);
         return offsetParent != null ? bridgeForOffset.ToJSObject(offsetParent) : JSNull.Value;
     }
 
 
-    private JSValue JsElementInterfacesGetBoundingClientRect079Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement? elForOffset, global::System.Boolean isViewportElement, in Arguments _)
+    private JSValue JsElementInterfacesGetBoundingClientRect079Core(DomBridge? bridgeForOffset, DomElement? elForOffset, bool isViewportElement, in Arguments _)
     {
-        var rectData = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isViewportElement);
+        var (Left, Top, Width, Height) = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isViewportElement);
         var rect = new JSObject();
-        rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        rect.FastAddValue((KeyString)"x", new JSNumber(Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"y", new JSNumber(Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"top", new JSNumber(Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"left", new JSNumber(Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"right", new JSNumber(Left + Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"bottom", new JSNumber(Top + Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"width", new JSNumber(Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"height", new JSNumber(Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        
         return rect;
     }
 
 
-    private JSValue JsElementInterfacesGetClientRects080Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement? elForOffset, global::System.Boolean isViewportElement, in Arguments a2)
+    private JSValue JsElementInterfacesGetClientRects080Core(DomBridge? bridgeForOffset, DomElement? elForOffset, bool isViewportElement, in Arguments a2)
     {
-        var rectData = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isViewportElement);
+        var (Left, Top, Width, Height) = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isViewportElement);
         var rect = new JSObject();
-        rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
-        return rectData.Width > 0 || rectData.Height > 0 || isViewportElement ? new JSArray([rect]) : new JSArray();
+
+        rect.FastAddValue((KeyString)"x", new JSNumber(Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"y", new JSNumber(Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"top", new JSNumber(Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"left", new JSNumber(Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"right", new JSNumber(Left + Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"bottom", new JSNumber(Top + Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"width", new JSNumber(Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue((KeyString)"height", new JSNumber(Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        
+        return Width > 0 || Height > 0 || isViewportElement ? new JSArray([rect]) : new JSArray();
     }
 
 
-    private JSValue JsElementInterfacesScrollIntoView081Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement? elForOffset, in Arguments a)
+    private JSValue JsElementInterfacesScrollIntoView081Core(DomBridge? bridgeForOffset, DomElement? elForOffset, in Arguments a)
     {
-        var options = bridgeForOffset.GetScrollIntoViewOptions(a);
-        bridgeForOffset.ScrollElementIntoView(elForOffset, options.Block, options.Inline, options.Behavior);
+        var (Block, Inline, Behavior) = bridgeForOffset.GetScrollIntoViewOptions(a);
+        bridgeForOffset.ScrollElementIntoView(elForOffset, Block, Inline, Behavior);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsElementInterfacesScroll082Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments a)
-    {
-        var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
-        bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsElementInterfacesScrollTo083Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesScroll082Core(DomBridge? bridgeForOffset, DomElement element, in Arguments a)
     {
         var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
         bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
@@ -697,7 +696,15 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesScrollBy084Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesScrollTo083Core(DomBridge? bridgeForOffset, DomElement element, in Arguments a)
+    {
+        var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
+        bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
+        return JSUndefined.Value;
+    }
+
+
+    private JSValue JsElementInterfacesScrollBy084Core(DomBridge? bridgeForOffset, DomElement element, in Arguments a)
     {
         var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
         bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, relative: true, clamp: false, behavior: behavior);
@@ -705,18 +712,18 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesScrollParent085Core(global::Broiler.HtmlBridge.DomBridge? bridgeForOffset, global::Broiler.Dom.DomElement? elForOffset, in Arguments _)
+    private JSValue JsElementInterfacesScrollParent085Core(DomBridge? bridgeForOffset, DomElement? elForOffset, in Arguments _)
     {
         var scrollParent = bridgeForOffset.GetScrollParentForDomElement(elForOffset);
         return scrollParent != null ? bridgeForOffset.ToJSObject(scrollParent) : JSNull.Value;
     }
 
 
-    private JSValue JsElementInterfacesCallback086Core(global::System.String? attrName, global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesCallback086Core(string? attrName, DomElement element, in Arguments _)
     {
         var animLength = new JSObject();
         var valueStr = TryGetAttribute(element, attrName, out var v) ? v : "0";
-        double.TryParse(valueStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var numVal);
+        double.TryParse(valueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var numVal);
         var baseVal = CreateSvgLengthValue(numVal);
         var animVal = CreateSvgLengthValue(numVal);
         animLength.FastAddValue((KeyString)"baseVal", baseVal, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -725,7 +732,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetViewBox087Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetViewBox087Core(DomElement element, in Arguments _)
     {
         var animRect = new JSObject();
         var baseRect = new JSObject();
@@ -735,10 +742,10 @@ public sealed partial class DomBridge
             var parts = vb.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 4)
             {
-                double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbX);
-                double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbY);
-                double.TryParse(parts[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbW);
-                double.TryParse(parts[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbH);
+                double.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out vbX);
+                double.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out vbY);
+                double.TryParse(parts[2], NumberStyles.Any, CultureInfo.InvariantCulture, out vbW);
+                double.TryParse(parts[3], NumberStyles.Any, CultureInfo.InvariantCulture, out vbH);
             }
         }
 
@@ -752,7 +759,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetNumberOfChars088Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetNumberOfChars088Core(DomElement element, in Arguments _)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -760,7 +767,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetComputedTextLength089Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private JSValue JsElementInterfacesGetComputedTextLength089Core(DomElement element, in Arguments _)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -769,14 +776,14 @@ public sealed partial class DomBridge
         if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
-            double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+            double.TryParse(fsClean, NumberStyles.Any, CultureInfo.InvariantCulture, out fontSize);
         }
 
         return new JSNumber(sb.Length * fontSize * 0.6);
     }
 
 
-    private JSValue JsElementInterfacesGetSubStringLength090Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesGetSubStringLength090Core(DomElement element, in Arguments a)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -790,14 +797,14 @@ public sealed partial class DomBridge
         if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
-            double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+            double.TryParse(fsClean, NumberStyles.Any, CultureInfo.InvariantCulture, out fontSize);
         }
 
         return new JSNumber(nchars * fontSize * 0.6);
     }
 
 
-    private JSValue JsElementInterfacesGetStartPositionOfChar091Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesGetStartPositionOfChar091Core(DomElement element, in Arguments a)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -808,7 +815,7 @@ public sealed partial class DomBridge
         if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
-            double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+            double.TryParse(fsClean, NumberStyles.Any, CultureInfo.InvariantCulture, out fontSize);
         }
 
         var pt = new JSObject();
@@ -818,7 +825,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetEndPositionOfChar092Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesGetEndPositionOfChar092Core(DomElement element, in Arguments a)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -829,7 +836,7 @@ public sealed partial class DomBridge
         if (TryGetAttribute(element, "font-size", out var fs))
         {
             var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
-            double.TryParse(fsClean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+            double.TryParse(fsClean, NumberStyles.Any, CultureInfo.InvariantCulture, out fontSize);
         }
 
         var pt = new JSObject();
@@ -839,7 +846,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesGetRotationOfChar093Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private JSValue JsElementInterfacesGetRotationOfChar093Core(DomElement element, in Arguments a)
     {
         var sb = new StringBuilder();
         CollectTextContent(element, sb);
@@ -851,7 +858,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsElementInterfacesSetCurrentTime095Core(ref global::System.Double currentTime, in Arguments a)
+    private JSValue JsElementInterfacesSetCurrentTime095Core(ref double currentTime, in Arguments a)
     {
         if (a.Length > 0)
             currentTime = a[0].DoubleValue;

@@ -1,7 +1,8 @@
 using Broiler.Layout;
 using System.Drawing;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -35,7 +36,7 @@ public sealed partial class DomBridge
     // lazily on the first shared query and torn down with the pass, so the renderer
     // lays out at most once per pass (one GetRenderDocument call) rather than per
     // element — see ClearSharedGeometrySnapshot in WithLayoutGeometryCache.
-    private System.Collections.Generic.IReadOnlyDictionary<Broiler.Dom.DomElement, BoxGeometry> _sharedGeometrySnapshot;
+    private IReadOnlyDictionary<DomElement, BoxGeometry> _sharedGeometrySnapshot;
 
     /// <summary>
     /// Looks up real-layout box geometry for <paramref name="element"/> via the renderer
@@ -44,16 +45,16 @@ public sealed partial class DomBridge
     /// the caller falls back to the estimator. Active only when
     /// <see cref="UseSharedLayoutGeometry"/> is set; the live entry points gate on that.
     /// </summary>
-    private bool TryGetSharedLayoutGeometry(Broiler.Dom.DomElement element, out BoxGeometry geometry)
+    private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)
     {
         var snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
         return snapshot.TryGetValue(element, out geometry);
     }
 
-    private static readonly System.Collections.Generic.IReadOnlyDictionary<Broiler.Dom.DomElement, BoxGeometry> EmptySharedGeometry =
-        new System.Collections.Generic.Dictionary<Broiler.Dom.DomElement, BoxGeometry>();
+    private static readonly IReadOnlyDictionary<DomElement, BoxGeometry> EmptySharedGeometry = 
+        new Dictionary<DomElement, BoxGeometry>();
 
-    private System.Collections.Generic.IReadOnlyDictionary<Broiler.Dom.DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
+    private IReadOnlyDictionary<DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
     {
         // RF-BRIDGE-1b render-doc/live-doc separation: install a revert log so the zoom
         // baking GetRenderDocument applies (needed for correct RENDERED geometry, incl. a

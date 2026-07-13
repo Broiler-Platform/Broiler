@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -10,9 +10,7 @@ public sealed partial class DomBridge
     /// <c>position-anchor</c> but no <c>position-area</c>.
     /// Centers the element on the anchor in the appropriate axis.
     /// </summary>
-    private void ResolveAnchorCenter(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, AnchorInfo> anchorRegistry)
+    private void ResolveAnchorCenter(Broiler.Dom.DomElement element, Dictionary<string, AnchorInfo> anchorRegistry)
     {
         if (!IsText(element))
         {
@@ -79,30 +77,18 @@ public sealed partial class DomBridge
     /// (nearest to the anchor). For "end" cells (bottom/right), aligned
     /// to the start. For "center" cells, centered.
     /// </summary>
-    private static double ComputeAlignmentOffset(
-        AxisSelection sel, double cellSize, double elementSize, bool isInlineAxis)
+    private static double ComputeAlignmentOffset(AxisSelection sel, double cellSize, double elementSize, bool isInlineAxis)
     {
         double slack = cellSize - elementSize;
         if (slack <= 0) return 0;
 
-        switch (sel)
+        return sel switch
         {
-            case AxisSelection.Start:
-                // "top" or "left" cell: align towards the anchor (end of cell).
-                return slack;
-            case AxisSelection.End:
-                // "bottom" or "right" cell: align towards the anchor (start of cell).
-                return 0;
-            case AxisSelection.Center:
-                // "center" cell: center the element.
-                return slack / 2;
-            case AxisSelection.SpanStart:
-            case AxisSelection.SpanEnd:
-            case AxisSelection.SpanAll:
-                // Spanning cells: align to start by default.
-                return 0;
-            default:
-                return 0;
-        }
+            AxisSelection.Start => slack,// "top" or "left" cell: align towards the anchor (end of cell).
+            AxisSelection.End => 0,// "bottom" or "right" cell: align towards the anchor (start of cell).
+            AxisSelection.Center => slack / 2,// "center" cell: center the element.
+            AxisSelection.SpanStart or AxisSelection.SpanEnd or AxisSelection.SpanAll => 0,// Spanning cells: align to start by default.
+            _ => 0,
+        };
     }
 }

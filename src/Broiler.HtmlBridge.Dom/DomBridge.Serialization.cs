@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
-using SharedHtmlSerializer = Broiler.Dom.Html.HtmlSerializer;
 using Broiler.Dom.Html;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// DOM → HTML serialisation — converts the in-memory DOM tree back to
@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     private const int MaxSerializationDepth = 100_000;
     private const double ZoomSerializationEpsilon = 0.0001;
     private const double DefaultProgressLikeTrackLengthPx = 120;
-    private readonly Dictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];
+    private readonly Dictionary<DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];
 
     // RF-BRIDGE-1b render-doc/live-doc separation: when non-null, ApplyZoomSerializationStyles
     // records each mutated element's pre-bake Style + Attributes here so the geometry-snapshot
@@ -26,7 +26,7 @@ public sealed partial class DomBridge
     // sizes and drops the `zoom` property — which would otherwise corrupt subsequent unzoomed
     // CSSOM queries, e.g. clientWidth of a zoomed element). The render/serialize paths leave
     // this null so their baking stays permanent.
-    private List<(Broiler.Dom.DomElement Element, Dictionary<string, string> Style, Dictionary<string, string> Attributes)>? _zoomSerializationRevertLog;
+    private List<(DomElement Element, Dictionary<string, string> Style, Dictionary<string, string> Attributes)>? _zoomSerializationRevertLog;
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -37,7 +37,7 @@ public sealed partial class DomBridge
     {
         ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
-        return SharedHtmlSerializer.Serialize(
+        return HtmlSerializer.Serialize(
             DocumentElement,
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(
@@ -51,9 +51,9 @@ public sealed partial class DomBridge
     /// Returns the canonical document prepared for direct renderer consumption.
     /// Bridge-owned style and form-control state is reflected into canonical
     /// attributes because the typed renderer intentionally depends only on
-    /// <see cref="Broiler.Dom.DomDocument"/>.
+    /// <see cref="DomDocument"/>.
     /// </summary>
-    public Broiler.Dom.DomDocument GetRenderDocument()
+    public DomDocument GetRenderDocument()
     {
         // Zoom baking runs per call (not part of the run-once guarded transforms) so the
         // geometry-snapshot path can revert it afterward via _zoomSerializationRevertLog;
@@ -98,7 +98,7 @@ public sealed partial class DomBridge
             target[kv.Key] = kv.Value;
     }
 
-    private void ReflectRenderState(Broiler.Dom.DomElement element)
+    private void ReflectRenderState(DomElement element)
     {
         if (!IsText(element) && !element.TagName.StartsWith('#'))
         {
@@ -111,7 +111,7 @@ public sealed partial class DomBridge
                 var styleText = string.Join(
                     "; ",
                     InlineStyle(element)
-                        .OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+                        .OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
                         .Select(static kv => $"{kv.Key}: {kv.Value}"));
                 if (!TryGetAttribute(element, "style", out var currentStyle) ||
                     !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
@@ -133,13 +133,11 @@ public sealed partial class DomBridge
             ReflectRenderState(child);
     }
 
-    private string SerializeElementToHtml(Broiler.Dom.DomElement element) =>
-        SharedHtmlSerializer.Serialize(
-            element,
-            CreateSerializationAdapter(),
+    private string SerializeElementToHtml(DomElement element) =>
+        HtmlSerializer.Serialize(element, CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(Broiler.Dom.DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
+    private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms()
     {
@@ -170,7 +168,7 @@ public sealed partial class DomBridge
     /// so JS-visible <c>innerHTML</c>/<c>outerHTML</c> (which serialize without it)
     /// still expose the comments.
     /// </summary>
-    private static void RemoveRenderCommentNodes(Broiler.Dom.DomElement element)
+    private static void RemoveRenderCommentNodes(DomElement element)
     {
         for (int i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
@@ -181,7 +179,7 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            if (child is Broiler.Dom.DomElement childElement)
+            if (child is DomElement childElement)
                 RemoveRenderCommentNodes(childElement);
         }
     }
@@ -209,11 +207,7 @@ public sealed partial class DomBridge
         InsertChildAt(DocumentElement, 0, styleElement);
     }
 
-    private void CollectZoomPseudoSerializationOverrides(
-        Broiler.Dom.DomElement element,
-        double parentZoom,
-        List<string> rules,
-        ref int pseudoIndex)
+    private void CollectZoomPseudoSerializationOverrides(DomElement element, double parentZoom, List<string> rules, ref int pseudoIndex)
     {
         if (IsText(element))
             return;
@@ -232,12 +226,7 @@ public sealed partial class DomBridge
             CollectZoomPseudoSerializationOverrides(child, usedZoom, rules, ref pseudoIndex);
     }
 
-    private void AppendZoomPseudoSerializationOverride(
-        Broiler.Dom.DomElement element,
-        string pseudoElement,
-        double usedZoom,
-        List<string> rules,
-        ref int pseudoIndex)
+    private void AppendZoomPseudoSerializationOverride(DomElement element, string pseudoElement, double usedZoom, List<string> rules, ref int pseudoIndex)
     {
         var pseudoProps = BuildComputedStyleMap(element, pseudoElement);
         var content = pseudoProps.GetValueOrDefault("content")?.Trim();
@@ -267,7 +256,7 @@ public sealed partial class DomBridge
         rules.Add($"#{element.Id}{pseudoElement} {{ {string.Join("; ", declarations)}; }}");
     }
 
-    private static Broiler.Dom.DomElement? FindFirstElementByTagName(Broiler.Dom.DomElement root, string tagName)
+    private static DomElement? FindFirstElementByTagName(DomElement root, string tagName)
     {
         if (string.Equals(root.TagName, tagName, StringComparison.OrdinalIgnoreCase))
             return root;
@@ -282,7 +271,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private void ApplyProgressLikeSerializationPlaceholders(Broiler.Dom.DomElement element)
+    private void ApplyProgressLikeSerializationPlaceholders(DomElement element)
     {
         if (IsText(element))
             return;
@@ -346,7 +335,7 @@ public sealed partial class DomBridge
         element.AppendChild(fill);
     }
 
-    private static double ResolveProgressLikeValueRatio(Broiler.Dom.DomElement element, string tag)
+    private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
     {
         var min = tag == "meter" ? ReadNumericAttribute(element, "min", 0) : 0;
         var max = ReadNumericAttribute(element, "max", 1);
@@ -357,7 +346,7 @@ public sealed partial class DomBridge
         return Math.Clamp((value - min) / (max - min), 0, 1);
     }
 
-    private static double ReadNumericAttribute(Broiler.Dom.DomElement element, string attributeName, double fallback)
+    private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
     {
         if (!TryGetAttribute(element, attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
             return fallback;
@@ -389,7 +378,7 @@ public sealed partial class DomBridge
             : fallback;
     }
 
-    private void ApplyZoomSerializationStyles(Broiler.Dom.DomElement element, double parentZoom)
+    private void ApplyZoomSerializationStyles(DomElement element, double parentZoom)
     {
         if (IsText(element))
             return;
@@ -430,17 +419,13 @@ public sealed partial class DomBridge
             ApplyZoomSerializationStyles(child, usedZoom);
     }
 
-    private static bool ShouldApplySvgSerializationAttributes(Broiler.Dom.DomElement element)
+    private static bool ShouldApplySvgSerializationAttributes(DomElement element)
     {
         var tag = element.TagName.ToLowerInvariant();
         return tag is "svg" or "defs" or "path" or "rect" or "line" or "text" or "textpath" or "polygon" or "polyline";
     }
 
-    private bool TryGetZoomSerializableValue(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, string> props,
-        string property,
-        out string value)
+    private bool TryGetZoomSerializableValue(DomElement element, Dictionary<string, string> props, string property, out string value)
     {
         value = string.Empty;
         if (ZoomPreferSpecifiedProperties.Contains(property))
@@ -474,7 +459,7 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private Dictionary<string, string> GetZoomSpecifiedStyleMap(Broiler.Dom.DomElement element)
+    private Dictionary<string, string> GetZoomSpecifiedStyleMap(DomElement element)
     {
         if (!_zoomSpecifiedStyleCache.TryGetValue(element, out var specified))
         {
@@ -511,7 +496,7 @@ public sealed partial class DomBridge
         "column-width", "column-height", "column-gap"
     ];
 
-    private void ApplyZoomSerializationSvgAttributes(Broiler.Dom.DomElement element, double usedZoom)
+    private void ApplyZoomSerializationSvgAttributes(DomElement element, double usedZoom)
     {
         var tag = element.TagName.ToLowerInvariant();
         var props = GetComputedProps(element);
@@ -558,11 +543,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void ApplySvgPresentationAttribute(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, string> props,
-        string propertyName,
-        bool preferInlineStyle = false)
+    private void ApplySvgPresentationAttribute(DomElement element, Dictionary<string, string> props, string propertyName, bool preferInlineStyle = false)
     {
         if (HasAttr(element, propertyName))
             return;
@@ -581,7 +562,7 @@ public sealed partial class DomBridge
         SetAttr(element, propertyName, value.Trim());
     }
 
-    private void ScaleSvgLengthAttribute(Broiler.Dom.DomElement element, string attributeName, double usedZoom)
+    private void ScaleSvgLengthAttribute(DomElement element, string attributeName, double usedZoom)
     {
         if (!TryGetAttribute(element, attributeName, out var value) ||
             !TryScaleSvgLengthToken(element, value, usedZoom, out var scaled))
@@ -592,7 +573,7 @@ public sealed partial class DomBridge
         SetAttr(element, attributeName, scaled);
     }
 
-    private void ScaleSvgPointListAttribute(Broiler.Dom.DomElement element, string attributeName, double usedZoom)
+    private void ScaleSvgPointListAttribute(DomElement element, string attributeName, double usedZoom)
     {
         if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
@@ -600,7 +581,7 @@ public sealed partial class DomBridge
         SetAttr(element, attributeName, ScaleSvgPointRegex().Replace(value, match => ScaleSvgNumericMatch(match, usedZoom)));
     }
 
-    private void ScaleSvgPathDataAttribute(Broiler.Dom.DomElement element, string attributeName, double usedZoom)
+    private void ScaleSvgPathDataAttribute(DomElement element, string attributeName, double usedZoom)
     {
         if (!TryGetAttribute(element, attributeName, out var value) || string.IsNullOrWhiteSpace(value))
             return;
@@ -619,7 +600,7 @@ public sealed partial class DomBridge
         return (number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private bool TryScaleSvgLengthToken(Broiler.Dom.DomElement element, string value, double usedZoom, out string scaled)
+    private bool TryScaleSvgLengthToken(DomElement element, string value, double usedZoom, out string scaled)
     {
         scaled = string.Empty;
         var trimmed = value.Trim();
@@ -663,7 +644,7 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private bool TryResolveSvgFontRelativeUnitPixels(Broiler.Dom.DomElement element, string unit, out double pixels)
+    private bool TryResolveSvgFontRelativeUnitPixels(DomElement element, string unit, out double pixels)
     {
         pixels = 0;
         if (SvgRootFontRelativeUnits.Contains(unit))
@@ -679,9 +660,9 @@ public sealed partial class DomBridge
         return pixels > 0;
     }
 
-    private double ResolveOriginalNearestSpecifiedFontSizePx(Broiler.Dom.DomElement element)
+    private double ResolveOriginalNearestSpecifiedFontSizePx(DomElement element)
     {
-        for (Broiler.Dom.DomElement? current = element; current != null; current = ParentEl(current))
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             if (TryGetSpecifiedFontSizePx(current, out var fontSize))
                 return fontSize;
@@ -693,7 +674,7 @@ public sealed partial class DomBridge
     private double ResolveOriginalRootSpecifiedFontSizePx() =>
         TryGetSpecifiedFontSizePx(DocumentElement, out var fontSize) ? fontSize : 16;
 
-    private bool TryGetSpecifiedFontSizePx(Broiler.Dom.DomElement element, out double fontSize)
+    private bool TryGetSpecifiedFontSizePx(DomElement element, out double fontSize)
     {
         fontSize = 0;
         var specified = BuildSpecifiedStyleMap(element);
@@ -728,7 +709,7 @@ public sealed partial class DomBridge
         _ => 1.0
     };
 
-    private double ResolveSvgLengthZoomFactor(Broiler.Dom.DomElement element, string unit, double usedZoom)
+    private double ResolveSvgLengthZoomFactor(DomElement element, string unit, double usedZoom)
     {
         if (SvgAbsoluteOrViewportUnits.Contains(unit))
             return usedZoom;
@@ -742,9 +723,9 @@ public sealed partial class DomBridge
         return usedZoom;
     }
 
-    private double GetNearestExplicitFontSizeOwnerZoom(Broiler.Dom.DomElement element)
+    private double GetNearestExplicitFontSizeOwnerZoom(DomElement element)
     {
-        for (Broiler.Dom.DomElement? current = element; current != null; current = ParentEl(current))
+        for (DomElement? current = element; current != null; current = ParentEl(current))
         {
             var props = GetComputedProps(current);
             if (props.TryGetValue("font-size", out var fontSize) && !string.IsNullOrWhiteSpace(fontSize))
@@ -854,11 +835,11 @@ public sealed partial class DomBridge
     // special kinds off the facade #document-fragment/#subdoc-root/#doctype TagNames (still facade
     // elements). GetName/GetAttributes/GetStyles/GetRawInnerHtml are only invoked for element/doctype
     // nodes (see HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
-    private HtmlSerializationAdapter<Broiler.Dom.DomNode> CreateSerializationAdapter() => new(
+    private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter() => new(
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
             : IsComment(node) ? HtmlSerializationNodeKind.Comment
-            : node is Broiler.Dom.DomElement element
+            : node is DomElement element
                 ? element.TagName.ToLowerInvariant() switch
                 {
                     "#document-fragment" => HtmlSerializationNodeKind.Fragment,
@@ -867,7 +848,7 @@ public sealed partial class DomBridge
                     _ => HtmlSerializationNodeKind.Element
                 }
                 : HtmlSerializationNodeKind.Element,
-        GetName: static node => node is Broiler.Dom.DomElement element ? element.TagName : string.Empty,
+        GetName: static node => node is DomElement element ? element.TagName : string.Empty,
         // Never serialise a materialised nested-browsing-context (#subdoc-root) into
         // its container.  A sub-document is fetched and attached to its <iframe>/
         // <object>/<frame> so scripts can reach contentDocument and onload can fire,
@@ -877,10 +858,10 @@ public sealed partial class DomBridge
         // The renderer rasterises each embedded document in isolation instead
         // (srcdoc content is round-tripped via the srcdoc attribute).
         GetChildren: static node => node.ChildNodes.Where(static child =>
-            !(child is Broiler.Dom.DomElement childElement && string.Equals(childElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))),
-        GetAttributes: node => node is Broiler.Dom.DomElement element ? GetSerializableAttributes(element) : [],
-        GetStyles: static node => node is Broiler.Dom.DomElement element
-            ? InlineStyle(element).OrderBy(kv => SharedHtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+            !(child is DomElement childElement && string.Equals(childElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))),
+        GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
+        GetStyles: static node => node is DomElement element
+            ? InlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
             : [],
         // RF-BRIDGE-1c Phase F (F3c part 2d): text nodes serialize with the same HTML escaping the
         // former element-store textContent path applied — except inside raw-text elements
@@ -888,10 +869,10 @@ public sealed partial class DomBridge
         // EncodeTextNodes:false, so GetText returns the already-escaped form. Comments stay raw.
         GetText: static node => node switch
         {
-            Broiler.Dom.DomText text => IsRawTextSerializationParent(text)
+            DomText text => IsRawTextSerializationParent(text)
                 ? text.Data
-                : SharedHtmlSerializer.Encode(text.Data),
-            Broiler.Dom.DomCharacterData other => other.Data,
+                : HtmlSerializer.Encode(text.Data),
+            DomCharacterData other => other.Data,
             _ => BridgeText(node),
         },
         GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
@@ -900,11 +881,11 @@ public sealed partial class DomBridge
     /// content is serialized literally (not HTML-escaped). The standard raw-text element set is
     /// owned by <see cref="SharedHtmlSerializer.RawTextElements"/> (§13.3); this bridge predicate
     /// only applies it to the node's parent. (RF-BRIDGE-1c Phase F, F3c part 2d.)</summary>
-    private static bool IsRawTextSerializationParent(Broiler.Dom.DomNode node) =>
-        node.ParentNode is Broiler.Dom.DomElement parent &&
-        SharedHtmlSerializer.IsRawTextElement(parent.TagName);
+    private static bool IsRawTextSerializationParent(DomNode node) =>
+        node.ParentNode is DomElement parent &&
+        HtmlSerializer.IsRawTextElement(parent.TagName);
 
-    private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(Broiler.Dom.DomElement element)
+    private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
     {
         if (!string.IsNullOrEmpty(element.Id))
             yield return new("id", element.Id);
@@ -939,7 +920,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private string? TrySerializeCurrentSrcDoc(Broiler.Dom.DomElement element)
+    private string? TrySerializeCurrentSrcDoc(DomElement element)
     {
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
             !HasAttr(element, "srcdoc"))
@@ -957,7 +938,7 @@ public sealed partial class DomBridge
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
     private static partial Regex ScaleSvgPointRegex();
-    
+
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
     private static partial Regex ScaleSvgPathRegex();
 

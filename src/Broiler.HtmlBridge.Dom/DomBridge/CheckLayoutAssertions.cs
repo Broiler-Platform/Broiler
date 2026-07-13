@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -14,8 +14,7 @@ public sealed partial class DomBridge
     /// <param name="Property">The checked geometry property (e.g. <c>offset-y</c>, <c>width</c>).</param>
     /// <param name="Expected">The value declared by the test's <c>data-*</c> attribute.</param>
     /// <param name="Actual">The value the bridge's layout-metrics estimator computes.</param>
-    public readonly record struct CheckLayoutAssertion(
-        string Element, string Property, double Expected, double Actual);
+    public readonly record struct CheckLayoutAssertion(string Element, string Property, double Expected, double Actual);
 
     // Maps the WPT check-layout-th.js data-* attributes this evaluator understands
     // to a short property label. Restricted to the box metrics the bridge computes
@@ -61,11 +60,9 @@ public sealed partial class DomBridge
     {
         foreach (var (attribute, property) in CheckLayoutAttributeMap)
         {
-            if (TryGetAttribute(element, attribute, out var raw) &&
-                double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var expected))
+            if (TryGetAttribute(element, attribute, out var raw) && double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var expected))
             {
-                results.Add(new CheckLayoutAssertion(
-                    DescribeElement(element), property, expected, ComputeCheckLayoutMetric(element, property)));
+                results.Add(new CheckLayoutAssertion(DescribeElement(element), property, expected, ComputeCheckLayoutMetric(element, property)));
             }
         }
 

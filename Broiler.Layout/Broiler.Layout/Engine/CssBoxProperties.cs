@@ -2197,6 +2197,6 @@ internal abstract partial class CssBoxProperties
         _actualBorderSpacingVertical = double.NaN;
     }
 
-    [GeneratedRegex(@"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*([^)]+))?\)", RegexOptions.IgnoreCase, "de-DE")]
+    [GeneratedRegex(@"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*([^)]+))?\)", RegexOptions.IgnoreCase)]
     private static partial Regex CssRegex();
 }

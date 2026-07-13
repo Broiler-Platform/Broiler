@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// Resolves CSS anchor positioning — for elements that use <c>anchor()</c>
@@ -52,8 +54,8 @@ public sealed partial class DomBridge
         //    Collects scroll containers that need position:relative but
         //    defers adding it until after position-visibility resolution,
         //    so IsAnchorVisibleForTarget is not affected by the new CB.
-        var scrollContainersNeedingRelative = new HashSet<Broiler.Dom.DomElement>();
-        var deferredDomMoves = new List<(Broiler.Dom.DomElement element, Broiler.Dom.DomElement oldParent, Broiler.Dom.DomElement newParent)>();
+        var scrollContainersNeedingRelative = new HashSet<DomElement>();
+        var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
         ResolvePositionAreaValues(
             DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
             deferredDomMoves);
@@ -196,9 +198,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static string? ExtractContentImageUrl(string content)
     {
-        var match = System.Text.RegularExpressions.Regex.Match(
-            content, @"url\(\s*(['""]?)(?<u>[^'""\)]+)\1\s*\)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var match = ExtractContentImageUrlRegex().Match(content);
         return match.Success ? match.Groups["u"].Value.Trim() : null;
     }
 
@@ -216,4 +216,7 @@ public sealed partial class DomBridge
         GetElementRuntimeState(DocumentElement).Scroll.Left.Set(GetVisualViewportPageOffset(vertical: false));
         GetElementRuntimeState(DocumentElement).Scroll.Top.Set(GetVisualViewportPageOffset(vertical: true));
     }
+
+    [GeneratedRegex(@"url\(\s*(['""]?)(?<u>[^'""\)]+)\1\s*\)", RegexOptions.IgnoreCase)]
+    private static partial Regex ExtractContentImageUrlRegex();
 }

@@ -25,7 +25,7 @@ public sealed class MicroTaskQueue
     /// </summary>
     public void Enqueue(Action task)
     {
-        if (task == null) throw new ArgumentNullException(nameof(task));
+        ArgumentNullException.ThrowIfNull(task);
         _queue.Enqueue(task);
     }
 
@@ -39,7 +39,7 @@ public sealed class MicroTaskQueue
     public IReadOnlyList<Exception> Drain()
     {
         if (_draining)
-            return Array.Empty<Exception>();
+            return [];
 
         _draining = true;
         var errors = new List<Exception>();

@@ -8,8 +8,10 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
+using Broiler.CSS;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// Internal helper methods — string conversions, DOM tree utilities,
@@ -29,7 +31,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Parses a DOCTYPE declaration and creates a Broiler.Dom.DomElement representing the DocumentType node.
     /// </summary>
-    private Broiler.Dom.DomElement? ParseDocType(string html)
+    private DomElement? ParseDocType(string html)
     {
         var match = DocTypePattern.Match(html);
         if (!match.Success) return null;
@@ -48,7 +50,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Gets the lowercase name from a DOCTYPE Broiler.Dom.DomElement.</summary>
-    private static string GetDocTypeName(Broiler.Dom.DomElement element)
+    private static string GetDocTypeName(DomElement element)
     {
         var dtName = GetElementRuntimeState(element).DocumentType.Name.TryGet(out var n) ? n?.ToString() ?? "html" : "html";
         return dtName.ToLowerInvariant();
@@ -57,10 +59,10 @@ public sealed partial class DomBridge
     /// <summary>
     /// Searches descendants of an element using a CSS selector.
     /// </summary>
-    private static JSValue FindInDescendants(Broiler.Dom.DomElement root, string selector, bool all, DomBridge bridge)
+    private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
-        if (selector.IndexOf(":scope", StringComparison.Ordinal) >= 0 &&
+        if (selector.Contains(":scope") &&
             MatchesSelector(root, selector, root))
         {
             results.Add(bridge.ToJSObject(root));
@@ -73,7 +75,7 @@ public sealed partial class DomBridge
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(Broiler.Dom.DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, Broiler.Dom.DomElement scope)
+    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -90,7 +92,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    private static void CollectTextContent(Broiler.Dom.DomNode node, StringBuilder sb)
+    private static void CollectTextContent(DomNode node, StringBuilder sb)
     {
         if (IsText(node))
         {
@@ -102,33 +104,6 @@ public sealed partial class DomBridge
         // Behaviour-preserving on today's homogeneous tree where every child is an element.
         foreach (var child in node.ChildNodes)
             CollectTextContent(child, sb);
-    }
-
-    /// <summary>
-    /// Returns <c>true</c> if the resource URL points to a non-HTML content type
-    /// based on file extension (e.g., .png, .txt, .jpg, .gif, .pdf).
-    /// </summary>
-    private static bool IsNonHtmlResource(string url)
-    {
-        if (string.IsNullOrWhiteSpace(url)) return false;
-        // Strip query string and fragment
-        var path = url;
-        var qIndex = path.IndexOf('?');
-        if (qIndex >= 0) path = path.Substring(0, qIndex);
-        var hIndex = path.IndexOf('#');
-        if (hIndex >= 0) path = path.Substring(0, hIndex);
-
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
-        {
-            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".ico" or ".svg" => true,
-            ".txt" or ".text" => true,
-            ".pdf" or ".zip" or ".tar" or ".gz" => true,
-            ".js" or ".mjs" or ".json" or ".xml" or ".css" => true,
-            ".mp3" or ".mp4" or ".wav" or ".ogg" or ".webm" or ".avi" => true,
-            ".woff" or ".woff2" or ".ttf" or ".otf" or ".eot" => true,
-            _ => false,
-        };
     }
 
     /// <summary>
@@ -262,19 +237,18 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Finds the <see cref="Broiler.Dom.DomElement"/> corresponding to a given <see cref="JSObject"/>
+    /// Finds the <see cref="DomElement"/> corresponding to a given <see cref="JSObject"/>
     /// by looking up the JS object cache.
     /// </summary>
-    private Broiler.Dom.DomElement? FindDomElementByJSObject(JSObject jsObj) =>
-        FindDomNodeByJSObject(jsObj) as Broiler.Dom.DomElement;
+    private DomElement? FindDomElementByJSObject(JSObject jsObj) => FindDomNodeByJSObject(jsObj) as DomElement;
 
     /// <summary>
-    /// Finds the canonical <see cref="Broiler.Dom.DomNode"/> corresponding to a given
+    /// Finds the canonical <see cref="DomNode"/> corresponding to a given
     /// <see cref="JSObject"/> by reverse-scanning the JS-object cache. Unlike
     /// <see cref="FindDomElementByJSObject"/> this also resolves text/comment nodes
     /// (RF-BRIDGE-1c Phase F — needed once ranges/selection carry canonical char-data nodes).
     /// </summary>
-    private Broiler.Dom.DomNode? FindDomNodeByJSObject(JSObject jsObj)
+    private DomNode? FindDomNodeByJSObject(JSObject jsObj)
     {
         foreach (var kvp in _jsObjectCache)
         {
@@ -284,14 +258,13 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static bool IsSubDocRoot(Broiler.Dom.DomElement element) =>
-        string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
+    private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
 
     /// <summary>
     /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
     /// <paramref name="ancestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendant(Broiler.Dom.DomNode ancestor, Broiler.Dom.DomNode candidate)
+    private static bool IsDescendant(DomNode ancestor, DomNode candidate)
     {
         var current = candidate.ParentNode;
         while (current != null)
@@ -307,18 +280,18 @@ public sealed partial class DomBridge
     /// Returns -1 when <paramref name="first"/> precedes <paramref name="second"/>,
     /// 1 when it follows, and 0 when no ordering can be determined.
     /// </summary>
-    private static int CompareTreeOrder(Broiler.Dom.DomNode first, Broiler.Dom.DomNode second)
+    private static int CompareTreeOrder(DomNode first, DomNode second)
     {
         if (ReferenceEquals(first, second))
             return 0;
 
-        var firstAncestors = new List<Broiler.Dom.DomNode>();
-        for (Broiler.Dom.DomNode? current = first; current != null; current = current.ParentNode)
+        var firstAncestors = new List<DomNode>();
+        for (DomNode? current = first; current != null; current = current.ParentNode)
             firstAncestors.Add(current);
         firstAncestors.Reverse();
 
-        var secondAncestors = new List<Broiler.Dom.DomNode>();
-        for (Broiler.Dom.DomNode? current = second; current != null; current = current.ParentNode)
+        var secondAncestors = new List<DomNode>();
+        for (DomNode? current = second; current != null; current = current.ParentNode)
             secondAncestors.Add(current);
         secondAncestors.Reverse();
 
@@ -355,7 +328,7 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(Broiler.Dom.DomNode node, Broiler.Dom.DomElement? ownerDocRoot)
+    private static void AdoptSubtreeIntoDocument(DomNode node, DomElement? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
@@ -363,7 +336,7 @@ public sealed partial class DomBridge
         // too. Behaviour-preserving on today's homogeneous tree (every child is an element).
         foreach (var child in node.ChildNodes)
         {
-            if (child is Broiler.Dom.DomElement childElement && IsSubDocRoot(childElement))
+            if (child is DomElement childElement && IsSubDocRoot(childElement))
                 continue;
 
             AdoptSubtreeIntoDocument(child, ownerDocRoot);
@@ -371,23 +344,23 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Clones a <see cref="Broiler.Dom.DomElement"/>. When <paramref name="deep"/> is true,
+    /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
     /// all descendants are recursively cloned.
     /// </summary>
-    private Broiler.Dom.DomNode CloneDomElement(Broiler.Dom.DomNode source, bool deep)
+    private DomNode CloneDomElement(DomNode source, bool deep)
     {
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes clone via the document
         // factories (DomText/DomComment ctors are internal). Dead on today's homogeneous facade
         // tree — facade text/comment nodes are Broiler.Dom.DomElement and take the element path below; live
         // once text/comment construction flips to canonical DomText/DomComment.
-        if (source is Broiler.Dom.DomCharacterData sourceCharData)
+        if (source is DomCharacterData sourceCharData)
         {
             return IsComment(source)
                 ? _document.CreateComment(sourceCharData.Data)
                 : _document.CreateTextNode(sourceCharData.Data);
         }
 
-        var element = (Broiler.Dom.DomElement)source;
+        var element = (DomElement)source;
         // Preserve the source element's exact namespace (folds the old post-construction
         // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
         // their namespace rather than defaulting to HTML.
@@ -444,9 +417,9 @@ public sealed partial class DomBridge
     /// Collects all &lt;tr&gt; elements in a table in HTML spec order:
     /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows.
     /// </summary>
-    private static List<Broiler.Dom.DomElement> CollectTableRows(Broiler.Dom.DomElement table)
+    private static List<DomElement> CollectTableRows(DomElement table)
     {
-        var rows = new List<Broiler.Dom.DomElement>();
+        var rows = new List<DomElement>();
         // 1. All tr children of thead elements (in tree order)
         foreach (var child in ChildElements(table))
         {
@@ -480,16 +453,15 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a JSArray of table rows for the 'rows' property.
     /// </summary>
-    private JSArray BuildTableRows(Broiler.Dom.DomElement table)
+    private JSArray BuildTableRows(DomElement table)
     {
         var rows = CollectTableRows(table);
         var jsRows = new List<JSValue>();
         foreach (var r in rows)
             jsRows.Add(ToJSObject(r));
         var arr = new JSArray(jsRows);
-        arr.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => new JSNumber(jsRows.Count), "get length"),
+        arr.FastAddProperty((KeyString)"length",
+            new JSFunction((in _) => new JSNumber(jsRows.Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         return arr;
     }
@@ -497,7 +469,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Inserts a row into a table at the given index, per HTMLTableElement.insertRow() spec.
     /// </summary>
-    private JSValue InsertTableRow(Broiler.Dom.DomElement table, int index, DomBridge bridge)
+    private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
     {
         var tr = CreateBridgeElement("tr");
         bridge._knownNodes.Add(tr);
@@ -506,10 +478,10 @@ public sealed partial class DomBridge
         if (allRows.Count == 0 || index == -1 || index == allRows.Count)
         {
             // Find the last section to append to, or create a tbody
-            Broiler.Dom.DomElement? lastSection = null;
+            DomElement? lastSection = null;
             for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
             {
-                if (ChildAt(table, i) is not Broiler.Dom.DomElement childElement)
+                if (ChildAt(table, i) is not DomElement childElement)
                     continue;
                 var ctag = childElement.TagName.ToLowerInvariant();
                 if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
@@ -552,14 +524,14 @@ public sealed partial class DomBridge
     /// <summary>
     /// Collects form control elements (input, select, textarea, button) from a form.
     /// </summary>
-    internal static List<Broiler.Dom.DomElement> CollectFormControls(Broiler.Dom.DomElement form)
+    internal static List<DomElement> CollectFormControls(DomElement form)
     {
-        var controls = new List<Broiler.Dom.DomElement>();
+        var controls = new List<DomElement>();
         CollectFormControlsRecursive(form, controls);
         return controls;
     }
 
-    private static void CollectFormControlsRecursive(Broiler.Dom.DomElement parent, List<Broiler.Dom.DomElement> controls)
+    private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -574,7 +546,7 @@ public sealed partial class DomBridge
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
-    private static void UncheckRadioSiblings(Broiler.Dom.DomElement scope, Broiler.Dom.DomElement except, string radioName)
+    private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
         foreach (var child in ChildElements(scope))
         {
@@ -588,6 +560,7 @@ public sealed partial class DomBridge
                 {
                     GetElementRuntimeState(child).FormControl.Checked.Set(false);
                 }
+
                 UncheckRadioSiblings(child, except, radioName);
             }
         }
@@ -596,7 +569,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a form.elements collection (JSObject with indexed + named access).
     /// </summary>
-    private JSValue BuildFormElementsCollection(Broiler.Dom.DomElement form, DomBridge bridge)
+    private JSValue BuildFormElementsCollection(DomElement form, DomBridge bridge)
     {
         var controls = CollectFormControls(form);
 
@@ -607,9 +580,8 @@ public sealed partial class DomBridge
             collection.FastAddValue((uint)i, ToJSObject(controls[i]),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
-        collection.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => JsUtilitiesGetLength002Core(form, in _), "get length"),
+        collection.FastAddProperty((KeyString)"length",
+            new JSFunction((in _) => JsUtilitiesGetLength002Core(form, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return collection;
@@ -619,7 +591,7 @@ public sealed partial class DomBridge
     /// Collects all descendants of <paramref name="root"/> in document order
     /// (depth-first pre-order).
     /// </summary>
-    private static void CollectDescendants(Broiler.Dom.DomNode root, List<Broiler.Dom.DomNode> result)
+    private static void CollectDescendants(DomNode root, List<DomNode> result)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so document-order traversal
         // includes text/comment nodes (range boundary indexing needs them). Behaviour-preserving
@@ -628,7 +600,7 @@ public sealed partial class DomBridge
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
-            if (child is Broiler.Dom.DomElement childElement && IsSubDocRoot(childElement))
+            if (child is DomElement childElement && IsSubDocRoot(childElement))
                 continue;
             result.Add(child);
             CollectDescendants(child, result);
@@ -642,7 +614,7 @@ public sealed partial class DomBridge
     /// </summary>
     // RF-BRIDGE-1c Phase F (F3c part 2d): flatten the whole subtree (raw ChildNodes) so text/comment
     // descendants are collected for registration too.
-    private static void CollectAllDescendantsFlat(Broiler.Dom.DomNode parent, List<Broiler.Dom.DomNode> result)
+    private static void CollectAllDescendantsFlat(DomNode parent, List<DomNode> result)
     {
         foreach (var child in parent.ChildNodes)
         {
@@ -654,7 +626,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).
     /// </summary>
-    private static void CollectDescendantsByTag(Broiler.Dom.DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
+    private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
         foreach (var child in ChildElements(root))
         {
@@ -668,21 +640,21 @@ public sealed partial class DomBridge
     /// Returns a flat list of all nodes in the subtree rooted at
     /// <paramref name="root"/> in document order (including the root).
     /// </summary>
-    private static List<Broiler.Dom.DomNode> GetDocumentOrderNodes(Broiler.Dom.DomNode root)
+    private static List<DomNode> GetDocumentOrderNodes(DomNode root)
     {
-        var list = new List<Broiler.Dom.DomNode> { root };
+        var list = new List<DomNode> { root };
         CollectDescendants(root, list);
         return list;
     }
 
     /// <summary>
-    /// Returns the node type constant for a <see cref="Broiler.Dom.DomElement"/>.
+    /// Returns the node type constant for a <see cref="DomElement"/>.
     /// </summary>
-    private static int GetNodeType(Broiler.Dom.DomNode node)
+    private static int GetNodeType(DomNode node)
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
-        if (node is not Broiler.Dom.DomElement element) return 1;
+        if (node is not DomElement element) return 1;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE
@@ -701,37 +673,27 @@ public sealed partial class DomBridge
     /// inline style (<see cref="ElementRuntimeState.Style"/>, reached via
     /// <c>InlineStyle</c>) in CSS kebab-case (<c>animation-delay: -100s</c>).
     /// </summary>
-    private sealed class CssStyleDeclaration : JSObject
+    private sealed class CssStyleDeclaration(DomElement element, Action? onMutation = null) : JSObject
     {
-        private readonly Broiler.Dom.DomElement _element;
-        private readonly Action? _onMutation;
-
         // Names that are JS methods / special properties, not CSS properties.
         private static HashSet<string> NonCssNames => CssStyleDeclarationNonCssNames;
 
-        public CssStyleDeclaration(Broiler.Dom.DomElement element, Action? onMutation = null)
-        {
-            _element = element;
-            _onMutation = onMutation;
-        }
-
-        protected override bool SetValue(
-            KeyString name, JSValue value, JSValue receiver, bool throwError = true)
+        protected override bool SetValue(KeyString name, JSValue value, JSValue receiver, bool throwError = true)
         {
             var nameStr = name.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(nameStr);
+                var kebab = CssPropertyNames.ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
-                    InlineStyle(_element).Remove(kebab);
-                    GetElementRuntimeState(_element).JsSetStyleProps.Remove(kebab);
+                    InlineStyle(element).Remove(kebab);
+                    GetElementRuntimeState(element).JsSetStyleProps.Remove(kebab);
                 }
                 else if (IsAcceptableInlineValue(kebab, val))
                 {
-                    InlineStyle(_element)[kebab] = val;
-                    GetElementRuntimeState(_element).JsSetStyleProps.Add(kebab);
+                    InlineStyle(element)[kebab] = val;
+                    GetElementRuntimeState(element).JsSetStyleProps.Add(kebab);
                 }
                 else
                 {
@@ -745,16 +707,15 @@ public sealed partial class DomBridge
                 // Invalidate cached position-area resolution when relevant
                 // properties change so offset queries recompute.
                 if (kebab is "position-area" or "position-anchor")
-                    ClearPositionAreaResolution(_element);
+                    ClearPositionAreaResolution(element);
 
-                _onMutation?.Invoke();
+                onMutation?.Invoke();
             }
 
             return base.SetValue(name, value, receiver, throwError);
         }
 
-        protected override JSValue GetValue(
-            KeyString key, JSValue receiver, bool throwError = true)
+        protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
         {
             // Try normal lookup first (methods, explicit properties, etc.)
             var result = base.GetValue(key, receiver, false);
@@ -765,32 +726,27 @@ public sealed partial class DomBridge
             var nameStr = key.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                if (TryGetStylePropertyRawValue(_element, nameStr, out var val))
-                    return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                if (TryGetStylePropertyRawValue(element, nameStr, out var val))
+                    return new JSString(CssPriority.Strip(val));
             }
 
             return new JSString(string.Empty);
         }
     }
 
-    private sealed class CssRuleStyleDeclaration : JSObject
+    private sealed class CssRuleStyleDeclaration(Dictionary<string, string> style) : JSObject
     {
-        private readonly Dictionary<string, string> _style;
-
-        public CssRuleStyleDeclaration(Dictionary<string, string> style) => _style = style;
-
-        protected override bool SetValue(
-            KeyString name, JSValue value, JSValue receiver, bool throwError = true)
+        protected override bool SetValue(KeyString name, JSValue value, JSValue receiver, bool throwError = true)
         {
             var nameStr = name.ToString();
             if (!CssStyleDeclarationNonCssNames.Contains(nameStr))
             {
-                var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(nameStr);
+                var kebab = CssPropertyNames.ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
-                    _style.Remove(kebab);
+                    style.Remove(kebab);
                 else if (IsAcceptableInlineValue(kebab, val))
-                    _style[kebab] = val;
+                    style[kebab] = val;
                 else
                     return true;   // invalid value ignored; don't store it as a JS property either
             }
@@ -798,8 +754,7 @@ public sealed partial class DomBridge
             return base.SetValue(name, value, receiver, throwError);
         }
 
-        protected override JSValue GetValue(
-            KeyString key, JSValue receiver, bool throwError = true)
+        protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
         {
             var result = base.GetValue(key, receiver, false);
             if (result != null && !result.IsUndefined)
@@ -807,22 +762,20 @@ public sealed partial class DomBridge
 
             var nameStr = key.ToString();
             if (!CssStyleDeclarationNonCssNames.Contains(nameStr) &&
-                TryGetStylePropertyRawValue(_style, nameStr, out var val))
+                TryGetStylePropertyRawValue(style, nameStr, out var val))
             {
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                return new JSString(CssPriority.Strip(val));
             }
 
             return new JSString(string.Empty);
         }
     }
 
-    private static List<string> GetStylePropertyNames(IReadOnlyDictionary<string, string> style)
-        => style.Keys.ToList();
+    private static List<string> GetStylePropertyNames(IReadOnlyDictionary<string, string> style) => [.. style.Keys];
 
-    private static List<string> GetStylePropertyNames(Broiler.Dom.DomElement element)
-        => GetStylePropertyNames((IReadOnlyDictionary<string, string>)InlineStyle(element));
+    private static List<string> GetStylePropertyNames(DomElement element) => GetStylePropertyNames(InlineStyle(element));
 
-    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(Broiler.Dom.DomElement element)
+    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
     {
         var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -842,7 +795,7 @@ public sealed partial class DomBridge
         return declared;
     }
 
-    private static bool TryGetExpandedInlineStyleRawValue(Broiler.Dom.DomElement element, string property, out string value)
+    private static bool TryGetExpandedInlineStyleRawValue(DomElement element, string property, out string value)
     {
         var declared = BuildDeclaredInlineStyleMap(element);
         if (declared.Count == 0)
@@ -856,11 +809,11 @@ public sealed partial class DomBridge
         if (declared.TryGetValue(property, out value!))
             return true;
 
-        var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(property);
+        var camel = CssPropertyNames.ToDomPropertyName(property);
         if (camel != property && declared.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(property);
+        var kebab = CssPropertyNames.ToCssPropertyName(property);
         if (kebab != property && declared.TryGetValue(kebab, out value!))
             return true;
 
@@ -873,11 +826,11 @@ public sealed partial class DomBridge
         if (style.TryGetValue(property, out value!))
             return true;
 
-        var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(property);
+        var camel = CssPropertyNames.ToDomPropertyName(property);
         if (camel != property && style.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = Broiler.CSS.CssPropertyNames.ToCssPropertyName(property);
+        var kebab = CssPropertyNames.ToCssPropertyName(property);
         if (kebab != property && style.TryGetValue(kebab, out value!))
             return true;
 
@@ -885,76 +838,65 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static bool TryGetStylePropertyRawValue(Broiler.Dom.DomElement element, string property, out string value)
+    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
     {
-        if (TryGetStylePropertyRawValue((IReadOnlyDictionary<string, string>)InlineStyle(element), property, out value!))
+        if (TryGetStylePropertyRawValue(InlineStyle(element), property, out value!))
             return true;
 
         return TryGetExpandedInlineStyleRawValue(element, property, out value!);
     }
 
-    private static JSObject BuildStyleObject(Broiler.Dom.DomElement element, Action? onMutation = null, JSValue? parentRule = null)
+    private static JSObject BuildStyleObject(DomElement element, Action? onMutation = null, JSValue? parentRule = null)
     {
         var style = new CssStyleDeclaration(element, onMutation);
 
         // style.cssText (getter / setter)
-        style.FastAddProperty(
-            (KeyString)"cssText",
-            new JSFunction((in Arguments a) => JsUtilitiesGetCssText003Core(element, in a), "get cssText"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetCssText004Core(element, onMutation, in a), "set cssText"),
+        style.FastAddProperty((KeyString)"cssText",
+            new JSFunction((in a) => JsUtilitiesGetCssText003Core(element, in a), "get cssText"),
+            new JSFunction((in a) => JsUtilitiesSetCssText004Core(element, onMutation, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style.setProperty(property, value)
-        style.FastAddValue(
-            (KeyString)"setProperty",
-            new JSFunction((in Arguments a) => JsUtilitiesSetProperty005Core(element, onMutation, in a), "setProperty", 2),
+        style.FastAddValue((KeyString)"setProperty",
+            new JSFunction((in a) => JsUtilitiesSetProperty005Core(element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.getPropertyValue(property) — checks InlineStyle(element) dict first, then
         // tries camelCase conversion for kebab-case input (or vice versa),
         // and also checks JSObject properties (set via el.style.camelCase = value).
-        style.FastAddValue(
-            (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyValue006Core(element, in a), "getPropertyValue", 1),
+        style.FastAddValue((KeyString)"getPropertyValue",
+            new JSFunction((in a) => JsUtilitiesGetPropertyValue006Core(element, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.removeProperty(property)
-        style.FastAddValue(
-            (KeyString)"removeProperty",
-            new JSFunction((in Arguments a) => JsUtilitiesRemoveProperty007Core(element, onMutation, in a), "removeProperty", 1),
+        style.FastAddValue((KeyString)"removeProperty",
+            new JSFunction((in a) => JsUtilitiesRemoveProperty007Core(element, onMutation, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.cssFloat (getter/setter) — maps to CSS "float" property
-        style.FastAddProperty(
-            (KeyString)"cssFloat",
-            new JSFunction((in Arguments a) => JsUtilitiesGetCssFloat008Core(element, in a), "get cssFloat"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetCssFloat009Core(element, onMutation, in a), "set cssFloat"),
+        style.FastAddProperty((KeyString)"cssFloat",
+            new JSFunction((in a) => JsUtilitiesGetCssFloat008Core(element, in a), "get cssFloat"),
+            new JSFunction((in a) => JsUtilitiesSetCssFloat009Core(element, onMutation, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style.length (read-only)
-        style.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => new JSNumber(GetStylePropertyNames(element).Count), "get length"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        style.FastAddProperty((KeyString)"length",
+            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(element).Count), "get length"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // style.item(index)
-        style.FastAddValue(
-            (KeyString)"item",
-            new JSFunction((in Arguments a) => JsUtilitiesItem011Core(element, in a), "item", 1),
+        style.FastAddValue((KeyString)"item",
+            new JSFunction((in a) => JsUtilitiesItem011Core(element, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // style.getPropertyPriority(property)
-        style.FastAddValue(
-            (KeyString)"getPropertyPriority",
-            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyPriority012Core(element, in a), "getPropertyPriority", 1),
+        style.FastAddValue((KeyString)"getPropertyPriority",
+            new JSFunction((in a) => JsUtilitiesGetPropertyPriority012Core(element, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddProperty(
-            (KeyString)"parentRule",
-            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        style.FastAddProperty((KeyString)"parentRule",
+            new JSFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return style;
     }
@@ -963,54 +905,43 @@ public sealed partial class DomBridge
     {
         var style = new CssRuleStyleDeclaration(styleMap);
 
-        style.FastAddProperty(
-            (KeyString)"cssText",
-            new JSFunction((in Arguments _) => JsUtilitiesGetCssText014Core(styleMap, in _), "get cssText"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetCssText015Core(styleMap, in a), "set cssText"),
+        style.FastAddProperty((KeyString)"cssText",
+            new JSFunction((in _) => JsUtilitiesGetCssText014Core(styleMap, in _), "get cssText"),
+            new JSFunction((in a) => JsUtilitiesSetCssText015Core(styleMap, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        style.FastAddValue(
-            (KeyString)"setProperty",
-            new JSFunction((in Arguments a) => JsUtilitiesSetProperty016Core(styleMap, in a), "setProperty", 2),
+        style.FastAddValue((KeyString)"setProperty",
+            new JSFunction((in a) => JsUtilitiesSetProperty016Core(styleMap, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddValue(
-            (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyValue017Core(styleMap, in a), "getPropertyValue", 1),
+        style.FastAddValue((KeyString)"getPropertyValue",
+            new JSFunction((in a) => JsUtilitiesGetPropertyValue017Core(styleMap, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddValue(
-            (KeyString)"removeProperty",
-            new JSFunction((in Arguments a) => JsUtilitiesRemoveProperty018Core(styleMap, in a), "removeProperty", 1),
+        style.FastAddValue((KeyString)"removeProperty",
+            new JSFunction((in a) => JsUtilitiesRemoveProperty018Core(styleMap, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddProperty(
-            (KeyString)"cssFloat",
-            new JSFunction((in Arguments _) => JsUtilitiesGetCssFloat019Core(styleMap, in _), "get cssFloat"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetCssFloat020Core(styleMap, in a), "set cssFloat"),
+        style.FastAddProperty((KeyString)"cssFloat",
+            new JSFunction((in _) => JsUtilitiesGetCssFloat019Core(styleMap, in _), "get cssFloat"),
+            new JSFunction((in a) => JsUtilitiesSetCssFloat020Core(styleMap, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        style.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => new JSNumber(GetStylePropertyNames(styleMap).Count), "get length"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        style.FastAddProperty((KeyString)"length",
+            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(styleMap).Count), "get length"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        style.FastAddValue(
-            (KeyString)"item",
-            new JSFunction((in Arguments a) => JsUtilitiesItem022Core(styleMap, in a), "item", 1),
+        style.FastAddValue((KeyString)"item",
+            new JSFunction((in a) => JsUtilitiesItem022Core(styleMap, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddValue(
-            (KeyString)"getPropertyPriority",
-            new JSFunction((in Arguments a) => JsUtilitiesGetPropertyPriority023Core(styleMap, in a), "getPropertyPriority", 1),
+        style.FastAddValue((KeyString)"getPropertyPriority",
+            new JSFunction((in a) => JsUtilitiesGetPropertyPriority023Core(styleMap, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        style.FastAddProperty(
-            (KeyString)"parentRule",
-            new JSFunction((in Arguments _) => parentRule ?? JSNull.Value, "get parentRule"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        style.FastAddProperty((KeyString)"parentRule",
+            new JSFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return style;
     }
@@ -1019,38 +950,33 @@ public sealed partial class DomBridge
     /// Builds a <c>classList</c> object exposing <c>add</c>, <c>remove</c>,
     /// <c>toggle</c>, and <c>contains</c>.
     /// </summary>
-    private static JSObject BuildClassListObject(Broiler.Dom.DomElement element, Action<Broiler.Dom.DomElement>? onClassChanged = null)
+    private static JSObject BuildClassListObject(DomElement element, Action<DomElement>? onClassChanged = null)
     {
         var classList = new JSObject();
 
         // classList.contains(className)
-        classList.FastAddValue(
-            (KeyString)"contains",
-            new JSFunction((in Arguments a) => JsUtilitiesContains025Core(element, in a), "contains", 1),
+        classList.FastAddValue((KeyString)"contains",
+            new JSFunction((in a) => JsUtilitiesContains025Core(element, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.add(...classNames)
-        classList.FastAddValue(
-            (KeyString)"add",
-            new JSFunction((in Arguments a) => JsUtilitiesAdd026Core(element, onClassChanged, in a), "add"),
+        classList.FastAddValue((KeyString)"add",
+            new JSFunction((in a) => JsUtilitiesAdd026Core(element, onClassChanged, in a), "add"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.remove(...classNames)
-        classList.FastAddValue(
-            (KeyString)"remove",
-            new JSFunction((in Arguments a) => JsUtilitiesRemove027Core(element, onClassChanged, in a), "remove"),
+        classList.FastAddValue((KeyString)"remove",
+            new JSFunction((in a) => JsUtilitiesRemove027Core(element, onClassChanged, in a), "remove"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.toggle(className[, force])
-        classList.FastAddValue(
-            (KeyString)"toggle",
-            new JSFunction((in Arguments a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
+        classList.FastAddValue((KeyString)"toggle",
+            new JSFunction((in a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // classList.replace(oldToken, newToken)
-        classList.FastAddValue(
-            (KeyString)"replace",
-            new JSFunction((in Arguments a) => JsUtilitiesReplaceClassToken(element, onClassChanged, in a), "replace", 2),
+        classList.FastAddValue((KeyString)"replace",
+            new JSFunction((in a) => JsUtilitiesReplaceClassToken(element, onClassChanged, in a), "replace", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return classList;
@@ -1068,27 +994,23 @@ public sealed partial class DomBridge
         var store = new Dictionary<string, string>();
 
         // localStorage.getItem(key)
-        storage.FastAddValue(
-            (KeyString)"getItem",
-            new JSFunction((in Arguments a) => JsUtilitiesGetItem029Core(store, in a), "getItem", 1),
+        storage.FastAddValue((KeyString)"getItem",
+            new JSFunction((in a) => JsUtilitiesGetItem029Core(store, in a), "getItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.setItem(key, value)
-        storage.FastAddValue(
-            (KeyString)"setItem",
-            new JSFunction((in Arguments a) => JsUtilitiesSetItem030Core(storage, store, in a), "setItem", 2),
+        storage.FastAddValue((KeyString)"setItem",
+            new JSFunction((in a) => JsUtilitiesSetItem030Core(storage, store, in a), "setItem", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.removeItem(key)
-        storage.FastAddValue(
-            (KeyString)"removeItem",
-            new JSFunction((in Arguments a) => JsUtilitiesRemoveItem031Core(storage, store, in a), "removeItem", 1),
+        storage.FastAddValue((KeyString)"removeItem",
+            new JSFunction((in a) => JsUtilitiesRemoveItem031Core(storage, store, in a), "removeItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // localStorage.clear()
-        storage.FastAddValue(
-            (KeyString)"clear",
-            new JSFunction((in Arguments a) => JsUtilitiesClear032Core(storage, store, in a), "clear", 0),
+        storage.FastAddValue((KeyString)"clear",
+            new JSFunction((in a) => JsUtilitiesClear032Core(storage, store, in a), "clear", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return storage;
@@ -1100,7 +1022,7 @@ public sealed partial class DomBridge
     /// operations as defined in the HTML Canvas 2D Context specification.
     /// Drawing commands are recorded but not rasterised in the current implementation.
     /// </summary>
-    private static JSObject BuildCanvas2DContext(Broiler.Dom.DomElement canvas)
+    private static JSObject BuildCanvas2DContext(DomElement canvas)
     {
         var ctx = new JSObject();
         int width = 300, height = 150;
@@ -1110,78 +1032,71 @@ public sealed partial class DomBridge
         var context2d = new CanvasRenderingContext2D(width, height);
 
         // fillStyle (get/set)
-        ctx.FastAddProperty(
-            (KeyString)"fillStyle",
-            new JSFunction((in Arguments _) => new JSString(context2d.FillStyle), "get fillStyle"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetFillStyle034Core(context2d, in a), "set fillStyle"),
+        ctx.FastAddProperty((KeyString)"fillStyle",
+            new JSFunction((in _) => new JSString(context2d.FillStyle), "get fillStyle"),
+            new JSFunction((in a) => JsUtilitiesSetFillStyle034Core(context2d, in a), "set fillStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // strokeStyle (get/set)
-        ctx.FastAddProperty(
-            (KeyString)"strokeStyle",
-            new JSFunction((in Arguments _) => new JSString(context2d.StrokeStyle), "get strokeStyle"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetStrokeStyle036Core(context2d, in a), "set strokeStyle"),
+        ctx.FastAddProperty((KeyString)"strokeStyle",
+            new JSFunction((in _) => new JSString(context2d.StrokeStyle), "get strokeStyle"),
+            new JSFunction((in a) => JsUtilitiesSetStrokeStyle036Core(context2d, in a), "set strokeStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lineWidth (get/set)
-        ctx.FastAddProperty(
-            (KeyString)"lineWidth",
-            new JSFunction((in Arguments _) => new JSNumber(context2d.LineWidth), "get lineWidth"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetLineWidth038Core(context2d, in a), "set lineWidth"),
+        ctx.FastAddProperty((KeyString)"lineWidth",
+            new JSFunction((in _) => new JSNumber(context2d.LineWidth), "get lineWidth"),
+            new JSFunction((in a) => JsUtilitiesSetLineWidth038Core(context2d, in a), "set lineWidth"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // font (get/set)
-        ctx.FastAddProperty(
-            (KeyString)"font",
-            new JSFunction((in Arguments _) => new JSString(context2d.Font), "get font"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetFont040Core(context2d, in a), "set font"),
+        ctx.FastAddProperty((KeyString)"font",
+            new JSFunction((in _) => new JSString(context2d.Font), "get font"),
+            new JSFunction((in a) => JsUtilitiesSetFont040Core(context2d, in a), "set font"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // globalAlpha (get/set)
-        ctx.FastAddProperty(
-            (KeyString)"globalAlpha",
-            new JSFunction((in Arguments _) => new JSNumber(context2d.GlobalAlpha), "get globalAlpha"),
-            new JSFunction((in Arguments a) => JsUtilitiesSetGlobalAlpha042Core(context2d, in a), "set globalAlpha"),
+        ctx.FastAddProperty((KeyString)"globalAlpha",
+            new JSFunction((in _) => new JSNumber(context2d.GlobalAlpha), "get globalAlpha"),
+            new JSFunction((in a) => JsUtilitiesSetGlobalAlpha042Core(context2d, in a), "set globalAlpha"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // canvas property
-        ctx.FastAddProperty(
-            (KeyString)"canvas",
-            new JSFunction((in Arguments _) => new JSObject(), "get canvas"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        ctx.FastAddProperty((KeyString)"canvas",
+            new JSFunction((in _) => new JSObject(), "get canvas"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // Drawing methods
-        ctx.FastAddValue((KeyString)"fillRect", new JSFunction((in Arguments a) => JsUtilitiesFillRect044Core(context2d, in a), "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillRect", new JSFunction((in a) => JsUtilitiesFillRect044Core(context2d, in a), "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeRect", new JSFunction((in Arguments a) => JsUtilitiesStrokeRect045Core(context2d, in a), "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeRect", new JSFunction((in a) => JsUtilitiesStrokeRect045Core(context2d, in a), "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"clearRect", new JSFunction((in Arguments a) => JsUtilitiesClearRect046Core(context2d, in a), "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"clearRect", new JSFunction((in a) => JsUtilitiesClearRect046Core(context2d, in a), "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"beginPath", new JSFunction((in Arguments _) => JsUtilitiesBeginPath047Core(context2d, in _), "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"beginPath", new JSFunction((in _) => JsUtilitiesBeginPath047Core(context2d, in _), "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"moveTo", new JSFunction((in Arguments a) => JsUtilitiesMoveTo048Core(context2d, in a), "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"moveTo", new JSFunction((in a) => JsUtilitiesMoveTo048Core(context2d, in a), "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"lineTo", new JSFunction((in Arguments a) => JsUtilitiesLineTo049Core(context2d, in a), "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"lineTo", new JSFunction((in a) => JsUtilitiesLineTo049Core(context2d, in a), "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"arc", new JSFunction((in Arguments a) => JsUtilitiesArc050Core(context2d, in a), "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"arc", new JSFunction((in a) => JsUtilitiesArc050Core(context2d, in a), "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"closePath", new JSFunction((in Arguments _) => JsUtilitiesClosePath051Core(context2d, in _), "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"closePath", new JSFunction((in _) => JsUtilitiesClosePath051Core(context2d, in _), "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fill", new JSFunction((in Arguments _) => JsUtilitiesFill052Core(context2d, in _), "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fill", new JSFunction((in _) => JsUtilitiesFill052Core(context2d, in _), "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"stroke", new JSFunction((in Arguments _) => JsUtilitiesStroke053Core(context2d, in _), "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"stroke", new JSFunction((in _) => JsUtilitiesStroke053Core(context2d, in _), "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fillText", new JSFunction((in Arguments a) => JsUtilitiesFillText054Core(context2d, in a), "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillText", new JSFunction((in a) => JsUtilitiesFillText054Core(context2d, in a), "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeText", new JSFunction((in Arguments a) => JsUtilitiesStrokeText055Core(context2d, in a), "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeText", new JSFunction((in a) => JsUtilitiesStrokeText055Core(context2d, in a), "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"save", new JSFunction((in Arguments _) => JsUtilitiesSave056Core(context2d, in _), "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"save", new JSFunction((in _) => JsUtilitiesSave056Core(context2d, in _), "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"restore", new JSFunction((in Arguments _) => JsUtilitiesRestore057Core(context2d, in _), "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"restore", new JSFunction((in _) => JsUtilitiesRestore057Core(context2d, in _), "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // measureText(text) — returns { width: ... }
-        ctx.FastAddValue((KeyString)"measureText", new JSFunction((in Arguments a) => JsUtilitiesMeasureText058Core(in a), "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"measureText", new JSFunction((in a) => JsUtilitiesMeasureText058Core(in a), "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return ctx;
     }
@@ -1198,18 +1113,14 @@ public sealed partial class DomBridge
     /// such as U+212A (Kelvin sign).
     /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
     /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex ValidXmlNamePattern = new(
-        @"^[\p{L}_][\p{L}\p{N}_.\-]*$",
-        RegexOptions.Compiled);
+    private static readonly Regex ValidXmlNamePattern = ValidXmlNamePatternRegex();
 
     /// <summary>
     /// Regex for valid XML QName: either a simple name or prefix:localName
     /// where both prefix and localName are valid XML names (no colons).
     /// Uses Unicode categories per XML 1.0 §2.3.
     /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePattern = new(
-        @"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$",
-        RegexOptions.Compiled);
+    private static readonly Regex ValidXmlQualifiedNamePattern = ValidXmlQualifiedNamePatternRegex();
 
     /// <summary>
     /// Throws a proper <c>DOMException</c> with the given name/code via the JS-registered constructor.
@@ -1454,4 +1365,9 @@ public sealed partial class DomBridge
             SVGLength.SVG_LENGTHTYPE_PC = 10;
         ");
     }
+
+    [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*$", RegexOptions.Compiled)]
+    private static partial Regex ValidXmlNamePatternRegex();
+    [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$", RegexOptions.Compiled)]
+    private static partial Regex ValidXmlQualifiedNamePatternRegex();
 }

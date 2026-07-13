@@ -6,20 +6,22 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
+using Broiler.Dom;
+using System.Xml.Linq;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
-    private readonly Dictionary<Broiler.Dom.DomElement, JSObject> _subDocumentCache = [];
-    private readonly Dictionary<Broiler.Dom.DomElement, JSObject> _subWindowCache = [];
-    private readonly Dictionary<Broiler.Dom.DomElement, string> _subDocumentLocationCache = [];
-    private readonly Dictionary<Broiler.Dom.DomElement, string> _subDocumentBaseUrlCache = [];
-    private readonly HashSet<Broiler.Dom.DomElement> _objectLoadFailures = [];
-    private readonly HashSet<Broiler.Dom.DomElement> _onloadFired = [];
+    private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
+    private readonly Dictionary<DomElement, JSObject> _subWindowCache = [];
+    private readonly Dictionary<DomElement, string> _subDocumentLocationCache = [];
+    private readonly Dictionary<DomElement, string> _subDocumentBaseUrlCache = [];
+    private readonly HashSet<DomElement> _objectLoadFailures = [];
+    private readonly HashSet<DomElement> _onloadFired = [];
 
-    private void InvalidateCachedSubDocument(Broiler.Dom.DomElement containerElement)
+    private void InvalidateCachedSubDocument(DomElement containerElement)
     {
         var existingDocRoot = ChildElements(containerElement).FirstOrDefault(child =>
             string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
@@ -41,7 +43,7 @@ public sealed partial class DomBridge
     /// Handles both property-based handlers (element.onload = function) and
     /// attribute-based handlers (setAttribute("onload", code)).
     /// </summary>
-    private void FireSubDocumentOnload(Broiler.Dom.DomElement element)
+    private void FireSubDocumentOnload(DomElement element)
     {
         if (_jsContext == null) return;
         if (_onloadFired.Contains(element)) return;
@@ -77,7 +79,7 @@ public sealed partial class DomBridge
     /// Recursively fires onload for all iframe/object descendants of an element.
     /// Called when a subtree containing iframes/objects is added to the document.
     /// </summary>
-    private void FireDescendantOnloads(Broiler.Dom.DomElement element)
+    private void FireDescendantOnloads(DomElement element)
     {
         // Snapshot before iterating: FireSubDocumentOnload runs a sub-document's
         // onload handler, whose script can structurally mutate element.Children
@@ -101,7 +103,7 @@ public sealed partial class DomBridge
     /// failed to load (HTTP 404, file not found, etc.), meaning fallback content
     /// should be visible and contentDocument should return null.
     /// </summary>
-    private bool IsObjectLoadFailed(Broiler.Dom.DomElement objectElement)
+    private bool IsObjectLoadFailed(DomElement objectElement)
     {
         if (_objectLoadFailures.Contains(objectElement))
             return true;
@@ -127,7 +129,7 @@ public sealed partial class DomBridge
     /// For same-origin HTTP/HTTPS resources, attempts to fetch and parse the content.
     /// Non-HTML resources (by extension or Content-Type) get a minimal empty document.
     /// </summary>
-    internal JSObject GetOrCreateSubDocument(Broiler.Dom.DomElement containerElement)
+    internal JSObject GetOrCreateSubDocument(DomElement containerElement)
     {
         if (_subDocumentCache.TryGetValue(containerElement, out var cached))
             return cached;
@@ -197,7 +199,7 @@ public sealed partial class DomBridge
         return doc;
     }
 
-    private JSObject GetOrCreateSubWindow(Broiler.Dom.DomElement containerElement)
+    private JSObject GetOrCreateSubWindow(DomElement containerElement)
     {
         if (_subWindowCache.TryGetValue(containerElement, out var cached))
             return cached;
@@ -210,18 +212,14 @@ public sealed partial class DomBridge
         InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
         RegisterWindowMessaging(subWindow);
 
-        subWindow.FastAddProperty(
-            (KeyString)"document",
-            new JSFunction((in Arguments _) => GetOrCreateSubDocument(containerElement), "get document"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"document",
+            new JSFunction((in _) => GetOrCreateSubDocument(containerElement), "get document"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var locationHref = GetSubWindowLocationHref(containerElement);
         var iframeLocation = new JSObject();
-        iframeLocation.FastAddValue(
-            (KeyString)"href",
-            new JSString(locationHref),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        iframeLocation.FastAddValue((KeyString)"href",
+            new JSString(locationHref), JSPropertyAttributes.EnumerableConfigurableValue);
         if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
         {
             iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -237,100 +235,65 @@ public sealed partial class DomBridge
             iframeLocation.FastAddValue((KeyString)"search", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
             iframeLocation.FastAddValue((KeyString)"hash", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
         }
-        subWindow.FastAddValue(
-            (KeyString)"location",
-            iframeLocation,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddProperty(
-            (KeyString)"scrollX",
-            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty(
-            (KeyString)"scrollY",
-            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty(
-            (KeyString)"pageXOffset",
-            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty(
-            (KeyString)"pageYOffset",
-            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"scrollX", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"scrollY", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        subWindow.FastAddValue(
-            (KeyString)"scroll",
-            new JSFunction((in Arguments a) => JsSubDocumentsScroll006Core(containerElement, in a), "scroll", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue(
-            (KeyString)"scrollTo",
-            new JSFunction((in Arguments a) => JsSubDocumentsScrollTo007Core(containerElement, in a), "scrollTo", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue(
-            (KeyString)"scrollBy",
-            new JSFunction((in Arguments a) => JsSubDocumentsScrollBy008Core(containerElement, in a), "scrollBy", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scroll", new JSFunction((in a) => JsSubDocumentsScroll006Core(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => JsSubDocumentsScrollTo007Core(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => JsSubDocumentsScrollBy008Core(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddValue(
-            (KeyString)"self",
-            subWindow,
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue(
-            (KeyString)"window",
-            subWindow,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["Event"] is { } eventCtor)
             subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["CustomEvent"] is { } customEventCtor)
             subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["MouseEvent"] is { } mouseEventCtor)
             subWindow.FastAddValue((KeyString)"MouseEvent", mouseEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["FocusEvent"] is { } focusEventCtor)
             subWindow.FastAddValue((KeyString)"FocusEvent", focusEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["KeyboardEvent"] is { } keyboardEventCtor)
             subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
             subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["UIEvent"] is { } uiEventCtor)
             subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         if (_jsContext?["MessageChannel"] is { } messageChannelCtor)
             subWindow.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
-            subWindow.FastAddValue(
-                (KeyString)"parent",
-                parentWindow,
-                JSPropertyAttributes.EnumerableConfigurableValue);
+            subWindow.FastAddValue((KeyString)"parent", parentWindow, JSPropertyAttributes.EnumerableConfigurableValue);
         }
-        subWindow.FastAddValue(
-            (KeyString)"top",
-            _windowJSObject ?? subWindow,
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subDocument.FastAddValue(
-            (KeyString)"defaultView",
-            subWindow,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"top", _windowJSObject ?? subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.getComputedStyle — sub-window needs its own copy so that
         // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
         // the sub-document's <style> elements rather than the main document.
         var bridgeForSubStyle = this;
-        subWindow.FastAddValue(
-            (KeyString)"getComputedStyle",
-            new JSFunction((in Arguments a) => JsSubDocumentsGetComputedStyle009Core(bridgeForSubStyle, in a), "getComputedStyle", 2),
+        subWindow.FastAddValue((KeyString)"getComputedStyle", new JSFunction((in a) => JsSubDocumentsGetComputedStyle009Core(bridgeForSubStyle, in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return subWindow;
     }
 
-    private string GetSubWindowLocationHref(Broiler.Dom.DomElement containerElement)
+    private string GetSubWindowLocationHref(DomElement containerElement)
     {
         if (_subDocumentLocationCache.TryGetValue(containerElement, out var cachedLocation) &&
             !string.IsNullOrWhiteSpace(cachedLocation))
@@ -346,13 +309,13 @@ public sealed partial class DomBridge
         return !string.IsNullOrWhiteSpace(resolvedUrl) ? resolvedUrl : "about:blank";
     }
 
-    private double GetSubWindowScrollOffset(Broiler.Dom.DomElement containerElement, bool vertical)
+    private double GetSubWindowScrollOffset(DomElement containerElement, bool vertical)
     {
         var scrollingElement = GetSubDocumentScrollingElement(containerElement);
         return scrollingElement == null ? 0 : GetElementScrollOffset(scrollingElement, vertical);
     }
 
-    private void SetSubWindowScrollOffsets(Broiler.Dom.DomElement containerElement, double? left = null, double? top = null, bool relative = false, string? behavior = null)
+    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false, string? behavior = null)
     {
         var scrollingElement = GetSubDocumentScrollingElement(containerElement);
         if (scrollingElement == null)
@@ -361,35 +324,35 @@ public sealed partial class DomBridge
         SetElementScrollOffsetsWithBehavior(scrollingElement, left, top, relative: relative, clamp: false, behavior: behavior);
     }
 
-    private static Broiler.Dom.DomElement? GetSubDocumentScrollingElement(Broiler.Dom.DomElement containerElement)
+    private static DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
     {
         var docRoot = ChildElements(containerElement).FirstOrDefault(c =>
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
             return null;
 
-        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
+        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#'));
     }
 
-    private static Broiler.Dom.DomElement? FindBodyElement(Broiler.Dom.DomElement documentElement) =>
+    private static DomElement? FindBodyElement(DomElement documentElement) =>
         ChildElements(documentElement).FirstOrDefault(c =>
             !IsText(c) &&
             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
 
-    private JSObject? GetParentWindowForSubDocument(Broiler.Dom.DomElement containerElement)
+    private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
     {
         var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
-        if (ownerDocRoot != null && ParentEl(ownerDocRoot) != null && !ParentEl(ownerDocRoot).TagName.StartsWith("#", StringComparison.Ordinal))
+        if (ownerDocRoot != null && ParentEl(ownerDocRoot) != null && !ParentEl(ownerDocRoot).TagName.StartsWith('#'))
             return GetOrCreateSubWindow(ParentEl(ownerDocRoot));
 
         return _windowJSObject;
     }
 
-    private string GetInheritedSubDocumentBaseUrl(Broiler.Dom.DomElement containerElement)
+    private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
         var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
         if (ownerDocRoot != null && ParentEl(ownerDocRoot) != null &&
-            !ParentEl(ownerDocRoot).TagName.StartsWith("#", StringComparison.Ordinal) &&
+            !ParentEl(ownerDocRoot).TagName.StartsWith('#') &&
             _subDocumentBaseUrlCache.TryGetValue(ParentEl(ownerDocRoot), out var parentBaseUrl) &&
             !string.IsNullOrWhiteSpace(parentBaseUrl))
         {
@@ -399,7 +362,7 @@ public sealed partial class DomBridge
         return _pageUrl;
     }
 
-    private string GetSubDocumentBaseUrl(Broiler.Dom.DomElement containerElement)
+    private string GetSubDocumentBaseUrl(DomElement containerElement)
     {
         return _subDocumentBaseUrlCache.TryGetValue(containerElement, out var baseUrl) &&
                !string.IsNullOrWhiteSpace(baseUrl)
@@ -501,7 +464,7 @@ public sealed partial class DomBridge
         return File.Exists(localPath) ? localPath : null;
     }
 
-    private void ExecuteSubDocumentScripts(Broiler.Dom.DomElement containerElement, string html)
+    private void ExecuteSubDocumentScripts(DomElement containerElement, string html)
     {
         if (_jsContext == null || string.IsNullOrWhiteSpace(html))
             return;
@@ -570,7 +533,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Creates a minimal empty sub-document structure (html > head + body).
     /// </summary>
-    private Broiler.Dom.DomElement BuildEmptySubDocument(Broiler.Dom.DomElement containerElement)
+    private DomElement BuildEmptySubDocument(DomElement containerElement)
     {
         var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
@@ -600,7 +563,7 @@ public sealed partial class DomBridge
     /// Creates a sub-document with plain text content wrapped in a <c>&lt;pre&gt;</c> element.
     /// Used for <c>text/plain</c> resources.
     /// </summary>
-    private Broiler.Dom.DomElement BuildSubDocumentWithText(string textContent, Broiler.Dom.DomElement containerElement)
+    private DomElement BuildSubDocumentWithText(string textContent, DomElement containerElement)
     {
         var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
@@ -640,7 +603,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets the resource URL for a container element (iframe src or object data).
     /// </summary>
-    private static string GetSubResourceUrl(Broiler.Dom.DomElement containerElement)
+    private static string GetSubResourceUrl(DomElement containerElement)
     {
         var tag = containerElement.TagName?.ToLowerInvariant();
         if (tag == "iframe")
@@ -785,9 +748,9 @@ public sealed partial class DomBridge
         // Strip query string and fragment from the URL to get the filename
         var filename = resourceUrl;
         var qIdx = filename.IndexOf('?');
-        if (qIdx >= 0) filename = filename.Substring(0, qIdx);
+        if (qIdx >= 0) filename = filename[..qIdx];
         var hIdx = filename.IndexOf('#');
-        if (hIdx >= 0) filename = filename.Substring(0, hIdx);
+        if (hIdx >= 0) filename = filename[..hIdx];
 
         // Only handle relative URLs (no scheme)
         if (filename.Contains("://")) return (null, string.Empty);
@@ -848,7 +811,7 @@ public sealed partial class DomBridge
 
         // Generic XML detection
         if (trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) ||
-            (trimmed.StartsWith("<") && !trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) &&
+            (trimmed.StartsWith('<') && !trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) &&
              !trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase)))
             return "application/xml";
 
@@ -863,7 +826,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a sub-document tree from fetched HTML content.
     /// </summary>
-    private Broiler.Dom.DomElement BuildSubDocumentFromHtml(string html, Broiler.Dom.DomElement containerElement)
+    private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
     {
         var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
@@ -884,8 +847,7 @@ public sealed partial class DomBridge
         // Add non-structural elements from the builder (skip any already registered)
         foreach (var el in allElements)
         {
-            if (!_knownNodes.Contains(el))
-                _knownNodes.Add(el);
+            _knownNodes.Add(el);
         }
 
         return docRoot;
@@ -899,26 +861,26 @@ public sealed partial class DomBridge
     // RF-BRIDGE-1c Phase F (F3c part 2d): register/unregister the whole node subtree (raw
     // ChildNodes) so canonical text/comment nodes round-trip through _knownNodes too. No-op on the
     // old homogeneous tree where every child was an element.
-    private void AddElementsRecursive(Broiler.Dom.DomNode node)
+    private void AddElementsRecursive(DomNode node)
     {
-        if (!_knownNodes.Contains(node))
-            _knownNodes.Add(node);
+        _knownNodes.Add(node);
         foreach (var child in node.ChildNodes)
             AddElementsRecursive(child);
     }
 
-    private void RemoveElementsRecursive(Broiler.Dom.DomNode node)
+    private void RemoveElementsRecursive(DomNode node)
     {
         _knownNodes.Remove(node);
         _jsObjectCache.Remove(node);
-        if (node is Broiler.Dom.DomElement element)
+
+        if (node is DomElement element)
             _styleSheetCache.Remove(element);
 
         foreach (var child in node.ChildNodes)
             RemoveElementsRecursive(child);
     }
 
-    private void NormalizeNode(Broiler.Dom.DomElement node)
+    private void NormalizeNode(DomElement node)
     {
         for (var index = 0; index < node.ChildNodes.Count;)
         {
@@ -926,7 +888,7 @@ public sealed partial class DomBridge
             if (!IsText(child))
             {
                 // Recurse into element children (a comment has no text children to merge).
-                if (child is Broiler.Dom.DomElement childElement)
+                if (child is DomElement childElement)
                     NormalizeNode(childElement);
                 index++;
                 continue;
@@ -951,7 +913,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void RemoveChildAt(Broiler.Dom.DomElement parent, int index)
+    private void RemoveChildAt(DomElement parent, int index)
     {
         if (index < 0 || index >= parent.ChildNodes.Count)
             return;
@@ -964,7 +926,7 @@ public sealed partial class DomBridge
         NotifyChildRemoved(parent, child, index);
     }
 
-    private static bool NodesAreEqual(Broiler.Dom.DomNode first, Broiler.Dom.DomNode second)
+    private static bool NodesAreEqual(DomNode first, DomNode second)
     {
         if (ReferenceEquals(first, second))
             return true;
@@ -976,11 +938,11 @@ public sealed partial class DomBridge
         // TagName/attributes — they are equal iff their data matches. Dead on today's homogeneous
         // facade tree (facade text/comment are Broiler.Dom.DomElement and take the element path below); live
         // once construction flips to canonical DomText/DomComment.
-        if (first is Broiler.Dom.DomCharacterData || second is Broiler.Dom.DomCharacterData)
+        if (first is DomCharacterData || second is DomCharacterData)
             return string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal);
 
-        var firstEl = (Broiler.Dom.DomElement)first;
-        var secondEl = (Broiler.Dom.DomElement)second;
+        var firstEl = (DomElement)first;
+        var secondEl = (DomElement)second;
         if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
             !string.Equals(firstEl.NamespaceUri, secondEl.NamespaceUri, StringComparison.Ordinal) ||
             !string.Equals(BridgeText(firstEl), BridgeText(secondEl), StringComparison.Ordinal))
@@ -1011,7 +973,7 @@ public sealed partial class DomBridge
     /// local name) key maps to the same value and qualified name (the qualified-name
     /// check preserves the prefix sensitivity the snapshot comparison had).
     /// </summary>
-    private static bool CanonicalAttributesAreEqual(Broiler.Dom.DomElement first, Broiler.Dom.DomElement second)
+    private static bool CanonicalAttributesAreEqual(DomElement first, DomElement second)
     {
         if (first.Attributes.Count != second.Attributes.Count)
             return false;
@@ -1039,7 +1001,7 @@ public sealed partial class DomBridge
         return string.Empty;
     }
 
-    private (Broiler.Dom.DomElement Parent, int Index) GetInsertAdjacentTarget(Broiler.Dom.DomElement element, string position)
+    private (DomElement Parent, int Index) GetInsertAdjacentTarget(DomElement element, string position)
     {
         switch (position)
         {
@@ -1061,7 +1023,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private void InsertNodeAt(Broiler.Dom.DomElement parent, Broiler.Dom.DomNode node, int index)
+    private void InsertNodeAt(DomElement parent, DomNode node, int index)
     {
         if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
@@ -1094,7 +1056,7 @@ public sealed partial class DomBridge
 
         // RF-BRIDGE-1c Phase F (F3c part 2b): only elements carry a TagName / fire onloads; a
         // canonical char-data node inserts with no sub-document side effects.
-        if (node is Broiler.Dom.DomElement insertedElement)
+        if (node is DomElement insertedElement)
         {
             var insertedTag = insertedElement.TagName?.ToLowerInvariant();
             if (insertedTag == "iframe" || insertedTag == "object")
@@ -1104,9 +1066,9 @@ public sealed partial class DomBridge
         }
     }
 
-    private List<Broiler.Dom.DomNode> BuildAdjacentHtmlNodes(Broiler.Dom.DomElement contextElement, string html)
+    private List<DomNode> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
     {
-        var nodes = new List<Broiler.Dom.DomNode>();
+        var nodes = new List<DomNode>();
         if (string.IsNullOrEmpty(html))
             return nodes;
 
@@ -1126,11 +1088,11 @@ public sealed partial class DomBridge
         return nodes;
     }
 
-    private List<Broiler.Dom.DomNode> BuildChildNodeArgumentNodes(in Arguments arguments)
+    private List<DomNode> BuildChildNodeArgumentNodes(in Arguments arguments)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2b): returns canonical DomNode — an argument may be a
         // text node (resolved via FindDomNodeByJSObject) and string arguments mint text nodes.
-        var nodes = new List<Broiler.Dom.DomNode>();
+        var nodes = new List<DomNode>();
         for (var i = 0; i < arguments.Length; i++)
         {
             var value = arguments[i];
@@ -1139,7 +1101,7 @@ public sealed partial class DomBridge
                 var candidateNode = FindDomNodeByJSObject(candidateObject);
                 if (candidateNode != null)
                 {
-                    if (candidateNode is Broiler.Dom.DomElement candidateElement &&
+                    if (candidateNode is DomElement candidateElement &&
                         string.Equals(candidateElement.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
                     {
                         foreach (var fragmentChild in candidateElement.ChildNodes.ToArray())
@@ -1160,7 +1122,7 @@ public sealed partial class DomBridge
         return nodes;
     }
 
-    private void SetElementInnerHtml(Broiler.Dom.DomElement element, string html)
+    private void SetElementInnerHtml(DomElement element, string html)
     {
         html ??= string.Empty;
         GetElementRuntimeState(element).InnerHtml = html;
@@ -1187,7 +1149,7 @@ public sealed partial class DomBridge
         InvalidateStyleScope(element);
     }
 
-    private void SetElementOuterHtml(Broiler.Dom.DomElement element, string html)
+    private void SetElementOuterHtml(DomElement element, string html)
     {
         html ??= string.Empty;
 
@@ -1202,10 +1164,10 @@ public sealed partial class DomBridge
         var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
         var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
 
-        Broiler.Dom.DomElement? parsedContainer = null;
+        DomElement? parsedContainer = null;
         if (!string.IsNullOrEmpty(html))
         {
-            var parsingContext = parent.TagName.StartsWith("#", StringComparison.Ordinal)
+            var parsingContext = parent.TagName.StartsWith('#')
                 ? CreateBridgeElement("body")
                 : parent;
             if (TryBuildInnerHtmlFragmentContainer(parsingContext, html, out var fragmentContainer))
@@ -1235,7 +1197,7 @@ public sealed partial class DomBridge
         InvalidateStyleScope(parent);
     }
 
-    private bool TryBuildInnerHtmlFragmentContainer(Broiler.Dom.DomElement contextElement, string html, out Broiler.Dom.DomElement container)
+    private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
     {
         container = null!;
 
@@ -1248,7 +1210,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static Broiler.Dom.DomElement? FindFirstElementByTag(Broiler.Dom.DomElement root, string tag)
+    private static DomElement? FindFirstElementByTag(DomElement root, string tag)
     {
         foreach (var child in ChildElements(root))
         {
@@ -1272,7 +1234,7 @@ public sealed partial class DomBridge
     /// For XHTML with valid namespace, also executes embedded scripts.
     /// XML well-formedness errors result in an empty document.
     /// </summary>
-    private Broiler.Dom.DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, Broiler.Dom.DomElement containerElement)
+    private DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
     {
         var docRoot = CreateBridgeElement("#subdoc-root");
         SetParent(docRoot, containerElement);
@@ -1284,11 +1246,11 @@ public sealed partial class DomBridge
             while (cleanXml.TrimStart().StartsWith("<?xml-stylesheet", StringComparison.OrdinalIgnoreCase))
             {
                 var piEnd = cleanXml.IndexOf("?>", StringComparison.Ordinal);
-                if (piEnd >= 0) cleanXml = cleanXml.Substring(piEnd + 2).TrimStart();
+                if (piEnd >= 0) cleanXml = cleanXml[(piEnd + 2)..].TrimStart();
                 else break;
             }
 
-            var xdoc = System.Xml.Linq.XDocument.Parse(cleanXml);
+            var xdoc = XDocument.Parse(cleanXml);
             if (xdoc.Root == null)
             {
                 InsertChildAt(containerElement, 0, docRoot);
@@ -1337,7 +1299,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively builds a Broiler.Dom.DomElement tree from an XElement.
     /// </summary>
-    private Broiler.Dom.DomElement BuildDomElementFromXElement(System.Xml.Linq.XElement xe)
+    private DomElement BuildDomElementFromXElement(XElement xe)
     {
         var tagName = xe.Name.LocalName.ToLowerInvariant();
         var el = CreateBridgeElement(tagName);
@@ -1350,14 +1312,14 @@ public sealed partial class DomBridge
 
         foreach (var child in xe.Nodes())
         {
-            if (child is System.Xml.Linq.XElement childXe)
+            if (child is XElement childXe)
             {
                 var childEl = BuildDomElementFromXElement(childXe);
                 SetParent(childEl, el);
                 el.AppendChild(childEl);
                 _knownNodes.Add(childEl);
             }
-            else if (child is System.Xml.Linq.XText childText)
+            else if (child is XText childText)
             {
                 var textNode = CreateBridgeTextNode(childText.Value);
                 SetParent(textNode, el);
@@ -1373,7 +1335,7 @@ public sealed partial class DomBridge
     /// Finds and executes script elements within a sub-document tree.
     /// Scripts call parent.notify() etc. in the main JS context.
     /// </summary>
-    private void ExecuteSubDocumentScripts(Broiler.Dom.DomElement docRoot)
+    private void ExecuteSubDocumentScripts(DomElement docRoot)
     {
         if (_jsContext == null) return;
 
@@ -1397,7 +1359,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from script elements.
     /// </summary>
-    private static void CollectScriptContent(Broiler.Dom.DomElement element, List<string> scripts)
+    private static void CollectScriptContent(DomElement element, List<string> scripts)
     {
         if (string.Equals(element.TagName, "script", StringComparison.OrdinalIgnoreCase))
         {
@@ -1414,7 +1376,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets the concatenated text content of an element and all its descendants.
     /// </summary>
-    private static string GetTextContentRecursive(Broiler.Dom.DomElement element)
+    private static string GetTextContentRecursive(DomElement element)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2d): aggregate descendant text over raw ChildNodes.
         var sb = new StringBuilder();

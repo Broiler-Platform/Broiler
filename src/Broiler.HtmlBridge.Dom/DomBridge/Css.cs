@@ -1,7 +1,5 @@
 using System.Globalization;
-using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
@@ -9,8 +7,12 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using System.Collections.Concurrent;
+using Broiler.Dom;
+using Broiler.CSS;
+using Broiler.CSS.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// CSS specificity calculation, style-block extraction, rule cascading,
@@ -19,7 +21,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     private int _styleInvalidationBatchDepth;
-    private HashSet<Broiler.Dom.DomElement>? _pendingStyleInvalidationRoots;
+    private HashSet<DomElement>? _pendingStyleInvalidationRoots;
     // These caches/reentrancy guards are read and written while computing
     // getComputedStyle / element geometry. That work is re-entered from JS
     // Promise/async/generator and scroll/timer continuations that the JS engine
@@ -31,8 +33,8 @@ public sealed partial class DomBridge
     // the whole process (SIGABRT/exit 134), taking out an entire WPT shard
     // (issue #1143). Use concurrent collections, the same defensive idiom as the
     // timer/raf maps.
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsCache = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Broiler.Dom.DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
+    private readonly ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsCache = new();
+    private readonly ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
 
     /// <summary>
     /// Clears the bridge's <c>GetComputedProps</c> memo <em>and</em> the per-document engines'
@@ -66,7 +68,7 @@ public sealed partial class DomBridge
     /// by the shared style engine; only inline declarations and JavaScript-set values
     /// remain in the bridge-owned declaration map.
     /// </summary>
-    internal void InvalidateElementStyles(Broiler.Dom.DomElement element)
+    internal void InvalidateElementStyles(DomElement element)
     {
         // 1. Collect property names that come from the inline style attribute.
         //    These must never be cleared or overwritten by the cascade.
@@ -91,10 +93,7 @@ public sealed partial class DomBridge
     /// document scope after a selector-affecting mutation such as a class,
     /// attribute, or sibling structure change.
     /// </summary>
-    internal void BeginStyleInvalidationBatch()
-    {
-        _styleInvalidationBatchDepth++;
-    }
+    internal void BeginStyleInvalidationBatch() => _styleInvalidationBatchDepth++;
 
     internal void EndStyleInvalidationBatch()
     {
@@ -106,7 +105,7 @@ public sealed partial class DomBridge
             FlushPendingStyleInvalidations();
     }
 
-    internal void InvalidateStyleScope(Broiler.Dom.DomElement anchor)
+    internal void InvalidateStyleScope(DomElement anchor)
     {
         ClearComputedPropsCache();
         var docRoot = GetDocumentRootFor(anchor);
@@ -131,9 +130,9 @@ public sealed partial class DomBridge
         _pendingStyleInvalidationRoots.Clear();
     }
 
-    private void InvalidateStyleScopeRecursive(Broiler.Dom.DomElement element)
+    private void InvalidateStyleScopeRecursive(DomElement element)
     {
-        if (!IsText(element) && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+        if (!IsText(element) && !element.TagName.StartsWith('#'))
             InvalidateElementStyles(element);
 
         foreach (var child in ChildElements(element))
@@ -148,13 +147,13 @@ public sealed partial class DomBridge
     /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
     /// Returns the topmost node within the element's document scope.
     /// </summary>
-    private static Broiler.Dom.DomElement GetDocumentRootFor(Broiler.Dom.DomElement el)
+    private static DomElement GetDocumentRootFor(DomElement el)
     {
         var root = el;
         while (ParentEl(root) != null)
         {
             // If we've reached a document root, stop here
-            if (root.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (root.TagName.StartsWith('#'))
                 return root;
             root = ParentEl(root);
         }
@@ -165,7 +164,7 @@ public sealed partial class DomBridge
     /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
     /// Does not descend into sub-document boundaries (<c>#subdoc-root</c>).
     /// </summary>
-    private static void CollectStyleElementsInTree(Broiler.Dom.DomElement root, List<Broiler.Dom.DomElement> styleElements)
+    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
         foreach (var child in SnapshotChildren(root))
         {
@@ -190,7 +189,7 @@ public sealed partial class DomBridge
     /// </summary>
     /// <remarks>
     /// A plain <c>ChildElements(root).ToList()</c> is NOT thread-safe here.
-    /// <see cref="Broiler.Dom.DomElement.LegacyChildList"/> projects the live
+    /// <see cref="DomElement.LegacyChildList"/> projects the live
     /// <c>ChildNodes</c> collection: <see cref="Enumerable.ToList{T}"/> reads
     /// <c>Count</c>, allocates a destination array of that size, then calls
     /// <c>CopyTo</c>, which materialises the <em>current</em> (possibly larger)
@@ -203,7 +202,7 @@ public sealed partial class DomBridge
     /// for the whole tree, leaving the document unstyled. Retry a bounded number
     /// of times, then fall back to a tolerant index walk.
     /// </remarks>
-    private static List<Broiler.Dom.DomElement> SnapshotChildren(Broiler.Dom.DomElement root)
+    private static List<DomElement> SnapshotChildren(DomElement root)
     {
         for (var attempt = 0; attempt < 4; attempt++)
         {
@@ -221,16 +220,16 @@ public sealed partial class DomBridge
 
         // Sustained contention: copy element-by-element, re-checking bounds each
         // step so a shrinking list can only truncate the snapshot, never throw.
-        var snapshot = new List<Broiler.Dom.DomElement>();
+        var snapshot = new List<DomElement>();
         for (var i = 0; ; i++)
         {
-            Broiler.Dom.DomElement? child;
+            DomElement? child;
             try
             {
                 if (i >= root.ChildNodes.Count)
                     break;
                 // Element snapshot: a char-data child (post-flip) is skipped (null).
-                child = ChildAt(root, i) as Broiler.Dom.DomElement;
+                child = ChildAt(root, i) as DomElement;
             }
             catch (Exception ex) when (ex is ArgumentOutOfRangeException or InvalidOperationException)
             {
@@ -244,7 +243,7 @@ public sealed partial class DomBridge
         return snapshot;
     }
 
-    private JSObject BuildComputedStyleObject(Broiler.Dom.DomElement? element, string? pseudoElement = null)
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
         var computed = BuildComputedStyleMap(element, pseudoElement);
         var propertyNames = computed.Keys.ToList();
@@ -253,45 +252,26 @@ public sealed partial class DomBridge
         // Expose all computed properties as both camelCase and kebab-case
         foreach (var kv in computed)
         {
-            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(kv.Key);
-            var normalized = Broiler.CSS.CssPriority.Strip(kv.Value);
+            var camel = CssPropertyNames.ToDomPropertyName(kv.Key);
+            var normalized = CssPriority.Strip(kv.Value);
             obj.FastAddValue((KeyString)kv.Key, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
             if (camel != kv.Key)
                 obj.FastAddValue((KeyString)camel, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // getPropertyValue method (supports both kebab-case and camelCase lookups)
-        obj.FastAddValue(
-            (KeyString)"getPropertyValue",
-            new JSFunction((in Arguments a) => JsCssGetPropertyValue001Core(computed, in a), "getPropertyValue", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"getPropertyValue", new JSFunction((in a) => JsCssGetPropertyValue001Core(computed, in a), "getPropertyValue", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(propertyNames.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => new JSNumber(propertyNames.Count), "get length"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        obj.FastAddValue((KeyString)"item", new JSFunction((in a) => JsCssItem003Core(propertyNames, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"getPropertyPriority", new JSFunction((in _) => new JSString(string.Empty), "getPropertyPriority", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue(
-            (KeyString)"item",
-            new JSFunction((in Arguments a) => JsCssItem003Core(propertyNames, in a), "item", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue(
-            (KeyString)"getPropertyPriority",
-            new JSFunction((in Arguments _) => new JSString(string.Empty), "getPropertyPriority", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddProperty(
-            (KeyString)"parentRule",
-            NullFunction("get parentRule"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        obj.FastAddProperty((KeyString)"parentRule", NullFunction("get parentRule"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return obj;
     }
 
-    private Dictionary<string, string> BuildComputedStyleMap(Broiler.Dom.DomElement? element, string? pseudoElement = null)
+    private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
     {
         // getComputedStyle() resolves through the shared Broiler.CSS.Dom.CssStyleEngine
         // (BuildComputedStyleMapViaEngine, see DomBridge.ComputedStyleEngine.cs). The legacy
@@ -305,7 +285,7 @@ public sealed partial class DomBridge
         return BuildComputedStyleMapViaEngine(element, pseudoElement);
     }
 
-    private Dictionary<string, string> BuildSpecifiedStyleMap(Broiler.Dom.DomElement element, string? pseudoElement = null)
+    private Dictionary<string, string> BuildSpecifiedStyleMap(DomElement element, string? pseudoElement = null)
     {
         pseudoElement = NormalizePseudoElement(pseudoElement);
         var specified = new Dictionary<string, string>(
@@ -345,9 +325,9 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static bool IsSelectListBox(Broiler.Dom.DomElement element) => GetSelectVisibleRowCount(element) > 1;
+    private static bool IsSelectListBox(DomElement element) => GetSelectVisibleRowCount(element) > 1;
 
-    private static int GetSelectVisibleRowCount(Broiler.Dom.DomElement element)
+    private static int GetSelectVisibleRowCount(DomElement element)
     {
         bool isMultiple = HasAttr(element, "multiple");
         if (TryGetAttribute(element, "size", out var rawSize) &&
@@ -373,7 +353,7 @@ public sealed partial class DomBridge
     /// mutations applied. This is the input from which the shared rule model is
     /// (re)parsed; <see cref="GetStyleElementCssText"/> applies mutations on top.
     /// </summary>
-    private string GetStyleElementSourceText(Broiler.Dom.DomElement styleEl)
+    private string GetStyleElementSourceText(DomElement styleEl)
     {
         var cssText = new StringBuilder();
         // RF-BRIDGE-1c Phase F (F3c part 2d): iterate raw ChildNodes — the <style> text is a
@@ -427,14 +407,14 @@ public sealed partial class DomBridge
     /// the source text and thus discards prior <c>insertRule</c>/<c>deleteRule</c>
     /// mutations, matching CSSOM semantics.
     /// </summary>
-    private List<Broiler.CSS.CssRule> EnsureStyleSheetRulesCurrent(Broiler.Dom.DomElement styleEl)
+    private List<CssRule> EnsureStyleSheetRulesCurrent(DomElement styleEl)
     {
         var state = GetElementRuntimeState(styleEl).StyleSheet;
         var sourceText = GetStyleElementSourceText(styleEl);
         if (state.Rules is null ||
             !string.Equals(state.RulesSourceText, sourceText, StringComparison.Ordinal))
         {
-            state.Rules = [.. new Broiler.CSS.CssParser().ParseStyleSheet(sourceText).Rules];
+            state.Rules = [.. new CssParser().ParseStyleSheet(sourceText).Rules];
             state.RulesSourceText = sourceText;
             state.RulesMutated = false;
         }
@@ -466,7 +446,7 @@ public sealed partial class DomBridge
         ApplyStyleCsp(DocumentElement, csp, blockStyleAttribute: !csp.AllowsInlineStyleAttribute());
     }
 
-    private void ApplyStyleCsp(Broiler.Dom.DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
+    private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
     {
         if (!IsText(element))
         {
@@ -493,18 +473,16 @@ public sealed partial class DomBridge
             ApplyStyleCsp(child, csp, blockStyleAttribute);
     }
 
-    private string GetStyleElementCssText(Broiler.Dom.DomElement styleEl)
+    private string GetStyleElementCssText(DomElement styleEl)
     {
         var rules = EnsureStyleSheetRulesCurrent(styleEl);
         var state = GetElementRuntimeState(styleEl).StyleSheet;
         return state.RulesMutated
-            ? string.Join("\n", rules.Select(CSS.CssSerializer.Serialize))
+            ? string.Join("\n", rules.Select(CssSerializer.Serialize))
             : state.RulesSourceText ?? string.Empty;
     }
 
-    private static void ApplyUserAgentDisplayDefaults(
-        Dictionary<string, string> computed,
-        Broiler.Dom.DomElement element)
+    private static void ApplyUserAgentDisplayDefaults(Dictionary<string, string> computed, DomElement element)
     {
         if (computed.ContainsKey("display"))
             return;
@@ -515,7 +493,7 @@ public sealed partial class DomBridge
             return;
         }
 
-        if (CSS.Dom.CssUserAgentDefaults.DisplayValues.TryGetValue(element.TagName, out var display))
+        if (CssUserAgentDefaults.DisplayValues.TryGetValue(element.TagName, out var display))
             computed["display"] = display;
     }
 
@@ -523,12 +501,12 @@ public sealed partial class DomBridge
     /// Expands CSS shorthand properties into individual longhand properties (e.g.
     /// <c>margin: 10px 5px</c> → <c>margin-top/right/bottom/left</c>), only setting longhands
     /// not already present. DOM/CSS promotion Phase 2: this now delegates to the single canonical
-    /// <see cref="Broiler.CSS.Dom.CssStyleEngine.ExpandShorthands"/> — the bridge's own copy (which
+    /// <see cref="CssStyleEngine.ExpandShorthands"/> — the bridge's own copy (which
     /// had drifted to a narrower subset: no <c>outline</c>, no <c>font</c> slash line-height, and a
     /// single-layer <c>background</c> parser) is deleted so it can no longer drift from the engine.
     /// </summary>
     private static void ExpandCssShorthands(Dictionary<string, string> computed)
-        => Broiler.CSS.Dom.CssStyleEngine.ExpandShorthands(computed);
+        => CssStyleEngine.ExpandShorthands(computed);
 
     /// <summary>
     /// Evaluates a media query string. Supports basic queries needed for Acid3.
@@ -537,9 +515,7 @@ public sealed partial class DomBridge
     /// like <c>(min-color: 0)</c>, <c>(min-monochrome: 0)</c>.
     /// </summary>
     private static bool EvaluateMediaQuery(string query, int viewportWidth = 0, int viewportHeight = 0)
-        => CSS.Dom.CssStyleEngine.MatchesMediaQuery(
-            query,
-            new Broiler.CSS.Dom.CssEnvironment(viewportWidth, viewportHeight));
+        => CssStyleEngine.MatchesMediaQuery(query, new CssEnvironment(viewportWidth, viewportHeight));
 
     /// <summary>
     /// Parses a CSS length value (e.g. "0", "100px", "1em") to pixels.
@@ -726,7 +702,7 @@ public sealed partial class DomBridge
     /// the viewport is the iframe container's CSS dimensions. For the main
     /// document, the viewport is 0×0 (headless).
     /// </summary>
-    private (int Width, int Height) GetViewportForDocRoot(Broiler.Dom.DomElement docRoot)
+    private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
     {
         if (ReferenceEquals(docRoot, DocumentElement) ||
             string.Equals(docRoot.TagName, "#document", StringComparison.OrdinalIgnoreCase))
@@ -800,8 +776,7 @@ public sealed partial class DomBridge
         }
         catch (Exception ex)
         {
-            RenderLogger.LogError(LogCategory.HtmlRenderer, "DomBridge.FetchExternalStylesheet",
-                $"Failed to fetch stylesheet '{url}': {ex.Message}", ex);
+            RenderLogger.LogError(LogCategory.HtmlRenderer, "DomBridge.FetchExternalStylesheet", $"Failed to fetch stylesheet '{url}': {ex.Message}", ex);
             return null;
         }
     }

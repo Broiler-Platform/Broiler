@@ -8,6 +8,7 @@ using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge;
 using Broiler.Graphics;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Dom;
 
 namespace Broiler.Wpt;
 

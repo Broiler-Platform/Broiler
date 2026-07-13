@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Dom;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using Broiler.Media.Image;

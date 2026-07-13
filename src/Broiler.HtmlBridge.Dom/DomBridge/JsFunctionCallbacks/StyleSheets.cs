@@ -3,19 +3,17 @@ using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.CSS;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsStyleSheetsGetLength002Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, in Arguments _)
-    {
-        return new JSNumber(currentRules().Count);
-    }
+    private JSValue JsStyleSheetsGetLength002Core(Func<List<CssRule>> currentRules, in Arguments _) => new JSNumber(currentRules().Count);
 
 
-    private JSValue JsStyleSheetsItem003Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, in Arguments a)
+    private JSValue JsStyleSheetsItem003Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, Func<List<CssRule>> currentRules, in Arguments a)
     {
         syncLiveCssRulesIndices();
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
@@ -24,14 +22,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsGetCssRules004Core(global::System.Action syncLiveCssRulesIndices, global::Broiler.JavaScript.Runtime.JSObject? liveCssRules, in Arguments _)
+    private JSValue JsStyleSheetsGetCssRules004Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, in Arguments _)
     {
         syncLiveCssRulesIndices();
         return liveCssRules;
     }
 
 
-    private JSValue JsStyleSheetsInsertRule005Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, global::System.Action markRulesMutated, global::System.Action syncLiveCssRulesIndices, in Arguments a)
+    private JSValue JsStyleSheetsInsertRule005Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
     {
         var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
         // currentRules() reparses on any pending textContent change before we mutate,
@@ -42,7 +40,7 @@ public sealed partial class DomBridge
         index = Math.Clamp(index, 0, rules.Count);
         // Route the mutation through the shared model: parse the inserted text
         // into a CssRule rather than storing the raw string (Phase 6).
-        var parsed = new global::Broiler.CSS.CssParser().ParseStyleSheet(ruleText).Rules;
+        var parsed = new CssParser().ParseStyleSheet(ruleText).Rules;
         if (parsed.Count > 0)
         {
             rules.Insert(index, parsed[0]);
@@ -54,7 +52,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsDeleteRule006Core(global::System.Func<global::System.Collections.Generic.List<global::Broiler.CSS.CssRule>> currentRules, global::System.Action markRulesMutated, global::System.Action syncLiveCssRulesIndices, in Arguments a)
+    private JSValue JsStyleSheetsDeleteRule006Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
     {
         var rules = currentRules();
         if (a.Length > 0)
@@ -74,7 +72,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsItem008Core(global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject> rules, in Arguments a)
+    private static JSValue JsStyleSheetsItem008Core(List<JSObject> rules, in Arguments a)
     {
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
         var index = double.IsNaN(dv) ? 0 : (int)dv;
@@ -82,7 +80,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsInsertRule009Core(global::System.Action syncIndices, global::System.Func<global::System.String, global::Broiler.JavaScript.Runtime.JSObject>? ruleFactory, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject> rules, in Arguments a)
+    private static JSValue JsStyleSheetsInsertRule009Core(Action syncIndices, Func<string, JSObject>? ruleFactory, List<JSObject> rules, in Arguments a)
     {
         if (ruleFactory is null)
             return new JSNumber(0);
@@ -96,7 +94,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsDeleteRule010Core(global::System.Action syncIndices, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject> rules, in Arguments a)
+    private static JSValue JsStyleSheetsDeleteRule010Core(Action syncIndices, List<JSObject> rules, in Arguments a)
     {
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
         var index = double.IsNaN(dv) ? 0 : (int)dv;
@@ -110,7 +108,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText013Core(global::System.String? keyText, global::Broiler.JavaScript.Runtime.JSObject? ruleObj, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText013Core(string? keyText, JSObject? ruleObj, in Arguments _)
     {
         var styleObj = ruleObj[(KeyString)"style"];
         var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
@@ -118,35 +116,35 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText017Core(global::System.String? href, global::System.String? mediaText, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText017Core(string? href, string? mediaText, in Arguments _)
     {
         var mediaSuffix = string.IsNullOrEmpty(mediaText) ? string.Empty : $" {mediaText}";
         return new JSString($"@import url(\"{href}\"){mediaSuffix};");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText018Core(global::System.String? mediaText, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject>? nestedRuleObjects, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText018Core(string? mediaText, List<JSObject>? nestedRuleObjects, in Arguments _)
     {
         var nestedCssText = string.Join(" ", nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString()).Where(text => !string.IsNullOrEmpty(text)));
         return new JSString($"@media {mediaText} {{ {nestedCssText} }}");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText019Core(global::Broiler.JavaScript.Runtime.JSObject? styleObj, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText019Core(JSObject? styleObj, in Arguments _)
     {
         var cssText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
         return new JSString($"@font-face {{ {cssText} }}");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText020Core(global::System.String? name, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject>? nestedRuleObjects, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText020Core(string? name, List<JSObject>? nestedRuleObjects, in Arguments _)
     {
         var nestedCssText = string.Join(" ", nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString()).Where(text => !string.IsNullOrEmpty(text)));
         return new JSString($"@keyframes {name} {{ {nestedCssText} }}");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText021Core(global::System.Boolean inherits, global::System.String? initialValue, global::System.String? propertyName, global::System.String? syntax, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText021Core(bool inherits, string? initialValue, string? propertyName, string? syntax, in Arguments _)
     {
         var serialized = new List<string>
                         {
@@ -158,7 +156,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText022Core((global::System.String CssName, global::System.String JsName)[]? descriptorMap, global::System.String? ruleName, global::Broiler.JavaScript.Runtime.JSObject? ruleObj, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText022Core((string CssName, string JsName)[]? descriptorMap, string? ruleName, JSObject? ruleObj, in Arguments _)
     {
         var serialized = new List<string>();
         foreach (var (cssName, jsName) in descriptorMap)
@@ -175,14 +173,14 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText023Core(global::System.String? conditionText, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject>? nestedRuleObjects, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText023Core(string? conditionText, List<JSObject>? nestedRuleObjects, in Arguments _)
     {
         var nestedCssText = string.Join(" ", nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString()).Where(text => !string.IsNullOrEmpty(text)));
         return new JSString($"@supports {conditionText} {{ {nestedCssText} }}");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText024Core(global::System.String? nameText, global::System.Collections.Generic.List<global::Broiler.JavaScript.Runtime.JSObject>? nestedRuleObjects, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText024Core(string? nameText, List<JSObject>? nestedRuleObjects, in Arguments _)
     {
         var nestedCssText = string.Join(" ", nestedRuleObjects.Select(rule => rule[(KeyString)"cssText"]?.ToString()).Where(text => !string.IsNullOrEmpty(text)));
         var namePrefix = string.IsNullOrEmpty(nameText) ? string.Empty : $"{nameText} ";
@@ -190,21 +188,21 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText025Core(global::System.String? nameText, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText025Core(string? nameText, in Arguments _)
     {
         var nameSuffix = string.IsNullOrEmpty(nameText) ? string.Empty : $" {nameText}";
         return new JSString($"@layer{nameSuffix};");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText026Core(global::System.String? namespaceUri, global::System.String? prefix, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText026Core(string? namespaceUri, string? prefix, in Arguments _)
     {
         var prefixPart = string.IsNullOrEmpty(prefix) ? string.Empty : $"{prefix} ";
         return new JSString($"@namespace {prefixPart}\"{namespaceUri}\";");
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText027Core(global::System.String? selectorText, global::Broiler.JavaScript.Runtime.JSObject? styleObj, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText027Core(string? selectorText, JSObject? styleObj, in Arguments _)
     {
         var styleText = styleObj[(KeyString)"cssText"]?.ToString() ?? string.Empty;
         var selectorSuffix = string.IsNullOrEmpty(selectorText) ? string.Empty : $" {selectorText}";
@@ -212,7 +210,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsStyleSheetsGetCssText028Core(global::Broiler.JavaScript.Runtime.JSObject? ruleObj, global::System.String? selectorText, in Arguments _)
+    private static JSValue JsStyleSheetsGetCssText028Core(JSObject? ruleObj, string? selectorText, in Arguments _)
     {
         var styleObj = ruleObj[(KeyString)"style"];
         var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;

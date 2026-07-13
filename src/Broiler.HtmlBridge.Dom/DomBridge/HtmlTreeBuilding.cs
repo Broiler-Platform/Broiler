@@ -1,6 +1,7 @@
 using Broiler.Dom.Html;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -17,13 +18,13 @@ public sealed partial class DomBridge
     /// canonical <c>&lt;html&gt;</c> root, the non-structural node registration list, and the title.
     /// Replaces the retired <c>HtmlTreeBuilder.Build</c>.
     /// </summary>
-    private static (Broiler.Dom.DomElement DocumentElement, List<Broiler.Dom.DomNode> AllElements, string Title) BuildDocumentTree(string html)
+    private static (DomElement DocumentElement, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
     {
         var parsed = new HtmlDocumentParser().ParseDocument(html);
         var root = parsed.Document.DocumentElement ??
             throw new InvalidOperationException("The shared HTML parser did not produce a document element.");
 
-        var allElements = new List<Broiler.Dom.DomNode>();
+        var allElements = new List<DomNode>();
         AppendParsedTreeNodes(root, structural: true, allElements);
         return (root, allElements, parsed.Title);
     }
@@ -32,11 +33,12 @@ public sealed partial class DomBridge
     /// Parses an HTML fragment in <paramref name="contextTagName"/>'s context and wraps its children
     /// in a bridge <c>#document-fragment</c> sentinel element. Replaces <c>HtmlTreeBuilder.BuildFragment</c>.
     /// </summary>
-    private (Broiler.Dom.DomElement Fragment, List<Broiler.Dom.DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
+    private (DomElement Fragment, List<DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
     {
         var parsed = new HtmlDocumentParser().ParseFragment(html, contextTagName);
         var fragment = CreateBridgeElement("#document-fragment");
-        var allElements = new List<Broiler.Dom.DomNode>();
+        var allElements = new List<DomNode>();
+
         // AppendChild adopts each parsed child subtree into _document (fragment is _document-owned).
         foreach (var child in parsed.Fragment.ChildNodes.ToArray())
         {
@@ -52,17 +54,17 @@ public sealed partial class DomBridge
     /// (<c>&lt;html&gt;</c> and its direct <c>&lt;head&gt;</c>/<c>&lt;body&gt;</c> children) exactly as the
     /// retired <c>HtmlTreeBuilder.ConvertNode</c>'s <c>structural</c> flag did.
     /// </summary>
-    private static void AppendParsedTreeNodes(Broiler.Dom.DomNode source, bool structural, List<Broiler.Dom.DomNode> allElements)
+    private static void AppendParsedTreeNodes(DomNode source, bool structural, List<DomNode> allElements)
     {
         if (!structural)
             allElements.Add(source);
 
         foreach (var child in source.ChildNodes)
         {
-            var childIsStructural =
-                structural &&
-                child is Broiler.Dom.DomElement childElement &&
+            var childIsStructural = structural &&
+                child is DomElement childElement &&
                 childElement.LocalName is "head" or "body";
+            
             AppendParsedTreeNodes(child, childIsStructural, allElements);
         }
     }

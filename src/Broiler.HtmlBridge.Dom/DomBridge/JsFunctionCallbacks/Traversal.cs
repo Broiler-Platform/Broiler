@@ -6,254 +6,13 @@ using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
-
-    private JSValue JsTraversalSetCurrentNode002Core(ref global::Broiler.Dom.DomElement? currentNode, in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSObject nodeObj)
-        {
-            var el = FindDomElementByJSObject(nodeObj);
-            if (el != null)
-                currentNode = el;
-        }
-
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsTraversalParentNode003Core(ref global::Broiler.Dom.DomElement? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
-    {
-        var node = currentNode;
-        while (node != null && !ReferenceEquals(node, root))
-        {
-            node = ParentEl(node);
-            if (node == null)
-                break;
-            var result = ApplyFilter(node, whatToShow, filterFn);
-            if (result == 1)
-            {
-                currentNode = node;
-                return ToJSObject(node);
-            } // ACCEPT
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsTraversalNextNode008Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
-    {
-        var node = currentNode;
-        // Try children first
-        while (true)
-        {
-            if (node.ChildNodes.Count > 0)
-            {
-                node = ChildAt(node, 0);
-                var result = ApplyFilter(node, whatToShow, filterFn);
-                if (result == 1)
-                {
-                    currentNode = node;
-                    return ToJSObject(node);
-                }
-
-                if (result == 2) // REJECT — skip subtree
-                {
-                    // Move to next sibling or ancestor's sibling
-                    node = GetNextSkippingChildren(node, root);
-                    if (node == null)
-                        return JSNull.Value;
-                    var r2 = ApplyFilter(node, whatToShow, filterFn);
-                    if (r2 == 1)
-                    {
-                        currentNode = node;
-                        return ToJSObject(node);
-                    }
-
-                    continue;
-                }
-
-                // SKIP — descend into children
-                continue;
-            }
-
-            // No children — next sibling or ancestor's next sibling
-            node = GetNextSkippingChildren(node, root);
-            if (node == null)
-                return JSNull.Value;
-            var r = ApplyFilter(node, whatToShow, filterFn);
-            if (r == 1)
-            {
-                currentNode = node;
-                return ToJSObject(node);
-            }
-
-            if (r == 2) // REJECT — skip subtree
-            {
-                node = GetNextSkippingChildren(node, root);
-                if (node == null)
-                    return JSNull.Value;
-                var r3 = ApplyFilter(node, whatToShow, filterFn);
-                if (r3 == 1)
-                {
-                    currentNode = node;
-                    return ToJSObject(node);
-                }
-
-                continue;
-            }
-            // SKIP — continue loop
-        }
-    }
-
-
-    private JSValue JsTraversalPreviousNode009Core(ref global::Broiler.Dom.DomNode? currentNode, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::System.Int32 whatToShow, in Arguments a)
-    {
-        var node = currentNode;
-        while (true)
-        {
-            // Try previous sibling's deepest descendant
-            var parent = node?.ParentNode;
-            if (parent != null && !ReferenceEquals(node, root))
-            {
-                var idx = ChildIndexOf(parent, node!);
-                if (idx > 0)
-                {
-                    node = parent.ChildNodes[idx - 1];
-                    // Go to deepest last child
-                    while (node.ChildNodes.Count > 0)
-                        node = ChildAt(node, ^1);
-                    var result = ApplyFilter(node, whatToShow, filterFn);
-                    if (result == 1)
-                    {
-                        currentNode = node;
-                        return ToJSObject(node);
-                    }
-
-                    continue;
-                }
-
-                // Move to parent
-                node = ParentEl(node);
-                var r = ApplyFilter(node, whatToShow, filterFn);
-                if (r == 1)
-                {
-                    currentNode = node;
-                    return ToJSObject(node);
-                }
-
-                if (ReferenceEquals(node, root))
-                    return JSNull.Value;
-                continue;
-            }
-
-            return JSNull.Value;
-        }
-    }
-
-
-    private JSValue JsTraversalNextNode012Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
-    {
-        if (detached)
-            return JSNull.Value;
-        var allNodes = GetDocumentOrderNodes(root);
-        var refIdx = state.ReferenceNode != null ? allNodes.IndexOf(state.ReferenceNode) : -1;
-        // If reference is detached, use last known position
-        if (refIdx < 0 && state.ReferenceNode != null)
-            refIdx = state.LastKnownIndex >= 0 ? Math.Min(state.LastKnownIndex, allNodes.Count - 1) : -1;
-        var startIdx = state.PointerBeforeReferenceNode ? refIdx : refIdx + 1;
-        for (var i = startIdx; i < allNodes.Count; i++)
-        {
-            var candidateNode = allNodes[i];
-            state.LastKnownIndex = i;
-            var result = ApplyFilter(candidateNode, whatToShow, filterFn);
-            // Rebuild allNodes after filter (filter may have mutated the tree)
-            allNodes = GetDocumentOrderNodes(root);
-            if (result == 1) // FILTER_ACCEPT
-            {
-                state.ReferenceNode = candidateNode;
-                state.PointerBeforeReferenceNode = false;
-                // Update last known index to where the node is now (or was)
-                var newIdx = allNodes.IndexOf(candidateNode);
-                state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
-                return ToJSObject(candidateNode);
-            }
-
-            // After filter, the node may have been removed — adjust i if needed
-            var nowIdx = allNodes.IndexOf(candidateNode);
-            if (nowIdx < 0)
-            {
-                // Node was removed during filter. Next candidate is at i (same position)
-                // since list shifted down. Adjust so the for-loop increment lands correctly.
-                i--;
-                if (i < startIdx - 1)
-                    i = startIdx - 1;
-            }
-            else
-            {
-                i = nowIdx; // Re-sync in case list shifted
-            }
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsTraversalPreviousNode013Core(global::System.Boolean detached, global::Broiler.JavaScript.BuiltIns.Function.JSFunction? filterFn, global::Broiler.Dom.DomElement root, global::Broiler.HtmlBridge.DomBridge.IteratorState? state, global::System.Int32 whatToShow, in Arguments a)
-    {
-        if (detached)
-            return JSNull.Value;
-        var allNodes = GetDocumentOrderNodes(root);
-        var refIdx = state.ReferenceNode != null ? allNodes.IndexOf(state.ReferenceNode) : -1;
-        // If reference is detached, use last known position
-        if (refIdx < 0 && state.ReferenceNode != null)
-            refIdx = state.LastKnownIndex >= 0 ? Math.Min(state.LastKnownIndex, allNodes.Count) : 0;
-        var startIdx = state.PointerBeforeReferenceNode ? refIdx - 1 : refIdx;
-        for (var i = startIdx; i >= 0; i--)
-        {
-            if (i >= allNodes.Count)
-            {
-                i = allNodes.Count;
-                continue;
-            }
-
-            var candidateNode = allNodes[i];
-            state.LastKnownIndex = i;
-            var result = ApplyFilter(candidateNode, whatToShow, filterFn);
-            // Rebuild allNodes after filter (filter may have mutated the tree)
-            allNodes = GetDocumentOrderNodes(root);
-            if (result == 1)
-            {
-                state.ReferenceNode = candidateNode;
-                state.PointerBeforeReferenceNode = true;
-                var newIdx = allNodes.IndexOf(candidateNode);
-                state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
-                return ToJSObject(candidateNode);
-            }
-
-            // After filter, re-sync position in case list shifted
-            var nowIdx = allNodes.IndexOf(candidateNode);
-            if (nowIdx >= 0)
-                i = nowIdx; // Re-sync
-                            // If node was removed (nowIdx < 0), i naturally decrements
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsTraversalDetach014Core(ref global::System.Boolean detached, in Arguments a)
-    {
-        detached = true;
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsTraversalGetCommonAncestorContainer020Core(global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalGetCommonAncestorContainer020Core(DomRange state, in Arguments a)
     {
         // FindCommonAncestor (bridge helper) returns null for boundaries in different trees,
         // preserving the lenient JSNull result; the canonical CommonAncestorContainer would throw.
@@ -262,39 +21,38 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalGetBoundingClientRect021Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments _)
+    private JSValue JsTraversalGetBoundingClientRect021Core(DomBridge? bridge, DomRange state, in Arguments _)
     {
         var rects = bridge.GetClientRectsForRange(state);
         return bridge.CreateDomRectObject(UnionClientRects(rects));
     }
 
 
-    private JSValue JsTraversalGetClientRects022Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments _)
+    private JSValue JsTraversalGetClientRects022Core(DomBridge? bridge, DomRange state, in Arguments _)
     {
         var rects = bridge.GetClientRectsForRange(state);
         if (rects.Count == 0)
             return new JSArray();
-        return new JSArray(rects.Select(rect => (JSValue)bridge.CreateDomRectObject(rect)).ToArray());
+        return new JSArray([.. rects.Select(rect => (JSValue)bridge.CreateDomRectObject(rect))]);
     }
 
 
     // Coerces a JS-supplied range offset to the node's valid [0, length] range, matching the
     // pre-rewire bridge's lenient behaviour (it clamped in the content ops) so canonical
     // Substring/child indexing never throws on an out-of-range offset.
-    private static int ClampRangeOffset(global::Broiler.Dom.DomNode node, int offset)
+    private static int ClampRangeOffset(DomNode node, int offset)
     {
-        var length = node is global::Broiler.Dom.DomCharacterData characterData
+        var length = node is DomCharacterData characterData
             ? characterData.Data.Length
             : node.ChildNodes.Count;
         return Math.Clamp(offset, 0, length);
     }
 
-    private JSValue JsTraversalSetStart023Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetStart023Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length < 2)
             throw new JSException("Failed to execute 'setStart': 2 arguments required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             throw new JSException("Failed to execute 'setStart': parameter 1 is not of type 'Node'.");
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
@@ -304,12 +62,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSetEnd024Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetEnd024Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length < 2)
             throw new JSException("Failed to execute 'setEnd': 2 arguments required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             throw new JSException("Failed to execute 'setEnd': parameter 1 is not of type 'Node'.");
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
@@ -319,12 +76,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSetStartBefore025Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetStartBefore025Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'setStartBefore': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
@@ -338,12 +94,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSetStartAfter026Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetStartAfter026Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'setStartAfter': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
@@ -357,12 +112,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSetEndBefore027Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetEndBefore027Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'setEndBefore': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
@@ -377,12 +131,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSetEndAfter028Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSetEndAfter028Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'setEndAfter': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el is null || ParentEl(el) == null)
@@ -396,19 +149,18 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalCollapse029Core(global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalCollapse029Core(DomRange state, in Arguments a)
     {
         state.Collapse(a.Length > 0 && a[0].BooleanValue);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsTraversalSelectNode030Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSelectNode030Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'selectNode': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         // Preserve the pre-rewire lenient behaviour: a parentless node is a no-op here rather
@@ -420,12 +172,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSelectNodeContents031Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSelectNodeContents031Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'selectNodeContents': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
@@ -435,27 +186,26 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalCloneContents032Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a) =>
+    private JSValue JsTraversalCloneContents032Core(DomBridge? bridge, DomRange state, in Arguments a) =>
         bridge.ToJSObject(state.CloneContents());
 
 
-    private JSValue JsTraversalExtractContents033Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a) =>
+    private JSValue JsTraversalExtractContents033Core(DomBridge? bridge, DomRange state, in Arguments a) =>
         bridge.ToJSObject(state.ExtractContents());
 
 
-    private JSValue JsTraversalDeleteContents034Core(global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalDeleteContents034Core(DomRange state, in Arguments a)
     {
         state.DeleteContents();
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsTraversalInsertNode035Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalInsertNode035Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'insertNode': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = bridge.FindDomNodeByJSObject(nodeObj);
         if (el == null)
@@ -464,7 +214,7 @@ public sealed partial class DomBridge
         {
             state.InsertNode(el);
         }
-        catch (Broiler.Dom.DomException ex)
+        catch (DomException ex)
         {
             ThrowDOMException(bridge._jsContext!, ex.Message, ex.Name);
         }
@@ -473,12 +223,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalSurroundContents036Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalSurroundContents036Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'surroundContents': 1 argument required.");
-        var nodeObj = a[0] as JSObject;
-        if (nodeObj == null)
+        if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var newParent = bridge.FindDomElementByJSObject(nodeObj);
         if (newParent == null)
@@ -488,7 +237,7 @@ public sealed partial class DomBridge
         // #document / #subdoc-root sentinels are plain elements to the canonical DOM, so its
         // single-document-element hierarchy rule does not fire. Preserve the Acid3-era check that
         // surrounding at the document level cannot introduce a second element child.
-        if (state.StartContainer is Broiler.Dom.DomElement startContainerElement &&
+        if (state.StartContainer is DomElement startContainerElement &&
             (string.Equals(startContainerElement.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(startContainerElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)))
         {
             var nodes = GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
@@ -507,7 +256,7 @@ public sealed partial class DomBridge
         {
             state.SurroundContents(newParent);
         }
-        catch (Broiler.Dom.DomException ex)
+        catch (DomException ex)
         {
             ThrowDOMException(bridge._jsContext!, ex.Message, ex.Name);
         }
@@ -516,7 +265,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalCloneRange037Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalCloneRange037Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         var clone = bridge.BuildRange();
         // Set clone boundaries via internal approach
@@ -528,7 +277,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalCompareBoundaryPoints038Core(global::Broiler.HtmlBridge.DomBridge? bridge, global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalCompareBoundaryPoints038Core(DomBridge? bridge, DomRange state, in Arguments a)
     {
         if (a.Length < 2)
             throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
@@ -556,7 +305,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsTraversalToString039Core(global::Broiler.Dom.DomRange state, in Arguments a)
+    private JSValue JsTraversalToString039Core(DomRange state, in Arguments a)
     {
         var sb = new StringBuilder();
         // Handle case where range is within a single text/comment node

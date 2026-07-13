@@ -11,7 +11,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -322,7 +322,7 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }
             formDataObject.FastAddValue((KeyString)"set", new JSFunction(JsRegistrationSet090, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-            formDataObject.FastAddValue((KeyString)"toString", new JSFunction((in Arguments _) => new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
+            formDataObject.FastAddValue((KeyString)"toString", new JSFunction((in _) => new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
                 "toString", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return formDataObject;
@@ -333,8 +333,8 @@ public sealed partial class DomBridge
             var blobObject = new JSObject();
             blobObject[(KeyString)"size"] = new JSNumber(Encoding.UTF8.GetByteCount(bodyText));
             blobObject[(KeyString)"type"] = new JSString(contentType);
-            blobObject.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) => CreateThenable(() => new JSString(bodyText)), "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            blobObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) => CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(bodyText))), "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            blobObject.FastAddValue((KeyString)"text", new JSFunction((in _) => CreateThenable(() => new JSString(bodyText)), "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            blobObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in _) => CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(bodyText))), "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             return blobObject;
         }
         static bool IsBodyUnavailable(JSObject owner)
@@ -655,15 +655,15 @@ public sealed partial class DomBridge
 
             throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
         }
-        var formDataCtor = new JSFunction((in Arguments a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
-        var headersCtor = new JSFunction((in Arguments a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
-        var requestCtor = new JSFunction((in Arguments a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
-        var responseCtor = new JSFunction((in Arguments a) => JsRegistrationResponse113Core(ParseResponseInit, CreateResponse, in a), "Response", 2);
-        responseCtor.FastAddValue((KeyString)"json", new JSFunction((in Arguments a) => JsRegistrationJson114Core(ParseResponseInit, CreateResponse, in a), "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        responseCtor.FastAddValue((KeyString)"error", new JSFunction((in Arguments _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+        var formDataCtor = new JSFunction((in a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
+        var headersCtor = new JSFunction((in a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
+        var requestCtor = new JSFunction((in a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
+        var responseCtor = new JSFunction((in a) => JsRegistrationResponse113Core(ParseResponseInit, CreateResponse, in a), "Response", 2);
+        responseCtor.FastAddValue((KeyString)"json", new JSFunction((in a) => JsRegistrationJson114Core(ParseResponseInit, CreateResponse, in a), "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue((KeyString)"error", new JSFunction((in _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
             "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in Arguments a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        var messageChannelCtor = new JSFunction((in Arguments _) => CreateMessageChannel(), "MessageChannel", 0);
+        responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        var messageChannelCtor = new JSFunction((in _) => CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -675,13 +675,13 @@ public sealed partial class DomBridge
         context["Response"] = responseCtor;
         context["MessageChannel"] = messageChannelCtor;
         // fetch(url, options) — polyfill backed by HttpClient with headers, method support
-        var fetchFn = new JSFunction((in Arguments a) => JsRegistrationFetch120Core(TryGetJsPropertyString, EnumerateObjectStringEntries, CreateAbortErrorValue, CreateResponse, in a), "fetch", 1);
+        var fetchFn = new JSFunction((in a) => JsRegistrationFetch120Core(TryGetJsPropertyString, EnumerateObjectStringEntries, CreateAbortErrorValue, CreateResponse, in a), "fetch", 1);
         window.FastAddValue((KeyString)"fetch", fetchFn, JSPropertyAttributes.EnumerableConfigurableValue);
         // window.getComputedStyle(element, pseudoElement)
         var bridgeForStyle = this;
         window.FastAddValue(
             (KeyString)"getComputedStyle",
-            new JSFunction((in Arguments a) => JsRegistrationGetComputedStyle121Core(bridgeForStyle, in a), "getComputedStyle", 2),
+            new JSFunction((in a) => JsRegistrationGetComputedStyle121Core(bridgeForStyle, in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // XMLHttpRequest — basic polyfill backed by HttpClient
         RegisterXMLHttpRequest(context);

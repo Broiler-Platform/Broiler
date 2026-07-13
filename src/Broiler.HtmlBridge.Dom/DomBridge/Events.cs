@@ -7,8 +7,10 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.DomBridge;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// DOM event dispatch — capture → target → bubble propagation and
@@ -70,9 +72,9 @@ public sealed partial class DomBridge
         }
     }
 
-    private JSValue BuildComposedPathValue(Broiler.Dom.DomNode target, IReadOnlyList<Broiler.Dom.DomElement> path)
+    private JSValue BuildComposedPathValue(DomNode target, IReadOnlyList<DomElement> path)
     {
-        JSValue ToEventPathObject(Broiler.Dom.DomNode node)
+        JSValue ToEventPathObject(DomNode node)
             => node == _documentNode ? (_documentJSObject ?? JSNull.Value) : ToJSObject(node);
 
         var values = new List<JSValue> { ToEventPathObject(target) };
@@ -83,10 +85,10 @@ public sealed partial class DomBridge
         if (_windowJSObject != null)
             values.Add(_windowJSObject);
 
-        return new JSArray(values.ToArray());
+        return new JSArray([.. values]);
     }
 
-    private static bool CheckElementValidity(Broiler.Dom.DomElement element)
+    private static bool CheckElementValidity(DomElement element)
     {
         if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
         {
@@ -107,7 +109,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool ValidateFormChildren(Broiler.Dom.DomElement form)
+    private static bool ValidateFormChildren(DomElement form)
     {
         foreach (var child in ChildElements(form))
         {
@@ -121,14 +123,14 @@ public sealed partial class DomBridge
     /// Dispatches a DOM event on the given element with full capture → target → bubble
     /// propagation (DOM Events Level 3).
     /// </summary>
-    private JSValue DispatchEventOnElement(Broiler.Dom.DomNode target, JSObject evt)
+    private JSValue DispatchEventOnElement(DomNode target, JSObject evt)
     {
         var typeVal = evt[(KeyString)"type"];
         var eventType = typeVal != null && typeVal is JSString ? typeVal.ToString() : "unknown";
 
         // Build the path from the root to the target
-        var path = new List<Broiler.Dom.DomElement>();
-        var visited = new HashSet<Broiler.Dom.DomElement>();
+        var path = new List<DomElement>();
+        var visited = new HashSet<DomElement>();
         var node = ParentEl(target);
         while (node != null && visited.Add(node)) { path.Add(node); node = ParentEl(node); }
         path.Reverse();
@@ -151,27 +153,32 @@ public sealed partial class DomBridge
             : ToJSObject(target);
         evt[(KeyString)"srcElement"] = evt[(KeyString)"target"];
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
+        
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) => JsEventsStopPropagation001Core(ref legacyCancelBubble, ref stopped, in _), "stopPropagation", 0),
+            new JSFunction((in _) => JsEventsStopPropagation001Core(ref legacyCancelBubble, ref stopped, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) => JsEventsStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, ref stopped, in _), "stopImmediatePropagation", 0),
+            new JSFunction((in _) => JsEventsStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, ref stopped, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in Arguments _) => JsEventsPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new JSFunction((in _) => JsEventsPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        
         evt.FastAddProperty(
             (KeyString)"cancelBubble",
-            new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in Arguments setArgs) => JsEventsSetCancelBubble005Core(ref legacyCancelBubble, ref stopped, in setArgs), "set cancelBubble"),
+            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new JSFunction((in setArgs) => JsEventsSetCancelBubble005Core(ref legacyCancelBubble, ref stopped, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
-        evt.FastAddProperty(
-            (KeyString)"returnValue",
-            new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in Arguments setArgs) => JsEventsSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+        
+        evt.FastAddProperty((KeyString)"returnValue",
+            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new JSFunction((in setArgs) => JsEventsSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+        
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in Arguments _) => BuildComposedPathValue(target, path), "composedPath", 0),
+            new JSFunction((in _) => BuildComposedPathValue(target, path), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Phase 1: Capture (root → parent of target)
@@ -214,6 +221,7 @@ public sealed partial class DomBridge
 
         evt[(KeyString)"currentTarget"] = JSNull.Value;
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
+
         return prevented ? JSBoolean.False : JSBoolean.True;
     }
 
@@ -223,7 +231,7 @@ public sealed partial class DomBridge
     /// When <c>false</c>, only bubble listeners fire.
     /// When <c>null</c> (unused), all listeners fire in registration order plus the inline handler.
     /// </summary>
-    private static void FireListeners(Broiler.Dom.DomNode el, string eventType, JSObject evt,
+    private static void FireListeners(DomNode el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
     {
         if (GetEventListeners(el).TryGetValue(eventType, out var listeners))
@@ -262,7 +270,7 @@ public sealed partial class DomBridge
     /// element into <see cref="JSFunction"/> instances stored in <see cref="bridge-owned inline event handler state"/>.
     /// Only compiles attributes that have not already been compiled.
     /// </summary>
-    private void CompileInlineEventAttributes(Broiler.Dom.DomElement element)
+    private void CompileInlineEventAttributes(DomElement element)
     {
         foreach (var eventName in InlineEventNames)
         {
@@ -280,7 +288,7 @@ public sealed partial class DomBridge
     /// Compiles a single <c>on*</c> attribute value into a <see cref="JSFunction"/>
     /// and stores it in <see cref="bridge-owned inline event handler state"/>.
     /// </summary>
-    internal void CompileInlineEventAttribute(Broiler.Dom.DomElement element, string attrName, string code)
+    internal void CompileInlineEventAttribute(DomElement element, string attrName, string code)
     {
         if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
         var eventName = attrName[2..].ToLowerInvariant();

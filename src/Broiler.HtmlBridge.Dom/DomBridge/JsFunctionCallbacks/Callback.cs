@@ -2,19 +2,19 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsCallbackStopPropagation001Core(ref global::System.Boolean legacyCancelBubble, in Arguments _)
+    private JSValue JsCallbackStopPropagation001Core(ref bool legacyCancelBubble, in Arguments _)
     {
         legacyCancelBubble = true;
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsCallbackStopImmediatePropagation002Core(ref global::System.Boolean immediateStopped, ref global::System.Boolean legacyCancelBubble, in Arguments _)
+    private JSValue JsCallbackStopImmediatePropagation002Core(ref bool immediateStopped, ref bool legacyCancelBubble, in Arguments _)
     {
         immediateStopped = true;
         legacyCancelBubble = true;
@@ -22,7 +22,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsCallbackPreventDefault003Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments _)
+    private JSValue JsCallbackPreventDefault003Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments _)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
@@ -35,7 +35,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsCallbackSetCancelBubble005Core(ref global::System.Boolean legacyCancelBubble, in Arguments setArgs)
+    private JSValue JsCallbackSetCancelBubble005Core(ref bool legacyCancelBubble, in Arguments setArgs)
     {
         if (setArgs.Length > 0 && setArgs[0].BooleanValue)
         {
@@ -46,7 +46,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsCallbackSetReturnValue007Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments setArgs)
+    private JSValue JsCallbackSetReturnValue007Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments setArgs)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive && cancelable != null && cancelable.BooleanValue)

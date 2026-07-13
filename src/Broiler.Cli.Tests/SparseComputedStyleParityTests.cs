@@ -1,6 +1,7 @@
 using System.Text;
 using Broiler.CSS.Dom;
 using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Dom;
 using Broiler.JavaScript.Engine;
 using Xunit;
 

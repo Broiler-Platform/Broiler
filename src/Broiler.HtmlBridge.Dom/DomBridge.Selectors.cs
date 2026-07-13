@@ -1,24 +1,27 @@
-namespace Broiler.HtmlBridge;
+using Broiler.Dom;
+using Broiler.CSS.Dom;
+
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// Compatibility entry points over the shared canonical-DOM selector matcher.
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static readonly CSS.Dom.CssSelectorMatcher SharedSelectorMatcher =
+    private static readonly CssSelectorMatcher SharedSelectorMatcher =
         new(new BridgeSelectorStateProvider());
 
     private static bool MatchesSelector(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         string selector,
-        Broiler.Dom.DomElement? scope = null) =>
+        DomElement? scope = null) =>
         SharedSelectorMatcher.Matches(element, selector, scope);
 
-    private sealed class BridgeSelectorStateProvider : CSS.Dom.ICssSelectorStateProvider
+    private sealed class BridgeSelectorStateProvider : ICssSelectorStateProvider
     {
-        public bool? IsChecked(Broiler.Dom.DomElement element)
+        public bool? IsChecked(DomElement element)
         {
-            if (element is not Broiler.Dom.DomElement bridgeElement)
+            if (element is not DomElement bridgeElement)
                 return null;
 
             return GetElementRuntimeState(bridgeElement).FormControl.Checked.TryGet(out var value)

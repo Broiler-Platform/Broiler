@@ -1,12 +1,10 @@
 using Broiler.JavaScript.Runtime;
+using Broiler.CSS;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.DomBridge;
 
-internal readonly record struct EventListenerRegistration(
-    JSValue Listener,
-    bool Capture,
-    bool Once = false,
-    bool Passive = false);
+internal readonly record struct EventListenerRegistration(JSValue Listener, bool Capture, bool Once = false, bool Passive = false);
 
 /// <summary>
 /// JavaScript and browser-runtime state associated with a legacy DOM node.
@@ -14,11 +12,9 @@ internal readonly record struct EventListenerRegistration(
 /// </summary>
 internal sealed class ElementRuntimeState
 {
-    public Dictionary<string, List<EventListenerRegistration>> EventListeners { get; } =
-        new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<EventListenerRegistration>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public Dictionary<string, JSValue> InlineEventHandlers { get; } =
-        new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Inline-style property names last written through the JS <c>element.style</c> /
@@ -34,7 +30,7 @@ internal sealed class ElementRuntimeState
     /// (RF-BRIDGE-1c Phase A). Not carried across <c>cloneNode</c> (matching the prior
     /// facade behaviour: a clone re-derives its owner on adoption).
     /// </summary>
-    public Broiler.Dom.DomElement? OwnerDocRoot { get; set; }
+    public DomElement? OwnerDocRoot { get; set; }
 
     /// <summary>
     /// The element's raw inner-HTML/inner-text string — the source text for raw-text
@@ -136,8 +132,8 @@ internal sealed class DialogRuntimeState
 
 internal sealed class ShadowRuntimeState
 {
-    public RuntimeValue<Broiler.Dom.DomElement> Root { get; } = new();
-    public RuntimeValue<Broiler.Dom.DomElement> Host { get; } = new();
+    public RuntimeValue<DomElement> Root { get; } = new();
+    public RuntimeValue<DomElement> Host { get; } = new();
     public RuntimeValue<string> Mode { get; } = new();
 }
 
@@ -152,7 +148,7 @@ internal sealed class StyleSheetRuntimeState
     /// <c>getComputedStyle</c> engine sheet (Phase 6 store unification). <c>null</c>
     /// until first materialized from <see cref="RulesSourceText"/>.
     /// </summary>
-    public List<Broiler.CSS.CssRule>? Rules { get; set; }
+    public List<CssRule>? Rules { get; set; }
 
     /// <summary>
     /// The source text <see cref="Rules"/> was last parsed from. When the element's

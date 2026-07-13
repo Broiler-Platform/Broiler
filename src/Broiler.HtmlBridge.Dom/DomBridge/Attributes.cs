@@ -5,8 +5,9 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -21,7 +22,7 @@ public sealed partial class DomBridge
 
     /// <summary>Legacy <c>Attributes.TryGetValue</c>: case-insensitive lookup by
     /// qualified name; <paramref name="value"/> is <c>""</c> when absent.</summary>
-    private static bool TryGetAttribute(Broiler.Dom.DomElement element, string qualifiedName, out string value)
+    private static bool TryGetAttribute(DomElement element, string qualifiedName, out string value)
     {
         foreach (var attribute in element.Attributes.Values)
         {
@@ -37,18 +38,18 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.GetValueOrDefault</c> / null-returning indexer get.</summary>
-    private static string? GetAttr(Broiler.Dom.DomElement element, string qualifiedName) =>
+    private static string? GetAttr(DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out var value) ? value : null;
 
     /// <summary>Legacy <c>Attributes.ContainsKey</c>.</summary>
-    private static bool HasAttr(Broiler.Dom.DomElement element, string qualifiedName) =>
+    private static bool HasAttr(DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out _);
 
     /// <summary>Legacy string-keyed <c>Attributes[name] = value</c> setter: updates an
     /// existing attribute in place (preserving its namespace) or creates a no-namespace one.</summary>
-    private static void SetAttr(Broiler.Dom.DomElement element, string qualifiedName, string value)
+    private static void SetAttr(DomElement element, string qualifiedName, string value)
     {
-        Broiler.Dom.DomAttribute? existing = null;
+        DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)
         {
             if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
@@ -65,9 +66,9 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Remove</c>: removes the attribute matched by qualified name.</summary>
-    private static bool RemoveAttr(Broiler.Dom.DomElement element, string qualifiedName)
+    private static bool RemoveAttr(DomElement element, string qualifiedName)
     {
-        Broiler.Dom.DomAttribute? existing = null;
+        DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)
         {
             if (string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
@@ -89,7 +90,7 @@ public sealed partial class DomBridge
     /// namespace is normalized (empty string ≡ null) to match canonical attribute keying,
     /// the same normalization <c>SetAttributeNS</c>/<c>GetAttributeNS</c> apply.
     /// </summary>
-    private static bool TryGetNsAttribute(Broiler.Dom.DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
+    private static bool TryGetNsAttribute(DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
     {
         var ns = string.IsNullOrEmpty(namespaceUri) ? null : namespaceUri;
         if (element.Attributes.TryGetValue((ns, localName), out var attribute))
@@ -105,13 +106,13 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Keys</c>: the qualified names of the element's attributes.</summary>
-    private static IEnumerable<string> AttributeNames(Broiler.Dom.DomElement element) =>
+    private static IEnumerable<string> AttributeNames(DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
 
     /// <summary>Legacy enumeration/snapshot of the string-keyed attribute map (qualified
     /// name → value, case-insensitive, last-wins on collision — matching the old
     /// <c>LegacyAttributeDictionary.Snapshot</c>).</summary>
-    private static Dictionary<string, string> AttributeSnapshot(Broiler.Dom.DomElement element)
+    private static Dictionary<string, string> AttributeSnapshot(DomElement element)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in element.Attributes.Values)
@@ -121,7 +122,7 @@ public sealed partial class DomBridge
 
     /// <summary>Restores the element's attribute set to <paramref name="saved"/> — the
     /// attribute-map equivalent of <c>RestoreStringMap</c> (remove extras, then set saved).</summary>
-    private static void RestoreAttributes(Broiler.Dom.DomElement element, Dictionary<string, string> saved)
+    private static void RestoreAttributes(DomElement element, Dictionary<string, string> saved)
     {
         foreach (var name in AttributeNames(element).ToList())
         {
@@ -133,7 +134,7 @@ public sealed partial class DomBridge
             SetAttr(element, kv.Key, kv.Value);
     }
 
-    private void CollectByTagName(Broiler.Dom.DomElement root, string tag, List<JSValue> results)
+    private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -147,7 +148,7 @@ public sealed partial class DomBridge
     /// Collects all <c>&lt;a&gt;</c> and <c>&lt;area&gt;</c> elements with an
     /// <c>href</c> attribute in document tree order.
     /// </summary>
-    private void CollectLinksInTreeOrder(Broiler.Dom.DomElement root, List<JSValue> results)
+    private void CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -163,7 +164,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
-    private void CollectMatching(Broiler.Dom.DomElement root, Func<Broiler.Dom.DomElement, bool> predicate, List<JSValue> results)
+    private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -174,7 +175,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all Broiler.Dom.DomElement nodes in a sub-tree for tracking.</summary>
-    private static void CollectSubDocElements(Broiler.Dom.DomElement root, List<Broiler.Dom.DomElement> list)
+    private static void CollectSubDocElements(DomElement root, List<DomElement> list)
     {
         list.Add(root);
         foreach (var child in ChildElements(root))
@@ -191,66 +192,34 @@ public sealed partial class DomBridge
     /// Builds a NamedNodeMap-like JSObject for element.attributes, with
     /// getNamedItem, setNamedItem, removeNamedItem, item, and length.
     /// </summary>
-    private JSObject BuildNamedNodeMapObject(Broiler.Dom.DomElement element, JSObject ownerObj)
+    private JSObject BuildNamedNodeMapObject(DomElement element, JSObject ownerObj)
     {
         var map = new JSObject();
 
         // length — number of attributes
-        map.FastAddProperty(
-            (KeyString)"length",
-            new JSFunction((in Arguments _) => new JSNumber(element.Attributes.Count), "get length"),
-            null,
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        map.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(element.Attributes.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getNamedItem(name) — returns Attr node or null
-        map.FastAddValue(
-            (KeyString)"getNamedItem",
-            new JSFunction((in Arguments a) => JsAttributesGetNamedItem002Core(element, ownerObj, in a), "getNamedItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        map.FastAddValue(
-            (KeyString)"getNamedItemNS",
-            new JSFunction((in Arguments a) => JsAttributesGetNamedItemNS003Core(element, ownerObj, in a), "getNamedItemNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"getNamedItem", new JSFunction((in a) => JsAttributesGetNamedItem002Core(element, ownerObj, in a), "getNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"getNamedItemNS", new JSFunction((in a) => JsAttributesGetNamedItemNS003Core(element, ownerObj, in a), "getNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setNamedItem(attr) — adds/replaces attribute from Attr node, returns old Attr or null
-        map.FastAddValue(
-            (KeyString)"setNamedItem",
-            new JSFunction((in Arguments a) => JsAttributesSetNamedItem004Core(element, ownerObj, in a), "setNamedItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        map.FastAddValue(
-            (KeyString)"setNamedItemNS",
-            new JSFunction((in Arguments a) => JsAttributesSetNamedItemNS005Core(element, ownerObj, in a), "setNamedItemNS", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"setNamedItem", new JSFunction((in a) => JsAttributesSetNamedItem004Core(element, ownerObj, in a), "setNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"setNamedItemNS", new JSFunction((in a) => JsAttributesSetNamedItemNS005Core(element, ownerObj, in a), "setNamedItemNS", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeNamedItem(name) — removes and returns the Attr node
-        map.FastAddValue(
-            (KeyString)"removeNamedItem",
-            new JSFunction((in Arguments a) => JsAttributesRemoveNamedItem006Core(element, ownerObj, in a), "removeNamedItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        map.FastAddValue(
-            (KeyString)"removeNamedItemNS",
-            new JSFunction((in Arguments a) => JsAttributesRemoveNamedItemNS007Core(element, ownerObj, in a), "removeNamedItemNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"removeNamedItem", new JSFunction((in a) => JsAttributesRemoveNamedItem006Core(element, ownerObj, in a), "removeNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"removeNamedItemNS", new JSFunction((in a) => JsAttributesRemoveNamedItemNS007Core(element, ownerObj, in a), "removeNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // item(index) — returns Attr node at position
-        map.FastAddValue(
-            (KeyString)"item",
-            new JSFunction((in Arguments a) => JsAttributesItem008Core(element, ownerObj, in a), "item", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"item", new JSFunction((in a) => JsAttributesItem008Core(element, ownerObj, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Numeric index access — expose each attribute by index
         var attrKeys = AttributeNames(element).ToList();
         for (var i = 0; i < attrKeys.Count; i++)
         {
             var idx = i;
-            map.FastAddProperty(
-                (KeyString)idx.ToString(),
-                new JSFunction((in Arguments _) => JsAttributesCallback009Core(element, idx, ownerObj, in _), "get " + idx),
-                null,
-                JSPropertyAttributes.EnumerableConfigurableProperty);
+            map.FastAddProperty((KeyString)idx.ToString(), new JSFunction((in _) => JsAttributesCallback009Core(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         return map;
@@ -259,7 +228,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds an Attr-like JSObject with name, value, specified, ownerElement, nodeType, nodeName.
     /// </summary>
-    private static JSObject BuildAttrNode(string name, string value, Broiler.Dom.DomElement element, JSObject ownerObj)
+    private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
     {
         var namespaceUri = TryGetAttachedAttrNamespace(element, name, out var ns, out var localName)
             ? ns
@@ -267,10 +236,7 @@ public sealed partial class DomBridge
         return BuildAttrNodeCore(name, value, ownerObj, namespaceUri, localName);
     }
 
-    private static JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri)
-    {
-        return BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
-    }
+    private static JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri) => BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
 
     private static JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri, string? explicitLocalName = null)
     {
@@ -278,6 +244,7 @@ public sealed partial class DomBridge
         var colonIdx = name.IndexOf(':');
         var localName = explicitLocalName ?? (colonIdx >= 0 ? name[(colonIdx + 1)..] : name);
         var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
+
         attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"value", new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -287,10 +254,11 @@ public sealed partial class DomBridge
         attr.FastAddValue((KeyString)"localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
         attr.FastAddValue((KeyString)"namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+
         return attr;
     }
 
-    private static bool TryGetAttachedAttrNamespace(Broiler.Dom.DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
+    private static bool TryGetAttachedAttrNamespace(DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
     {
         // Match a genuinely namespaced attribute (non-null namespace) by qualified name —
         // the set NsAttrMap used to track. No-namespace attributes are skipped so the
@@ -298,8 +266,7 @@ public sealed partial class DomBridge
         // prefixed qualified name can only carry a namespace, so this never drops one.
         foreach (var attribute in element.Attributes.Values)
         {
-            if (attribute.NamespaceUri is null ||
-                !string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
+            if (attribute.NamespaceUri is null || !string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -349,7 +316,7 @@ public sealed partial class DomBridge
             : null;
     }
 
-    private void SetAttributeLikeSetAttribute(Broiler.Dom.DomElement element, string attrName, string attrVal)
+    private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
     {
         TryGetAttribute(element, attrName, out var previousAttrVal);
         SetAttr(element, attrName, attrVal);
@@ -376,7 +343,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void RemoveAttributeLikeRemoveAttribute(Broiler.Dom.DomElement element, string attrName)
+    private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
     {
         TryGetAttribute(element, attrName, out var previousAttrVal);
         var removed = RemoveAttr(element, attrName);
@@ -390,7 +357,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void SetAttributeLikeSetAttributeNS(Broiler.Dom.DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
+    private void SetAttributeLikeSetAttributeNS(DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
     {
         string? previousAttrVal = null;
         if (TryGetNsAttribute(element, namespaceUri, localName, out var previousQualifiedName, out var existingAttrVal))
@@ -431,7 +398,7 @@ public sealed partial class DomBridge
             NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
 
-    private void RemoveAttributeLikeRemoveAttributeNS(Broiler.Dom.DomElement element, string? namespaceUri, string localName)
+    private void RemoveAttributeLikeRemoveAttributeNS(DomElement element, string? namespaceUri, string localName)
     {
         if (!TryGetNsAttribute(element, namespaceUri, localName, out var attrName, out var previousAttrVal))
             return;

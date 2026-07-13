@@ -1,6 +1,7 @@
 using System.Globalization;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -30,22 +31,22 @@ public sealed partial class DomBridge
             }
         }
     }
+
     /// <summary>
     /// Computes an element's box position relative to its positioned
     /// containing block, resolving <c>right</c> to <c>left</c> when needed.
     /// </summary>
-    private AnchorInfo? ComputeElementBoxWithContainer(Broiler.Dom.DomElement element)
-    {
+    private AnchorInfo? ComputeElementBoxWithContainer(DomElement element) =>
         // Delegate to the main ComputeElementBox which already handles
         // both positioned and normal-flow elements with ancestor offset
         // accumulation and block-width computation.
-        return ComputeElementBox(element);
-    }
+        ComputeElementBox(element);
+
     /// <summary>
     /// Finds the width of the nearest positioned ancestor (containing block)
     /// for an absolutely positioned element.
     /// </summary>
-    private double FindContainingBlockWidth(Broiler.Dom.DomElement element)
+    private double FindContainingBlockWidth(DomElement element)
     {
         var parent = ParentEl(element);
         while (parent != null)
@@ -55,35 +56,35 @@ public sealed partial class DomBridge
             if (EstablishesContainingBlock(parentProps))
             {
                 double? explicitW = TryParsePx(parentProps.GetValueOrDefault("width"));
-                if (explicitW == null)
-                {
-                    // Inline elements (e.g. <span>) with position:relative
-                    // may not have explicit width. Estimate from content.
-                    explicitW = EstimateInlineContentWidth(parent);
-                }
-                if (explicitW == null)
-                {
-                    // A no-width block-level containing block (e.g. a transformed
-                    // wrapper with no explicit width) fills ITS own containing
-                    // block; resolve its used width from the nearest sized
-                    // ancestor up the normal-flow parent chain rather than
-                    // defaulting to the viewport (css-anchor-position transform-005:
-                    // a nested no-width anchor under a sized 100px ancestor made
-                    // anchor-size(width) resolve to the viewport width).
-                    explicitW = ResolveBlockUsedWidthFromAncestors(parent);
-                }
+                // Inline elements (e.g. <span>) with position:relative
+                // may not have explicit width. Estimate from content.
+                explicitW ??= EstimateInlineContentWidth(parent);
+
+                // A no-width block-level containing block (e.g. a transformed
+                // wrapper with no explicit width) fills ITS own containing
+                // block; resolve its used width from the nearest sized
+                // ancestor up the normal-flow parent chain rather than
+                // defaulting to the viewport (css-anchor-position transform-005:
+                // a nested no-width anchor under a sized 100px ancestor made
+                // anchor-size(width) resolve to the viewport width).
+                explicitW ??= ResolveBlockUsedWidthFromAncestors(parent);
+
                 double w = explicitW ?? _viewportWidth;
                 // Subtract padding from the CB width to get content width.
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-left")) ?? 0;
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-right")) ?? 0;
+
                 return w;
             }
+
             parent = ParentEl(parent);
         }
+
         // No positioned ancestor found; use viewport width minus default body
         // margin (8px each side) as the effective content width for block layout.
         return _viewportWidth - 16;
     }
+
     /// <summary>
     /// Resolves the used content width of a block-level element that has no
     /// explicit <c>width</c> by walking up the normal-flow parent chain to the
@@ -94,7 +95,7 @@ public sealed partial class DomBridge
     /// than defaulting to the viewport. Returns <c>null</c> when no sized
     /// ancestor is found (caller falls back to the viewport width).
     /// </summary>
-    private double? ResolveBlockUsedWidthFromAncestors(Broiler.Dom.DomElement blockEl)
+    private double? ResolveBlockUsedWidthFromAncestors(DomElement blockEl)
     {
         for (var a = ParentEl(blockEl); a != null && !IsText(a); a = ParentEl(a))
         {
@@ -116,7 +117,7 @@ public sealed partial class DomBridge
     /// Finds the height of the nearest positioned ancestor (containing block)
     /// for an absolutely positioned element.
     /// </summary>
-    private double FindContainingBlockHeight(Broiler.Dom.DomElement element)
+    private double FindContainingBlockHeight(DomElement element)
     {
         var parent = ParentEl(element);
         while (parent != null)
@@ -168,7 +169,7 @@ public sealed partial class DomBridge
         }
         return 8;
     }
-    private Broiler.Dom.DomElement? FindBodyElement()
+    private DomElement? FindBodyElement()
     {
         foreach (var el in Elements)
         {
@@ -183,7 +184,7 @@ public sealed partial class DomBridge
     /// <c>&lt;span&gt;</c>) by examining its text content and child element widths.
     /// Returns <c>null</c> if the element is not an inline element.
     /// </summary>
-    private double? EstimateInlineContentWidth(Broiler.Dom.DomElement element)
+    private double? EstimateInlineContentWidth(DomElement element)
     {
         string? display = GetComputedProps(element).GetValueOrDefault("display");
         bool isInline = IsInlineElement(element.TagName, display);
@@ -232,7 +233,7 @@ public sealed partial class DomBridge
     /// line-height or font-size.
     /// Returns <c>null</c> if the element is not an inline element.
     /// </summary>
-    private double? EstimateInlineContentHeight(Broiler.Dom.DomElement element)
+    private double? EstimateInlineContentHeight(DomElement element)
     {
         string? display = GetComputedProps(element).GetValueOrDefault("display");
         bool isInline = IsInlineElement(element.TagName, display);
@@ -297,7 +298,7 @@ public sealed partial class DomBridge
     /// <c>position: relative</c>).  Broiler's renderer cannot correctly
     /// place absolutely positioned children inside such elements.
     /// </summary>
-    private bool IsInlineContainingBlock(Broiler.Dom.DomElement element)
+    private bool IsInlineContainingBlock(DomElement element)
     {
         var props = GetComputedProps(element);
         string? display = props.GetValueOrDefault("display");
@@ -313,10 +314,10 @@ public sealed partial class DomBridge
     /// not support positioning absolutely positioned elements inside
     /// inline boxes (like <c>&lt;span&gt;</c>).
     /// </summary>
-    private void PromoteAbsPosFromInlineCBs(Broiler.Dom.DomElement root)
+    private void PromoteAbsPosFromInlineCBs(DomElement root)
     {
         // Collect all promotions first (to avoid mutating during traversal).
-        var promotions = new List<(Broiler.Dom.DomElement child, Broiler.Dom.DomElement inlineCB, Broiler.Dom.DomElement blockAncestor,
+        var promotions = new List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
             double offX, double offY)>();
         CollectInlineCBPromotions(root, promotions);
 
@@ -361,8 +362,8 @@ public sealed partial class DomBridge
         }
     }
     private void CollectInlineCBPromotions(
-        Broiler.Dom.DomElement element,
-        List<(Broiler.Dom.DomElement child, Broiler.Dom.DomElement inlineCB, Broiler.Dom.DomElement blockAncestor,
+        DomElement element,
+        List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
             double offX, double offY)> promotions)
     {
         if (!IsText(element) && IsInlineContainingBlock(element))
@@ -393,8 +394,7 @@ public sealed partial class DomBridge
     /// coordinates when promoting position-area elements out of an inline CB.
     /// Returns (offsetX, offsetY, blockAncestor).
     /// </summary>
-    private (double offsetX, double offsetY, Broiler.Dom.DomElement? blockAncestor)
-        ComputeInlineCBOffset(Broiler.Dom.DomElement inlineCB)
+    private (double offsetX, double offsetY, DomElement? blockAncestor) ComputeInlineCBOffset(DomElement inlineCB)
     {
         // Walk up from the inline CB to find the nearest block-level ancestor.
         // The inline CB's position within its parent block is determined by:
@@ -403,7 +403,7 @@ public sealed partial class DomBridge
         // - Line breaks
         // We estimate this from the layout context.
         var parent = ParentEl(inlineCB);
-        Broiler.Dom.DomElement? blockAncestor = null;
+        DomElement? blockAncestor = null;
 
         // Find nearest block-level ancestor.
         while (parent != null)
@@ -441,7 +441,7 @@ public sealed partial class DomBridge
     /// its nearest block ancestor, accounting for preceding text and
     /// inline content.
     /// </summary>
-    private double EstimateInlineOffsetX(Broiler.Dom.DomElement inlineEl, Broiler.Dom.DomElement blockAncestor)
+    private double EstimateInlineOffsetX(DomElement inlineEl, DomElement blockAncestor)
     {
         double offset = 0;
         var parent = ParentEl(inlineEl);
@@ -463,7 +463,7 @@ public sealed partial class DomBridge
     /// siblings, line breaks (<c>&lt;br&gt;</c>), and text nodes that
     /// contain only line breaks.
     /// </summary>
-    private double EstimateInlineOffsetY(Broiler.Dom.DomElement inlineEl, Broiler.Dom.DomElement blockAncestor)
+    private double EstimateInlineOffsetY(DomElement inlineEl, DomElement blockAncestor)
     {
         double offset = 0;
         var parent = ParentEl(inlineEl);
@@ -482,7 +482,7 @@ public sealed partial class DomBridge
     /// handling <c>&lt;br&gt;</c> elements (which contribute the parent's
     /// line-height) and text nodes with line breaks.
     /// </summary>
-    private double EstimatePrecedingBlockHeight(Broiler.Dom.DomElement element, Broiler.Dom.DomElement parent)
+    private double EstimatePrecedingBlockHeight(DomElement element, DomElement parent)
     {
         double totalHeight = 0;
         var parentProps = GetComputedProps(parent);
@@ -558,7 +558,7 @@ public sealed partial class DomBridge
     /// Estimates the total width of inline content preceding <paramref name="element"/>
     /// within <paramref name="parent"/>.  This includes text nodes and inline elements.
     /// </summary>
-    private double EstimatePrecedingInlineWidth(Broiler.Dom.DomElement element, Broiler.Dom.DomElement parent)
+    private double EstimatePrecedingInlineWidth(DomElement element, DomElement parent)
     {
         double width = 0;
         var props = GetComputedProps(parent);

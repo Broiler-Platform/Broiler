@@ -1,7 +1,6 @@
-using System;
 using System.Collections.Generic;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Scripting;
 
 /// <summary>
 /// Detailed result of a JavaScript execution batch, including per-script
@@ -18,7 +17,7 @@ public sealed class ScriptExecutionResult
     /// Per-script errors captured during execution. Empty when all
     /// scripts succeed.
     /// </summary>
-    public IReadOnlyList<ScriptError> Errors { get; init; } = Array.Empty<ScriptError>();
+    public IReadOnlyList<ScriptError> Errors { get; init; } = [];
 }
 
 /// <summary>

@@ -15,58 +15,40 @@ namespace Broiler.HtmlBridge;
 /// returned; external <c>src</c> references (http/https/file) are skipped
 /// by <see cref="Extract"/> but resolved and fetched by <see cref="ExtractAll"/>.
 /// </summary>
-public static class ScriptExtractionService
+public static partial class ScriptExtractionService
 {
     // Match ALL <script> tags (both inline and with src attributes) in document order.
-    private static readonly Regex AnyScriptPattern = new(
-        @"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex AnyScriptPattern = AnyScriptPatternRegex();
 
     // Match src attribute whose value starts with "data:"
-    private static readonly Regex DataSrcAttrPattern = new(
-        @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DataSrcAttrPattern = DataSrcAttrPatternRegex();
 
     // Match any src attribute (to detect and skip external scripts)
-    private static readonly Regex AnySrcAttrPattern = new(
-        @"\ssrc\s*=",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex AnySrcAttrPattern = AnySrcAttrPatternRegex();
 
     /// <summary>
     /// Matches any <c>src</c> attribute value (not just <c>data:</c> URIs).
     /// Used to extract external script URLs for HTTP/HTTPS/file loading.
     /// </summary>
-    private static readonly Regex AnySrcAttrWithValuePattern = new(
-        @"\ssrc\s*=\s*(?:""(?<uri>[^""]+)""|'(?<uri>[^']+)'|(?<uri>[^\s>]+))",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex AnySrcAttrWithValuePattern = AnySrcAttrWithValuePatternRegex();
 
     /// <summary>
     /// Matches the <c>defer</c> attribute on a script tag (standalone or with a value).
     /// </summary>
-    private static readonly Regex DeferAttrPattern = new(
-        @"(?:^|\s)defer(?:\s|$|=)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DeferAttrPattern = DeferAttrPatternRegex();
 
     /// <summary>
     /// Matches the <c>async</c> attribute on a script tag (standalone or with a value).
     /// </summary>
-    private static readonly Regex AsyncAttrPattern = new(
-        @"(?:^|\s)async(?:\s|$|=)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex AsyncAttrPattern = AsyncAttrPatternRegex();
 
     // Match <script type="module"> tags (inline only, no src)
-    private static readonly Regex ModuleScriptPattern = new(
-        @"<script\s[^>]*type\s*=\s*[""']module[""'][^>]*>(?<content>[\s\S]*?)</script>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ModuleScriptPattern = ModuleScriptPatternRegex();
 
     // Match the type="module" attribute on a script tag
-    private static readonly Regex ModuleTypeAttribute = new(
-        @"\stype\s*=\s*[""']module[""']",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ModuleTypeAttribute = ModuleTypeModuleTypeAttributeRegex();
 
-    private static readonly Regex WhitespacePattern = new(
-        @"\s+",
-        RegexOptions.Compiled);
+    private static readonly Regex WhitespacePattern = WhitespacePatternRegex();
 
     /// <summary>
     /// Shared <see cref="HttpClient"/> for fetching external scripts.
@@ -187,27 +169,6 @@ public static class ScriptExtractionService
         return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts);
     }
 
-    /// <inheritdoc />
-    public static IReadOnlyList<string> ExtractModules(string html)
-    {
-        var modules = new List<string>();
-
-        foreach (Match match in ModuleScriptPattern.Matches(html))
-        {
-            // Skip if it has a src attribute (external module)
-            if (Regex.IsMatch(match.Value, @"\ssrc\s*=", RegexOptions.IgnoreCase))
-                continue;
-
-            var content = match.Groups["content"].Value.Trim();
-            if (!string.IsNullOrEmpty(content))
-            {
-                modules.Add(content);
-            }
-        }
-
-        return modules;
-    }
-
     /// <summary>
     /// Decodes a <c>data:</c> URI into its text content.
     /// Supports percent-encoding and base64 payloads.
@@ -296,4 +257,23 @@ public static class ScriptExtractionService
             return null;
         }
     }
+
+    [GeneratedRegex(@"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AnyScriptPatternRegex();
+    [GeneratedRegex(@"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex DataSrcAttrPatternRegex();
+    [GeneratedRegex(@"\ssrc\s*=", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AnySrcAttrPatternRegex();
+    [GeneratedRegex(@"\ssrc\s*=\s*(?:""(?<uri>[^""]+)""|'(?<uri>[^']+)'|(?<uri>[^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AnySrcAttrWithValuePatternRegex();
+    [GeneratedRegex(@"(?:^|\s)defer(?:\s|$|=)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex DeferAttrPatternRegex();
+    [GeneratedRegex(@"(?:^|\s)async(?:\s|$|=)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AsyncAttrPatternRegex();
+    [GeneratedRegex(@"<script\s[^>]*type\s*=\s*[""']module[""'][^>]*>(?<content>[\s\S]*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex ModuleScriptPatternRegex();
+    [GeneratedRegex(@"\stype\s*=\s*[""']module[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex ModuleTypeModuleTypeAttributeRegex();
+    [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
+    private static partial Regex WhitespacePatternRegex();
 }

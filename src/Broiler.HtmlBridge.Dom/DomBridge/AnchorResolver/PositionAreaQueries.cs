@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -18,7 +19,7 @@ public sealed partial class DomBridge
     // by element identity mirrors ElementRuntimeStates' lifetime, so a detached element's
     // memo is collected with it, and the invalidation (position-area / position-anchor
     // mutation) and clone-copy semantics are unchanged from the old .Layout slots.
-    private static readonly ConditionalWeakTable<Broiler.Dom.DomElement, PositionAreaResolution>
+    private static readonly ConditionalWeakTable<DomElement, PositionAreaResolution>
         PositionAreaResolutions = [];
 
     private sealed class PositionAreaResolution
@@ -30,7 +31,7 @@ public sealed partial class DomBridge
     }
 
     private static bool TryGetPositionAreaResolution(
-        Broiler.Dom.DomElement element, out (double left, double top, double width, double height) rect)
+        DomElement element, out (double left, double top, double width, double height) rect)
     {
         if (PositionAreaResolutions.TryGetValue(element, out var r))
         {
@@ -43,7 +44,7 @@ public sealed partial class DomBridge
     }
 
     private static void SetPositionAreaResolution(
-        Broiler.Dom.DomElement element, double left, double top, double width, double height) =>
+        DomElement element, double left, double top, double width, double height) =>
         PositionAreaResolutions.AddOrUpdate(element, new PositionAreaResolution
         {
             Left = left,
@@ -52,10 +53,10 @@ public sealed partial class DomBridge
             Height = height,
         });
 
-    private static void ClearPositionAreaResolution(Broiler.Dom.DomElement element) =>
+    private static void ClearPositionAreaResolution(DomElement element) =>
         PositionAreaResolutions.Remove(element);
 
-    private static void CopyPositionAreaResolution(Broiler.Dom.DomElement source, Broiler.Dom.DomElement target)
+    private static void CopyPositionAreaResolution(DomElement source, DomElement target)
     {
         if (PositionAreaResolutions.TryGetValue(source, out var r))
             PositionAreaResolutions.AddOrUpdate(target, new PositionAreaResolution
@@ -72,8 +73,7 @@ public sealed partial class DomBridge
     /// returning the computed rect as (left, top, width, height).
     /// Called lazily when offsetLeft/offsetTop/etc. are queried.
     /// </summary>
-    internal (double left, double top, double width, double height)?
-        ResolvePositionAreaForElement(Broiler.Dom.DomElement element)
+    internal (double left, double top, double width, double height)? ResolvePositionAreaForElement(DomElement element)
     {
         // Check for pre-resolved values first.
         if (TryGetPositionAreaResolution(element, out var cached))

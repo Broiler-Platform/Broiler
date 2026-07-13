@@ -2,12 +2,13 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
-    private JSArray BuildAnimationList(Broiler.Dom.DomElement? target)
+    private JSArray BuildAnimationList(DomElement? target)
     {
         var animations = new List<JSValue>();
         foreach (var element in Elements)
@@ -28,7 +29,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryGetAnimationProperties(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         out string? animationShorthand,
         out string? animationDelay)
     {
@@ -51,7 +52,7 @@ public sealed partial class DomBridge
     }
 
     private void EnsureAnimationCurrentTime(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         string? animationShorthand,
         string? animationDelay)
     {
@@ -81,23 +82,23 @@ public sealed partial class DomBridge
         GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(currentTimeMs);
     }
 
-    private static JSObject BuildAnimationObject(Broiler.Dom.DomElement element)
+    private static JSObject BuildAnimationObject(DomElement element)
     {
         var animation = new JSObject();
         animation.FastAddProperty(
             (KeyString)"currentTime",
-            new JSFunction((in Arguments _) => JsRegistrationGetCurrentTime152Core(element, in _), "get currentTime"),
-            new JSFunction((in Arguments a) => JsRegistrationSetCurrentTime153Core(element, in a), "set currentTime"),
+            new JSFunction((in _) => JsRegistrationGetCurrentTime152Core(element, in _), "get currentTime"),
+            new JSFunction((in a) => JsRegistrationSetCurrentTime153Core(element, in a), "set currentTime"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var ready = new JSObject();
         ready.FastAddValue(
             (KeyString)"then",
-            new JSFunction((in Arguments a) => JsRegistrationThen154Core(ready, in a), "then", 1),
+            new JSFunction((in a) => JsRegistrationThen154Core(ready, in a), "then", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         ready.FastAddValue(
             (KeyString)"catch",
-            new JSFunction((in Arguments _) => ready, "catch", 1),
+            new JSFunction((in _) => ready, "catch", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         animation.FastAddValue((KeyString)"ready", ready, JSPropertyAttributes.EnumerableConfigurableValue);

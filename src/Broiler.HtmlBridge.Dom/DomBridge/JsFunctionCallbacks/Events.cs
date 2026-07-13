@@ -2,12 +2,12 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsEventsStopPropagation001Core(ref global::System.Boolean legacyCancelBubble, ref global::System.Boolean stopped, in Arguments _)
+    private JSValue JsEventsStopPropagation001Core(ref bool legacyCancelBubble, ref bool stopped, in Arguments _)
     {
         stopped = true;
         legacyCancelBubble = true;
@@ -15,7 +15,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsEventsStopImmediatePropagation002Core(ref global::System.Boolean immediateStopped, ref global::System.Boolean legacyCancelBubble, ref global::System.Boolean stopped, in Arguments _)
+    private JSValue JsEventsStopImmediatePropagation002Core(ref bool immediateStopped, ref bool legacyCancelBubble, ref bool stopped, in Arguments _)
     {
         stopped = true;
         immediateStopped = true;
@@ -24,7 +24,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsEventsPreventDefault003Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments _)
+    private JSValue JsEventsPreventDefault003Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments _)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
@@ -37,7 +37,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsEventsSetCancelBubble005Core(ref global::System.Boolean legacyCancelBubble, ref global::System.Boolean stopped, in Arguments setArgs)
+    private JSValue JsEventsSetCancelBubble005Core(ref bool legacyCancelBubble, ref bool stopped, in Arguments setArgs)
     {
         if (setArgs.Length > 0 && setArgs[0].BooleanValue)
         {
@@ -49,7 +49,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsEventsSetReturnValue007Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments setArgs)
+    private JSValue JsEventsSetReturnValue007Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments setArgs)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive && cancelable != null && cancelable.BooleanValue)

@@ -1,7 +1,7 @@
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 /// <summary>
 /// JavaScript bridge registration — wires up the <c>document</c>,

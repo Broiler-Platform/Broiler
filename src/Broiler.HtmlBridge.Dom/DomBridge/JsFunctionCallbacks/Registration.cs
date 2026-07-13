@@ -9,8 +9,11 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
+using Broiler.JavaScript.Engine;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -120,11 +123,11 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationElementsFromPoint012Core(in Arguments a)
     {
         var hits = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1));
-        return new JSArray(hits.Select(ToJSObject).ToArray());
+        return new JSArray([.. hits.Select(ToJSObject)]);
     }
 
 
-    private JSValue JsRegistrationCreateElement014Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateElement014Core(JSContext context, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'createElement': 1 argument required, but only 0 present.");
@@ -146,7 +149,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateAttribute016Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateAttribute016Core(JSContext context, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'createAttribute': 1 argument required, but only 0 present.");
@@ -168,6 +171,7 @@ public sealed partial class DomBridge
     {
         var evt = new JSObject();
         var legacyCancelBubble = false;
+
         evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -203,6 +207,7 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+
         JSValue JsRegistrationStopPropagation018(in Arguments _)
         {
             legacyCancelBubble = true;
@@ -526,7 +531,7 @@ public sealed partial class DomBridge
                     // insert the new nodes right after it (matching real browser
                     // behaviour where document.write() inserts at the parser
                     // insertion point).
-                    Broiler.Dom.DomElement? currentScript = null;
+                    DomElement? currentScript = null;
                     var documentElements = Elements;
                     if (CurrentScriptIndex >= 0 && CurrentScriptIndex < documentElements.Count)
                     {
@@ -561,7 +566,7 @@ public sealed partial class DomBridge
                     // getElementsByTagName, document.links, etc. return
                     // elements in the correct order relative to the rest of
                     // the document.
-                    var contentEls = new List<Broiler.Dom.DomNode>();
+                    var contentEls = new List<DomNode>();
                     foreach (var tc in writtenChildren)
                     {
                         contentEls.Add(tc);
@@ -582,19 +587,18 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationWriteln037Core(global::Broiler.JavaScript.BuiltIns.Function.JSFunction? writeFn, in Arguments a)
+    private JSValue JsRegistrationWriteln037Core(JSFunction? writeFn, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() + "\n" : "\n";
         return writeFn.InvokeFunction(new Arguments(writeFn, new JSString(text)));
     }
 
 
-    private JSValue JsRegistrationCreateTreeWalker038Core(global::Broiler.HtmlBridge.DomBridge? bridgeForTraversal, in Arguments a)
+    private JSValue JsRegistrationCreateTreeWalker038Core(DomBridge? bridgeForTraversal, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'createTreeWalker': 1 argument required.");
-        var rootObj = a[0] as JSObject;
-        if (rootObj == null)
+        if (a[0] is not JSObject rootObj)
             throw new JSException("Failed to execute 'createTreeWalker': parameter 1 is not of type 'Node'.");
         var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
         if (rootEl == null)
@@ -605,12 +609,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateNodeIterator039Core(global::Broiler.HtmlBridge.DomBridge? bridgeForTraversal, in Arguments a)
+    private JSValue JsRegistrationCreateNodeIterator039Core(DomBridge? bridgeForTraversal, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'createNodeIterator': 1 argument required.");
-        var rootObj = a[0] as JSObject;
-        if (rootObj == null)
+        if (a[0] is not JSObject rootObj)
             throw new JSException("Failed to execute 'createNodeIterator': parameter 1 is not of type 'Node'.");
         var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
         if (rootEl == null)
@@ -639,12 +642,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRemoveChild047Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationRemoveChild047Core(DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
-        var childObj = a[0] as JSObject;
-        if (childObj == null)
+        if (a[0] is not JSObject childObj)
             return JSNull.Value;
         var childEl = FindDomNodeByJSObject(childObj);
         if (childEl != null)
@@ -663,12 +665,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAppendChild048Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationAppendChild048Core(DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
-        var childObj = a[0] as JSObject;
-        if (childObj == null)
+        if (a[0] is not JSObject childObj)
             return JSNull.Value;
         var childEl = FindDomNodeByJSObject(childObj);
         if (childEl != null)
@@ -694,12 +695,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationInsertBefore049Core(global::Broiler.Dom.DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationInsertBefore049Core(DomElement? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
-        var newObj = a[0] as JSObject;
-        if (newObj == null)
+        if (a[0] is not JSObject newObj)
             return JSNull.Value;
         var newEl = FindDomNodeByJSObject(newObj);
         if (newEl == null)
@@ -765,7 +765,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateElementNS051Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateElementNS051Core(JSContext context, in Arguments a)
     {
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
@@ -778,7 +778,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateAttributeNS052Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateAttributeNS052Core(JSContext context, in Arguments a)
     {
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         if (a.Length < 2)
@@ -812,7 +812,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationGetStyleSheets055Core(in Arguments _)
     {
-        var styleEls = new List<Broiler.Dom.DomElement>();
+        var styleEls = new List<DomElement>();
         foreach (var el in Elements)
         {
             if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
@@ -826,7 +826,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateDocumentType057Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateDocumentType057Core(JSContext context, in Arguments a)
     {
         if (a.Length < 3)
             throw new JSException("Failed to execute 'createDocumentType' on 'DOMImplementation': 3 arguments required.");
@@ -848,7 +848,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateDocument058Core(global::Broiler.JavaScript.Engine.JSContext context, in Arguments a)
+    private JSValue JsRegistrationCreateDocument058Core(JSContext context, in Arguments a)
     {
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var qName = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? a[1].ToString() : null;
@@ -865,7 +865,7 @@ public sealed partial class DomBridge
             // Find the Broiler.Dom.DomElement for the doctype JSObject
             foreach (var kvp in _jsObjectCache)
             {
-                if (kvp.Value == dtObj && kvp.Key is Broiler.Dom.DomElement dtEl)
+                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {
                     SetParent(dtEl, docRoot);
                     GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
@@ -943,7 +943,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAddEventListener060Core(global::Broiler.Dom.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationAddEventListener060Core(DomElement? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -962,7 +962,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRemoveEventListener061Core(global::Broiler.Dom.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationRemoveEventListener061Core(DomElement? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -985,12 +985,11 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationDispatchEvent062Core(global::Broiler.HtmlBridge.DomBridge? bridgeRef, global::Broiler.Dom.DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationDispatchEvent062Core(DomBridge? bridgeRef, DomElement? docNode, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.True;
-        var evt = a[0] as JSObject;
-        if (evt == null)
+        if (a[0] is not JSObject evt)
             return JSBoolean.True;
         return bridgeRef.DispatchEventOnElement(docNode, evt);
     }
@@ -1118,7 +1117,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRedirect116Core(global::System.Func<string, string> resolveResponseRedirectUrl, ResponseFactory createResponse, in Arguments a)
+    private JSValue JsRegistrationRedirect116Core(Func<string, string> resolveResponseRedirectUrl, ResponseFactory createResponse, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'redirect' on 'Response': 1 argument required.");
@@ -1136,7 +1135,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationFetch120Core(JsPropertyStringGetter tryGetJsPropertyString, ObjectStringEntriesEnumerator enumerateObjectStringEntries, global::System.Func<JSValue, JSValue> createAbortErrorValue, ResponseFactory createResponse, in Arguments a)
+    private JSValue JsRegistrationFetch120Core(JsPropertyStringGetter tryGetJsPropertyString, ObjectStringEntriesEnumerator enumerateObjectStringEntries, Func<JSValue, JSValue> createAbortErrorValue, ResponseFactory createResponse, in Arguments a)
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'fetch': 1 argument required.");
@@ -1262,7 +1261,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationGetComputedStyle121Core(global::Broiler.HtmlBridge.DomBridge? bridgeForStyle, in Arguments a)
+    private JSValue JsRegistrationGetComputedStyle121Core(DomBridge? bridgeForStyle, in Arguments a)
     {
         if (a.Length == 0)
             return new JSObject();
@@ -1273,14 +1272,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationNow122Core(global::System.Int64 performanceTimeOrigin, in Arguments _)
+    private JSValue JsRegistrationNow122Core(long performanceTimeOrigin, in Arguments _)
     {
         var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - performanceTimeOrigin;
         return new JSNumber(elapsed);
     }
 
 
-    private JSValue JsRegistrationSendBeacon124Core(global::Broiler.JavaScript.Runtime.JSObject? window, in Arguments a)
+    private JSValue JsRegistrationSendBeacon124Core(JSObject? window, in Arguments a)
     {
         if (a.Length == 0 || a[0].IsNullOrUndefined)
             return JSBoolean.False;
@@ -1410,7 +1409,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationSetCookie149Core(ref global::System.String? cookieStore, in Arguments a)
+    private JSValue JsRegistrationSetCookie149Core(ref string? cookieStore, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -1448,7 +1447,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationGetCurrentTime152Core(global::Broiler.Dom.DomElement element, in Arguments _)
+    private static JSValue JsRegistrationGetCurrentTime152Core(DomElement element, in Arguments _)
     {
         if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)
         {
@@ -1459,7 +1458,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationSetCurrentTime153Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsRegistrationSetCurrentTime153Core(DomElement element, in Arguments a)
     {
         if (a.Length > 0)
             GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(a[0].DoubleValue);
@@ -1467,7 +1466,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationThen154Core(global::Broiler.JavaScript.Runtime.JSObject? ready, in Arguments a)
+    private static JSValue JsRegistrationThen154Core(JSObject? ready, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSFunction fn)
             fn.InvokeFunction(new Arguments(JSUndefined.Value, JSUndefined.Value));

@@ -2,8 +2,9 @@ using System.Text;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -16,24 +17,18 @@ public sealed partial class DomBridge
     private delegate (int status, string statusText, string url, string type, bool redirected, Dictionary<string, string> headers) ResponseInitParser(JSValue? initValue);
 
 
-    private delegate JSValue ResponseFactory(
-        string body,
-        int statusCode,
-        string statusText,
-        string responseUrl,
-        string type,
-        bool redirected,
-        Dictionary<string, string> headers);
+    private delegate JSValue ResponseFactory(string body, int statusCode, string statusText,
+        string responseUrl, string type, bool redirected, Dictionary<string, string> headers);
 
 
-    private JSValue GetNodeTextValue(Broiler.Dom.DomNode node)
+    private JSValue GetNodeTextValue(DomNode node)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2d): character-data nodes expose their data as textContent;
         // an element's textContent is the concatenation of its descendant text.
-        if (node is Broiler.Dom.DomCharacterData characterData)
+        if (node is DomCharacterData characterData)
             return new JSString(characterData.Data);
 
-        if (node is not Broiler.Dom.DomElement element)
+        if (node is not DomElement element)
             return new JSString(string.Empty);
 
         if (element.ChildNodes.Count > 0)
@@ -47,7 +42,7 @@ public sealed partial class DomBridge
     }
 
 
-    private bool IsCurrentIframeCrossOrigin(Broiler.Dom.DomElement element)
+    private bool IsCurrentIframeCrossOrigin(DomElement element)
     {
         if (HasAttr(element, "srcdoc"))
             return false;
@@ -67,12 +62,12 @@ public sealed partial class DomBridge
     }
 
 
-    private static Broiler.Dom.DomMutationObserverOptions CreateMutationObserverOptions(JSValue? value)
+    private static DomMutationObserverOptions CreateMutationObserverOptions(JSValue? value)
     {
         if (value is not JSObject optionsObject)
-            return new Broiler.Dom.DomMutationObserverOptions();
+            return new DomMutationObserverOptions();
 
-        return new Broiler.Dom.DomMutationObserverOptions
+        return new DomMutationObserverOptions
         {
             ChildList = GetMutationObserverOption(optionsObject, "childList"),
             Attributes = GetMutationObserverOption(optionsObject, "attributes"),
@@ -84,7 +79,7 @@ public sealed partial class DomBridge
     }
 
 
-    private void RegisterMutationObserver(JSObject observerObject, Broiler.Dom.DomNode target, Broiler.Dom.DomMutationObserverOptions options)
+    private void RegisterMutationObserver(JSObject observerObject, DomNode target, DomMutationObserverOptions options)
     {
         _mutationObservers.RemoveAll(entry =>
             ReferenceEquals(entry.Observer, observerObject) &&
@@ -93,27 +88,20 @@ public sealed partial class DomBridge
     }
 
 
-    private void UnregisterMutationObserver(JSObject observerObject)
-    {
-        _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
-    }
+    private void UnregisterMutationObserver(JSObject observerObject) => _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
 
 
-    private static Broiler.Dom.DomElement GetDocumentElement(Broiler.Dom.DomElement docRoot)
-    {
-        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"))
-            ?? docRoot;
-    }
+    private static DomElement GetDocumentElement(DomElement docRoot) => ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#')) ?? docRoot;
 
 
-    private bool IsPositionAfter(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
+    private bool IsPositionAfter(DomNode docRoot, DomNode containerA, int offsetA, DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB))
             return offsetA > offsetB;
 
         if (IsDescendant(containerA, containerB))
         {
-            Broiler.Dom.DomNode node = containerB;
+            DomNode node = containerB;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
                 node = node.ParentNode;
             if (node.ParentNode != null)
@@ -127,7 +115,7 @@ public sealed partial class DomBridge
 
         if (IsDescendant(containerB, containerA))
         {
-            Broiler.Dom.DomNode node = containerA;
+            DomNode node = containerA;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))
                 node = node.ParentNode;
             if (node.ParentNode != null)
@@ -150,7 +138,7 @@ public sealed partial class DomBridge
     }
 
 
-    private int CompareBoundaryPosition(Broiler.Dom.DomNode docRoot, Broiler.Dom.DomNode containerA, int offsetA, Broiler.Dom.DomNode containerB, int offsetB)
+    private int CompareBoundaryPosition(DomNode docRoot, DomNode containerA, int offsetA, DomNode containerB, int offsetB)
     {
         if (ReferenceEquals(containerA, containerB) && offsetA == offsetB)
             return 0;
@@ -163,5 +151,4 @@ public sealed partial class DomBridge
 
         return 0;
     }
-
 }

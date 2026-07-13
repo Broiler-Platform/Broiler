@@ -1,6 +1,7 @@
 using System.Globalization;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -14,11 +15,9 @@ public sealed partial class DomBridge
     /// element's position and the containing block, then selects the
     /// region specified by position-area and sets explicit inline styles.
     /// </summary>
-    private void ResolvePositionAreaValues(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, AnchorInfo> anchorRegistry,
-        HashSet<Broiler.Dom.DomElement> scrollContainersNeedingRelative,
-        List<(Broiler.Dom.DomElement element, Broiler.Dom.DomElement oldParent, Broiler.Dom.DomElement newParent)> deferredDomMoves)
+    private void ResolvePositionAreaValues(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry,
+        HashSet<DomElement> scrollContainersNeedingRelative,
+        List<(DomElement element, DomElement oldParent, DomElement newParent)> deferredDomMoves)
     {
         if (!IsText(element))
         {
@@ -399,8 +398,9 @@ public sealed partial class DomBridge
             ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative,
                 deferredDomMoves);
     }
-    private readonly record struct PositionAreaRect(
-        double Left, double Top, double Width, double Height);
+
+    private readonly record struct PositionAreaRect(double Left, double Top, double Width, double Height);
+
     /// <summary>
     /// Computes the rectangle for a given <c>position-area</c> value using
     /// the 3×3 grid defined by the anchor element and containing block.
@@ -408,9 +408,8 @@ public sealed partial class DomBridge
     /// computed relative to that container (the anchor's scroll container)
     /// rather than the target element's normal containing block.
     /// </summary>
-    private PositionAreaRect? ComputePositionAreaRect(
-        Broiler.Dom.DomElement element, AnchorInfo anchor, string positionArea,
-        Broiler.Dom.DomElement? scrollContainer = null)
+    private PositionAreaRect? ComputePositionAreaRect(DomElement element, AnchorInfo anchor, string positionArea,
+        DomElement? scrollContainer = null)
     {
         double cbWidth, cbHeight;
         double anchorLeft, anchorRight, anchorTop, anchorBottom;
@@ -570,13 +569,14 @@ public sealed partial class DomBridge
 
         return new PositionAreaRect(colStart, rowStart, width, height);
     }
+
     /// <summary>
     /// Computes the total width of the scrollable content inside a scroll
     /// container by examining its children's widths and margins.
     /// Falls back to the container's own width if no explicit child widths
     /// are found.
     /// </summary>
-    private double FindScrollContentWidth(Broiler.Dom.DomElement scrollContainer, double containerWidth)
+    private double FindScrollContentWidth(DomElement scrollContainer, double containerWidth)
     {
         double maxWidth = containerWidth;
         foreach (var child in SnapshotChildren(scrollContainer))
@@ -594,6 +594,7 @@ public sealed partial class DomBridge
         }
         return maxWidth;
     }
+
     /// <summary>
     /// Computes the total height of the scrollable content inside a scroll
     /// container.  In-flow block children stack vertically, so the scrollable
@@ -603,7 +604,7 @@ public sealed partial class DomBridge
     /// the block-axis scroll extent.  The result is clamped to at least the
     /// container's own height (scrollHeight ≥ clientHeight).
     /// </summary>
-    private double FindScrollContentHeight(Broiler.Dom.DomElement scrollContainer, double containerHeight)
+    private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
     {
         double stackedHeight = 0;
         foreach (var child in SnapshotChildren(scrollContainer))
@@ -620,6 +621,7 @@ public sealed partial class DomBridge
         }
         return Math.Max(containerHeight, stackedHeight);
     }
+
     /// <summary>
     /// Computes the anchor's position relative to the specified container.
     /// When the anchor's containing block IS the container (e.g. the
@@ -628,7 +630,7 @@ public sealed partial class DomBridge
     /// Otherwise, both are in document coordinates and we subtract.
     /// </summary>
     private (double Left, double Top) ComputeAnchorRelativeToContainer(
-        AnchorInfo anchor, Broiler.Dom.DomElement container)
+        AnchorInfo anchor, DomElement container)
     {
         // Check if the container establishes a CB. If it does, the anchor's
         // ComputeElementBox walk will have stopped at the container, and
@@ -642,11 +644,12 @@ public sealed partial class DomBridge
             return (anchor.Left, anchor.Top);
         return (anchor.Left - containerBox.Left, anchor.Top - containerBox.Top);
     }
+
     /// <summary>
     /// Finds the nearest ancestor of <paramref name="el"/> that is a scroll
     /// container (has <c>overflow: hidden/scroll/auto/clip</c>).
     /// </summary>
-    private Broiler.Dom.DomElement? FindNearestScrollContainer(Broiler.Dom.DomElement el)
+    private DomElement? FindNearestScrollContainer(DomElement el)
     {
         var parent = ParentEl(el);
         while (parent != null)
@@ -661,11 +664,12 @@ public sealed partial class DomBridge
         }
         return null;
     }
+
     /// <summary>
     /// Returns <c>true</c> when <paramref name="el"/> is a descendant of
     /// <paramref name="potentialAncestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendantOfElement(Broiler.Dom.DomElement el, Broiler.Dom.DomElement potentialAncestor)
+    private static bool IsDescendantOfElement(DomElement el, DomElement potentialAncestor)
     {
         var current = ParentEl(el);
         while (current != null)
@@ -676,14 +680,14 @@ public sealed partial class DomBridge
         return false;
     }
     private enum AxisSelection { Start, Center, End, SpanStart, SpanEnd, SpanAll }
+
     /// <summary>
     /// Parses a position-area value into block and inline axis selections.
     /// Block keywords: top, bottom, span-top, span-bottom.
     /// Inline keywords: left, right, span-left, span-right.
     /// Ambiguous: center, span-all (assigned to whichever axis needs it).
     /// </summary>
-    private static void ParsePositionArea(
-        string value, out AxisSelection blockSel, out AxisSelection inlineSel)
+    private static void ParsePositionArea(string value, out AxisSelection blockSel, out AxisSelection inlineSel)
     {
         blockSel = AxisSelection.SpanAll;
         inlineSel = AxisSelection.SpanAll;

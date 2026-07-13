@@ -5,6 +5,7 @@ using Broiler.HTML.Image;
 using Broiler.JavaScript.Engine;
 using DomDocument = Broiler.Dom.DomDocument;
 using DomElement = Broiler.Dom.DomElement;
+using Broiler.HtmlBridge.Dom;
 
 namespace Broiler.Cli.Tests;
 

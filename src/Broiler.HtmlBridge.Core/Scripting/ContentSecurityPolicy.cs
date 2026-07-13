@@ -22,11 +22,9 @@ namespace Broiler.HtmlBridge.Scripting;
 /// non-script directives are intentionally not yet implemented and therefore
 /// remain explicit gaps.
 /// </summary>
-public sealed class ContentSecurityPolicy
+public sealed partial class ContentSecurityPolicy
 {
-    private static readonly Regex MetaPattern = new(
-        @"<meta(?<attrs>[^>]*)>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MetaPattern = MetaPatternRegex();
 
     private readonly HashSet<string> _defaultSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcTokens = new(StringComparer.OrdinalIgnoreCase);
@@ -292,10 +290,7 @@ public sealed class ContentSecurityPolicy
     /// Extract a <c>nonce</c> attribute value from a script tag attribute list.
     /// Returns <c>null</c> when no nonce is present.
     /// </summary>
-    public static string? ExtractNonceFromAttributes(string attributes)
-    {
-        return ExtractAttributeValue(attributes, "nonce");
-    }
+    public static string? ExtractNonceFromAttributes(string attributes) => ExtractAttributeValue(attributes, "nonce");
 
     private bool IsEvalAllowed()
     {
@@ -470,4 +465,7 @@ public sealed class ContentSecurityPolicy
         var match = Regex.Match(attributes, pattern, RegexOptions.IgnoreCase);
         return match.Success ? match.Groups["value"].Value : null;
     }
+
+    [GeneratedRegex(@"<meta(?<attrs>[^>]*)>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex MetaPatternRegex();
 }

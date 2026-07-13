@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -34,6 +34,7 @@ public sealed partial class DomBridge
             return result;
         return null;
     }
+
     /// <summary>
     /// Resolves a CSS value that may be a percentage or a pixel length.
     /// Percentages are resolved against <paramref name="reference"/>.
@@ -46,13 +47,12 @@ public sealed partial class DomBridge
             return reference * pct.Value / 100.0;
         return TryParsePx(value) ?? 0;
     }
+
     /// <summary>
     /// Returns true if the value contains a CSS percentage token.
     /// </summary>
-    private static bool HasPercent(string? value)
-    {
-        return value != null && value.Contains('%');
-    }
+    private static bool HasPercent(string? value) => value != null && value.Contains('%');
+
     /// <summary>
     /// Resolves a CSS border-width value from cascaded properties.
     /// Checks the individual property (e.g. "border-left-width") first,

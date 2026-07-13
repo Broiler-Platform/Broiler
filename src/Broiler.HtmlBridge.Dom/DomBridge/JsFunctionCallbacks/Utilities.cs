@@ -4,20 +4,22 @@ using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.Dom;
+using Broiler.CSS;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsUtilitiesGetLength002Core(global::Broiler.Dom.DomElement form, in Arguments _)
+    private JSValue JsUtilitiesGetLength002Core(DomElement form, in Arguments _)
     {
         var currentControls = CollectFormControls(form);
         return new JSNumber(currentControls.Count);
     }
 
 
-    private static JSValue JsUtilitiesGetCssText003Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesGetCssText003Core(DomElement element, in Arguments a)
     {
         var parts = InlineStyle(element).Select(kv => $"{kv.Key}: {kv.Value}");
         var text = string.Join("; ", parts);
@@ -25,7 +27,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetCssText004Core(global::Broiler.Dom.DomElement element, global::System.Action? onMutation, in Arguments a)
+    private static JSValue JsUtilitiesSetCssText004Core(DomElement element, Action? onMutation, in Arguments a)
     {
         InlineStyle(element).Clear();
         GetElementRuntimeState(element).JsSetStyleProps.Clear();
@@ -43,12 +45,12 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetProperty005Core(global::Broiler.Dom.DomElement element, global::System.Action? onMutation, in Arguments a)
+    private static JSValue JsUtilitiesSetProperty005Core(DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length >= 2)
         {
             var prop = a[0].ToString();
-            var value = Broiler.CSS.CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+            var value = CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
             {
                 InlineStyle(element).Remove(prop);
@@ -68,15 +70,15 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetPropertyValue006Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesGetPropertyValue006Core(DomElement element, in Arguments a)
     {
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
             if (TryGetStylePropertyRawValue(element, prop, out var val))
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
+                return new JSString(CssPriority.Strip(val));
             // Try camelCase version of kebab-case input
-            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(prop);
+            var camel = CssPropertyNames.ToDomPropertyName(prop);
             // Check JSObject properties (set via el.style.propertyName = value)
             var jsVal = a.This?[(KeyString)camel];
             if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
@@ -90,7 +92,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesRemoveProperty007Core(global::Broiler.Dom.DomElement element, global::System.Action? onMutation, in Arguments a)
+    private static JSValue JsUtilitiesRemoveProperty007Core(DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -106,7 +108,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetCssFloat008Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesGetCssFloat008Core(DomElement element, in Arguments a)
     {
         if (InlineStyle(element).TryGetValue("float", out var val))
             return new JSString(val);
@@ -114,7 +116,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetCssFloat009Core(global::Broiler.Dom.DomElement element, global::System.Action? onMutation, in Arguments a)
+    private static JSValue JsUtilitiesSetCssFloat009Core(DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -127,7 +129,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesItem011Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesItem011Core(DomElement element, in Arguments a)
     {
         if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
         {
@@ -140,15 +142,15 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetPropertyPriority012Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesGetPropertyPriority012Core(DomElement element, in Arguments a)
     {
         if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
-            return new JSString(Broiler.CSS.CssPriority.Parse(value));
+            return new JSString(CssPriority.Parse(value));
         return new JSString(string.Empty);
     }
 
 
-    private static JSValue JsUtilitiesGetCssText014Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments _)
+    private static JSValue JsUtilitiesGetCssText014Core(Dictionary<string, string> styleMap, in Arguments _)
     {
         var parts = styleMap.Select(kv => $"{kv.Key}: {kv.Value}");
         var text = string.Join("; ", parts);
@@ -156,7 +158,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetCssText015Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesSetCssText015Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         styleMap.Clear();
         if (a.Length > 0)
@@ -169,12 +171,12 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetProperty016Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesSetProperty016Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length >= 2)
         {
             var prop = a[0].ToString();
-            var value = Broiler.CSS.CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
+            var value = CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
                 styleMap.Remove(prop);
             else if (IsAcceptableInlineValue(prop, value))
@@ -186,14 +188,14 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetPropertyValue017Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesGetPropertyValue017Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
             if (TryGetStylePropertyRawValue(styleMap, prop, out var val))
-                return new JSString(Broiler.CSS.CssPriority.Strip(val));
-            var camel = Broiler.CSS.CssPropertyNames.ToDomPropertyName(prop);
+                return new JSString(CssPriority.Strip(val));
+            var camel = CssPropertyNames.ToDomPropertyName(prop);
             var jsVal = a.This?[(KeyString)camel];
             if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
                 return jsVal;
@@ -206,14 +208,14 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesRemoveProperty018Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesRemoveProperty018Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
-            var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? Broiler.CSS.CssPriority.Strip(val) : string.Empty;
+            var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? CssPriority.Strip(val) : string.Empty;
             styleMap.Remove(prop);
-            styleMap.Remove(Broiler.CSS.CssPropertyNames.ToCssPropertyName(prop));
+            styleMap.Remove(CssPropertyNames.ToCssPropertyName(prop));
             return new JSString(removed);
         }
 
@@ -221,7 +223,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetCssFloat019Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments _)
+    private static JSValue JsUtilitiesGetCssFloat019Core(Dictionary<string, string> styleMap, in Arguments _)
     {
         if (styleMap.TryGetValue("float", out var val))
             return new JSString(val);
@@ -229,7 +231,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetCssFloat020Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesSetCssFloat020Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -241,7 +243,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesItem022Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesItem022Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
         {
@@ -254,10 +256,10 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesGetPropertyPriority023Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String> styleMap, in Arguments a)
+    private static JSValue JsUtilitiesGetPropertyPriority023Core(Dictionary<string, string> styleMap, in Arguments a)
     {
         if (a.Length > 0 && TryGetStylePropertyRawValue(styleMap, a[0].ToString(), out var value))
-            return new JSString(Broiler.CSS.CssPriority.Parse(value));
+            return new JSString(CssPriority.Parse(value));
         return new JSString(string.Empty);
     }
 
@@ -267,17 +269,17 @@ public sealed partial class DomBridge
     // attribute-synchronized). The bridge keeps only the JavaScript argument
     // marshaling, the lenient empty-token skip these methods have always applied,
     // and the style-scope invalidation callback.
-    private static JSValue JsUtilitiesContains025Core(global::Broiler.Dom.DomElement element, in Arguments a)
+    private static JSValue JsUtilitiesContains025Core(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
-        return new global::Broiler.Dom.DomTokenList(element, "class").Contains(a[0].ToString())
+        return new DomTokenList(element, "class").Contains(a[0].ToString())
             ? JSBoolean.True
             : JSBoolean.False;
     }
 
 
-    private static JSValue JsUtilitiesAdd026Core(global::Broiler.Dom.DomElement element, global::System.Action<global::Broiler.Dom.DomElement>? onClassChanged, in Arguments a)
+    private static JSValue JsUtilitiesAdd026Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
     {
         var tokens = new List<string>();
         for (var i = 0; i < a.Length; i++)
@@ -287,13 +289,13 @@ public sealed partial class DomBridge
                 tokens.Add(cls);
         }
 
-        new global::Broiler.Dom.DomTokenList(element, "class").Add(tokens.ToArray());
+        new DomTokenList(element, "class").Add([.. tokens]);
         onClassChanged?.Invoke(element);
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesRemove027Core(global::Broiler.Dom.DomElement element, global::System.Action<global::Broiler.Dom.DomElement>? onClassChanged, in Arguments a)
+    private static JSValue JsUtilitiesRemove027Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
     {
         var tokens = new List<string>();
         for (var i = 0; i < a.Length; i++)
@@ -303,36 +305,36 @@ public sealed partial class DomBridge
                 tokens.Add(cls);
         }
 
-        new global::Broiler.Dom.DomTokenList(element, "class").Remove(tokens.ToArray());
+        new DomTokenList(element, "class").Remove([.. tokens]);
         onClassChanged?.Invoke(element);
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesToggle028Core(global::Broiler.Dom.DomElement element, global::System.Action<global::Broiler.Dom.DomElement>? onClassChanged, in Arguments a)
+    private static JSValue JsUtilitiesToggle028Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
         var cls = a[0].ToString();
         bool? force = a.Length >= 2 && a[1] is not JSUndefined ? a[1].BooleanValue : null;
-        var present = new global::Broiler.Dom.DomTokenList(element, "class").Toggle(cls, force);
+        var present = new DomTokenList(element, "class").Toggle(cls, force);
         onClassChanged?.Invoke(element);
         return present ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private static JSValue JsUtilitiesReplaceClassToken(global::Broiler.Dom.DomElement element, global::System.Action<global::Broiler.Dom.DomElement>? onClassChanged, in Arguments a)
+    private static JSValue JsUtilitiesReplaceClassToken(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
     {
         if (a.Length < 2)
             return JSBoolean.False;
-        var replaced = new global::Broiler.Dom.DomTokenList(element, "class").Replace(a[0].ToString(), a[1].ToString());
+        var replaced = new DomTokenList(element, "class").Replace(a[0].ToString(), a[1].ToString());
         if (replaced)
             onClassChanged?.Invoke(element);
         return replaced ? JSBoolean.True : JSBoolean.False;
     }
 
 
-    private static JSValue JsUtilitiesGetItem029Core(global::System.Collections.Generic.Dictionary<global::System.String, global::System.String>? store, in Arguments a)
+    private static JSValue JsUtilitiesGetItem029Core(Dictionary<string, string>? store, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -341,7 +343,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetItem030Core(global::Broiler.JavaScript.Runtime.JSObject? storage, global::System.Collections.Generic.Dictionary<global::System.String, global::System.String>? store, in Arguments a)
+    private static JSValue JsUtilitiesSetItem030Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
     {
         if (a.Length >= 2)
         {
@@ -355,7 +357,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesRemoveItem031Core(global::Broiler.JavaScript.Runtime.JSObject? storage, global::System.Collections.Generic.Dictionary<global::System.String, global::System.String>? store, in Arguments a)
+    private static JSValue JsUtilitiesRemoveItem031Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
     {
         if (a.Length > 0)
         {
@@ -368,7 +370,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesClear032Core(global::Broiler.JavaScript.Runtime.JSObject? storage, global::System.Collections.Generic.Dictionary<global::System.String, global::System.String>? store, in Arguments a)
+    private static JSValue JsUtilitiesClear032Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
     {
         foreach (var key in store.Keys.ToList())
             storage.Delete((KeyString)key);
@@ -377,7 +379,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetFillStyle034Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesSetFillStyle034Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0)
             context2d.FillStyle = a[0].ToString();
@@ -385,7 +387,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetStrokeStyle036Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesSetStrokeStyle036Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0)
             context2d.StrokeStyle = a[0].ToString();
@@ -393,7 +395,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetLineWidth038Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesSetLineWidth038Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSNumber n)
             context2d.LineWidth = (float)n.DoubleValue;
@@ -401,7 +403,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetFont040Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesSetFont040Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0)
             context2d.Font = a[0].ToString();
@@ -409,7 +411,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSetGlobalAlpha042Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesSetGlobalAlpha042Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0 && a[0] is JSNumber n)
             context2d.GlobalAlpha = (float)n.DoubleValue;
@@ -417,7 +419,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesFillRect044Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesFillRect044Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 4)
             context2d.FillRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
@@ -425,7 +427,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesStrokeRect045Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesStrokeRect045Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 4)
             context2d.StrokeRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
@@ -433,7 +435,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesClearRect046Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesClearRect046Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 4)
             context2d.ClearRect((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue);
@@ -441,14 +443,14 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesBeginPath047Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesBeginPath047Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.BeginPath();
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesMoveTo048Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesMoveTo048Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 2)
             context2d.MoveTo((float)a[0].DoubleValue, (float)a[1].DoubleValue);
@@ -456,7 +458,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesLineTo049Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesLineTo049Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 2)
             context2d.LineTo((float)a[0].DoubleValue, (float)a[1].DoubleValue);
@@ -464,7 +466,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesArc050Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesArc050Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 5)
             context2d.Arc((float)a[0].DoubleValue, (float)a[1].DoubleValue, (float)a[2].DoubleValue, (float)a[3].DoubleValue, (float)a[4].DoubleValue);
@@ -472,28 +474,28 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesClosePath051Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesClosePath051Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.ClosePath();
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesFill052Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesFill052Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.Fill();
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesStroke053Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesStroke053Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.Stroke();
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesFillText054Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesFillText054Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 3)
             context2d.FillText(a[0].ToString(), (float)a[1].DoubleValue, (float)a[2].DoubleValue);
@@ -501,7 +503,7 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesStrokeText055Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments a)
+    private static JSValue JsUtilitiesStrokeText055Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length >= 3)
             context2d.StrokeText(a[0].ToString(), (float)a[1].DoubleValue, (float)a[2].DoubleValue);
@@ -509,14 +511,14 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsUtilitiesSave056Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesSave056Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.Save();
         return JSUndefined.Value;
     }
 
 
-    private static JSValue JsUtilitiesRestore057Core(global::Broiler.HtmlBridge.CanvasRenderingContext2D? context2d, in Arguments _)
+    private static JSValue JsUtilitiesRestore057Core(CanvasRenderingContext2D? context2d, in Arguments _)
     {
         context2d.Restore();
         return JSUndefined.Value;

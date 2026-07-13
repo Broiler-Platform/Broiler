@@ -1,3 +1,4 @@
+using Broiler.HtmlBridge.DomBridge;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -8,25 +9,22 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
     private void InstallEventTargetApi(JSObject target, string logContext)
     {
-        target.FastAddValue(
-            (KeyString)"addEventListener",
-            new JSFunction((in Arguments a) => JsMessagingAddEventListener001Core(target, in a), "addEventListener", 3),
+        target.FastAddValue((KeyString)"addEventListener",
+            new JSFunction((in a) => JsMessagingAddEventListener001Core(target, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue(
-            (KeyString)"removeEventListener",
-            new JSFunction((in Arguments a) => JsMessagingRemoveEventListener002Core(target, in a), "removeEventListener", 3),
+        target.FastAddValue((KeyString)"removeEventListener",
+            new JSFunction((in a) => JsMessagingRemoveEventListener002Core(target, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue(
-            (KeyString)"dispatchEvent",
-            new JSFunction((in Arguments a) => JsMessagingDispatchEvent003Core(logContext, target, in a), "dispatchEvent", 1),
+        target.FastAddValue((KeyString)"dispatchEvent",
+            new JSFunction((in a) => JsMessagingDispatchEvent003Core(logContext, target, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -61,27 +59,31 @@ public sealed partial class DomBridge
         var currentListenerPassive = false;
         var legacyCancelBubble = false;
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
+
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in Arguments _) => JsMessagingStopPropagation004Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
+            new JSFunction((in _) => JsMessagingStopPropagation004Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in Arguments _) => JsMessagingStopImmediatePropagation005Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
+            new JSFunction((in _) => JsMessagingStopImmediatePropagation005Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in Arguments _) => JsMessagingPreventDefault006Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new JSFunction((in _) => JsMessagingPreventDefault006Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddProperty(
-            (KeyString)"cancelBubble",
-            new JSFunction((in Arguments _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in Arguments setArgs) => JsMessagingSetCancelBubble008Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
+
+        evt.FastAddProperty((KeyString)"cancelBubble",
+            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new JSFunction((in setArgs) => JsMessagingSetCancelBubble008Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
-        evt.FastAddProperty(
-            (KeyString)"returnValue",
-            new JSFunction((in Arguments _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in Arguments setArgs) => JsMessagingSetReturnValue010Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+
+        evt.FastAddProperty((KeyString)"returnValue",
+            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new JSFunction((in setArgs) => JsMessagingSetReturnValue010Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in Arguments _) => new JSArray(target), "composedPath", 0),
+            new JSFunction((in _) => new JSArray(target), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         InvokeEventTargetHandler(target, eventType, evt, logContext);
@@ -237,7 +239,7 @@ public sealed partial class DomBridge
     {
         window.FastAddValue(
             (KeyString)"postMessage",
-            new JSFunction((in Arguments a) => JsMessagingPostMessage012Core(window, in a), "postMessage", 2),
+            new JSFunction((in a) => JsMessagingPostMessage012Core(window, in a), "postMessage", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -289,6 +291,7 @@ public sealed partial class DomBridge
         var seenPorts = new HashSet<JSObject>(ReferenceEqualityComparer.Instance);
         var transferredBuffers = new List<JSValue>();
         var seenBuffers = new HashSet<JSArrayBuffer>(ReferenceEqualityComparer.Instance);
+
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
             if (item is JSObject port && _messagePortPeers.ContainsKey(port))
@@ -408,25 +411,21 @@ public sealed partial class DomBridge
         InstallEventTargetApi(port, "DomBridge.messagePort.dispatchEvent");
         JSValue onMessageHandler = JSNull.Value;
 
-        port.FastAddValue(
-            (KeyString)"postMessage",
-            new JSFunction((in Arguments a) => JsMessagingPostMessage013Core(port, in a), "postMessage", 1),
+        port.FastAddValue((KeyString)"postMessage",
+            new JSFunction((in a) => JsMessagingPostMessage013Core(port, in a), "postMessage", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        port.FastAddProperty(
-            (KeyString)"onmessage",
-            new JSFunction((in Arguments _) => onMessageHandler, "get onmessage"),
-            new JSFunction((in Arguments a) => JsMessagingSetOnmessage015Core(ref onMessageHandler, port, in a), "set onmessage"),
+        port.FastAddProperty((KeyString)"onmessage",
+            new JSFunction((in _) => onMessageHandler, "get onmessage"),
+            new JSFunction((in a) => JsMessagingSetOnmessage015Core(ref onMessageHandler, port, in a), "set onmessage"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        port.FastAddValue(
-            (KeyString)"start",
-            new JSFunction((in Arguments a) => JsMessagingStart016Core(port, in a), "start", 0),
+        port.FastAddValue((KeyString)"start",
+            new JSFunction((in a) => JsMessagingStart016Core(port, in a), "start", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        port.FastAddValue(
-            (KeyString)"close",
-            new JSFunction((in Arguments a) => JsMessagingClose017Core(port, in a), "close", 0),
+        port.FastAddValue((KeyString)"close",
+            new JSFunction((in a) => JsMessagingClose017Core(port, in a), "close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return port;

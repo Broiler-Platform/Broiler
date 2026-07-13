@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -14,7 +15,7 @@ public sealed partial class DomBridge
     /// properties.  This prevents the renderer from applying unsupported CSS
     /// that would conflict with the resolved inline styles.
     /// </summary>
-    private static void NeutralizeStyleElementsForAnchorRules(Broiler.Dom.DomElement root)
+    private static void NeutralizeStyleElementsForAnchorRules(DomElement root)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
@@ -49,15 +50,14 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(root))
             NeutralizeStyleElementsForAnchorRules(child);
     }
-    private static readonly System.Text.RegularExpressions.Regex CssRuleBlockPattern = new(
-        @"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}",
-        RegexOptions.Compiled);
+
+    private static readonly Regex CssRuleBlockPattern = CssRuleBlockPatternRegex();
+
     /// <summary>
     /// Matches <c>@position-try</c> at-rules (with their full block).
     /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex PositionTryAtRulePattern = new(
-        @"@position-try\s+[^{]+\{[^}]*\}",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PositionTryAtRulePattern = PositionTryAtRulePatternRegex();
+
     /// <summary>
     /// Property names that are anchor-positioning-specific and should be
     /// stripped from CSS rule bodies after the DomBridge has resolved them
@@ -73,6 +73,7 @@ public sealed partial class DomBridge
         "position-try",
         "position-visibility",
     ];
+
     private static string RemoveUnsupportedCssRules(string css)
     {
         // 1. Remove @position-try at-rules entirely.
@@ -118,13 +119,13 @@ public sealed partial class DomBridge
 
         return css;
     }
+
     /// <summary>
     /// Layout properties that should also be stripped when the DomBridge has
     /// resolved position-area or position-anchor to inline pixel values.
     /// These would otherwise conflict with the DomBridge-computed values.
     /// </summary>
-    private static readonly HashSet<string> PositionResolvedProperties = new(
-        StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> PositionResolvedProperties = new(StringComparer.OrdinalIgnoreCase)
     {
         "position", "width", "height", "top", "left", "right", "bottom",
         "inset", "inset-block", "inset-inline",
@@ -135,6 +136,7 @@ public sealed partial class DomBridge
         "grid-column-start", "grid-column-end",
         "grid-row-start", "grid-row-end",
     };
+
     /// <summary>
     /// Removes individual CSS declarations that use anchor-positioning
     /// properties from a rule body string, keeping all other declarations.
@@ -192,4 +194,9 @@ public sealed partial class DomBridge
 
         return sb.ToString();
     }
+
+    [GeneratedRegex(@"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}", RegexOptions.Compiled)]
+    private static partial Regex CssRuleBlockPatternRegex();
+    [GeneratedRegex(@"@position-try\s+[^{]+\{[^}]*\}", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex PositionTryAtRulePatternRegex();
 }

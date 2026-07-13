@@ -1,4 +1,6 @@
-namespace Broiler.HtmlBridge;
+using Broiler.Dom;
+
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -13,11 +15,9 @@ public sealed partial class DomBridge
     /// but cannot resolve dimensions from opposing inset values (e.g.
     /// <c>top: 0; bottom: 0</c> should give full-height but doesn't).
     /// </summary>
-    private void ResolveFixedPositionSizing(int vpW, int vpH)
-    {
-        ResolveFixedPositionSizingInTree(DocumentElement, vpW, vpH);
-    }
-    private void ResolveFixedPositionSizingInTree(Broiler.Dom.DomElement el, int vpW, int vpH)
+    private void ResolveFixedPositionSizing(int vpW, int vpH) => ResolveFixedPositionSizingInTree(DocumentElement, vpW, vpH);
+
+    private void ResolveFixedPositionSizingInTree(DomElement el, int vpW, int vpH)
     {
         if (!IsText(el))
         {

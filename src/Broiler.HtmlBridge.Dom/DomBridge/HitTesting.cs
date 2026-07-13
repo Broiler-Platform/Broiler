@@ -1,6 +1,7 @@
 using Broiler.JavaScript.Runtime;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -9,36 +10,37 @@ public sealed partial class DomBridge
             ? args[index].DoubleValue
             : double.NaN;
 
-    private IReadOnlyList<Broiler.Dom.DomElement> HitTestDocumentPoint(Broiler.Dom.DomElement docRoot, double x, double y)
+    private IReadOnlyList<DomElement> HitTestDocumentPoint(DomElement docRoot, double x, double y)
     {
         if (!double.IsFinite(x) || !double.IsFinite(y))
-            return Array.Empty<Broiler.Dom.DomElement>();
+            return [];
 
         var documentElement = IsDocumentElement(docRoot)
             ? docRoot
-            : ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith("#"));
+            : ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#'));
+
         if (documentElement == null)
-            return Array.Empty<Broiler.Dom.DomElement>();
+            return [];
 
         if (!DocumentHasViewport(documentElement))
-            return Array.Empty<Broiler.Dom.DomElement>();
+            return [];
 
         var viewportWidth = GetViewportReferenceLength(documentElement, vertical: false);
         var viewportHeight = GetViewportReferenceLength(documentElement, vertical: true);
         if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
-            return Array.Empty<Broiler.Dom.DomElement>();
+            return [];
 
-        var hits = new List<Broiler.Dom.DomElement>();
+        var hits = new List<DomElement>();
         CollectHitTestMatches(documentElement, x, y, hits);
         return hits;
     }
 
-    private void CollectHitTestMatches(Broiler.Dom.DomElement element, double x, double y, List<Broiler.Dom.DomElement> hits)
+    private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)
     {
         for (var i = element.ChildNodes.Count - 1; i >= 0; i--)
         {
             // Only element children are hit-test candidates (skip text/comment).
-            if (ChildAt(element, i) is Broiler.Dom.DomElement child && !child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (ChildAt(element, i) is DomElement child && !child.TagName.StartsWith('#'))
                 CollectHitTestMatches(child, x, y, hits);
         }
 
@@ -47,7 +49,7 @@ public sealed partial class DomBridge
     }
 
 
-    private bool IsElementHitTestCandidate(Broiler.Dom.DomElement element, double x, double y)
+    private bool IsElementHitTestCandidate(DomElement element, double x, double y)
     {
         if (IsAreaElement(element))
             return IsImageMapAreaHit(element, x, y);
@@ -73,7 +75,7 @@ public sealed partial class DomBridge
                y >= rect.Top && y < rect.Top + rect.Height;
     }
 
-    private (double Left, double Top, double Width, double Height) GetHitTestRectForElement(Broiler.Dom.DomElement element)
+    private (double Left, double Top, double Width, double Height) GetHitTestRectForElement(DomElement element)
     {
         if (IsDocumentElement(element))
             return GetBoundingClientRectForDomElement(element, isRoot: true);
@@ -109,18 +111,17 @@ public sealed partial class DomBridge
         return rect;
     }
 
-    private static bool IsTableCellElement(Broiler.Dom.DomElement element)
+    private static bool IsTableCellElement(DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "td", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "th", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsAreaElement(Broiler.Dom.DomElement element) =>
+    private static bool IsAreaElement(DomElement element) =>
         string.Equals(element.TagName, "area", StringComparison.OrdinalIgnoreCase);
 
-    private bool TryGetListItemMarkerHitTestRect(
-        Broiler.Dom.DomElement element,
+    private bool TryGetListItemMarkerHitTestRect(DomElement element,
         out (double Left, double Top, double Width, double Height) rect)
     {
         rect = default;
@@ -128,8 +129,8 @@ public sealed partial class DomBridge
         if (!IsOutsideListItemMarkerCandidate(element, props))
             return false;
 
-        var baseRect = GetBoundingClientRectForDomElement(element, isRoot: false);
-        if (baseRect.Width <= 0 || baseRect.Height <= 0)
+        var (Left, Top, Width, Height) = GetBoundingClientRectForDomElement(element, isRoot: false);
+        if (Width <= 0 || Height <= 0)
             return false;
 
         var markerExtent = EstimateOutsideListMarkerExtent(element, props);
@@ -139,19 +140,17 @@ public sealed partial class DomBridge
         var isVertical = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
         if (isVertical)
         {
-            rect = (baseRect.Left, baseRect.Top - markerExtent, baseRect.Width, baseRect.Height + markerExtent);
+            rect = (Left, Top - markerExtent, Width, Height + markerExtent);
             return true;
         }
 
         var isRtl = string.Equals(props.GetValueOrDefault("direction"), "rtl", StringComparison.OrdinalIgnoreCase);
-        rect = isRtl
-            ? (baseRect.Left, baseRect.Top, baseRect.Width + markerExtent, baseRect.Height)
-            : (baseRect.Left - markerExtent, baseRect.Top, baseRect.Width + markerExtent, baseRect.Height);
+        rect = isRtl ? (Left, Top, Width + markerExtent, Height)
+            : (Left - markerExtent, Top, Width + markerExtent, Height);
         return true;
     }
 
-    private static bool IsOutsideListItemMarkerCandidate(
-        Broiler.Dom.DomElement element,
+    private static bool IsOutsideListItemMarkerCandidate(DomElement element,
         IReadOnlyDictionary<string, string> props)
     {
         var isListItem = string.Equals(element.TagName, "li", StringComparison.OrdinalIgnoreCase) ||
@@ -169,7 +168,7 @@ public sealed partial class DomBridge
                 !string.Equals(listStyleImage, "none", StringComparison.OrdinalIgnoreCase));
     }
 
-    private double EstimateOutsideListMarkerExtent(Broiler.Dom.DomElement element, IReadOnlyDictionary<string, string> props)
+    private double EstimateOutsideListMarkerExtent(DomElement element, IReadOnlyDictionary<string, string> props)
     {
         var fontSize = Math.Max(8, ResolveFontSizeForElement(element));
         var listStyleType = props.GetValueOrDefault("list-style-type");
@@ -184,7 +183,7 @@ public sealed partial class DomBridge
         return Math.Min(40, markerCore + 8);
     }
 
-    private static bool IsTableStructuralHitTestOnlyElement(Broiler.Dom.DomElement element)
+    private static bool IsTableStructuralHitTestOnlyElement(DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "tr", StringComparison.OrdinalIgnoreCase) ||
@@ -196,7 +195,7 @@ public sealed partial class DomBridge
     }
 
     private bool TryGetSimpleTableCellHitTestRect(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         out (double Left, double Top, double Width, double Height) rect)
     {
         rect = default;
@@ -235,13 +234,13 @@ public sealed partial class DomBridge
         if (columnCount <= 0 || rows.Count <= 0)
             return false;
 
-        var tableRect = GetBoundingClientRectForDomElement(table, isRoot: false);
-        if (tableRect.Width <= 0 || tableRect.Height <= 0)
+        var (Left, Top, Width, Height) = GetBoundingClientRectForDomElement(table, isRoot: false);
+        if (Width <= 0 || Height <= 0)
             return false;
 
         var (spacingX, spacingY) = GetEffectiveTableBorderSpacing(table);
-        var cellWidth = Math.Max(0, (tableRect.Width - (columnCount + 1) * spacingX) / columnCount);
-        var cellHeight = Math.Max(0, (tableRect.Height - (rows.Count + 1) * spacingY) / rows.Count);
+        var cellWidth = Math.Max(0, (Width - (columnCount + 1) * spacingX) / columnCount);
+        var cellHeight = Math.Max(0, (Height - (rows.Count + 1) * spacingY) / rows.Count);
         if (cellWidth <= 0 || cellHeight <= 0)
             return false;
 
@@ -252,19 +251,19 @@ public sealed partial class DomBridge
 
         rect = !isVertical
             ? (
-                tableRect.Left + spacingX + visualCellIndex * (cellWidth + spacingX),
-                tableRect.Top + spacingY + rowIndex * (cellHeight + spacingY),
+                Left + spacingX + visualCellIndex * (cellWidth + spacingX),
+                Top + spacingY + rowIndex * (cellHeight + spacingY),
                 cellWidth,
                 cellHeight)
             : (
-                tableRect.Left + spacingX + rowIndex * (cellWidth + spacingX),
-                tableRect.Top + spacingY + visualCellIndex * (cellHeight + spacingY),
+                Left + spacingX + rowIndex * (cellWidth + spacingX),
+                Top + spacingY + visualCellIndex * (cellHeight + spacingY),
                 cellWidth,
                 cellHeight);
         return true;
     }
 
-    private (double Horizontal, double Vertical) GetEffectiveTableBorderSpacing(Broiler.Dom.DomElement table)
+    private (double Horizontal, double Vertical) GetEffectiveTableBorderSpacing(DomElement table)
     {
         var rawValue = GetComputedProps(table).GetValueOrDefault("border-spacing");
         if (string.IsNullOrWhiteSpace(rawValue))
@@ -286,7 +285,7 @@ public sealed partial class DomBridge
         return (horizontal, vertical);
     }
 
-    private bool IsImageMapAreaHit(Broiler.Dom.DomElement area, double x, double y)
+    private bool IsImageMapAreaHit(DomElement area, double x, double y)
     {
         var image = FindAssociatedImageMapImage(area);
         if (image == null)
@@ -301,13 +300,13 @@ public sealed partial class DomBridge
         if (localX < 0 || localY < 0 || localX >= imageRect.Width || localY >= imageRect.Height)
             return false;
 
-        var coordinateScale = GetImageMapCoordinateScale(image, imageRect);
-        var scaledX = coordinateScale.ScaleX > 0 ? localX / coordinateScale.ScaleX : localX;
-        var scaledY = coordinateScale.ScaleY > 0 ? localY / coordinateScale.ScaleY : localY;
+        var (ScaleX, ScaleY) = GetImageMapCoordinateScale(image, imageRect);
+        var scaledX = ScaleX > 0 ? localX / ScaleX : localX;
+        var scaledY = ScaleY > 0 ? localY / ScaleY : localY;
         return IsPointInsideAreaShape(area, scaledX, scaledY);
     }
 
-    private Broiler.Dom.DomElement? FindAssociatedImageMapImage(Broiler.Dom.DomElement area)
+    private DomElement? FindAssociatedImageMapImage(DomElement area)
     {
         var map = ParentEl(area);
         if (map == null || !string.Equals(map.TagName, "map", StringComparison.OrdinalIgnoreCase))
@@ -333,11 +332,11 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private IEnumerable<Broiler.Dom.DomElement> EnumerateDomDescendants(Broiler.Dom.DomElement root)
+    private IEnumerable<DomElement> EnumerateDomDescendants(DomElement root)
     {
         foreach (var child in ChildElements(root))
         {
-            if (IsText(child) || child.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (IsText(child) || child.TagName.StartsWith('#'))
                 continue;
 
             yield return child;
@@ -347,7 +346,7 @@ public sealed partial class DomBridge
     }
 
     private (double ScaleX, double ScaleY) GetImageMapCoordinateScale(
-        Broiler.Dom.DomElement image,
+        DomElement image,
         (double Left, double Top, double Width, double Height) imageRect)
     {
         var widthBasis = ParsePositiveDouble(GetAttr(image, "width"));
@@ -358,7 +357,7 @@ public sealed partial class DomBridge
             heightBasis > 0 ? imageRect.Height / heightBasis : 1);
     }
 
-    private bool IsPointInsideAreaShape(Broiler.Dom.DomElement area, double x, double y)
+    private bool IsPointInsideAreaShape(DomElement area, double x, double y)
     {
         var shape = GetAttr(area, "shape")?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(shape))
@@ -374,11 +373,9 @@ public sealed partial class DomBridge
         };
     }
 
-    private bool IsPointInsideRoundedHitRect(
-        Broiler.Dom.DomElement element,
+    private bool IsPointInsideRoundedHitRect(DomElement element,
         (double Left, double Top, double Width, double Height) rect,
-        double x,
-        double y)
+        double x, double y)
     {
         var radius = GetUniformHitTestBorderRadius(element, rect.Width, rect.Height);
         if (radius <= 0)
@@ -400,15 +397,8 @@ public sealed partial class DomBridge
                !IsPointInsideRoundedCorner(localX, localY, rx, ry, rect.Width, rect.Height, top: false, left: false);
     }
 
-    private bool IsPointInsideRoundedCorner(
-        double localX,
-        double localY,
-        double rx,
-        double ry,
-        double width,
-        double height,
-        bool top,
-        bool left)
+    private bool IsPointInsideRoundedCorner(double localX, double localY,
+        double rx, double ry, double width, double height, bool top, bool left)
     {
         var cornerLeft = left ? 0 : width - rx;
         var cornerTop = top ? 0 : height - ry;
@@ -422,7 +412,7 @@ public sealed partial class DomBridge
         return normalizedX * normalizedX + normalizedY * normalizedY > 1;
     }
 
-    private double GetUniformHitTestBorderRadius(Broiler.Dom.DomElement element, double width, double height)
+    private double GetUniformHitTestBorderRadius(DomElement element, double width, double height)
     {
         var rawRadius = GetComputedProps(element).GetValueOrDefault("border-radius");
         if (string.IsNullOrWhiteSpace(rawRadius) || string.Equals(rawRadius, "0", StringComparison.Ordinal))
@@ -442,10 +432,9 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(rawCoords))
             return [];
 
-        return rawCoords
+        return [.. rawCoords
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(ParsePositiveOrNegativeDouble)
-            .ToList();
+            .Select(ParsePositiveOrNegativeDouble)];
     }
 
     private static bool IsPointInsideRectArea(IReadOnlyList<double> coords, double x, double y)
@@ -504,14 +493,14 @@ public sealed partial class DomBridge
             : 0;
     }
 
-    private bool IsElementRenderedForHitTesting(Broiler.Dom.DomElement element)
+    private bool IsElementRenderedForHitTesting(DomElement element)
     {
         for (var current = element; current != null; current = ParentEl(current))
         {
             if (IsText(current))
                 return false;
 
-            if (current.TagName.StartsWith("#", StringComparison.Ordinal))
+            if (current.TagName.StartsWith('#'))
                 continue;
 
             var props = GetComputedProps(current);
@@ -530,7 +519,7 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool DocumentHasViewport(Broiler.Dom.DomElement documentElement)
+    private static bool DocumentHasViewport(DomElement documentElement)
     {
         var docRoot = GetElementRuntimeState(documentElement).OwnerDocRoot;
         if (docRoot == null)

@@ -1,4 +1,6 @@
-namespace Broiler.HtmlBridge;
+using Broiler.Dom;
+
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -11,15 +13,9 @@ public sealed partial class DomBridge
     /// elements.  Hides elements when their anchor is not visible (scrolled out,
     /// CSS <c>visibility: hidden</c>) or does not exist.
     /// </summary>
-    private void ResolvePositionVisibility(
-        Broiler.Dom.DomElement root,
-        Dictionary<string, AnchorInfo> anchorRegistry)
-    {
-        ResolvePositionVisibilityTree(root, anchorRegistry);
-    }
-    private void ResolvePositionVisibilityTree(
-        Broiler.Dom.DomElement el,
-        Dictionary<string, AnchorInfo> anchorRegistry)
+    private void ResolvePositionVisibility(DomElement root, Dictionary<string, AnchorInfo> anchorRegistry) => ResolvePositionVisibilityTree(root, anchorRegistry);
+
+    private void ResolvePositionVisibilityTree(DomElement el, Dictionary<string, AnchorInfo> anchorRegistry)
     {
         if (!IsText(el))
         {
@@ -95,11 +91,12 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(el))
             ResolvePositionVisibilityTree(child, anchorRegistry);
     }
+
     /// <summary>
     /// Finds the <see cref="Broiler.Dom.DomElement"/> that has the given
     /// <c>anchor-name</c> (from CSS rules or inline styles).
     /// </summary>
-    private Broiler.Dom.DomElement? FindElementByAnchorName(string anchorName)
+    private DomElement? FindElementByAnchorName(string anchorName)
     {
         foreach (var el in Elements)
         {
@@ -121,6 +118,7 @@ public sealed partial class DomBridge
         }
         return null;
     }
+
     /// <summary>
     /// Checks whether the anchor element is "visible" for the purposes of
     /// <c>position-visibility: anchors-visible</c>.  An anchor is not visible
@@ -129,7 +127,7 @@ public sealed partial class DomBridge
     /// the scroll container is the containing block for the target element,
     /// the anchor is considered visible (per spec § position-visibility).
     /// </summary>
-    private bool IsAnchorVisibleForTarget(Broiler.Dom.DomElement anchor, Broiler.Dom.DomElement target)
+    private bool IsAnchorVisibleForTarget(DomElement anchor, DomElement target)
     {
         // Check CSS visibility on the anchor and its ancestors.
         if (HasInheritedVisibilityHidden(anchor))
@@ -180,7 +178,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Checks whether the element or any ancestor has <c>visibility: hidden</c>.
     /// </summary>
-    private bool HasInheritedVisibilityHidden(Broiler.Dom.DomElement el)
+    private bool HasInheritedVisibilityHidden(DomElement el)
     {
         var current = el;
         while (current != null)
@@ -198,7 +196,7 @@ public sealed partial class DomBridge
     /// <paramref name="container"/> by summing heights of preceding siblings
     /// and ancestor margins/padding up to the container.
     /// </summary>
-    private double ComputeNaturalOffsetInContainer(Broiler.Dom.DomElement el, Broiler.Dom.DomElement container)
+    private double ComputeNaturalOffsetInContainer(DomElement el, DomElement container)
     {
         double offset = 0;
         var current = el;
@@ -221,7 +219,7 @@ public sealed partial class DomBridge
     /// Finds the nearest positioned ancestor that serves as the containing
     /// block for an absolutely positioned element.
     /// </summary>
-    private Broiler.Dom.DomElement? FindContainingBlockElement(Broiler.Dom.DomElement el)
+    private DomElement? FindContainingBlockElement(DomElement el)
     {
         var parent = ParentEl(el);
         while (parent != null)
@@ -238,7 +236,7 @@ public sealed partial class DomBridge
     /// The anchor's CB is typically the same as the target's CB when both are
     /// inside the same positioned ancestor.
     /// </summary>
-    private Broiler.Dom.DomElement? FindAnchorContainingBlock(Broiler.Dom.DomElement target, Broiler.Dom.DomElement targetCB)
+    private DomElement? FindAnchorContainingBlock(DomElement target, DomElement targetCB)
     {
         // Find the anchor element by looking at the target's position-anchor.
         var cssProps = GetComputedProps(target);

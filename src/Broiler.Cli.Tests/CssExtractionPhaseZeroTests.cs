@@ -3,6 +3,7 @@ using Broiler.CSS;
 using Broiler.HTML.Core;
 using Broiler.HTML.Core.Entities;
 using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Dom;
 
 namespace Broiler.Cli.Tests;
 

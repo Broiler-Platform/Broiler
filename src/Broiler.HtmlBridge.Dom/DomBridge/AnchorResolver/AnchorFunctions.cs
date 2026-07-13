@@ -1,7 +1,8 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Broiler.Dom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
@@ -9,15 +10,9 @@ public sealed partial class DomBridge
     // anchor() resolution
     // -----------------------------------------------------------------
 
-    private static readonly System.Text.RegularExpressions.Regex AnchorFunctionPattern = new(
-        @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly System.Text.RegularExpressions.Regex AnchorSizeFunctionPattern = new(
-        @"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private void ResolveAnchorFunctions(
-        Broiler.Dom.DomElement element,
-        Dictionary<string, AnchorInfo> anchorRegistry)
+    private static readonly Regex AnchorFunctionPattern = AnchorFunctionPatternRegex();
+    private static readonly Regex AnchorSizeFunctionPattern = AnchorSizeFunctionPatternRegex();
+    private void ResolveAnchorFunctions(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var cssProps = CollectMatchedRuleProperties(element);
 
@@ -177,8 +172,7 @@ public sealed partial class DomBridge
     /// (that scroller scrolls both, or is the target's containing block). The offset
     /// is scaled to match <c>ApplyScrollSimulation</c> under an active visual viewport.
     /// </summary>
-    private void ComputeInterveningScrollOffset(
-        Broiler.Dom.DomElement anchorEl, Broiler.Dom.DomElement targetEl, out double offX, out double offY)
+    private void ComputeInterveningScrollOffset(DomElement anchorEl, DomElement targetEl, out double offX, out double offY)
     {
         offX = 0;
         offY = 0;
@@ -234,7 +228,7 @@ public sealed partial class DomBridge
     /// True when <paramref name="node"/> is <paramref name="ancestor"/> or a
     /// descendant of it.
     /// </summary>
-    private static bool IsDescendantOrSelf(Broiler.Dom.DomElement node, Broiler.Dom.DomElement ancestor)
+    private static bool IsDescendantOrSelf(DomElement node, DomElement ancestor)
     {
         for (var cur = node; cur != null; cur = ParentEl(cur))
             if (cur == ancestor)
@@ -255,7 +249,7 @@ public sealed partial class DomBridge
     /// dimensions.
     /// </summary>
     private static void ResolveAnchorSizeFunctions(
-        Broiler.Dom.DomElement element,
+        DomElement element,
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
@@ -305,4 +299,9 @@ public sealed partial class DomBridge
             }
         }
     }
+
+    [GeneratedRegex(@"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AnchorFunctionPatternRegex();
+    [GeneratedRegex(@"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex AnchorSizeFunctionPatternRegex();
 }

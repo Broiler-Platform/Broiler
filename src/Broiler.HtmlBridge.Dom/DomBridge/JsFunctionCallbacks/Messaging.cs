@@ -2,12 +2,12 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom;
 
 public sealed partial class DomBridge
 {
 
-    private JSValue JsMessagingAddEventListener001Core(global::Broiler.JavaScript.Runtime.JSObject target, in Arguments a)
+    private JSValue JsMessagingAddEventListener001Core(JSObject target, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -21,7 +21,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingRemoveEventListener002Core(global::Broiler.JavaScript.Runtime.JSObject target, in Arguments a)
+    private JSValue JsMessagingRemoveEventListener002Core(JSObject target, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -44,7 +44,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingDispatchEvent003Core(global::System.String logContext, global::Broiler.JavaScript.Runtime.JSObject target, in Arguments a)
+    private JSValue JsMessagingDispatchEvent003Core(string logContext, JSObject target, in Arguments a)
     {
         if (a.Length == 0 || a[0] is not JSObject evt)
             return JSBoolean.True;
@@ -52,14 +52,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingStopPropagation004Core(ref global::System.Boolean legacyCancelBubble, in Arguments _)
+    private JSValue JsMessagingStopPropagation004Core(ref bool legacyCancelBubble, in Arguments _)
     {
         legacyCancelBubble = true;
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsMessagingStopImmediatePropagation005Core(ref global::System.Boolean immediateStopped, ref global::System.Boolean legacyCancelBubble, in Arguments _)
+    private JSValue JsMessagingStopImmediatePropagation005Core(ref bool immediateStopped, ref bool legacyCancelBubble, in Arguments _)
     {
         immediateStopped = true;
         legacyCancelBubble = true;
@@ -67,7 +67,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingPreventDefault006Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments _)
+    private JSValue JsMessagingPreventDefault006Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments _)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
@@ -80,7 +80,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingSetCancelBubble008Core(ref global::System.Boolean legacyCancelBubble, in Arguments setArgs)
+    private JSValue JsMessagingSetCancelBubble008Core(ref bool legacyCancelBubble, in Arguments setArgs)
     {
         if (setArgs.Length > 0 && setArgs[0].BooleanValue)
             legacyCancelBubble = true;
@@ -88,7 +88,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingSetReturnValue010Core(global::System.Boolean currentListenerPassive, global::Broiler.JavaScript.Runtime.JSObject evt, ref global::System.Boolean prevented, in Arguments setArgs)
+    private JSValue JsMessagingSetReturnValue010Core(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments setArgs)
     {
         var cancelable = evt[(KeyString)"cancelable"];
         if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive && cancelable != null && cancelable.BooleanValue)
@@ -101,7 +101,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingPostMessage012Core(global::Broiler.JavaScript.Runtime.JSObject window, in Arguments a)
+    private JSValue JsMessagingPostMessage012Core(JSObject window, in Arguments a)
     {
         var targetWindow = a.This as JSObject ?? window;
         var sourceWindow = ResolveCurrentWindow();
@@ -127,7 +127,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingPostMessage013Core(global::Broiler.JavaScript.Runtime.JSObject? port, in Arguments a)
+    private JSValue JsMessagingPostMessage013Core(JSObject? port, in Arguments a)
     {
         var sourcePort = a.This as JSObject ?? port;
         if (_closedMessagePorts.Contains(sourcePort) || !_messagePortPeers.TryGetValue(sourcePort, out var targetPort) || _closedMessagePorts.Contains(targetPort))
@@ -166,7 +166,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingSetOnmessage015Core(ref global::Broiler.JavaScript.Runtime.JSValue onMessageHandler, global::Broiler.JavaScript.Runtime.JSObject? port, in Arguments a)
+    private JSValue JsMessagingSetOnmessage015Core(ref JSValue onMessageHandler, JSObject? port, in Arguments a)
     {
         onMessageHandler = a.Length > 0 ? a[0] : JSUndefined.Value;
         if (!onMessageHandler.IsNullOrUndefined)
@@ -178,14 +178,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsMessagingStart016Core(global::Broiler.JavaScript.Runtime.JSObject? port, in Arguments a)
+    private JSValue JsMessagingStart016Core(JSObject? port, in Arguments a)
     {
         ActivateMessagePort(a.This as JSObject ?? port);
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsMessagingClose017Core(global::Broiler.JavaScript.Runtime.JSObject? port, in Arguments a)
+    private JSValue JsMessagingClose017Core(JSObject? port, in Arguments a)
     {
         var currentPort = a.This as JSObject ?? port;
         _closedMessagePorts.Add(currentPort);
