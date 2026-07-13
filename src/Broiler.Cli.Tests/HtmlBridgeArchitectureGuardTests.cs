@@ -67,15 +67,117 @@ public class HtmlBridgeArchitectureGuardTests
         Assert.Contains("Broiler.CSS.Dom", references);
     }
 
-    // roadmap Phase 1 target: replace the Dom -> Rendering -> Broiler.HTML.Image path
-    // with a narrow ILayoutView contract. Until then the dependency exists; this
-    // tripwire pins the current reality so its removal in Phase 1 is a deliberate,
-    // reviewed change (update or delete this test when the reference is gone).
+    // roadmap Phase 1 (project-graph repair), exit criterion:
+    // "Broiler.HtmlBridge.Dom no longer references Broiler.HTML.Image." The geometry path
+    // now runs through the neutral ILayoutView contract, so no project in the bridge Dom's
+    // transitive project graph may reach the image-rendering stack. Walk the csproj graph
+    // (not just emitted assembly metadata, which never listed Image directly) to lock it.
     [Fact]
-    public void Baseline_Bridge_Rendering_Still_References_Html_Image_Until_Phase1()
+    public void Bridge_Dom_Project_Graph_Does_Not_Reach_Html_Image()
     {
-        var references = ReferencedBroilerAssemblies("Broiler.HtmlBridge.Rendering");
-        Assert.Contains("Broiler.HTML.Image", references);
+        var reachable = TransitiveProjectReferences("Broiler.HtmlBridge.Dom");
+        Assert.DoesNotContain("Broiler.HTML.Image", reachable);
+    }
+
+    // The geometry provider moved out of Broiler.HtmlBridge.Rendering into
+    // Broiler.HTML.Headless, so Rendering (which Dom still references for the canvas
+    // recorder) must itself no longer pull the renderer.
+    [Fact]
+    public void Bridge_Rendering_Project_Graph_Does_Not_Reach_Html_Image()
+    {
+        var reachable = TransitiveProjectReferences("Broiler.HtmlBridge.Rendering");
+        Assert.DoesNotContain("Broiler.HTML.Image", reachable);
+    }
+
+    // The narrow layout read-model contract the bridge depends on lives in the canonical
+    // Broiler.Layout, not in a bridge or renderer assembly.
+    [Fact]
+    public void Layout_Owns_The_LayoutView_Contract()
+    {
+        Assert.Equal("Broiler.Layout", typeof(Broiler.Layout.ILayoutView).Assembly.GetName().Name);
+        Assert.True(typeof(Broiler.Layout.ILayoutView).IsAssignableFrom(
+            typeof(Broiler.HTML.Headless.HeadlessLayoutView)));
+    }
+
+    // roadmap Phase 1 (project-graph repair), exit criterion: "One Broiler.Dom assembly node
+    // and one Graphics implementation in a solution build." Submodules carry nested checkouts
+    // of both kernels for standalone builds; in-tree every consumer resolves the single ROOT
+    // checkout via $(BroilerDomPath)/$(BroilerGraphicsPath), so the main solution lists exactly
+    // one node for each canonical kernel csproj.
+    [Theory]
+    [InlineData("Broiler.Dom.csproj")]
+    [InlineData("Broiler.Graphics.csproj")]
+    public void Solution_Builds_A_Single_Canonical_Kernel_Node(string projectFileName)
+    {
+        var solutionPath = Path.Combine(FindRepositoryRoot(), "Broiler.slnx");
+        var pattern = new System.Text.RegularExpressions.Regex(
+            "Path=\"[^\"]*/" + System.Text.RegularExpressions.Regex.Escape(projectFileName) + "\"");
+        var count = pattern.Matches(File.ReadAllText(solutionPath)).Count;
+
+        Assert.Equal(1, count);
+    }
+
+    // Set of Broiler assembly names reachable through the csproj <ProjectReference> graph
+    // rooted at the given project. Literal relative Includes are resolved; MSBuild
+    // property-based Includes (e.g. $(BroilerDomPath), introduced by the Phase 1 path
+    // dedup) resolve only to the canonical Dom/Graphics kernels and never toward the image
+    // stack, so they are skipped rather than MSBuild-evaluated.
+    private static HashSet<string> TransitiveProjectReferences(string rootProjectName)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var start = FindProjectFile(repositoryRoot, rootProjectName)
+            ?? throw new FileNotFoundException($"Could not locate {rootProjectName}.csproj");
+
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<string>();
+        queue.Enqueue(start);
+        visited.Add(start);
+
+        var includePattern = new System.Text.RegularExpressions.Regex(
+            "<ProjectReference\\s+Include=\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        while (queue.Count > 0)
+        {
+            var projectFile = queue.Dequeue();
+            var directory = Path.GetDirectoryName(projectFile)!;
+            foreach (System.Text.RegularExpressions.Match match in includePattern.Matches(File.ReadAllText(projectFile)))
+            {
+                var include = match.Groups[1].Value;
+                if (include.Contains('$', StringComparison.Ordinal))
+                    continue; // property-based path (Dom/Graphics kernel) — never reaches the image stack
+
+                var normalized = include.Replace('\\', Path.DirectorySeparatorChar);
+                var fullPath = Path.GetFullPath(Path.Combine(directory, normalized));
+                if (!File.Exists(fullPath) || !visited.Add(fullPath))
+                    continue;
+
+                result.Add(Path.GetFileNameWithoutExtension(fullPath));
+                queue.Enqueue(fullPath);
+            }
+        }
+
+        return result;
+    }
+
+    private static string? FindProjectFile(string repositoryRoot, string projectName)
+    {
+        var candidate = Path.Combine(repositoryRoot, "src", projectName, projectName + ".csproj");
+        return File.Exists(candidate) ? candidate : null;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate Broiler.slnx from the test output directory.");
     }
 
     private static string[] ReferencedBroilerAssemblies(string assemblyName) =>

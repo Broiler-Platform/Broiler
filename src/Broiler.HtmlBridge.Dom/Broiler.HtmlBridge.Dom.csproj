@@ -12,6 +12,7 @@
     <InternalsVisibleTo Include="Broiler" />
     <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
+    <InternalsVisibleTo Include="Broiler.Engines.Baseline" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
     <InternalsVisibleTo Include="Broiler.Wpt" />
@@ -26,7 +27,9 @@
     <ProjectReference Include="..\Broiler.HtmlBridge.Core\Broiler.HtmlBridge.Core.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Rendering\Broiler.HtmlBridge.Rendering.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Dom\Broiler.HTML.Dom.csproj" />
-    <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+    <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
+    <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
+    <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.Globals\Broiler.JavaScript.Globals.csproj" />
   </ItemGroup>
 
 </Project>

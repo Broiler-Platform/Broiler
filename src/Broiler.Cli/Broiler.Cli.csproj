@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image.Compat\Broiler.HTML.Image.Compat.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Headless\Broiler.HTML.Headless.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Orchestration\Broiler.HTML.Orchestration.csproj" />
     <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
     <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />

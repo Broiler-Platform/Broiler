@@ -249,6 +249,19 @@ observed status) lives in [Phase 0 baseline](htmlbridge-phase0-baseline.md).
 
 ### Phase 1 - repair the project graph
 
+Status: **completed** 2026-07-13 (branch `htmlbridge-phase1-project-graph`). All five
+work items landed: (1) dropped the dead Rendering→Core reference; (2) inverted
+Dom→HTML.Image behind a new `Broiler.Layout.ILayoutView`, with the renderer-backed
+implementation relocated to the new `Broiler.HTML.Headless` submodule project and injected
+into `DomBridge` via a `[ModuleInitializer]`-registered factory; (3) made the layout view
+disposable, document-scoped and `(document,version,viewport,baseUrl)`-keyed; (4) collapsed
+the duplicate `Broiler.Dom`/`Broiler.Graphics` nodes via overridable `$(BroilerDomPath)`/
+`$(BroilerGraphicsPath)` MSBuild props plus a `scripts/check-submodule-sha-drift.sh` CI
+guard; (5) narrowed the bridge Dom/Scripting projects off `Broiler.JavaScript.All`. All four
+exit criteria are locked by guard tests in `HtmlBridgeArchitectureGuardTests`. The static
+`DomBridge.LayoutViewFactory` seam is an intentional temporary compromise that Phase 2's
+`BrowserDocumentSession` replaces with constructor injection.
+
 Goal: make later extraction possible without dragging duplicate or high-level
 projects through every test.
 

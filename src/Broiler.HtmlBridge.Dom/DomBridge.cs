@@ -876,6 +876,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         ClearComputedPropsCache();
         ClearChildren(_documentNode);
         _serializationTransformsApplied = false;
+        // A re-parsed document is a new generation: release the prior document's headless
+        // layout view (and its renderer container) so geometry is document-scoped.
+        DisposeLayoutView();
 
         // Parse DOCTYPE from the HTML and add it as first child of _documentNode
         var doctype = ParseDocType(html);
