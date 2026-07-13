@@ -51,6 +51,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // characterData record delivery — lives in the MutationObserverBinding module, reached through
     // the narrow IMutationObserverHost contract (see DomBridge.MutationObserverHost.cs).
     private readonly Dom.Features.MutationObserverBinding _mutations;
+    // Phase 3 (P3.3): the DOM event dispatch engine — capture/target/bubble propagation, the event
+    // object's propagation-control methods and composedPath() — lives in EventDispatchBinding,
+    // reached through the narrow IEventDispatchHost contract (see DomBridge.EventDispatchHost.cs).
+    private readonly Dom.Features.EventDispatchBinding _eventDispatch;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -135,6 +139,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         _traversal = new Dom.Features.TraversalBinding(this);
         _mutations = new Dom.Features.MutationObserverBinding(this);
+        _eventDispatch = new Dom.Features.EventDispatchBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");

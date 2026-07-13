@@ -514,10 +514,33 @@ guards + childList/attribute-oldValue/disconnect characterizations). Regression 
 MutationObserver, DomEvents, Attributes, Traversal, Messaging and architecture-guard suites pass
 unchanged; same pre-existing/known failures as above → zero regressions.
 
-Still to come: the Events dispatch engine itself (the highest-coupling piece —
-`addEventListener` is registered across four files and `DispatchEventOnElement`/`FireListeners`
-are called from ~12), then CSSOM, Element, Window/Document, Forms, Frames/Network, Messaging,
-Canvas, and the DomBridge 500-800-line facade target.
+Status: **P3.3 completed** 2026-07-13 (same branch). The **event dispatch engine** — the highest-
+coupling core of the Events feature — is the third co-located module: `EventDispatchBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) owns the capture → target → bubble propagation
+algorithm (`DispatchEventOnElement`), the per-element listener firing (`FireListeners`, which had no
+external callers), the event object's propagation-control methods (`stopPropagation`/
+`stopImmediatePropagation`/`preventDefault`/`cancelBubble`/`returnValue`, renamed from the numbered
+`JsEvents…001…007Core`) and `composedPath()`. It reads what it dispatches through the narrow
+`IEventDispatchHost` contract (`ToJSObject`, `DocumentNode`, `DocumentJSObject`, `WindowJSObject`,
+`GetEventListeners`, `GetInlineEventHandlers`), implemented by explicit interface members in
+`DomBridge.EventDispatchHost.cs`. **Deliberately kept in the bridge** (different concerns, not
+dispatch): the `addEventListener`/`removeEventListener` *registration* helpers
+(`CreateEventListenerRegistration`/`GetCaptureForRemoval`/`HasMatchingEventListener`) that the four
+registration sites use, inline-handler *compilation* (`CompileInlineEventAttribute(s)`), form
+validity checks, and the shared `InvokeEventListener` (widened to `internal static` — also used by
+the window/submit/messaging firing paths, which the module calls as `DomBridge.InvokeEventListener`).
+The bridge keeps a same-name `DispatchEventOnElement` delegator so the ~five caller files
+(`JsObjects`/`Registration`/`LayoutMetrics`/`SubDocuments`/`DomBridge.cs`) are untouched; the emptied
+`JsFunctionCallbacks/Events.cs` was deleted. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/EventDispatchBindingModuleTests.cs` (co-location/
+host-contract guards + capture/target/bubble ordering, stopPropagation and preventDefault
+characterizations). Regression check: DomEvents (81), DomEventsEdgeCase (33), Acid3RegressionTests
+(26), Attributes, MutationObserver, Messaging and architecture-guard suites pass unchanged → zero
+regressions.
+
+Still to come: the `addEventListener` registration itself (spread across four files), then CSSOM,
+Element, Window/Document, Forms, SVG, Dialog/popover, Frames/Network, Messaging, Canvas, and the
+DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
