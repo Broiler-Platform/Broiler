@@ -10,7 +10,7 @@ using Broiler.Dom;
 using Broiler.CSS;
 using Broiler.CSS.Cssom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// CSSOM — style-sheet collection, individual style-sheet objects, and

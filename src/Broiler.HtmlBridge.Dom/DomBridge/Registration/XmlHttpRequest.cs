@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Engine;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

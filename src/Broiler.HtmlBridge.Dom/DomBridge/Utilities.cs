@@ -11,7 +11,7 @@ using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
 using Broiler.CSS;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Internal helper methods — string conversions, DOM tree utilities,

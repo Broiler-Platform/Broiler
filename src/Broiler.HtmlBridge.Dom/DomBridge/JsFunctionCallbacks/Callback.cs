@@ -2,7 +2,7 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

@@ -12,7 +12,7 @@ using Broiler.Dom;
 using Broiler.CSS;
 using Broiler.CSS.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// CSS specificity calculation, style-block extraction, rule cascading,

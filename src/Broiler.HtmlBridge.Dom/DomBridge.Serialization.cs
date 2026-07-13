@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using Broiler.Dom.Html;
 using Broiler.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// DOM → HTML serialisation — converts the in-memory DOM tree back to
