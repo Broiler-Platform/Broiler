@@ -33,18 +33,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public const int AsyncDrainIterationLimit = 1000;
 
-    // External resource fetches (stylesheets, iframe documents, JS fetch) block
-    // the synchronous render/script pipeline.  In the sandboxed WPT/headless
-    // environment external http(s) hosts are unreachable, so the only question is
-    // how long each blocked fetch waits before failing — and the per-test budget
-    // (Broiler.Wpt's default 30 s) equals this client's old 30 s timeout, so a
-    // single unreachable stylesheet consumed the entire budget and timed the test
-    // out (WPT #1147 Timeout cluster, e.g. CSS2/cascade-import-* which @link three
-    // delayed-file CGI URLs).  A short timeout fails fast: even several sequential
-    // external fetches stay well under the test budget, converting a 30 s hang
-    // (which also risks aborting the whole shard) into a quick, deterministic miss.
-    private const int FetchTimeoutSeconds = 5;
-    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
+    // P2.6: sub-resource HTTP and the local base path now live in ResourceLoader, the single host
+    // resource loader (was the static SharedHttpClient plus the _localBasePath field). Feature
+    // callbacks ask the loader instead of reaching a static HttpClient.
+    private readonly Dom.Runtime.ResourceLoader _resources = new();
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
@@ -54,7 +46,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // widen on the current homogeneous tree.
     private readonly HashSet<DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<(JSObject Observer, DomNode Target, DomMutationObserverOptions Options)> _mutationObservers = [];
+    // P2.5: registered MutationObservers now live in MutationObserverHub, the single observer owner
+    // (was the bare _mutationObservers list).
+    private readonly Dom.Runtime.MutationObserverHub _mutationObserverHub = new();
     private readonly List<WeakReference<DomRange>> _activeRanges = [];
     private readonly List<WeakReference<DomNodeIterator>> _activeNodeIterators = [];
     private readonly DomDocument _document;
@@ -63,39 +57,28 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
-    private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
-    // Timer & async execution queues.
-    //
-    // These are read and cleared by the main-thread timer drain (FlushTimerStep)
-    // but written by setTimeout/setInterval/requestAnimationFrame and scroll
-    // callbacks that can run on ThreadPool threads — the JS engine dispatches
-    // Promise/async/generator continuations via ThreadPool.QueueUserWorkItem, so
-    // a continuation may register a timer concurrently with a flush. Plain
-    // Dictionary/HashSet are not safe under that race (it surfaced as
-    // "Collection was modified" / "Destination array is not long enough" aborting
-    // FlushTimerStep), so use concurrent collections and atomic id counters.
-    private int _timerIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _timeoutCallbacks = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _intervalCallbacks = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, byte> _clearedTimerIds = new();
-    private int _rafIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _rafCallbacks = new();
-    private int _frameActionIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Action> _frameActions = new();
-    // Touched by the same scroll/frame-action callbacks that can run on
-    // ThreadPool threads (see the timer-map note above), so keep it concurrent.
+    // P2.4: the timer/interval/requestAnimationFrame/frame-action queues, their id counters and the
+    // drain (FlushTimerStep/FlushTimers) now live in BrowserEventLoop, the single owner of the
+    // document's task queues (was the eight scattered _timerIdCounter/_timeoutCallbacks/… fields).
+    private readonly Dom.Runtime.BrowserEventLoop _eventLoop = new();
+    // Smooth-scroll continuation tokens: a per-element monotonic marker so a queued smooth-scroll
+    // frame action only commits if it is still the active scroll for that element. Touched by
+    // scroll/frame-action callbacks that can run on ThreadPool threads, so keep it concurrent.
+    private int _smoothScrollTokenCounter;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, int> _smoothScrollTokens = new();
-    private readonly List<JSFunction> _visualViewportScrollListeners = [];
-    private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<JSObject, Dictionary<string, List<EventListenerRegistration>>> _eventTargetListeners = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows = new(ReferenceEqualityComparer.Instance);
+    // P2.5: the event-listener stores (per-node addEventListener listeners, window listeners,
+    // generic JS-target listeners, target→owner-window map, and visual-viewport scroll listeners)
+    // now live in EventTargetRegistry, the single listener owner (was the scattered
+    // _windowEventListeners/_eventTargetListeners/_eventTargetOwnerWindows/_visualViewportScrollListeners
+    // fields plus ElementRuntimeState.EventListeners for node listeners).
+    private readonly Dom.Runtime.EventTargetRegistry _eventTargets = new();
     private readonly Dictionary<JSObject, DomElement> _subWindowContainers = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, JSObject> _messagePortPeers = new(ReferenceEqualityComparer.Instance);
-    private readonly HashSet<JSObject> _closedMessagePorts = new(ReferenceEqualityComparer.Instance);
-    private readonly HashSet<JSObject> _startedMessagePorts = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, List<JSObject>> _queuedMessagePortEvents = new(ReferenceEqualityComparer.Instance);
+    // P2.6: MessageChannel/MessagePort state (peers, closed/started marks, queued messages) now lives
+    // in MessagePortRegistry, the single owner of the browsing-context port state (was the scattered
+    // _messagePortPeers/_closedMessagePorts/_startedMessagePorts/_queuedMessagePortEvents fields).
+    private readonly Dom.Runtime.MessagePortRegistry _messagePorts = new();
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -115,12 +98,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         get => CurrentScriptIndex;
         set => CurrentScriptIndex = value;
     }
-
-    /// <summary>
-    /// Optional local base path for resolving relative sub-resource URLs to local files.
-    /// When set, relative URLs are first checked against this directory before attempting HTTP.
-    /// </summary>
-    private string? _localBasePath;
 
     // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
     private int _viewportWidth = 1024;
@@ -412,8 +389,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     internal IReadOnlyDictionary<string, string> GetSparseComputedStyleForParity(DomElement element) =>
         GetSyncedScopedEngine(element).GetSparseComputedStyle(element, sparseInheritance: true);
 
-    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
-        GetElementRuntimeState(element).EventListeners;
+    private Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
+        _eventTargets.NodeListeners(element);
 
     private static Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
@@ -463,6 +440,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void Attach(JSContext context, string html)
     {
+        ThrowIfDisposed();
         ParseHtml(html);
         RegisterDocument(context);
     }
@@ -474,6 +452,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void Attach(JSContext context, string html, string url)
     {
+        ThrowIfDisposed();
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             _pageUrl = uri.ToString();
@@ -549,7 +528,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// When set, sub-resource URLs (e.g. iframe src) are first looked up as files
     /// relative to this directory before falling back to HTTP fetch.
     /// </summary>
-    public void SetLocalBasePath(string basePath) => _localBasePath = basePath;
+    public void SetLocalBasePath(string basePath) => _resources.LocalBasePath = basePath;
 
     /// <summary>
     /// Executes all pending <c>setTimeout</c>, <c>setInterval</c>, and
@@ -561,15 +540,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void FlushTimers()
     {
-        const int maxIterations = 1000;
-        for (var iteration = 0; iteration < maxIterations; iteration++)
-        {
-            if (!FlushTimerStep())
-                break;
-        }
-
-        // Clear all processed timer IDs after flush loop completes
-        _clearedTimerIds.Clear();
+        ThrowIfDisposed();
+        _eventLoop.DrainAll(TaskCheckpointCallback);
     }
 
     /// <summary>
@@ -577,7 +549,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>setInterval</c>, or <c>requestAnimationFrame</c> callbacks
     /// waiting to execute.
     /// </summary>
-    public bool HasPendingTimers => !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
+    public bool HasPendingTimers
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _eventLoop.HasPendingWork;
+        }
+    }
 
     /// <summary>
     /// Executes one batch of pending timer and animation-frame callbacks.
@@ -588,93 +567,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public bool FlushTimerStep()
     {
-        void RunTaskCheckpoint()
-        {
-            try
-            {
-                TaskCheckpointCallback?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"Task checkpoint error: {ex.Message}", ex);
-            }
-        }
-
-        var pending = new List<(int Id, JSFunction Fn)>();
-
-        // ConcurrentDictionary.ToArray() takes a consistent snapshot even while
-        // other threads register callbacks, and TryRemove drains only the entries
-        // we actually collected — so a timer registered concurrently (or by a
-        // callback that runs during this flush) is carried to the next step
-        // instead of being wiped by a blanket Clear().
-
-        // Collect timeout callbacks (one-shot: remove as collected)
-        foreach (var kv in _timeoutCallbacks.ToArray())
-        {
-            if (_timeoutCallbacks.TryRemove(kv.Key, out var fn) && !_clearedTimerIds.ContainsKey(kv.Key))
-                pending.Add((kv.Key, fn));
-        }
-
-        // Collect interval callbacks (execute once per step, keep registered)
-        var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _intervalCallbacks.ToArray())
-        {
-            if (!_clearedTimerIds.ContainsKey(kv.Key))
-                intervalSnapshot.Add((kv.Key, kv.Value));
-        }
-
-        // Collect rAF callbacks (one-shot: remove as collected)
-        var rafSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _rafCallbacks.ToArray())
-        {
-            if (_rafCallbacks.TryRemove(kv.Key, out var fn))
-                rafSnapshot.Add((kv.Key, fn));
-        }
-
-        var frameActionSnapshot = new List<Action>();
-        foreach (var kv in _frameActions.ToArray())
-        {
-            if (_frameActions.TryRemove(kv.Key, out var action))
-                frameActionSnapshot.Add(action);
-        }
-
-        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
-            return false;
-
-        // Execute timeout callbacks
-        foreach (var (id, fn) in pending)
-        {
-            if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setTimeout callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        // Execute interval callbacks (one tick per step)
-        foreach (var (id, fn) in intervalSnapshot)
-        {
-            if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setInterval callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        // Execute rAF callbacks
-        foreach (var (id, fn) in rafSnapshot)
-        {
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"rAF callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        foreach (var action in frameActionSnapshot)
-        {
-            try { action(); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"frame action error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        return true;
+        ThrowIfDisposed();
+        return _eventLoop.DrainStep(TaskCheckpointCallback);
     }
 
     /// <summary>
@@ -688,6 +582,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void FireWindowLoadEvent()
     {
+        ThrowIfDisposed();
         if (_jsContext == null) return;
 
         _jsContext["frames"] = BuildWindowFramesArray();
@@ -816,7 +711,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             new JSFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        if (_windowEventListeners.TryGetValue(eventType, out var listeners))
+        if (_eventTargets.TryGetWindowListeners(eventType, out var listeners))
         {
             foreach (var registration in listeners.ToList())
             {
@@ -872,10 +767,17 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private void ParseHtml(string html)
     {
         _knownNodes.Clear();
-        _jsObjectCache.Clear();
+        // P2.2: one call clears both wrapper maps. Re-parse now also releases stale sub-document
+        // wrappers (keyed by detached roots that no lookup can reach again) — observably
+        // equivalent to before, but it stops them lingering until disposal.
+        _jsObjects.Clear();
         ClearComputedPropsCache();
         ClearChildren(_documentNode);
         _serializationTransformsApplied = false;
+        // A re-parse is a new document generation: drop the prior document's timers, listeners,
+        // observers and message ports so re-attaching leaves no state from the previous document
+        // (HtmlBridge complexity-reduction roadmap Phase 2, P2.1).
+        ClearRuntimeSessionState();
         // A re-parsed document is a new generation: release the prior document's headless
         // layout view (and its renderer container) so geometry is document-scoped.
         DisposeLayoutView();

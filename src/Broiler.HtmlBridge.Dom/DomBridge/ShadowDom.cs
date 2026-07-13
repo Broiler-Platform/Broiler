@@ -57,7 +57,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(root, _documentNode))
             return _documentJSObject ?? JSNull.Value;
 
-        if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _docRootToDocJSObject.TryGetValue(rootEl, out var subDocument))
+        if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _jsObjects.TryGetDocument(rootEl, out var subDocument))
             return subDocument;
 
         return ToJSObject(root);

@@ -293,6 +293,142 @@ Exit criteria:
 
 ### Phase 2 - establish document services and a single state authority
 
+Status: **P2.1 completed** 2026-07-13 (branch `htmlbridge-phase2-p2-1-lifetime-disposal`).
+`DomBridge` is now `IDisposable` with a deterministic, idempotent `Dispose()` that releases
+every per-session resource (layout view, timer/animation queues, listener stores, mutation
+observers, ranges/iterators, message ports, JS wrapper caches; it drops — never disposes — the
+borrowed `JSContext`). A shared `ClearRuntimeSessionState()` reset is called by both `Dispose()`
+and `ParseHtml`, so **re-attaching now leaves no timers/listeners/observers from the prior
+document** (previously they leaked — nothing cleared those maps on re-parse). The post-dispose
+document/timer entry points fail fast with `ObjectDisposedException`. A minimal
+`DomBridgeDisposalRegistry` (namespace `Broiler.HtmlBridge.Dom.Runtime`) is the single
+lifetime/composition seam that P2.2+ grows into `BrowserDocumentSession`. Characterization +
+disposal + guard tests live in `Broiler.Cli.Tests/DomBridgeSessionLifetimeTests.cs`; the public-API
+snapshot baseline was regenerated (only the `Broiler.HtmlBridge.Dom` DomBridge type line changed —
+Core is untouched, so `IDomBridgeRuntime` stays source-compatible and is **not** `IDisposable`).
+
+**P2.2 completed** 2026-07-13 (same branch). JS wrapper identity now has a single authority:
+`JsObjectRegistry` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the per-node wrapper map and
+the sub-document-root document-wrapper map (both reference-keyed) behind a narrow surface
+(`TryGet`/`Set`/`Remove`/`Entries`/`TryGetNode`/`SetDocument`/`TryGetDocument`/`Clear`), replacing
+the scattered `_jsObjectCache` and `_docRootToDocJSObject` fields at ~20 sites across
+`JsObjects`/`JsFunctionCallbacks`/`Registration`/`SubDocuments*`/`ShadowDom`/`Utilities`. Behavior
+is preserved; re-parse now also releases stale sub-document wrappers via one `Clear()` (observably
+equivalent — the dropped keys are detached roots no lookup can reach again). No public-API change
+(the registry is internal). Tests: `Broiler.Cli.Tests/JsObjectRegistryTests.cs` (registry unit
+tests + wrapper-identity characterization through the bridge). The wrapper *construction* in
+`ToJSObject` stays in the bridge (it needs `this` for hundreds of callbacks); only the identity
+store moved. The per-document JS singletons (`_documentJSObject`/`_windowJSObject`/
+`_visualViewportJSObject`) are intentionally left as fields — they are single globals, not node
+identity — for a later pass.
+
+**P2.3 completed** 2026-07-13 (same branch). Computed-style machinery now has a single authority:
+`DocumentStyleContext` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the per-document-root
+`CssStyleEngine` scopes (and the `ComputedStyleEngineScope` type), the `GetComputedProps` memo (cache
++ re-entrancy in-progress map), and the style-invalidation batch state — replacing the five scattered
+bridge fields (`_computedStyleEngines`, `_computedPropsCache`, `_computedPropsInProgress`,
+`_styleInvalidationBatchDepth`, `_pendingStyleInvalidationRoots`). There is now one invalidation
+route, `DocumentStyleContext.InvalidateComputedStyle()`, which clears the memo *and* the engines'
+cascade/computed caches together (they must invalidate as one because `GetComputedProps` reads inline
+style from the live ElementRuntimeState map, invisible to the engine's own DOM-mutation subscription).
+The bridge keeps the algorithms that need the DOM/loading (engine construction via
+`GetSyncedScopedEngine`, `<style>`/`<link>` collection, the recursive scope walk) and calls into the
+context for storage; no back-reference. Behavior-preserving; no public-API change (internal). Tests:
+`Broiler.Cli.Tests/DocumentStyleContextTests.cs` (memo/engine-scope/batch unit tests + a
+class-change → `getComputedStyle` invalidation characterization through the bridge). Net −53 lines in
+the bridge partials.
+
+**P2.4 completed** 2026-07-13 (same branch). The document's task queues now have a single owner:
+`BrowserEventLoop` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the `setTimeout`/`setInterval`
+callback maps, the `requestAnimationFrame` map, the internal frame-action queue, their id counters
+and the cleared-timer set — plus the drain itself (`DrainStep`/`DrainAll`). It replaces the eight
+scattered bridge fields and the ~90-line `FlushTimerStep` body. Registration
+(`setTimeout`/`clearTimeout`/`setInterval`/`clearInterval`/`requestAnimationFrame`/
+`cancelAnimationFrame`) and `QueueFrameAction` delegate to it; `DomBridge.FlushTimers`/
+`FlushTimerStep`/`HasPendingTimers` are now thin wrappers (still guarded by `ThrowIfDisposed`, and the
+per-task `TaskCheckpointCallback` is passed into the drain). The incidental reuse of the frame-action
+counter to mint smooth-scroll tokens is gone — smooth-scroll tokens get their own bridge-local
+counter (observably equivalent: the two were independent namespaces). Behavior-preserving; no
+public-API change (the loop is internal, and the public timer methods keep their signatures). Tests:
+`Broiler.Cli.Tests/BrowserEventLoopTests.cs` (registration/cancellation/drain/checkpoint/error-isolation
+unit tests + a timer-flush characterization through the bridge; existing
+`ScriptEngineExecuteTests.DomBridge_FlushTimerStep_*` still pass). Net −147 lines in the bridge
+partials. The loop is also the seam for the still-pending single-owner thread-affinity model (Phase 2
+item 5); today it preserves the existing defensive concurrent collections.
+
+**P2.5 completed** 2026-07-13 (same branch). Listeners and observers now have single owners, both in
+namespace `Broiler.HtmlBridge.Dom.Runtime`:
+
+- `EventTargetRegistry` owns the per-node `addEventListener` listeners, the window listeners, the
+  generic JS-target (message-port / sub-window) listeners, the target→owner-window map, and the
+  visual-viewport `scroll` listeners — replacing four scattered bridge fields plus the node-listener
+  store that used to live on the process-global `ElementRuntimeState`. Node listeners now use an
+  **instance-scoped `ConditionalWeakTable`**, keeping the same weak GC semantics while removing them
+  from the static table (partial progress on Phase-2 item 4). `ElementRuntimeState.EventListeners` is
+  deleted; only inline `on*` handlers remain node-runtime state there. The dispatch algorithms stay in
+  the bridge (`FireListeners` became an instance method) and read/write listeners through the registry.
+- `MutationObserverHub` owns the registered observer list — `Register` (with `observe()` replace
+  semantics), `Unregister` (`disconnect`), `Count`, `Snapshot`, `Clear`. Registration
+  (`Common.cs`), the three delivery loops (`Traversal.cs`) and teardown route through it; the bridge
+  still builds and delivers the JS mutation records.
+
+Behavior-preserving; no public-API change (both are internal; only private helpers changed static→
+instance). Tests: `Broiler.Cli.Tests/EventTargetRegistryTests.cs` +
+`Broiler.Cli.Tests/MutationObserverHubTests.cs` (unit tests + element/window listener characterization;
+the existing `DomEventsEdgeCaseTests`, messaging and MutationObserver suites still pass). Full-suite
+regression check vs the P2.4 baseline: zero regressions.
+
+**P2.6 completed** 2026-07-13 (same branch) — **Phase 2 complete.** Two owners, both in
+`Broiler.HtmlBridge.Dom.Runtime`:
+
+- `MessagePortRegistry` owns the `MessageChannel`/`MessagePort` state — entangled peers, closed and
+  started marks, and the per-port queue of pending messages — replacing the four scattered port maps.
+  The messaging callbacks still build/dispatch the JS `MessageEvent`s; they read/mutate port state
+  through it (`Link`/`TryGetPeer`/`HasPeer`/`IsClosed`/`Close`/`IsStarted`/`Start`/`Enqueue`/
+  `TakeQueued`/`Clear`).
+- `ResourceLoader` owns the host resource I/O — a process-shared `HttpClient` (kept static inside the
+  loader so many documents don't each open a socket pool) and the optional local base path — replacing
+  the static `SharedHttpClient` that feature callbacks reached into directly. This is the "no feature
+  callback constructs an `HttpClient`" seam Phase 7 builds on (CSP, unified fetch/XHR/frame routing,
+  cancellation are still to come). `FetchExternalStylesheet` went static→instance.
+
+Behavior-preserving; no public-API change (both internal). Tests:
+`Broiler.Cli.Tests/MessagePortRegistryTests.cs` + `Broiler.Cli.Tests/ResourceLoaderTests.cs` (unit
+tests + existing messaging/network suites pass). Full-suite regression check vs the P2.5 baseline:
+every candidate fails identically in isolation on both sides → zero regressions.
+
+**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3):** the sub-window and
+sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
+`_subDocumentCache`, `_subDocumentLocationCache`, `_subDocumentBaseUrlCache`, `_objectLoadFailures`,
+`_onloadFired`) and `_currentWindowOverride` are not yet consolidated into a `BrowsingContextManager`
+— they are largely internal to `SubDocuments.cs` and intertwined with sub-document resolution. P2.6
+took the cross-file cohesive slice (ports) and the resource-loader seam.
+
+## Phase 2 outcome
+
+All six sub-PRs landed on branch `htmlbridge-phase2-p2-1-lifetime-disposal`: P2.1 disposal/lifetime,
+P2.2 `JsObjectRegistry`, P2.3 `DocumentStyleContext`, P2.4 `BrowserEventLoop`, P2.5
+`EventTargetRegistry`+`MutationObserverHub`, P2.6 `MessagePortRegistry`+`ResourceLoader`. Hidden
+bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridge.Dom.Runtime`); node
+event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
+`ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
+isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
+and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables plus the
+sub-document caches above are still to be de-globalized/consolidated.
+
+Two findings recorded for later phases:
+
+- **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
+  Two live `JSContext` instances currently share global state at the Broiler.JS engine layer (the
+  last-created context's globals win), so simultaneous-session isolation cannot be delivered by a
+  bridge-only change. The supported model today is one active session per thread; the bridge
+  guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
+  (out of this roadmap's scope).
+- **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
+  `PositionAreaResolutions`) is deferred: it is a 155-call-site / 24-file cascade through the
+  project's ~284 static helpers, and the tables are weak + node-keyed (they GC with the session's
+  nodes, so they do not leak or cross sessions today). Its own later PR under item 4.
+
 Goal: make hidden state dependencies explicit while preserving behavior.
 
 Work:
@@ -321,12 +457,12 @@ Exit criteria:
 
 Suggested PR order:
 
-- P2.1 session lifetime and disposal characterization.
-- P2.2 JS identity registry.
-- P2.3 style context and invalidation.
-- P2.4 event loop.
-- P2.5 listeners/observers.
-- P2.6 resource loader and browsing-context state.
+- P2.1 session lifetime and disposal characterization. **(done — see Status above)**
+- P2.2 JS identity registry. **(done — see Status above)**
+- P2.3 style context and invalidation. **(done — see Status above)**
+- P2.4 event loop. **(done — see Status above)**
+- P2.5 listeners/observers. **(done — see Status above)**
+- P2.6 resource loader and browsing-context state. **(done — see Status above; Phase 2 complete)**
 
 ### Phase 3 - replace the partial god object with feature modules
 

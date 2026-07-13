@@ -863,7 +863,7 @@ public sealed partial class DomBridge
         if (doctypeArg is JSObject dtObj)
         {
             // Find the Broiler.Dom.DomElement for the doctype JSObject
-            foreach (var kvp in _jsObjectCache)
+            foreach (var kvp in _jsObjects.Entries)
             {
                 if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {
@@ -1017,75 +1017,40 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationSetTimeout070Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _timerIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _timeoutCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationSetTimeout070Core(in Arguments a) =>
+        new JSNumber(_eventLoop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationClearTimeout071Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _timeoutCallbacks.TryRemove(id, out _);
-            _clearedTimerIds[id] = 0;
-        }
+            _eventLoop.ClearTimeout((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsRegistrationSetInterval072Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _timerIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _intervalCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationSetInterval072Core(in Arguments a) =>
+        new JSNumber(_eventLoop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationClearInterval073Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _intervalCallbacks.TryRemove(id, out _);
-            _clearedTimerIds[id] = 0;
-        }
+            _eventLoop.ClearInterval((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _rafIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _rafCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a) =>
+        new JSNumber(_eventLoop.RequestAnimationFrame(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationCancelAnimationFrame075Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _rafCallbacks.TryRemove(id, out _);
-        }
+            _eventLoop.CancelAnimationFrame((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }
@@ -1198,7 +1163,7 @@ public sealed partial class DomBridge
                         request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
                 }
 
-                var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
+                var response = _resources.SendAsync(request).GetAwaiter().GetResult();
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
                 var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1335,11 +1300,7 @@ public sealed partial class DomBridge
             return JSUndefined.Value;
         var type = a[0].ToString();
         var listener = a[1];
-        if (!_windowEventListeners.TryGetValue(type, out var listeners))
-        {
-            listeners = [];
-            _windowEventListeners[type] = listeners;
-        }
+        var listeners = _eventTargets.WindowListenersForAdd(type);
 
         var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
         if (!HasMatchingEventListener(listeners, registration))
@@ -1355,7 +1316,7 @@ public sealed partial class DomBridge
         var type = a[0].ToString();
         var listener = a[1];
         var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_windowEventListeners.TryGetValue(type, out var listeners))
+        if (_eventTargets.TryGetWindowListeners(type, out var listeners))
         {
             for (int i = listeners.Count - 1; i >= 0; i--)
             {
@@ -1389,9 +1350,9 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationAddEventListener146Core(in Arguments a)
     {
-        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener && !_visualViewportScrollListeners.Contains(listener))
+        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
         {
-            _visualViewportScrollListeners.Add(listener);
+            _eventTargets.AddVisualViewportScrollListener(listener);
         }
 
         return JSUndefined.Value;
@@ -1402,7 +1363,7 @@ public sealed partial class DomBridge
     {
         if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
         {
-            _visualViewportScrollListeners.Remove(listener);
+            _eventTargets.RemoveVisualViewportScrollListener(listener);
         }
 
         return JSUndefined.Value;

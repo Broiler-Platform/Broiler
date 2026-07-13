@@ -304,10 +304,10 @@ public sealed partial class DomBridge
     /// </summary>
     private Dictionary<string, string> GetComputedProps(DomElement element)
     {
-        if (_computedPropsCache.TryGetValue(element, out var cached))
+        if (_styleContext.TryGetComputedProps(element, out var cached))
             return cached;
 
-        if (_computedPropsInProgress.TryGetValue(element, out var inProgress))
+        if (_styleContext.TryGetComputedPropsInProgress(element, out var inProgress))
             return inProgress;
 
         // Route the whole computed-style pipeline — cascade + inline, custom-property/
@@ -324,7 +324,7 @@ public sealed partial class DomBridge
         var props = new Dictionary<string, string>(
             GetSyncedScopedEngine(element).GetSparseComputedStyle(element, sparseInheritance: true),
             StringComparer.OrdinalIgnoreCase);
-        _computedPropsInProgress[element] = props;
+        _styleContext.SetComputedPropsInProgress(element, props);
         try
         {
             // Two reconciliations the engine's sparse projection deliberately does not do:
@@ -335,12 +335,12 @@ public sealed partial class DomBridge
             ResolveExplicitInheritedValues(props, element);
             ApplyUserAgentDisplayDefaults(props, element);
 
-            _computedPropsCache[element] = props;
+            _styleContext.SetComputedProps(element, props);
             return props;
         }
         finally
         {
-            _computedPropsInProgress.TryRemove(element, out _);
+            _styleContext.RemoveComputedPropsInProgress(element);
         }
     }
 

@@ -248,15 +248,8 @@ public sealed partial class DomBridge
     /// <see cref="FindDomElementByJSObject"/> this also resolves text/comment nodes
     /// (RF-BRIDGE-1c Phase F — needed once ranges/selection carry canonical char-data nodes).
     /// </summary>
-    private DomNode? FindDomNodeByJSObject(JSObject jsObj)
-    {
-        foreach (var kvp in _jsObjectCache)
-        {
-            if (ReferenceEquals(kvp.Value, jsObj))
-                return kvp.Key;
-        }
-        return null;
-    }
+    private DomNode? FindDomNodeByJSObject(JSObject jsObj) =>
+        _jsObjects.TryGetNode(jsObj, out var node) ? node : null;
 
     private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
 

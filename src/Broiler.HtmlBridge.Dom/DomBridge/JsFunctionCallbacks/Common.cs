@@ -79,16 +79,11 @@ public sealed partial class DomBridge
     }
 
 
-    private void RegisterMutationObserver(JSObject observerObject, DomNode target, DomMutationObserverOptions options)
-    {
-        _mutationObservers.RemoveAll(entry =>
-            ReferenceEquals(entry.Observer, observerObject) &&
-            ReferenceEquals(entry.Target, target));
-        _mutationObservers.Add((observerObject, target, options));
-    }
+    private void RegisterMutationObserver(JSObject observerObject, DomNode target, DomMutationObserverOptions options) =>
+        _mutationObserverHub.Register(observerObject, target, options);
 
 
-    private void UnregisterMutationObserver(JSObject observerObject) => _mutationObservers.RemoveAll(entry => ReferenceEquals(entry.Observer, observerObject));
+    private void UnregisterMutationObserver(JSObject observerObject) => _mutationObserverHub.Unregister(observerObject);
 
 
     private static DomElement GetDocumentElement(DomElement docRoot) => ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#')) ?? docRoot;

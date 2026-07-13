@@ -572,7 +572,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         foreach (var child in ChildElements(docRoot).ToList())
         {
-            if (bridge._jsObjectCache.TryGetValue(child, out var cached) && cached == childObj)
+            if (bridge._jsObjects.TryGet(child, out var cached) && cached == childObj)
             {
                 var idx = ChildIndexOf(docRoot, child);
                 if (idx >= 0)
@@ -597,7 +597,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         if (a[0] is not JSObject childObj)
             return a.Length > 0 ? a[0] : JSNull.Value;
-        foreach (var kvp in bridge._jsObjectCache)
+        foreach (var kvp in bridge._jsObjects.Entries)
         {
             if (kvp.Value == childObj && kvp.Key is DomElement child)
             {
@@ -668,7 +668,7 @@ public sealed partial class DomBridge
         _knownNodes.Add(subDocRoot);
         if (doctypeArg is JSObject dtObj)
         {
-            foreach (var kvp in _jsObjectCache)
+            foreach (var kvp in _jsObjects.Entries)
             {
                 if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {

@@ -208,7 +208,7 @@ public sealed partial class DomBridge
         var subWindow = new JSObject();
         _subWindowCache[containerElement] = subWindow;
         _subWindowContainers[subWindow] = containerElement;
-        _eventTargetOwnerWindows[subWindow] = subWindow;
+        _eventTargets.SetOwnerWindow(subWindow, subWindow);
         InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
         RegisterWindowMessaging(subWindow);
 
@@ -418,8 +418,8 @@ public sealed partial class DomBridge
         wptRoot = string.Empty;
 
         var candidates = new List<string>();
-        if (!string.IsNullOrWhiteSpace(_localBasePath))
-            candidates.Add(_localBasePath);
+        if (!string.IsNullOrWhiteSpace(_resources.LocalBasePath))
+            candidates.Add(_resources.LocalBasePath);
 
         if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var pageUri) &&
             string.Equals(pageUri.Scheme, Uri.UriSchemeFile, StringComparison.OrdinalIgnoreCase))
@@ -645,7 +645,7 @@ public sealed partial class DomBridge
         var extensionMime = GetMimeTypeForExtension(resourceUrl);
 
         // Try local base path first (before URL resolution and HTTP fetch)
-        if (!string.IsNullOrEmpty(_localBasePath))
+        if (!string.IsNullOrEmpty(_resources.LocalBasePath))
         {
             var localResult = TryReadLocalResource(resourceUrl, extensionMime);
             if (localResult.content != null || localResult.contentType != string.Empty)
@@ -686,7 +686,7 @@ public sealed partial class DomBridge
 
         try
         {
-            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
+            using var response = _resources.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 return (null, FetchFailedContentType);
 
@@ -742,7 +742,7 @@ public sealed partial class DomBridge
     /// </summary>
     private (string? content, string contentType) TryReadLocalResource(string resourceUrl, string extensionMime)
     {
-        if (string.IsNullOrEmpty(_localBasePath))
+        if (string.IsNullOrEmpty(_resources.LocalBasePath))
             return (null, string.Empty);
 
         // Strip query string and fragment from the URL to get the filename
@@ -755,7 +755,7 @@ public sealed partial class DomBridge
         // Only handle relative URLs (no scheme)
         if (filename.Contains("://")) return (null, string.Empty);
 
-        var localPath = Path.Combine(_localBasePath, filename);
+        var localPath = Path.Combine(_resources.LocalBasePath, filename);
         if (!File.Exists(localPath))
             return (null, string.Empty);
 
@@ -871,7 +871,7 @@ public sealed partial class DomBridge
     private void RemoveElementsRecursive(DomNode node)
     {
         _knownNodes.Remove(node);
-        _jsObjectCache.Remove(node);
+        _jsObjects.Remove(node);
 
         if (node is DomElement element)
             _styleSheetCache.Remove(element);

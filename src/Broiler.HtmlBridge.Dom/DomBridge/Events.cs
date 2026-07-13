@@ -231,7 +231,7 @@ public sealed partial class DomBridge
     /// When <c>false</c>, only bubble listeners fire.
     /// When <c>null</c> (unused), all listeners fire in registration order plus the inline handler.
     /// </summary>
-    private static void FireListeners(DomNode el, string eventType, JSObject evt,
+    private void FireListeners(DomNode el, string eventType, JSObject evt,
         bool? capturePhase, ref bool stopped, ref bool immediateStopped, ref bool currentListenerPassive)
     {
         if (GetEventListeners(el).TryGetValue(eventType, out var listeners))

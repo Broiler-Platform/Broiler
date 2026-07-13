@@ -28,7 +28,7 @@ public sealed partial class DomBridge
         var type = a[0].ToString();
         var listener = a[1];
         var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_eventTargetListeners.TryGetValue(target, out var listenersByType) && listenersByType.TryGetValue(type, out var listeners))
+        if (_eventTargets.TryGetTargetListeners(target, out var listenersByType) && listenersByType.TryGetValue(type, out var listeners))
         {
             for (var i = listeners.Count - 1; i >= 0; i--)
             {
@@ -130,7 +130,7 @@ public sealed partial class DomBridge
     private JSValue JsMessagingPostMessage013Core(JSObject? port, in Arguments a)
     {
         var sourcePort = a.This as JSObject ?? port;
-        if (_closedMessagePorts.Contains(sourcePort) || !_messagePortPeers.TryGetValue(sourcePort, out var targetPort) || _closedMessagePorts.Contains(targetPort))
+        if (_messagePorts.IsClosed(sourcePort) || !_messagePorts.TryGetPeer(sourcePort, out var targetPort) || _messagePorts.IsClosed(targetPort))
         {
             return JSUndefined.Value;
         }
@@ -154,7 +154,7 @@ public sealed partial class DomBridge
         CommitTransferredPorts(transferredPorts, targetOwner);
         QueueFrameAction(() =>
         {
-            if (_closedMessagePorts.Contains(sourcePort) || _closedMessagePorts.Contains(targetPort))
+            if (_messagePorts.IsClosed(sourcePort) || _messagePorts.IsClosed(targetPort))
             {
                 return;
             }
@@ -188,8 +188,7 @@ public sealed partial class DomBridge
     private JSValue JsMessagingClose017Core(JSObject? port, in Arguments a)
     {
         var currentPort = a.This as JSObject ?? port;
-        _closedMessagePorts.Add(currentPort);
-        _queuedMessagePortEvents.Remove(currentPort);
+        _messagePorts.Close(currentPort);
         return JSUndefined.Value;
     }
 
