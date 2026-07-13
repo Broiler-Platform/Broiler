@@ -16,7 +16,7 @@ public sealed partial class DomBridge : ITraversalHost
 {
     JSContext ITraversalHost.JsContext => _jsContext!;
 
-    DomElement ITraversalHost.DocumentNode => _documentNode;
+    DomNode ITraversalHost.DocumentNode => _document;
 
     JSObject ITraversalHost.ToJSObject(DomNode node) => ToJSObject(node);
 

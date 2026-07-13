@@ -565,13 +565,13 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationGetChildNodes046Core(in Arguments _)
     {
         var nodes = new List<JSValue>();
-        foreach (var child in ChildElements(_documentNode))
+        foreach (var child in ChildElements(_document))
             nodes.Add(ToJSObject(child));
         return new JSArray(nodes);
     }
 
 
-    private JSValue JsRegistrationRemoveChild047Core(DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationRemoveChild047Core(DomNode? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -594,7 +594,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAppendChild048Core(DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationAppendChild048Core(DomNode? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -624,7 +624,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationInsertBefore049Core(DomElement? docNodeForMutation, in Arguments a)
+    private JSValue JsRegistrationInsertBefore049Core(DomNode? docNodeForMutation, in Arguments a)
     {
         if (a.Length == 0)
             return JSNull.Value;
@@ -847,7 +847,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAddEventListener060Core(DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationAddEventListener060Core(DomNode? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -863,7 +863,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationRemoveEventListener061Core(DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationRemoveEventListener061Core(DomNode? docNode, in Arguments a)
     {
         if (a.Length < 2)
             return JSUndefined.Value;
@@ -875,7 +875,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationDispatchEvent062Core(DomBridge? bridgeRef, DomElement? docNode, in Arguments a)
+    private JSValue JsRegistrationDispatchEvent062Core(DomBridge? bridgeRef, DomNode? docNode, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.True;

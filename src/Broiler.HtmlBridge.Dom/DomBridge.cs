@@ -71,7 +71,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // ITraversalHost contract it implements (see DomBridge.TraversalHost.cs).
     private readonly Dom.Features.TraversalBinding _traversal;
     private readonly DomDocument _document;
-    private readonly DomElement _documentNode;
     private static readonly ConditionalWeakTable<DomNode, ElementRuntimeState> ElementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
@@ -171,10 +170,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
         _document = new DomDocument();
-        _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
-        _document.AppendChild(_documentNode);
-        _documentNode.AppendChild(DocumentElement);
+        // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS
+        // `document` object maps to it and <html>/doctype are its direct children (no #document
+        // wrapper element). DomDocument enforces DOM child validity (one documentElement, doctype
+        // first); the constructor's single <html> child satisfies it.
+        _document.AppendChild(DocumentElement);
     }
 
     /// <summary>
@@ -191,7 +192,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// All elements parsed from the HTML source.
     /// </summary>
     public IReadOnlyList<DomElement> Elements =>
-        [.. _documentNode.InclusiveDescendants().OfType<DomElement>().Where(element => !ReferenceEquals(element, _documentNode))];
+        [.. _document.InclusiveDescendants().OfType<DomElement>()];
 
     private static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
         ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
@@ -836,7 +837,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // equivalent to before, but it stops them lingering until disposal.
         _jsObjects.Clear();
         ClearComputedPropsCache();
-        ClearChildren(_documentNode);
+        // Clear the document first so the doctype/<html> re-append below satisfies canonical
+        // DomDocument ordering (doctype must precede the document element).
+        ClearChildren(_document);
         _serializationTransformsApplied = false;
         // A re-parse is a new document generation: drop the prior document's timers, listeners,
         // observers and message ports so re-attaching leaves no state from the previous document
@@ -846,13 +849,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         // layout view (and its renderer container) so geometry is document-scoped.
         DisposeLayoutView();
 
-        // Parse DOCTYPE from the HTML and add it as first child of _documentNode
+        // Parse DOCTYPE from the HTML and add it as the document's first child (before <html>,
+        // which is (re)appended below — canonical DomDocument requires doctype-before-element).
         var doctype = ParseDocType(html);
         if (doctype != null)
-        {
-            SetParent(doctype, _documentNode);
-            _documentNode.AppendChild(doctype);
-        }
+            _document.AppendChild(doctype);
 
         // Publish the document's quirks mode for the render that follows on this
         // thread. Layout (which on the HTML-string path holds no back-reference to
@@ -888,11 +889,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             InlineStyle(DocumentElement)[kv.Key] = kv.Value;
 
 
-        // Connect DocumentElement to _documentNode so that document.firstChild works
-        // and structural pseudo-classes correctly detect the document root boundary
-        SetParent(DocumentElement, _documentNode);
-        if (!_documentNode.ChildNodes.Contains(DocumentElement))
-            _documentNode.AppendChild(DocumentElement);
+        // Connect DocumentElement to the canonical document (after the doctype) so that
+        // document.firstChild works and structural pseudo-classes correctly detect the document
+        // root boundary.
+        if (!_document.ChildNodes.Contains(DocumentElement))
+            _document.AppendChild(DocumentElement);
 
 
         // Stylesheet discovery is document-scoped and lazy through the shared

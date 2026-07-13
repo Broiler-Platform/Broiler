@@ -44,17 +44,17 @@ public sealed partial class DomBridge
     private DomNode GetTreeRoot(DomNode node)
     {
         DomNode current = node;
-        // Stop at the topmost element: the facade #document's ParentNode is the canonical
-        // DomDocument (not a Broiler.Dom.DomElement), which is the same stop point the old ParentEl walk had.
-        // A detached text node roots to itself (returned as a DomNode).
-        while (current.ParentNode is DomElement parent)
+        // Walk to the absolute root. For a connected node this is the canonical DomDocument
+        // (Phase 4: the document root is the DomDocument, not a #document wrapper element); a
+        // detached subtree roots to its topmost node (returned as a DomNode).
+        while (current.ParentNode is { } parent)
             current = parent;
         return current;
     }
 
     private JSValue ToJSRootNode(DomNode root)
     {
-        if (ReferenceEquals(root, _documentNode))
+        if (ReferenceEquals(root, _document))
             return _documentJSObject ?? JSNull.Value;
 
         if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _jsObjects.TryGetDocument(rootEl, out var subDocument))

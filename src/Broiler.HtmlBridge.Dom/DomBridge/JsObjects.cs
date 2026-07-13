@@ -34,6 +34,13 @@ public sealed partial class DomBridge
         if (_jsObjects.TryGet(node, out var cached))
             return cached;
 
+        // Phase 4 item 1: a canonical DomDocument is the document root. The main document is in the
+        // node-wrapper map above; a sub-document root's wrapper lives in the document-wrapper map
+        // (P2.2/P4.4a). Resolve it here so e.g. documentElement.parentNode returns the document
+        // object, not a fallthrough character-data wrapper.
+        if (node is DomDocument documentNode && _jsObjects.TryGetDocument(documentNode, out var documentWrapper))
+            return documentWrapper;
+
         var obj = new JSObject();
         _jsObjects.Set(node, obj);
 
@@ -188,7 +195,7 @@ public sealed partial class DomBridge
 
         // parentNode (read-only, dynamic)
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(element) != null ? ToJSObject(ParentEl(element)) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => element.ParentNode != null ? ToJSObject(element.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"isConnected",
@@ -777,7 +784,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(node) != null ? ToJSObject(ParentEl(node)) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"parentElement",
@@ -935,7 +942,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(node) != null ? ToJSObject(ParentEl(node)!) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"parentElement",
@@ -1058,7 +1065,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in _) => ParentEl(node) != null ? ToJSObject(ParentEl(node)!) : JSNull.Value, "get parentNode"),
+            new JSFunction((in _) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         obj.FastAddProperty((KeyString)"parentElement",
             new JSFunction((in a) => JsJsObjectsGetParentElement058Core(node, in a), "get parentElement"),

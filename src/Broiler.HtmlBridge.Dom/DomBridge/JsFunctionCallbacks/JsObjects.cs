@@ -211,7 +211,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetIsConnected032Core(DomNode node, in Arguments _)
     {
         var root = GetTreeRoot(node);
-        return ReferenceEquals(root, _documentNode) ? JSBoolean.True : JSBoolean.False;
+        return ReferenceEquals(root, _document) ? JSBoolean.True : JSBoolean.False;
     }
 
     /// <summary>Whether <paramref name="node"/> is a sub-document root element (only elements can be).</summary>
@@ -289,10 +289,10 @@ public sealed partial class DomBridge
             return new JSNumber(10); // DOCUMENT_TYPE_NODE (canonical DomDocumentType)
         if (node is DomDocumentFragment)
             return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE (canonical DomDocumentFragment)
-        if (node is not DomElement element)
+        if (node is DomDocument)
+            return new JSNumber(9); // DOCUMENT_NODE (canonical DomDocument — the document root)
+        if (node is not DomElement)
             return new JSNumber(1); // canonical non-element char-data already handled above
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
-            return new JSNumber(9); // DOCUMENT_NODE
         return new JSNumber(1); // ELEMENT_NODE
     }
 
@@ -307,10 +307,10 @@ public sealed partial class DomBridge
             return new JSString(docType.Name); // doctype nodeName is its (already lowercased) name
         if (node is DomDocumentFragment)
             return new JSString("#document-fragment");
+        if (node is DomDocument)
+            return new JSString("#document"); // canonical DomDocument — the document root
         if (node is not DomElement element)
             return JSNull.Value;
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
-            return new JSString("#document");
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
         if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))

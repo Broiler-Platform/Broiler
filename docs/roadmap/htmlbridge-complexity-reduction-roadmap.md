@@ -778,6 +778,53 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.6 completed** 2026-07-13 (same branch) — **work item 1, the final sentinel: `#document`.**
+The `#document` wrapper element (`_documentNode`, a fake-tag `DomElement` that sat between the
+canonical `_document` and `<html>`) is deleted; the JS `document` object now maps directly to the
+canonical `Broiler.Dom.DomDocument`, and `<html>`/doctype are its direct children. This is the *last*
+`#document`-family sentinel (doctype P4.2, fragment P4.3, subdoc-root-regime-B P4.4a; regime-A
+`#subdoc-root` remains blocked below the bridge per P4.4b).
+
+**No layout blocker (unlike `#subdoc-root`).** `Broiler.Layout` has zero `#document` references; the
+renderer's `DomDocument→CssBox` builder (`Broiler.HTML .../HtmlParser.cs`) already *special-cased and
+discarded* the sentinel (a zero-width box that would collapse layout), so with the sentinel gone the
+bridge's tree flows through the renderer's normal `<html>`-rooted path and produces an identical box
+tree — the workaround becomes dead code. Precedent: P4.4a already proved a canonical `DomDocument`
+root works (sub-documents), including pre-insert validity and the JS-document-over-`DomDocument`
+wrapper.
+
+Change surface (well-bounded, ~16 files, +66/−58): constructor + `ParseHtml` retarget to `_document`
+(the doctype-then-`<html>` append order already satisfies canonical `DomDocument` validity —
+one documentElement, doctype-first — and `ParseHtml` now clears `_document` first so re-parse stays
+valid); `_jsObjects.Set(_document, document)` remaps the JS wrapper; `ITraversalHost`/
+`IEventDispatchHost.DocumentNode` and the event-dispatch propagation `path` widen `DomElement`→
+`DomNode`; the child-mutation notify chain (`NotifyChildAdded`/`NotifyChildRemoved`/
+`NotifyMutationObservers`/`TraversalBinding.NotifyNodeRemoved`/`DeliverChildListMutation`) widens to
+`DomNode` so `document.appendChild`/`removeChild` MutationObserver delivery is preserved; the generic
+`nodeType`/`nodeName` sites gain a `DomDocument` branch (canonical `NodeType` is already Document/9).
+
+**Two semantic fixes the migration required** (both because the document parent is now a non-element
+`DomDocument`, which the element-only `ParentEl` nulls): (1) `GetTreeRoot` now walks to the *absolute*
+root so `getRootNode()`/`isConnected`/`compareDocumentPosition` return the document, not `<html>`; and
+(2) the four `parentNode` getters (element/char-data/doctype/fragment wrappers) read the raw
+`ParentNode` instead of `ParentEl`, so `document.documentElement.parentNode` and `doctype.parentNode`
+resolve to the document (a `parentNode`-vs-`parentElement` correctness fix — `parentElement` correctly
+stays element-only and is now null for the documentElement). `ToJSObject` also gained a `DomDocument`
+branch resolving a sub-document root to its document wrapper. **Behavioral note:** `document.appendChild`
+of a second element / text node now throws `HierarchyRequestError` (canonical validity), which is
+spec-correct — the sentinel previously permitted it silently.
+
+Behaviour-preserving on every normal path; no public-API change (the widened interfaces are internal).
+Tests: `Broiler.Cli.Tests/DocumentSentinelMigrationTests.cs` (nodeType/nodeName, documentElement/
+head/body, firstChild=doctype, getElementById/querySelector, `getRootNode()`/`isConnected`,
+serialization round-trip). Regression check vs the P4.5 baseline: the DOM / events / mutation-observer
+/ shadow-DOM / traversal-range / HtmlDomInterface / sentinel-migration / sub-document / messaging /
+serializer / namespace / public-API-snapshot / architecture-guard suites pass (300+ tests); every
+observed failure (the `:lang`/CssEscape/CssExtraction structural guards, the `<select>` writing-mode
+layout test, the `ScriptEngineExecuteTests` iframe-scroll/zoom serialization tests, the headless
+`Range_GetBoundingClientRect` and iframe-HTTP tests) reproduces identically with the change stashed →
+zero regressions.
+
 Status: **P4.5 completed** 2026-07-13 (branch `claude/htmlbridge-phase-4-a4w8vp`) — **work item 3, the
 parallel `InnerHtml` string.** `ElementRuntimeState.InnerHtml` (the bridge-side raw-text mirror for
 `<style>`/`<script>`/`<textarea>`, the historical `innerHTML`-getter fallback, and the

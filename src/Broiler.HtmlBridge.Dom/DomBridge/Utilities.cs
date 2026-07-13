@@ -548,8 +548,8 @@ public sealed partial class DomBridge
         if (IsComment(node)) return 8;
         if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
         if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
-        if (node is not DomElement element) return 1;
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
+        if (node is DomDocument) return 9; // DOCUMENT_NODE (canonical DomDocument — document root)
+        if (node is not DomElement) return 1;
         return 1; // ELEMENT_NODE
     }
 

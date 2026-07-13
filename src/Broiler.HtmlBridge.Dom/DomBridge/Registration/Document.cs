@@ -92,16 +92,16 @@ public sealed partial class DomBridge
         document.FastAddProperty((KeyString)"nodeName", new JSFunction((in _) => new JSString("#document"), "get nodeName"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.firstChild (getter — returns first child of document: DOCTYPE if present, else documentElement)
-        document.FastAddProperty((KeyString)"firstChild", new JSFunction((in _) => _documentNode.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_documentNode, 0)) : JSNull.Value, "get firstChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"firstChild", new JSFunction((in _) => _document.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_document, 0)) : JSNull.Value, "get firstChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.lastChild (getter — returns last child of document, typically documentElement)
-        document.FastAddProperty((KeyString)"lastChild", new JSFunction((in _) => _documentNode.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_documentNode, ^1)) : JSNull.Value, "get lastChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"lastChild", new JSFunction((in _) => _document.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_document, ^1)) : JSNull.Value, "get lastChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.childNodes (getter — returns children of document node: [DOCTYPE, documentElement])
         document.FastAddProperty((KeyString)"childNodes", new JSFunction(JsRegistrationGetChildNodes046Core, "get childNodes"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.removeChild(child)
-        var docNodeForMutation = _documentNode;
+        var docNodeForMutation = _document;
         document.FastAddValue((KeyString)"removeChild", new JSFunction((in a) => JsRegistrationRemoveChild047Core(docNodeForMutation, in a), "removeChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.appendChild(child)
@@ -156,7 +156,7 @@ public sealed partial class DomBridge
     private void RegisterDocumentEventTargetAndMetadata(JSObject document)
     {
         // document-level addEventListener / removeEventListener / dispatchEvent
-        var docNode = _documentNode;
+        var docNode = _document;
         var bridgeRef = this;
 
         document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => JsRegistrationAddEventListener060Core(docNode, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);

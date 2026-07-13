@@ -18,7 +18,7 @@ internal interface IEventDispatchHost
     JSObject ToJSObject(DomNode node);
 
     /// <summary>The main document root node (the top of the event propagation path).</summary>
-    DomElement DocumentNode { get; }
+    DomNode DocumentNode { get; }
 
     /// <summary>The JS <c>document</c> wrapper, used as the event target/currentTarget when the
     /// document node is on the path; null before the document global is installed.</summary>

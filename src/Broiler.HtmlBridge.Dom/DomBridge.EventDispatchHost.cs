@@ -15,7 +15,7 @@ public sealed partial class DomBridge : IEventDispatchHost
 {
     JSObject IEventDispatchHost.ToJSObject(DomNode node) => ToJSObject(node);
 
-    DomElement IEventDispatchHost.DocumentNode => _documentNode;
+    DomNode IEventDispatchHost.DocumentNode => _document;
 
     JSObject? IEventDispatchHost.DocumentJSObject => _documentJSObject;
 
