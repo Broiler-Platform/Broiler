@@ -19,9 +19,9 @@
     <InternalsVisibleTo Include="Broiler.Wpt.Tests" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
-    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
-  </ItemGroup>
+  <!-- Phase 1 (project-graph repair): the geometry provider moved to
+       Broiler.HTML.Headless behind ILayoutView, so Rendering no longer references
+       Broiler.HTML.Image or Broiler.Dom. The remaining CanvasCommandRecorder and
+       HtmlPostProcessor helpers depend on nothing outside the BCL. -->
 
 </Project>

@@ -877,6 +877,12 @@
       <BuildType Solution="Release-Linux|*" Project="Release" />
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Headless/Broiler.HTML.Headless.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image.Compat/Broiler.HTML.Image.Compat.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />

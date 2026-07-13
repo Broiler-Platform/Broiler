@@ -12,6 +12,7 @@
     <InternalsVisibleTo Include="Broiler" />
     <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
+    <InternalsVisibleTo Include="Broiler.Engines.Baseline" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
     <InternalsVisibleTo Include="Broiler.Wpt" />

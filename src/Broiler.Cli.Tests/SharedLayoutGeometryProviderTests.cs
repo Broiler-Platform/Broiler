@@ -1,16 +1,18 @@
 using System.Drawing;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Dom;
+using Broiler.HTML.Headless;
 using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// RF-BRIDGE-1b increment ②: the bridge-side <see cref="SharedLayoutGeometryProvider"/>
-/// drives the renderer's headless layout for the canonical document and caches the
-/// per-element geometry map by document version + viewport. These tests cover the
-/// provider in isolation; the live <c>LayoutMetrics</c> routing (behind
-/// <c>UseSharedLayoutGeometry</c>) lands in increment ③.
+/// RF-BRIDGE-1b increment ②: the renderer-backed <see cref="HeadlessLayoutView"/>
+/// (Broiler.HTML.Headless, the Phase-1 <c>ILayoutView</c> implementation) drives the
+/// renderer's headless layout for the canonical document and caches the per-element
+/// geometry map by document version + viewport + base URL. These tests cover the view in
+/// isolation; the live <c>LayoutMetrics</c> routing (behind <c>UseSharedLayoutGeometry</c>)
+/// lands in increment ③.
 /// </summary>
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryProviderTests
@@ -27,7 +29,7 @@ public sealed class SharedLayoutGeometryProviderTests
             "file:///p.html");
         var document = bridge.GetRenderDocument();
 
-        var provider = new SharedLayoutGeometryProvider();
+        using var provider = new HeadlessLayoutView();
         var map = provider.GetGeometry(document, new SizeF(800, 600), "file:///p.html");
 
         var target = document.GetElementById("target");
@@ -47,7 +49,7 @@ public sealed class SharedLayoutGeometryProviderTests
             "<!DOCTYPE html><html><body><div id='t' style='width:10px;height:10px'></div></body></html>",
             "file:///p.html");
         var document = bridge.GetRenderDocument();
-        var provider = new SharedLayoutGeometryProvider();
+        using var provider = new HeadlessLayoutView();
 
         var first = provider.GetGeometry(document, new SizeF(800, 600), "file:///p.html");
         var second = provider.GetGeometry(document, new SizeF(800, 600), "file:///p.html");

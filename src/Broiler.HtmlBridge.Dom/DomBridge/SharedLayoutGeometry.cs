@@ -8,7 +8,7 @@ public sealed partial class DomBridge
 {
     // RF-BRIDGE-1b: when true, element-geometry queries (offset*/client*/
     // getBoundingClientRect/check-layout) resolve through the renderer's real layout
-    // engine via SharedLayoutGeometryProvider instead of the coarse LayoutMetrics
+    // engine via the injected ILayoutView instead of the coarse LayoutMetrics
     // estimators. Enabled once increments 1-3 landed (the LayoutMetrics entry points and
     // the anchor resolver route through the provider, and the Broiler.HTML inline-box
     // geometry fix is live on CI) and the increment-4 parity gate confirmed the shared
@@ -27,10 +27,31 @@ public sealed partial class DomBridge
     // See docs/roadmap/htmlbridge-blocked-items-completion-roadmap.md milestone 2.4.
     internal static bool UseSharedGeometryExclusively = true;
 
-    private SharedLayoutGeometryProvider _sharedLayoutGeometry;
+    // Phase 1 (project-graph repair): the concrete renderer-backed layout view
+    // (Broiler.HTML.Headless.HeadlessLayoutView) is injected here so this binding project
+    // depends only on the neutral ILayoutView contract in Broiler.Layout — not on
+    // Broiler.HTML.Image. A composition root that references the renderer registers the
+    // factory once at startup (see the [ModuleInitializer]s in Broiler.Cli / Broiler.Wpt /
+    // the test hosts). A bare `new DomBridge()` with no factory set falls back to an empty
+    // view, so it never throws and never pulls the renderer stack. This process-static seam
+    // is a deliberate, temporary Phase-1 compromise (the roadmap otherwise avoids service
+    // locators); Phase 2's BrowserDocumentSession replaces it with constructor injection.
+    internal static Func<ILayoutView>? LayoutViewFactory;
 
-    private SharedLayoutGeometryProvider SharedLayoutGeometry =>
-        _sharedLayoutGeometry ??= new SharedLayoutGeometryProvider();
+    private ILayoutView? _layoutView;
+
+    private ILayoutView LayoutView =>
+        _layoutView ??= LayoutViewFactory?.Invoke() ?? NullLayoutView.Instance;
+
+    // Document-scoped teardown: dispose the current view (releasing the renderer's headless
+    // container) and drop the per-pass snapshot so a re-attached/re-parsed document lays out
+    // fresh. Called from ParseHtml.
+    private void DisposeLayoutView()
+    {
+        _layoutView?.Dispose();
+        _layoutView = null;
+        _sharedGeometrySnapshot = null;
+    }
 
     // The geometry snapshot for the current WithLayoutGeometryCache read pass. Built
     // lazily on the first shared query and torn down with the pass, so the renderer
@@ -39,10 +60,10 @@ public sealed partial class DomBridge
     private IReadOnlyDictionary<DomElement, BoxGeometry> _sharedGeometrySnapshot;
 
     /// <summary>
-    /// Looks up real-layout box geometry for <paramref name="element"/> via the renderer
-    /// (RF-BRIDGE-1b), from the current pass's snapshot (built once per pass). Returns
-    /// <c>false</c> when the element produced no box (detached / <c>display:none</c>), so
-    /// the caller falls back to the estimator. Active only when
+    /// Looks up real-layout box geometry for <paramref name="element"/> via the injected
+    /// <see cref="ILayoutView"/> (RF-BRIDGE-1b), from the current pass's snapshot (built once
+    /// per pass). Returns <c>false</c> when the element produced no box (detached /
+    /// <c>display:none</c>), so the caller falls back to the estimator. Active only when
     /// <see cref="UseSharedLayoutGeometry"/> is set; the live entry points gate on that.
     /// </summary>
     private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)
@@ -51,7 +72,7 @@ public sealed partial class DomBridge
         return snapshot.TryGetValue(element, out geometry);
     }
 
-    private static readonly IReadOnlyDictionary<DomElement, BoxGeometry> EmptySharedGeometry = 
+    private static readonly IReadOnlyDictionary<DomElement, BoxGeometry> EmptySharedGeometry =
         new Dictionary<DomElement, BoxGeometry>();
 
     private IReadOnlyDictionary<DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
@@ -66,13 +87,15 @@ public sealed partial class DomBridge
         {
             var document = GetRenderDocument();
             var viewport = new SizeF(_viewportWidth, _viewportHeight);
-            return SharedLayoutGeometry.GetGeometry(document, viewport, _pageUrl);
+            return LayoutView.GetGeometry(document, viewport, _pageUrl);
         }
         catch
         {
             // Any failure building the shared snapshot (reflection, headless layout,
             // etc.) degrades the whole pass to the estimator — a geometry query must
-            // never throw because the renderer choked on the document.
+            // never throw because the renderer choked on the document. This is the
+            // bridge's safety net; the injected ILayoutView itself no longer swallows
+            // the underlying cause.
             return EmptySharedGeometry;
         }
         finally
@@ -82,4 +105,15 @@ public sealed partial class DomBridge
     }
 
     private void ClearSharedGeometrySnapshot() => _sharedGeometrySnapshot = null;
+
+    // Fallback used when no composition root registered a real layout view: geometry queries
+    // resolve to an empty map (the same degraded behaviour as a renderer layout failure), so
+    // a bridge constructed without the renderer never throws and never references it.
+    private sealed class NullLayoutView : ILayoutView
+    {
+        public static readonly NullLayoutView Instance = new();
+        public IReadOnlyDictionary<DomElement, BoxGeometry> GetGeometry(
+            DomDocument document, SizeF viewport, string baseUrl) => EmptySharedGeometry;
+        public void Dispose() { }
+    }
 }

@@ -56,7 +56,3 @@ TYPE Broiler.HtmlBridge.CanvasRenderingContext2D
   property System.String Font { get; set; }
   property System.String StrokeStyle { get; set; }
   property System.String TextAlign { get; set; }
-TYPE Broiler.HtmlBridge.SharedLayoutGeometryProvider
-  ctor ()
-  method System.Boolean TryGetGeometry(Broiler.Dom.DomDocument, System.Drawing.SizeF, System.String, Broiler.Dom.DomElement, ref Broiler.Layout.BoxGeometry)
-  method System.Collections.Generic.IReadOnlyDictionary<Broiler.Dom.DomElement, Broiler.Layout.BoxGeometry> GetGeometry(Broiler.Dom.DomDocument, System.Drawing.SizeF, System.String)
