@@ -466,6 +466,201 @@ Suggested PR order:
 
 ### Phase 3 - replace the partial god object with feature modules
 
+Status: **P3.1 completed** 2026-07-13 (branch `htmlbridge-phase3-traversal-module`). The DOM
+traversal / Range vertical slice is the first co-located feature binding module:
+`TraversalBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) now owns `TreeWalker`,
+`NodeIterator`, `Range`, the `NodeFilter` machinery and `document.createComment` — its registration
+(`RegisterDocumentApis`), every handler (renamed from the numbered `JsTraversal…020…039Core` to
+semantic `Range*`/`Create*` names) and the traversal-scoped state (the weak active-range and
+active-node-iterator registries) live together in one file. The module depends only on the narrow
+`ITraversalHost` contract (JS-wrapper identity, node lookup, boundary/geometry helpers still in the
+bridge pending Phase 5, and the range-scoped node-construction seams) which `DomBridge` implements
+via **explicit interface members** in `DomBridge.TraversalHost.cs` — so no handler reaches an
+arbitrary bridge private field and the public surface is unchanged. `DomBridge`'s traversal
+partials are now thin: the old `JsFunctionCallbacks/Traversal.cs` is deleted; `Traversal.cs` keeps
+only the mutation-observer notification machinery and range client-rect geometry plus three
+one-line `Build*` delegators; `Registration/Traversal.cs` is a single delegating call; the
+`_activeRanges`/`_activeNodeIterators` fields moved off the bridge. Neutral static DOM-tree helpers
+the module shares (`IsText`/`IsComment`/`ParentEl`/`ChildAt`/`ChildIndexOf`/`ChildElements`/
+`GetNodeType`/`GetDocumentOrderNodes`/`CollectTextContent`/`IsDescendant`/`FindCommonAncestor`/
+`GetNodesInRange`/`ThrowDOMException`) were widened `private static`→`internal static` in place
+(no behaviour/API change; Phase 4 promotes them to Broiler.Dom). Behaviour-preserving; no
+public-API change (both the module and the contract are internal). Tests:
+`Broiler.Cli.Tests/TraversalBindingModuleTests.cs` (co-location/host-contract/state-moved guards +
+Range/TreeWalker/createComment characterizations). Regression check vs the P2.6 baseline: the
+existing traversal, mutation-observer, events and messaging suites pass unchanged; the pre-existing
+environmental/known failures (`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`
+headless-geometry, the six Acid3 pixel/cascade/border/NodeIterator-pre-removal tests, and the two
+`:root`/`:lang` selector tests) fail identically on both sides → zero regressions.
+
+Status: **P3.2 completed** 2026-07-13 (same branch). The **MutationObserver** feature (the
+Events-and-MutationObserver pair's observer half) is the second co-located module:
+`MutationObserverBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) now **owns** the P2.5
+`MutationObserverHub` state authority and co-locates the whole feature — the JS `MutationObserver`
+polyfill + its `__broilerRegister/UnregisterMutationObserver` host functions, the
+`observe()`/`disconnect()` callbacks (was `JsRegistrationBroiler…034/035Core`), the option parsing
+(`CreateMutationObserverOptions`/`GetMutationObserverOption`, moved out of `Common.cs`), and the
+childList/attribute/characterData record delivery (`Deliver…`, moved out of `Traversal.cs`). It
+depends only on the narrow `IMutationObserverHost` contract (`ToJSObject` + `FindDomNodeByJSObject`),
+which `DomBridge` implements via explicit interface members in `DomBridge.MutationObserverHost.cs`.
+The bridge keeps three same-name `Notify…MutationObservers` delegators so the ~7 mutation-path call
+sites in `Traversal.cs`/`Attributes.cs`/`JsObjects.cs` are untouched; `RegisterDocumentEventsAnd
+MutationObservers` now registers only the typed `Event` constructors and delegates the observer
+install; lifetime reset calls `_mutations.Clear()`. This also finished the P3.1 `Traversal.cs`
+cleanup (the mutation-observer machinery it had temporarily retained is gone). Behaviour-preserving;
+no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/MutationObserverBindingModuleTests.cs` (co-location/host-contract/hub-ownership
+guards + childList/attribute-oldValue/disconnect characterizations). Regression check: the
+MutationObserver, DomEvents, Attributes, Traversal, Messaging and architecture-guard suites pass
+unchanged; same pre-existing/known failures as above → zero regressions.
+
+Status: **P3.3 completed** 2026-07-13 (same branch). The **event dispatch engine** — the highest-
+coupling core of the Events feature — is the third co-located module: `EventDispatchBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) owns the capture → target → bubble propagation
+algorithm (`DispatchEventOnElement`), the per-element listener firing (`FireListeners`, which had no
+external callers), the event object's propagation-control methods (`stopPropagation`/
+`stopImmediatePropagation`/`preventDefault`/`cancelBubble`/`returnValue`, renamed from the numbered
+`JsEvents…001…007Core`) and `composedPath()`. It reads what it dispatches through the narrow
+`IEventDispatchHost` contract (`ToJSObject`, `DocumentNode`, `DocumentJSObject`, `WindowJSObject`,
+`GetEventListeners`, `GetInlineEventHandlers`), implemented by explicit interface members in
+`DomBridge.EventDispatchHost.cs`. **Deliberately kept in the bridge** (different concerns, not
+dispatch): the `addEventListener`/`removeEventListener` *registration* helpers
+(`CreateEventListenerRegistration`/`GetCaptureForRemoval`/`HasMatchingEventListener`) that the four
+registration sites use, inline-handler *compilation* (`CompileInlineEventAttribute(s)`), form
+validity checks, and the shared `InvokeEventListener` (widened to `internal static` — also used by
+the window/submit/messaging firing paths, which the module calls as `DomBridge.InvokeEventListener`).
+The bridge keeps a same-name `DispatchEventOnElement` delegator so the ~five caller files
+(`JsObjects`/`Registration`/`LayoutMetrics`/`SubDocuments`/`DomBridge.cs`) are untouched; the emptied
+`JsFunctionCallbacks/Events.cs` was deleted. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/EventDispatchBindingModuleTests.cs` (co-location/
+host-contract guards + capture/target/bubble ordering, stopPropagation and preventDefault
+characterizations). Regression check: DomEvents (81), DomEventsEdgeCase (33), Acid3RegressionTests
+(26), Attributes, MutationObserver, Messaging and architecture-guard suites pass unchanged → zero
+regressions.
+
+Status: **P3.4 completed** 2026-07-13 (same branch) — the Events feature's listener half, completing
+Events alongside P3.3's dispatch half. The `addEventListener`/`removeEventListener` *registration
+semantics* (option parsing for capture/once/passive, the DOM duplicate-registration check, and
+match-by-listener-and-capture removal) are now one co-located helper, `EventListenerBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`), exposing two storage-agnostic operations —
+`AddListener(list, listener, options)` and `RemoveListener(list?, listener, options)` — plus the four
+former bridge helpers (`CreateEventListenerRegistration`/`GetCaptureForRemoval`/
+`HasMatchingEventListener`/`GetBooleanOption`) now internal to it. It is stateless with **no host
+contract**: each of the four target callbacks (element in `JsObjects`, document + window in
+`Registration`, message-port in `Messaging`) resolves its own listener list from the P2.5
+`EventTargetRegistry` and calls the shared operations, replacing the identical ~15-line add/remove
+block that had been copied across those four feature files. Behaviour-preserving; no public-API
+change (the helper is internal). Tests: `Broiler.Cli.Tests/EventListenerBindingModuleTests.cs`
+(co-location guard + dedup / capture-scoped-removal / once characterizations). Regression check:
+DomEvents (81), DomEventsEdgeCase (33), Messaging (15), Attributes and the event/architecture-guard
+suites pass unchanged → zero regressions.
+
+Status: **P3.5 completed** 2026-07-13 (same branch). The **HTML table DOM interfaces** are the fifth
+co-located module: `TableBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the whole
+`HTMLTableElement` interface (`caption`/`tHead`/`tFoot`/`tBodies`/`rows` plus `createCaption`/
+`createTHead`/`createTFoot`/`deleteCaption`/`deleteTHead`/`deleteTFoot`/`insertRow`/`deleteRow`),
+`HTMLTableSectionElement` (`rows`/`insertRow`) and `HTMLTableRowElement` (`rowIndex`/
+`sectionRowIndex`/`cells`/`insertCell`/`deleteCell`) — ~20 callbacks (renamed from the numbered
+`JsElementInterfaces…001…023Core`) plus `BuildTableRows` and the `insertRow` placement algorithm,
+moved out of `JsFunctionCallbacks/ElementInterfaces.cs` and `Utilities.cs`. The table registration in
+`AddElementSpecificMembers` collapsed to a single `_tables.Install(obj, element, tag)` call. Table
+DOM is pure canonical-tree manipulation, so the `ITableHost` contract is just two seams (`ToJSObject`
++ `CreateElement`, the construction funnel), implemented via explicit interface members in
+`DomBridge.TableHost.cs`; everything structural uses the neutral static `DomBridge` tree helpers
+(`SetParent`/`InsertChildAt`/`RemoveChildFrom`/`IsTableCellElement`/`UndefinedFunction` widened
+`private`→`internal static`). `CollectTableRows` stayed a bridge `internal static` helper because hit
+testing also uses it. Behaviour-preserving; no public-API change (module + contract internal).
+Tests: `Broiler.Cli.Tests/TableBindingModuleTests.cs` (co-location/host-contract guards + insertRow/
+insertCell/rows-spec-order/createTHead-idempotence/deleteRow characterizations). Regression check:
+HtmlDomInterface (49), FormControlRender, Acid3RegressionTests (26) and the architecture-guard suites
+pass unchanged; the one pre-existing environmental failure
+(`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
+test) fails identically on both sides → zero regressions.
+
+Status: **P3.6 completed** 2026-07-13 (same branch). The **`Element.classList` / `DOMTokenList`**
+API is the sixth co-located module: `ClassListBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+owns `Build(element, onClassChanged)` plus the `contains`/`add`/`remove`/`toggle`/`replace`
+operations (renamed from the bridge's `BuildClassListObject` + the scattered `JsUtilities…025…Core`
+callbacks). It is the cleanest slice so far — pure logic over the canonical `Broiler.Dom.DomTokenList`
+with an injected `Action<DomElement>` style-invalidation callback, so it is an **internal static
+class with no host contract at all**. The registration site (`JsObjects.cs`) calls
+`ClassListBinding.Build(element, bridge.InvalidateStyleScope)`. Behaviour-preserving; no public-API
+change. Tests: `Broiler.Cli.Tests/ClassListBindingModuleTests.cs` (co-location guard +
+add/remove/contains, toggle-with/without-force, replace characterizations). Regression check:
+SelectorsAndCssom (only the two known-baseline `:root`/`:lang` fails, unchanged) and the
+architecture-guard suites pass → zero regressions.
+
+Status: **P3.7 completed** 2026-07-13 (same branch) — the first *runtime-state-coupled* feature
+extracted, establishing the narrow-named-accessor pattern for the entangled remainder. The **dialog
+/ popover / details JS API** is the seventh co-located module: `DialogBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) owns `HTMLDialogElement` (`showModal`/`show`/`close`/`open`/
+`returnValue`), the popover API (`showPopover`/`hidePopover` on any element with the global
+`popover` attribute) and `HTMLDetailsElement.open` — 8 callbacks (renamed from the numbered
+`JsElementInterfaces…029…036Core`; the identical details/dialog `open` setters deduplicated) plus
+the three registration blocks in `AddElementSpecificMembers`, now one
+`_dialogs.Install(obj, element, tag, hasPopover)` call. Its runtime state
+(`ElementRuntimeState.Dialog.{Modal,PopoverOpen,TopLayerOrder}`, `FormControl.ReturnValue`, the
+top-layer counter) is reached through the narrow `IDialogHost` contract as **named primitives**
+(`SetOpenAttribute`/`HasOpenAttribute`/`InvalidateStyleScope`/`AssignNextTopLayerOrder`/
+`SetDialogModal`/`SetPopoverOpen`/`Get`/`SetReturnValue`/`PopoverKeepsOverlayOnHide`), implemented
+via explicit interface members in `DomBridge.DialogHost.cs` — the module never touches the
+runtime-state object, and these accessors are the single seam a future `TopLayerManager` re-homes.
+The backdrop/top-layer **rendering** stays in the bridge's anchor resolver. Behaviour-preserving; no
+public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DialogBindingModuleTests.cs` (co-location/host-contract guards +
+showModal/close/returnValue, dialog.open-setter, details.open characterizations). Regression check:
+Dialog, Popover, Overlay, Backdrop, HtmlDomInterface (49), Acid3RegressionTests (26) and the
+architecture-guard suites pass unchanged → zero regressions (the renderer reads the same runtime
+state the module now writes).
+
+Status: **P3.8 completed** 2026-07-13 (same branch) — the second runtime-state-coupled feature, via
+the P3.7 named-accessor pattern. The **HTMLSelectElement / HTMLOptionElement** interface is the
+eighth co-located module: `SelectBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns
+`select.add`/`options`/`selectedIndex`/`size` plus the option-collection, selected-index and value
+algorithms (`CollectSelectOptions`/`GetSelectedIndex`/`SetSelectedIndex`/`GetValue`/`SetValue`,
+**relocated out of `LayoutMetrics.cs`** where they lived but were never used by layout) and
+`option.defaultSelected` — 6 callbacks (renamed from the numbered `JsElementInterfaces…037…045Core`).
+The select + option registration blocks in `AddElementSpecificMembers` collapsed to one
+`_select.Install(obj, element, tag)` call; the shared `value` form-control handler in `JsObjects.cs`
+keeps its input/textarea branches and delegates only its select branch to `_select.GetValue`/
+`SetValue`. The per-element form-control state (the select's dirty selected index, an option's IDL
+value and default-selected flag on `ElementRuntimeState.FormControl`) is reached through the narrow
+`ISelectHost` contract as named primitives (`TryGetSelectedIndex`/`SetSelectedIndex`/
+`TryGetOptionValue`/`Get`/`SetOptionDefaultSelected`) plus `ToJSObject`/`FindDomElementByJSObject`,
+implemented via explicit interface members in `DomBridge.SelectHost.cs`; the module never touches the
+runtime-state object. Neutral attribute helpers `HasAttr`/`TryGetAttribute`/`SetAttr`/`RemoveAttr`/
+`GetElementTextContent` were widened `private`→`internal static`. Behaviour-preserving; no public-API
+change (module + contract internal). Tests: `Broiler.Cli.Tests/SelectBindingModuleTests.cs`
+(co-location/host-contract guards + options/default-selected-index, selectedIndex-setter,
+value-setter, add/size characterizations). Regression check: HtmlDomInterface (49), FormControlRender
+and the architecture-guard suites pass unchanged; the one pre-existing environmental failure
+(`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
+test) fails identically on both sides → zero regressions.
+
+Status: **P3.9 completed** 2026-07-13 (same branch). The **HTMLFormElement** interface is the ninth
+co-located module: `FormBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns `form.elements`
+(an `HTMLFormControlsCollection` with numeric **and named** access), `form.length`, `form.action`,
+and the constraint-validation checks (`checkValidity`/`reportValidity`, whose logic moved out of
+`Events.cs` — completing that file's de-form-ing). The bridge's `FormElementsCollection` (a JSObject
+subclass with a named-lookup override) moved into the module as a nested type; its sole bridge
+coupling — the `DomBridge` back-reference it carried only to wrap a control as a JS object — is
+replaced by the narrow `IFormHost` contract (`ToJSObject`), implemented via one explicit interface
+member in `DomBridge.FormHost.cs`. Everything else (control collection, validity) is pure
+tree/attribute work over the already-`internal static` `DomBridge.CollectFormControls`/`HasAttr`/
+`TryGetAttribute`/`ChildElements`/`IsText`, so no new widening was needed. The form registration block
+in `AddElementSpecificMembers` collapsed to one `_forms.Install(obj, element, tag)` call; the
+`checkValidity`/`reportValidity` registration on form-associated elements in `JsObjects.cs` now calls
+`_forms.IsElementValid(element)`. Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/FormBindingModuleTests.cs` (co-location/host-contract guards +
+elements indexed/named/length, action get/set, checkValidity characterizations). Regression check:
+HtmlDomInterface (49), FormControlRender and the architecture-guard suites pass unchanged; the one
+pre-existing environmental `<select>` layout failure reproduces identically → zero regressions.
+
+Still to come — each entangled with layout, network, or rendering; the P3.7–P3.9 named-accessor
+pattern is the template for any residual runtime-state coupling: CSSOM/computed style,
+Element/geometry, Window/Document, SVG, Frames/Network, Messaging, Canvas, and the DomBridge
+500-800-line facade target.
+
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
 

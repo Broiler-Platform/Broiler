@@ -13,7 +13,7 @@ public sealed partial class DomBridge
     private static readonly JSFunctionDelegate ReturnTrueDelegate = ReturnTrue;
     private static readonly JSFunctionDelegate ReturnZeroDelegate = ReturnZero;
 
-    private static JSFunction UndefinedFunction(string name, int length = 0) => new(ReturnUndefinedDelegate, name, length);
+    internal static JSFunction UndefinedFunction(string name, int length = 0) => new(ReturnUndefinedDelegate, name, length);
 
     private static JSFunction NullFunction(string name, int length = 0) => new(ReturnNullDelegate, name, length);
 

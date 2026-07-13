@@ -46,11 +46,36 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // widen on the current homogeneous tree.
     private readonly HashSet<DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    // P2.5: registered MutationObservers now live in MutationObserverHub, the single observer owner
-    // (was the bare _mutationObservers list).
-    private readonly Dom.Runtime.MutationObserverHub _mutationObserverHub = new();
-    private readonly List<WeakReference<DomRange>> _activeRanges = [];
-    private readonly List<WeakReference<DomNodeIterator>> _activeNodeIterators = [];
+    // Phase 3 (P3.2): the whole MutationObserver feature — the observer registry (P2.5
+    // MutationObserverHub), the observe()/disconnect() registration and childList/attribute/
+    // characterData record delivery — lives in the MutationObserverBinding module, reached through
+    // the narrow IMutationObserverHost contract (see DomBridge.MutationObserverHost.cs).
+    private readonly Dom.Features.MutationObserverBinding _mutations;
+    // Phase 3 (P3.3): the DOM event dispatch engine — capture/target/bubble propagation, the event
+    // object's propagation-control methods and composedPath() — lives in EventDispatchBinding,
+    // reached through the narrow IEventDispatchHost contract (see DomBridge.EventDispatchHost.cs).
+    private readonly Dom.Features.EventDispatchBinding _eventDispatch;
+    // Phase 3 (P3.5): the HTML table DOM interfaces (HTMLTableElement / HTMLTableSectionElement /
+    // HTMLTableRowElement) live in TableBinding, reached through the narrow ITableHost contract
+    // (see DomBridge.TableHost.cs).
+    private readonly Dom.Features.TableBinding _tables;
+    // Phase 3 (P3.7): the dialog / popover / details JS API (showModal/show/close/showPopover/
+    // hidePopover/open/returnValue) lives in DialogBinding, reached through the narrow IDialogHost
+    // contract (see DomBridge.DialogHost.cs); backdrop/top-layer rendering stays in the bridge.
+    private readonly Dom.Features.DialogBinding _dialogs;
+    // Phase 3 (P3.8): HTMLSelectElement / HTMLOptionElement (add/options/selectedIndex/size/value +
+    // option.defaultSelected) live in SelectBinding, reached through the narrow ISelectHost contract
+    // (see DomBridge.SelectHost.cs); the shared value property delegates its select branch to it.
+    private readonly Dom.Features.SelectBinding _select;
+    // Phase 3 (P3.9): HTMLFormElement (elements/length/action) and constraint validation
+    // (checkValidity/reportValidity) live in FormBinding, reached through the narrow IFormHost
+    // contract (see DomBridge.FormHost.cs).
+    private readonly Dom.Features.FormBinding _forms;
+    // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
+    // callback and the traversal-scoped active-range / active-node-iterator registries live in the
+    // co-located TraversalBinding module. The bridge holds the module through the narrow
+    // ITraversalHost contract it implements (see DomBridge.TraversalHost.cs).
+    private readonly Dom.Features.TraversalBinding _traversal;
     private readonly DomDocument _document;
     private readonly DomElement _documentNode;
     private static readonly ConditionalWeakTable<DomNode, ElementRuntimeState> ElementRuntimeStates = [];
@@ -128,6 +153,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     public DomBridge()
     {
+        _traversal = new Dom.Features.TraversalBinding(this);
+        _mutations = new Dom.Features.MutationObserverBinding(this);
+        _eventDispatch = new Dom.Features.EventDispatchBinding(this);
+        _tables = new Dom.Features.TableBinding(this);
+        _dialogs = new Dom.Features.DialogBinding(this);
+        _select = new Dom.Features.SelectBinding(this);
+        _forms = new Dom.Features.FormBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
@@ -174,14 +206,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// narrowed from <c>Cast</c> to <c>OfType&lt;Broiler.Dom.DomElement&gt;()</c> so it skips canonical
     /// <c>DomText</c>/<c>DomComment</c> children once construction flips; a no-op on today's
     /// homogeneous tree. Callers that need text/comment children walk raw <c>ChildNodes</c> instead.</summary>
-    private static IEnumerable<DomElement> ChildElements(DomNode element) =>
+    internal static IEnumerable<DomElement> ChildElements(DomNode element) =>
         element.ChildNodes.OfType<DomElement>();
 
     /// <summary>The child node at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
     /// Phase F (F3c part 2c): returns canonical <see cref="DomNode"/> — a child may be a
     /// <c>DomText</c>/<c>DomComment</c> once construction flips. Element-only callers narrow with
     /// <c>as Broiler.Dom.DomElement</c>/<c>is Broiler.Dom.DomElement</c>; on today's homogeneous tree every child is an element.</summary>
-    private static DomNode ChildAt(DomNode element, int index) => element.ChildNodes[index];
+    internal static DomNode ChildAt(DomNode element, int index) => element.ChildNodes[index];
 
     /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
@@ -191,7 +223,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
-    private static int ChildIndexOf(DomNode element, DomNode child)
+    internal static int ChildIndexOf(DomNode element, DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)
         {
@@ -208,14 +240,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // RemoveChild enforce nothing text-specific, so this is a safe widen.
 
     /// <summary>Old <c>Children.Insert(index, child)</c>.</summary>
-    private static void InsertChildAt(DomNode parent, int index, DomNode child)
+    internal static void InsertChildAt(DomNode parent, int index, DomNode child)
     {
         var reference = index < parent.ChildNodes.Count ? parent.ChildNodes[index] : null;
         parent.InsertBefore(child, reference);
     }
 
     /// <summary>Old <c>Children.Remove(child)</c> — removes only if actually a child; returns success.</summary>
-    private static bool RemoveChildFrom(DomNode parent, DomNode child)
+    internal static bool RemoveChildFrom(DomNode parent, DomNode child)
     {
         if (!ReferenceEquals(child.ParentNode, parent))
             return false;
@@ -239,20 +271,20 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// the facade <c>IsText(Broiler.Dom.DomElement)</c>). NodeType-based, so it holds for the current
     /// facade text nodes and for canonical <c>DomText</c> once construction flips in the
     /// <c>Children</c>/text cutover.</summary>
-    private static bool IsText(DomNode node) => node.NodeType == DomNodeType.Text;
+    internal static bool IsText(DomNode node) => node.NodeType == DomNodeType.Text;
 
     /// <summary>Whether <paramref name="node"/> is a comment node (RF-BRIDGE-1c Phase F).
     /// NodeType-based, so it holds for the current facade comment nodes and for canonical
     /// <c>DomComment</c> once construction flips — the replacement for the many
     /// <c>TagName == "#comment"</c> checks, since a canonical <c>DomComment</c> has no
     /// <c>TagName</c>.</summary>
-    private static bool IsComment(DomNode node) => node.NodeType == DomNodeType.Comment;
+    internal static bool IsComment(DomNode node) => node.NodeType == DomNodeType.Comment;
 
     /// <summary>Reads a text/comment node's character data (RF-BRIDGE-1c Phase F). Canonical
     /// <c>DomText</c>/<c>DomComment</c> expose it as <c>Data</c>; the facade text/comment nodes
     /// (pre-flip) expose it as <c>TextContent</c>. The single accessor both models funnel through
     /// during the text cutover; returns <c>""</c> (never null) for character-data nodes.</summary>
-    private static string BridgeText(DomNode node) => node switch
+    internal static string BridgeText(DomNode node) => node switch
     {
         DomCharacterData characterData => characterData.Data,
         _ => node.NodeValue ?? string.Empty,
@@ -323,7 +355,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>An element's <c>textContent</c> — the concatenation of its descendant text (RF-BRIDGE-1c
     /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>Broiler.Dom.DomElement.TextContent</c>.</summary>
-    private static string GetElementTextContent(DomElement element)
+    internal static string GetElementTextContent(DomElement element)
     {
         var sb = new System.Text.StringBuilder();
         CollectTextContent(element, sb);
@@ -334,14 +366,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> getter — <c>ParentNode as Broiler.Dom.DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
     /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
-    private static DomElement? ParentEl(DomNode node) => node.ParentNode as DomElement;
+    internal static DomElement? ParentEl(DomNode node) => node.ParentNode as DomElement;
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> setter). A null parent detaches;
     /// otherwise the child is appended if not already there — matching the old setter exactly.
     /// RF-BRIDGE-1c Phase F (F3c part 2b): the parent widened to <c>DomNode?</c> so range-extract
     /// code can pass DomNode-typed ancestor-chain clones (always elements at runtime).</summary>
-    private static void SetParent(DomNode child, DomNode? parent)
+    internal static void SetParent(DomNode child, DomNode? parent)
     {
         if (parent is null)
             child.Remove();
@@ -906,34 +938,4 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex DocTypePatternRegex();
-}
-
-/// <summary>
-/// Custom JSObject subclass for HTMLFormControlsCollection that returns null
-/// (not undefined) for named property lookups that don't match any control.
-/// </summary>
-internal sealed class FormElementsCollection(DomElement form, DomBridge bridge) : JSObject()
-{
-    protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
-    {
-        // First check own properties (length, numeric indices, known names)
-        var result = base.GetValue(key, receiver, false);
-        if (result != null && !result.IsUndefined)
-            return result;
-
-        // Dynamic named lookup in form controls
-        var prop = key.Value.ToString();
-        if (!string.IsNullOrEmpty(prop))
-        {
-            var controls = DomBridge.CollectFormControls(form);
-            foreach (var ctrl in controls)
-            {
-                if (ctrl.GetAttribute("name") is { } name &&
-                    string.Equals(name, prop, StringComparison.Ordinal))
-                    return bridge.ToJSObject(ctrl);
-            }
-        }
-
-        return JSNull.Value; // HTMLFormControlsCollection returns null for missing names
-    }
 }

@@ -1,5 +1,4 @@
 using Broiler.JavaScript.Engine;
-using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.HtmlBridge;
 
@@ -136,47 +135,9 @@ public sealed partial class DomBridge
                     return evt;
                 }
             ");
-        var registerMutationObserverFn = new JSFunction(JsRegistrationBroilerRegisterMutationObserver034Core, "__broilerRegisterMutationObserver", 3);
-        var unregisterMutationObserverFn = new JSFunction(JsRegistrationBroilerUnregisterMutationObserver035Core, "__broilerUnregisterMutationObserver", 1);
-        context["__broilerRegisterMutationObserver"] = registerMutationObserverFn;
-        context["__broilerUnregisterMutationObserver"] = unregisterMutationObserverFn;
-        // MutationObserver — DOM Level 4
-        context.Eval(@"
-                function MutationObserver(callback) {
-                    this._callback = callback;
-                    this._targets = [];
-                    this._records = [];
-                }
-                MutationObserver.prototype.observe = function(target, options) {
-                    var normalizedOptions = options || {};
-                    this._targets.push({ target: target, options: normalizedOptions });
-                    if (typeof __broilerRegisterMutationObserver === 'function') {
-                        __broilerRegisterMutationObserver(this, target, normalizedOptions);
-                    }
-                };
-                MutationObserver.prototype.disconnect = function() {
-                    this._targets = [];
-                    this._records = [];
-                    if (typeof __broilerUnregisterMutationObserver === 'function') {
-                        __broilerUnregisterMutationObserver(this);
-                    }
-                };
-                MutationObserver.prototype.takeRecords = function() {
-                    var r = this._records.slice();
-                    this._records = [];
-                    return r;
-                };
-                MutationObserver.prototype._notify = function(records) {
-                    if (records && records.length > 0) {
-                        for (var i = 0; i < records.length; i++) {
-                            this._records.push(records[i]);
-                        }
-                        var pending = this._records.slice();
-                        this._records = [];
-                        try { this._callback(pending, this); } catch(e) {}
-                    }
-                };
-            ");
+        // MutationObserver (constructor/prototype + host bridge functions) is installed by the
+        // Phase 3 MutationObserverBinding feature module.
+        _mutations.RegisterDocumentApis(context);
     }
 
 }

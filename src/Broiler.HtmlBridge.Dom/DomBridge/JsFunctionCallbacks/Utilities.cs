@@ -12,12 +12,8 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsUtilitiesGetLength002Core(DomElement form, in Arguments _)
-    {
-        var currentControls = CollectFormControls(form);
-        return new JSNumber(currentControls.Count);
-    }
-
+    // form.elements.length moved to the Phase 3 FormBinding feature module
+    // (Broiler.HtmlBridge.Dom.Features).
 
     private static JSValue JsUtilitiesGetCssText003Core(DomElement element, in Arguments a)
     {
@@ -269,70 +265,8 @@ public sealed partial class DomBridge
     // attribute-synchronized). The bridge keeps only the JavaScript argument
     // marshaling, the lenient empty-token skip these methods have always applied,
     // and the style-scope invalidation callback.
-    private static JSValue JsUtilitiesContains025Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSBoolean.False;
-        return new DomTokenList(element, "class").Contains(a[0].ToString())
-            ? JSBoolean.True
-            : JSBoolean.False;
-    }
-
-
-    private static JSValue JsUtilitiesAdd026Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
-    {
-        var tokens = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-        {
-            var cls = a[i].ToString();
-            if (!string.IsNullOrEmpty(cls))
-                tokens.Add(cls);
-        }
-
-        new DomTokenList(element, "class").Add([.. tokens]);
-        onClassChanged?.Invoke(element);
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsUtilitiesRemove027Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
-    {
-        var tokens = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-        {
-            var cls = a[i].ToString();
-            if (!string.IsNullOrEmpty(cls))
-                tokens.Add(cls);
-        }
-
-        new DomTokenList(element, "class").Remove([.. tokens]);
-        onClassChanged?.Invoke(element);
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsUtilitiesToggle028Core(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSBoolean.False;
-        var cls = a[0].ToString();
-        bool? force = a.Length >= 2 && a[1] is not JSUndefined ? a[1].BooleanValue : null;
-        var present = new DomTokenList(element, "class").Toggle(cls, force);
-        onClassChanged?.Invoke(element);
-        return present ? JSBoolean.True : JSBoolean.False;
-    }
-
-
-    private static JSValue JsUtilitiesReplaceClassToken(DomElement element, Action<DomElement>? onClassChanged, in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSBoolean.False;
-        var replaced = new DomTokenList(element, "class").Replace(a[0].ToString(), a[1].ToString());
-        if (replaced)
-            onClassChanged?.Invoke(element);
-        return replaced ? JSBoolean.True : JSBoolean.False;
-    }
-
+    // classList / DOMTokenList callbacks (contains/add/remove/toggle/replace) moved to the Phase 3
+    // ClassListBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private static JSValue JsUtilitiesGetItem029Core(Dictionary<string, string>? store, in Arguments a)
     {

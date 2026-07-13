@@ -52,39 +52,8 @@ public sealed partial class DomBridge
     }
 
 
-    private static bool GetMutationObserverOption(JSObject optionsObject, string propertyName)
-    {
-        var optionValue = optionsObject[(KeyString)propertyName];
-        return optionValue != null &&
-               !optionValue.IsUndefined &&
-               !optionValue.IsNull &&
-               optionValue.BooleanValue;
-    }
-
-
-    private static DomMutationObserverOptions CreateMutationObserverOptions(JSValue? value)
-    {
-        if (value is not JSObject optionsObject)
-            return new DomMutationObserverOptions();
-
-        return new DomMutationObserverOptions
-        {
-            ChildList = GetMutationObserverOption(optionsObject, "childList"),
-            Attributes = GetMutationObserverOption(optionsObject, "attributes"),
-            AttributeOldValue = GetMutationObserverOption(optionsObject, "attributeOldValue"),
-            CharacterData = GetMutationObserverOption(optionsObject, "characterData"),
-            CharacterDataOldValue = GetMutationObserverOption(optionsObject, "characterDataOldValue"),
-            Subtree = GetMutationObserverOption(optionsObject, "subtree")
-        };
-    }
-
-
-    private void RegisterMutationObserver(JSObject observerObject, DomNode target, DomMutationObserverOptions options) =>
-        _mutationObserverHub.Register(observerObject, target, options);
-
-
-    private void UnregisterMutationObserver(JSObject observerObject) => _mutationObserverHub.Unregister(observerObject);
-
+    // MutationObserver option parsing and observe()/disconnect() registration moved to the Phase 3
+    // MutationObserverBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private static DomElement GetDocumentElement(DomElement docRoot) => ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#')) ?? docRoot;
 

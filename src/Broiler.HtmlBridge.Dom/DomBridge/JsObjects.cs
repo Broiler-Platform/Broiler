@@ -138,9 +138,9 @@ public sealed partial class DomBridge
             new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // classList — class list manipulation
+        // classList — class list manipulation (Phase 3 P3.6: co-located ClassListBinding module)
         obj.FastAddValue((KeyString)"classList",
-            BuildClassListObject(element, bridge.InvalidateStyleScope),
+            Dom.Features.ClassListBinding.Build(element, bridge.InvalidateStyleScope),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // attributes — NamedNodeMap interface
@@ -593,14 +593,14 @@ public sealed partial class DomBridge
             new JSFunction((in a) => JsJsObjectsSetRequired121Core(bridge, element, in a), "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // checkValidity() — form validation
+        // checkValidity() — form validation (Phase 3 P3.9: FormBinding owns the validity check)
         obj.FastAddValue((KeyString)"checkValidity",
-            new JSFunction((in a) => CheckElementValidity(element) ? JSBoolean.True : JSBoolean.False, "checkValidity", 0),
+            new JSFunction((in a) => _forms.IsElementValid(element) ? JSBoolean.True : JSBoolean.False, "checkValidity", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // reportValidity() — form validation
         obj.FastAddValue((KeyString)"reportValidity",
-            new JSFunction((in a) => CheckElementValidity(element) ? JSBoolean.True : JSBoolean.False, "reportValidity", 0),
+            new JSFunction((in a) => _forms.IsElementValid(element) ? JSBoolean.True : JSBoolean.False, "reportValidity", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // submit() — for form elements

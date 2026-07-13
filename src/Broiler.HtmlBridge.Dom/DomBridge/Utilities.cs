@@ -92,7 +92,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    private static void CollectTextContent(DomNode node, StringBuilder sb)
+    internal static void CollectTextContent(DomNode node, StringBuilder sb)
     {
         if (IsText(node))
         {
@@ -257,7 +257,7 @@ public sealed partial class DomBridge
     /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
     /// <paramref name="ancestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendant(DomNode ancestor, DomNode candidate)
+    internal static bool IsDescendant(DomNode ancestor, DomNode candidate)
     {
         var current = candidate.ParentNode;
         while (current != null)
@@ -407,10 +407,11 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Collects all &lt;tr&gt; elements in a table in HTML spec order:
-    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows.
+    /// Collects all &lt;tr&gt; elements in a table in HTMLTableElement.rows spec order:
+    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows. Neutral
+    /// tree helper shared by the <c>TableBinding</c> feature module and hit testing.
     /// </summary>
-    private static List<DomElement> CollectTableRows(DomElement table)
+    internal static List<DomElement> CollectTableRows(DomElement table)
     {
         var rows = new List<DomElement>();
         // 1. All tr children of thead elements (in tree order)
@@ -421,7 +422,7 @@ public sealed partial class DomBridge
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
-        // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
+        // 2. Direct tr children of the table, or tr children of tbody elements (in tree order)
         foreach (var child in ChildElements(table))
         {
             var ctag = child.TagName.ToLowerInvariant();
@@ -441,77 +442,6 @@ public sealed partial class DomBridge
                         rows.Add(c);
         }
         return rows;
-    }
-
-    /// <summary>
-    /// Builds a JSArray of table rows for the 'rows' property.
-    /// </summary>
-    private JSArray BuildTableRows(DomElement table)
-    {
-        var rows = CollectTableRows(table);
-        var jsRows = new List<JSValue>();
-        foreach (var r in rows)
-            jsRows.Add(ToJSObject(r));
-        var arr = new JSArray(jsRows);
-        arr.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(jsRows.Count), "get length"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        return arr;
-    }
-
-    /// <summary>
-    /// Inserts a row into a table at the given index, per HTMLTableElement.insertRow() spec.
-    /// </summary>
-    private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
-    {
-        var tr = CreateBridgeElement("tr");
-        bridge._knownNodes.Add(tr);
-
-        var allRows = CollectTableRows(table);
-        if (allRows.Count == 0 || index == -1 || index == allRows.Count)
-        {
-            // Find the last section to append to, or create a tbody
-            DomElement? lastSection = null;
-            for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
-            {
-                if (ChildAt(table, i) is not DomElement childElement)
-                    continue;
-                var ctag = childElement.TagName.ToLowerInvariant();
-                if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
-                {
-                    lastSection = childElement;
-                    break;
-                }
-            }
-            if (lastSection == null && allRows.Count == 0)
-            {
-                // No sections and no rows at all: create a new tbody per spec
-                var tbody = CreateBridgeElement("tbody");
-                bridge._knownNodes.Add(tbody);
-                SetParent(tbody, table);
-                table.AppendChild(tbody);
-                lastSection = tbody;
-            }
-            if (lastSection != null)
-            {
-                SetParent(tr, lastSection);
-                lastSection.AppendChild(tr);
-            }
-            else
-            {
-                SetParent(tr, table);
-                table.AppendChild(tr);
-            }
-        }
-        else if (index >= 0 && index < allRows.Count)
-        {
-            var refRow = allRows[index];
-            var parent = ParentEl(refRow) ?? table;
-            SetParent(tr, parent);
-            var idx = ChildIndexOf(parent, refRow);
-            InsertChildAt(parent, idx >= 0 ? idx : parent.ChildNodes.Count, tr);
-        }
-        return ToJSObject(tr);
     }
 
     /// <summary>
@@ -559,26 +489,8 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Builds a form.elements collection (JSObject with indexed + named access).
-    /// </summary>
-    private JSValue BuildFormElementsCollection(DomElement form, DomBridge bridge)
-    {
-        var controls = CollectFormControls(form);
-
-        // Use FormElementsCollection which returns null for missing named properties
-        // (per HTMLFormControlsCollection spec behavior)
-        var collection = new FormElementsCollection(form, bridge);
-        for (int i = 0; i < controls.Count; i++)
-            collection.FastAddValue((uint)i, ToJSObject(controls[i]),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-        collection.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => JsUtilitiesGetLength002Core(form, in _), "get length"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        return collection;
-    }
+    // form.elements collection (indexed + named access) moved to the Phase 3 FormBinding feature
+    // module (Broiler.HtmlBridge.Dom.Features).
 
     /// <summary>
     /// Collects all descendants of <paramref name="root"/> in document order
@@ -633,7 +545,7 @@ public sealed partial class DomBridge
     /// Returns a flat list of all nodes in the subtree rooted at
     /// <paramref name="root"/> in document order (including the root).
     /// </summary>
-    private static List<DomNode> GetDocumentOrderNodes(DomNode root)
+    internal static List<DomNode> GetDocumentOrderNodes(DomNode root)
     {
         var list = new List<DomNode> { root };
         CollectDescendants(root, list);
@@ -643,7 +555,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Returns the node type constant for a <see cref="DomElement"/>.
     /// </summary>
-    private static int GetNodeType(DomNode node)
+    internal static int GetNodeType(DomNode node)
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
@@ -943,37 +855,8 @@ public sealed partial class DomBridge
     /// Builds a <c>classList</c> object exposing <c>add</c>, <c>remove</c>,
     /// <c>toggle</c>, and <c>contains</c>.
     /// </summary>
-    private static JSObject BuildClassListObject(DomElement element, Action<DomElement>? onClassChanged = null)
-    {
-        var classList = new JSObject();
-
-        // classList.contains(className)
-        classList.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsUtilitiesContains025Core(element, in a), "contains", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.add(...classNames)
-        classList.FastAddValue((KeyString)"add",
-            new JSFunction((in a) => JsUtilitiesAdd026Core(element, onClassChanged, in a), "add"),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.remove(...classNames)
-        classList.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => JsUtilitiesRemove027Core(element, onClassChanged, in a), "remove"),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.toggle(className[, force])
-        classList.FastAddValue((KeyString)"toggle",
-            new JSFunction((in a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.replace(oldToken, newToken)
-        classList.FastAddValue((KeyString)"replace",
-            new JSFunction((in a) => JsUtilitiesReplaceClassToken(element, onClassChanged, in a), "replace", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return classList;
-    }
+    // classList / DOMTokenList moved to the Phase 3 ClassListBinding feature module
+    // (Broiler.HtmlBridge.Dom.Features).
 
     /// <summary>
     /// Builds an in-memory <c>localStorage</c> stub exposing <c>getItem</c>,
@@ -1121,7 +1004,7 @@ public sealed partial class DomBridge
     /// so that JS try/catch blocks can intercept it with full <c>.code</c>, <c>.name</c>,
     /// and <c>.message</c> properties intact.
     /// </summary>
-    private static void ThrowDOMException(JSContext context, string message, string name)
+    internal static void ThrowDOMException(JSContext context, string message, string name)
     {
         if (context["DOMException"] is JSFunction domExCtor)
         {

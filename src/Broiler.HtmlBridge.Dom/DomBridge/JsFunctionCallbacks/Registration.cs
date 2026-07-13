@@ -492,26 +492,8 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationBroilerRegisterMutationObserver034Core(in Arguments a)
-    {
-        if (a.Length < 2 || a[0] is not JSObject observerObject || a[1] is not JSObject targetObject)
-            return JSUndefined.Value;
-        // A MutationObserver can observe a character-data node (characterData mutations).
-        var target = FindDomNodeByJSObject(targetObject);
-        if (target == null)
-            return JSUndefined.Value;
-        RegisterMutationObserver(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationBroilerUnregisterMutationObserver035Core(in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSObject observerObject)
-            UnregisterMutationObserver(observerObject);
-        return JSUndefined.Value;
-    }
-
+    // MutationObserver observe()/disconnect() callbacks moved to the Phase 3
+    // MutationObserverBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private JSValue JsRegistrationWrite036Core(in Arguments a)
     {
@@ -594,44 +576,8 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateTreeWalker038Core(DomBridge? bridgeForTraversal, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createTreeWalker': 1 argument required.");
-        if (a[0] is not JSObject rootObj)
-            throw new JSException("Failed to execute 'createTreeWalker': parameter 1 is not of type 'Node'.");
-        var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
-        if (rootEl == null)
-            return JSNull.Value;
-        var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
-        var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
-        return bridgeForTraversal.BuildTreeWalker(rootEl, whatToShow, filterFn);
-    }
-
-
-    private JSValue JsRegistrationCreateNodeIterator039Core(DomBridge? bridgeForTraversal, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createNodeIterator': 1 argument required.");
-        if (a[0] is not JSObject rootObj)
-            throw new JSException("Failed to execute 'createNodeIterator': parameter 1 is not of type 'Node'.");
-        var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
-        if (rootEl == null)
-            return JSNull.Value;
-        var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
-        var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
-        return bridgeForTraversal.BuildNodeIterator(rootEl, whatToShow, filterFn);
-    }
-
-
-    private JSValue JsRegistrationCreateComment041Core(in Arguments a)
-    {
-        var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = CreateBridgeCommentNode(data);
-        _knownNodes.Add(el);
-        return ToJSObject(el);
-    }
-
+    // createTreeWalker / createNodeIterator / createComment moved to the Phase 3
+    // TraversalBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private JSValue JsRegistrationGetChildNodes046Core(in Arguments _)
     {
@@ -948,16 +894,13 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
         if (!GetEventListeners(docNode).TryGetValue(type, out var listeners))
         {
             listeners = [];
             GetEventListeners(docNode)[type] = listeners;
         }
 
-        var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (!HasMatchingEventListener(listeners, registration))
-            listeners.Add(registration);
+        Dom.Features.EventListenerBinding.AddListener(listeners, a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -967,20 +910,9 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (GetEventListeners(docNode).TryGetValue(type, out var listeners))
-        {
-            for (int i = listeners.Count - 1; i >= 0; i--)
-            {
-                if (listeners[i].Listener == listener && listeners[i].Capture == capture)
-                {
-                    listeners.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-
+        Dom.Features.EventListenerBinding.RemoveListener(
+            GetEventListeners(docNode).TryGetValue(type, out var listeners) ? listeners : null,
+            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -1299,12 +1231,8 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var listeners = _eventTargets.WindowListenersForAdd(type);
-
-        var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (!HasMatchingEventListener(listeners, registration))
-            listeners.Add(registration);
+        Dom.Features.EventListenerBinding.AddListener(
+            _eventTargets.WindowListenersForAdd(type), a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -1314,20 +1242,9 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_eventTargets.TryGetWindowListeners(type, out var listeners))
-        {
-            for (int i = listeners.Count - 1; i >= 0; i--)
-            {
-                if (listeners[i].Listener == listener && listeners[i].Capture == capture)
-                {
-                    listeners.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-
+        Dom.Features.EventListenerBinding.RemoveListener(
+            _eventTargets.TryGetWindowListeners(type, out var listeners) ? listeners : null,
+            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
