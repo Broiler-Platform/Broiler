@@ -20,20 +20,22 @@ public sealed partial class DomBridge
     private const double DefaultBodyMarginPixels = 8;
     private const int MaxScrollContinuationDepth = 16;
 
-    // RF-BRIDGE-1c Phase F (F3b): the JS-object cache is keyed by canonical DomNode so
+    // RF-BRIDGE-1c Phase F (F3b): the JS-object registry is keyed by canonical DomNode so
     // text/comment nodes (which get JS wrappers) can round-trip once they flip to canonical
     // DomText/DomComment. A facade node IS-A DomNode, so this is a behaviour-preserving widen.
-    private readonly Dictionary<DomNode, JSObject> _jsObjectCache = [];
+    // P2.2: wrapper identity now lives in JsObjectRegistry, the single authority (was the scattered
+    // _jsObjectCache/_docRootToDocJSObject fields).
+    private readonly Dom.Runtime.JsObjectRegistry _jsObjects = new();
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
     private int _topLayerCounter;
 
     internal JSObject ToJSObject(DomNode node)
     {
-        if (_jsObjectCache.TryGetValue(node, out var cached))
+        if (_jsObjects.TryGet(node, out var cached))
             return cached;
 
         var obj = new JSObject();
-        _jsObjectCache[node] = obj;
+        _jsObjects.Set(node, obj);
 
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
         // Broiler.Dom.DomElement, so they receive a minimal Node/CharacterData wrapper instead of the full
@@ -699,7 +701,7 @@ public sealed partial class DomBridge
     /// RF-BRIDGE-1c Phase F (F3c): builds the minimal Node/CharacterData JS wrapper for a canonical
     /// <c>DomText</c>/<c>DomComment</c> — the members a character-data node actually exposes (no
     /// tagName/style/attributes/querySelector/form/iframe surface). Populated onto the already-cached
-    /// <paramref name="obj"/> (the caller registers it in <c>_jsObjectCache</c> before calling, so
+    /// <paramref name="obj"/> (the caller registers it in the <c>JsObjectRegistry</c> before calling, so
     /// re-entrant <c>ToJSObject</c> lookups resolve). The node-level <c>*Core</c> helpers are the
     /// same ones the element wrapper uses, now widened to <see cref="DomNode"/>.
     /// Includes the ChildNode mixin (remove/before/after/replaceWith) and EventTarget (added once the

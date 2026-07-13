@@ -871,7 +871,7 @@ public sealed partial class DomBridge
     private void RemoveElementsRecursive(DomNode node)
     {
         _knownNodes.Remove(node);
-        _jsObjectCache.Remove(node);
+        _jsObjects.Remove(node);
 
         if (node is DomElement element)
             _styleSheetCache.Remove(element);

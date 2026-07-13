@@ -63,7 +63,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
-    private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
     // Timer & async execution queues.
@@ -884,7 +883,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private void ParseHtml(string html)
     {
         _knownNodes.Clear();
-        _jsObjectCache.Clear();
+        // P2.2: one call clears both wrapper maps. Re-parse now also releases stale sub-document
+        // wrappers (keyed by detached roots that no lookup can reach again) — observably
+        // equivalent to before, but it stops them lingering until disposal.
+        _jsObjects.Clear();
         ClearComputedPropsCache();
         ClearChildren(_documentNode);
         _serializationTransformsApplied = false;

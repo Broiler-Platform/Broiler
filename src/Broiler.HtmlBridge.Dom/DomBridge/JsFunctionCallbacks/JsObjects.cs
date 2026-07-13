@@ -422,7 +422,7 @@ public sealed partial class DomBridge
         }
 
         // Invalidate cached JSObject so length/data properties reflect the update
-        _jsObjectCache.Remove(node);
+        _jsObjects.Remove(node);
         return ToJSObject(newNode);
     }
 
@@ -503,7 +503,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetOwnerDocument057Core(DomNode node, in Arguments a)
     {
         // For elements in sub-documents, return the sub-document JSObject
-        if (GetElementRuntimeState(node).OwnerDocRoot != null && _docRootToDocJSObject.TryGetValue(GetElementRuntimeState(node).OwnerDocRoot, out var subDoc))
+        if (GetElementRuntimeState(node).OwnerDocRoot != null && _jsObjects.TryGetDocument(GetElementRuntimeState(node).OwnerDocRoot, out var subDoc))
             return subDoc;
         // For main document elements, return the main document JSObject
         return _documentJSObject ?? JSNull.Value;

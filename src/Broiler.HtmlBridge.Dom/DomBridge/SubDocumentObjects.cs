@@ -14,10 +14,10 @@ public sealed partial class DomBridge
     private JSObject BuildSubDocument(DomElement docRoot)
     {
         var doc = new JSObject();
-        _docRootToDocJSObject[docRoot] = doc;
+        _jsObjects.SetDocument(docRoot, doc);
         // Map docRoot → doc JSObject so that ToJSObject(docRoot) returns the doc
         // object. This ensures strict equality checks like 'range.startContainer === doc' work.
-        _jsObjectCache[docRoot] = doc;
+        _jsObjects.Set(docRoot, doc);
         var bridge = this;
 
         doc.FastAddProperty((KeyString)"documentElement",

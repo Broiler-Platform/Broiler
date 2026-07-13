@@ -28,7 +28,7 @@ public sealed partial class DomBridge
         // Map the document JSObject to _documentNode so that ToJSObject(_documentNode) returns
         // the same object as the 'document' variable visible in JS. This ensures
         // strict equality checks like 'range.commonAncestorContainer === document' work.
-        _jsObjectCache[_documentNode] = document;
+        _jsObjects.Set(_documentNode, document);
 
         RegisterDocumentBasics(context, document);
         RegisterDocumentEventsAndMutationObservers(context);

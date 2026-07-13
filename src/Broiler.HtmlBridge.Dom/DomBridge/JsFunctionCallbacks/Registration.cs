@@ -863,7 +863,7 @@ public sealed partial class DomBridge
         if (doctypeArg is JSObject dtObj)
         {
             // Find the Broiler.Dom.DomElement for the doctype JSObject
-            foreach (var kvp in _jsObjectCache)
+            foreach (var kvp in _jsObjects.Entries)
             {
                 if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
                 {

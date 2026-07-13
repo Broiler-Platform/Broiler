@@ -307,6 +307,21 @@ disposal + guard tests live in `Broiler.Cli.Tests/DomBridgeSessionLifetimeTests.
 snapshot baseline was regenerated (only the `Broiler.HtmlBridge.Dom` DomBridge type line changed —
 Core is untouched, so `IDomBridgeRuntime` stays source-compatible and is **not** `IDisposable`).
 
+**P2.2 completed** 2026-07-13 (same branch). JS wrapper identity now has a single authority:
+`JsObjectRegistry` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the per-node wrapper map and
+the sub-document-root document-wrapper map (both reference-keyed) behind a narrow surface
+(`TryGet`/`Set`/`Remove`/`Entries`/`TryGetNode`/`SetDocument`/`TryGetDocument`/`Clear`), replacing
+the scattered `_jsObjectCache` and `_docRootToDocJSObject` fields at ~20 sites across
+`JsObjects`/`JsFunctionCallbacks`/`Registration`/`SubDocuments*`/`ShadowDom`/`Utilities`. Behavior
+is preserved; re-parse now also releases stale sub-document wrappers via one `Clear()` (observably
+equivalent — the dropped keys are detached roots no lookup can reach again). No public-API change
+(the registry is internal). Tests: `Broiler.Cli.Tests/JsObjectRegistryTests.cs` (registry unit
+tests + wrapper-identity characterization through the bridge). The wrapper *construction* in
+`ToJSObject` stays in the bridge (it needs `this` for hundreds of callbacks); only the identity
+store moved. The per-document JS singletons (`_documentJSObject`/`_windowJSObject`/
+`_visualViewportJSObject`) are intentionally left as fields — they are single globals, not node
+identity — for a later pass.
+
 Two findings recorded for later phases:
 
 - **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
@@ -349,7 +364,7 @@ Exit criteria:
 Suggested PR order:
 
 - P2.1 session lifetime and disposal characterization. **(done — see Status above)**
-- P2.2 JS identity registry.
+- P2.2 JS identity registry. **(done — see Status above)**
 - P2.3 style context and invalidation.
 - P2.4 event loop.
 - P2.5 listeners/observers.

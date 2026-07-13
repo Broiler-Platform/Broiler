@@ -52,8 +52,7 @@ public sealed partial class DomBridge : IDisposable
         // Computed-style engines/cache and JavaScript wrapper identity caches.
         ResetComputedStyleEngines();
         ClearComputedPropsCache();
-        _jsObjectCache.Clear();
-        _docRootToDocJSObject.Clear();
+        _jsObjects.Clear();
         _documentJSObject = null;
         _windowJSObject = null;
         _visualViewportJSObject = null;
