@@ -812,8 +812,29 @@ Behaviour-preserving; no public-API change. Tests:
 nodeType 9 with a canonical documentElement + doctype child; element creation/lookup/query work).
 Regression check vs the P4.3 baseline: a 1073-test wide sweep has the change-side failure set as a
 strict subset of baseline (no new failures); the Acid+Range set-diff's one apparent delta passes in
-isolation (known parallel-load render flakiness) → zero regressions. **Next: P4.4b** severs the
-regime-A iframe tree link and rewires the ~15 consumer sites; **P4.4c** eliminates `OwnerDocRoot`.
+isolation (known parallel-load render flakiness) → zero regressions.
+
+**P4.4b (regime-A iframe sever) is BLOCKED below the bridge — it requires a `Broiler.Layout` submodule
+change, not a bridge-only slice.** A full bridge-side implementation was written and reverted; the
+approach (documented here for the eventual cross-layer PR) added `_contentDocuments`/
+`_documentContainers` container↔document maps, made the four `BuildSubDocument*` paths mint a canonical
+`DomDocument` referenced by the container (not a `#subdoc-root` tree child), and rewired the
+lookup/reverse consumers
+(`GetOrCreateSubDocument`, `InvalidateCachedSubDocument`, `GetSubDocumentScrollingElement`,
+`TrySerializeCurrentSrcDoc`, `GetOuterFrameElement`). It built cleanly and passed the DOM/script
+sub-document suites, but produced **four deterministic iframe-geometry regressions**
+(`Todo28_Iframe_ZeroSize_No_Visual_Box`, the two script-assigned-iframe-position `ScrollIntoView`
+tests, and `SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame`). Root cause:
+`Broiler.Layout/Broiler.Layout/Engine/CssBox.cs` `LayoutNestedBrowsingContexts` composes each
+subframe's geometry into the main coordinate frame by **walking the `#subdoc-root` subtree that is
+present in the main box tree** — i.e. the `#subdoc-root` tree child is load-bearing for *layout*, not
+only script DOM. The shared-layout-geometry snapshot lays out `_document` (which contained the
+`#subdoc-root` subtree), so `getBoundingClientRect` of a sub-document element found its box; severing
+removes the sub-document from `_document`, so the layout engine composes nothing. The clean fix is to
+make `Broiler.Layout` lay out the referenced content-documents (via the container↔document map)
+instead of the `#subdoc-root` subtree — a cross-layer change that overlaps Phase 5 (used-value/Layout
+work). Until then, regime-A stays on the `#subdoc-root` element path. **P4.4c** (eliminate
+`OwnerDocRoot`) and the remaining `#document` sentinel are independent of this blocker.
 
 Status: **P4.3 completed** 2026-07-13 (same branch) — work item 1, second of four sentinels. The
 `#document-fragment` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentFragment`.
