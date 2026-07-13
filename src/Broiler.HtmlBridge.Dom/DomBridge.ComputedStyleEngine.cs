@@ -1,5 +1,6 @@
 using Broiler.Dom;
 using Broiler.CSS.Dom;
+using Broiler.HtmlBridge.Dom.Runtime;
 
 namespace Broiler.HtmlBridge;
 
@@ -14,33 +15,11 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    // One engine per document root: this keeps the engine's mutation-driven
-    // computed-style cache and its single DomDocument.Mutated subscription intact
-    // across calls, instead of leaking a subscription per getComputedStyle() call.
-    // The scoped stylesheet set is re-synced only when the collected
-    // <style>/<link>/inserted-rule text actually changes.
-    private readonly Dictionary<DomElement, ComputedStyleEngineScope> _computedStyleEngines = [];
-
-    private sealed class ComputedStyleEngineScope
-    {
-        public required CssStyleScopeBuilder ScopeBuilder { get; init; }
-        // The wrapped engine, held directly so ERS-inline mutations (which the engine's
-        // DOM-mutation subscription does not observe) can invalidate its computed caches.
-        public required CssStyleEngine Engine { get; init; }
-    }
-
-    /// <summary>
-    /// Invalidates every per-document engine's cascade/computed-style caches. Called
-    /// alongside clearing <c>_computedPropsCache</c> because those engines now read inline
-    /// style from the bridge's live ElementRuntimeState map (via
-    /// <see cref="CssStyleEngine.SetInlineStyleSource"/>), whose mutations
-    /// are not DOM mutations and so do not trigger the engine's own invalidation.
-    /// </summary>
-    private void InvalidateScopedEngineComputedCaches()
-    {
-        foreach (var scope in _computedStyleEngines.Values)
-            scope.Engine.InvalidateComputedStyleCaches();
-    }
+    // P2.3: the per-document engine scopes, the GetComputedProps memo and the style-invalidation
+    // batch state now live in DocumentStyleContext, the single computed-style authority (was the
+    // scattered _computedStyleEngines/_computedPropsCache/_computedPropsInProgress/
+    // _styleInvalidationBatchDepth/_pendingStyleInvalidationRoots fields).
+    private readonly DocumentStyleContext _styleContext = new();
 
     /// <summary>
     /// Serializes an element's live inline-style map (ElementRuntimeState) to a CSS
@@ -68,7 +47,7 @@ public sealed partial class DomBridge
     /// Resets the per-scope computed-style engines. Called when the document tree
     /// is rebuilt so stale document roots do not retain engines or subscriptions.
     /// </summary>
-    private void ResetComputedStyleEngines() => _computedStyleEngines.Clear();
+    private void ResetComputedStyleEngines() => _styleContext.ResetEngines();
 
     /// <summary>
     /// Returns the shared <see cref="CssStyleEngine"/> for
@@ -79,20 +58,15 @@ public sealed partial class DomBridge
     private CssStyleEngine GetSyncedScopedEngine(DomElement element)
     {
         var docRoot = GetDocumentRootFor(element);
-        if (!_computedStyleEngines.TryGetValue(docRoot, out var scope))
+        var scope = _styleContext.GetOrCreateEngineScope(docRoot, static () =>
         {
             var engine = new CssStyleEngine(new BridgeSelectorStateProvider());
             // Feed the bridge's live ElementRuntimeState inline map as the cascade's inline
             // source (see SerializeInlineStyleForEngine) so the engine sees JS-set and
             // anchor-resolver-written inline that never reaches the DOM style attribute.
             engine.SetInlineStyleSource(SerializeInlineStyleForEngine);
-            scope = new ComputedStyleEngineScope
-            {
-                ScopeBuilder = new CssStyleScopeBuilder(engine),
-                Engine = engine,
-            };
-            _computedStyleEngines[docRoot] = scope;
-        }
+            return new ComputedStyleEngineScope(new CssStyleScopeBuilder(engine), engine);
+        });
 
         var styleElements = new List<DomElement>();
         CollectStyleElementsInTree(docRoot, styleElements);

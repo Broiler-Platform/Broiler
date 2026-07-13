@@ -322,6 +322,22 @@ store moved. The per-document JS singletons (`_documentJSObject`/`_windowJSObjec
 `_visualViewportJSObject`) are intentionally left as fields — they are single globals, not node
 identity — for a later pass.
 
+**P2.3 completed** 2026-07-13 (same branch). Computed-style machinery now has a single authority:
+`DocumentStyleContext` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the per-document-root
+`CssStyleEngine` scopes (and the `ComputedStyleEngineScope` type), the `GetComputedProps` memo (cache
++ re-entrancy in-progress map), and the style-invalidation batch state — replacing the five scattered
+bridge fields (`_computedStyleEngines`, `_computedPropsCache`, `_computedPropsInProgress`,
+`_styleInvalidationBatchDepth`, `_pendingStyleInvalidationRoots`). There is now one invalidation
+route, `DocumentStyleContext.InvalidateComputedStyle()`, which clears the memo *and* the engines'
+cascade/computed caches together (they must invalidate as one because `GetComputedProps` reads inline
+style from the live ElementRuntimeState map, invisible to the engine's own DOM-mutation subscription).
+The bridge keeps the algorithms that need the DOM/loading (engine construction via
+`GetSyncedScopedEngine`, `<style>`/`<link>` collection, the recursive scope walk) and calls into the
+context for storage; no back-reference. Behavior-preserving; no public-API change (internal). Tests:
+`Broiler.Cli.Tests/DocumentStyleContextTests.cs` (memo/engine-scope/batch unit tests + a
+class-change → `getComputedStyle` invalidation characterization through the bridge). Net −53 lines in
+the bridge partials.
+
 Two findings recorded for later phases:
 
 - **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
@@ -365,7 +381,7 @@ Suggested PR order:
 
 - P2.1 session lifetime and disposal characterization. **(done — see Status above)**
 - P2.2 JS identity registry. **(done — see Status above)**
-- P2.3 style context and invalidation.
+- P2.3 style context and invalidation. **(done — see Status above)**
 - P2.4 event loop.
 - P2.5 listeners/observers.
 - P2.6 resource loader and browsing-context state.

@@ -7,7 +7,6 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
-using System.Collections.Concurrent;
 using Broiler.Dom;
 using Broiler.CSS;
 using Broiler.CSS.Dom;
@@ -20,34 +19,21 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private int _styleInvalidationBatchDepth;
-    private HashSet<DomElement>? _pendingStyleInvalidationRoots;
-    // These caches/reentrancy guards are read and written while computing
-    // getComputedStyle / element geometry. That work is re-entered from JS
-    // Promise/async/generator and scroll/timer continuations that the JS engine
-    // dispatches on ThreadPool threads (see the timer-map note in DomBridge.cs),
-    // so a continuation can mutate them concurrently with the main-thread layout
-    // pass. A plain Dictionary/HashSet corrupts under that race and throws
-    // "Operations that change non-concurrent collections must have exclusive
-    // access" from GetComputedProps — unhandled on a ThreadPool thread it aborts
-    // the whole process (SIGABRT/exit 134), taking out an entire WPT shard
-    // (issue #1143). Use concurrent collections, the same defensive idiom as the
-    // timer/raf maps.
-    private readonly ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsCache = new();
-    private readonly ConcurrentDictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = new();
+    // P2.3: computed-style state (the GetComputedProps memo and the style-invalidation batch depth /
+    // pending roots) moved to DocumentStyleContext (see _styleContext). The memo maps are concurrent
+    // there for the same reason they were here — JS continuations on ThreadPool threads re-enter
+    // computed-style/geometry work concurrently with the main-thread layout pass, and a plain
+    // dictionary corrupts under that race and aborts the process/WPT shard (issue #1143).
 
     /// <summary>
     /// Clears the bridge's <c>GetComputedProps</c> memo <em>and</em> the per-document engines'
-    /// cascade/computed-style caches together. The two must invalidate as one now that
-    /// <c>GetComputedProps</c> routes through the engine's sparse projection, which reads inline
-    /// style from the live ElementRuntimeState map (an ERS mutation is invisible to the engine's
-    /// own DOM-mutation subscription).
+    /// cascade/computed-style caches together — the single computed-style invalidation route
+    /// (see <see cref="DocumentStyleContext.InvalidateComputedStyle"/>). The two must invalidate as
+    /// one because <c>GetComputedProps</c> routes through the engine's sparse projection, which reads
+    /// inline style from the live ElementRuntimeState map (an ERS mutation is invisible to the
+    /// engine's own DOM-mutation subscription).
     /// </summary>
-    private void ClearComputedPropsCache()
-    {
-        _computedPropsCache.Clear();
-        InvalidateScopedEngineComputedCaches();
-    }
+    private void ClearComputedPropsCache() => _styleContext.InvalidateComputedStyle();
 
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
@@ -93,15 +79,11 @@ public sealed partial class DomBridge
     /// document scope after a selector-affecting mutation such as a class,
     /// attribute, or sibling structure change.
     /// </summary>
-    internal void BeginStyleInvalidationBatch() => _styleInvalidationBatchDepth++;
+    internal void BeginStyleInvalidationBatch() => _styleContext.BeginBatch();
 
     internal void EndStyleInvalidationBatch()
     {
-        if (_styleInvalidationBatchDepth == 0)
-            return;
-
-        _styleInvalidationBatchDepth--;
-        if (_styleInvalidationBatchDepth == 0)
+        if (_styleContext.EndBatchShouldFlush())
             FlushPendingStyleInvalidations();
     }
 
@@ -109,25 +91,16 @@ public sealed partial class DomBridge
     {
         ClearComputedPropsCache();
         var docRoot = GetDocumentRootFor(anchor);
-        if (_styleInvalidationBatchDepth > 0)
-        {
-            _pendingStyleInvalidationRoots ??= [];
-            _pendingStyleInvalidationRoots.Add(docRoot);
+        if (_styleContext.TryDeferRoot(docRoot))
             return;
-        }
 
         InvalidateStyleScopeRecursive(docRoot);
     }
 
     private void FlushPendingStyleInvalidations()
     {
-        if (_pendingStyleInvalidationRoots == null || _pendingStyleInvalidationRoots.Count == 0)
-            return;
-
-        foreach (var root in _pendingStyleInvalidationRoots)
+        foreach (var root in _styleContext.DrainPendingRoots())
             InvalidateStyleScopeRecursive(root);
-
-        _pendingStyleInvalidationRoots.Clear();
     }
 
     private void InvalidateStyleScopeRecursive(DomElement element)
