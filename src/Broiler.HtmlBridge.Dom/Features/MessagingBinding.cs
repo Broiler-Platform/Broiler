@@ -1,4 +1,3 @@
-using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -8,24 +7,92 @@ using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
+using Broiler.HtmlBridge.Dom.Runtime;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom.Features;
 
-public sealed partial class DomBridge
+/// <summary>
+/// The web-messaging feature binding module (HtmlBridge complexity-reduction roadmap Phase 3, P3.10).
+/// It co-locates the whole feature: <c>window.postMessage</c>, <c>MessageChannel</c>/<c>MessagePort</c>
+/// (creation, <c>postMessage</c>, <c>start</c>/<c>close</c>/<c>onmessage</c>, the port message queue),
+/// structured-clone/transfer-list handling and <c>MessageEvent</c> construction. It <b>owns</b> the
+/// Phase 2 <see cref="MessagePortRegistry"/> state authority (entangled peers, closed/started marks
+/// and the per-port pending-message queue).
+///
+/// It also owns the generic <c>EventTarget</c> dispatch (<c>addEventListener</c>/
+/// <c>removeEventListener</c>/<c>dispatchEvent</c> with capture/target/bubble-free propagation control)
+/// that is installed on message ports <em>and</em> on sub-windows — the two non-node event targets in
+/// the bridge. That dispatch is co-located here (its listeners already come from the shared
+/// <see cref="EventTargetRegistry"/>) pending a dedicated generic-EventTarget/Window module; sub-window
+/// installation goes through the module's <see cref="InstallEventTargetApi"/> entry point.
+///
+/// The module depends on the shared <see cref="EventTargetRegistry"/> (generic-target listeners +
+/// owner-window map, which it does not own) and reaches the document's browsing-context operations —
+/// window resolution, the window-context switch, frame-action queueing and top-window dispatch —
+/// through the narrow <see cref="IMessagingHost"/> contract. It never touches an arbitrary bridge
+/// field. The static, engine-neutral bridge helpers <c>DomBridge.InvokeEventListener</c> and
+/// <c>DomBridge.ThrowDOMException</c> are called directly.
+/// </summary>
+internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry eventTargets)
 {
-    private void InstallEventTargetApi(JSObject target, string logContext)
+    private readonly IMessagingHost _host = host;
+    private readonly EventTargetRegistry _eventTargets = eventTargets;
+
+    // P2.6 state authority for MessageChannel/MessagePort (peers, closed/started marks, queued
+    // messages). Owned here now that the whole messaging feature is co-located.
+    private readonly MessagePortRegistry _messagePorts = new();
+
+    /// <summary>Releases all message-channel/port state (called by the bridge's session reset).</summary>
+    internal void ClearPorts() => _messagePorts.Clear();
+
+    // ==================== Generic EventTarget dispatch ====================
+    // Installed on message ports and on sub-windows (the two non-node event targets).
+
+    /// <summary>Installs <c>addEventListener</c>/<c>removeEventListener</c>/<c>dispatchEvent</c> on a
+    /// generic event target (a message port or a sub-window).</summary>
+    internal void InstallEventTargetApi(JSObject target, string logContext)
     {
         target.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => JsMessagingAddEventListener001Core(target, in a), "addEventListener", 3),
+            new JSFunction((in a) => AddEventListener(target, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         target.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => JsMessagingRemoveEventListener002Core(target, in a), "removeEventListener", 3),
+            new JSFunction((in a) => RemoveEventListener(target, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         target.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => JsMessagingDispatchEvent003Core(logContext, target, in a), "dispatchEvent", 1),
+            new JSFunction((in a) => DispatchEvent(logContext, target, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    private JSValue AddEventListener(JSObject target, in Arguments a)
+    {
+        if (a.Length < 2)
+            return JSUndefined.Value;
+        var type = a[0].ToString();
+        EventListenerBinding.AddListener(
+            GetOrCreateEventTargetListeners(target, type), a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
+        return JSUndefined.Value;
+    }
+
+    private JSValue RemoveEventListener(JSObject target, in Arguments a)
+    {
+        if (a.Length < 2)
+            return JSUndefined.Value;
+        var type = a[0].ToString();
+        var listeners = _eventTargets.TryGetTargetListeners(target, out var listenersByType) &&
+                        listenersByType.TryGetValue(type, out var byType)
+            ? byType
+            : null;
+        EventListenerBinding.RemoveListener(listeners, a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
+        return JSUndefined.Value;
+    }
+
+    private JSValue DispatchEvent(string logContext, JSObject target, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject evt)
+            return JSBoolean.True;
+        return DispatchEventTarget(target, evt, logContext);
     }
 
     private List<EventListenerRegistration> GetOrCreateEventTargetListeners(JSObject target, string type)
@@ -57,25 +124,25 @@ public sealed partial class DomBridge
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
 
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in _) => JsMessagingStopPropagation004Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
+            new JSFunction((in _) => StopPropagation(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in _) => JsMessagingStopImmediatePropagation005Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
+            new JSFunction((in _) => StopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in _) => JsMessagingPreventDefault006Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new JSFunction((in _) => PreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddProperty((KeyString)"cancelBubble",
             new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in setArgs) => JsMessagingSetCancelBubble008Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
+            new JSFunction((in setArgs) => SetCancelBubble(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddProperty((KeyString)"returnValue",
             new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in setArgs) => JsMessagingSetReturnValue010Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+            new JSFunction((in setArgs) => SetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddValue((KeyString)"composedPath",
@@ -119,124 +186,95 @@ public sealed partial class DomBridge
 
     private void InvokeEventListenerWithOwner(JSObject target, JSValue listener, JSObject evt, string logContext)
     {
-        var ownerWindow = ResolveOwnerWindow(target);
+        var ownerWindow = _host.ResolveOwnerWindow(target);
         if (ownerWindow == null)
         {
-            InvokeEventListener(listener, evt, logContext);
+            DomBridge.InvokeEventListener(listener, evt, logContext);
             return;
         }
 
-        RunWithWindowContext(ownerWindow, () => InvokeEventListener(listener, evt, logContext));
+        _host.RunWithWindowContext(ownerWindow, () => DomBridge.InvokeEventListener(listener, evt, logContext));
     }
 
-    private JSObject? ResolveCurrentWindow()
-        => GetCanonicalWindow(_currentWindowOverride ?? _jsContext?["window"] as JSObject ?? _windowJSObject);
-
-    private JSObject? ResolveOwnerWindow(JSObject target)
-        => _eventTargets.TryGetOwnerWindow(target, out var ownerWindow) ? GetCanonicalWindow(ownerWindow) : ResolveCurrentWindow();
-
-    private JSObject? GetCanonicalWindow(JSObject? candidate)
+    private static JSValue StopPropagation(ref bool legacyCancelBubble, in Arguments _)
     {
-        if (candidate == null || ReferenceEquals(candidate, _windowJSObject))
-            return candidate;
+        legacyCancelBubble = true;
+        return JSUndefined.Value;
+    }
 
-        if (_subWindowContainers.ContainsKey(candidate))
-            return candidate;
+    private static JSValue StopImmediatePropagation(ref bool immediateStopped, ref bool legacyCancelBubble, in Arguments _)
+    {
+        immediateStopped = true;
+        legacyCancelBubble = true;
+        return JSUndefined.Value;
+    }
 
-        foreach (var subWindow in _subWindowCache.Values)
+    private static JSValue PreventDefault(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments _)
+    {
+        var cancelable = evt[(KeyString)"cancelable"];
+        if (!currentListenerPassive && cancelable != null && cancelable.BooleanValue)
         {
-            if (ReferenceEquals(candidate, subWindow))
-                return subWindow;
-
-            var candidateHref = (candidate[(KeyString)"location"] as JSObject)?[(KeyString)"href"]?.ToString();
-            var subWindowHref = (subWindow[(KeyString)"location"] as JSObject)?[(KeyString)"href"]?.ToString();
-            if (!string.Equals(candidateHref, subWindowHref, StringComparison.Ordinal))
-                continue;
-
-            var candidateParent = candidate[(KeyString)"parent"] as JSObject;
-            var subWindowParent = subWindow[(KeyString)"parent"] as JSObject;
-            if (ReferenceEquals(candidateParent, subWindowParent))
-                return subWindow;
+            prevented = true;
+            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
         }
 
-        return candidate;
+        return JSUndefined.Value;
     }
 
-    private void RunWithWindowContext(JSObject targetWindow, Action callback)
+    private static JSValue SetCancelBubble(ref bool legacyCancelBubble, in Arguments setArgs)
     {
-        if (_jsContext == null)
+        if (setArgs.Length > 0 && setArgs[0].BooleanValue)
+            legacyCancelBubble = true;
+        return JSUndefined.Value;
+    }
+
+    private static JSValue SetReturnValue(bool currentListenerPassive, JSObject evt, ref bool prevented, in Arguments setArgs)
+    {
+        var cancelable = evt[(KeyString)"cancelable"];
+        if (setArgs.Length > 0 && !setArgs[0].BooleanValue && !currentListenerPassive && cancelable != null && cancelable.BooleanValue)
         {
-            callback();
-            return;
+            prevented = true;
+            evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
         }
 
-        JSValue? previousWindow = null;
-        JSValue? previousDocument = null;
-        JSValue? previousLocation = null;
-        JSValue? previousParent = null;
-        JSValue? previousPostMessage = null;
-        JSValue? previousSelf = null;
-        JSValue? previousTop = null;
-        var previousCurrentWindow = _currentWindowOverride;
-
-        try
-        {
-            previousWindow = _jsContext.Eval("typeof window === 'undefined' ? undefined : window");
-            previousDocument = _jsContext.Eval("typeof document === 'undefined' ? undefined : document");
-            previousLocation = _jsContext.Eval("typeof location === 'undefined' ? undefined : location");
-            previousParent = _jsContext.Eval("typeof parent === 'undefined' ? undefined : parent");
-            previousPostMessage = _jsContext.Eval("typeof postMessage === 'undefined' ? undefined : postMessage");
-            previousSelf = _jsContext.Eval("typeof self === 'undefined' ? undefined : self");
-            previousTop = _jsContext.Eval("typeof top === 'undefined' ? undefined : top");
-
-            _jsContext["window"] = targetWindow;
-            _jsContext["document"] = GetWindowDocument(targetWindow);
-            _jsContext["location"] = targetWindow[(KeyString)"location"] ?? JSUndefined.Value;
-            _jsContext["parent"] = GetWindowParent(targetWindow);
-            _jsContext["postMessage"] = targetWindow[(KeyString)"postMessage"] ?? JSUndefined.Value;
-            _jsContext["self"] = targetWindow;
-            _jsContext["top"] = _windowJSObject ?? targetWindow;
-            _currentWindowOverride = targetWindow;
-
-            callback();
-        }
-        finally
-        {
-            _jsContext["window"] = previousWindow ?? JSUndefined.Value;
-            _jsContext["document"] = previousDocument ?? JSUndefined.Value;
-            _jsContext["location"] = previousLocation ?? JSUndefined.Value;
-            _jsContext["parent"] = previousParent ?? JSUndefined.Value;
-            _jsContext["postMessage"] = previousPostMessage ?? JSUndefined.Value;
-            _jsContext["self"] = previousSelf ?? JSUndefined.Value;
-            _jsContext["top"] = previousTop ?? JSUndefined.Value;
-            _currentWindowOverride = previousCurrentWindow;
-        }
+        return JSUndefined.Value;
     }
 
-    private JSValue GetWindowDocument(JSObject targetWindow)
-    {
-        if (ReferenceEquals(targetWindow, _windowJSObject))
-            return _documentJSObject ?? JSUndefined.Value;
+    // ==================== window.postMessage ====================
 
-        return _subWindowContainers.TryGetValue(targetWindow, out var containerElement)
-            ? GetOrCreateSubDocument(containerElement)
-            : JSUndefined.Value;
-    }
-
-    private JSValue GetWindowParent(JSObject targetWindow)
-    {
-        if (ReferenceEquals(targetWindow, _windowJSObject))
-            return _jsContext?.Eval("this") ?? targetWindow;
-
-        return targetWindow[(KeyString)"parent"] ?? (_windowJSObject ?? targetWindow);
-    }
-
-    private void RegisterWindowMessaging(JSObject window)
+    /// <summary>Installs <c>window.postMessage</c> on <paramref name="window"/> (top window or a
+    /// sub-window).</summary>
+    internal void RegisterWindowMessaging(JSObject window)
     {
         window.FastAddValue(
             (KeyString)"postMessage",
-            new JSFunction((in a) => JsMessagingPostMessage012Core(window, in a), "postMessage", 2),
+            new JSFunction((in a) => WindowPostMessage(window, in a), "postMessage", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    private JSValue WindowPostMessage(JSObject window, in Arguments a)
+    {
+        var targetWindow = a.This as JSObject ?? window;
+        var sourceWindow = _host.ResolveCurrentWindow();
+        var (targetOrigin, ports, cloneOptions, transferredPorts) = GetPostMessageDispatchOptions(a);
+        if (!ShouldDeliverWindowMessage(targetWindow, sourceWindow, targetOrigin))
+            return JSUndefined.Value;
+        var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value, cloneOptions);
+        CommitTransferredPorts(transferredPorts, targetWindow);
+        var origin = GetWindowOrigin(sourceWindow);
+        _host.QueueFrameAction(() =>
+        {
+            var evt = CreateMessageEvent(payload, sourceWindow, origin, ports);
+            if (ReferenceEquals(targetWindow, _host.WindowJSObject))
+            {
+                _host.DispatchWindowEvent(evt);
+            }
+            else
+            {
+                _host.RunWithWindowContext(targetWindow, () => DispatchEventTarget(targetWindow, evt, "DomBridge.window.postMessage"));
+            }
+        });
+        return JSUndefined.Value;
     }
 
     private (string TargetOrigin, JSArray Ports, JSValue CloneOptions, List<JSObject> TransferredPorts) GetPostMessageDispatchOptions(in Arguments a)
@@ -276,7 +314,7 @@ public sealed partial class DomBridge
 
         if (transferValue is not JSArray)
         {
-            ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+            DomBridge.ThrowDOMException(_host.JsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
             return (new JSArray(), JSUndefined.Value, []);
         }
 
@@ -293,7 +331,7 @@ public sealed partial class DomBridge
             if (item is JSObject port && _messagePorts.HasPeer(port))
             {
                 if (!seenPorts.Add(port))
-                    ThrowDOMException(_jsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
+                    DomBridge.ThrowDOMException(_host.JsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
 
                 transferredPorts.Add(port);
                 transferredPortObjects.Add(port);
@@ -303,16 +341,16 @@ public sealed partial class DomBridge
             if (item is JSArrayBuffer arrayBuffer)
             {
                 if (arrayBuffer.Detached)
-                    ThrowDOMException(_jsContext!, "The transfer list contains a detached ArrayBuffer.", "DataCloneError");
+                    DomBridge.ThrowDOMException(_host.JsContext!, "The transfer list contains a detached ArrayBuffer.", "DataCloneError");
 
                 if (!seenBuffers.Add(arrayBuffer))
-                    ThrowDOMException(_jsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
+                    DomBridge.ThrowDOMException(_host.JsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
 
                 transferredBuffers.Add(arrayBuffer);
                 continue;
             }
 
-            ThrowDOMException(_jsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
+            DomBridge.ThrowDOMException(_host.JsContext!, "The transfer list contains a non-transferable value.", "DataCloneError");
         }
 
         JSValue cloneOptions = JSUndefined.Value;
@@ -379,12 +417,12 @@ public sealed partial class DomBridge
         }
         catch (JSException)
         {
-            ThrowDOMException(_jsContext!, "The object could not be cloned.", "DataCloneError");
+            DomBridge.ThrowDOMException(_host.JsContext!, "The object could not be cloned.", "DataCloneError");
             return JSUndefined.Value;
         }
     }
 
-    private JSObject CreateMessageEvent(JSValue data, JSObject? sourceWindow, string origin, JSArray ports)
+    private static JSObject CreateMessageEvent(JSValue data, JSObject? sourceWindow, string origin, JSArray ports)
     {
         var evt = new JSObject();
         evt.FastAddValue((KeyString)"type", new JSString("message"), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -399,37 +437,12 @@ public sealed partial class DomBridge
         return evt;
     }
 
-    private JSObject CreateMessagePort(JSObject? ownerWindow)
+    // ==================== MessageChannel / MessagePort ====================
+
+    /// <summary>Constructs a <c>MessageChannel</c> with two entangled ports.</summary>
+    internal JSObject CreateMessageChannel()
     {
-        var port = new JSObject();
-        var effectiveOwner = ownerWindow ?? _windowJSObject ?? ResolveCurrentWindow() ?? port;
-        _eventTargets.SetOwnerWindow(port, effectiveOwner);
-        InstallEventTargetApi(port, "DomBridge.messagePort.dispatchEvent");
-        JSValue onMessageHandler = JSNull.Value;
-
-        port.FastAddValue((KeyString)"postMessage",
-            new JSFunction((in a) => JsMessagingPostMessage013Core(port, in a), "postMessage", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        port.FastAddProperty((KeyString)"onmessage",
-            new JSFunction((in _) => onMessageHandler, "get onmessage"),
-            new JSFunction((in a) => JsMessagingSetOnmessage015Core(ref onMessageHandler, port, in a), "set onmessage"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        port.FastAddValue((KeyString)"start",
-            new JSFunction((in a) => JsMessagingStart016Core(port, in a), "start", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        port.FastAddValue((KeyString)"close",
-            new JSFunction((in a) => JsMessagingClose017Core(port, in a), "close", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return port;
-    }
-
-    private JSObject CreateMessageChannel()
-    {
-        var ownerWindow = ResolveCurrentWindow();
+        var ownerWindow = _host.ResolveCurrentWindow();
         var port1 = CreateMessagePort(ownerWindow);
         var port2 = CreateMessagePort(ownerWindow);
         _messagePorts.Link(port1, port2);
@@ -438,6 +451,96 @@ public sealed partial class DomBridge
         channel.FastAddValue((KeyString)"port1", port1, JSPropertyAttributes.EnumerableConfigurableValue);
         channel.FastAddValue((KeyString)"port2", port2, JSPropertyAttributes.EnumerableConfigurableValue);
         return channel;
+    }
+
+    private JSObject CreateMessagePort(JSObject? ownerWindow)
+    {
+        var port = new JSObject();
+        var effectiveOwner = ownerWindow ?? _host.WindowJSObject ?? _host.ResolveCurrentWindow() ?? port;
+        _eventTargets.SetOwnerWindow(port, effectiveOwner);
+        InstallEventTargetApi(port, "DomBridge.messagePort.dispatchEvent");
+        JSValue onMessageHandler = JSNull.Value;
+
+        port.FastAddValue((KeyString)"postMessage",
+            new JSFunction((in a) => PortPostMessage(port, in a), "postMessage", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        port.FastAddProperty((KeyString)"onmessage",
+            new JSFunction((in _) => onMessageHandler, "get onmessage"),
+            new JSFunction((in a) => SetOnMessage(ref onMessageHandler, port, in a), "set onmessage"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        port.FastAddValue((KeyString)"start",
+            new JSFunction((in a) => StartPort(port, in a), "start", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        port.FastAddValue((KeyString)"close",
+            new JSFunction((in a) => ClosePort(port, in a), "close", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return port;
+    }
+
+    private JSValue PortPostMessage(JSObject? port, in Arguments a)
+    {
+        var sourcePort = a.This as JSObject ?? port;
+        if (_messagePorts.IsClosed(sourcePort) || !_messagePorts.TryGetPeer(sourcePort, out var targetPort) || _messagePorts.IsClosed(targetPort))
+        {
+            return JSUndefined.Value;
+        }
+
+        JSValue transferValue = JSUndefined.Value;
+        if (a.Length > 1)
+        {
+            if (a[1] is JSObject optionsObject && optionsObject[(KeyString)"transfer"] is { })
+            {
+                transferValue = optionsObject[(KeyString)"transfer"] ?? JSUndefined.Value;
+            }
+            else
+            {
+                transferValue = a[1];
+            }
+        }
+
+        var targetOwner = _host.ResolveOwnerWindow(targetPort) ?? _host.WindowJSObject ?? sourcePort;
+        var (ports, cloneOptions, transferredPorts) = ExtractTransferList(transferValue);
+        var payload = CloneForMessaging(a.Length > 0 ? a[0] : JSUndefined.Value, cloneOptions);
+        CommitTransferredPorts(transferredPorts, targetOwner);
+        _host.QueueFrameAction(() =>
+        {
+            if (_messagePorts.IsClosed(sourcePort) || _messagePorts.IsClosed(targetPort))
+            {
+                return;
+            }
+
+            var evt = CreateMessageEvent(payload, null, string.Empty, ports);
+            DispatchOrQueueMessagePortEvent(targetPort, evt);
+        });
+        return JSUndefined.Value;
+    }
+
+    private JSValue SetOnMessage(ref JSValue onMessageHandler, JSObject? port, in Arguments a)
+    {
+        onMessageHandler = a.Length > 0 ? a[0] : JSUndefined.Value;
+        if (!onMessageHandler.IsNullOrUndefined)
+        {
+            ActivateMessagePort(a.This as JSObject ?? port);
+        }
+
+        return JSUndefined.Value;
+    }
+
+    private JSValue StartPort(JSObject? port, in Arguments a)
+    {
+        ActivateMessagePort(a.This as JSObject ?? port);
+        return JSUndefined.Value;
+    }
+
+    private JSValue ClosePort(JSObject? port, in Arguments a)
+    {
+        var currentPort = a.This as JSObject ?? port;
+        _messagePorts.Close(currentPort);
+        return JSUndefined.Value;
     }
 
     private void DispatchOrQueueMessagePortEvent(JSObject targetPort, JSObject evt)
@@ -457,7 +560,7 @@ public sealed partial class DomBridge
     private bool CanDispatchMessagePortEvent(JSObject targetPort)
         => _messagePorts.IsStarted(targetPort) || HasOnMessageHandler(targetPort);
 
-    private bool HasOnMessageHandler(JSObject targetPort)
+    private static bool HasOnMessageHandler(JSObject targetPort)
         => targetPort[(KeyString)"onmessage"] is { } handler && !handler.IsNullOrUndefined;
 
     private void ActivateMessagePort(JSObject port)
@@ -479,14 +582,14 @@ public sealed partial class DomBridge
 
     private void DispatchMessagePortEvent(JSObject targetPort, JSObject evt)
     {
-        var targetOwner = ResolveOwnerWindow(targetPort);
+        var targetOwner = _host.ResolveOwnerWindow(targetPort);
         if (targetOwner == null)
         {
             DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage");
         }
         else
         {
-            RunWithWindowContext(targetOwner, () =>
+            _host.RunWithWindowContext(targetOwner, () =>
                 DispatchEventTarget(targetPort, evt, "DomBridge.messagePort.postMessage"));
         }
     }

@@ -10,12 +10,40 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Dom.Runtime;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom.Features;
 
-public sealed partial class DomBridge
+/// <summary>
+/// The networking feature binding module (HtmlBridge complexity-reduction roadmap Phase 3, P3.11).
+/// It co-locates the whole <c>fetch</c> / <c>XMLHttpRequest</c> surface: the <c>fetch</c> polyfill and
+/// its <c>Headers</c>/<c>Request</c>/<c>Response</c>/<c>FormData</c>/<c>Blob</c>/<c>AbortController</c>
+/// helper objects, the <c>Response</c> static factories and the <c>XMLHttpRequest</c> polyfill. Host
+/// I/O goes through the injected Phase 2 <see cref="ResourceLoader"/> — the "no feature callback
+/// constructs an <c>HttpClient</c>" seam Phase 7 builds on — and the only other bridge coupling (the
+/// page URL used to resolve <c>Response.redirect</c> relative URLs) is reached through the narrow
+/// <see cref="IFetchHost"/> contract. The non-networking registrations that historically lived in this
+/// method (<c>MessageChannel</c>, <c>getComputedStyle</c>) were moved back to the window-globals
+/// registration site.
+/// </summary>
+internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resources)
 {
-    private JSFunction RegisterFetchAndHttpApis(JSContext context, JSObject window)
+    private readonly IFetchHost _host = host;
+    private readonly ResourceLoader _resources = resources;
+
+    private delegate string? JsPropertyStringGetter(JSObject obj, params string[] names);
+
+    private delegate IEnumerable<(string Key, string Value)> ObjectStringEntriesEnumerator(JSObject obj);
+
+    private delegate (int status, string statusText, string url, string type, bool redirected, Dictionary<string, string> headers) ResponseInitParser(JSValue? initValue);
+
+    private delegate JSValue ResponseFactory(string body, int statusCode, string statusText,
+        string responseUrl, string type, bool redirected, Dictionary<string, string> headers);
+
+    /// <summary>Installs <c>fetch</c>/<c>Headers</c>/<c>Request</c>/<c>Response</c>/<c>FormData</c> and
+    /// <c>XMLHttpRequest</c> on <paramref name="window"/>/<paramref name="context"/>, returning the
+    /// <c>fetch</c> function so the caller can register it among the window globals.</summary>
+    internal JSFunction Install(JSContext context, JSObject window)
     {
         static IEnumerable<(string Key, string Value)> EnumerateObjectStringEntries(JSObject obj)
         {
@@ -647,7 +675,7 @@ public sealed partial class DomBridge
             if (Uri.TryCreate(redirectUrl, UriKind.Absolute, out var absoluteUri))
                 return absoluteUri.AbsoluteUri;
 
-            if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+            if (Uri.TryCreate(_host.PageUrl, UriKind.Absolute, out var baseUri) &&
                 Uri.TryCreate(baseUri, redirectUrl, out var resolvedUri))
             {
                 return resolvedUri.AbsoluteUri;
@@ -663,27 +691,18 @@ public sealed partial class DomBridge
         responseCtor.FastAddValue((KeyString)"error", new JSFunction((in _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
             "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        var messageChannelCtor = new JSFunction((in _) => CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["FormData"] = formDataCtor;
         context["Headers"] = headersCtor;
         context["Request"] = requestCtor;
         context["Response"] = responseCtor;
-        context["MessageChannel"] = messageChannelCtor;
-        // fetch(url, options) — polyfill backed by HttpClient with headers, method support
+        // fetch(url, options) — polyfill backed by the injected ResourceLoader
         var fetchFn = new JSFunction((in a) => JsRegistrationFetch120Core(TryGetJsPropertyString, EnumerateObjectStringEntries, CreateAbortErrorValue, CreateResponse, in a), "fetch", 1);
         window.FastAddValue((KeyString)"fetch", fetchFn, JSPropertyAttributes.EnumerableConfigurableValue);
-        // window.getComputedStyle(element, pseudoElement)
-        var bridgeForStyle = this;
-        window.FastAddValue(
-            (KeyString)"getComputedStyle",
-            new JSFunction((in a) => JsRegistrationGetComputedStyle121Core(bridgeForStyle, in a), "getComputedStyle", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        // XMLHttpRequest — basic polyfill backed by HttpClient
+        // XMLHttpRequest — basic polyfill backed by fetch/the ResourceLoader
         RegisterXMLHttpRequest(context);
         return fetchFn;
     }

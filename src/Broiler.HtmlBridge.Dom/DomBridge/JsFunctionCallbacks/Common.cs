@@ -8,19 +8,6 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private delegate string? JsPropertyStringGetter(JSObject obj, params string[] names);
-
-
-    private delegate IEnumerable<(string Key, string Value)> ObjectStringEntriesEnumerator(JSObject obj);
-
-
-    private delegate (int status, string statusText, string url, string type, bool redirected, Dictionary<string, string> headers) ResponseInitParser(JSValue? initValue);
-
-
-    private delegate JSValue ResponseFactory(string body, int statusCode, string statusText,
-        string responseUrl, string type, bool redirected, Dictionary<string, string> headers);
-
-
     private JSValue GetNodeTextValue(DomNode node)
     {
         // RF-BRIDGE-1c Phase F (F3c part 2d): character-data nodes expose their data as textContent;

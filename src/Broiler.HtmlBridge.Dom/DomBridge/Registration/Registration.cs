@@ -1,5 +1,7 @@
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.HtmlBridge;
 
@@ -44,7 +46,17 @@ public sealed partial class DomBridge
         _windowJSObject = window;
 
         var console = RegisterWindowBasics(document, window);
-        var fetchFn = RegisterFetchAndHttpApis(context, window);
+        var fetchFn = _fetch.Install(context, window);
+        // MessageChannel (messaging) and getComputedStyle (CSSOM) historically lived inside the fetch
+        // registration; they are registered here alongside the other window globals now that the fetch
+        // networking surface is an isolated feature module.
+        var messageChannelCtor = new JSFunction((in _) => _messaging.CreateMessageChannel(), "MessageChannel", 0);
+        window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["MessageChannel"] = messageChannelCtor;
+        window.FastAddValue(
+            (KeyString)"getComputedStyle",
+            new JSFunction((in a) => JsRegistrationGetComputedStyle121Core(this, in a), "getComputedStyle", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
         RegisterWindowGlobals(context, document, window, console, fetchFn);
         RegisterPerformanceObject(context, window);
         RegisterNavigatorObject(context, window);

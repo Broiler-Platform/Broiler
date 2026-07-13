@@ -38,7 +38,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.GetValueOrDefault</c> / null-returning indexer get.</summary>
-    private static string? GetAttr(DomElement element, string qualifiedName) =>
+    internal static string? GetAttr(DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out var value) ? value : null;
 
     /// <summary>Legacy <c>Attributes.ContainsKey</c>.</summary>
@@ -90,7 +90,7 @@ public sealed partial class DomBridge
     /// namespace is normalized (empty string ≡ null) to match canonical attribute keying,
     /// the same normalization <c>SetAttributeNS</c>/<c>GetAttributeNS</c> apply.
     /// </summary>
-    private static bool TryGetNsAttribute(DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
+    internal static bool TryGetNsAttribute(DomElement element, string? namespaceUri, string localName, out string qualifiedName, out string value)
     {
         var ns = string.IsNullOrEmpty(namespaceUri) ? null : namespaceUri;
         if (element.Attributes.TryGetValue((ns, localName), out var attribute))
@@ -106,7 +106,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Keys</c>: the qualified names of the element's attributes.</summary>
-    private static IEnumerable<string> AttributeNames(DomElement element) =>
+    internal static IEnumerable<string> AttributeNames(DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
 
     /// <summary>Legacy enumeration/snapshot of the string-keyed attribute map (qualified
@@ -182,235 +182,4 @@ public sealed partial class DomBridge
             CollectSubDocElements(child, list);
     }
 
-    /// <summary>
-    /// Builds a styleSheets collection JSObject for a sub-document.
-    /// </summary>
-
-    // -- Phase 7: NamedNodeMap and Attr node helpers --
-
-    /// <summary>
-    /// Builds a NamedNodeMap-like JSObject for element.attributes, with
-    /// getNamedItem, setNamedItem, removeNamedItem, item, and length.
-    /// </summary>
-    private JSObject BuildNamedNodeMapObject(DomElement element, JSObject ownerObj)
-    {
-        var map = new JSObject();
-
-        // length — number of attributes
-        map.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(element.Attributes.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // getNamedItem(name) — returns Attr node or null
-        map.FastAddValue((KeyString)"getNamedItem", new JSFunction((in a) => JsAttributesGetNamedItem002Core(element, ownerObj, in a), "getNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"getNamedItemNS", new JSFunction((in a) => JsAttributesGetNamedItemNS003Core(element, ownerObj, in a), "getNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // setNamedItem(attr) — adds/replaces attribute from Attr node, returns old Attr or null
-        map.FastAddValue((KeyString)"setNamedItem", new JSFunction((in a) => JsAttributesSetNamedItem004Core(element, ownerObj, in a), "setNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"setNamedItemNS", new JSFunction((in a) => JsAttributesSetNamedItemNS005Core(element, ownerObj, in a), "setNamedItemNS", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // removeNamedItem(name) — removes and returns the Attr node
-        map.FastAddValue((KeyString)"removeNamedItem", new JSFunction((in a) => JsAttributesRemoveNamedItem006Core(element, ownerObj, in a), "removeNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"removeNamedItemNS", new JSFunction((in a) => JsAttributesRemoveNamedItemNS007Core(element, ownerObj, in a), "removeNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // item(index) — returns Attr node at position
-        map.FastAddValue((KeyString)"item", new JSFunction((in a) => JsAttributesItem008Core(element, ownerObj, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // Numeric index access — expose each attribute by index
-        var attrKeys = AttributeNames(element).ToList();
-        for (var i = 0; i < attrKeys.Count; i++)
-        {
-            var idx = i;
-            map.FastAddProperty((KeyString)idx.ToString(), new JSFunction((in _) => JsAttributesCallback009Core(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
-
-        return map;
-    }
-
-    /// <summary>
-    /// Builds an Attr-like JSObject with name, value, specified, ownerElement, nodeType, nodeName.
-    /// </summary>
-    private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
-    {
-        var namespaceUri = TryGetAttachedAttrNamespace(element, name, out var ns, out var localName)
-            ? ns
-            : null;
-        return BuildAttrNodeCore(name, value, ownerObj, namespaceUri, localName);
-    }
-
-    private static JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri) => BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
-
-    private static JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri, string? explicitLocalName = null)
-    {
-        var attr = new JSObject();
-        var colonIdx = name.IndexOf(':');
-        var localName = explicitLocalName ?? (colonIdx >= 0 ? name[(colonIdx + 1)..] : name);
-        var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
-
-        attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"value", new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"ownerElement", ownerElement, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return attr;
-    }
-
-    private static bool TryGetAttachedAttrNamespace(DomElement element, string qualifiedName, out string? namespaceUri, out string localName)
-    {
-        // Match a genuinely namespaced attribute (non-null namespace) by qualified name —
-        // the set NsAttrMap used to track. No-namespace attributes are skipped so the
-        // colon-split fallback below governs their local name, exactly as before: a
-        // prefixed qualified name can only carry a namespace, so this never drops one.
-        foreach (var attribute in element.Attributes.Values)
-        {
-            if (attribute.NamespaceUri is null || !string.Equals(attribute.QualifiedName, qualifiedName, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            namespaceUri = attribute.NamespaceUri;
-            localName = attribute.LocalName;
-            return true;
-        }
-
-        namespaceUri = null;
-        var colonIdx = qualifiedName.IndexOf(':');
-        localName = colonIdx >= 0 ? qualifiedName[(colonIdx + 1)..] : qualifiedName;
-        return false;
-    }
-
-    private static string GetAttrNodeName(JSObject attrObj)
-    {
-        var nameValue = attrObj[(KeyString)"name"];
-        if (nameValue != null && !nameValue.IsUndefined && !nameValue.IsNull)
-            return nameValue.ToString();
-
-        var nodeNameValue = attrObj[(KeyString)"nodeName"];
-        return nodeNameValue != null && !nodeNameValue.IsUndefined && !nodeNameValue.IsNull
-            ? nodeNameValue.ToString()
-            : string.Empty;
-    }
-
-    private static string GetAttrNodeLocalName(JSObject attrObj)
-    {
-        var localNameValue = attrObj[(KeyString)"localName"];
-        if (localNameValue != null && !localNameValue.IsUndefined && !localNameValue.IsNull)
-            return localNameValue.ToString();
-
-        var name = GetAttrNodeName(attrObj);
-        if (string.IsNullOrEmpty(name))
-            return string.Empty;
-
-        var colonIdx = name.IndexOf(':');
-        return colonIdx >= 0 ? name[(colonIdx + 1)..] : name;
-    }
-
-    private static string? GetAttrNodeNamespace(JSObject attrObj)
-    {
-        var namespaceValue = attrObj[(KeyString)"namespaceURI"];
-        return namespaceValue != null && !namespaceValue.IsUndefined && !namespaceValue.IsNull
-            ? namespaceValue.ToString()
-            : null;
-    }
-
-    private void SetAttributeLikeSetAttribute(DomElement element, string attrName, string attrVal)
-    {
-        TryGetAttribute(element, attrName, out var previousAttrVal);
-        SetAttr(element, attrName, attrVal);
-        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
-            element.Id = attrVal;
-        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-            element.ClassName = attrVal;
-        else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
-        {
-            InlineStyle(element).Clear();
-            foreach (var kv in ParseStyle(attrVal, reportDrops: true))
-                InlineStyle(element)[kv.Key] = kv.Value;
-            InvalidateStyleScope(element);
-        }
-        else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
-        {
-            CompileInlineEventAttribute(element, attrName, attrVal);
-        }
-
-        if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
-            InvalidateStyleScope(element);
-
-        if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
-            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
-    }
-
-    private void RemoveAttributeLikeRemoveAttribute(DomElement element, string attrName)
-    {
-        TryGetAttribute(element, attrName, out var previousAttrVal);
-        var removed = RemoveAttr(element, attrName);
-        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
-            element.Id = null;
-        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-            element.ClassName = null;
-
-        InvalidateStyleScope(element);
-        if (removed)
-            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
-    }
-
-    private void SetAttributeLikeSetAttributeNS(DomElement element, string? namespaceUri, string attrName, string localName, string attrVal)
-    {
-        string? previousAttrVal = null;
-        if (TryGetNsAttribute(element, namespaceUri, localName, out var previousQualifiedName, out var existingAttrVal))
-        {
-            previousAttrVal = existingAttrVal;
-            // A prefix change keeps the same (namespace, localName) canonical key, so the
-            // SetAttributeNS below replaces the old-prefix attribute in place. The explicit
-            // remove keeps the canonical mutation-record sequence identical to the shadow-map era.
-            if (!string.Equals(previousQualifiedName, attrName, StringComparison.OrdinalIgnoreCase))
-                RemoveAttr(element, previousQualifiedName);
-        }
-        else
-        {
-            TryGetAttribute(element, attrName, out previousAttrVal);
-        }
-
-        element.SetAttributeNS(namespaceUri, attrName, attrVal);
-        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
-            element.Id = attrVal;
-        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-            element.ClassName = attrVal;
-        else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
-        {
-            InlineStyle(element).Clear();
-            foreach (var kv in ParseStyle(attrVal, reportDrops: true))
-                InlineStyle(element)[kv.Key] = kv.Value;
-            InvalidateStyleScope(element);
-        }
-        else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
-        {
-            CompileInlineEventAttribute(element, attrName, attrVal);
-        }
-
-        if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
-            InvalidateStyleScope(element);
-
-        if (!string.Equals(previousAttrVal, attrVal, StringComparison.Ordinal))
-            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
-    }
-
-    private void RemoveAttributeLikeRemoveAttributeNS(DomElement element, string? namespaceUri, string localName)
-    {
-        if (!TryGetNsAttribute(element, namespaceUri, localName, out var attrName, out var previousAttrVal))
-            return;
-
-        var removed = RemoveAttr(element, attrName);
-        if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
-            element.Id = null;
-        else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-            element.ClassName = null;
-
-        InvalidateStyleScope(element);
-        if (removed)
-            NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
-    }
 }

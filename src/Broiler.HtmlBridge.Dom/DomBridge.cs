@@ -100,10 +100,23 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // fields plus ElementRuntimeState.EventListeners for node listeners).
     private readonly Dom.Runtime.EventTargetRegistry _eventTargets = new();
     private readonly Dictionary<JSObject, DomElement> _subWindowContainers = new(ReferenceEqualityComparer.Instance);
-    // P2.6: MessageChannel/MessagePort state (peers, closed/started marks, queued messages) now lives
-    // in MessagePortRegistry, the single owner of the browsing-context port state (was the scattered
-    // _messagePortPeers/_closedMessagePorts/_startedMessagePorts/_queuedMessagePortEvents fields).
-    private readonly Dom.Runtime.MessagePortRegistry _messagePorts = new();
+    // Phase 3 (P3.10): the whole web-messaging feature — window.postMessage, MessageChannel/
+    // MessagePort (which own the P2.6 MessagePortRegistry state) and the generic EventTarget dispatch
+    // shared with sub-windows — lives in MessagingBinding, reached through the narrow IMessagingHost
+    // contract (see DomBridge.MessagingHost.cs). The module holds a reference to the shared
+    // _eventTargets registry (generic-target listeners it does not own).
+    private readonly Dom.Features.MessagingBinding _messaging;
+    // Phase 3 (P3.11): the fetch / XMLHttpRequest networking surface (fetch + Headers/Request/Response/
+    // FormData/Blob/AbortController + the XHR polyfill) lives in FetchBinding, backed by the injected
+    // P2.6 ResourceLoader; the only bridge coupling (page URL for redirect resolution) is reached
+    // through the narrow IFetchHost contract (see DomBridge.FetchHost.cs).
+    private readonly Dom.Features.FetchBinding _fetch;
+    // Phase 3 (P3.12): the DOM attribute object model — the element.attributes NamedNodeMap and its
+    // Attr nodes — plus the setAttribute/removeAttribute write path live in AttributesBinding, reached
+    // through the narrow IAttributesHost contract (see DomBridge.AttributesHost.cs) for the write
+    // path's cross-cutting side effects (inline style, inline event handlers, style invalidation,
+    // mutation records). The low-level attribute scans stay shared static helpers on DomBridge.
+    private readonly Dom.Features.AttributesBinding _attributes;
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -160,6 +173,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _dialogs = new Dom.Features.DialogBinding(this);
         _select = new Dom.Features.SelectBinding(this);
         _forms = new Dom.Features.FormBinding(this);
+        _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
+        _fetch = new Dom.Features.FetchBinding(this, _resources);
+        _attributes = new Dom.Features.AttributesBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");

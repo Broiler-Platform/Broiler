@@ -162,7 +162,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"removeEventListener", new JSFunction(JsRegistrationRemoveEventListener137Core, "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"dispatchEvent", new JSFunction(JsRegistrationDispatchEvent138Core, "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        RegisterWindowMessaging(window);
+        _messaging.RegisterWindowMessaging(window);
 
         window.FastAddProperty((KeyString)"frames", new JSFunction((in _) => BuildWindowFramesArray(), "get frames"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         context["frames"] = BuildWindowFramesArray();

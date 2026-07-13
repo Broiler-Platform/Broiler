@@ -656,9 +656,100 @@ elements indexed/named/length, action get/set, checkValidity characterizations).
 HtmlDomInterface (49), FormControlRender and the architecture-guard suites pass unchanged; the one
 pre-existing environmental `<select>` layout failure reproduces identically → zero regressions.
 
-Still to come — each entangled with layout, network, or rendering; the P3.7–P3.9 named-accessor
-pattern is the template for any residual runtime-state coupling: CSSOM/computed style,
-Element/geometry, Window/Document, SVG, Frames/Network, Messaging, Canvas, and the DomBridge
+Status: **P3.10 completed** 2026-07-13 (same branch) — the first *browsing-context-coupled* feature.
+The **web-messaging** feature is the tenth co-located module: `MessagingBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) owns `window.postMessage`, `MessageChannel`/`MessagePort` (creation,
+`postMessage`, `start`/`close`/`onmessage`, the per-port pending-message queue), the structured-clone
++ transfer-list handling and `MessageEvent` construction — and it **owns** the P2.6
+`MessagePortRegistry` state authority (entangled peers, closed/started marks, queued messages), the way
+P3.2 took over the P2.5 hub. It also owns the generic `EventTarget` dispatch
+(`addEventListener`/`removeEventListener`/`dispatchEvent` with the propagation-control methods) that is
+installed on message ports **and** sub-windows — the two non-node event targets — co-located here (its
+listeners already come from the shared `EventTargetRegistry`) pending a future dedicated generic-
+EventTarget/Window module; sub-window installation goes through the module's public
+`InstallEventTargetApi`. All the callbacks were renamed from the numbered `JsMessaging…001…017Core` to
+semantic names. The module holds a reference to the shared `EventTargetRegistry` (generic-target
+listeners + owner-window map, which it does **not** own) and reaches the document's browsing-context
+operations — current/owner-window resolution, the window-context switch, top-window dispatch and
+frame-action queueing — through the narrow `IMessagingHost` contract, implemented via explicit
+interface members in `DomBridge.MessagingHost.cs`. The window-resolution / window-context-switch
+cluster itself (`ResolveCurrentWindow`/`ResolveOwnerWindow`/`GetCanonicalWindow`/`RunWithWindowContext`/
+`GetWindowDocument`/`GetWindowParent`) is genuine browsing-context infrastructure entangled with the
+sub-window/sub-document caches Phase 2 deferred, so it was **relocated (not moved into the module)**
+into a new bridge partial `DomBridge.WindowContext.cs` — bridge-owned pending a future
+`BrowsingContextManager`, and still called directly by `SubDocuments.cs`. The three external call sites
+(`Registration/Window.cs` window messaging, `Registration/Fetch.cs` `MessageChannel` constructor,
+`SubDocuments.cs` sub-window EventTarget install) now go through the module; lifetime reset calls
+`_messaging.ClearPorts()`. The old `DomBridge/Messaging.cs` + `JsFunctionCallbacks/Messaging.cs` were
+deleted. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/MessagingBindingModuleTests.cs` (co-location / host-contract / registry-ownership
+guards + MessageChannel port round-trip, queue-until-onmessage, and async window-postMessage
+characterizations). Regression check vs the P3.9 baseline: WebMessaging (existing), MessagePortRegistry,
+DomEvents (81), DomEventsEdgeCase, MutationObserver, EventDispatch, EventListener, Attributes and the
+architecture-guard suites all pass unchanged (164 tests); the pre-existing environmental iframe/sub-
+document HTTP failures (`HttpSubResourceTests.Iframe_*`, `ScriptEngineExecuteTests.…Iframe_Scroll_State
+_In_SrcDoc`) fail identically on both sides → zero regressions.
+
+Status: **P3.11 completed** 2026-07-13 (same branch) — the networking feature. **`fetch` /
+`XMLHttpRequest`** is the eleventh co-located module: `FetchBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`, split into `FetchBinding.cs` / `FetchBinding.Callbacks.cs` /
+`FetchBinding.Xhr.cs` to stay under the 750-line/file guideline) owns the whole `fetch` polyfill and
+its `Headers`/`Request`/`Response`/`FormData`/`Blob`/`AbortController` helper objects, the `Response`
+static factories (`new Response`/`Response.json`/`Response.redirect`) and the `XMLHttpRequest` polyfill
+— i.e. `RegisterFetchAndHttpApis` (now `Install`), the four `JsRegistration…113/114/116/120Core`
+callbacks (moved out of the shared 1516-line `JsFunctionCallbacks/Registration.cs`), the four fetch
+delegate types (moved out of `JsFunctionCallbacks/Common.cs`) and `RegisterXMLHttpRequest`. Host I/O
+goes through the injected **P2.6 `ResourceLoader`** — the module holds a reference to it (passed in
+`new FetchBinding(this, _resources)`), so no feature callback constructs an `HttpClient` (the seam
+Phase 7 builds on). The **only** remaining bridge coupling — the page URL used to resolve a relative
+`Response.redirect` target — is the narrow `IFetchHost.PageUrl`, implemented via one explicit interface
+member in `DomBridge.FetchHost.cs`. **Two non-networking registrations that historically lived inside
+`RegisterFetchAndHttpApis` were relocated** to the window-globals site (`Registration/Registration.cs`):
+`MessageChannel` (messaging — delegates to `_messaging.CreateMessageChannel()`) and `getComputedStyle`
+(CSSOM — still calls the bridge's `JsRegistrationGetComputedStyle121Core`). The caller now does
+`var fetchFn = _fetch.Install(context, window)`; the old `Registration/Fetch.cs` and
+`Registration/XmlHttpRequest.cs` were deleted. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/FetchBindingModuleTests.cs` (co-location / host-contract /
+ResourceLoader-ownership guards + Response/Response.json, Headers/FormData, XHR-installed and
+relocated-MessageChannel/getComputedStyle characterizations, all network-free). Regression check vs the
+P3.10 baseline: the network/computed-style/messaging/selector suites pass unchanged (286 tests); the
+pre-existing environmental failures (the 8 `HttpClientMigrationTests` assembly-reflection checks, the 3
+`HttpSubResourceTests.Iframe_*`, the 2 `NetworkAndHttpTests.Fetch_*Body_Readers` that need real HTTP,
+and the 2 `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
+
+Status: **P3.12 completed** 2026-07-13 (same branch) — the DOM-attributes feature. **Node/attributes**
+is the twelfth co-located module: `AttributesBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns
+the attribute object model — the `element.attributes` `NamedNodeMap` (`BuildNamedNodeMap` + the eight
+`getNamedItem`/`setNamedItem`/`removeNamedItem`/`item`/NS callbacks, renamed from the numbered
+`JsAttributes…002…009Core`) and the `Attr` node construction (`BuildAttrNode`/`BuildStandaloneAttrNode`/
+`BuildAttrNodeCore`/`TryGetAttachedAttrNamespace`/`GetAttrNode{Name,LocalName,Namespace}`) — **and the
+attribute write path** (`SetAttributeLikeSetAttribute`/`…NS` + `RemoveAttributeLikeRemoveAttribute`/`…NS`),
+which applies the change to the canonical attribute set and then coordinates the cross-cutting side
+effects through the narrow `IAttributesHost` contract: `ApplyStyleAttribute` (re-parse the `style`
+attribute into inline style + invalidate), `CompileInlineEventAttribute` (an `on*` handler),
+`InvalidateStyleScope`, and `NotifyAttributeMutationObservers`. Those seams are implemented via explicit
+interface members in `DomBridge.AttributesHost.cs`, so the public surface is unchanged. The element's own
+`getAttribute`/`setAttribute`/… methods stay registered among the other element members in the bridge but
+now **delegate their write and Attr-node construction to `_attributes`** (the module both consumes the
+write hub and provides Attr-node construction back to those element callbacks + `document.createAttribute`).
+The low-level, engine-neutral attribute scans (`TryGetAttribute`/`SetAttr`/`RemoveAttr`/`AttributeNames`/
+`GetAttr`/`TryGetNsAttribute`) stay shared `internal static` helpers on `DomBridge` — used by many other
+modules — and are called qualified (`GetAttr`/`AttributeNames`/`TryGetNsAttribute` widened
+`private`→`internal static`); Phase 4 promotes them to Broiler.Dom. The document-query collectors
+(`CollectByTagName`/`CollectLinksInTreeOrder`/…) and `AttributeSnapshot`/`RestoreAttributes` stay in the
+bridge (not attributes-feature). The old `JsFunctionCallbacks/Attributes.cs` was deleted. Behaviour-
+preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/AttributesBindingModuleTests.cs` (co-location / host-contract guards + set/get/remove/
+hasAttribute round-trip, NamedNodeMap + Attr node, style-attribute→inline-style, and attribute
+MutationObserver characterizations). Regression check vs the P3.11 baseline: the attribute,
+MutationObserver, HtmlDomInterface and namespace suites pass unchanged (140 tests, 0 failures); the
+pre-existing environmental failures (the three `ScriptEngineExecuteTests` zoom/iframe serialization tests
+and the two `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.12 named-accessor / relocated-infra /
+shared-write-hub pattern is the template for any residual coupling: CSSOM/computed style,
+Element/geometry, Window/Document, SVG, Frames/browsing-contexts (SubDocuments), Canvas (better done with
+Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge
 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the

@@ -145,7 +145,7 @@ public sealed partial class DomBridge
 
         // attributes — NamedNodeMap interface
         obj.FastAddProperty((KeyString)"attributes",
-            new JSFunction((in _) => BuildNamedNodeMapObject(element, obj), "get attributes"),
+            new JSFunction((in _) => _attributes.BuildNamedNodeMap(element, obj), "get attributes"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // setAttribute(name, value)
