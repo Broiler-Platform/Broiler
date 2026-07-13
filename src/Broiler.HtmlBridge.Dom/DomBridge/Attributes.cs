@@ -134,7 +134,7 @@ public sealed partial class DomBridge
             SetAttr(element, kv.Key, kv.Value);
     }
 
-    private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
+    private void CollectByTagName(DomNode root, string tag, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {
@@ -164,7 +164,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
-    private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
+    private void CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
         {

@@ -11,7 +11,7 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private JSObject BuildSubDocument(DomElement docRoot)
+    private JSObject BuildSubDocument(DomNode docRoot)
     {
         var doc = new JSObject();
         _jsObjects.SetDocument(docRoot, doc);
@@ -21,11 +21,11 @@ public sealed partial class DomBridge
         var bridge = this;
 
         doc.FastAddProperty((KeyString)"documentElement",
-            new JSFunction((in _) => ToJSObject(GetDocumentElement(docRoot)), "get documentElement"),
+            new JSFunction((in _) => GetDocumentElement(docRoot) is { } de ? ToJSObject(de) : JSNull.Value, "get documentElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         doc.FastAddProperty((KeyString)"scrollingElement",
-            new JSFunction((in _) => ToJSObject(GetDocumentElement(docRoot)), "get scrollingElement"),
+            new JSFunction((in _) => GetDocumentElement(docRoot) is { } se ? ToJSObject(se) : JSNull.Value, "get scrollingElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // body
@@ -235,7 +235,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Finds the first element in a sub-tree matching a predicate.</summary>
-    private DomElement? FindInSubTree(DomElement root, Func<DomElement, bool> predicate)
+    private DomElement? FindInSubTree(DomNode root, Func<DomElement, bool> predicate)
     {
         foreach (var child in ChildElements(root))
         {

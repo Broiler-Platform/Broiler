@@ -839,16 +839,17 @@ public sealed partial class DomBridge
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
             : IsComment(node) ? HtmlSerializationNodeKind.Comment
+            : node is DomDocumentType ? HtmlSerializationNodeKind.DocumentType
+            : node is DomDocumentFragment ? HtmlSerializationNodeKind.Fragment
             : node is DomElement element
                 ? element.TagName.ToLowerInvariant() switch
                 {
-                    "#document-fragment" => HtmlSerializationNodeKind.Fragment,
                     "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
-                    "#doctype" => HtmlSerializationNodeKind.DocumentType,
                     _ => HtmlSerializationNodeKind.Element
                 }
                 : HtmlSerializationNodeKind.Element,
-        GetName: static node => node is DomElement element ? element.TagName : string.Empty,
+        GetName: static node => node is DomDocumentType docType ? docType.Name
+            : node is DomElement element ? element.TagName : string.Empty,
         // Never serialise a materialised nested-browsing-context (#subdoc-root) into
         // its container.  A sub-document is fetched and attached to its <iframe>/
         // <object>/<frame> so scripts can reach contentDocument and onload can fire,

@@ -260,7 +260,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// Builds a DOM <c>Range</c> object. The <paramref name="documentRoot"/> is the document node
     /// that owns this range (main or sub-document); defaults to the main document root.
     /// </summary>
-    internal JSObject BuildRange(DomElement? documentRoot = null)
+    internal JSObject BuildRange(DomNode? documentRoot = null)
     {
         var range = new JSObject();
         var docRoot = documentRoot ?? _host.DocumentNode;

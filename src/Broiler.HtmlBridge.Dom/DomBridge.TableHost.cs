@@ -17,7 +17,6 @@ public sealed partial class DomBridge : ITableHost
     DomElement ITableHost.CreateElement(string tag)
     {
         var element = CreateBridgeElement(tag);
-        _knownNodes.Add(element);
         return element;
     }
 }

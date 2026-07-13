@@ -21,7 +21,7 @@ public sealed partial class DomBridge
     /// <summary>Cache for stylesheet objects, keyed by the owning style element.</summary>
     private readonly Dictionary<DomElement, JSObject> _styleSheetCache = [];
 
-    private JSArray BuildStyleSheetsCollection(DomElement docRoot)
+    private JSArray BuildStyleSheetsCollection(DomNode docRoot)
     {
         var styleEls = new List<DomElement>();
         CollectStyleElements(docRoot, styleEls);
@@ -37,7 +37,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Collects all style elements in the sub-tree.</summary>
-    private static void CollectStyleElements(DomElement root, List<DomElement> results)
+    private static void CollectStyleElements(DomNode root, List<DomElement> results)
     {
         foreach (var child in ChildElements(root))
         {

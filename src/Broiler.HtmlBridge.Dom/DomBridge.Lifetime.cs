@@ -60,7 +60,6 @@ public sealed partial class DomBridge : IDisposable
         // The bridge borrows the JS context; only drop the reference.
         _jsContext = null;
 
-        _knownNodes.Clear();
 
         // Drain anything later PRs registered (currently the layout view is released directly
         // above; the registry is the seam future document services release through).

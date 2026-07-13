@@ -85,13 +85,16 @@ internal sealed partial class TraversalBinding
         if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el is null || DomBridge.ParentEl(el) == null)
+        // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
+        // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
+        // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
+        if (el is null || el.ParentNode == null)
         {
             DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.SetStart(DomBridge.ParentEl(el), DomBridge.ChildIndexOf(DomBridge.ParentEl(el)!, el));
+        state.SetStart(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el));
         return JSUndefined.Value;
     }
 
@@ -102,13 +105,16 @@ internal sealed partial class TraversalBinding
         if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el is null || DomBridge.ParentEl(el) == null)
+        // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
+        // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
+        // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
+        if (el is null || el.ParentNode == null)
         {
             DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.SetStart(DomBridge.ParentEl(el), DomBridge.ChildIndexOf(DomBridge.ParentEl(el)!, el) + 1);
+        state.SetStart(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el) + 1);
         return JSUndefined.Value;
     }
 
@@ -119,14 +125,15 @@ internal sealed partial class TraversalBinding
         if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el is null || DomBridge.ParentEl(el) == null)
+        // INVALID_NODE_TYPE_ERR — node has no parent. Phase 4 item 1 (P4.4a): use the raw ParentNode so
+        // a canonical DomDocument parent (regime-B createDocument root) is accepted as a container.
+        if (el is null || el.ParentNode == null)
         {
-            // INVALID_NODE_TYPE_ERR — node has no parent
             DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.SetEnd(DomBridge.ParentEl(el), DomBridge.ChildIndexOf(DomBridge.ParentEl(el)!, el));
+        state.SetEnd(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el));
         return JSUndefined.Value;
     }
 
@@ -137,13 +144,16 @@ internal sealed partial class TraversalBinding
         if (a[0] is not JSObject nodeObj)
             return JSUndefined.Value;
         var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el is null || DomBridge.ParentEl(el) == null)
+        // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
+        // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
+        // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
+        if (el is null || el.ParentNode == null)
         {
             DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.SetEnd(DomBridge.ParentEl(el), DomBridge.ChildIndexOf(DomBridge.ParentEl(el)!, el) + 1);
+        state.SetEnd(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el) + 1);
         return JSUndefined.Value;
     }
 
@@ -234,7 +244,10 @@ internal sealed partial class TraversalBinding
             var nodes = DomBridge.GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
             var elemCount = DomBridge.ChildElements(startContainerElement).Count(c => !DomBridge.IsText(c) && !DomBridge.IsComment(c));
             var removedElems = nodes.Count(n => !DomBridge.IsText(n) && !DomBridge.IsComment(n));
-            if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !DomBridge.IsComment(newParent)))
+            // newParent is always a real element here (a canonical DomDocumentFragment / DomComment
+            // is not a DomElement, so FindDomElementByJSObject returned null and we returned above) —
+            // the former "#document-fragment" sentinel-tag exclusion is dead.
+            if (elemCount - removedElems + 1 > 1 || !DomBridge.IsComment(newParent))
             {
                 DomBridge.ThrowDOMException(_host.JsContext, "Hierarchy request error", "HierarchyRequestError");
                 return JSUndefined.Value;

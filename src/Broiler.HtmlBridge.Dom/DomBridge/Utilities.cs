@@ -29,9 +29,9 @@ public sealed partial class DomBridge
     };
 
     /// <summary>
-    /// Parses a DOCTYPE declaration and creates a Broiler.Dom.DomElement representing the DocumentType node.
+    /// Parses a DOCTYPE declaration and creates the canonical <see cref="DomDocumentType"/> node.
     /// </summary>
-    private DomElement? ParseDocType(string html)
+    private DomDocumentType? ParseDocType(string html)
     {
         var match = DocTypePattern.Match(html);
         if (!match.Success) return null;
@@ -40,42 +40,33 @@ public sealed partial class DomBridge
         var publicId = match.Groups[2].Success ? match.Groups[2].Value : string.Empty;
         var systemId = match.Groups[3].Success ? match.Groups[3].Value : string.Empty;
 
-        var doctype = CreateBridgeElement("#doctype");
-        GetElementRuntimeState(doctype).DocumentType.Name.Set(name);
-        GetElementRuntimeState(doctype).DocumentType.PublicId.Set(publicId);
-        GetElementRuntimeState(doctype).DocumentType.SystemId.Set(systemId);
-        GetElementRuntimeState(doctype).DocumentType.InternalSubset.Set(null);
-
-        return doctype;
-    }
-
-    /// <summary>Gets the lowercase name from a DOCTYPE Broiler.Dom.DomElement.</summary>
-    private static string GetDocTypeName(DomElement element)
-    {
-        var dtName = GetElementRuntimeState(element).DocumentType.Name.TryGet(out var n) ? n?.ToString() ?? "html" : "html";
-        return dtName.ToLowerInvariant();
+        return CreateBridgeDocumentType(name, publicId, systemId);
     }
 
     /// <summary>
     /// Searches descendants of an element using a CSS selector.
     /// </summary>
-    private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
+    // Phase 4 item 1: root widened DomElement -> DomNode so querySelector/querySelectorAll work over a
+    // canonical DomDocumentFragment. A fragment cannot itself match a selector, so the :scope-root
+    // self-match is guarded to element roots and the descendant scope is null for a fragment root.
+    private static JSValue FindInDescendants(DomNode root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
-        if (selector.Contains(":scope") &&
-            MatchesSelector(root, selector, root))
+        var scope = root as DomElement;
+        if (scope is not null && selector.Contains(":scope") &&
+            MatchesSelector(scope, selector, scope))
         {
-            results.Add(bridge.ToJSObject(root));
+            results.Add(bridge.ToJSObject(scope));
             if (!all)
                 return results[0];
         }
 
-        SearchDescendants(root, selector, results, bridge, all, root);
+        SearchDescendants(root, selector, results, bridge, all, scope);
         if (all) return new JSArray(results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
+    private static void SearchDescendants(DomNode parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement? scope)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -321,7 +312,7 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(DomNode node, DomElement? ownerDocRoot)
+    private static void AdoptSubtreeIntoDocument(DomNode node, DomNode? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
@@ -351,6 +342,21 @@ public sealed partial class DomBridge
             return IsComment(source)
                 ? _document.CreateComment(sourceCharData.Data)
                 : _document.CreateTextNode(sourceCharData.Data);
+        }
+
+        // Phase 4 item 1: a canonical DomDocumentType clones its immutable name/publicId/systemId.
+        if (source is DomDocumentType sourceDocType)
+            return _document.CreateDocumentType(sourceDocType.Name, sourceDocType.PublicId, sourceDocType.SystemId);
+
+        // Phase 4 item 1: a canonical DomDocumentFragment clones to an empty fragment; a deep clone
+        // copies its children (a shallow clone is empty, per DOM).
+        if (source is DomDocumentFragment sourceFragment)
+        {
+            var fragmentClone = CreateBridgeDocumentFragment();
+            if (deep)
+                foreach (var child in sourceFragment.ChildNodes.ToArray())
+                    fragmentClone.AppendChild(CloneDomElement(child, true));
+            return fragmentClone;
         }
 
         var element = (DomElement)source;
@@ -400,7 +406,6 @@ public sealed partial class DomBridge
                 var childClone = CloneDomElement(child, true);
                 SetParent(childClone, clone);
                 clone.AppendChild(childClone);
-                _knownNodes.Add(childClone);
             }
         }
         return clone;
@@ -512,21 +517,6 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Collects all descendants of <paramref name="parent"/> into <paramref name="result"/>
-    /// in depth-first pre-order (without skipping sub-document roots).
-    /// Used by <c>document.write()</c> to register parsed elements.
-    /// </summary>
-    // RF-BRIDGE-1c Phase F (F3c part 2d): flatten the whole subtree (raw ChildNodes) so text/comment
-    // descendants are collected for registration too.
-    private static void CollectAllDescendantsFlat(DomNode parent, List<DomNode> result)
-    {
-        foreach (var child in parent.ChildNodes)
-        {
-            result.Add(child);
-            CollectAllDescendantsFlat(child, result);
-        }
-    }
 
     /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).
@@ -559,9 +549,10 @@ public sealed partial class DomBridge
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
+        if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
+        if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
         if (node is not DomElement element) return 1;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE
     }
 

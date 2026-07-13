@@ -778,6 +778,174 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.4a completed** 2026-07-13 (same branch) — work item 1, third sentinel (`#subdoc-root`),
+**stage a of a multi-stage remodel**. `#subdoc-root` cannot become a canonical `DomDocument` in place
+because the iframe/object/frame roots (regime A) are live *tree children* of their container, which a
+`DomDocument` forbids; the full remodel severs that link and follows a container↔document reference.
+P4.4a does the safe, self-contained first stage: the **detached** `createDocument`/`createHTMLDocument`
+roots (regime B) — which are already parentless — become real canonical `DomDocument`s
+(`CreateBrowsingContextDocument`), and their doctype/documentElement are appended as true canonical
+document children (a `DomDocumentType` is finally a legitimate child of a `DomDocument`). Regime A
+(iframe) stays on the `#subdoc-root` element path until P4.4b.
+
+Foundation (behavior-preserving `DomElement`→`DomNode` widenings so a `DomDocument` root flows through
+the shared sub-document infrastructure): `ElementRuntimeState.OwnerDocRoot`, the `_documentWrappers`
+map + `SetDocument`/`TryGetDocument`, `AdoptSubtreeIntoDocument`, `BuildSubDocument` + its 24
+sub-document callbacks, and the shared descendant helpers `GetDocumentElement`/`CollectByTagName`/
+`FindInSubTree`/`CollectMatching`/`CollectStyleElements`/`HitTestDocumentPoint`/`BuildStyleSheetsCollection`/
+`BuildRange`. `GetDocumentElement` became honestly nullable (an empty `DomDocument` has no
+documentElement, per DOM — was the `#subdoc-root` self-fallback), with null-guards added to the six
+callers.
+
+**Two regressions found and fixed during the stage** (both from the doctype/document now being a
+canonical non-element the surrounding element-typed code didn't expect): (1) `createDocument` with an
+empty qualifiedName produced an empty `DomDocument`, so `doc.documentElement` returned null and the
+facade getter crashed on `ToJSObject(null)` — fixed by returning `null` per DOM; (2) the `Range`
+`setStart/EndBefore/After` boundary setters used `ParentEl` (`ParentNode as DomElement`, which nulls a
+`DomDocument` parent) and so threw `InvalidNodeTypeError` when a node's parent was a regime-B document
+root — fixed to use the raw `ParentNode` (a Document is a valid boundary container). Both are guarded
+by pre-existing tests (`DomImplementationTests.Implementation_CreateDocument_Without_QualifiedName`,
+`Acid3Phase4RangeTests.Test8_MovingBoundaryPoints`).
+
+Behaviour-preserving; no public-API change. Tests:
+`Broiler.Cli.Tests/BrowsingContextRootMigrationTests.cs` (createDocument/createHTMLDocument report
+nodeType 9 with a canonical documentElement + doctype child; element creation/lookup/query work).
+Regression check vs the P4.3 baseline: a 1073-test wide sweep has the change-side failure set as a
+strict subset of baseline (no new failures); the Acid+Range set-diff's one apparent delta passes in
+isolation (known parallel-load render flakiness) → zero regressions.
+
+**P4.4b (regime-A iframe sever) is BLOCKED below the bridge — it requires a `Broiler.Layout` submodule
+change, not a bridge-only slice.** A full bridge-side implementation was written and reverted; the
+approach (documented here for the eventual cross-layer PR) added `_contentDocuments`/
+`_documentContainers` container↔document maps, made the four `BuildSubDocument*` paths mint a canonical
+`DomDocument` referenced by the container (not a `#subdoc-root` tree child), and rewired the
+lookup/reverse consumers
+(`GetOrCreateSubDocument`, `InvalidateCachedSubDocument`, `GetSubDocumentScrollingElement`,
+`TrySerializeCurrentSrcDoc`, `GetOuterFrameElement`). It built cleanly and passed the DOM/script
+sub-document suites, but produced **four deterministic iframe-geometry regressions**
+(`Todo28_Iframe_ZeroSize_No_Visual_Box`, the two script-assigned-iframe-position `ScrollIntoView`
+tests, and `SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame`). Root cause:
+`Broiler.Layout/Broiler.Layout/Engine/CssBox.cs` `LayoutNestedBrowsingContexts` composes each
+subframe's geometry into the main coordinate frame by **walking the `#subdoc-root` subtree that is
+present in the main box tree** — i.e. the `#subdoc-root` tree child is load-bearing for *layout*, not
+only script DOM. The shared-layout-geometry snapshot lays out `_document` (which contained the
+`#subdoc-root` subtree), so `getBoundingClientRect` of a sub-document element found its box; severing
+removes the sub-document from `_document`, so the layout engine composes nothing. The clean fix is to
+make `Broiler.Layout` lay out the referenced content-documents (via the container↔document map)
+instead of the `#subdoc-root` subtree — a cross-layer change that overlaps Phase 5 (used-value/Layout
+work). Until then, regime-A stays on the `#subdoc-root` element path. **P4.4c** (eliminate
+`OwnerDocRoot`) and the remaining `#document` sentinel are independent of this blocker.
+
+Status: **P4.3 completed** 2026-07-13 (same branch) — work item 1, second of four sentinels. The
+`#document-fragment` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentFragment`.
+Unlike the doctype leaf, a fragment is a *container*, so it gets a dedicated
+`PopulateDocumentFragmentJSObject` wrapper in `ToJSObject` (Node base + ParentNode mixin +
+child-manipulation: childNodes/children/first-last-child/-ElementChild, appendChild/insertBefore/
+removeChild/replaceChild/append/prepend, querySelector(-All), textContent, cloneNode) — deliberately
+NOT the element surface (attributes/style/tagName) it inherited as a sentinel element, and (preserving
+today's behaviour) NOT `getElementById`. Node-generic members reuse the existing DomNode handlers;
+the container members are focused fragment lambdas over the neutral tree helpers plus two shared
+helpers widened `DomElement`→`DomNode`: `InsertNodeAt` (guarding the element-only style-scope
+invalidation / child-added notification with `is DomElement`; a fragment parent has neither) and
+`FindInDescendants`/`SearchDescendants` (read-only descendant walk; scope is null for a fragment
+root). Fragment construction funnels through a new `CreateBridgeDocumentFragment()` at all three sites
+(`createDocumentFragment`, Range clone/extract result, the internal HTML fragment-parse container);
+the parse-container carriers (`BuildFragmentTree` return, `TryBuildInnerHtmlFragmentContainer` out
+param, the `parsedContainer` local) became `DomDocumentFragment`. `CloneDomElement`, `NodesAreEqual`,
+`GetNodeType`×2, `GetNodeName`, the serialization `GetKind` and the `append`-family child-spread
+(`BuildChildNodeArgumentNodes`) all gained a `DomDocumentFragment` branch and shed their
+`#document-fragment` TagName checks (the child-spread was the "silently stops matching" hazard the
+audit flagged). `appendChild(fragment)` now also unpacks natively (via the DomNode-widened
+`InsertNodeAt`), matching `append(fragment)`.
+
+**Regression fixed in this slice (introduced by P4.2, missed because that PR's wide-sweep log was
+tail-truncated to 8 of 10 failures):** `document.implementation.createDocument(ns, qname, doctype)`
+resolved the passed doctype with `_jsObjects.Entries … kvp.Key is DomElement`, which silently skipped
+the now-non-element `DomDocumentType` — so the doctype's `OwnerDocRoot` was never set and
+`doctype.ownerDocument` wrongly returned the main document. Fixed by matching `is DomNode` in both
+`createDocument` paths (main + sub-document) and, for the same class of hazard, in the sub-document
+`appendChild` node-lookup. Guarded by the pre-existing
+`DomEdgeCasePhase4Tests.CreateDocument_XHTML_With_DocType_Sets_OwnerDocument` (confirmed pass@P4.1 →
+fail@P4.2 → pass now).
+
+Behaviour-preserving; no public-API change. Tests:
+`Broiler.Cli.Tests/DocumentFragmentSentinelMigrationTests.cs` (create, append-unpack, query/children,
+cloneNode, Range extractContents). Regression check vs the P4.1 baseline (predating both P4.2 and
+P4.3): a 1005-test sweep has the change-side failure set as a strict subset of baseline (one flaky
+`:root` test even flipped to passing) with **no new failures**; the 21 apparent Acid deltas all pass
+in isolation (known parallel-load render flakiness — the Acid count varied 7/8/28 across runs) → zero
+regressions.
+
+Status: **P4.2 completed** 2026-07-13 (same branch) — work item 1, first of four sentinels. The
+`#doctype` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentType`. The doctype
+was a fake-tag `DomElement` (null namespace, `TagName == "#doctype"`) whose name/publicId/systemId
+lived in a parallel `ElementRuntimeState.DocumentType` state class (`DocumentTypeRuntimeState`); it
+now IS a canonical DocumentType node that carries those natively — so `DocumentTypeRuntimeState` and
+its `CopyRuntimeValuesTo` copy are deleted. Construction funnels through a new
+`CreateBridgeDocumentType(name, publicId, systemId)` over the existing `DomDocument.CreateDocumentType`
+factory (name lowercased once at construction to preserve the old read-time `GetDocTypeName`
+lowercasing; the always-`null` `internalSubset` is dropped — canonical has no such field and the JS
+getter already returned `null`). All five creation sites (main-parse `ParseDocType`, `document.write`,
+`createDocumentType` × main+sub, `createHTMLDocument` × main+sub) use the funnel. The reads move to the
+canonical node: a dedicated `PopulateDocumentTypeJSObject` wrapper gives the doctype the correct
+minimal DocumentType surface (Node base + ChildNode mixin + EventTarget + name/publicId/systemId,
+**not** the element surface it used to inherit); `GetNodeType`/`GetNodeName`, the serialization adapter
+(`GetKind`/`GetName`), `NodesAreEqual` (isEqualNode) and `CloneDomElement` all gained a
+`DomDocumentType` branch and shed their `#doctype` TagName special-cases. The canonical
+`HtmlSerializer`/`HtmlDocumentParser` already speak `DomDocumentType`, so no submodule change was
+needed. **One regression found and fixed during the slice:** the sub-document `childNodes` handler
+used `ChildElements` (element-only), which silently dropped the now-non-element doctype — switched to
+raw `ChildNodes` (matching `firstChild` and DOM `childNodes` semantics). Behaviour-preserving; no
+public-API change. Tests: `Broiler.Cli.Tests/DoctypeSentinelMigrationTests.cs` (parsed doctype,
+`createDocumentType`, `createHTMLDocument`, `cloneNode`, serialization). Regression check vs the P4.1
+baseline: the DOM / sub-document / cross-document / HTML-DOM-interface / serializer / namespace /
+traversal / lifetime / guard suites pass unchanged (595 in the wide sweep); the Acid pixel/layout
+suite fails the same **count** (8) on baseline and change with the differing test passing in isolation
+(known container flakiness), plus the standing headless-geometry failure → zero regressions.
+
+The remaining three sentinels — `#document-fragment` → `DomDocumentFragment`, `#subdoc-root` →
+browsing-context root, and `#document` → `DomDocument` — are separate sub-slices (P4.3+). They are
+harder than doctype: a fragment/subdoc-root/document is a **container** whose JS surface (appendChild,
+querySelector, children) the element wrapper currently supplies, and a canonical `DomDocumentType` may
+only be a child of a canonical `DomDocument` — so once the document/subdoc roots also become canonical,
+the doctype's `SetParent`/`AppendChild` will run under canonical pre-insert validity (today it is
+allowed because the parent is still an element).
+
+Status: **P4.1 completed** 2026-07-13 (branch `htmlbridge-phase4-remove-knownnodes`) — work item 6.
+The `_knownNodes` parallel node set is deleted. It was a process-instance
+`HashSet<DomNode>` populated on **every** node-construction path (`createElement`, `cloneNode`,
+`createComment`/`createTextNode`, `createDocumentFragment`, doctype/subdoc-root creation, HTML/XHTML
+parse, `document.write`, `innerHTML`/`outerHTML` replace, `insertAdjacent*`, `attachShadow`, the
+XML-fallback builders) — ~70 write sites across 10 files — but had **no behaviour-affecting reader
+left**: its last real consumer (`document.links`/collection ordering) was already replaced by
+tree-order traversal, and its only surviving lookup was a redundant `if (!Contains) Add` guard on a
+`HashSet` (idempotent by definition). It was pure parallel state shadowing canonical tree membership,
+so the canonical Broiler.Dom tree is now the single authority. Removed with it: the now-dead
+`AddElementsRecursive` register-subtree helper (its `RemoveElementsRecursive` counterpart stays — it
+still evicts `_jsObjects`/`_styleSheetCache` on sub-document teardown) and the orphaned
+`CollectAllDescendantsFlat` document.write helper. `ParseHtml`/`Dispose` no longer `Clear()` a set
+that is gone. Behaviour-preserving; no public-API change (`_knownNodes` was `private`). Tests:
+`Broiler.Cli.Tests/KnownNodesRemovalTests.cs` (guard: the field is gone + it must not be
+reintroduced; characterizations: element create/insert, `cloneNode`/comment/fragment construction,
+and `innerHTML` parse-replace all still round-trip through the canonical tree). Regression check vs
+the P3.12 baseline: the DOM / traversal / namespace / HTML-DOM-interface / serializer / cross-document
+(SVG) / attributes / MutationObserver / lifetime / public-API-snapshot / architecture-guard / Acid3
+suites pass unchanged; the pre-existing environmental headless-geometry failure
+(`DomTraversalAndRangeTests.Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`) fails
+identically with the change stashed → zero regressions.
+
+This is the first Phase 4 slice and the safest opener: it removes a genuine parallel authority (not a
+convenience wrapper) and declutters the `SubDocuments`/`Registration` node-construction paths that the
+still-pending Phase 3 Frames/browsing-context and Window/Document feature modules must extract — every
+construction site lost its `_knownNodes.Add(...)` bookkeeping line. The heavier parallel-state items
+(1 sentinel `#document`-family elements, 2 inline-style single authority, 3 parallel `InnerHtml`
+string) remain; item 5 "delete bridge copies" is a **separate judgement**, not a blanket sweep: the
+Phase-3-widened neutral shims (`IsText`/`ParentEl`/`ChildAt`/attribute scans, etc.) read the canonical
+tree rather than holding state, so they are wrappers to consolidate opportunistically, and the bridge's
+`Normalize`/`isEqualNode`/`cloneNode` reimplementations are **not** straight swaps for the canonical
+ones — they fire the bridge's MutationObserver / NodeIterator side effects the canonical algorithms do
+not.
+
 Goal: make Broiler.Dom and Broiler.Dom.Html the only authorities for document
 tree/content state.
 

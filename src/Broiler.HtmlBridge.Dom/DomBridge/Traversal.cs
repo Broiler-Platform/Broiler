@@ -24,7 +24,7 @@ public sealed partial class DomBridge
     private JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn) =>
         _traversal.BuildNodeIterator(root, whatToShow, filterFn);
 
-    private JSObject BuildRange(DomElement? documentRoot = null) =>
+    private JSObject BuildRange(DomNode? documentRoot = null) =>
         _traversal.BuildRange(documentRoot);
 
     /// <summary>

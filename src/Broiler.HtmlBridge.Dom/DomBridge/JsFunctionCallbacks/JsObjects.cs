@@ -285,14 +285,14 @@ public sealed partial class DomBridge
             return new JSNumber(3); // TEXT_NODE
         if (IsComment(node))
             return new JSNumber(8); // COMMENT_NODE
+        if (node is DomDocumentType)
+            return new JSNumber(10); // DOCUMENT_TYPE_NODE (canonical DomDocumentType)
+        if (node is DomDocumentFragment)
+            return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE (canonical DomDocumentFragment)
         if (node is not DomElement element)
             return new JSNumber(1); // canonical non-element char-data already handled above
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(9); // DOCUMENT_NODE
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
-            return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE
-        if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
-            return new JSNumber(10); // DOCUMENT_TYPE_NODE
         return new JSNumber(1); // ELEMENT_NODE
     }
 
@@ -303,16 +303,14 @@ public sealed partial class DomBridge
             return new JSString("#text");
         if (IsComment(node))
             return new JSString("#comment");
+        if (node is DomDocumentType docType)
+            return new JSString(docType.Name); // doctype nodeName is its (already lowercased) name
+        if (node is DomDocumentFragment)
+            return new JSString("#document-fragment");
         if (node is not DomElement element)
             return JSNull.Value;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSString("#document");
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
-            return new JSString("#document-fragment");
-        if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
-        {
-            return new JSString(GetDocTypeName(element));
-        }
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
         if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
@@ -412,7 +410,6 @@ public sealed partial class DomBridge
         var remainingText = text[offset..];
         SetBridgeText(node, text[..offset]);
         var newNode = CreateBridgeTextNode(remainingText);
-        _knownNodes.Add(newNode);
         // Insert new node as next sibling
         if (ParentEl(node) != null)
         {
@@ -486,18 +483,12 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetPublicId055Core(DomElement element, in Arguments _)
-    {
-        var pubId = GetElementRuntimeState(element).DocumentType.PublicId.TryGet(out var p) ? p?.ToString() ?? string.Empty : string.Empty;
-        return new JSString(pubId);
-    }
+    private static JSValue JsJsObjectsGetPublicId055Core(DomNode node, in Arguments _) =>
+        new JSString(node is DomDocumentType dt ? dt.PublicId : string.Empty);
 
 
-    private JSValue JsJsObjectsGetSystemId056Core(DomElement element, in Arguments _)
-    {
-        var sysId = GetElementRuntimeState(element).DocumentType.SystemId.TryGet(out var s) ? s?.ToString() ?? string.Empty : string.Empty;
-        return new JSString(sysId);
-    }
+    private static JSValue JsJsObjectsGetSystemId056Core(DomNode node, in Arguments _) =>
+        new JSString(node is DomDocumentType dt ? dt.SystemId : string.Empty);
 
 
     private JSValue JsJsObjectsGetOwnerDocument057Core(DomNode node, in Arguments a)
@@ -767,7 +758,6 @@ public sealed partial class DomBridge
     {
         var deep = a.Length > 0 && a[0].BooleanValue;
         var clone = CloneDomElement(node, deep);
-        _knownNodes.Add(clone);
         return ToJSObject(clone);
     }
 
@@ -886,7 +876,6 @@ public sealed partial class DomBridge
         GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
         GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
         GetElementRuntimeState(element).Shadow.Mode.Set(mode);
-        _knownNodes.Add(shadowRoot);
         return ToJSObject(shadowRoot);
     }
 
@@ -1507,7 +1496,6 @@ public sealed partial class DomBridge
         var text = a.Length > 1 ? a[1].ToString() : string.Empty;
         var (parent, index) = GetInsertAdjacentTarget(element, position);
         var textNode = CreateBridgeTextNode(text);
-        _knownNodes.Add(textNode);
         InsertNodeAt(parent, textNode, index);
         return JSUndefined.Value;
     }
