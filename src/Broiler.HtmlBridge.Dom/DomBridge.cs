@@ -67,6 +67,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // option.defaultSelected) live in SelectBinding, reached through the narrow ISelectHost contract
     // (see DomBridge.SelectHost.cs); the shared value property delegates its select branch to it.
     private readonly Dom.Features.SelectBinding _select;
+    // Phase 3 (P3.9): HTMLFormElement (elements/length/action) and constraint validation
+    // (checkValidity/reportValidity) live in FormBinding, reached through the narrow IFormHost
+    // contract (see DomBridge.FormHost.cs).
+    private readonly Dom.Features.FormBinding _forms;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -155,6 +159,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _tables = new Dom.Features.TableBinding(this);
         _dialogs = new Dom.Features.DialogBinding(this);
         _select = new Dom.Features.SelectBinding(this);
+        _forms = new Dom.Features.FormBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
@@ -933,34 +938,4 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex DocTypePatternRegex();
-}
-
-/// <summary>
-/// Custom JSObject subclass for HTMLFormControlsCollection that returns null
-/// (not undefined) for named property lookups that don't match any control.
-/// </summary>
-internal sealed class FormElementsCollection(DomElement form, DomBridge bridge) : JSObject()
-{
-    protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
-    {
-        // First check own properties (length, numeric indices, known names)
-        var result = base.GetValue(key, receiver, false);
-        if (result != null && !result.IsUndefined)
-            return result;
-
-        // Dynamic named lookup in form controls
-        var prop = key.Value.ToString();
-        if (!string.IsNullOrEmpty(prop))
-        {
-            var controls = DomBridge.CollectFormControls(form);
-            foreach (var ctrl in controls)
-            {
-                if (ctrl.GetAttribute("name") is { } name &&
-                    string.Equals(name, prop, StringComparison.Ordinal))
-                    return bridge.ToJSObject(ctrl);
-            }
-        }
-
-        return JSNull.Value; // HTMLFormControlsCollection returns null for missing names
-    }
 }

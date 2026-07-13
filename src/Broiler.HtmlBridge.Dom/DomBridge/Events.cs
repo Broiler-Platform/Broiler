@@ -38,36 +38,8 @@ public sealed partial class DomBridge
         }
     }
 
-    private static bool CheckElementValidity(DomElement element)
-    {
-        if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
-        {
-            return ValidateFormChildren(element);
-        }
-
-        // Individual element validation
-        if (!HasAttr(element, "required")) return true;
-
-        var tag = element.TagName;
-        if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tag, "textarea", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tag, "select", StringComparison.OrdinalIgnoreCase))
-        {
-            TryGetAttribute(element, "value", out var val);
-            return !string.IsNullOrEmpty(val);
-        }
-        return true;
-    }
-
-    private static bool ValidateFormChildren(DomElement form)
-    {
-        foreach (var child in ChildElements(form))
-        {
-            if (!IsText(child) && !CheckElementValidity(child)) return false;
-            if (!ValidateFormChildren(child)) return false;
-        }
-        return true;
-    }
+    // Constraint validation (checkValidity/reportValidity) moved to the Phase 3 FormBinding feature
+    // module (Broiler.HtmlBridge.Dom.Features).
 
     /// <summary>
     /// Dispatches a DOM event on the given element with full capture → target → bubble propagation.

@@ -14,19 +14,8 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsElementInterfacesGetLength025Core(DomElement element, in Arguments _)
-    {
-        var controls = CollectFormControls(element);
-        return new JSNumber(controls.Count);
-    }
-
-
-    private JSValue JsElementInterfacesSetAction027Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "action", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
+    // form.length and form.action moved to the Phase 3 FormBinding feature module
+    // (Broiler.HtmlBridge.Dom.Features).
 
     private JSValue JsElementInterfacesSetHtmlFor047Core(DomElement element, in Arguments a)
     {

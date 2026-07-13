@@ -489,26 +489,8 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Builds a form.elements collection (JSObject with indexed + named access).
-    /// </summary>
-    private JSValue BuildFormElementsCollection(DomElement form, DomBridge bridge)
-    {
-        var controls = CollectFormControls(form);
-
-        // Use FormElementsCollection which returns null for missing named properties
-        // (per HTMLFormControlsCollection spec behavior)
-        var collection = new FormElementsCollection(form, bridge);
-        for (int i = 0; i < controls.Count; i++)
-            collection.FastAddValue((uint)i, ToJSObject(controls[i]),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-        collection.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => JsUtilitiesGetLength002Core(form, in _), "get length"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        return collection;
-    }
+    // form.elements collection (indexed + named access) moved to the Phase 3 FormBinding feature
+    // module (Broiler.HtmlBridge.Dom.Features).
 
     /// <summary>
     /// Collects all descendants of <paramref name="root"/> in document order

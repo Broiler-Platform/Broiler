@@ -12,12 +12,8 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsUtilitiesGetLength002Core(DomElement form, in Arguments _)
-    {
-        var currentControls = CollectFormControls(form);
-        return new JSNumber(currentControls.Count);
-    }
-
+    // form.elements.length moved to the Phase 3 FormBinding feature module
+    // (Broiler.HtmlBridge.Dom.Features).
 
     private static JSValue JsUtilitiesGetCssText003Core(DomElement element, in Arguments a)
     {

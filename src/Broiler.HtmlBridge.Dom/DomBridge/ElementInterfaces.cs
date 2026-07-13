@@ -20,19 +20,8 @@ public sealed partial class DomBridge
         // extracted into the co-located TableBinding feature module).
         _tables.Install(obj, element, tag);
 
-        // HTMLFormElement interface
-        if (tag == "form")
-        {
-            // elements — returns collection of form controls with named access
-            obj.FastAddProperty((KeyString)"elements", new JSFunction((in _) => BuildFormElementsCollection(element, bridge), "get elements"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // length — alias for elements.length
-            obj.FastAddProperty((KeyString)"length", new JSFunction((in _) => JsElementInterfacesGetLength025Core(element, in _), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // action (read/write)
-            obj.FastAddProperty((KeyString)"action", new JSFunction((in _) => TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty), "get action"),
-                new JSFunction((in a) => JsElementInterfacesSetAction027Core(element, in a), "set action"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
+        // HTMLFormElement interface (Phase 3 P3.9: extracted into the co-located FormBinding module).
+        _forms.Install(obj, element, tag);
 
         // HTMLDetailsElement.open, HTMLDialogElement (showModal/show/close/open/returnValue) and the
         // popover API (Phase 3 P3.7: extracted into the co-located DialogBinding feature module).

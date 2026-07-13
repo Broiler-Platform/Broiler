@@ -637,10 +637,28 @@ and the architecture-guard suites pass unchanged; the one pre-existing environme
 (`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
 test) fails identically on both sides → zero regressions.
 
-Still to come — each entangled with the process-static `ElementRuntimeState`, layout, custom JS
-collection types, or network/rendering; the P3.7/P3.8 named-accessor pattern is the template for the
-runtime-state-coupled ones: CSSOM/computed style, Element/geometry, Window/Document, Forms (the
-`FormElementsCollection` named-access type), SVG, Frames/Network, Messaging, Canvas, and the DomBridge
+Status: **P3.9 completed** 2026-07-13 (same branch). The **HTMLFormElement** interface is the ninth
+co-located module: `FormBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns `form.elements`
+(an `HTMLFormControlsCollection` with numeric **and named** access), `form.length`, `form.action`,
+and the constraint-validation checks (`checkValidity`/`reportValidity`, whose logic moved out of
+`Events.cs` — completing that file's de-form-ing). The bridge's `FormElementsCollection` (a JSObject
+subclass with a named-lookup override) moved into the module as a nested type; its sole bridge
+coupling — the `DomBridge` back-reference it carried only to wrap a control as a JS object — is
+replaced by the narrow `IFormHost` contract (`ToJSObject`), implemented via one explicit interface
+member in `DomBridge.FormHost.cs`. Everything else (control collection, validity) is pure
+tree/attribute work over the already-`internal static` `DomBridge.CollectFormControls`/`HasAttr`/
+`TryGetAttribute`/`ChildElements`/`IsText`, so no new widening was needed. The form registration block
+in `AddElementSpecificMembers` collapsed to one `_forms.Install(obj, element, tag)` call; the
+`checkValidity`/`reportValidity` registration on form-associated elements in `JsObjects.cs` now calls
+`_forms.IsElementValid(element)`. Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/FormBindingModuleTests.cs` (co-location/host-contract guards +
+elements indexed/named/length, action get/set, checkValidity characterizations). Regression check:
+HtmlDomInterface (49), FormControlRender and the architecture-guard suites pass unchanged; the one
+pre-existing environmental `<select>` layout failure reproduces identically → zero regressions.
+
+Still to come — each entangled with layout, network, or rendering; the P3.7–P3.9 named-accessor
+pattern is the template for any residual runtime-state coupling: CSSOM/computed style,
+Element/geometry, Window/Document, SVG, Frames/Network, Messaging, Canvas, and the DomBridge
 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
