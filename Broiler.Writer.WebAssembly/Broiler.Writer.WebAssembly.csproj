@@ -11,6 +11,11 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>Broiler.Writer.WebAssembly</RootNamespace>
     <AssemblyName>Broiler.Writer.WebAssembly</AssemblyName>
+    <!-- Publishing this browser-wasm app untrimmed crashes the mono runtime at boot
+         (AppContext.Setup). Trim on every publish path — direct `dotnet publish` of this project AND
+         a hosted publish through Broiler.Office.Server (BOSS), where the pubxml profile does not
+         apply. Full AOT still layers on top with -p:RunAOTCompilation=true. -->
+    <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>

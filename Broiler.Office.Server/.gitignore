@@ -1,0 +1,3 @@
+# The web root is generated: the Broiler Writer WASM bundle is vendored here from the client's
+# published output by the VendorWriterClientForRun MSBuild target (see the .csproj). Never commit it.
+/wwwroot/
