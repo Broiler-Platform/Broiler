@@ -778,6 +778,45 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.5 completed** 2026-07-13 (branch `claude/htmlbridge-phase-4-a4w8vp`) — **work item 3, the
+parallel `InnerHtml` string.** `ElementRuntimeState.InnerHtml` (the bridge-side raw-text mirror for
+`<style>`/`<script>`/`<textarea>`, the historical `innerHTML`-getter fallback, and the
+serialization round-trip value) is **deleted**. The `innerHTML` getter already served canonical
+children (`SerializeChildrenToHtml`), and `SetElementInnerHtml` already parses/replaces into canonical
+children — so the string was pure shadow state. All nine accesses were removed: the two write sites in
+`SetElementInnerHtml` (`SubDocuments.cs`) and `CloneDomElement` (`Utilities.cs`, a clone now carries
+content only via its deep-cloned DomText children — shallow clone correctly drops it, per DOM); the
+progress/meter placeholder reset (`Serialization.cs`); the `<style>` source fallback in
+`GetStyleElementSourceText` (`Css.cs`); the `textContent` fallback for a childless element
+(`Common.cs`, now returns `""` per DOM); the serializer's `GetRawInnerHtml` adapter (now `_ => null`,
+matching the canonical default); and the anchor-cleanup `!hadTextChild` InnerHtml branch
+(`AnchorResolver/CssCleanup.cs`), which neutralized a source that no longer exists.
+
+**The load-bearing invariant — proven, not assumed:** raw-text element content is *always* a canonical
+`DomText` child (initial parse via `HtmlDocumentParser`, and the `innerHTML` setter's fragment parse,
+both emit one), even after the full anchor/render resolve pipeline (`NeutralizeStyleElementsForAnchorRules`
+rewrites the text node **in place** via `SetBridgeText`, never migrating content to a string). The
+childless-`<style>`-with-content state that `AnimationResolver`/`PositionTry`/`CssCleanup` carried
+defensive InnerHtml-fallback handling for is **unreachable through the public API** — the former
+`AnimationInnerHtmlStyleTests` had to fabricate it by reflection. Those two tests were rewritten to
+exercise the same `@keyframes` / stylesheet-`animation` collection through a real DomText-backed
+`<style>` (their production shape); the stale "CSS can live in InnerHtml with no DomText child"
+comments across those three resolvers were corrected. Behaviour-preserving; no public-API change (the
+field was `private`). Tests: `Broiler.Cli.Tests/InnerHtmlParallelStateRemovalTests.cs` (invariant
+probe: a `<style>` keeps its DomText child through `ResolveAnchorPositions`; plus getter/setter/
+textContent/clone/serialization/cascade characterizations). Regression check vs the P4.4a baseline: see
+below.
+
+**Finding recorded for P4.4c (eliminate `OwnerDocRoot`): it is effectively gated on P4.4b, contrary to
+this roadmap's earlier "independent of this blocker" note.** A full audit found `OwnerDocRoot`'s
+`ownerDocument`-getter read and its `_documentWrappers` key have **no canonical substitute** for
+regime-A (`#subdoc-root`) iframe nodes and shadow roots: those nodes are not children of a canonical
+`DomDocument`, so canonical `node.OwnerDocument` returns the *main* document for them. The property
+cannot be removed until regime-A roots become canonical documents (the same P4.4b layout blocker). The
+only safe isolated changes here are preparatory convergence (trimming the redundant regime-B
+`OwnerDocRoot` writes that duplicate `AppendChild`'s `AdoptNode`, and adopting detached
+sub-document-created nodes so canonical `OwnerDocument` matches) — non-terminal, so deferred.
+
 Status: **P4.4a completed** 2026-07-13 (same branch) — work item 1, third sentinel (`#subdoc-root`),
 **stage a of a multi-stage remodel**. `#subdoc-root` cannot become a canonical `DomDocument` in place
 because the iframe/object/frame roots (regime A) are live *tree children* of their container, which a

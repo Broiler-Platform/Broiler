@@ -306,7 +306,6 @@ public sealed partial class DomBridge
             InlineStyle(element)["height"] = height;
 
         ClearChildren(element);
-        GetElementRuntimeState(element).InnerHtml = string.Empty;
 
         var fill = CreateBridgeElement("div");
         SetParent(fill, element);
@@ -833,8 +832,8 @@ public sealed partial class DomBridge
     // text/comment children serialize once construction flips to DomText/DomComment. GetKind keys
     // text/comment off NodeType (holds for facade and canonical char-data), and the remaining
     // special kinds off the facade #document-fragment/#subdoc-root/#doctype TagNames (still facade
-    // elements). GetName/GetAttributes/GetStyles/GetRawInnerHtml are only invoked for element/doctype
-    // nodes (see HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
+    // elements). GetName/GetAttributes/GetStyles are only invoked for element/doctype nodes (see
+    // HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
     private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter() => new(
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
@@ -876,7 +875,9 @@ public sealed partial class DomBridge
             DomCharacterData other => other.Data,
             _ => BridgeText(node),
         },
-        GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
+        // Phase 4 item 3: the parallel InnerHtml string is gone — raw-text content is always a
+        // canonical DomText child, serialized via GetChildren/GetText above. No raw fallback.
+        GetRawInnerHtml: static _ => null);
 
     /// <summary>Whether <paramref name="node"/>'s parent is an HTML raw-text element whose text
     /// content is serialized literally (not HTML-escaped). The standard raw-text element set is

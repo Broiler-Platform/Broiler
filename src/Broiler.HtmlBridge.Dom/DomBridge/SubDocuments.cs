@@ -1121,7 +1121,6 @@ public sealed partial class DomBridge
     private void SetElementInnerHtml(DomElement element, string html)
     {
         html ??= string.Empty;
-        GetElementRuntimeState(element).InnerHtml = html;
 
         foreach (var child in element.ChildNodes.ToArray())
             RemoveElementsRecursive(child);

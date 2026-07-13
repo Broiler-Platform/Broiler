@@ -25,7 +25,9 @@ public sealed partial class DomBridge
             return new JSString(sb.ToString());
         }
 
-        return new JSString(GetElementRuntimeState(element).InnerHtml);
+        // A childless element has empty textContent (its content, if any, is canonical DomText
+        // children handled above — Phase 4 item 3 removed the parallel InnerHtml fallback).
+        return new JSString(string.Empty);
     }
 
 

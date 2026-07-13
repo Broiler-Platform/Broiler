@@ -40,10 +40,9 @@ public sealed partial class DomBridge
     private sealed record KeyframeEntry(float Position, Dictionary<string, string> Properties);
 
     // Instance (not static): reads <style> source through the canonical
-    // GetStyleElementSourceText accessor rather than hand-walking child text nodes, so
-    // @keyframes are still collected when the CSS lives in the element's InnerHtml runtime
-    // state with no DomText child (RF-BRIDGE-1c Phase F / F3c — same fix as @position-try and
-    // CollectAnimPropsFromStyleElements).
+    // GetStyleElementSourceText accessor (the single source the cascade also reads) rather than
+    // hand-walking child text nodes, keeping @keyframes collection aligned with @position-try and
+    // CollectAnimPropsFromStyleElements.
     private void CollectKeyframes(DomElement root, Dictionary<string, List<KeyframeEntry>> map)
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
@@ -182,14 +181,10 @@ public sealed partial class DomBridge
     {
         if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            // RF-BRIDGE-1c Phase F (F3c) follow-up: read the <style> source through the canonical
-            // GetStyleElementSourceText accessor rather than hand-walking child text nodes. After
-            // Attach, a <style> element's CSS can live in its InnerHtml runtime state with no DomText
-            // child (childCount == 0) in some parse paths — the raw child walk then saw nothing, so
-            // stylesheet-declared animation / @keyframes properties were silently missed (the same
-            // failure mode that broke @position-try; fixed in AnchorResolver/PositionTry.cs).
-            // GetStyleElementSourceText covers the DomText-child, InnerHtml-fallback, and linked-href
-            // stylesheet cases uniformly.
+            // Read the <style> source through the canonical GetStyleElementSourceText accessor
+            // (the single source the cascade also reads) rather than hand-walking child text nodes,
+            // so stylesheet-declared animation / @keyframes properties and linked-href stylesheets
+            // are collected uniformly (aligned with @position-try in AnchorResolver/PositionTry.cs).
             var css = GetStyleElementSourceText(node);
 
             var styleSheet = new CssParser().ParseStyleSheet(css);

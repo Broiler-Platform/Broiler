@@ -364,9 +364,6 @@ public sealed partial class DomBridge
         // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
         // their namespace rather than defaulting to HTML.
         var clone = CreateBridgeElementNS(element.NamespaceUri, element.TagName, element.Id, element.ClassName);
-        // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
-        // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
-        GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
         // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
         // set so namespaced attributes (namespace, prefix, local name) survive the clone —
         // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
