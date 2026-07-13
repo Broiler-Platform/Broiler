@@ -412,7 +412,6 @@ public sealed partial class DomBridge
         var remainingText = text[offset..];
         SetBridgeText(node, text[..offset]);
         var newNode = CreateBridgeTextNode(remainingText);
-        _knownNodes.Add(newNode);
         // Insert new node as next sibling
         if (ParentEl(node) != null)
         {
@@ -767,7 +766,6 @@ public sealed partial class DomBridge
     {
         var deep = a.Length > 0 && a[0].BooleanValue;
         var clone = CloneDomElement(node, deep);
-        _knownNodes.Add(clone);
         return ToJSObject(clone);
     }
 
@@ -886,7 +884,6 @@ public sealed partial class DomBridge
         GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
         GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
         GetElementRuntimeState(element).Shadow.Mode.Set(mode);
-        _knownNodes.Add(shadowRoot);
         return ToJSObject(shadowRoot);
     }
 
@@ -1507,7 +1504,6 @@ public sealed partial class DomBridge
         var text = a.Length > 1 ? a[1].ToString() : string.Empty;
         var (parent, index) = GetInsertAdjacentTarget(element, position);
         var textNode = CreateBridgeTextNode(text);
-        _knownNodes.Add(textNode);
         InsertNodeAt(parent, textNode, index);
         return JSUndefined.Value;
     }

@@ -123,8 +123,7 @@ public sealed partial class DomBridge
         document.FastAddProperty((KeyString)"images", new JSFunction(JsRegistrationGetImages053Core, "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links — collection of all <a> and <area> elements with href
-        // Uses tree-order traversal instead of _knownNodes insertion order
-        // to correctly reflect dynamically appended elements.
+        // Uses tree-order traversal so dynamically appended elements are reflected.
         document.FastAddProperty((KeyString)"links", new JSFunction(JsRegistrationGetLinks054Core, "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.styleSheets — collection of stylesheet objects for main document

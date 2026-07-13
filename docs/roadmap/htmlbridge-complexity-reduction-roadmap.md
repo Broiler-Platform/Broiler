@@ -778,6 +778,41 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.1 completed** 2026-07-13 (branch `htmlbridge-phase4-remove-knownnodes`) — work item 6.
+The `_knownNodes` parallel node set is deleted. It was a process-instance
+`HashSet<DomNode>` populated on **every** node-construction path (`createElement`, `cloneNode`,
+`createComment`/`createTextNode`, `createDocumentFragment`, doctype/subdoc-root creation, HTML/XHTML
+parse, `document.write`, `innerHTML`/`outerHTML` replace, `insertAdjacent*`, `attachShadow`, the
+XML-fallback builders) — ~70 write sites across 10 files — but had **no behaviour-affecting reader
+left**: its last real consumer (`document.links`/collection ordering) was already replaced by
+tree-order traversal, and its only surviving lookup was a redundant `if (!Contains) Add` guard on a
+`HashSet` (idempotent by definition). It was pure parallel state shadowing canonical tree membership,
+so the canonical Broiler.Dom tree is now the single authority. Removed with it: the now-dead
+`AddElementsRecursive` register-subtree helper (its `RemoveElementsRecursive` counterpart stays — it
+still evicts `_jsObjects`/`_styleSheetCache` on sub-document teardown) and the orphaned
+`CollectAllDescendantsFlat` document.write helper. `ParseHtml`/`Dispose` no longer `Clear()` a set
+that is gone. Behaviour-preserving; no public-API change (`_knownNodes` was `private`). Tests:
+`Broiler.Cli.Tests/KnownNodesRemovalTests.cs` (guard: the field is gone + it must not be
+reintroduced; characterizations: element create/insert, `cloneNode`/comment/fragment construction,
+and `innerHTML` parse-replace all still round-trip through the canonical tree). Regression check vs
+the P3.12 baseline: the DOM / traversal / namespace / HTML-DOM-interface / serializer / cross-document
+(SVG) / attributes / MutationObserver / lifetime / public-API-snapshot / architecture-guard / Acid3
+suites pass unchanged; the pre-existing environmental headless-geometry failure
+(`DomTraversalAndRangeTests.Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`) fails
+identically with the change stashed → zero regressions.
+
+This is the first Phase 4 slice and the safest opener: it removes a genuine parallel authority (not a
+convenience wrapper) and declutters the `SubDocuments`/`Registration` node-construction paths that the
+still-pending Phase 3 Frames/browsing-context and Window/Document feature modules must extract — every
+construction site lost its `_knownNodes.Add(...)` bookkeeping line. The heavier parallel-state items
+(1 sentinel `#document`-family elements, 2 inline-style single authority, 3 parallel `InnerHtml`
+string) remain; item 5 "delete bridge copies" is a **separate judgement**, not a blanket sweep: the
+Phase-3-widened neutral shims (`IsText`/`ParentEl`/`ChildAt`/attribute scans, etc.) read the canonical
+tree rather than holding state, so they are wrappers to consolidate opportunistically, and the bridge's
+`Normalize`/`isEqualNode`/`cloneNode` reimplementations are **not** straight swaps for the canonical
+ones — they fire the bridge's MutationObserver / NodeIterator side effects the canonical algorithms do
+not.
+
 Goal: make Broiler.Dom and Broiler.Dom.Html the only authorities for document
 tree/content state.
 

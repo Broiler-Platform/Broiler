@@ -400,7 +400,6 @@ public sealed partial class DomBridge
                 var childClone = CloneDomElement(child, true);
                 SetParent(childClone, clone);
                 clone.AppendChild(childClone);
-                _knownNodes.Add(childClone);
             }
         }
         return clone;
@@ -512,21 +511,6 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Collects all descendants of <paramref name="parent"/> into <paramref name="result"/>
-    /// in depth-first pre-order (without skipping sub-document roots).
-    /// Used by <c>document.write()</c> to register parsed elements.
-    /// </summary>
-    // RF-BRIDGE-1c Phase F (F3c part 2d): flatten the whole subtree (raw ChildNodes) so text/comment
-    // descendants are collected for registration too.
-    private static void CollectAllDescendantsFlat(DomNode parent, List<DomNode> result)
-    {
-        foreach (var child in parent.ChildNodes)
-        {
-            result.Add(child);
-            CollectAllDescendantsFlat(child, result);
-        }
-    }
 
     /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).

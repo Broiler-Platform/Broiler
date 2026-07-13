@@ -117,7 +117,6 @@ public sealed partial class DomBridge
         tagName = AsciiToLower(tagName);
         var el = CreateBridgeElement(tagName);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
-        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -127,7 +126,6 @@ public sealed partial class DomBridge
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = CreateBridgeTextNode(text);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
-        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -137,7 +135,6 @@ public sealed partial class DomBridge
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = CreateBridgeCommentNode(data);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
-        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -151,7 +148,6 @@ public sealed partial class DomBridge
             ? CreateBridgeElement(localName)
             : CreateBridgeElementNS(ns, localName);
         GetElementRuntimeState(el).OwnerDocRoot = docRoot;
-        _knownNodes.Add(el);
         return ToJSObject(el);
     }
 
@@ -501,26 +497,19 @@ public sealed partial class DomBridge
         var fragment = a[0].ToString();
         // Parse DOCTYPE if present
         var doctype = bridge.ParseDocType(fragment);
-        var (parsedDoc, allEls, _) = BuildDocumentTree(fragment);
+        var (parsedDoc, _, _) = BuildDocumentTree(fragment);
         if (docRoot.ChildNodes.Count == 0)
         {
             if (doctype != null)
             {
                 SetParent(doctype, docRoot);
                 docRoot.AppendChild(doctype);
-                bridge._knownNodes.Add(doctype);
             }
 
             // parsedDoc is the <html> element from HtmlTreeBuilder.
             // Add it directly to docRoot (not its children).
             SetParent(parsedDoc, docRoot);
             docRoot.AppendChild(parsedDoc);
-            if (!bridge._knownNodes.Contains(parsedDoc))
-                bridge._knownNodes.Add(parsedDoc);
-            foreach (var el in allEls)
-            {
-                bridge._knownNodes.Add(el);
-            }
         }
         else
         {
@@ -536,11 +525,6 @@ public sealed partial class DomBridge
                         bodyEl.AppendChild(child);
                     }
                 }
-            }
-
-            foreach (var el in allEls)
-            {
-                bridge._knownNodes.Add(el);
             }
         }
 
@@ -651,7 +635,6 @@ public sealed partial class DomBridge
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(publicId);
         GetElementRuntimeState(dt).DocumentType.SystemId.Set(systemId);
         GetElementRuntimeState(dt).DocumentType.InternalSubset.Set(null);
-        _knownNodes.Add(dt);
         return ToJSObject(dt);
     }
 
@@ -665,7 +648,6 @@ public sealed partial class DomBridge
             ValidateQualifiedName(qName, ns, _jsContext!);
         var subDocRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
-        _knownNodes.Add(subDocRoot);
         if (doctypeArg is JSObject dtObj)
         {
             foreach (var kvp in _jsObjects.Entries)
@@ -688,7 +670,6 @@ public sealed partial class DomBridge
             SetParent(docEl, subDocRoot);
             GetElementRuntimeState(docEl).OwnerDocRoot = subDocRoot;
             subDocRoot.AppendChild(docEl);
-            _knownNodes.Add(docEl);
         }
 
         return BuildSubDocument(subDocRoot);
@@ -700,7 +681,6 @@ public sealed partial class DomBridge
         var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         var subDocRoot = CreateBridgeElement("#subdoc-root");
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
-        _knownNodes.Add(subDocRoot);
         var dt = CreateBridgeElement("#doctype");
         GetElementRuntimeState(dt).DocumentType.Name.Set("html");
         GetElementRuntimeState(dt).DocumentType.PublicId.Set(string.Empty);
@@ -709,37 +689,31 @@ public sealed partial class DomBridge
         SetParent(dt, subDocRoot);
         GetElementRuntimeState(dt).OwnerDocRoot = subDocRoot;
         subDocRoot.AppendChild(dt);
-        _knownNodes.Add(dt);
         // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
         var subHtml = CreateBridgeElement("html");
         SetParent(subHtml, subDocRoot);
         GetElementRuntimeState(subHtml).OwnerDocRoot = subDocRoot;
         subDocRoot.AppendChild(subHtml);
-        _knownNodes.Add(subHtml);
         var subHead = CreateBridgeElement("head");
         SetParent(subHead, subHtml);
         GetElementRuntimeState(subHead).OwnerDocRoot = subDocRoot;
         subHtml.AppendChild(subHead);
-        _knownNodes.Add(subHead);
         if (subTitle != null)
         {
             var subTitleEl = CreateBridgeElement("title");
             SetParent(subTitleEl, subHead);
             GetElementRuntimeState(subTitleEl).OwnerDocRoot = subDocRoot;
             subHead.AppendChild(subTitleEl);
-            _knownNodes.Add(subTitleEl);
             var subTitleText = CreateBridgeTextNode(subTitle);
             SetParent(subTitleText, subTitleEl);
             GetElementRuntimeState(subTitleText).OwnerDocRoot = subDocRoot;
             subTitleEl.AppendChild(subTitleText);
-            _knownNodes.Add(subTitleText);
         }
 
         var subBody = CreateBridgeElement("body");
         SetParent(subBody, subHtml);
         GetElementRuntimeState(subBody).OwnerDocRoot = subDocRoot;
         subHtml.AppendChild(subBody);
-        _knownNodes.Add(subBody);
         return BuildSubDocument(subDocRoot);
     }
 

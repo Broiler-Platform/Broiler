@@ -40,12 +40,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
-    // RF-BRIDGE-1c Phase F (F3b): the registration set is keyed by canonical DomNode so
-    // it can hold text/comment nodes once they flip to canonical DomText/DomComment (which
-    // are not Broiler.Dom.DomElement). A facade node IS-A DomNode, so this is a behaviour-preserving
-    // widen on the current homogeneous tree.
-    private readonly HashSet<DomNode> _knownNodes =
-        new(ReferenceEqualityComparer.Instance);
     // Phase 3 (P3.2): the whole MutationObserver feature — the observer registry (P2.5
     // MutationObserverHub), the observe()/disconnect() registration and childList/attribute/
     // characterData record delivery — lives in the MutationObserverBinding module, reached through
@@ -364,7 +358,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         if (!string.IsNullOrEmpty(value))
         {
             var textNode = CreateBridgeTextNode(value);
-            _knownNodes.Add(textNode);
             element.AppendChild(textNode);
         }
     }
@@ -682,9 +675,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         //    listeners registered on the body element.
         // Find the <body> element by traversing the document tree.
         // The body is a child of <html> (documentElement), which is a
-        // child of the document node. It may not appear in the flat
-        // _knownNodes list because html/head/body are structural elements
-        // pre-created by HtmlTreeBuilder.
+        // child of the document node.
         DomElement? body = null;
         if (htmlEl != null)
         {
@@ -814,7 +805,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     private void ParseHtml(string html)
     {
-        _knownNodes.Clear();
         // P2.2: one call clears both wrapper maps. Re-parse now also releases stale sub-document
         // wrappers (keyed by detached roots that no lookup can reach again) — observably
         // equivalent to before, but it stops them lingering until disposal.
@@ -836,7 +826,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         {
             SetParent(doctype, _documentNode);
             _documentNode.AppendChild(doctype);
-            _knownNodes.Add(doctype);
         }
 
         // Publish the document's quirks mode for the render that follows on this
@@ -872,7 +861,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         foreach (var kv in InlineStyle(docElement))
             InlineStyle(DocumentElement)[kv.Key] = kv.Value;
 
-        _knownNodes.UnionWith(allElements);
 
         // Connect DocumentElement to _documentNode so that document.firstChild works
         // and structural pseudo-classes correctly detect the document root boundary
@@ -880,7 +868,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         if (!_documentNode.ChildNodes.Contains(DocumentElement))
             _documentNode.AppendChild(DocumentElement);
 
-        _knownNodes.Add(DocumentElement);
 
         // Stylesheet discovery is document-scoped and lazy through the shared
         // CssStyleEngine. A rebuilt document must not retain the prior engines.

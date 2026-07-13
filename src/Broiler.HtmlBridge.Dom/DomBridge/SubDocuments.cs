@@ -551,10 +551,6 @@ public sealed partial class DomBridge
         htmlEl.AppendChild(bodyEl);
 
         InsertChildAt(containerElement, 0, docRoot);
-        _knownNodes.Add(docRoot);
-        _knownNodes.Add(htmlEl);
-        _knownNodes.Add(headEl);
-        _knownNodes.Add(bodyEl);
 
         return docRoot;
     }
@@ -590,12 +586,6 @@ public sealed partial class DomBridge
         preEl.AppendChild(textNode);
 
         InsertChildAt(containerElement, 0, docRoot);
-        _knownNodes.Add(docRoot);
-        _knownNodes.Add(htmlEl);
-        _knownNodes.Add(headEl);
-        _knownNodes.Add(bodyEl);
-        _knownNodes.Add(preEl);
-        _knownNodes.Add(textNode);
 
         return docRoot;
     }
@@ -839,38 +829,16 @@ public sealed partial class DomBridge
         docRoot.AppendChild(parsedRoot);
 
         InsertChildAt(containerElement, 0, docRoot);
-        _knownNodes.Add(docRoot);
-        _knownNodes.Add(parsedRoot);
-        // Add structural children (head, body) that HtmlTreeBuilder does not include in allElements
-        foreach (var child in ChildElements(parsedRoot))
-            AddElementsRecursive(child);
-        // Add non-structural elements from the builder (skip any already registered)
-        foreach (var el in allElements)
-        {
-            _knownNodes.Add(el);
-        }
 
         return docRoot;
     }
 
-    /// <summary>
-    /// Recursively adds a Broiler.Dom.DomElement and all its descendants to the element tracking list.
-    /// Used by <see cref="BuildSubDocumentFromHtml"/> to register structural elements
-    /// (html, head, body) that <see cref="HtmlTreeBuilder"/> does not include in its allElements list.
-    /// </summary>
-    // RF-BRIDGE-1c Phase F (F3c part 2d): register/unregister the whole node subtree (raw
-    // ChildNodes) so canonical text/comment nodes round-trip through _knownNodes too. No-op on the
-    // old homogeneous tree where every child was an element.
-    private void AddElementsRecursive(DomNode node)
-    {
-        _knownNodes.Add(node);
-        foreach (var child in node.ChildNodes)
-            AddElementsRecursive(child);
-    }
-
+    // RF-BRIDGE-1c Phase F (F3c part 2d): unregister the whole node subtree from the bridge's
+    // per-node caches when a sub-document root is torn down (raw ChildNodes so canonical
+    // text/comment nodes are released too). The former AddElementsRecursive counterpart is gone —
+    // node membership is now read from the canonical tree, so there is nothing to register on build.
     private void RemoveElementsRecursive(DomNode node)
     {
-        _knownNodes.Remove(node);
         _jsObjects.Remove(node);
 
         if (node is DomElement element)
@@ -1081,7 +1049,6 @@ public sealed partial class DomBridge
         {
             RemoveChildFrom(fragmentContainer, child);
             SetParent(child, null);
-            AddElementsRecursive(child);
             nodes.Add(child);
         }
 
@@ -1115,7 +1082,6 @@ public sealed partial class DomBridge
             }
 
             var textNode = CreateBridgeTextNode(value.ToString());
-            _knownNodes.Add(textNode);
             nodes.Add(textNode);
         }
 
@@ -1141,7 +1107,6 @@ public sealed partial class DomBridge
                 SetParent(child, element);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
                 element.AppendChild(child);
-                AddElementsRecursive(child);
             }
         }
 
@@ -1187,7 +1152,6 @@ public sealed partial class DomBridge
                 SetParent(child, parent);
                 AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
                 InsertChildAt(parent, insertIndex, child);
-                AddElementsRecursive(child);
                 NotifyChildAdded(parent, child, insertIndex);
                 insertIndex++;
             }
@@ -1254,7 +1218,6 @@ public sealed partial class DomBridge
             if (xdoc.Root == null)
             {
                 InsertChildAt(containerElement, 0, docRoot);
-                _knownNodes.Add(docRoot);
                 return docRoot;
             }
 
@@ -1277,8 +1240,6 @@ public sealed partial class DomBridge
             docRoot.AppendChild(rootEl);
 
             InsertChildAt(containerElement, 0, docRoot);
-            _knownNodes.Add(docRoot);
-            _knownNodes.Add(rootEl);
 
             // Execute scripts in XHTML documents with correct namespace
             if (isXhtml && hasCorrectXhtmlNs)
@@ -1290,7 +1251,6 @@ public sealed partial class DomBridge
         {
             // XML well-formedness error — return empty document, don't execute scripts
             InsertChildAt(containerElement, 0, docRoot);
-            _knownNodes.Add(docRoot);
         }
 
         return docRoot;
@@ -1317,14 +1277,12 @@ public sealed partial class DomBridge
                 var childEl = BuildDomElementFromXElement(childXe);
                 SetParent(childEl, el);
                 el.AppendChild(childEl);
-                _knownNodes.Add(childEl);
             }
             else if (child is XText childText)
             {
                 var textNode = CreateBridgeTextNode(childText.Value);
                 SetParent(textNode, el);
                 el.AppendChild(textNode);
-                _knownNodes.Add(textNode);
             }
         }
 

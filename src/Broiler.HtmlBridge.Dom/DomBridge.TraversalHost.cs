@@ -38,28 +38,24 @@ public sealed partial class DomBridge : ITraversalHost
     JSObject ITraversalHost.CreateCommentNode(string data)
     {
         var comment = CreateBridgeCommentNode(data);
-        _knownNodes.Add(comment);
         return ToJSObject(comment);
     }
 
     DomNode ITraversalHost.CreateRangeResultFragment()
     {
         var fragment = CreateBridgeElement("#document-fragment");
-        _knownNodes.Add(fragment);
         return fragment;
     }
 
     DomNode ITraversalHost.CloneRangeNode(DomNode node, bool deep)
     {
         var clone = CloneDomElement(node, deep);
-        _knownNodes.Add(clone);
         return clone;
     }
 
     DomText ITraversalHost.CreateRangeTextNode(string data)
     {
         var text = CreateBridgeTextNode(data);
-        _knownNodes.Add(text);
         return text;
     }
 }
