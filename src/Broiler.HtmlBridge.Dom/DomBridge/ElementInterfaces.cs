@@ -34,40 +34,9 @@ public sealed partial class DomBridge
                 new JSFunction((in a) => JsElementInterfacesSetAction027Core(element, in a), "set action"), JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        if (tag == "details")
-        {
-            obj.FastAddProperty((KeyString)"open", new JSFunction((in _) => HasAttr(element, "open") ? JSBoolean.True : JSBoolean.False, "get open"),
-                new JSFunction((in a) => JsElementInterfacesSetOpen029Core(bridge, element, in a), "set open"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
-
-        // HTMLDialogElement interface
-        if (tag == "dialog")
-        {
-            // showModal() — sets the 'open' attribute so the dialog is visible.
-            obj.FastAddValue((KeyString)"showModal", new JSFunction((in _) => JsElementInterfacesShowModal030Core(bridge, element, in _), "showModal", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // show() — opens non-modally.
-            obj.FastAddValue((KeyString)"show", new JSFunction((in _) => JsElementInterfacesShow031Core(bridge, element, in _), "show", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // close(returnValue) — removes the 'open' attribute.
-            obj.FastAddValue((KeyString)"close", new JSFunction((in a) => JsElementInterfacesClose032Core(bridge, element, in a), "close", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // open (getter/setter)
-            obj.FastAddProperty((KeyString)"open", new JSFunction((in _) => HasAttr(element, "open") ? JSBoolean.True : JSBoolean.False, "get open"),
-                new JSFunction((in a) => JsElementInterfacesSetOpen034Core(bridge, element, in a), "set open"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // returnValue (getter/setter)
-            obj.FastAddProperty((KeyString)"returnValue", new JSFunction((in _) => GetElementRuntimeState(element).FormControl.ReturnValue.TryGet(out var rv) && rv is string s ? new JSString(s) : new JSString(string.Empty), "get returnValue"),
-                new JSFunction((in a) => JsElementInterfacesSetReturnValue036Core(element, in a), "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
-
-        // Popover API (HTML §popover) — showPopover()/hidePopover() are exposed on
-        // any element carrying the global `popover` attribute, not tied to a tag.
-        if (HasAttr(element, "popover"))
-        {
-            obj.FastAddValue((KeyString)"showPopover", new JSFunction((in _) => JsElementInterfacesShowPopoverCore(bridge, element, in _), "showPopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"hidePopover", new JSFunction((in _) => JsElementInterfacesHidePopoverCore(bridge, element, in _), "hidePopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
+        // HTMLDetailsElement.open, HTMLDialogElement (showModal/show/close/open/returnValue) and the
+        // popover API (Phase 3 P3.7: extracted into the co-located DialogBinding feature module).
+        _dialogs.Install(obj, element, tag, HasAttr(element, "popover"));
 
         // HTMLSelectElement interface
         if (tag == "select")

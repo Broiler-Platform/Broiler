@@ -59,6 +59,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // HTMLTableRowElement) live in TableBinding, reached through the narrow ITableHost contract
     // (see DomBridge.TableHost.cs).
     private readonly Dom.Features.TableBinding _tables;
+    // Phase 3 (P3.7): the dialog / popover / details JS API (showModal/show/close/showPopover/
+    // hidePopover/open/returnValue) lives in DialogBinding, reached through the narrow IDialogHost
+    // contract (see DomBridge.DialogHost.cs); backdrop/top-layer rendering stays in the bridge.
+    private readonly Dom.Features.DialogBinding _dialogs;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -145,6 +149,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _mutations = new Dom.Features.MutationObserverBinding(this);
         _eventDispatch = new Dom.Features.EventDispatchBinding(this);
         _tables = new Dom.Features.TableBinding(this);
+        _dialogs = new Dom.Features.DialogBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");

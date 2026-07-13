@@ -590,11 +590,33 @@ add/remove/contains, toggle-with/without-force, replace characterizations). Regr
 SelectorsAndCssom (only the two known-baseline `:root`/`:lang` fails, unchanged) and the
 architecture-guard suites pass → zero regressions.
 
-Still to come — each meaningfully more entangled (with the process-static `ElementRuntimeState`,
-layout, custom JS collection types, or network/rendering) and better suited to dedicated efforts:
-CSSOM/computed style, Element/geometry, Window/Document, Forms + Select (runtime-state coupled),
-SVG, Dialog/popover (top-layer state), Frames/Network, Messaging, Canvas, and the DomBridge
-500-800-line facade target.
+Status: **P3.7 completed** 2026-07-13 (same branch) — the first *runtime-state-coupled* feature
+extracted, establishing the narrow-named-accessor pattern for the entangled remainder. The **dialog
+/ popover / details JS API** is the seventh co-located module: `DialogBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) owns `HTMLDialogElement` (`showModal`/`show`/`close`/`open`/
+`returnValue`), the popover API (`showPopover`/`hidePopover` on any element with the global
+`popover` attribute) and `HTMLDetailsElement.open` — 8 callbacks (renamed from the numbered
+`JsElementInterfaces…029…036Core`; the identical details/dialog `open` setters deduplicated) plus
+the three registration blocks in `AddElementSpecificMembers`, now one
+`_dialogs.Install(obj, element, tag, hasPopover)` call. Its runtime state
+(`ElementRuntimeState.Dialog.{Modal,PopoverOpen,TopLayerOrder}`, `FormControl.ReturnValue`, the
+top-layer counter) is reached through the narrow `IDialogHost` contract as **named primitives**
+(`SetOpenAttribute`/`HasOpenAttribute`/`InvalidateStyleScope`/`AssignNextTopLayerOrder`/
+`SetDialogModal`/`SetPopoverOpen`/`Get`/`SetReturnValue`/`PopoverKeepsOverlayOnHide`), implemented
+via explicit interface members in `DomBridge.DialogHost.cs` — the module never touches the
+runtime-state object, and these accessors are the single seam a future `TopLayerManager` re-homes.
+The backdrop/top-layer **rendering** stays in the bridge's anchor resolver. Behaviour-preserving; no
+public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DialogBindingModuleTests.cs` (co-location/host-contract guards +
+showModal/close/returnValue, dialog.open-setter, details.open characterizations). Regression check:
+Dialog, Popover, Overlay, Backdrop, HtmlDomInterface (49), Acid3RegressionTests (26) and the
+architecture-guard suites pass unchanged → zero regressions (the renderer reads the same runtime
+state the module now writes).
+
+Still to come — each entangled with the process-static `ElementRuntimeState`, layout, custom JS
+collection types, or network/rendering; the P3.7 named-accessor pattern is the template for the
+runtime-state-coupled ones: CSSOM/computed style, Element/geometry, Window/Document, Forms + Select,
+SVG, Frames/Network, Messaging, Canvas, and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
