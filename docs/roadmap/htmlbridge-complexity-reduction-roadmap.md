@@ -717,11 +717,40 @@ pre-existing environmental failures (the 8 `HttpClientMigrationTests` assembly-r
 `HttpSubResourceTests.Iframe_*`, the 2 `NetworkAndHttpTests.Fetch_*Body_Readers` that need real HTTP,
 and the 2 `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.11 named-accessor / relocated-infra
-pattern is the template for any residual runtime-state or browsing-context coupling: CSSOM/computed
-style, Element/geometry, Window/Document, SVG, Frames/browsing-contexts (SubDocuments), Canvas (better
-done with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the
-DomBridge 500-800-line facade target.
+Status: **P3.12 completed** 2026-07-13 (same branch) — the DOM-attributes feature. **Node/attributes**
+is the twelfth co-located module: `AttributesBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns
+the attribute object model — the `element.attributes` `NamedNodeMap` (`BuildNamedNodeMap` + the eight
+`getNamedItem`/`setNamedItem`/`removeNamedItem`/`item`/NS callbacks, renamed from the numbered
+`JsAttributes…002…009Core`) and the `Attr` node construction (`BuildAttrNode`/`BuildStandaloneAttrNode`/
+`BuildAttrNodeCore`/`TryGetAttachedAttrNamespace`/`GetAttrNode{Name,LocalName,Namespace}`) — **and the
+attribute write path** (`SetAttributeLikeSetAttribute`/`…NS` + `RemoveAttributeLikeRemoveAttribute`/`…NS`),
+which applies the change to the canonical attribute set and then coordinates the cross-cutting side
+effects through the narrow `IAttributesHost` contract: `ApplyStyleAttribute` (re-parse the `style`
+attribute into inline style + invalidate), `CompileInlineEventAttribute` (an `on*` handler),
+`InvalidateStyleScope`, and `NotifyAttributeMutationObservers`. Those seams are implemented via explicit
+interface members in `DomBridge.AttributesHost.cs`, so the public surface is unchanged. The element's own
+`getAttribute`/`setAttribute`/… methods stay registered among the other element members in the bridge but
+now **delegate their write and Attr-node construction to `_attributes`** (the module both consumes the
+write hub and provides Attr-node construction back to those element callbacks + `document.createAttribute`).
+The low-level, engine-neutral attribute scans (`TryGetAttribute`/`SetAttr`/`RemoveAttr`/`AttributeNames`/
+`GetAttr`/`TryGetNsAttribute`) stay shared `internal static` helpers on `DomBridge` — used by many other
+modules — and are called qualified (`GetAttr`/`AttributeNames`/`TryGetNsAttribute` widened
+`private`→`internal static`); Phase 4 promotes them to Broiler.Dom. The document-query collectors
+(`CollectByTagName`/`CollectLinksInTreeOrder`/…) and `AttributeSnapshot`/`RestoreAttributes` stay in the
+bridge (not attributes-feature). The old `JsFunctionCallbacks/Attributes.cs` was deleted. Behaviour-
+preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/AttributesBindingModuleTests.cs` (co-location / host-contract guards + set/get/remove/
+hasAttribute round-trip, NamedNodeMap + Attr node, style-attribute→inline-style, and attribute
+MutationObserver characterizations). Regression check vs the P3.11 baseline: the attribute,
+MutationObserver, HtmlDomInterface and namespace suites pass unchanged (140 tests, 0 failures); the
+pre-existing environmental failures (the three `ScriptEngineExecuteTests` zoom/iframe serialization tests
+and the two `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.12 named-accessor / relocated-infra /
+shared-write-hub pattern is the template for any residual coupling: CSSOM/computed style,
+Element/geometry, Window/Document, SVG, Frames/browsing-contexts (SubDocuments), Canvas (better done with
+Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge
+500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

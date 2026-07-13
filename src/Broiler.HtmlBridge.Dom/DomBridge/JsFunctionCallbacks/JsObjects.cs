@@ -192,7 +192,7 @@ public sealed partial class DomBridge
         if (a.Length == 0)
             return JSNull.Value;
         var name = a[0].ToString();
-        return TryGetAttribute(element, name, out var val) ? BuildAttrNode(name, val, element, obj) : JSNull.Value;
+        return TryGetAttribute(element, name, out var val) ? _attributes.BuildAttrNode(name, val, element, obj) : JSNull.Value;
     }
 
 
@@ -204,7 +204,7 @@ public sealed partial class DomBridge
         var localName = a[1].ToString();
         if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
-        return BuildAttrNode(qName, val, element, obj);
+        return _attributes.BuildAttrNode(qName, val, element, obj);
     }
 
 
@@ -561,12 +561,12 @@ public sealed partial class DomBridge
         if (shouldHaveAttribute)
         {
             if (!hasAttribute)
-                SetAttributeLikeSetAttribute(element, attrName, string.Empty);
+                _attributes.SetAttributeLikeSetAttribute(element, attrName, string.Empty);
             return JSBoolean.True;
         }
 
         if (hasAttribute)
-            RemoveAttributeLikeRemoveAttribute(element, attrName);
+            _attributes.RemoveAttributeLikeRemoveAttribute(element, attrName);
         return JSBoolean.False;
     }
 
@@ -575,11 +575,11 @@ public sealed partial class DomBridge
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
-        var name = GetAttrNodeName(attrObj);
+        var name = _attributes.GetAttrNodeName(attrObj);
         if (string.IsNullOrEmpty(name))
             return JSNull.Value;
-        var old = TryGetAttribute(element, name, out var oldVal) ? BuildAttrNode(name, oldVal, element, obj) : JSNull.Value;
-        SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
+        var old = TryGetAttribute(element, name, out var oldVal) ? _attributes.BuildAttrNode(name, oldVal, element, obj) : JSNull.Value;
+        _attributes.SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
         return old;
     }
 
@@ -588,15 +588,15 @@ public sealed partial class DomBridge
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
-        var name = GetAttrNodeName(attrObj);
-        var localName = GetAttrNodeLocalName(attrObj);
+        var name = _attributes.GetAttrNodeName(attrObj);
+        var localName = _attributes.GetAttrNodeLocalName(attrObj);
         if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(localName))
             return JSNull.Value;
-        var ns = GetAttrNodeNamespace(attrObj);
+        var ns = _attributes.GetAttrNodeNamespace(attrObj);
         JSValue old = JSNull.Value;
         if (TryGetNsAttribute(element, ns, localName, out var oldQName, out var oldVal))
-            old = BuildAttrNode(oldQName, oldVal, element, obj);
-        SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
+            old = _attributes.BuildAttrNode(oldQName, oldVal, element, obj);
+        _attributes.SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
         return old;
     }
 
@@ -605,11 +605,11 @@ public sealed partial class DomBridge
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
-        var name = GetAttrNodeName(attrObj);
+        var name = _attributes.GetAttrNodeName(attrObj);
         if (string.IsNullOrEmpty(name) || !TryGetAttribute(element, name, out var val))
             return JSNull.Value;
-        var removed = BuildAttrNode(name, val, element, obj);
-        RemoveAttributeLikeRemoveAttribute(element, name);
+        var removed = _attributes.BuildAttrNode(name, val, element, obj);
+        _attributes.RemoveAttributeLikeRemoveAttribute(element, name);
         return removed;
     }
 
@@ -618,14 +618,14 @@ public sealed partial class DomBridge
     {
         if (a.Length == 0 || a[0] is not JSObject attrObj)
             return JSNull.Value;
-        var localName = GetAttrNodeLocalName(attrObj);
+        var localName = _attributes.GetAttrNodeLocalName(attrObj);
         if (string.IsNullOrEmpty(localName))
             return JSNull.Value;
-        var ns = GetAttrNodeNamespace(attrObj);
+        var ns = _attributes.GetAttrNodeNamespace(attrObj);
         if (!TryGetNsAttribute(element, ns, localName, out var qName, out var val))
             return JSNull.Value;
-        var removed = BuildAttrNode(qName, val, element, obj);
-        RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+        var removed = _attributes.BuildAttrNode(qName, val, element, obj);
+        _attributes.RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
         return removed;
     }
 
@@ -638,7 +638,7 @@ public sealed partial class DomBridge
             var qName = a[1].ToString();
             var val = a[2].ToString();
             var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
-            bridgeForSet.SetAttributeLikeSetAttributeNS(element, ns, qName, localName, val);
+            bridgeForSet._attributes.SetAttributeLikeSetAttributeNS(element, ns, qName, localName, val);
         }
 
         return JSUndefined.Value;
@@ -662,7 +662,7 @@ public sealed partial class DomBridge
         {
             var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
             var localName = a[1].ToString();
-            bridgeForSet.RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+            bridgeForSet._attributes.RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
         }
 
         return JSUndefined.Value;

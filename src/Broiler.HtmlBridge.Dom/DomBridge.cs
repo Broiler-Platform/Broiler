@@ -111,6 +111,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // P2.6 ResourceLoader; the only bridge coupling (page URL for redirect resolution) is reached
     // through the narrow IFetchHost contract (see DomBridge.FetchHost.cs).
     private readonly Dom.Features.FetchBinding _fetch;
+    // Phase 3 (P3.12): the DOM attribute object model — the element.attributes NamedNodeMap and its
+    // Attr nodes — plus the setAttribute/removeAttribute write path live in AttributesBinding, reached
+    // through the narrow IAttributesHost contract (see DomBridge.AttributesHost.cs) for the write
+    // path's cross-cutting side effects (inline style, inline event handlers, style invalidation,
+    // mutation records). The low-level attribute scans stay shared static helpers on DomBridge.
+    private readonly Dom.Features.AttributesBinding _attributes;
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -169,6 +175,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _forms = new Dom.Features.FormBinding(this);
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
+        _attributes = new Dom.Features.AttributesBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");

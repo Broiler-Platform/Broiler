@@ -155,7 +155,7 @@ public sealed partial class DomBridge
             throw new JSException("Failed to execute 'createAttribute': 1 argument required, but only 0 present.");
         var name = a[0].ToString();
         ValidateElementName(name, context);
-        return BuildStandaloneAttrNode(AsciiToLower(name), null);
+        return _attributes.BuildStandaloneAttrNode(AsciiToLower(name), null);
     }
 
 
@@ -731,7 +731,7 @@ public sealed partial class DomBridge
             throw new JSException("Failed to execute 'createAttributeNS': 2 arguments required, but fewer present.");
         var qualifiedName = a[1].ToString();
         ValidateQualifiedName(qualifiedName, ns, context);
-        return BuildStandaloneAttrNode(qualifiedName, ns);
+        return _attributes.BuildStandaloneAttrNode(qualifiedName, ns);
     }
 
 
