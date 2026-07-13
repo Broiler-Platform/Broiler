@@ -25,4 +25,11 @@ internal static class WriterPalette
     public static readonly BColor ToolbarButtonPressed = BColor.FromArgb(0xFF, 0xD8, 0xE8, 0xFC);
     public static readonly BColor ToolbarButtonActive = BColor.FromArgb(0xFF, 0xDF, 0xEC, 0xFA);
     public static readonly BColor ToolbarButtonBorder = BColor.FromArgb(0xFF, 0xC4, 0xD2, 0xE0);
+    public static readonly BColor FormatCodesSurface = BColor.FromArgb(0xFF, 0xF8, 0xF7, 0xFC);
+    public static readonly BColor FormatCodesInline = BColor.FromArgb(0xFF, 0x69, 0x3A, 0xA8);
+    public static readonly BColor FormatCodesParagraph = BColor.FromArgb(0xFF, 0x0D, 0x72, 0x74);
+    public static readonly BColor FormatCodesStructure = BColor.FromArgb(0xFF, 0x9A, 0x58, 0x00);
+    public static readonly BColor FormatCodesEscape = BColor.FromArgb(0xFF, 0xB4, 0x23, 0x18);
+    public static readonly BColor FormatCodesPending = BColor.FromArgb(0xFF, 0x1E, 0x7A, 0x46);
+    public static readonly BColor FormatCodesSplitter = BColor.FromArgb(0xFF, 0xE6, 0xE3, 0xEF);
 }

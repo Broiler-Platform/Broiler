@@ -152,7 +152,8 @@ public sealed class FormatCodeProjection
             token.AffectedRange);
     }
 
-    internal int GetProjectedOffset(FormatCodeCaret caret)
+    /// <summary>Returns the canonical UTF-16 offset represented by a projected caret.</summary>
+    public int GetProjectedOffset(FormatCodeCaret caret)
     {
         if (caret.TokenIndex == -1 && _tokens.Count == 0)
             return 0;

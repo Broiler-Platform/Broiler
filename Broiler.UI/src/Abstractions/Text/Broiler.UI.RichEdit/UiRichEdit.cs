@@ -21,6 +21,7 @@ public abstract class UiRichEdit : UiElement
     private string _placeholderText = string.Empty;
     private BSize _preferredSize = new(320, 160);
     private RichEditScrollPolicy _verticalScrollPolicy = RichEditScrollPolicy.Auto;
+    private RichTextRange? _secondarySelection;
 
     public event EventHandler<RichEditDocumentChangedEventArgs>? DocumentChanged;
 
@@ -38,6 +39,7 @@ public abstract class UiRichEdit : UiElement
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(value);
             _editor.LoadDocument(value);
+            _secondarySelection = null;
             Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
             DocumentChanged?.Invoke(this, new RichEditDocumentChangedEventArgs(_editor.Document));
             SelectionChanged?.Invoke(this, new RichEditSelectionChangedEventArgs(_editor.Selection));
@@ -57,6 +59,28 @@ public abstract class UiRichEdit : UiElement
                 Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
                 SelectionChanged?.Invoke(this, new RichEditSelectionChangedEventArgs(_editor.Selection));
             }
+        }
+    }
+
+    /// <summary>
+    /// Optional non-editing highlight used by synchronized inspectors. It does
+    /// not change the editor selection, caret, document, or undo history.
+    /// </summary>
+    public RichTextRange? SecondarySelection
+    {
+        get => _secondarySelection;
+        set
+        {
+            ThrowIfDisposed();
+            RichTextRange? resolved = value is RichTextRange range
+                ? new RichTextRange(
+                    _editor.Document.ClampPosition(range.Anchor),
+                    _editor.Document.ClampPosition(range.Focus))
+                : null;
+            if (_secondarySelection == resolved)
+                return;
+            _secondarySelection = resolved;
+            Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
         }
     }
 
@@ -142,6 +166,7 @@ public abstract class UiRichEdit : UiElement
     {
         ThrowIfDisposed();
         _editor.LoadPlainText(text);
+        _secondarySelection = null;
         Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
         DocumentChanged?.Invoke(this, new RichEditDocumentChangedEventArgs(_editor.Document));
         SelectionChanged?.Invoke(this, new RichEditSelectionChangedEventArgs(_editor.Selection));

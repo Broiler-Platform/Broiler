@@ -1117,6 +1117,20 @@
       <BuildType Solution="Release-Windows|*" Project="Debug" />
     </Project>
   </Folder>
+  <Folder Name="/Writer/">
+    <Project Path="Broiler.Writer.FormatCodes.Tests/Broiler.Writer.FormatCodes.Tests.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Debug" />
+      <BuildType Solution="Release-Windows|*" Project="Debug" />
+    </Project>
+    <Project Path="Broiler.Writer.FormatCodes/Broiler.Writer.FormatCodes.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Debug" />
+      <BuildType Solution="Release-Windows|*" Project="Debug" />
+    </Project>
+  </Folder>
   <Project Path="src/Broiler.Wpt/Broiler.Wpt.csproj">
     <BuildType Solution="Debug-Linux|*" Project="Debug" />
     <BuildType Solution="Debug-Windows|*" Project="Debug" />

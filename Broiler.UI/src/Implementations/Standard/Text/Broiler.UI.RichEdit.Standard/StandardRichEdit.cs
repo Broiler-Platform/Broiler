@@ -29,6 +29,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         BorderColor = theme.Border;
         FocusRing = theme.FocusRing;
         SelectionBackground = theme.AccentSoft;
+        SecondarySelectionBackground = theme.Warning;
         CaretColor = theme.Text;
     }
 
@@ -57,6 +58,8 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     public BColor FocusRing { get; set; } = StandardControlPaint.Focus;
 
     public BColor SelectionBackground { get; set; } = BColor.FromArgb(0xFF, 0xC7, 0xDD, 0xFA);
+
+    public BColor SecondarySelectionBackground { get; set; } = BColor.FromArgb(0xFF, 0xFF, 0xF0, 0xB3);
 
     public BColor CaretColor { get; set; } = BColor.Black;
 
@@ -108,6 +111,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         else
         {
             DrawRunBackgrounds(renderList, inner);
+            DrawRange(renderList, inner, SecondarySelection, SecondarySelectionBackground);
             DrawSelection(renderList, inner);
             DrawText(renderList, inner);
             DrawComposition(renderList, inner, focused);
@@ -159,8 +163,12 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
 
     private void DrawSelection(BRenderList renderList, BRect inner)
     {
-        RichTextRange selection = Selection;
-        if (selection.IsEmpty)
+        DrawRange(renderList, inner, Selection, SelectionBackground);
+    }
+
+    private void DrawRange(BRenderList renderList, BRect inner, RichTextRange? range, BColor color)
+    {
+        if (range is not RichTextRange selection || selection.IsEmpty)
             return;
 
         RichTextPosition start = selection.Start;
@@ -196,7 +204,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
                 width = BTextMeasurer.MeasureAdvance(" ", Font); // sliver marking an empty selected line
             }
 
-            renderList.FillRect(new BRect(x1, y, width, line.Height), SelectionBackground);
+            renderList.FillRect(new BRect(x1, y, width, line.Height), color);
         }
     }
 

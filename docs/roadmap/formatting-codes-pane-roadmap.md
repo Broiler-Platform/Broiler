@@ -1,6 +1,6 @@
 # Broiler Writer Formatting Codes Pane Roadmap
 
-> **Status:** Phase 2 complete; Phase 3 ready
+> **Status:** Phase 3 complete; Phase 4 ready
 > **Last updated:** 2026-07-12
 > **Scope:** An independently designed bottom pane inspired by the WordPerfect®
 > word processor that presents Broiler's rich-text state as simple text tokens such as
@@ -616,28 +616,33 @@ Exit gate:
 
 **Estimate:** 5-8 engineering days
 
+**Status:** Complete (2026-07-12). Public evidence is recorded in the
+[`Phase 3 implementation record`](formatting-codes-phase3/implementation-record.md)
+and the machine-readable
+[`Phase 3 boundary record`](formatting-codes-phase3/phase3-boundary.json).
+
 Tasks:
 
-- Add `WriterFormatCodesController` with subscription disposal and reentrancy
+- [x] Add `WriterFormatCodesController` with subscription disposal and reentrancy
   guards.
-- Subscribe to `DocumentChanged`, `SelectionChanged`, and `CommandExecuted`.
-- Integrate View menu command, pane, splitter, layout reservation, status text,
+- [x] Subscribe to `DocumentChanged`, `SelectionChanged`, and `CommandExecuted`.
+- [x] Integrate View menu command, pane, splitter, layout reservation, status text,
   and palette tokens in desktop Writer.
-- Mirror the small shell changes in WebAssembly Writer while sharing all feature
+- [x] Mirror the small shell changes in WebAssembly Writer while sharing all feature
   logic.
-- Implement caret follow, selection mapping, click-to-source, affected-range
+- [x] Implement caret follow, selection mapping, click-to-source, affected-range
   highlight, focus cycling, and pending-style overlay.
-- Preserve pane state through New/Open/Save and document replacement.
-- Add desktop/browser parity and smoke tests.
+- [x] Preserve pane state through New/Open/Save and document replacement.
+- [x] Add desktop/browser parity and smoke tests.
 
 Exit gate - **read-only preview milestone**:
 
-- `[Bold ON]Hello World![Bold OFF]` is produced for the representative document;
-- edits in the main editor update the pane without manual refresh;
-- navigation works in both directions without loops or focus theft;
-- show/hide and resizing do not damage Writer layout;
-- desktop and WebAssembly behavior match; and
-- existing document codecs and RichEdit tests remain green.
+- [x] `[Bold ON]Hello World![Bold OFF]` is produced for the representative document;
+- [x] edits in the main editor update the pane without manual refresh;
+- [x] navigation works in both directions without loops or focus theft;
+- [x] show/hide and resizing do not damage Writer layout;
+- [x] desktop and WebAssembly behavior match; and
+- [x] existing document codecs and RichEdit tests remain green.
 
 ### Phase 4 - Safe structured editing
 

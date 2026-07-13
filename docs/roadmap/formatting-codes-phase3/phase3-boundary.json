@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "phase": 3,
+  "status": "complete",
+  "completedOn": "2026-07-12",
+  "assembly": {
+    "name": "Broiler.Writer.FormatCodes",
+    "role": "shared Writer synchronization, scheduling, layout, and shortcut policy",
+    "projectDependencies": [
+      "Broiler.Documents.FormatCodes",
+      "Broiler.UI.FormatCodeView",
+      "Broiler.UI.RichEdit"
+    ],
+    "forbiddenDependencies": [
+      "document codecs",
+      "desktop platform",
+      "WebAssembly platform",
+      "native UI"
+    ]
+  },
+  "hosts": [
+    "Broiler.Writer",
+    "Broiler.Writer.WebAssembly"
+  ],
+  "commands": {
+    "menu": "view.formatting-codes",
+    "toggleShortcut": "Ctrl+Shift+F3",
+    "focusCycle": "F6",
+    "reverseFocusCycle": "Shift+F6"
+  },
+  "invariants": {
+    "readOnlyPane": true,
+    "editorIsMutableSourceOfTruth": true,
+    "visibleTextIsNeverParsedForNavigation": true,
+    "controllerMovesFocus": false,
+    "projectionReplacesDocument": false,
+    "projectionConsumesUndoHistory": false,
+    "directionalSelectionPreserved": true,
+    "staleBackgroundResultsDiscarded": true,
+    "desktopBrowserSharedPolicy": true
+  },
+  "verifiedTests": {
+    "phase3Focused": 16,
+    "uiSolution": 226,
+    "documentsSolution": 256,
+    "richEditRtfIntegration": 6,
+    "total": 504,
+    "failed": 0
+  },
+  "builds": {
+    "desktopWriterReleaseWarnings": 0,
+    "webAssemblyWriterReleaseWarnings": 0
+  }
+}
