@@ -293,6 +293,33 @@ Exit criteria:
 
 ### Phase 2 - establish document services and a single state authority
 
+Status: **P2.1 completed** 2026-07-13 (branch `htmlbridge-phase2-p2-1-lifetime-disposal`).
+`DomBridge` is now `IDisposable` with a deterministic, idempotent `Dispose()` that releases
+every per-session resource (layout view, timer/animation queues, listener stores, mutation
+observers, ranges/iterators, message ports, JS wrapper caches; it drops — never disposes — the
+borrowed `JSContext`). A shared `ClearRuntimeSessionState()` reset is called by both `Dispose()`
+and `ParseHtml`, so **re-attaching now leaves no timers/listeners/observers from the prior
+document** (previously they leaked — nothing cleared those maps on re-parse). The post-dispose
+document/timer entry points fail fast with `ObjectDisposedException`. A minimal
+`DomBridgeDisposalRegistry` (namespace `Broiler.HtmlBridge.Dom.Runtime`) is the single
+lifetime/composition seam that P2.2+ grows into `BrowserDocumentSession`. Characterization +
+disposal + guard tests live in `Broiler.Cli.Tests/DomBridgeSessionLifetimeTests.cs`; the public-API
+snapshot baseline was regenerated (only the `Broiler.HtmlBridge.Dom` DomBridge type line changed —
+Core is untouched, so `IDomBridgeRuntime` stays source-compatible and is **not** `IDisposable`).
+
+Two findings recorded for later phases:
+
+- **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
+  Two live `JSContext` instances currently share global state at the Broiler.JS engine layer (the
+  last-created context's globals win), so simultaneous-session isolation cannot be delivered by a
+  bridge-only change. The supported model today is one active session per thread; the bridge
+  guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
+  (out of this roadmap's scope).
+- **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
+  `PositionAreaResolutions`) is deferred: it is a 155-call-site / 24-file cascade through the
+  project's ~284 static helpers, and the tables are weak + node-keyed (they GC with the session's
+  nodes, so they do not leak or cross sessions today). Its own later PR under item 4.
+
 Goal: make hidden state dependencies explicit while preserving behavior.
 
 Work:
@@ -321,7 +348,7 @@ Exit criteria:
 
 Suggested PR order:
 
-- P2.1 session lifetime and disposal characterization.
+- P2.1 session lifetime and disposal characterization. **(done — see Status above)**
 - P2.2 JS identity registry.
 - P2.3 style context and invalidation.
 - P2.4 event loop.

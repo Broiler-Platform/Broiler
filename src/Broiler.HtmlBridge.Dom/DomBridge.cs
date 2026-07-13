@@ -463,6 +463,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void Attach(JSContext context, string html)
     {
+        ThrowIfDisposed();
         ParseHtml(html);
         RegisterDocument(context);
     }
@@ -474,6 +475,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void Attach(JSContext context, string html, string url)
     {
+        ThrowIfDisposed();
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             _pageUrl = uri.ToString();
@@ -561,6 +563,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void FlushTimers()
     {
+        ThrowIfDisposed();
         const int maxIterations = 1000;
         for (var iteration = 0; iteration < maxIterations; iteration++)
         {
@@ -577,7 +580,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <c>setInterval</c>, or <c>requestAnimationFrame</c> callbacks
     /// waiting to execute.
     /// </summary>
-    public bool HasPendingTimers => !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
+    public bool HasPendingTimers
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
+        }
+    }
 
     /// <summary>
     /// Executes one batch of pending timer and animation-frame callbacks.
@@ -588,6 +598,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public bool FlushTimerStep()
     {
+        ThrowIfDisposed();
         void RunTaskCheckpoint()
         {
             try
@@ -688,6 +699,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public void FireWindowLoadEvent()
     {
+        ThrowIfDisposed();
         if (_jsContext == null) return;
 
         _jsContext["frames"] = BuildWindowFramesArray();
@@ -876,6 +888,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         ClearComputedPropsCache();
         ClearChildren(_documentNode);
         _serializationTransformsApplied = false;
+        // A re-parse is a new document generation: drop the prior document's timers, listeners,
+        // observers and message ports so re-attaching leaves no state from the previous document
+        // (HtmlBridge complexity-reduction roadmap Phase 2, P2.1).
+        ClearRuntimeSessionState();
         // A re-parsed document is a new generation: release the prior document's headless
         // layout view (and its renderer container) so geometry is document-scoped.
         DisposeLayoutView();
