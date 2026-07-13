@@ -894,16 +894,13 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
         if (!GetEventListeners(docNode).TryGetValue(type, out var listeners))
         {
             listeners = [];
             GetEventListeners(docNode)[type] = listeners;
         }
 
-        var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (!HasMatchingEventListener(listeners, registration))
-            listeners.Add(registration);
+        Dom.Features.EventListenerBinding.AddListener(listeners, a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -913,20 +910,9 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (GetEventListeners(docNode).TryGetValue(type, out var listeners))
-        {
-            for (int i = listeners.Count - 1; i >= 0; i--)
-            {
-                if (listeners[i].Listener == listener && listeners[i].Capture == capture)
-                {
-                    listeners.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-
+        Dom.Features.EventListenerBinding.RemoveListener(
+            GetEventListeners(docNode).TryGetValue(type, out var listeners) ? listeners : null,
+            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -1245,12 +1231,8 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var listeners = _eventTargets.WindowListenersForAdd(type);
-
-        var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (!HasMatchingEventListener(listeners, registration))
-            listeners.Add(registration);
+        Dom.Features.EventListenerBinding.AddListener(
+            _eventTargets.WindowListenersForAdd(type), a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 
@@ -1260,20 +1242,9 @@ public sealed partial class DomBridge
         if (a.Length < 2)
             return JSUndefined.Value;
         var type = a[0].ToString();
-        var listener = a[1];
-        var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_eventTargets.TryGetWindowListeners(type, out var listeners))
-        {
-            for (int i = listeners.Count - 1; i >= 0; i--)
-            {
-                if (listeners[i].Listener == listener && listeners[i].Capture == capture)
-                {
-                    listeners.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-
+        Dom.Features.EventListenerBinding.RemoveListener(
+            _eventTargets.TryGetWindowListeners(type, out var listeners) ? listeners : null,
+            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
         return JSUndefined.Value;
     }
 

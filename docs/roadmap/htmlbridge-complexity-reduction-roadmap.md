@@ -538,9 +538,25 @@ characterizations). Regression check: DomEvents (81), DomEventsEdgeCase (33), Ac
 (26), Attributes, MutationObserver, Messaging and architecture-guard suites pass unchanged → zero
 regressions.
 
-Still to come: the `addEventListener` registration itself (spread across four files), then CSSOM,
-Element, Window/Document, Forms, SVG, Dialog/popover, Frames/Network, Messaging, Canvas, and the
-DomBridge 500-800-line facade target.
+Status: **P3.4 completed** 2026-07-13 (same branch) — the Events feature's listener half, completing
+Events alongside P3.3's dispatch half. The `addEventListener`/`removeEventListener` *registration
+semantics* (option parsing for capture/once/passive, the DOM duplicate-registration check, and
+match-by-listener-and-capture removal) are now one co-located helper, `EventListenerBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`), exposing two storage-agnostic operations —
+`AddListener(list, listener, options)` and `RemoveListener(list?, listener, options)` — plus the four
+former bridge helpers (`CreateEventListenerRegistration`/`GetCaptureForRemoval`/
+`HasMatchingEventListener`/`GetBooleanOption`) now internal to it. It is stateless with **no host
+contract**: each of the four target callbacks (element in `JsObjects`, document + window in
+`Registration`, message-port in `Messaging`) resolves its own listener list from the P2.5
+`EventTargetRegistry` and calls the shared operations, replacing the identical ~15-line add/remove
+block that had been copied across those four feature files. Behaviour-preserving; no public-API
+change (the helper is internal). Tests: `Broiler.Cli.Tests/EventListenerBindingModuleTests.cs`
+(co-location guard + dedup / capture-scoped-removal / once characterizations). Regression check:
+DomEvents (81), DomEventsEdgeCase (33), Messaging (15), Attributes and the event/architecture-guard
+suites pass unchanged → zero regressions.
+
+Still to come: CSSOM, Element, Window/Document, Forms, SVG, Dialog/popover, Frames/Network,
+Messaging, Canvas, and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

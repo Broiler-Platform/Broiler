@@ -2,7 +2,6 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
-using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -13,37 +12,9 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static EventListenerRegistration CreateEventListenerRegistration(JSValue listener, JSValue options)
-    {
-        if (options is JSObject optionsObject)
-        {
-            return new EventListenerRegistration(
-                listener,
-                GetBooleanOption(optionsObject, "capture"),
-                GetBooleanOption(optionsObject, "once"),
-                GetBooleanOption(optionsObject, "passive"));
-        }
-
-        return new EventListenerRegistration(listener, options.BooleanValue);
-    }
-
-    private static bool GetCaptureForRemoval(JSValue options)
-        => options is JSObject optionsObject ? GetBooleanOption(optionsObject, "capture") : options.BooleanValue;
-
-    private static bool HasMatchingEventListener(
-        List<EventListenerRegistration> listeners,
-        EventListenerRegistration candidate)
-        // Callers pass the registrations already scoped to a single event type,
-        // so the DOM duplicate-registration check only needs listener/capture.
-        => listeners.Any(existing =>
-            existing.Listener == candidate.Listener &&
-            existing.Capture == candidate.Capture);
-
-    private static bool GetBooleanOption(JSObject options, string name)
-    {
-        var value = options[(KeyString)name];
-        return value != null && !value.IsNullOrUndefined && value.BooleanValue;
-    }
+    // addEventListener/removeEventListener registration semantics (option parsing, the
+    // duplicate-registration check and match-by-listener+capture removal) moved to the Phase 3
+    // EventListenerBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     internal static void InvokeEventListener(JSValue listener, JSObject evt, string logContext)
     {
