@@ -12,8 +12,8 @@ internal readonly record struct EventListenerRegistration(JSValue Listener, bool
 /// </summary>
 internal sealed class ElementRuntimeState
 {
-    public Dictionary<string, List<EventListenerRegistration>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
-
+    // P2.5: addEventListener listeners moved off this (process-global) table into the instance-scoped
+    // EventTargetRegistry; only inline on* handlers remain node-runtime state here.
     public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

@@ -28,7 +28,7 @@ public sealed partial class DomBridge
         var type = a[0].ToString();
         var listener = a[1];
         var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_eventTargetListeners.TryGetValue(target, out var listenersByType) && listenersByType.TryGetValue(type, out var listeners))
+        if (_eventTargets.TryGetTargetListeners(target, out var listenersByType) && listenersByType.TryGetValue(type, out var listeners))
         {
             for (var i = listeners.Count - 1; i >= 0; i--)
             {

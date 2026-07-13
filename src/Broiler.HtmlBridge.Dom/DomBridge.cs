@@ -54,7 +54,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // widen on the current homogeneous tree.
     private readonly HashSet<DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    private readonly List<(JSObject Observer, DomNode Target, DomMutationObserverOptions Options)> _mutationObservers = [];
+    // P2.5: registered MutationObservers now live in MutationObserverHub, the single observer owner
+    // (was the bare _mutationObservers list).
+    private readonly Dom.Runtime.MutationObserverHub _mutationObserverHub = new();
     private readonly List<WeakReference<DomRange>> _activeRanges = [];
     private readonly List<WeakReference<DomNodeIterator>> _activeNodeIterators = [];
     private readonly DomDocument _document;
@@ -74,10 +76,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // scroll/frame-action callbacks that can run on ThreadPool threads, so keep it concurrent.
     private int _smoothScrollTokenCounter;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, int> _smoothScrollTokens = new();
-    private readonly List<JSFunction> _visualViewportScrollListeners = [];
-    private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<JSObject, Dictionary<string, List<EventListenerRegistration>>> _eventTargetListeners = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, JSObject> _eventTargetOwnerWindows = new(ReferenceEqualityComparer.Instance);
+    // P2.5: the event-listener stores (per-node addEventListener listeners, window listeners,
+    // generic JS-target listeners, target→owner-window map, and visual-viewport scroll listeners)
+    // now live in EventTargetRegistry, the single listener owner (was the scattered
+    // _windowEventListeners/_eventTargetListeners/_eventTargetOwnerWindows/_visualViewportScrollListeners
+    // fields plus ElementRuntimeState.EventListeners for node listeners).
+    private readonly Dom.Runtime.EventTargetRegistry _eventTargets = new();
     private readonly Dictionary<JSObject, DomElement> _subWindowContainers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<JSObject, JSObject> _messagePortPeers = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<JSObject> _closedMessagePorts = new(ReferenceEqualityComparer.Instance);
@@ -399,8 +403,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     internal IReadOnlyDictionary<string, string> GetSparseComputedStyleForParity(DomElement element) =>
         GetSyncedScopedEngine(element).GetSparseComputedStyle(element, sparseInheritance: true);
 
-    private static Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
-        GetElementRuntimeState(element).EventListeners;
+    private Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
+        _eventTargets.NodeListeners(element);
 
     private static Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
@@ -721,7 +725,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             new JSFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        if (_windowEventListeners.TryGetValue(eventType, out var listeners))
+        if (_eventTargets.TryGetWindowListeners(eventType, out var listeners))
         {
             foreach (var registration in listeners.ToList())
             {

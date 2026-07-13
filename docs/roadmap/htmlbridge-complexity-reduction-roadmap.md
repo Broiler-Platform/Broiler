@@ -356,6 +356,28 @@ unit tests + a timer-flush characterization through the bridge; existing
 partials. The loop is also the seam for the still-pending single-owner thread-affinity model (Phase 2
 item 5); today it preserves the existing defensive concurrent collections.
 
+**P2.5 completed** 2026-07-13 (same branch). Listeners and observers now have single owners, both in
+namespace `Broiler.HtmlBridge.Dom.Runtime`:
+
+- `EventTargetRegistry` owns the per-node `addEventListener` listeners, the window listeners, the
+  generic JS-target (message-port / sub-window) listeners, the target→owner-window map, and the
+  visual-viewport `scroll` listeners — replacing four scattered bridge fields plus the node-listener
+  store that used to live on the process-global `ElementRuntimeState`. Node listeners now use an
+  **instance-scoped `ConditionalWeakTable`**, keeping the same weak GC semantics while removing them
+  from the static table (partial progress on Phase-2 item 4). `ElementRuntimeState.EventListeners` is
+  deleted; only inline `on*` handlers remain node-runtime state there. The dispatch algorithms stay in
+  the bridge (`FireListeners` became an instance method) and read/write listeners through the registry.
+- `MutationObserverHub` owns the registered observer list — `Register` (with `observe()` replace
+  semantics), `Unregister` (`disconnect`), `Count`, `Snapshot`, `Clear`. Registration
+  (`Common.cs`), the three delivery loops (`Traversal.cs`) and teardown route through it; the bridge
+  still builds and delivers the JS mutation records.
+
+Behavior-preserving; no public-API change (both are internal; only private helpers changed static→
+instance). Tests: `Broiler.Cli.Tests/EventTargetRegistryTests.cs` +
+`Broiler.Cli.Tests/MutationObserverHubTests.cs` (unit tests + element/window listener characterization;
+the existing `DomEventsEdgeCaseTests`, messaging and MutationObserver suites still pass). Full-suite
+regression check vs the P2.4 baseline: zero regressions.
+
 Two findings recorded for later phases:
 
 - **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
@@ -401,7 +423,7 @@ Suggested PR order:
 - P2.2 JS identity registry. **(done — see Status above)**
 - P2.3 style context and invalidation. **(done — see Status above)**
 - P2.4 event loop. **(done — see Status above)**
-- P2.5 listeners/observers.
+- P2.5 listeners/observers. **(done — see Status above)**
 - P2.6 resource loader and browsing-context state.
 
 ### Phase 3 - replace the partial god object with feature modules

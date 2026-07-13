@@ -208,7 +208,7 @@ public sealed partial class DomBridge
         var subWindow = new JSObject();
         _subWindowCache[containerElement] = subWindow;
         _subWindowContainers[subWindow] = containerElement;
-        _eventTargetOwnerWindows[subWindow] = subWindow;
+        _eventTargets.SetOwnerWindow(subWindow, subWindow);
         InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
         RegisterWindowMessaging(subWindow);
 

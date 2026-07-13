@@ -596,11 +596,11 @@ public sealed partial class DomBridge
     private void NotifyMutationObservers(DomElement target,
         DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling)
     {
-        if (_mutationObservers.Count == 0)
+        if (_mutationObserverHub.Count == 0)
             return;
 
         var mutation = new DomMutationRecord(DomMutationType.ChildList, target);
-        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
         {
             if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;
@@ -630,11 +630,11 @@ public sealed partial class DomBridge
 
     private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue)
     {
-        if (_mutationObservers.Count == 0)
+        if (_mutationObserverHub.Count == 0)
             return;
 
         var mutation = new DomMutationRecord(DomMutationType.Attributes, target, AttributeName: attributeName);
-        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
         {
             if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;
@@ -656,11 +656,11 @@ public sealed partial class DomBridge
 
     private void NotifyCharacterDataMutationObservers(DomNode target, string? oldValue)
     {
-        if (_mutationObservers.Count == 0)
+        if (_mutationObserverHub.Count == 0)
             return;
 
         var mutation = new DomMutationRecord(DomMutationType.CharacterData, target);
-        foreach (var (observer, observedTarget, options) in _mutationObservers.ToArray())
+        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
         {
             if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
                 continue;

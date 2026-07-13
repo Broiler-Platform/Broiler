@@ -1229,7 +1229,7 @@ public sealed partial class DomBridge
 
     private void DispatchVisualViewportScrollEvent()
     {
-        if (_visualViewportJSObject == null || _visualViewportScrollListeners.Count == 0)
+        if (_visualViewportJSObject == null || _eventTargets.VisualViewportScrollListeners.Count == 0)
             return;
 
         var evt = new JSObject();
@@ -1237,7 +1237,7 @@ public sealed partial class DomBridge
         evt.FastAddValue((KeyString)"target", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"currentTarget", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        foreach (var listener in _visualViewportScrollListeners.ToList())
+        foreach (var listener in _eventTargets.VisualViewportScrollListeners.ToList())
         {
             try
             {

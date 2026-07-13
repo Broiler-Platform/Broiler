@@ -30,11 +30,7 @@ public sealed partial class DomBridge
 
     private List<EventListenerRegistration> GetOrCreateEventTargetListeners(JSObject target, string type)
     {
-        if (!_eventTargetListeners.TryGetValue(target, out var listenersByType))
-        {
-            listenersByType = new Dictionary<string, List<EventListenerRegistration>>(StringComparer.OrdinalIgnoreCase);
-            _eventTargetListeners[target] = listenersByType;
-        }
+        var listenersByType = _eventTargets.TargetListenersForAdd(target);
 
         if (!listenersByType.TryGetValue(type, out var listeners))
         {
@@ -88,7 +84,7 @@ public sealed partial class DomBridge
 
         InvokeEventTargetHandler(target, eventType, evt, logContext);
 
-        if (_eventTargetListeners.TryGetValue(target, out var listenersByType) &&
+        if (_eventTargets.TryGetTargetListeners(target, out var listenersByType) &&
             listenersByType.TryGetValue(eventType, out var listeners))
         {
             foreach (var registration in listeners.ToList())
@@ -137,7 +133,7 @@ public sealed partial class DomBridge
         => GetCanonicalWindow(_currentWindowOverride ?? _jsContext?["window"] as JSObject ?? _windowJSObject);
 
     private JSObject? ResolveOwnerWindow(JSObject target)
-        => _eventTargetOwnerWindows.TryGetValue(target, out var ownerWindow) ? GetCanonicalWindow(ownerWindow) : ResolveCurrentWindow();
+        => _eventTargets.TryGetOwnerWindow(target, out var ownerWindow) ? GetCanonicalWindow(ownerWindow) : ResolveCurrentWindow();
 
     private JSObject? GetCanonicalWindow(JSObject? candidate)
     {
@@ -333,7 +329,7 @@ public sealed partial class DomBridge
     private void CommitTransferredPorts(IEnumerable<JSObject> transferredPorts, JSObject targetWindow)
     {
         foreach (var port in transferredPorts)
-            _eventTargetOwnerWindows[port] = targetWindow;
+            _eventTargets.SetOwnerWindow(port, targetWindow);
     }
 
     private bool ShouldDeliverWindowMessage(JSObject targetWindow, JSObject? sourceWindow, string targetOrigin)
@@ -407,7 +403,7 @@ public sealed partial class DomBridge
     {
         var port = new JSObject();
         var effectiveOwner = ownerWindow ?? _windowJSObject ?? ResolveCurrentWindow() ?? port;
-        _eventTargetOwnerWindows[port] = effectiveOwner;
+        _eventTargets.SetOwnerWindow(port, effectiveOwner);
         InstallEventTargetApi(port, "DomBridge.messagePort.dispatchEvent");
         JSValue onMessageHandler = JSNull.Value;
 

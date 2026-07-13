@@ -1300,11 +1300,7 @@ public sealed partial class DomBridge
             return JSUndefined.Value;
         var type = a[0].ToString();
         var listener = a[1];
-        if (!_windowEventListeners.TryGetValue(type, out var listeners))
-        {
-            listeners = [];
-            _windowEventListeners[type] = listeners;
-        }
+        var listeners = _eventTargets.WindowListenersForAdd(type);
 
         var registration = CreateEventListenerRegistration(listener, a.Length > 2 ? a[2] : JSUndefined.Value);
         if (!HasMatchingEventListener(listeners, registration))
@@ -1320,7 +1316,7 @@ public sealed partial class DomBridge
         var type = a[0].ToString();
         var listener = a[1];
         var capture = GetCaptureForRemoval(a.Length > 2 ? a[2] : JSUndefined.Value);
-        if (_windowEventListeners.TryGetValue(type, out var listeners))
+        if (_eventTargets.TryGetWindowListeners(type, out var listeners))
         {
             for (int i = listeners.Count - 1; i >= 0; i--)
             {
@@ -1354,9 +1350,9 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationAddEventListener146Core(in Arguments a)
     {
-        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener && !_visualViewportScrollListeners.Contains(listener))
+        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
         {
-            _visualViewportScrollListeners.Add(listener);
+            _eventTargets.AddVisualViewportScrollListener(listener);
         }
 
         return JSUndefined.Value;
@@ -1367,7 +1363,7 @@ public sealed partial class DomBridge
     {
         if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
         {
-            _visualViewportScrollListeners.Remove(listener);
+            _eventTargets.RemoveVisualViewportScrollListener(listener);
         }
 
         return JSUndefined.Value;

@@ -91,10 +91,7 @@ public sealed partial class DomBridge : IDisposable
         _smoothScrollTokens.Clear();
         _smoothScrollTokenCounter = 0;
 
-        _visualViewportScrollListeners.Clear();
-        _windowEventListeners.Clear();
-        _eventTargetListeners.Clear();
-        _eventTargetOwnerWindows.Clear();
+        _eventTargets.Clear();
         _subWindowContainers.Clear();
 
         _messagePortPeers.Clear();
@@ -102,7 +99,7 @@ public sealed partial class DomBridge : IDisposable
         _startedMessagePorts.Clear();
         _queuedMessagePortEvents.Clear();
 
-        _mutationObservers.Clear();
+        _mutationObserverHub.Clear();
         _activeRanges.Clear();
         _activeNodeIterators.Clear();
 
