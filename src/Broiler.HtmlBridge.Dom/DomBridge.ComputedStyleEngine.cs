@@ -1,7 +1,7 @@
 using Broiler.Dom;
 using Broiler.CSS.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Phase 4 cutover: <c>getComputedStyle()</c> resolves through the shared

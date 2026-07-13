@@ -1,0 +1,3 @@
+# Transient actual-surface dumps written by HtmlBridgePublicApiSnapshotTests on a
+# baseline mismatch. The committed *.PublicApi.txt files are the approved surface.
+*.received.txt

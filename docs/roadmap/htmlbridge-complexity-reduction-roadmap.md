@@ -244,6 +244,9 @@ Suggested PRs:
 - P0.2 API snapshot and architecture guards.
 - P0.3 reproducible behavioral/performance baseline.
 
+The recorded Phase 0 baseline (committed/linked artifacts, reproducible commands and
+observed status) lives in [Phase 0 baseline](htmlbridge-phase0-baseline.md).
+
 ### Phase 1 - repair the project graph
 
 Goal: make later extraction possible without dragging duplicate or high-level
@@ -579,6 +582,7 @@ These are architecture decisions, not blockers to starting Phases 0-2:
 This roadmap follows, rather than replaces, the completed neutral DOM/CSS
 promotion work:
 
+- [Phase 0 baseline record](htmlbridge-phase0-baseline.md)
 - [DOM/CSS promotion roadmap](htmlbridge-dom-css-promotion-roadmap.md)
 - [Remaining work roadmap](htmlbridge-remaining-work-roadmap.md)
 - [Promotion backlog](htmlbridge-promotion-backlog-roadmap.md)

@@ -1,4 +1,4 @@
-using Broiler.HtmlBridge.DomBridge;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -9,7 +9,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

@@ -9,7 +9,7 @@ using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
 using System.Globalization;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

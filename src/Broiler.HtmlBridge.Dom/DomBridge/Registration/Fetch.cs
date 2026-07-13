@@ -11,7 +11,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

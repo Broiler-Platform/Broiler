@@ -3,7 +3,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

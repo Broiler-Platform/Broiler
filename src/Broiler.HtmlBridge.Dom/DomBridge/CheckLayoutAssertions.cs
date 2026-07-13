@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {

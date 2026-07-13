@@ -13,12 +13,12 @@ using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Dom;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
-using Broiler.HtmlBridge.DomBridge;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 using Broiler.CSS.Dom;
 using Broiler.CSS;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Registers a minimal <c>document</c> object on a <see cref="JSContext"/>
@@ -388,6 +388,15 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return state.Style;
     }
 
+    /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
+    /// dictionary the anchor resolver reads and writes (display:none, resolved left/top/width/height,
+    /// …). RF-BRIDGE-1c Phase F4 removed the <c>Broiler.Dom.DomElement.Style</c> facade member; internal test and
+    /// tooling callers that need to inspect post-resolution inline styles route through this accessor
+    /// instead. Visible only to <c>InternalsVisibleTo</c> assemblies — not part of the public surface,
+    /// so it does not re-open a public facade seam.</summary>
+    internal static IReadOnlyDictionary<string, string> GetInlineStyleView(DomElement element) =>
+        InlineStyle(element);
+
     /// <summary>Parity-test hook (DOM/CSS promotion §2.1): the bridge's own sparse
     /// computed-style projection. Paired with <see cref="GetSparseComputedStyleForParity"/>
     /// (the canonical engine's candidate replacement over the SAME synced engine) so a
@@ -409,7 +418,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private static Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
 
-    internal static bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
+    internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
     {
         var slot = vertical
             ? GetElementRuntimeState(element).Scroll.Top
@@ -421,6 +430,30 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         }
 
         offset = 0;
+        return false;
+    }
+
+    internal double? GetStoredScrollOffsetOrDefault(DomElement element, bool vertical) =>
+        TryGetStoredScrollOffset(element, vertical, out var offset) ? offset : null;
+
+    internal bool TryGetResolvedLayout(
+        DomElement element,
+        out double left,
+        out double top,
+        out double width,
+        out double height)
+    {
+        // RF-BRIDGE-1b (Milestone 2.5): reads the memoized position-area resolution,
+        // relocated from ElementRuntimeState.Layout to the bridge-level
+        // PositionAreaResolutions cache. The four values are always set (and cleared)
+        // together, so a cached entry is equivalent to the old "all four slots present".
+        if (TryGetPositionAreaResolution(element, out var rect))
+        {
+            (left, top, width, height) = rect;
+            return true;
+        }
+
+        (left, top, width, height) = (0, 0, 0, 0);
         return false;
     }
 

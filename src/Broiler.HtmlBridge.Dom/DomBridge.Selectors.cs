@@ -1,7 +1,7 @@
 using Broiler.Dom;
 using Broiler.CSS.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Compatibility entry points over the shared canonical-DOM selector matcher.

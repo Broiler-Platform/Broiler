@@ -2,7 +2,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.CSS;
 using Broiler.Dom;
 
-namespace Broiler.HtmlBridge.DomBridge;
+namespace Broiler.HtmlBridge.Dom.Runtime;
 
 internal readonly record struct EventListenerRegistration(JSValue Listener, bool Capture, bool Once = false, bool Passive = false);
 

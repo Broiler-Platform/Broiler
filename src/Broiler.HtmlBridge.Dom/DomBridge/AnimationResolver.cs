@@ -4,7 +4,7 @@ using Broiler.CSS;
 using Broiler.Dom;
 using System.Text;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Resolves CSS animation snapshots — for elements with <c>animation</c> and a

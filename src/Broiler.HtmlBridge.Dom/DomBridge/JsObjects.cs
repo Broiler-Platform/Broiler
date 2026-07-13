@@ -8,7 +8,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Conversion of <see cref="DomElement"/> instances to YantraJS

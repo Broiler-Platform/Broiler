@@ -77,10 +77,13 @@ public class HtmlBridgeBoundaryGuardTests
     public void DomBridge_Runtime_State_Uses_Typed_Groups_Without_A_String_Property_Bag()
     {
         var bridgeAssembly = typeof(DomBridge).Assembly;
-        var runtimeStateType = bridgeAssembly.GetType("Broiler.HtmlBridge.ElementRuntimeState");
+        // P0.1 relocated the runtime-state group off the top-level bridge namespace into
+        // the internal Broiler.HtmlBridge.Dom.Runtime namespace (the DomBridge folder no
+        // longer drives a colliding Broiler.HtmlBridge.DomBridge namespace).
+        var runtimeStateType = bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState");
 
         Assert.NotNull(runtimeStateType);
-        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.ElementRuntimeProperties"));
+        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeProperties"));
         Assert.DoesNotContain(
             runtimeStateType!.GetProperties(BindingFlags.Public | BindingFlags.Instance),
             static property =>

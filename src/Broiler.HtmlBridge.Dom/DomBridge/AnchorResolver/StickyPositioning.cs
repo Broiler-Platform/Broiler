@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Broiler.Dom;
 using System.Globalization;
 
-namespace Broiler.HtmlBridge.Dom;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// CSS Positioned Layout 3 §sticky: computes the offset of
