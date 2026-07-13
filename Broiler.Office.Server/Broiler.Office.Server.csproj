@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    BOSS — the Broiler Office Standalone Server.
+
+    A self-contained ASP.NET Core / Kestrel host for the Broiler Office web apps. It serves the
+    Broiler Writer WebAssembly word processor (Broiler.Writer.WebAssembly).
+
+    Hosting model — "vendored publish", not Blazor-hosted:
+      The Writer is a Microsoft.NET.Sdk.WebAssembly app (not Blazor). The Blazor hosted model
+      (Components.WebAssembly.Server + ProjectReference) serves it fine in development but, on publish,
+      never bakes the WebAssembly SDK's transformed index.html (the import map + fingerprinted script
+      references) into the output — it ships the raw placeholder index.html and the app can't boot.
+      So instead this server VENDORS the Writer's *published* wwwroot (transformed index.html, the
+      _framework mono-wasm runtime, and every content-hashed asset) and serves it as plain static
+      files. That is exactly the bundle the standalone `python -m http.server` flow serves, just hosted
+      by Kestrel — identical in `dotnet run` and `dotnet publish`.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Broiler.Office.Server</RootNamespace>
+    <AssemblyName>Broiler.Office.Server</AssemblyName>
+    <IsPackable>false</IsPackable>
+
+    <!-- The vendored wwwroot is already content-hashed by the WebAssembly SDK and its transformed
+         index.html points at those exact names. Leave it untouched: don't let the Web SDK's static
+         web assets pipeline re-fingerprint or rewrite it. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+
+    <WriterClientProject>..\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
+    <!-- Absolute: this PublishDir is handed to the client's build, where a relative path would resolve
+         against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
+         is set early and reliably; IntermediateOutputPath is not yet populated at this point. -->
+    <WriterClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)writer-client\</WriterClientStage>
+  </PropertyGroup>
+
+  <!-- Publish the Writer WASM client (trimmed — untrimmed crashes mono at boot) into an intermediate
+       stage. Skipped once staged, so the dev inner loop stays fast; force a refresh after changing the
+       Writer with -p:ForceWriterClientPublish=true (or delete obj/). -->
+  <Target Name="PublishWriterClient"
+          Condition="!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceWriterClientPublish)' == 'true'">
+    <Message Importance="high" Text="BOSS: publishing the Broiler Writer WASM client into $(WriterClientStage)…" />
+    <RemoveDir Directories="$(WriterClientStage)" />
+    <MSBuild Projects="$(WriterClientProject)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(WriterClientStage);RunAOTCompilation=false" />
+  </Target>
+
+  <!-- Dev / `dotnet run`: vendor the staged bundle into this project's web root so Kestrel serves it. -->
+  <Target Name="VendorWriterClientForRun" DependsOnTargets="PublishWriterClient" BeforeTargets="Build">
+    <ItemGroup>
+      <_WriterClientFile Include="$(WriterClientStage)wwwroot\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WriterClientFile)"
+          DestinationFiles="@(_WriterClientFile->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Publish: vendor the staged bundle into the publish output web root. -->
+  <Target Name="VendorWriterClientForPublish" DependsOnTargets="PublishWriterClient" AfterTargets="Publish">
+    <ItemGroup>
+      <_WriterClientPublishFile Include="$(WriterClientStage)wwwroot\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WriterClientPublishFile)"
+          DestinationFiles="@(_WriterClientPublishFile->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
