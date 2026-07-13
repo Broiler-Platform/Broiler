@@ -731,7 +731,7 @@ public sealed partial class DomBridge
     /// Fetches an external CSS stylesheet from an HTTP/HTTPS URL.
     /// Returns the CSS text content, or <c>null</c> on failure.
     /// </summary>
-    private static string? FetchExternalStylesheet(string url)
+    private string? FetchExternalStylesheet(string url)
     {
         try
         {
@@ -742,7 +742,7 @@ public sealed partial class DomBridge
                 var path = uri.LocalPath;
                 return File.Exists(path) ? File.ReadAllText(path) : null;
             }
-            return SharedHttpClient.GetStringAsync(url)
+            return _resources.GetStringAsync(url)
                 .ConfigureAwait(false)
                 .GetAwaiter()
                 .GetResult();

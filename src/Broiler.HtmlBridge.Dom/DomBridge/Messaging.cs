@@ -290,7 +290,7 @@ public sealed partial class DomBridge
 
         foreach (var (_, item) in transferArray.GetArrayElements(withHoles: false))
         {
-            if (item is JSObject port && _messagePortPeers.ContainsKey(port))
+            if (item is JSObject port && _messagePorts.HasPeer(port))
             {
                 if (!seenPorts.Add(port))
                     ThrowDOMException(_jsContext!, "The transfer list contains duplicate transferable values.", "DataCloneError");
@@ -432,8 +432,7 @@ public sealed partial class DomBridge
         var ownerWindow = ResolveCurrentWindow();
         var port1 = CreateMessagePort(ownerWindow);
         var port2 = CreateMessagePort(ownerWindow);
-        _messagePortPeers[port1] = port2;
-        _messagePortPeers[port2] = port1;
+        _messagePorts.Link(port1, port2);
 
         var channel = new JSObject();
         channel.FastAddValue((KeyString)"port1", port1, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -443,7 +442,7 @@ public sealed partial class DomBridge
 
     private void DispatchOrQueueMessagePortEvent(JSObject targetPort, JSObject evt)
     {
-        if (_closedMessagePorts.Contains(targetPort))
+        if (_messagePorts.IsClosed(targetPort))
             return;
 
         if (CanDispatchMessagePortEvent(targetPort))
@@ -452,32 +451,26 @@ public sealed partial class DomBridge
             return;
         }
 
-        if (!_queuedMessagePortEvents.TryGetValue(targetPort, out var queuedEvents))
-        {
-            queuedEvents = [];
-            _queuedMessagePortEvents[targetPort] = queuedEvents;
-        }
-
-        queuedEvents.Add(evt);
+        _messagePorts.Enqueue(targetPort, evt);
     }
 
     private bool CanDispatchMessagePortEvent(JSObject targetPort)
-        => _startedMessagePorts.Contains(targetPort) || HasOnMessageHandler(targetPort);
+        => _messagePorts.IsStarted(targetPort) || HasOnMessageHandler(targetPort);
 
     private bool HasOnMessageHandler(JSObject targetPort)
         => targetPort[(KeyString)"onmessage"] is { } handler && !handler.IsNullOrUndefined;
 
     private void ActivateMessagePort(JSObject port)
     {
-        if (_closedMessagePorts.Contains(port))
+        if (_messagePorts.IsClosed(port))
             return;
 
-        _startedMessagePorts.Add(port);
+        _messagePorts.Start(port);
 
-        if (!_queuedMessagePortEvents.TryGetValue(port, out var queuedEvents) || queuedEvents.Count == 0)
+        var queuedEvents = _messagePorts.TakeQueued(port);
+        if (queuedEvents is null)
             return;
 
-        _queuedMessagePortEvents.Remove(port);
         foreach (var evt in queuedEvents)
         {
             DispatchMessagePortEvent(port, evt);

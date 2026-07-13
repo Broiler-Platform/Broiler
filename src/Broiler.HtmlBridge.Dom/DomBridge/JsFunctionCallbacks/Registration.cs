@@ -1163,7 +1163,7 @@ public sealed partial class DomBridge
                         request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
                 }
 
-                var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
+                var response = _resources.SendAsync(request).GetAwaiter().GetResult();
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
                 var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

@@ -378,6 +378,44 @@ instance). Tests: `Broiler.Cli.Tests/EventTargetRegistryTests.cs` +
 the existing `DomEventsEdgeCaseTests`, messaging and MutationObserver suites still pass). Full-suite
 regression check vs the P2.4 baseline: zero regressions.
 
+**P2.6 completed** 2026-07-13 (same branch) — **Phase 2 complete.** Two owners, both in
+`Broiler.HtmlBridge.Dom.Runtime`:
+
+- `MessagePortRegistry` owns the `MessageChannel`/`MessagePort` state — entangled peers, closed and
+  started marks, and the per-port queue of pending messages — replacing the four scattered port maps.
+  The messaging callbacks still build/dispatch the JS `MessageEvent`s; they read/mutate port state
+  through it (`Link`/`TryGetPeer`/`HasPeer`/`IsClosed`/`Close`/`IsStarted`/`Start`/`Enqueue`/
+  `TakeQueued`/`Clear`).
+- `ResourceLoader` owns the host resource I/O — a process-shared `HttpClient` (kept static inside the
+  loader so many documents don't each open a socket pool) and the optional local base path — replacing
+  the static `SharedHttpClient` that feature callbacks reached into directly. This is the "no feature
+  callback constructs an `HttpClient`" seam Phase 7 builds on (CSP, unified fetch/XHR/frame routing,
+  cancellation are still to come). `FetchExternalStylesheet` went static→instance.
+
+Behavior-preserving; no public-API change (both internal). Tests:
+`Broiler.Cli.Tests/MessagePortRegistryTests.cs` + `Broiler.Cli.Tests/ResourceLoaderTests.cs` (unit
+tests + existing messaging/network suites pass). Full-suite regression check vs the P2.5 baseline:
+every candidate fails identically in isolation on both sides → zero regressions.
+
+**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3):** the sub-window and
+sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
+`_subDocumentCache`, `_subDocumentLocationCache`, `_subDocumentBaseUrlCache`, `_objectLoadFailures`,
+`_onloadFired`) and `_currentWindowOverride` are not yet consolidated into a `BrowsingContextManager`
+— they are largely internal to `SubDocuments.cs` and intertwined with sub-document resolution. P2.6
+took the cross-file cohesive slice (ports) and the resource-loader seam.
+
+## Phase 2 outcome
+
+All six sub-PRs landed on branch `htmlbridge-phase2-p2-1-lifetime-disposal`: P2.1 disposal/lifetime,
+P2.2 `JsObjectRegistry`, P2.3 `DocumentStyleContext`, P2.4 `BrowserEventLoop`, P2.5
+`EventTargetRegistry`+`MutationObserverHub`, P2.6 `MessagePortRegistry`+`ResourceLoader`. Hidden
+bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridge.Dom.Runtime`); node
+event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
+`ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
+isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
+and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables plus the
+sub-document caches above are still to be de-globalized/consolidated.
+
 Two findings recorded for later phases:
 
 - **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
@@ -424,7 +462,7 @@ Suggested PR order:
 - P2.3 style context and invalidation. **(done — see Status above)**
 - P2.4 event loop. **(done — see Status above)**
 - P2.5 listeners/observers. **(done — see Status above)**
-- P2.6 resource loader and browsing-context state.
+- P2.6 resource loader and browsing-context state. **(done — see Status above; Phase 2 complete)**
 
 ### Phase 3 - replace the partial god object with feature modules
 

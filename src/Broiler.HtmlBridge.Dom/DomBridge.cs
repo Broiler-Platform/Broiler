@@ -33,18 +33,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public const int AsyncDrainIterationLimit = 1000;
 
-    // External resource fetches (stylesheets, iframe documents, JS fetch) block
-    // the synchronous render/script pipeline.  In the sandboxed WPT/headless
-    // environment external http(s) hosts are unreachable, so the only question is
-    // how long each blocked fetch waits before failing — and the per-test budget
-    // (Broiler.Wpt's default 30 s) equals this client's old 30 s timeout, so a
-    // single unreachable stylesheet consumed the entire budget and timed the test
-    // out (WPT #1147 Timeout cluster, e.g. CSS2/cascade-import-* which @link three
-    // delayed-file CGI URLs).  A short timeout fails fast: even several sequential
-    // external fetches stay well under the test budget, converting a 30 s hang
-    // (which also risks aborting the whole shard) into a quick, deterministic miss.
-    private const int FetchTimeoutSeconds = 5;
-    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
+    // P2.6: sub-resource HTTP and the local base path now live in ResourceLoader, the single host
+    // resource loader (was the static SharedHttpClient plus the _localBasePath field). Feature
+    // callbacks ask the loader instead of reaching a static HttpClient.
+    private readonly Dom.Runtime.ResourceLoader _resources = new();
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
@@ -83,10 +75,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // fields plus ElementRuntimeState.EventListeners for node listeners).
     private readonly Dom.Runtime.EventTargetRegistry _eventTargets = new();
     private readonly Dictionary<JSObject, DomElement> _subWindowContainers = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, JSObject> _messagePortPeers = new(ReferenceEqualityComparer.Instance);
-    private readonly HashSet<JSObject> _closedMessagePorts = new(ReferenceEqualityComparer.Instance);
-    private readonly HashSet<JSObject> _startedMessagePorts = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<JSObject, List<JSObject>> _queuedMessagePortEvents = new(ReferenceEqualityComparer.Instance);
+    // P2.6: MessageChannel/MessagePort state (peers, closed/started marks, queued messages) now lives
+    // in MessagePortRegistry, the single owner of the browsing-context port state (was the scattered
+    // _messagePortPeers/_closedMessagePorts/_startedMessagePorts/_queuedMessagePortEvents fields).
+    private readonly Dom.Runtime.MessagePortRegistry _messagePorts = new();
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -106,12 +98,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         get => CurrentScriptIndex;
         set => CurrentScriptIndex = value;
     }
-
-    /// <summary>
-    /// Optional local base path for resolving relative sub-resource URLs to local files.
-    /// When set, relative URLs are first checked against this directory before attempting HTTP.
-    /// </summary>
-    private string? _localBasePath;
 
     // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
     private int _viewportWidth = 1024;
@@ -542,7 +528,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// When set, sub-resource URLs (e.g. iframe src) are first looked up as files
     /// relative to this directory before falling back to HTTP fetch.
     /// </summary>
-    public void SetLocalBasePath(string basePath) => _localBasePath = basePath;
+    public void SetLocalBasePath(string basePath) => _resources.LocalBasePath = basePath;
 
     /// <summary>
     /// Executes all pending <c>setTimeout</c>, <c>setInterval</c>, and
