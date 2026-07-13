@@ -407,10 +407,11 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Collects all &lt;tr&gt; elements in a table in HTML spec order:
-    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows.
+    /// Collects all &lt;tr&gt; elements in a table in HTMLTableElement.rows spec order:
+    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows. Neutral
+    /// tree helper shared by the <c>TableBinding</c> feature module and hit testing.
     /// </summary>
-    private static List<DomElement> CollectTableRows(DomElement table)
+    internal static List<DomElement> CollectTableRows(DomElement table)
     {
         var rows = new List<DomElement>();
         // 1. All tr children of thead elements (in tree order)
@@ -421,7 +422,7 @@ public sealed partial class DomBridge
                     if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
-        // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
+        // 2. Direct tr children of the table, or tr children of tbody elements (in tree order)
         foreach (var child in ChildElements(table))
         {
             var ctag = child.TagName.ToLowerInvariant();
@@ -441,77 +442,6 @@ public sealed partial class DomBridge
                         rows.Add(c);
         }
         return rows;
-    }
-
-    /// <summary>
-    /// Builds a JSArray of table rows for the 'rows' property.
-    /// </summary>
-    private JSArray BuildTableRows(DomElement table)
-    {
-        var rows = CollectTableRows(table);
-        var jsRows = new List<JSValue>();
-        foreach (var r in rows)
-            jsRows.Add(ToJSObject(r));
-        var arr = new JSArray(jsRows);
-        arr.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(jsRows.Count), "get length"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        return arr;
-    }
-
-    /// <summary>
-    /// Inserts a row into a table at the given index, per HTMLTableElement.insertRow() spec.
-    /// </summary>
-    private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
-    {
-        var tr = CreateBridgeElement("tr");
-        bridge._knownNodes.Add(tr);
-
-        var allRows = CollectTableRows(table);
-        if (allRows.Count == 0 || index == -1 || index == allRows.Count)
-        {
-            // Find the last section to append to, or create a tbody
-            DomElement? lastSection = null;
-            for (int i = table.ChildNodes.Count - 1; i >= 0; i--)
-            {
-                if (ChildAt(table, i) is not DomElement childElement)
-                    continue;
-                var ctag = childElement.TagName.ToLowerInvariant();
-                if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
-                {
-                    lastSection = childElement;
-                    break;
-                }
-            }
-            if (lastSection == null && allRows.Count == 0)
-            {
-                // No sections and no rows at all: create a new tbody per spec
-                var tbody = CreateBridgeElement("tbody");
-                bridge._knownNodes.Add(tbody);
-                SetParent(tbody, table);
-                table.AppendChild(tbody);
-                lastSection = tbody;
-            }
-            if (lastSection != null)
-            {
-                SetParent(tr, lastSection);
-                lastSection.AppendChild(tr);
-            }
-            else
-            {
-                SetParent(tr, table);
-                table.AppendChild(tr);
-            }
-        }
-        else if (index >= 0 && index < allRows.Count)
-        {
-            var refRow = allRows[index];
-            var parent = ParentEl(refRow) ?? table;
-            SetParent(tr, parent);
-            var idx = ChildIndexOf(parent, refRow);
-            InsertChildAt(parent, idx >= 0 ? idx : parent.ChildNodes.Count, tr);
-        }
-        return ToJSObject(tr);
     }
 
     /// <summary>

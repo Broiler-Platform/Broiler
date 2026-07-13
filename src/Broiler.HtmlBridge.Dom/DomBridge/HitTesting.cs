@@ -111,7 +111,7 @@ public sealed partial class DomBridge
         return rect;
     }
 
-    private static bool IsTableCellElement(DomElement element)
+    internal static bool IsTableCellElement(DomElement element)
     {
         var tag = element.TagName;
         return string.Equals(tag, "td", StringComparison.OrdinalIgnoreCase) ||

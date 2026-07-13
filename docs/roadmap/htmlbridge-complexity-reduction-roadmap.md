@@ -555,6 +555,28 @@ change (the helper is internal). Tests: `Broiler.Cli.Tests/EventListenerBindingM
 DomEvents (81), DomEventsEdgeCase (33), Messaging (15), Attributes and the event/architecture-guard
 suites pass unchanged → zero regressions.
 
+Status: **P3.5 completed** 2026-07-13 (same branch). The **HTML table DOM interfaces** are the fifth
+co-located module: `TableBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the whole
+`HTMLTableElement` interface (`caption`/`tHead`/`tFoot`/`tBodies`/`rows` plus `createCaption`/
+`createTHead`/`createTFoot`/`deleteCaption`/`deleteTHead`/`deleteTFoot`/`insertRow`/`deleteRow`),
+`HTMLTableSectionElement` (`rows`/`insertRow`) and `HTMLTableRowElement` (`rowIndex`/
+`sectionRowIndex`/`cells`/`insertCell`/`deleteCell`) — ~20 callbacks (renamed from the numbered
+`JsElementInterfaces…001…023Core`) plus `BuildTableRows` and the `insertRow` placement algorithm,
+moved out of `JsFunctionCallbacks/ElementInterfaces.cs` and `Utilities.cs`. The table registration in
+`AddElementSpecificMembers` collapsed to a single `_tables.Install(obj, element, tag)` call. Table
+DOM is pure canonical-tree manipulation, so the `ITableHost` contract is just two seams (`ToJSObject`
++ `CreateElement`, the construction funnel), implemented via explicit interface members in
+`DomBridge.TableHost.cs`; everything structural uses the neutral static `DomBridge` tree helpers
+(`SetParent`/`InsertChildAt`/`RemoveChildFrom`/`IsTableCellElement`/`UndefinedFunction` widened
+`private`→`internal static`). `CollectTableRows` stayed a bridge `internal static` helper because hit
+testing also uses it. Behaviour-preserving; no public-API change (module + contract internal).
+Tests: `Broiler.Cli.Tests/TableBindingModuleTests.cs` (co-location/host-contract guards + insertRow/
+insertCell/rows-spec-order/createTHead-idempotence/deleteRow characterizations). Regression check:
+HtmlDomInterface (49), FormControlRender, Acid3RegressionTests (26) and the architecture-guard suites
+pass unchanged; the one pre-existing environmental failure
+(`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
+test) fails identically on both sides → zero regressions.
+
 Still to come: CSSOM, Element, Window/Document, Forms, SVG, Dialog/popover, Frames/Network,
 Messaging, Canvas, and the DomBridge 500-800-line facade target.
 

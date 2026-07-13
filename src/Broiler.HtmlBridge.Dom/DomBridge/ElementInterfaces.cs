@@ -16,74 +16,9 @@ public sealed partial class DomBridge
 
         var tag = element.TagName.ToLowerInvariant();
 
-        // HTMLTableElement interface
-        if (tag == "table")
-        {
-            // caption (get/set) — returns first <caption> child or null
-            obj.FastAddProperty((KeyString)"caption", new JSFunction((in _) => JsElementInterfacesGetCaption001Core(element, in _), "get caption"), UndefinedFunction("set caption"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // tHead (get/set) — returns first <thead> child or null
-            obj.FastAddProperty((KeyString)"tHead", new JSFunction((in _) => JsElementInterfacesGetTHead002Core(element, in _), "get tHead"), UndefinedFunction("set tHead"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // tFoot (get/set) — returns first <tfoot> child or null
-            obj.FastAddProperty((KeyString)"tFoot", new JSFunction((in _) => JsElementInterfacesGetTFoot003Core(element, in _), "get tFoot"), UndefinedFunction("set tFoot"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // tBodies (read-only) — returns collection of <tbody> children
-            obj.FastAddProperty((KeyString)"tBodies", new JSFunction((in _) => JsElementInterfacesGetTBodies005Core(element, in _), "get tBodies"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // rows (read-only) — returns all <tr> elements in spec order:
-            // 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows
-            obj.FastAddProperty((KeyString)"rows", new JSFunction((in _) => BuildTableRows(element), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // createCaption() — returns existing or creates new <caption>
-            obj.FastAddValue((KeyString)"createCaption", new JSFunction((in _) => JsElementInterfacesCreateCaption007Core(bridge, element, in _), "createCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // createTHead() — returns existing or creates new <thead>
-            obj.FastAddValue((KeyString)"createTHead", new JSFunction((in _) => JsElementInterfacesCreateTHead008Core(bridge, element, in _), "createTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // createTFoot() — returns existing or creates new <tfoot>
-            obj.FastAddValue((KeyString)"createTFoot", new JSFunction((in _) => JsElementInterfacesCreateTFoot009Core(bridge, element, in _), "createTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // deleteCaption()
-            obj.FastAddValue((KeyString)"deleteCaption", new JSFunction((in _) => JsElementInterfacesDeleteCaption010Core(element, in _), "deleteCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // deleteTHead()
-            obj.FastAddValue((KeyString)"deleteTHead", new JSFunction((in _) => JsElementInterfacesDeleteTHead011Core(element, in _), "deleteTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // deleteTFoot()
-            obj.FastAddValue((KeyString)"deleteTFoot", new JSFunction((in _) => JsElementInterfacesDeleteTFoot012Core(element, in _), "deleteTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // insertRow(index) — inserts a <tr> into the table
-            obj.FastAddValue((KeyString)"insertRow", new JSFunction((in a) => JsElementInterfacesInsertRow013Core(bridge, element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // deleteRow(index)
-            obj.FastAddValue((KeyString)"deleteRow", new JSFunction((in a) => JsElementInterfacesDeleteRow014Core(element, in a), "deleteRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-
-        // HTMLTableSectionElement (thead, tbody, tfoot) — rows and insertRow
-        if (tag == "thead" || tag == "tbody" || tag == "tfoot")
-        {
-            // rows — returns <tr> children of this section
-            obj.FastAddProperty((KeyString)"rows", new JSFunction((in _) => JsElementInterfacesGetRows016Core(element, in _), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // insertRow(index)
-            obj.FastAddValue((KeyString)"insertRow", new JSFunction((in a) => JsElementInterfacesInsertRow017Core(bridge, element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-
-        // HTMLTableRowElement (tr) — rowIndex, sectionRowIndex, cells, insertCell, deleteCell
-        if (tag == "tr")
-        {
-            // rowIndex — position in the table's rows collection
-            obj.FastAddProperty((KeyString)"rowIndex", new JSFunction((in _) => JsElementInterfacesGetRowIndex018Core(element, in _), "get rowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // sectionRowIndex — position within the parent section
-            obj.FastAddProperty((KeyString)"sectionRowIndex", new JSFunction((in _) => JsElementInterfacesGetSectionRowIndex019Core(element, in _), "get sectionRowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // cells — returns collection of <td>/<th> children
-            obj.FastAddProperty((KeyString)"cells", new JSFunction((in _) => JsElementInterfacesGetCells021Core(element, in _), "get cells"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddValue((KeyString)"insertCell", new JSFunction((in a) => JsElementInterfacesInsertCell022Core(bridge, element, in a), "insertCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteCell", new JSFunction((in a) => JsElementInterfacesDeleteCell023Core(element, in a), "deleteCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
+        // HTMLTableElement / HTMLTableSectionElement / HTMLTableRowElement interfaces (Phase 3 P3.5:
+        // extracted into the co-located TableBinding feature module).
+        _tables.Install(obj, element, tag);
 
         // HTMLFormElement interface
         if (tag == "form")

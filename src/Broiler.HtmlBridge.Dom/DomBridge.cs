@@ -55,6 +55,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // object's propagation-control methods and composedPath() — lives in EventDispatchBinding,
     // reached through the narrow IEventDispatchHost contract (see DomBridge.EventDispatchHost.cs).
     private readonly Dom.Features.EventDispatchBinding _eventDispatch;
+    // Phase 3 (P3.5): the HTML table DOM interfaces (HTMLTableElement / HTMLTableSectionElement /
+    // HTMLTableRowElement) live in TableBinding, reached through the narrow ITableHost contract
+    // (see DomBridge.TableHost.cs).
+    private readonly Dom.Features.TableBinding _tables;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -140,6 +144,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _traversal = new Dom.Features.TraversalBinding(this);
         _mutations = new Dom.Features.MutationObserverBinding(this);
         _eventDispatch = new Dom.Features.EventDispatchBinding(this);
+        _tables = new Dom.Features.TableBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
@@ -220,14 +225,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // RemoveChild enforce nothing text-specific, so this is a safe widen.
 
     /// <summary>Old <c>Children.Insert(index, child)</c>.</summary>
-    private static void InsertChildAt(DomNode parent, int index, DomNode child)
+    internal static void InsertChildAt(DomNode parent, int index, DomNode child)
     {
         var reference = index < parent.ChildNodes.Count ? parent.ChildNodes[index] : null;
         parent.InsertBefore(child, reference);
     }
 
     /// <summary>Old <c>Children.Remove(child)</c> — removes only if actually a child; returns success.</summary>
-    private static bool RemoveChildFrom(DomNode parent, DomNode child)
+    internal static bool RemoveChildFrom(DomNode parent, DomNode child)
     {
         if (!ReferenceEquals(child.ParentNode, parent))
             return false;
@@ -353,7 +358,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// otherwise the child is appended if not already there — matching the old setter exactly.
     /// RF-BRIDGE-1c Phase F (F3c part 2b): the parent widened to <c>DomNode?</c> so range-extract
     /// code can pass DomNode-typed ancestor-chain clones (always elements at runtime).</summary>
-    private static void SetParent(DomNode child, DomNode? parent)
+    internal static void SetParent(DomNode child, DomNode? parent)
     {
         if (parent is null)
             child.Remove();
