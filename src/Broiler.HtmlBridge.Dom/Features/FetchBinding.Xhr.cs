@@ -1,8 +1,8 @@
 using Broiler.JavaScript.Engine;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom.Features;
 
-public sealed partial class DomBridge
+internal sealed partial class FetchBinding
 {
     /// <summary>
     /// Registers a basic <c>XMLHttpRequest</c> constructor on the context.

@@ -690,10 +690,38 @@ architecture-guard suites all pass unchanged (164 tests); the pre-existing envir
 document HTTP failures (`HttpSubResourceTests.Iframe_*`, `ScriptEngineExecuteTests.…Iframe_Scroll_State
 _In_SrcDoc`) fail identically on both sides → zero regressions.
 
-Still to come — each entangled with layout, network, or rendering; the P3.7–P3.10 named-accessor /
-relocated-infra pattern is the template for any residual runtime-state or browsing-context coupling:
-CSSOM/computed style, Element/geometry, Window/Document, SVG, Frames/Network, Canvas, and the DomBridge
-500-800-line facade target.
+Status: **P3.11 completed** 2026-07-13 (same branch) — the networking feature. **`fetch` /
+`XMLHttpRequest`** is the eleventh co-located module: `FetchBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`, split into `FetchBinding.cs` / `FetchBinding.Callbacks.cs` /
+`FetchBinding.Xhr.cs` to stay under the 750-line/file guideline) owns the whole `fetch` polyfill and
+its `Headers`/`Request`/`Response`/`FormData`/`Blob`/`AbortController` helper objects, the `Response`
+static factories (`new Response`/`Response.json`/`Response.redirect`) and the `XMLHttpRequest` polyfill
+— i.e. `RegisterFetchAndHttpApis` (now `Install`), the four `JsRegistration…113/114/116/120Core`
+callbacks (moved out of the shared 1516-line `JsFunctionCallbacks/Registration.cs`), the four fetch
+delegate types (moved out of `JsFunctionCallbacks/Common.cs`) and `RegisterXMLHttpRequest`. Host I/O
+goes through the injected **P2.6 `ResourceLoader`** — the module holds a reference to it (passed in
+`new FetchBinding(this, _resources)`), so no feature callback constructs an `HttpClient` (the seam
+Phase 7 builds on). The **only** remaining bridge coupling — the page URL used to resolve a relative
+`Response.redirect` target — is the narrow `IFetchHost.PageUrl`, implemented via one explicit interface
+member in `DomBridge.FetchHost.cs`. **Two non-networking registrations that historically lived inside
+`RegisterFetchAndHttpApis` were relocated** to the window-globals site (`Registration/Registration.cs`):
+`MessageChannel` (messaging — delegates to `_messaging.CreateMessageChannel()`) and `getComputedStyle`
+(CSSOM — still calls the bridge's `JsRegistrationGetComputedStyle121Core`). The caller now does
+`var fetchFn = _fetch.Install(context, window)`; the old `Registration/Fetch.cs` and
+`Registration/XmlHttpRequest.cs` were deleted. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/FetchBindingModuleTests.cs` (co-location / host-contract /
+ResourceLoader-ownership guards + Response/Response.json, Headers/FormData, XHR-installed and
+relocated-MessageChannel/getComputedStyle characterizations, all network-free). Regression check vs the
+P3.10 baseline: the network/computed-style/messaging/selector suites pass unchanged (286 tests); the
+pre-existing environmental failures (the 8 `HttpClientMigrationTests` assembly-reflection checks, the 3
+`HttpSubResourceTests.Iframe_*`, the 2 `NetworkAndHttpTests.Fetch_*Body_Readers` that need real HTTP,
+and the 2 `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.11 named-accessor / relocated-infra
+pattern is the template for any residual runtime-state or browsing-context coupling: CSSOM/computed
+style, Element/geometry, Window/Document, SVG, Frames/browsing-contexts (SubDocuments), Canvas (better
+done with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the
+DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

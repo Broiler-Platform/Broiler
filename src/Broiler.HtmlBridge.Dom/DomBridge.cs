@@ -106,6 +106,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // contract (see DomBridge.MessagingHost.cs). The module holds a reference to the shared
     // _eventTargets registry (generic-target listeners it does not own).
     private readonly Dom.Features.MessagingBinding _messaging;
+    // Phase 3 (P3.11): the fetch / XMLHttpRequest networking surface (fetch + Headers/Request/Response/
+    // FormData/Blob/AbortController + the XHR polyfill) lives in FetchBinding, backed by the injected
+    // P2.6 ResourceLoader; the only bridge coupling (page URL for redirect resolution) is reached
+    // through the narrow IFetchHost contract (see DomBridge.FetchHost.cs).
+    private readonly Dom.Features.FetchBinding _fetch;
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -163,6 +168,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _select = new Dom.Features.SelectBinding(this);
         _forms = new Dom.Features.FormBinding(this);
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
+        _fetch = new Dom.Features.FetchBinding(this, _resources);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
