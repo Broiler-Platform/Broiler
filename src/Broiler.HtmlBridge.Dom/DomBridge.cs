@@ -63,6 +63,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // hidePopover/open/returnValue) lives in DialogBinding, reached through the narrow IDialogHost
     // contract (see DomBridge.DialogHost.cs); backdrop/top-layer rendering stays in the bridge.
     private readonly Dom.Features.DialogBinding _dialogs;
+    // Phase 3 (P3.8): HTMLSelectElement / HTMLOptionElement (add/options/selectedIndex/size/value +
+    // option.defaultSelected) live in SelectBinding, reached through the narrow ISelectHost contract
+    // (see DomBridge.SelectHost.cs); the shared value property delegates its select branch to it.
+    private readonly Dom.Features.SelectBinding _select;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -150,6 +154,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _eventDispatch = new Dom.Features.EventDispatchBinding(this);
         _tables = new Dom.Features.TableBinding(this);
         _dialogs = new Dom.Features.DialogBinding(this);
+        _select = new Dom.Features.SelectBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
@@ -345,7 +350,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>An element's <c>textContent</c> — the concatenation of its descendant text (RF-BRIDGE-1c
     /// Phase F, F3c part 2d). Replaces reads of the former element-store <c>Broiler.Dom.DomElement.TextContent</c>.</summary>
-    private static string GetElementTextContent(DomElement element)
+    internal static string GetElementTextContent(DomElement element)
     {
         var sb = new System.Text.StringBuilder();
         CollectTextContent(element, sb);

@@ -1261,7 +1261,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetValue106Core(DomElement element, in Arguments a)
     {
         if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
-            return new JSString(GetSelectValue(element));
+            return new JSString(_select.GetValue(element));
         if (GetElementRuntimeState(element).FormControl.Value.TryGet(out var domVal) && domVal is string sv)
             return new JSString(sv);
         if (TryGetAttribute(element, "value", out var val))
@@ -1277,7 +1277,7 @@ public sealed partial class DomBridge
         if (tag == "input")
             GetElementRuntimeState(element).FormControl.Value.Set(v); // IDL value, not reflected
         else if (tag == "select")
-            SetSelectValue(element, v);
+            _select.SetValue(element, v);
         else
             SetAttr(element, "value", v);
         return JSUndefined.Value;

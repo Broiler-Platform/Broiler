@@ -22,7 +22,7 @@ public sealed partial class DomBridge
 
     /// <summary>Legacy <c>Attributes.TryGetValue</c>: case-insensitive lookup by
     /// qualified name; <paramref name="value"/> is <c>""</c> when absent.</summary>
-    private static bool TryGetAttribute(DomElement element, string qualifiedName, out string value)
+    internal static bool TryGetAttribute(DomElement element, string qualifiedName, out string value)
     {
         foreach (var attribute in element.Attributes.Values)
         {
@@ -42,12 +42,12 @@ public sealed partial class DomBridge
         TryGetAttribute(element, qualifiedName, out var value) ? value : null;
 
     /// <summary>Legacy <c>Attributes.ContainsKey</c>.</summary>
-    private static bool HasAttr(DomElement element, string qualifiedName) =>
+    internal static bool HasAttr(DomElement element, string qualifiedName) =>
         TryGetAttribute(element, qualifiedName, out _);
 
     /// <summary>Legacy string-keyed <c>Attributes[name] = value</c> setter: updates an
     /// existing attribute in place (preserving its namespace) or creates a no-namespace one.</summary>
-    private static void SetAttr(DomElement element, string qualifiedName, string value)
+    internal static void SetAttr(DomElement element, string qualifiedName, string value)
     {
         DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)
@@ -66,7 +66,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Legacy <c>Attributes.Remove</c>: removes the attribute matched by qualified name.</summary>
-    private static bool RemoveAttr(DomElement element, string qualifiedName)
+    internal static bool RemoveAttr(DomElement element, string qualifiedName)
     {
         DomAttribute? existing = null;
         foreach (var attribute in element.Attributes.Values)

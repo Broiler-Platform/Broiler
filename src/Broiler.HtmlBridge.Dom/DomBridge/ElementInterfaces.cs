@@ -38,30 +38,9 @@ public sealed partial class DomBridge
         // popover API (Phase 3 P3.7: extracted into the co-located DialogBinding feature module).
         _dialogs.Install(obj, element, tag, HasAttr(element, "popover"));
 
-        // HTMLSelectElement interface
-        if (tag == "select")
-        {
-            // add(option, refOption)
-            obj.FastAddValue((KeyString)"add", new JSFunction((in a) => JsElementInterfacesAdd037Core(element, in a), "add", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // options — returns collection of <option> children
-            obj.FastAddProperty((KeyString)"options", new JSFunction((in _) => JsElementInterfacesGetOptions039Core(element, in _), "get options"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // selectedIndex — index of the selected option
-            obj.FastAddProperty((KeyString)"selectedIndex", new JSFunction((in _) => new JSNumber(GetSelectSelectedIndex(element)), "get selectedIndex"),
-                new JSFunction((in a) => JsElementInterfacesSetSelectedIndex041Core(element, in a), "set selectedIndex"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"size", new JSFunction((in _) => JsElementInterfacesGetSize042Core(element, in _), "get size"),
-                new JSFunction((in a) => JsElementInterfacesSetSize043Core(element, in a), "set size"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
-
-        // HTMLOptionElement interface
-        if (tag == "option")
-        {
-            // defaultSelected (read/write)
-            obj.FastAddProperty((KeyString)"defaultSelected", new JSFunction((in _) => GetElementRuntimeState(element).FormControl.DefaultSelected.TryGet(out var ds) && ds is true ? JSBoolean.True : JSBoolean.False, "get defaultSelected"),
-                new JSFunction((in a) => JsElementInterfacesSetDefaultSelected045Core(element, in a), "set defaultSelected"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
+        // HTMLSelectElement / HTMLOptionElement (Phase 3 P3.8: extracted into the co-located
+        // SelectBinding feature module).
+        _select.Install(obj, element, tag);
 
         // HTMLLabelElement — htmlFor property (maps to 'for' content attribute)
         if (tag == "label")

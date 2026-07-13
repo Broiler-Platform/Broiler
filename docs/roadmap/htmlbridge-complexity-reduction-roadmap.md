@@ -613,10 +613,35 @@ Dialog, Popover, Overlay, Backdrop, HtmlDomInterface (49), Acid3RegressionTests 
 architecture-guard suites pass unchanged → zero regressions (the renderer reads the same runtime
 state the module now writes).
 
+Status: **P3.8 completed** 2026-07-13 (same branch) — the second runtime-state-coupled feature, via
+the P3.7 named-accessor pattern. The **HTMLSelectElement / HTMLOptionElement** interface is the
+eighth co-located module: `SelectBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns
+`select.add`/`options`/`selectedIndex`/`size` plus the option-collection, selected-index and value
+algorithms (`CollectSelectOptions`/`GetSelectedIndex`/`SetSelectedIndex`/`GetValue`/`SetValue`,
+**relocated out of `LayoutMetrics.cs`** where they lived but were never used by layout) and
+`option.defaultSelected` — 6 callbacks (renamed from the numbered `JsElementInterfaces…037…045Core`).
+The select + option registration blocks in `AddElementSpecificMembers` collapsed to one
+`_select.Install(obj, element, tag)` call; the shared `value` form-control handler in `JsObjects.cs`
+keeps its input/textarea branches and delegates only its select branch to `_select.GetValue`/
+`SetValue`. The per-element form-control state (the select's dirty selected index, an option's IDL
+value and default-selected flag on `ElementRuntimeState.FormControl`) is reached through the narrow
+`ISelectHost` contract as named primitives (`TryGetSelectedIndex`/`SetSelectedIndex`/
+`TryGetOptionValue`/`Get`/`SetOptionDefaultSelected`) plus `ToJSObject`/`FindDomElementByJSObject`,
+implemented via explicit interface members in `DomBridge.SelectHost.cs`; the module never touches the
+runtime-state object. Neutral attribute helpers `HasAttr`/`TryGetAttribute`/`SetAttr`/`RemoveAttr`/
+`GetElementTextContent` were widened `private`→`internal static`. Behaviour-preserving; no public-API
+change (module + contract internal). Tests: `Broiler.Cli.Tests/SelectBindingModuleTests.cs`
+(co-location/host-contract guards + options/default-selected-index, selectedIndex-setter,
+value-setter, add/size characterizations). Regression check: HtmlDomInterface (49), FormControlRender
+and the architecture-guard suites pass unchanged; the one pre-existing environmental failure
+(`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
+test) fails identically on both sides → zero regressions.
+
 Still to come — each entangled with the process-static `ElementRuntimeState`, layout, custom JS
-collection types, or network/rendering; the P3.7 named-accessor pattern is the template for the
-runtime-state-coupled ones: CSSOM/computed style, Element/geometry, Window/Document, Forms + Select,
-SVG, Frames/Network, Messaging, Canvas, and the DomBridge 500-800-line facade target.
+collection types, or network/rendering; the P3.7/P3.8 named-accessor pattern is the template for the
+runtime-state-coupled ones: CSSOM/computed style, Element/geometry, Window/Document, Forms (the
+`FormElementsCollection` named-access type), SVG, Frames/Network, Messaging, Canvas, and the DomBridge
+500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
