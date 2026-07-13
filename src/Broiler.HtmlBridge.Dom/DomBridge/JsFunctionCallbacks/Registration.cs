@@ -492,26 +492,8 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationBroilerRegisterMutationObserver034Core(in Arguments a)
-    {
-        if (a.Length < 2 || a[0] is not JSObject observerObject || a[1] is not JSObject targetObject)
-            return JSUndefined.Value;
-        // A MutationObserver can observe a character-data node (characterData mutations).
-        var target = FindDomNodeByJSObject(targetObject);
-        if (target == null)
-            return JSUndefined.Value;
-        RegisterMutationObserver(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationBroilerUnregisterMutationObserver035Core(in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSObject observerObject)
-            UnregisterMutationObserver(observerObject);
-        return JSUndefined.Value;
-    }
-
+    // MutationObserver observe()/disconnect() callbacks moved to the Phase 3
+    // MutationObserverBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private JSValue JsRegistrationWrite036Core(in Arguments a)
     {

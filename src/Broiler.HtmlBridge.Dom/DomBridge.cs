@@ -46,9 +46,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // widen on the current homogeneous tree.
     private readonly HashSet<DomNode> _knownNodes =
         new(ReferenceEqualityComparer.Instance);
-    // P2.5: registered MutationObservers now live in MutationObserverHub, the single observer owner
-    // (was the bare _mutationObservers list).
-    private readonly Dom.Runtime.MutationObserverHub _mutationObserverHub = new();
+    // Phase 3 (P3.2): the whole MutationObserver feature — the observer registry (P2.5
+    // MutationObserverHub), the observe()/disconnect() registration and childList/attribute/
+    // characterData record delivery — lives in the MutationObserverBinding module, reached through
+    // the narrow IMutationObserverHost contract (see DomBridge.MutationObserverHost.cs).
+    private readonly Dom.Features.MutationObserverBinding _mutations;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -132,6 +134,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public DomBridge()
     {
         _traversal = new Dom.Features.TraversalBinding(this);
+        _mutations = new Dom.Features.MutationObserverBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");

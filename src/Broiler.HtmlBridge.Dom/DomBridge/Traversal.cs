@@ -1,8 +1,5 @@
-using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
-using Broiler.JavaScript.BuiltIns.Array;
-using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
@@ -157,91 +154,19 @@ public sealed partial class DomBridge
         NotifyMutationObservers(parent, null, removedChild, previousSibling, nextSibling);
     }
 
+    // MutationObserver record delivery lives in the MutationObserverBinding feature module (Phase 3
+    // P3.2), which owns the observer registry. These thin delegators keep the bridge mutation path's
+    // historical call sites (child add/remove here, attribute writes in Attributes.cs/JsObjects.cs,
+    // character-data writes below) source-compatible.
     private void NotifyMutationObservers(DomElement target,
-        DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling)
-    {
-        if (_mutationObserverHub.Count == 0)
-            return;
+        DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling) =>
+        _mutations.DeliverChildListMutation(target, addedChild, removedChild, previousSibling, nextSibling);
 
-        var mutation = new DomMutationRecord(DomMutationType.ChildList, target);
-        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
-        {
-            if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
-                continue;
+    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue) =>
+        _mutations.DeliverAttributeMutation(target, attributeName, oldValue);
 
-            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
-                continue;
-
-            var record = new JSObject();
-            record[(KeyString)"type"] = new JSString("childList");
-            record[(KeyString)"target"] = ToJSObject(target);
-            record[(KeyString)"addedNodes"] = addedChild != null
-                ? new JSArray([ToJSObject(addedChild)])
-                : new JSArray([]);
-            record[(KeyString)"removedNodes"] = removedChild != null
-                ? new JSArray([ToJSObject(removedChild)])
-                : new JSArray([]);
-            record[(KeyString)"previousSibling"] = previousSibling != null
-                ? ToJSObject(previousSibling)
-                : JSNull.Value;
-            record[(KeyString)"nextSibling"] = nextSibling != null
-                ? ToJSObject(nextSibling)
-                : JSNull.Value;
-
-            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
-        }
-    }
-
-    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue)
-    {
-        if (_mutationObserverHub.Count == 0)
-            return;
-
-        var mutation = new DomMutationRecord(DomMutationType.Attributes, target, AttributeName: attributeName);
-        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
-        {
-            if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
-                continue;
-
-            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
-                continue;
-
-            var record = new JSObject();
-            record[(KeyString)"type"] = new JSString("attributes");
-            record[(KeyString)"target"] = ToJSObject(target);
-            record[(KeyString)"attributeName"] = new JSString(attributeName);
-            record[(KeyString)"oldValue"] = options.AttributeOldValue && oldValue != null
-                ? new JSString(oldValue)
-                : JSNull.Value;
-
-            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
-        }
-    }
-
-    private void NotifyCharacterDataMutationObservers(DomNode target, string? oldValue)
-    {
-        if (_mutationObserverHub.Count == 0)
-            return;
-
-        var mutation = new DomMutationRecord(DomMutationType.CharacterData, target);
-        foreach (var (observer, observedTarget, options) in _mutationObserverHub.Snapshot())
-        {
-            if (!DomMutationObserverFilter.Matches(mutation, observedTarget, options))
-                continue;
-
-            if (observer[(KeyString)"_notify"] is not JSFunction notifyFunction)
-                continue;
-
-            var record = new JSObject();
-            record[(KeyString)"type"] = new JSString("characterData");
-            record[(KeyString)"target"] = ToJSObject(target);
-            record[(KeyString)"oldValue"] = options.CharacterDataOldValue && oldValue != null
-                ? new JSString(oldValue)
-                : JSNull.Value;
-
-            notifyFunction.InvokeFunction(new Arguments(observer, new JSArray([record])));
-        }
-    }
+    private void NotifyCharacterDataMutationObservers(DomNode target, string? oldValue) =>
+        _mutations.DeliverCharacterDataMutation(target, oldValue);
 
     private static void UpdateCharacterData(DomNode target, string? newValue) => SetBridgeText(target, newValue ?? string.Empty);
 

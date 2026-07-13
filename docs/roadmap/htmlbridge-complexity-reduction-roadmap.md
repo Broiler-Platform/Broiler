@@ -491,9 +491,33 @@ Range/TreeWalker/createComment characterizations). Regression check vs the P2.6 
 existing traversal, mutation-observer, events and messaging suites pass unchanged; the pre-existing
 environmental/known failures (`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`
 headless-geometry, the six Acid3 pixel/cascade/border/NodeIterator-pre-removal tests, and the two
-`:root`/`:lang` selector tests) fail identically on both sides → zero regressions. The remaining
-feature slices (Events, CSSOM, Element, Window/Document, Forms, Frames/Network, Messaging, Canvas)
-and the DomBridge 500-800-line facade target are still to come.
+`:root`/`:lang` selector tests) fail identically on both sides → zero regressions.
+
+Status: **P3.2 completed** 2026-07-13 (same branch). The **MutationObserver** feature (the
+Events-and-MutationObserver pair's observer half) is the second co-located module:
+`MutationObserverBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) now **owns** the P2.5
+`MutationObserverHub` state authority and co-locates the whole feature — the JS `MutationObserver`
+polyfill + its `__broilerRegister/UnregisterMutationObserver` host functions, the
+`observe()`/`disconnect()` callbacks (was `JsRegistrationBroiler…034/035Core`), the option parsing
+(`CreateMutationObserverOptions`/`GetMutationObserverOption`, moved out of `Common.cs`), and the
+childList/attribute/characterData record delivery (`Deliver…`, moved out of `Traversal.cs`). It
+depends only on the narrow `IMutationObserverHost` contract (`ToJSObject` + `FindDomNodeByJSObject`),
+which `DomBridge` implements via explicit interface members in `DomBridge.MutationObserverHost.cs`.
+The bridge keeps three same-name `Notify…MutationObservers` delegators so the ~7 mutation-path call
+sites in `Traversal.cs`/`Attributes.cs`/`JsObjects.cs` are untouched; `RegisterDocumentEventsAnd
+MutationObservers` now registers only the typed `Event` constructors and delegates the observer
+install; lifetime reset calls `_mutations.Clear()`. This also finished the P3.1 `Traversal.cs`
+cleanup (the mutation-observer machinery it had temporarily retained is gone). Behaviour-preserving;
+no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/MutationObserverBindingModuleTests.cs` (co-location/host-contract/hub-ownership
+guards + childList/attribute-oldValue/disconnect characterizations). Regression check: the
+MutationObserver, DomEvents, Attributes, Traversal, Messaging and architecture-guard suites pass
+unchanged; same pre-existing/known failures as above → zero regressions.
+
+Still to come: the Events dispatch engine itself (the highest-coupling piece —
+`addEventListener` is registered across four files and `DispatchEventOnElement`/`FireListeners`
+are called from ~12), then CSSOM, Element, Window/Document, Forms, Frames/Network, Messaging,
+Canvas, and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

@@ -96,7 +96,7 @@ public sealed partial class DomBridge : IDisposable
 
         _messagePorts.Clear();
 
-        _mutationObserverHub.Clear();
+        _mutations.Clear();
         _traversal.ClearActive();
 
         _currentWindowOverride = null;
