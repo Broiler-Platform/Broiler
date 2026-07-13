@@ -835,12 +835,9 @@
       <BuildType Solution="Release-Linux|*" Project="Release" />
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
-    <Project Path="Broiler.CSS/Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj">
-      <BuildType Solution="Debug-Linux|*" Project="Debug" />
-      <BuildType Solution="Debug-Windows|*" Project="Debug" />
-      <BuildType Solution="Release-Linux|*" Project="Release" />
-      <BuildType Solution="Release-Windows|*" Project="Release" />
-    </Project>
+    <!-- Phase 1 item 4: the nested Broiler.CSS/Broiler.DOM/Broiler.Dom node was removed;
+         Broiler.CSS.Dom now resolves the canonical kernel through $(BroilerDomPath), which
+         the root Directory.Build.props points at the single root Broiler.DOM checkout. -->
   </Folder>
   <Folder Name="/Dependencies/Layout/">
     <Project Path="Broiler.Layout/Broiler.Layout/Broiler.Layout.csproj">

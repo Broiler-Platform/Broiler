@@ -1,0 +1,49 @@
+name: Submodule SHA drift guard
+
+# HtmlBridge complexity-reduction Phase 1 (project-graph repair), item 4.
+# The main solution builds ONE Broiler.Dom and ONE Broiler.Graphics node by pointing every
+# consumer at the root submodule checkout ($(BroilerDomPath)/$(BroilerGraphicsPath)). This
+# guard fails if a nested submodule checkout (Broiler.CSS/Broiler.DOM,
+# Broiler.HTML/Broiler.Graphics) drifts to a different commit than the root submodule, which
+# would make a standalone submodule build compile different sources than CI's single node.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/submodule-sha-drift.yml'
+      - 'scripts/check-submodule-sha-drift.sh'
+      - '.gitmodules'
+      - 'Broiler.DOM'
+      - 'Broiler.CSS'
+      - 'Broiler.Graphics'
+      - 'Broiler.HTML'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/submodule-sha-drift.yml'
+      - 'scripts/check-submodule-sha-drift.sh'
+      - '.gitmodules'
+      - 'Broiler.DOM'
+      - 'Broiler.CSS'
+      - 'Broiler.Graphics'
+      - 'Broiler.HTML'
+
+jobs:
+  submodule-sha-drift:
+    name: Nested vs root submodule SHA equality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # First-level submodules only: the guard reads the gitlink SHA recorded in each
+          # submodule's own tree (git -C Broiler.CSS ls-tree ...), so Broiler.CSS/Broiler.HTML
+          # must be present as git repos, but their nested content is not needed.
+          submodules: true
+
+      - name: Check submodule SHA drift
+        run: bash scripts/check-submodule-sha-drift.sh

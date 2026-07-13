@@ -99,6 +99,24 @@ public class HtmlBridgeArchitectureGuardTests
             typeof(Broiler.HTML.Headless.HeadlessLayoutView)));
     }
 
+    // roadmap Phase 1 (project-graph repair), exit criterion: "One Broiler.Dom assembly node
+    // and one Graphics implementation in a solution build." Submodules carry nested checkouts
+    // of both kernels for standalone builds; in-tree every consumer resolves the single ROOT
+    // checkout via $(BroilerDomPath)/$(BroilerGraphicsPath), so the main solution lists exactly
+    // one node for each canonical kernel csproj.
+    [Theory]
+    [InlineData("Broiler.Dom.csproj")]
+    [InlineData("Broiler.Graphics.csproj")]
+    public void Solution_Builds_A_Single_Canonical_Kernel_Node(string projectFileName)
+    {
+        var solutionPath = Path.Combine(FindRepositoryRoot(), "Broiler.slnx");
+        var pattern = new System.Text.RegularExpressions.Regex(
+            "Path=\"[^\"]*/" + System.Text.RegularExpressions.Regex.Escape(projectFileName) + "\"");
+        var count = pattern.Matches(File.ReadAllText(solutionPath)).Count;
+
+        Assert.Equal(1, count);
+    }
+
     // Set of Broiler assembly names reachable through the csproj <ProjectReference> graph
     // rooted at the given project. Literal relative Includes are resolved; MSBuild
     // property-based Includes (e.g. $(BroilerDomPath), introduced by the Phase 1 path
