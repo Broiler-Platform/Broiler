@@ -356,6 +356,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private DomDocumentType CreateBridgeDocumentType(string name, string publicId, string systemId) =>
         _document.CreateDocumentType(name.ToLowerInvariant(), publicId, systemId);
 
+    /// <summary>Mints a canonical <see cref="DomDocumentFragment"/> (Phase 4 item 1 — the former
+    /// <c>#document-fragment</c> sentinel element). The single funnel for fragment construction over
+    /// the canonical document factory (used by <c>createDocumentFragment</c>, Range clone/extract
+    /// results, and the internal HTML fragment-parse container).</summary>
+    private DomDocumentFragment CreateBridgeDocumentFragment() => _document.CreateDocumentFragment();
+
     /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
     /// replaces all children with a single canonical <see cref="DomText"/> (or none when
     /// <paramref name="value"/> is null/empty). Replaces the former element-store

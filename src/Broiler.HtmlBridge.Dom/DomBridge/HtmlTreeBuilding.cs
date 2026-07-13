@@ -31,12 +31,13 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Parses an HTML fragment in <paramref name="contextTagName"/>'s context and wraps its children
-    /// in a bridge <c>#document-fragment</c> sentinel element. Replaces <c>HtmlTreeBuilder.BuildFragment</c>.
+    /// in a canonical <see cref="DomDocumentFragment"/> (Phase 4 item 1 — was a <c>#document-fragment</c>
+    /// sentinel element). Replaces <c>HtmlTreeBuilder.BuildFragment</c>.
     /// </summary>
-    private (DomElement Fragment, List<DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
+    private (DomDocumentFragment Fragment, List<DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
     {
         var parsed = new HtmlDocumentParser().ParseFragment(html, contextTagName);
-        var fragment = CreateBridgeElement("#document-fragment");
+        var fragment = CreateBridgeDocumentFragment();
         var allElements = new List<DomNode>();
 
         // AppendChild adopts each parsed child subtree into _document (fragment is _document-owned).

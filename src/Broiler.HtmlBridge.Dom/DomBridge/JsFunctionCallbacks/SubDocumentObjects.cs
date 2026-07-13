@@ -586,7 +586,9 @@ public sealed partial class DomBridge
             return a.Length > 0 ? a[0] : JSNull.Value;
         foreach (var kvp in bridge._jsObjects.Entries)
         {
-            if (kvp.Value == childObj && kvp.Key is DomElement child)
+            // Phase 4 item 1: match any DomNode so a canonical DomDocumentType / DomDocumentFragment
+            // can be appended to a sub-document root (was `is DomElement`, which skipped them).
+            if (kvp.Value == childObj && kvp.Key is DomNode child)
             {
                 if (ParentEl(child) != null)
                     child.Remove();
@@ -649,13 +651,15 @@ public sealed partial class DomBridge
         GetElementRuntimeState(subDocRoot).Document.HasViewport.Set(false);
         if (doctypeArg is JSObject dtObj)
         {
+            // Phase 4 item 1: the doctype is a canonical DomDocumentType (not a DomElement); match any
+            // DomNode so its ownerDocument is associated with this sub-document.
             foreach (var kvp in _jsObjects.Entries)
             {
-                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
+                if (kvp.Value == dtObj && kvp.Key is DomNode dtNode)
                 {
-                    SetParent(dtEl, subDocRoot);
-                    GetElementRuntimeState(dtEl).OwnerDocRoot = subDocRoot;
-                    subDocRoot.AppendChild(dtEl);
+                    SetParent(dtNode, subDocRoot);
+                    GetElementRuntimeState(dtNode).OwnerDocRoot = subDocRoot;
+                    subDocRoot.AppendChild(dtNode);
                     break;
                 }
             }

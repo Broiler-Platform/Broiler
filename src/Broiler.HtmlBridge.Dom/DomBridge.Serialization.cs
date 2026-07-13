@@ -840,10 +840,10 @@ public sealed partial class DomBridge
             IsText(node) ? HtmlSerializationNodeKind.Text
             : IsComment(node) ? HtmlSerializationNodeKind.Comment
             : node is DomDocumentType ? HtmlSerializationNodeKind.DocumentType
+            : node is DomDocumentFragment ? HtmlSerializationNodeKind.Fragment
             : node is DomElement element
                 ? element.TagName.ToLowerInvariant() switch
                 {
-                    "#document-fragment" => HtmlSerializationNodeKind.Fragment,
                     "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
                     _ => HtmlSerializationNodeKind.Element
                 }

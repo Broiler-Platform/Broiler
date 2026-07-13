@@ -778,6 +778,46 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.3 completed** 2026-07-13 (same branch) — work item 1, second of four sentinels. The
+`#document-fragment` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentFragment`.
+Unlike the doctype leaf, a fragment is a *container*, so it gets a dedicated
+`PopulateDocumentFragmentJSObject` wrapper in `ToJSObject` (Node base + ParentNode mixin +
+child-manipulation: childNodes/children/first-last-child/-ElementChild, appendChild/insertBefore/
+removeChild/replaceChild/append/prepend, querySelector(-All), textContent, cloneNode) — deliberately
+NOT the element surface (attributes/style/tagName) it inherited as a sentinel element, and (preserving
+today's behaviour) NOT `getElementById`. Node-generic members reuse the existing DomNode handlers;
+the container members are focused fragment lambdas over the neutral tree helpers plus two shared
+helpers widened `DomElement`→`DomNode`: `InsertNodeAt` (guarding the element-only style-scope
+invalidation / child-added notification with `is DomElement`; a fragment parent has neither) and
+`FindInDescendants`/`SearchDescendants` (read-only descendant walk; scope is null for a fragment
+root). Fragment construction funnels through a new `CreateBridgeDocumentFragment()` at all three sites
+(`createDocumentFragment`, Range clone/extract result, the internal HTML fragment-parse container);
+the parse-container carriers (`BuildFragmentTree` return, `TryBuildInnerHtmlFragmentContainer` out
+param, the `parsedContainer` local) became `DomDocumentFragment`. `CloneDomElement`, `NodesAreEqual`,
+`GetNodeType`×2, `GetNodeName`, the serialization `GetKind` and the `append`-family child-spread
+(`BuildChildNodeArgumentNodes`) all gained a `DomDocumentFragment` branch and shed their
+`#document-fragment` TagName checks (the child-spread was the "silently stops matching" hazard the
+audit flagged). `appendChild(fragment)` now also unpacks natively (via the DomNode-widened
+`InsertNodeAt`), matching `append(fragment)`.
+
+**Regression fixed in this slice (introduced by P4.2, missed because that PR's wide-sweep log was
+tail-truncated to 8 of 10 failures):** `document.implementation.createDocument(ns, qname, doctype)`
+resolved the passed doctype with `_jsObjects.Entries … kvp.Key is DomElement`, which silently skipped
+the now-non-element `DomDocumentType` — so the doctype's `OwnerDocRoot` was never set and
+`doctype.ownerDocument` wrongly returned the main document. Fixed by matching `is DomNode` in both
+`createDocument` paths (main + sub-document) and, for the same class of hazard, in the sub-document
+`appendChild` node-lookup. Guarded by the pre-existing
+`DomEdgeCasePhase4Tests.CreateDocument_XHTML_With_DocType_Sets_OwnerDocument` (confirmed pass@P4.1 →
+fail@P4.2 → pass now).
+
+Behaviour-preserving; no public-API change. Tests:
+`Broiler.Cli.Tests/DocumentFragmentSentinelMigrationTests.cs` (create, append-unpack, query/children,
+cloneNode, Range extractContents). Regression check vs the P4.1 baseline (predating both P4.2 and
+P4.3): a 1005-test sweep has the change-side failure set as a strict subset of baseline (one flaky
+`:root` test even flipped to passing) with **no new failures**; the 21 apparent Acid deltas all pass
+in isolation (known parallel-load render flakiness — the Acid count varied 7/8/28 across runs) → zero
+regressions.
+
 Status: **P4.2 completed** 2026-07-13 (same branch) — work item 1, first of four sentinels. The
 `#doctype` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentType`. The doctype
 was a fake-tag `DomElement` (null namespace, `TagName == "#doctype"`) whose name/publicId/systemId

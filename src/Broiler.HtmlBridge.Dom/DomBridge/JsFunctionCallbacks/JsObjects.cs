@@ -287,12 +287,12 @@ public sealed partial class DomBridge
             return new JSNumber(8); // COMMENT_NODE
         if (node is DomDocumentType)
             return new JSNumber(10); // DOCUMENT_TYPE_NODE (canonical DomDocumentType)
+        if (node is DomDocumentFragment)
+            return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE (canonical DomDocumentFragment)
         if (node is not DomElement element)
             return new JSNumber(1); // canonical non-element char-data already handled above
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(9); // DOCUMENT_NODE
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
-            return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE
         return new JSNumber(1); // ELEMENT_NODE
     }
 
@@ -305,12 +305,12 @@ public sealed partial class DomBridge
             return new JSString("#comment");
         if (node is DomDocumentType docType)
             return new JSString(docType.Name); // doctype nodeName is its (already lowercased) name
+        if (node is DomDocumentFragment)
+            return new JSString("#document-fragment");
         if (node is not DomElement element)
             return JSNull.Value;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return new JSString("#document");
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
-            return new JSString("#document-fragment");
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
         if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))

@@ -159,7 +159,7 @@ public sealed partial class DomBridge
 
     private JSValue JsRegistrationCreateDocumentFragment017Core(in Arguments a)
     {
-        var fragment = CreateBridgeElement("#document-fragment");
+        var fragment = CreateBridgeDocumentFragment();
         return ToJSObject(fragment);
     }
 
@@ -784,14 +784,16 @@ public sealed partial class DomBridge
         // Append doctype if provided
         if (doctypeArg is JSObject dtObj)
         {
-            // Find the Broiler.Dom.DomElement for the doctype JSObject
+            // Find the canonical node for the doctype JSObject. Phase 4 item 1: the doctype is a
+            // DomDocumentType (not a DomElement), so match any DomNode — the former `is DomElement`
+            // guard silently skipped the canonical doctype, leaving its ownerDocument unassociated.
             foreach (var kvp in _jsObjects.Entries)
             {
-                if (kvp.Value == dtObj && kvp.Key is DomElement dtEl)
+                if (kvp.Value == dtObj && kvp.Key is DomNode dtNode)
                 {
-                    SetParent(dtEl, docRoot);
-                    GetElementRuntimeState(dtEl).OwnerDocRoot = docRoot;
-                    docRoot.AppendChild(dtEl);
+                    SetParent(dtNode, docRoot);
+                    GetElementRuntimeState(dtNode).OwnerDocRoot = docRoot;
+                    docRoot.AppendChild(dtNode);
                     break;
                 }
             }

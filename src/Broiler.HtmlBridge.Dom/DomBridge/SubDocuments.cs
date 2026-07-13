@@ -916,6 +916,20 @@ public sealed partial class DomBridge
                    string.Equals(firstDocType.PublicId, secondDocType.PublicId, StringComparison.Ordinal) &&
                    string.Equals(firstDocType.SystemId, secondDocType.SystemId, StringComparison.Ordinal);
 
+        // Phase 4 item 1: two DocumentFragment nodes (no attributes/tag) are equal iff their children
+        // are equal — fall through to the child-count + per-child comparison below, which operates on
+        // the raw ChildNodes and needs no element cast.
+        if (first is DomDocumentFragment || second is DomDocumentFragment)
+        {
+            if (first is not DomDocumentFragment || second is not DomDocumentFragment ||
+                first.ChildNodes.Count != second.ChildNodes.Count)
+                return false;
+            for (var index = 0; index < first.ChildNodes.Count; index++)
+                if (!NodesAreEqual(ChildAt(first, index), ChildAt(second, index)))
+                    return false;
+            return true;
+        }
+
         var firstEl = (DomElement)first;
         var secondEl = (DomElement)second;
         if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
@@ -998,7 +1012,11 @@ public sealed partial class DomBridge
         }
     }
 
-    private void InsertNodeAt(DomElement parent, DomNode node, int index)
+    // Phase 4 item 1: parent widened DomElement -> DomNode so a canonical DomDocumentFragment can be
+    // an insertion parent (fragment.appendChild/append/...). The style-scope invalidation and
+    // child-added mutation notification are element-only concerns, guarded accordingly; the onload
+    // firing below already guards on `node is DomElement`. Behaviour for element parents is identical.
+    private void InsertNodeAt(DomNode parent, DomNode node, int index)
     {
         if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
@@ -1026,8 +1044,11 @@ public sealed partial class DomBridge
         SetParent(node, parent);
         AdoptSubtreeIntoDocument(node, GetElementRuntimeState(parent).OwnerDocRoot);
         InsertChildAt(parent, index, node);
-        InvalidateStyleScope(parent);
-        NotifyChildAdded(parent, node, index);
+        if (parent is DomElement parentElement)
+        {
+            InvalidateStyleScope(parentElement);
+            NotifyChildAdded(parentElement, node, index);
+        }
 
         // RF-BRIDGE-1c Phase F (F3c part 2b): only elements carry a TagName / fire onloads; a
         // canonical char-data node inserts with no sub-document side effects.
@@ -1075,10 +1096,12 @@ public sealed partial class DomBridge
                 var candidateNode = FindDomNodeByJSObject(candidateObject);
                 if (candidateNode != null)
                 {
-                    if (candidateNode is DomElement candidateElement &&
-                        string.Equals(candidateElement.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+                    // Phase 4 item 1: a canonical DomDocumentFragment argument inserts its children
+                    // (per DOM), not the fragment itself. (Was a "#document-fragment" TagName check on
+                    // the former sentinel element — a non-element fragment no longer matches that.)
+                    if (candidateNode is DomDocumentFragment candidateFragment)
                     {
-                        foreach (var fragmentChild in candidateElement.ChildNodes.ToArray())
+                        foreach (var fragmentChild in candidateFragment.ChildNodes.ToArray())
                             nodes.Add(fragmentChild);
                         continue;
                     }
@@ -1136,7 +1159,7 @@ public sealed partial class DomBridge
         var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
         var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
 
-        DomElement? parsedContainer = null;
+        DomDocumentFragment? parsedContainer = null;
         if (!string.IsNullOrEmpty(html))
         {
             var parsingContext = parent.TagName.StartsWith('#')
@@ -1168,7 +1191,7 @@ public sealed partial class DomBridge
         InvalidateStyleScope(parent);
     }
 
-    private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomElement container)
+    private bool TryBuildInnerHtmlFragmentContainer(DomElement contextElement, string html, out DomDocumentFragment container)
     {
         container = null!;
 

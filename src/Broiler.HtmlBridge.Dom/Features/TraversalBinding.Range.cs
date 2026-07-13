@@ -234,7 +234,10 @@ internal sealed partial class TraversalBinding
             var nodes = DomBridge.GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
             var elemCount = DomBridge.ChildElements(startContainerElement).Count(c => !DomBridge.IsText(c) && !DomBridge.IsComment(c));
             var removedElems = nodes.Count(n => !DomBridge.IsText(n) && !DomBridge.IsComment(n));
-            if (elemCount - removedElems + 1 > 1 || (!string.Equals(newParent.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase) && !DomBridge.IsComment(newParent)))
+            // newParent is always a real element here (a canonical DomDocumentFragment / DomComment
+            // is not a DomElement, so FindDomElementByJSObject returned null and we returned above) —
+            // the former "#document-fragment" sentinel-tag exclusion is dead.
+            if (elemCount - removedElems + 1 > 1 || !DomBridge.IsComment(newParent))
             {
                 DomBridge.ThrowDOMException(_host.JsContext, "Hierarchy request error", "HierarchyRequestError");
                 return JSUndefined.Value;

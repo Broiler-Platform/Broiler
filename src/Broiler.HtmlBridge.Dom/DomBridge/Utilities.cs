@@ -46,23 +46,27 @@ public sealed partial class DomBridge
     /// <summary>
     /// Searches descendants of an element using a CSS selector.
     /// </summary>
-    private static JSValue FindInDescendants(DomElement root, string selector, bool all, DomBridge bridge)
+    // Phase 4 item 1: root widened DomElement -> DomNode so querySelector/querySelectorAll work over a
+    // canonical DomDocumentFragment. A fragment cannot itself match a selector, so the :scope-root
+    // self-match is guarded to element roots and the descendant scope is null for a fragment root.
+    private static JSValue FindInDescendants(DomNode root, string selector, bool all, DomBridge bridge)
     {
         var results = new List<JSValue>();
-        if (selector.Contains(":scope") &&
-            MatchesSelector(root, selector, root))
+        var scope = root as DomElement;
+        if (scope is not null && selector.Contains(":scope") &&
+            MatchesSelector(scope, selector, scope))
         {
-            results.Add(bridge.ToJSObject(root));
+            results.Add(bridge.ToJSObject(scope));
             if (!all)
                 return results[0];
         }
 
-        SearchDescendants(root, selector, results, bridge, all, root);
+        SearchDescendants(root, selector, results, bridge, all, scope);
         if (all) return new JSArray(results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
-    private static void SearchDescendants(DomElement parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement scope)
+    private static void SearchDescendants(DomNode parent, string selector, List<JSValue> results, DomBridge bridge, bool all, DomElement? scope)
     {
         foreach (var child in ChildElements(parent))
         {
@@ -344,6 +348,17 @@ public sealed partial class DomBridge
         if (source is DomDocumentType sourceDocType)
             return _document.CreateDocumentType(sourceDocType.Name, sourceDocType.PublicId, sourceDocType.SystemId);
 
+        // Phase 4 item 1: a canonical DomDocumentFragment clones to an empty fragment; a deep clone
+        // copies its children (a shallow clone is empty, per DOM).
+        if (source is DomDocumentFragment sourceFragment)
+        {
+            var fragmentClone = CreateBridgeDocumentFragment();
+            if (deep)
+                foreach (var child in sourceFragment.ChildNodes.ToArray())
+                    fragmentClone.AppendChild(CloneDomElement(child, true));
+            return fragmentClone;
+        }
+
         var element = (DomElement)source;
         // Preserve the source element's exact namespace (folds the old post-construction
         // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
@@ -534,9 +549,10 @@ public sealed partial class DomBridge
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
+        if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
+        if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
         if (node is not DomElement element) return 1;
         if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
-        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
         return 1; // ELEMENT_NODE
     }
 

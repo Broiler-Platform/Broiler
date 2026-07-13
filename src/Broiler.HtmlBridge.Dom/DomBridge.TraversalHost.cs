@@ -41,11 +41,7 @@ public sealed partial class DomBridge : ITraversalHost
         return ToJSObject(comment);
     }
 
-    DomNode ITraversalHost.CreateRangeResultFragment()
-    {
-        var fragment = CreateBridgeElement("#document-fragment");
-        return fragment;
-    }
+    DomNode ITraversalHost.CreateRangeResultFragment() => CreateBridgeDocumentFragment();
 
     DomNode ITraversalHost.CloneRangeNode(DomNode node, bool deep)
     {
