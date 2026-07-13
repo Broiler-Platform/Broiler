@@ -209,8 +209,8 @@ public sealed partial class DomBridge
         _subWindowCache[containerElement] = subWindow;
         _subWindowContainers[subWindow] = containerElement;
         _eventTargets.SetOwnerWindow(subWindow, subWindow);
-        InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
-        RegisterWindowMessaging(subWindow);
+        _messaging.InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
+        _messaging.RegisterWindowMessaging(subWindow);
 
         subWindow.FastAddProperty((KeyString)"document",
             new JSFunction((in _) => GetOrCreateSubDocument(containerElement), "get document"),

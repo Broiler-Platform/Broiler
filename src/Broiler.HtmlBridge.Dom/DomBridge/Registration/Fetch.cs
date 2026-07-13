@@ -663,7 +663,7 @@ public sealed partial class DomBridge
         responseCtor.FastAddValue((KeyString)"error", new JSFunction((in _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
             "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        var messageChannelCtor = new JSFunction((in _) => CreateMessageChannel(), "MessageChannel", 0);
+        var messageChannelCtor = new JSFunction((in _) => _messaging.CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);

@@ -94,7 +94,7 @@ public sealed partial class DomBridge : IDisposable
         _eventTargets.Clear();
         _subWindowContainers.Clear();
 
-        _messagePorts.Clear();
+        _messaging.ClearPorts();
 
         _mutations.Clear();
         _traversal.ClearActive();

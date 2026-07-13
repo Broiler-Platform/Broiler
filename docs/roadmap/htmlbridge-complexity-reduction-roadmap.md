@@ -656,9 +656,43 @@ elements indexed/named/length, action get/set, checkValidity characterizations).
 HtmlDomInterface (49), FormControlRender and the architecture-guard suites pass unchanged; the one
 pre-existing environmental `<select>` layout failure reproduces identically → zero regressions.
 
-Still to come — each entangled with layout, network, or rendering; the P3.7–P3.9 named-accessor
-pattern is the template for any residual runtime-state coupling: CSSOM/computed style,
-Element/geometry, Window/Document, SVG, Frames/Network, Messaging, Canvas, and the DomBridge
+Status: **P3.10 completed** 2026-07-13 (same branch) — the first *browsing-context-coupled* feature.
+The **web-messaging** feature is the tenth co-located module: `MessagingBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) owns `window.postMessage`, `MessageChannel`/`MessagePort` (creation,
+`postMessage`, `start`/`close`/`onmessage`, the per-port pending-message queue), the structured-clone
++ transfer-list handling and `MessageEvent` construction — and it **owns** the P2.6
+`MessagePortRegistry` state authority (entangled peers, closed/started marks, queued messages), the way
+P3.2 took over the P2.5 hub. It also owns the generic `EventTarget` dispatch
+(`addEventListener`/`removeEventListener`/`dispatchEvent` with the propagation-control methods) that is
+installed on message ports **and** sub-windows — the two non-node event targets — co-located here (its
+listeners already come from the shared `EventTargetRegistry`) pending a future dedicated generic-
+EventTarget/Window module; sub-window installation goes through the module's public
+`InstallEventTargetApi`. All the callbacks were renamed from the numbered `JsMessaging…001…017Core` to
+semantic names. The module holds a reference to the shared `EventTargetRegistry` (generic-target
+listeners + owner-window map, which it does **not** own) and reaches the document's browsing-context
+operations — current/owner-window resolution, the window-context switch, top-window dispatch and
+frame-action queueing — through the narrow `IMessagingHost` contract, implemented via explicit
+interface members in `DomBridge.MessagingHost.cs`. The window-resolution / window-context-switch
+cluster itself (`ResolveCurrentWindow`/`ResolveOwnerWindow`/`GetCanonicalWindow`/`RunWithWindowContext`/
+`GetWindowDocument`/`GetWindowParent`) is genuine browsing-context infrastructure entangled with the
+sub-window/sub-document caches Phase 2 deferred, so it was **relocated (not moved into the module)**
+into a new bridge partial `DomBridge.WindowContext.cs` — bridge-owned pending a future
+`BrowsingContextManager`, and still called directly by `SubDocuments.cs`. The three external call sites
+(`Registration/Window.cs` window messaging, `Registration/Fetch.cs` `MessageChannel` constructor,
+`SubDocuments.cs` sub-window EventTarget install) now go through the module; lifetime reset calls
+`_messaging.ClearPorts()`. The old `DomBridge/Messaging.cs` + `JsFunctionCallbacks/Messaging.cs` were
+deleted. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/MessagingBindingModuleTests.cs` (co-location / host-contract / registry-ownership
+guards + MessageChannel port round-trip, queue-until-onmessage, and async window-postMessage
+characterizations). Regression check vs the P3.9 baseline: WebMessaging (existing), MessagePortRegistry,
+DomEvents (81), DomEventsEdgeCase, MutationObserver, EventDispatch, EventListener, Attributes and the
+architecture-guard suites all pass unchanged (164 tests); the pre-existing environmental iframe/sub-
+document HTTP failures (`HttpSubResourceTests.Iframe_*`, `ScriptEngineExecuteTests.…Iframe_Scroll_State
+_In_SrcDoc`) fail identically on both sides → zero regressions.
+
+Still to come — each entangled with layout, network, or rendering; the P3.7–P3.10 named-accessor /
+relocated-infra pattern is the template for any residual runtime-state or browsing-context coupling:
+CSSOM/computed style, Element/geometry, Window/Document, SVG, Frames/Network, Canvas, and the DomBridge
 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
