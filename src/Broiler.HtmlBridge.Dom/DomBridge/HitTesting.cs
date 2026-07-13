@@ -10,13 +10,15 @@ public sealed partial class DomBridge
             ? args[index].DoubleValue
             : double.NaN;
 
-    private IReadOnlyList<DomElement> HitTestDocumentPoint(DomElement docRoot, double x, double y)
+    private IReadOnlyList<DomElement> HitTestDocumentPoint(DomNode docRoot, double x, double y)
     {
         if (!double.IsFinite(x) || !double.IsFinite(y))
             return [];
 
-        var documentElement = IsDocumentElement(docRoot)
-            ? docRoot
+        // Phase 4 item 1 (P4.4a): docRoot may be a canonical DomDocument (regime-B) — resolve the
+        // documentElement from its element children; only an element docRoot can itself be one.
+        var documentElement = docRoot is DomElement docRootElement && IsDocumentElement(docRootElement)
+            ? docRootElement
             : ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#'));
 
         if (documentElement == null)

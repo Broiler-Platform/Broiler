@@ -312,7 +312,7 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(DomNode node, DomElement? ownerDocRoot)
+    private static void AdoptSubtreeIntoDocument(DomNode node, DomNode? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 

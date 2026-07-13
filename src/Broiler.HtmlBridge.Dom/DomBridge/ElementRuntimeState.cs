@@ -25,12 +25,15 @@ internal sealed class ElementRuntimeState
     public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// The document-root element that owns this node's (sub)document — iframe / nested
+    /// The browsing-context root that owns this node's (sub)document — iframe / nested
     /// browsing-context bookkeeping. Relocated off the <c>Broiler.Dom.DomElement</c> facade
     /// (RF-BRIDGE-1c Phase A). Not carried across <c>cloneNode</c> (matching the prior
-    /// facade behaviour: a clone re-derives its owner on adoption).
+    /// facade behaviour: a clone re-derives its owner on adoption). Phase 4 item 1 (P4.4a): widened
+    /// <c>DomElement?</c>→<c>DomNode?</c> so a canonical <c>DomDocument</c> browsing-context root
+    /// (createDocument/createHTMLDocument) can own its descendants, alongside the legacy
+    /// <c>#subdoc-root</c> element roots that regime-A (iframe) still uses.
     /// </summary>
-    public DomElement? OwnerDocRoot { get; set; }
+    public DomNode? OwnerDocRoot { get; set; }
 
     /// <summary>
     /// The element's raw inner-HTML/inner-text string — the source text for raw-text

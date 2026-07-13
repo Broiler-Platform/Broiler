@@ -778,6 +778,43 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.4a completed** 2026-07-13 (same branch) — work item 1, third sentinel (`#subdoc-root`),
+**stage a of a multi-stage remodel**. `#subdoc-root` cannot become a canonical `DomDocument` in place
+because the iframe/object/frame roots (regime A) are live *tree children* of their container, which a
+`DomDocument` forbids; the full remodel severs that link and follows a container↔document reference.
+P4.4a does the safe, self-contained first stage: the **detached** `createDocument`/`createHTMLDocument`
+roots (regime B) — which are already parentless — become real canonical `DomDocument`s
+(`CreateBrowsingContextDocument`), and their doctype/documentElement are appended as true canonical
+document children (a `DomDocumentType` is finally a legitimate child of a `DomDocument`). Regime A
+(iframe) stays on the `#subdoc-root` element path until P4.4b.
+
+Foundation (behavior-preserving `DomElement`→`DomNode` widenings so a `DomDocument` root flows through
+the shared sub-document infrastructure): `ElementRuntimeState.OwnerDocRoot`, the `_documentWrappers`
+map + `SetDocument`/`TryGetDocument`, `AdoptSubtreeIntoDocument`, `BuildSubDocument` + its 24
+sub-document callbacks, and the shared descendant helpers `GetDocumentElement`/`CollectByTagName`/
+`FindInSubTree`/`CollectMatching`/`CollectStyleElements`/`HitTestDocumentPoint`/`BuildStyleSheetsCollection`/
+`BuildRange`. `GetDocumentElement` became honestly nullable (an empty `DomDocument` has no
+documentElement, per DOM — was the `#subdoc-root` self-fallback), with null-guards added to the six
+callers.
+
+**Two regressions found and fixed during the stage** (both from the doctype/document now being a
+canonical non-element the surrounding element-typed code didn't expect): (1) `createDocument` with an
+empty qualifiedName produced an empty `DomDocument`, so `doc.documentElement` returned null and the
+facade getter crashed on `ToJSObject(null)` — fixed by returning `null` per DOM; (2) the `Range`
+`setStart/EndBefore/After` boundary setters used `ParentEl` (`ParentNode as DomElement`, which nulls a
+`DomDocument` parent) and so threw `InvalidNodeTypeError` when a node's parent was a regime-B document
+root — fixed to use the raw `ParentNode` (a Document is a valid boundary container). Both are guarded
+by pre-existing tests (`DomImplementationTests.Implementation_CreateDocument_Without_QualifiedName`,
+`Acid3Phase4RangeTests.Test8_MovingBoundaryPoints`).
+
+Behaviour-preserving; no public-API change. Tests:
+`Broiler.Cli.Tests/BrowsingContextRootMigrationTests.cs` (createDocument/createHTMLDocument report
+nodeType 9 with a canonical documentElement + doctype child; element creation/lookup/query work).
+Regression check vs the P4.3 baseline: a 1073-test wide sweep has the change-side failure set as a
+strict subset of baseline (no new failures); the Acid+Range set-diff's one apparent delta passes in
+isolation (known parallel-load render flakiness) → zero regressions. **Next: P4.4b** severs the
+regime-A iframe tree link and rewires the ~15 consumer sites; **P4.4c** eliminates `OwnerDocRoot`.
+
 Status: **P4.3 completed** 2026-07-13 (same branch) — work item 1, second of four sentinels. The
 `#document-fragment` sentinel element is replaced by the canonical `Broiler.Dom.DomDocumentFragment`.
 Unlike the doctype leaf, a fragment is a *container*, so it gets a dedicated

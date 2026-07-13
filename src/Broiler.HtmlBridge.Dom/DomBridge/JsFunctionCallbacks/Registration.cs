@@ -778,36 +778,31 @@ public sealed partial class DomBridge
         var doctypeArg = a.Length > 2 ? a[2] : null;
         if (!string.IsNullOrEmpty(qName))
             ValidateQualifiedName(qName, ns, context);
-        // Build a new document root
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        GetElementRuntimeState(docRoot).Document.HasViewport.Set(false);
-        // Append doctype if provided
+        // Phase 4 item 1 (P4.4a): a createDocument root is a canonical DomDocument (was a #subdoc-root
+        // sentinel element).
+        var docRoot = CreateBrowsingContextDocument();
+        // Append doctype if provided — a DocumentType is a legitimate canonical child of a DomDocument.
         if (doctypeArg is JSObject dtObj)
         {
-            // Find the canonical node for the doctype JSObject. Phase 4 item 1: the doctype is a
-            // DomDocumentType (not a DomElement), so match any DomNode — the former `is DomElement`
-            // guard silently skipped the canonical doctype, leaving its ownerDocument unassociated.
             foreach (var kvp in _jsObjects.Entries)
             {
                 if (kvp.Value == dtObj && kvp.Key is DomNode dtNode)
                 {
-                    SetParent(dtNode, docRoot);
-                    GetElementRuntimeState(dtNode).OwnerDocRoot = docRoot;
                     docRoot.AppendChild(dtNode);
+                    GetElementRuntimeState(dtNode).OwnerDocRoot = docRoot;
                     break;
                 }
             }
         }
 
-        // Create document element if qualifiedName is provided
+        // Create document element if qualifiedName is provided (appended after the doctype, per DOM).
         if (!string.IsNullOrEmpty(qName))
         {
             var docEl = string.IsNullOrEmpty(ns)
                 ? CreateBridgeElement(qName)
                 : CreateBridgeElementNS(ns, qName);
-            SetParent(docEl, docRoot);
-            GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
             docRoot.AppendChild(docEl);
+            GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
         }
 
         return BuildSubDocument(docRoot);
@@ -817,19 +812,16 @@ public sealed partial class DomBridge
     private JSValue JsRegistrationCreateHTMLDocument059Core(in Arguments a)
     {
         var title = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
-        // Build a new HTML document root with html/head/body
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        GetElementRuntimeState(docRoot).Document.HasViewport.Set(false);
-        // Add DOCTYPE
+        // Phase 4 item 1 (P4.4a): a createHTMLDocument root is a canonical DomDocument (was a
+        // #subdoc-root sentinel element); doctype + <html> are appended as canonical document children.
+        var docRoot = CreateBrowsingContextDocument();
         var doctype = CreateBridgeDocumentType("html", string.Empty, string.Empty);
-        SetParent(doctype, docRoot);
-        GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         docRoot.AppendChild(doctype);
+        GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
         var htmlEl = CreateBridgeElement("html");
-        SetParent(htmlEl, docRoot);
-        GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
         docRoot.AppendChild(htmlEl);
+        GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
         var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
         GetElementRuntimeState(headEl).OwnerDocRoot = docRoot;

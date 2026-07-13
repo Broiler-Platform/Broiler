@@ -362,6 +362,18 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// results, and the internal HTML fragment-parse container).</summary>
     private DomDocumentFragment CreateBridgeDocumentFragment() => _document.CreateDocumentFragment();
 
+    /// <summary>Mints a canonical <see cref="DomDocument"/> for a detached browsing context (Phase 4
+    /// item 1, P4.4a — the former <c>#subdoc-root</c> sentinel for <c>createDocument</c>/
+    /// <c>createHTMLDocument</c>). It is its own document (not the main <c>_document</c>) and, being a
+    /// programmatic non-rendered document, is marked viewport-less so hit-testing skips it. Its
+    /// children (doctype/documentElement) are appended as true canonical document children.</summary>
+    private DomDocument CreateBrowsingContextDocument()
+    {
+        var document = new DomDocument();
+        GetElementRuntimeState(document).Document.HasViewport.Set(false);
+        return document;
+    }
+
     /// <summary>Sets an element's <c>textContent</c> per DOM (RF-BRIDGE-1c Phase F, F3c part 2d):
     /// replaces all children with a single canonical <see cref="DomText"/> (or none when
     /// <paramref name="value"/> is null/empty). Replaces the former element-store
