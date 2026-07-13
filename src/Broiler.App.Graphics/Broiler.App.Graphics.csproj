@@ -15,6 +15,11 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Release-Linux'">
+    <!-- Collapse the multi-targeting list to the single Linux TFM. Without this,
+         restore fans out over the default TargetFrameworks (the Windows TFMs) and
+         never restores net10.0, so a later no-restore framework net10.0 build
+         fails with NETSDK1005. -->
+    <TargetFrameworks>net10.0</TargetFrameworks>
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>
