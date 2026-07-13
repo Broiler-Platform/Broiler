@@ -49,8 +49,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // P2.5: registered MutationObservers now live in MutationObserverHub, the single observer owner
     // (was the bare _mutationObservers list).
     private readonly Dom.Runtime.MutationObserverHub _mutationObserverHub = new();
-    private readonly List<WeakReference<DomRange>> _activeRanges = [];
-    private readonly List<WeakReference<DomNodeIterator>> _activeNodeIterators = [];
+    // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
+    // callback and the traversal-scoped active-range / active-node-iterator registries live in the
+    // co-located TraversalBinding module. The bridge holds the module through the narrow
+    // ITraversalHost contract it implements (see DomBridge.TraversalHost.cs).
+    private readonly Dom.Features.TraversalBinding _traversal;
     private readonly DomDocument _document;
     private readonly DomElement _documentNode;
     private static readonly ConditionalWeakTable<DomNode, ElementRuntimeState> ElementRuntimeStates = [];
@@ -128,6 +131,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     public DomBridge()
     {
+        _traversal = new Dom.Features.TraversalBinding(this);
         _document = new DomDocument();
         _documentNode = CreateBridgeElement("#document");
         DocumentElement = CreateBridgeElement("html");
@@ -174,14 +178,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// narrowed from <c>Cast</c> to <c>OfType&lt;Broiler.Dom.DomElement&gt;()</c> so it skips canonical
     /// <c>DomText</c>/<c>DomComment</c> children once construction flips; a no-op on today's
     /// homogeneous tree. Callers that need text/comment children walk raw <c>ChildNodes</c> instead.</summary>
-    private static IEnumerable<DomElement> ChildElements(DomNode element) =>
+    internal static IEnumerable<DomElement> ChildElements(DomNode element) =>
         element.ChildNodes.OfType<DomElement>();
 
     /// <summary>The child node at <paramref name="index"/> (old <c>Children[index]</c>). RF-BRIDGE-1c
     /// Phase F (F3c part 2c): returns canonical <see cref="DomNode"/> — a child may be a
     /// <c>DomText</c>/<c>DomComment</c> once construction flips. Element-only callers narrow with
     /// <c>as Broiler.Dom.DomElement</c>/<c>is Broiler.Dom.DomElement</c>; on today's homogeneous tree every child is an element.</summary>
-    private static DomNode ChildAt(DomNode element, int index) => element.ChildNodes[index];
+    internal static DomNode ChildAt(DomNode element, int index) => element.ChildNodes[index];
 
     /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
@@ -191,7 +195,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality).</summary>
-    private static int ChildIndexOf(DomNode element, DomNode child)
+    internal static int ChildIndexOf(DomNode element, DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)
         {
@@ -239,20 +243,20 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// the facade <c>IsText(Broiler.Dom.DomElement)</c>). NodeType-based, so it holds for the current
     /// facade text nodes and for canonical <c>DomText</c> once construction flips in the
     /// <c>Children</c>/text cutover.</summary>
-    private static bool IsText(DomNode node) => node.NodeType == DomNodeType.Text;
+    internal static bool IsText(DomNode node) => node.NodeType == DomNodeType.Text;
 
     /// <summary>Whether <paramref name="node"/> is a comment node (RF-BRIDGE-1c Phase F).
     /// NodeType-based, so it holds for the current facade comment nodes and for canonical
     /// <c>DomComment</c> once construction flips — the replacement for the many
     /// <c>TagName == "#comment"</c> checks, since a canonical <c>DomComment</c> has no
     /// <c>TagName</c>.</summary>
-    private static bool IsComment(DomNode node) => node.NodeType == DomNodeType.Comment;
+    internal static bool IsComment(DomNode node) => node.NodeType == DomNodeType.Comment;
 
     /// <summary>Reads a text/comment node's character data (RF-BRIDGE-1c Phase F). Canonical
     /// <c>DomText</c>/<c>DomComment</c> expose it as <c>Data</c>; the facade text/comment nodes
     /// (pre-flip) expose it as <c>TextContent</c>. The single accessor both models funnel through
     /// during the text cutover; returns <c>""</c> (never null) for character-data nodes.</summary>
-    private static string BridgeText(DomNode node) => node switch
+    internal static string BridgeText(DomNode node) => node switch
     {
         DomCharacterData characterData => characterData.Data,
         _ => node.NodeValue ?? string.Empty,
@@ -334,7 +338,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> getter — <c>ParentNode as Broiler.Dom.DomElement</c>).
     /// A node's parent is always an element, so this is stable when text/comment nodes become
     /// canonical <c>DomText</c>/<c>DomComment</c> in Phase D.</summary>
-    private static DomElement? ParentEl(DomNode node) => node.ParentNode as DomElement;
+    internal static DomElement? ParentEl(DomNode node) => node.ParentNode as DomElement;
 
     /// <summary>Reparents <paramref name="child"/> under <paramref name="parent"/> (RF-BRIDGE-1c
     /// Phase E: replaces the facade <c>ParentEl(Broiler.Dom.DomElement)</c> setter). A null parent detaches;

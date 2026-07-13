@@ -92,7 +92,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    private static void CollectTextContent(DomNode node, StringBuilder sb)
+    internal static void CollectTextContent(DomNode node, StringBuilder sb)
     {
         if (IsText(node))
         {
@@ -257,7 +257,7 @@ public sealed partial class DomBridge
     /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
     /// <paramref name="ancestor"/> in the DOM tree.
     /// </summary>
-    private static bool IsDescendant(DomNode ancestor, DomNode candidate)
+    internal static bool IsDescendant(DomNode ancestor, DomNode candidate)
     {
         var current = candidate.ParentNode;
         while (current != null)
@@ -633,7 +633,7 @@ public sealed partial class DomBridge
     /// Returns a flat list of all nodes in the subtree rooted at
     /// <paramref name="root"/> in document order (including the root).
     /// </summary>
-    private static List<DomNode> GetDocumentOrderNodes(DomNode root)
+    internal static List<DomNode> GetDocumentOrderNodes(DomNode root)
     {
         var list = new List<DomNode> { root };
         CollectDescendants(root, list);
@@ -643,7 +643,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Returns the node type constant for a <see cref="DomElement"/>.
     /// </summary>
-    private static int GetNodeType(DomNode node)
+    internal static int GetNodeType(DomNode node)
     {
         if (IsText(node)) return 3; // TEXT_NODE
         if (IsComment(node)) return 8;
@@ -1121,7 +1121,7 @@ public sealed partial class DomBridge
     /// so that JS try/catch blocks can intercept it with full <c>.code</c>, <c>.name</c>,
     /// and <c>.message</c> properties intact.
     /// </summary>
-    private static void ThrowDOMException(JSContext context, string message, string name)
+    internal static void ThrowDOMException(JSContext context, string message, string name)
     {
         if (context["DOMException"] is JSFunction domExCtor)
         {

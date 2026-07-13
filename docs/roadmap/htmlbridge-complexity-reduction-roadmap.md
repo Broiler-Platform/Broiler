@@ -466,6 +466,35 @@ Suggested PR order:
 
 ### Phase 3 - replace the partial god object with feature modules
 
+Status: **P3.1 completed** 2026-07-13 (branch `htmlbridge-phase3-traversal-module`). The DOM
+traversal / Range vertical slice is the first co-located feature binding module:
+`TraversalBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) now owns `TreeWalker`,
+`NodeIterator`, `Range`, the `NodeFilter` machinery and `document.createComment` — its registration
+(`RegisterDocumentApis`), every handler (renamed from the numbered `JsTraversal…020…039Core` to
+semantic `Range*`/`Create*` names) and the traversal-scoped state (the weak active-range and
+active-node-iterator registries) live together in one file. The module depends only on the narrow
+`ITraversalHost` contract (JS-wrapper identity, node lookup, boundary/geometry helpers still in the
+bridge pending Phase 5, and the range-scoped node-construction seams) which `DomBridge` implements
+via **explicit interface members** in `DomBridge.TraversalHost.cs` — so no handler reaches an
+arbitrary bridge private field and the public surface is unchanged. `DomBridge`'s traversal
+partials are now thin: the old `JsFunctionCallbacks/Traversal.cs` is deleted; `Traversal.cs` keeps
+only the mutation-observer notification machinery and range client-rect geometry plus three
+one-line `Build*` delegators; `Registration/Traversal.cs` is a single delegating call; the
+`_activeRanges`/`_activeNodeIterators` fields moved off the bridge. Neutral static DOM-tree helpers
+the module shares (`IsText`/`IsComment`/`ParentEl`/`ChildAt`/`ChildIndexOf`/`ChildElements`/
+`GetNodeType`/`GetDocumentOrderNodes`/`CollectTextContent`/`IsDescendant`/`FindCommonAncestor`/
+`GetNodesInRange`/`ThrowDOMException`) were widened `private static`→`internal static` in place
+(no behaviour/API change; Phase 4 promotes them to Broiler.Dom). Behaviour-preserving; no
+public-API change (both the module and the contract are internal). Tests:
+`Broiler.Cli.Tests/TraversalBindingModuleTests.cs` (co-location/host-contract/state-moved guards +
+Range/TreeWalker/createComment characterizations). Regression check vs the P2.6 baseline: the
+existing traversal, mutation-observer, events and messaging suites pass unchanged; the pre-existing
+environmental/known failures (`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`
+headless-geometry, the six Acid3 pixel/cascade/border/NodeIterator-pre-removal tests, and the two
+`:root`/`:lang` selector tests) fail identically on both sides → zero regressions. The remaining
+feature slices (Events, CSSOM, Element, Window/Document, Forms, Frames/Network, Messaging, Canvas)
+and the DomBridge 500-800-line facade target are still to come.
+
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
 

@@ -594,44 +594,8 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateTreeWalker038Core(DomBridge? bridgeForTraversal, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createTreeWalker': 1 argument required.");
-        if (a[0] is not JSObject rootObj)
-            throw new JSException("Failed to execute 'createTreeWalker': parameter 1 is not of type 'Node'.");
-        var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
-        if (rootEl == null)
-            return JSNull.Value;
-        var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
-        var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
-        return bridgeForTraversal.BuildTreeWalker(rootEl, whatToShow, filterFn);
-    }
-
-
-    private JSValue JsRegistrationCreateNodeIterator039Core(DomBridge? bridgeForTraversal, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createNodeIterator': 1 argument required.");
-        if (a[0] is not JSObject rootObj)
-            throw new JSException("Failed to execute 'createNodeIterator': parameter 1 is not of type 'Node'.");
-        var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
-        if (rootEl == null)
-            return JSNull.Value;
-        var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
-        var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
-        return bridgeForTraversal.BuildNodeIterator(rootEl, whatToShow, filterFn);
-    }
-
-
-    private JSValue JsRegistrationCreateComment041Core(in Arguments a)
-    {
-        var data = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = CreateBridgeCommentNode(data);
-        _knownNodes.Add(el);
-        return ToJSObject(el);
-    }
-
+    // createTreeWalker / createNodeIterator / createComment moved to the Phase 3
+    // TraversalBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
     private JSValue JsRegistrationGetChildNodes046Core(in Arguments _)
     {
