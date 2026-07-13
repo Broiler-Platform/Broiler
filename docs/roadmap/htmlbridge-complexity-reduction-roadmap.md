@@ -577,8 +577,24 @@ pass unchanged; the one pre-existing environmental failure
 (`FormControlRenderTests.SelectListBox_SizingAndScrolling_Follow_WritingMode`, a `<select>` layout
 test) fails identically on both sides → zero regressions.
 
-Still to come: CSSOM, Element, Window/Document, Forms, SVG, Dialog/popover, Frames/Network,
-Messaging, Canvas, and the DomBridge 500-800-line facade target.
+Status: **P3.6 completed** 2026-07-13 (same branch). The **`Element.classList` / `DOMTokenList`**
+API is the sixth co-located module: `ClassListBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+owns `Build(element, onClassChanged)` plus the `contains`/`add`/`remove`/`toggle`/`replace`
+operations (renamed from the bridge's `BuildClassListObject` + the scattered `JsUtilities…025…Core`
+callbacks). It is the cleanest slice so far — pure logic over the canonical `Broiler.Dom.DomTokenList`
+with an injected `Action<DomElement>` style-invalidation callback, so it is an **internal static
+class with no host contract at all**. The registration site (`JsObjects.cs`) calls
+`ClassListBinding.Build(element, bridge.InvalidateStyleScope)`. Behaviour-preserving; no public-API
+change. Tests: `Broiler.Cli.Tests/ClassListBindingModuleTests.cs` (co-location guard +
+add/remove/contains, toggle-with/without-force, replace characterizations). Regression check:
+SelectorsAndCssom (only the two known-baseline `:root`/`:lang` fails, unchanged) and the
+architecture-guard suites pass → zero regressions.
+
+Still to come — each meaningfully more entangled (with the process-static `ElementRuntimeState`,
+layout, custom JS collection types, or network/rendering) and better suited to dedicated efforts:
+CSSOM/computed style, Element/geometry, Window/Document, Forms + Select (runtime-state coupled),
+SVG, Dialog/popover (top-layer state), Frames/Network, Messaging, Canvas, and the DomBridge
+500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

@@ -873,37 +873,8 @@ public sealed partial class DomBridge
     /// Builds a <c>classList</c> object exposing <c>add</c>, <c>remove</c>,
     /// <c>toggle</c>, and <c>contains</c>.
     /// </summary>
-    private static JSObject BuildClassListObject(DomElement element, Action<DomElement>? onClassChanged = null)
-    {
-        var classList = new JSObject();
-
-        // classList.contains(className)
-        classList.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsUtilitiesContains025Core(element, in a), "contains", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.add(...classNames)
-        classList.FastAddValue((KeyString)"add",
-            new JSFunction((in a) => JsUtilitiesAdd026Core(element, onClassChanged, in a), "add"),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.remove(...classNames)
-        classList.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => JsUtilitiesRemove027Core(element, onClassChanged, in a), "remove"),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.toggle(className[, force])
-        classList.FastAddValue((KeyString)"toggle",
-            new JSFunction((in a) => JsUtilitiesToggle028Core(element, onClassChanged, in a), "toggle", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // classList.replace(oldToken, newToken)
-        classList.FastAddValue((KeyString)"replace",
-            new JSFunction((in a) => JsUtilitiesReplaceClassToken(element, onClassChanged, in a), "replace", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return classList;
-    }
+    // classList / DOMTokenList moved to the Phase 3 ClassListBinding feature module
+    // (Broiler.HtmlBridge.Dom.Features).
 
     /// <summary>
     /// Builds an in-memory <c>localStorage</c> stub exposing <c>getItem</c>,

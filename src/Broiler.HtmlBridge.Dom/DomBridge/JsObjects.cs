@@ -138,9 +138,9 @@ public sealed partial class DomBridge
             new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // classList — class list manipulation
+        // classList — class list manipulation (Phase 3 P3.6: co-located ClassListBinding module)
         obj.FastAddValue((KeyString)"classList",
-            BuildClassListObject(element, bridge.InvalidateStyleScope),
+            Dom.Features.ClassListBinding.Build(element, bridge.InvalidateStyleScope),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // attributes — NamedNodeMap interface
