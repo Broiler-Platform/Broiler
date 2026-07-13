@@ -338,6 +338,24 @@ context for storage; no back-reference. Behavior-preserving; no public-API chang
 class-change → `getComputedStyle` invalidation characterization through the bridge). Net −53 lines in
 the bridge partials.
 
+**P2.4 completed** 2026-07-13 (same branch). The document's task queues now have a single owner:
+`BrowserEventLoop` (namespace `Broiler.HtmlBridge.Dom.Runtime`) owns the `setTimeout`/`setInterval`
+callback maps, the `requestAnimationFrame` map, the internal frame-action queue, their id counters
+and the cleared-timer set — plus the drain itself (`DrainStep`/`DrainAll`). It replaces the eight
+scattered bridge fields and the ~90-line `FlushTimerStep` body. Registration
+(`setTimeout`/`clearTimeout`/`setInterval`/`clearInterval`/`requestAnimationFrame`/
+`cancelAnimationFrame`) and `QueueFrameAction` delegate to it; `DomBridge.FlushTimers`/
+`FlushTimerStep`/`HasPendingTimers` are now thin wrappers (still guarded by `ThrowIfDisposed`, and the
+per-task `TaskCheckpointCallback` is passed into the drain). The incidental reuse of the frame-action
+counter to mint smooth-scroll tokens is gone — smooth-scroll tokens get their own bridge-local
+counter (observably equivalent: the two were independent namespaces). Behavior-preserving; no
+public-API change (the loop is internal, and the public timer methods keep their signatures). Tests:
+`Broiler.Cli.Tests/BrowserEventLoopTests.cs` (registration/cancellation/drain/checkpoint/error-isolation
+unit tests + a timer-flush characterization through the bridge; existing
+`ScriptEngineExecuteTests.DomBridge_FlushTimerStep_*` still pass). Net −147 lines in the bridge
+partials. The loop is also the seam for the still-pending single-owner thread-affinity model (Phase 2
+item 5); today it preserves the existing defensive concurrent collections.
+
 Two findings recorded for later phases:
 
 - **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
@@ -382,7 +400,7 @@ Suggested PR order:
 - P2.1 session lifetime and disposal characterization. **(done — see Status above)**
 - P2.2 JS identity registry. **(done — see Status above)**
 - P2.3 style context and invalidation. **(done — see Status above)**
-- P2.4 event loop.
+- P2.4 event loop. **(done — see Status above)**
 - P2.5 listeners/observers.
 - P2.6 resource loader and browsing-context state.
 

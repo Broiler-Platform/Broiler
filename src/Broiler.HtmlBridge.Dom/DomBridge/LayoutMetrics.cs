@@ -1046,7 +1046,7 @@ public sealed partial class DomBridge
 
         if (string.Equals(effectiveBehavior, "smooth", StringComparison.OrdinalIgnoreCase))
         {
-            var token = Interlocked.Increment(ref _frameActionIdCounter);
+            var token = Interlocked.Increment(ref _smoothScrollTokenCounter);
             _smoothScrollTokens[element] = token;
             QueueFrameAction(() =>
             {
@@ -1081,7 +1081,7 @@ public sealed partial class DomBridge
         DispatchScrollEndEventIfNeeded(element, previousLeft, previousTop);
     }
 
-    private void QueueFrameAction(Action callback) => _frameActions[Interlocked.Increment(ref _frameActionIdCounter)] = callback;
+    private void QueueFrameAction(Action callback) => _eventLoop.QueueFrameAction(callback);
 
     private void CancelSmoothScroll(DomElement element) => _smoothScrollTokens.TryRemove(element, out _);
 

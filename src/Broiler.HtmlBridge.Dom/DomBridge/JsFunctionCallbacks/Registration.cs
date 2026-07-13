@@ -1017,75 +1017,40 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationSetTimeout070Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _timerIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _timeoutCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationSetTimeout070Core(in Arguments a) =>
+        new JSNumber(_eventLoop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationClearTimeout071Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _timeoutCallbacks.TryRemove(id, out _);
-            _clearedTimerIds[id] = 0;
-        }
+            _eventLoop.ClearTimeout((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsRegistrationSetInterval072Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _timerIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _intervalCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationSetInterval072Core(in Arguments a) =>
+        new JSNumber(_eventLoop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationClearInterval073Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _intervalCallbacks.TryRemove(id, out _);
-            _clearedTimerIds[id] = 0;
-        }
+            _eventLoop.ClearInterval((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }
 
 
-    private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a)
-    {
-        var id = Interlocked.Increment(ref _rafIdCounter);
-        if (a.Length > 0 && a[0] is JSFunction fn)
-        {
-            _rafCallbacks[id] = fn;
-        }
-
-        return new JSNumber(id);
-    }
+    private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a) =>
+        new JSNumber(_eventLoop.RequestAnimationFrame(a.Length > 0 ? a[0] as JSFunction : null));
 
 
     private JSValue JsRegistrationCancelAnimationFrame075Core(in Arguments a)
     {
         if (a.Length > 0)
-        {
-            var id = (int)a[0].DoubleValue;
-            _rafCallbacks.TryRemove(id, out _);
-        }
+            _eventLoop.CancelAnimationFrame((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
     }

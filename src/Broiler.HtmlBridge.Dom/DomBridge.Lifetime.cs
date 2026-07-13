@@ -87,15 +87,9 @@ public sealed partial class DomBridge : IDisposable
     /// </remarks>
     private void ClearRuntimeSessionState()
     {
-        _timeoutCallbacks.Clear();
-        _intervalCallbacks.Clear();
-        _clearedTimerIds.Clear();
-        _rafCallbacks.Clear();
-        _frameActions.Clear();
+        _eventLoop.Clear();
         _smoothScrollTokens.Clear();
-        _timerIdCounter = 0;
-        _rafIdCounter = 0;
-        _frameActionIdCounter = 0;
+        _smoothScrollTokenCounter = 0;
 
         _visualViewportScrollListeners.Clear();
         _windowEventListeners.Clear();

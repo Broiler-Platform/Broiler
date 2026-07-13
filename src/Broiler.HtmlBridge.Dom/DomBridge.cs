@@ -65,26 +65,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private JSObject? _visualViewportJSObject;
     private JSContext? _jsContext;
 
-    // Timer & async execution queues.
-    //
-    // These are read and cleared by the main-thread timer drain (FlushTimerStep)
-    // but written by setTimeout/setInterval/requestAnimationFrame and scroll
-    // callbacks that can run on ThreadPool threads — the JS engine dispatches
-    // Promise/async/generator continuations via ThreadPool.QueueUserWorkItem, so
-    // a continuation may register a timer concurrently with a flush. Plain
-    // Dictionary/HashSet are not safe under that race (it surfaced as
-    // "Collection was modified" / "Destination array is not long enough" aborting
-    // FlushTimerStep), so use concurrent collections and atomic id counters.
-    private int _timerIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _timeoutCallbacks = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _intervalCallbacks = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, byte> _clearedTimerIds = new();
-    private int _rafIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, JSFunction> _rafCallbacks = new();
-    private int _frameActionIdCounter;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Action> _frameActions = new();
-    // Touched by the same scroll/frame-action callbacks that can run on
-    // ThreadPool threads (see the timer-map note above), so keep it concurrent.
+    // P2.4: the timer/interval/requestAnimationFrame/frame-action queues, their id counters and the
+    // drain (FlushTimerStep/FlushTimers) now live in BrowserEventLoop, the single owner of the
+    // document's task queues (was the eight scattered _timerIdCounter/_timeoutCallbacks/… fields).
+    private readonly Dom.Runtime.BrowserEventLoop _eventLoop = new();
+    // Smooth-scroll continuation tokens: a per-element monotonic marker so a queued smooth-scroll
+    // frame action only commits if it is still the active scroll for that element. Touched by
+    // scroll/frame-action callbacks that can run on ThreadPool threads, so keep it concurrent.
+    private int _smoothScrollTokenCounter;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<DomElement, int> _smoothScrollTokens = new();
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
     private readonly Dictionary<string, List<EventListenerRegistration>> _windowEventListeners = new(StringComparer.OrdinalIgnoreCase);
@@ -563,15 +551,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public void FlushTimers()
     {
         ThrowIfDisposed();
-        const int maxIterations = 1000;
-        for (var iteration = 0; iteration < maxIterations; iteration++)
-        {
-            if (!FlushTimerStep())
-                break;
-        }
-
-        // Clear all processed timer IDs after flush loop completes
-        _clearedTimerIds.Clear();
+        _eventLoop.DrainAll(TaskCheckpointCallback);
     }
 
     /// <summary>
@@ -584,7 +564,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         get
         {
             ThrowIfDisposed();
-            return !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
+            return _eventLoop.HasPendingWork;
         }
     }
 
@@ -598,93 +578,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public bool FlushTimerStep()
     {
         ThrowIfDisposed();
-        void RunTaskCheckpoint()
-        {
-            try
-            {
-                TaskCheckpointCallback?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"Task checkpoint error: {ex.Message}", ex);
-            }
-        }
-
-        var pending = new List<(int Id, JSFunction Fn)>();
-
-        // ConcurrentDictionary.ToArray() takes a consistent snapshot even while
-        // other threads register callbacks, and TryRemove drains only the entries
-        // we actually collected — so a timer registered concurrently (or by a
-        // callback that runs during this flush) is carried to the next step
-        // instead of being wiped by a blanket Clear().
-
-        // Collect timeout callbacks (one-shot: remove as collected)
-        foreach (var kv in _timeoutCallbacks.ToArray())
-        {
-            if (_timeoutCallbacks.TryRemove(kv.Key, out var fn) && !_clearedTimerIds.ContainsKey(kv.Key))
-                pending.Add((kv.Key, fn));
-        }
-
-        // Collect interval callbacks (execute once per step, keep registered)
-        var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _intervalCallbacks.ToArray())
-        {
-            if (!_clearedTimerIds.ContainsKey(kv.Key))
-                intervalSnapshot.Add((kv.Key, kv.Value));
-        }
-
-        // Collect rAF callbacks (one-shot: remove as collected)
-        var rafSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _rafCallbacks.ToArray())
-        {
-            if (_rafCallbacks.TryRemove(kv.Key, out var fn))
-                rafSnapshot.Add((kv.Key, fn));
-        }
-
-        var frameActionSnapshot = new List<Action>();
-        foreach (var kv in _frameActions.ToArray())
-        {
-            if (_frameActions.TryRemove(kv.Key, out var action))
-                frameActionSnapshot.Add(action);
-        }
-
-        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
-            return false;
-
-        // Execute timeout callbacks
-        foreach (var (id, fn) in pending)
-        {
-            if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setTimeout callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        // Execute interval callbacks (one tick per step)
-        foreach (var (id, fn) in intervalSnapshot)
-        {
-            if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setInterval callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        // Execute rAF callbacks
-        foreach (var (id, fn) in rafSnapshot)
-        {
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"rAF callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        foreach (var action in frameActionSnapshot)
-        {
-            try { action(); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"frame action error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
-        }
-
-        return true;
+        return _eventLoop.DrainStep(TaskCheckpointCallback);
     }
 
     /// <summary>
