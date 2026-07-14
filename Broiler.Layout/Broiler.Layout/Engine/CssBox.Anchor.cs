@@ -63,32 +63,41 @@ partial class CssBox
     {
         if (box.PositionArea != "none" && box.TryResolvePositionAreaTarget(registry, out var target))
         {
-            // Apply the used SIZE first (P5.8d.2b sizing slice) for the boxes the engine
+            // Apply the used SIZE first (P5.8d.2b sizing slices) for the boxes the engine
             // can size without re-flowing a subtree: a childless box (no in-flow children
-            // or words), content-box sizing, and no percentage margin/padding/inset box
-            // properties (those resolve against the cell and need the bridge's explicit
-            // pre-bake for now). For such a box the grid-derived used width/height fills
-            // the cell / honours an explicit or percentage size exactly as the baked
-            // bridge path does; setting its border box repaints correctly with no
-            // children to re-flow. Every other box keeps the reposition-only MVP
-            // behaviour (its already-laid-out size is preserved).
+            // or words) with no percentage margin/padding/inset box properties (those
+            // resolve against the cell and need the bridge's explicit pre-bake for now).
+            // For such a box the grid-derived used size fills the cell / honours an explicit
+            // or percentage length exactly as the baked bridge path does; setting its border
+            // box repaints correctly with no children to re-flow. Every other box keeps the
+            // reposition-only behaviour (its already-laid-out size is preserved).
             if (box.CanApplyNativeAnchorSize())
             {
-                // target.Width/Height are the content-box used size. Add the box's own
-                // padding + border to form the border box (SizeF). Border/padding are read
-                // font-free (px + the CSS thin/medium/thick keyword map, style:none → 0) —
-                // matching the bridge's ResolveBorderWidth and avoiding the layout font the
-                // Actual* getters resolve (percentage padding is excluded by the gate).
-                double borderBoxW = target.Width
-                    + box.NativeBorderPx(box.BorderLeftWidth, box.BorderLeftStyle)
-                    + box.NativePaddingPx(box.PaddingLeft)
-                    + box.NativePaddingPx(box.PaddingRight)
+                // The box's own padding + border, read font-free (px + the CSS
+                // thin/medium/thick keyword map, style:none → 0 — matching the bridge's
+                // ResolveBorderWidth and avoiding the layout font the Actual* getters
+                // resolve; percentage padding is excluded by the gate).
+                double padBorderW =
+                    box.NativeBorderPx(box.BorderLeftWidth, box.BorderLeftStyle)
+                    + box.NativePaddingPx(box.PaddingLeft) + box.NativePaddingPx(box.PaddingRight)
                     + box.NativeBorderPx(box.BorderRightWidth, box.BorderRightStyle);
-                double borderBoxH = target.Height
-                    + box.NativeBorderPx(box.BorderTopWidth, box.BorderTopStyle)
-                    + box.NativePaddingPx(box.PaddingTop)
-                    + box.NativePaddingPx(box.PaddingBottom)
+                double padBorderH =
+                    box.NativeBorderPx(box.BorderTopWidth, box.BorderTopStyle)
+                    + box.NativePaddingPx(box.PaddingTop) + box.NativePaddingPx(box.PaddingBottom)
                     + box.NativeBorderPx(box.BorderBottomWidth, box.BorderBottomStyle);
+
+                // box-sizing: content-box (default) — target.Width/Height are the content
+                // size, so the border box adds padding+border. box-sizing: border-box —
+                // target.Width/Height already ARE the (cell-clamped/filled) border box, so
+                // use them directly, clamped to at least padding+border so the content box
+                // stays non-negative (mirrors the bridge's BorderBoxToContentSize + re-add).
+                bool borderBox = string.Equals(box.BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase);
+                double borderBoxW = borderBox
+                    ? System.Math.Max(target.Width, padBorderW)
+                    : target.Width + padBorderW;
+                double borderBoxH = borderBox
+                    ? System.Math.Max(target.Height, padBorderH)
+                    : target.Height + padBorderH;
                 box.Size = new System.Drawing.SizeF((float)borderBoxW, (float)borderBoxH);
             }
 
@@ -105,17 +114,16 @@ partial class CssBox
     /// <summary>
     /// Whether the native placement post-pass may set this box's used size directly
     /// (rather than only repositioning). True only when doing so cannot mis-render:
-    /// the box has no in-flow children or words to re-flow, uses content-box sizing,
-    /// and has no percentage margin/padding/inset box properties (which resolve against
-    /// the position-area cell — a used-value computation still owned by the bridge's
-    /// pre-bake path until a later expansion). Matches the boxes for which the engine's
-    /// grid-derived size equals the baked bridge result.
+    /// the box has no in-flow children or words to re-flow, and has no percentage
+    /// margin/padding/inset box properties (which resolve against the position-area
+    /// cell — a used-value computation still owned by the bridge's pre-bake path until a
+    /// later expansion). Both <c>content-box</c> and <c>border-box</c> sizing are handled
+    /// (the caller forms the border box accordingly). Matches the boxes for which the
+    /// engine's grid-derived size equals the baked bridge result.
     /// </summary>
     private bool CanApplyNativeAnchorSize()
     {
         if (Boxes.Count != 0 || Words.Count != 0)
-            return false;
-        if (string.Equals(BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase))
             return false;
         return !HasPercent(MarginTop) && !HasPercent(MarginRight)
             && !HasPercent(MarginBottom) && !HasPercent(MarginLeft)

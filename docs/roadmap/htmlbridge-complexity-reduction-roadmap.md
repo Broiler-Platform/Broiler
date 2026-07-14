@@ -1765,19 +1765,33 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   passing test regresses); `NativeAnchorPlacementWptTests` (bridge/engine paths agree pixel-wise) green in
   isolation. Also fixed a pre-existing arch-guard fail from the P5.8d.2b IVT addition
   (`LayoutArchitectureTests.Internal_Consumers_Are_Explicit_And_Minimal` did not list `Broiler.Wpt`). One
-  observed non-blocker: lever-on `position-area-scrolling-002` (already failing) drops 97.7 %→68.5 % —
-  native sizing amplifies the deferred scrolled-anchor placement divergence on an admitted box; it does
-  not change the fail *set* and production is default-off. The scroll case is excluded from correctness
-  until the scroll-simulation expansion.
+  observed non-blocker at this slice: lever-on `position-area-scrolling-002` (already failing) dropped
+  97.7 %→68.5 % (native sizing amplified a `box-sizing:border-box` box the size slice left on a partial
+  path); it did not change the fail *set* and production is default-off. **The box-sizing expansion below
+  fixes it** (scrolling-002 now passes lever-on).
+- **P5.8d.2b — native `box-sizing: border-box` (second expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). `CanApplyNativeAnchorSize` no longer excludes
+  `box-sizing: border-box`; the caller forms the border box per box-sizing. The engine paints `Size` as
+  the border box regardless of box-sizing, so for a border-box box the grid-resolved used size (which the
+  bridge feeds as the border-box value and clamps to the cell) IS the border box — `ApplyNativeAnchorPlacement`
+  now uses `borderBox ? max(target.Size, padding+border) : target.Size + padding+border`, the
+  `max(…, padding+border)` mirroring the bridge's `BorderBoxToContentSize` clamp (content ≥ 0). No new
+  parsing — the same `PositionAreaGrid.ResolveElementBox` inputs, just a different border-box assembly.
+  Tests: `NativeAnchorPlacementTests.cs` → 20 (replaced the border-box reposition-only fallback with two
+  border-box sizing cases: explicit width used as the border box — padding/border NOT added — and
+  border-box fill-the-cell). Regression check: full `Broiler.Layout.Tests` (128) green; native e2e (2)
+  green in isolation; the css-anchor-position **pixel** subset stays **byte-identical default-off (8-fail /
+  31-pass)**, and **lever-on improves to 7-fail / 32-pass** — `position-area-scrolling-002` flips to
+  passing (its border-box box now sizes to match the reference) with **zero regressions**.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
-  default-off until each feature is on the engine path — ~~percentage box props~~ → box-sizing → inline-CB
-  promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets
-  → position-try. (Childless auto/explicit/percentage sizing now lands natively — see the size expansion
-  above; percentage *box props* — margin/padding/inset resolved against the cell — and `box-sizing` are
-  still bridge-baked.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
-  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
-  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
-  the engine grows to reproduce them.
+  default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
+  inline-CB promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop →
+  `anchor()` insets → position-try. (Childless auto/explicit/percentage sizing AND `box-sizing:border-box`
+  now land natively — see the two size expansions above; percentage *box props* — margin/padding/inset
+  resolved against the cell — are still bridge-baked.) Each remaining feature is currently excluded by
+  `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
+  `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
+  widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 

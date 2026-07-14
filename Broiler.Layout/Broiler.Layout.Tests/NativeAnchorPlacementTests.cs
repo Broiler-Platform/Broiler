@@ -177,10 +177,16 @@ public sealed class NativeAnchorPlacementTests
     }
 
     [Fact]
-    public void Pass_KeepsLaidOutSize_ForBorderBoxSizing()
+    public void Pass_BorderBox_TreatsResolvedSizeAsBorderBox()
     {
         var (root, _) = FillCellFixture(out var target);
-        target.BoxSizing = "border-box"; // out of the sizing slice → reposition-only
+        // With box-sizing: border-box the authored width IS the border box, so padding
+        // and border are NOT added on top (content-box would give 50 + 10+10 = 70).
+        target.BoxSizing = "border-box";
+        target.Width = "50px";
+        target.Height = "50px";
+        target.PaddingLeft = "10px";
+        target.PaddingRight = "10px";
         try
         {
             NativeAnchorPlacement.Enabled = true;
@@ -188,8 +194,28 @@ public sealed class NativeAnchorPlacementTests
         }
         finally { NativeAnchorPlacement.Enabled = false; }
 
-        Assert.Equal(30, target.Size.Width, 3);
-        Assert.Equal(30, target.Size.Height, 3);
+        Assert.Equal(50, target.Size.Width, 3);   // border box = authored 50px
+        Assert.Equal(50, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void Pass_BorderBox_FillsCell_AsBorderBox()
+    {
+        var (root, _) = FillCellFixture(out var target);
+        // Auto width + border-box → the border box fills the cell (140), padding/border
+        // eat into the content box rather than extending beyond the cell.
+        target.BoxSizing = "border-box";
+        target.PaddingLeft = "10px";
+        target.PaddingRight = "10px";
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        Assert.Equal(140, target.Size.Width, 3);
+        Assert.Equal(140, target.Size.Height, 3);
     }
 
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
