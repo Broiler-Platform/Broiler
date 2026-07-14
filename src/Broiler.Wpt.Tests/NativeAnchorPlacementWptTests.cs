@@ -24,6 +24,7 @@ namespace Broiler.Wpt.Tests;
 /// anchor, a non-inline containing block, no scroll container, and no
 /// <c>position-try</c>/<c>anchor()</c>.
 /// </summary>
+[Xunit.Collection("NativeAnchorWpt")]
 public class NativeAnchorPlacementWptTests : IDisposable
 {
     private readonly bool _previousLever = WptTestRunner.NativeAnchorPlacement;

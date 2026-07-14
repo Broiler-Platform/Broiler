@@ -1903,18 +1903,45 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   anchor()-inset MVP path** (the corpus's anchor() tests are testharness/JS — unaffected by the render-only
   lever — or gate-excluded), so validation is the exact-geometry unit + pipeline + full-render tests plus
   no-regression.
+- **P5.8d.2b — `anchor-size()` sizing (eighth expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). Completes the `anchor()` function family (insets + sizing). A **childless** box whose
+  `width`/`height` use `anchor-size()` is now sized natively by the engine (the equivalent of the bridge's
+  `ResolveAnchorSizeFunctions`). The raw `anchor-size()` value survives onto `CssBox.Width`/`Height`, so:
+  - **Engine.** `CssBox.TryApplyNativeAnchorSizing` (run from the post-pass when `PositionArea == "none"`,
+    *before* the anchor()-inset placement so a repositioning uses the resolved size) resolves each
+    `anchor-size()` to the named anchor's dimension via `AnchorRegistry.ResolveAnchorSize` (dimensions are
+    frame-independent, so no CB conversion), then sets the used border box per `box-sizing` (content+pad/border,
+    or border-box clamped) with the font-free `NativeBorderPx`/`NativePaddingPx` helpers, growing the box in
+    place from its laid-out origin. Childless only (a re-flow would be needed otherwise).
+  - **Bridge.** `ResolveAnchorFunctions` skips baking the `anchor-size()` (`IsMvpNativeAnchorSizeBox`: an
+    absolutely-positioned childless box; `anchor-size()` only in `width`/`height` naming a registered
+    accessible anchor; no `anchor()` inset — the combined case stays baked; no `position-area`; no right/bottom
+    inset; **no CSS `zoom`**; not modal; no `position-try`), leaving the CSS for the engine.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +6 (width+height, width-only, content-box
+  pad/border, border-box, implicit `position-anchor`, childful fallback); `Broiler.Cli.Tests/
+  NativeAnchorSizePipelineTests.cs` (real pipeline sizes the box to the anchor's 50×70);
+  `Broiler.Wpt.Tests/NativeAnchorSizeWptTests.cs` (full render; baked & native agree). Regression check: full
+  `Broiler.Layout.Tests` (145) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged
+  (7-fail / 32-pass) with zero per-test movement.** The two corpus `anchor-size()` pixel tests stay baked and
+  **pass** as before — `anchor-size-css-zoom` (excluded by the `zoom` gate) and `transform-005` (excluded by
+  the `position-area` gate; it combines `anchor-size()` with `position-area` and 3D transforms) — so the clean
+  `anchor-size()` path is unit + pipeline + full-render validated with no corpus movement. (Also serialized
+  the three native-anchor WPT render test classes into one `[Collection("NativeAnchorWpt")]`: they toggle the
+  process-wide `WptTestRunner.NativeAnchorPlacement` static around a render, so running them in parallel let
+  one class's baked render stomp another's native render — a shared-static test race, not a product bug.)
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
-  CB)~~ → ~~`anchor()` insets~~ → abspos-inline CB (blockification reconciliation) → `anchor-size()` →
+  CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → abspos-inline CB (blockification reconciliation) →
   opposing-inset sizing → scroll simulation → `position-visibility` → dialog/backdrop → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
   props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
-  containing blocks, AND `anchor()` physical insets now land natively — see the seven expansions above.) Each
-  remaining feature is currently excluded by `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox` (or
-  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
-  `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
-  widen the gate one feature at a time as the engine grows to reproduce them.
+  containing blocks, `anchor()` physical insets, AND `anchor-size()` sizing now land natively — see the eight
+  expansions above.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox`/
+  `IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`) and stays on the
+  bridge path (baked + `position-area: none`), so enabling the lever globally is already safe (proven above);
+  the expansions widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 

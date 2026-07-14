@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Broiler.CSS;
 using Broiler.Dom;
 using Broiler.Layout;
@@ -146,7 +147,11 @@ public sealed partial class DomBridge
         }
 
         // Resolve anchor-size() function calls in both CSS and inline styles.
-        if (hasAnchorSizeRef)
+        // Native mode (P5.8d.2b anchor-size() expansion): skip baking for the MVP subset so
+        // the box's `width/height: anchor-size(...)` survives to the engine's sizing pass
+        // (CssBox.TryApplyNativeAnchorSizing).
+        if (hasAnchorSizeRef &&
+            !(NativeAnchorPlacement && IsMvpNativeAnchorSizeBox(element, cssProps, anchorRegistry)))
         {
             ResolveAnchorSizeFunctions(element, cssProps, anchorRegistry);
         }
@@ -254,6 +259,92 @@ public sealed partial class DomBridge
     /// <c>auto</c>.</summary>
     private static bool HasInset(Dictionary<string, string> props, string name) =>
         props.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) && v.Trim() != "auto";
+
+    /// <summary>
+    /// Whether an element's <c>anchor-size()</c> sizing is the MVP subset the engine's native
+    /// sizing pass reproduces (P5.8d.2b), so the bridge can hand it off instead of pre-baking
+    /// (see <see cref="CssBox"/>'s <c>TryApplyNativeAnchorSizing</c>). Requires: an absolutely
+    /// positioned, <b>childless</b> box (the engine only sizes childless boxes without a
+    /// re-flow); <c>anchor-size()</c> only in <c>width</c>/<c>height</c>, each naming a
+    /// registered accessible anchor; no <c>anchor()</c> inset (the combined case stays baked);
+    /// no <c>position-area</c>; no right/bottom inset (the engine grows the box from its
+    /// laid-out origin); no CSS <c>zoom</c>; not a modal dialog; and no <c>position-try</c>.
+    /// </summary>
+    private bool IsMvpNativeAnchorSizeBox(
+        DomElement element, Dictionary<string, string> cssProps,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        var merged = new Dictionary<string, string>(cssProps, StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in InlineStyle(element))
+            merged[kv.Key] = kv.Value;
+
+        // Absolutely positioned only (fixed gets a scroll adjustment the engine MVP omits).
+        if (merged.GetValueOrDefault("position") != "absolute")
+            return false;
+        if (merged.ContainsKey("position-try-fallbacks") || merged.ContainsKey("position-try"))
+            return false;
+        // position-area boxes are placed+sized by the position-area path, not here.
+        var area = merged.GetValueOrDefault("position-area");
+        if (!string.IsNullOrWhiteSpace(area) && area != "none")
+            return false;
+        if (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true)
+            return false;
+        // The engine sizes already-laid-out (already-zoomed) box geometry; a CSS zoom scale
+        // would double-count, so keep zoomed boxes baked.
+        if (Math.Abs(GetUsedZoomForElement(element) - 1.0) > 0.0001)
+            return false;
+        // Childless: the engine only resizes a box with no in-flow children/words.
+        if (ChildElements(element).Any())
+            return false;
+        if (!string.IsNullOrWhiteSpace(GetElementTextContent(element)))
+            return false;
+        // The engine grows the box from its laid-out left/top origin, so a right/bottom inset
+        // (which the baked path resolves via a re-layout) stays baked.
+        if (HasInset(merged, "right") || HasInset(merged, "bottom"))
+            return false;
+
+        // anchor-size() only in width/height; any anchor() inset means the combined case,
+        // which stays baked (the anchor()-inset gate already excludes anchor-size boxes).
+        bool anySize = false;
+        foreach (var (key, value) in merged)
+        {
+            if (value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
+                !value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (key is not ("width" or "height"))
+                return false;
+            anySize = true;
+        }
+        if (!anySize)
+            return false;
+
+        // Every referenced anchor must be registered and accessible.
+        string? implicitAnchor = merged.GetValueOrDefault("position-anchor");
+        foreach (var key in new[] { "width", "height" })
+        {
+            if (!merged.TryGetValue(key, out var value) ||
+                !value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                continue;
+            bool ok = true;
+            AnchorFunction.RewriteSize(value, r =>
+            {
+                var name = string.IsNullOrEmpty(r.Name)
+                    ? (implicitAnchor ?? string.Empty)
+                    : r.Name!;
+                if (string.IsNullOrEmpty(name) || name == "auto" ||
+                    !anchorRegistry.TryGetValue(name, out var anchor) ||
+                    !IsAnchorAccessible(anchor.SourceElement, element))
+                    ok = false;
+                return "0px";
+            });
+            if (!ok)
+                return false;
+        }
+
+        return true;
+    }
     /// <summary>
     /// Accumulates the scroll offset of scroll containers that lie between the
     /// anchor and the target — i.e. that are ancestors of <paramref name="anchorEl"/>

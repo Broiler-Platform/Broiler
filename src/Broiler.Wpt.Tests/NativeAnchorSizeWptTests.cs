@@ -4,27 +4,24 @@ using Broiler.HTML.Image;
 namespace Broiler.Wpt.Tests;
 
 /// <summary>
-/// End-to-end proof of the Phase 5 native <c>anchor()</c>-insets cutover (P5.8d.2b) through
-/// the full WPT render pipeline (<see cref="WptTestRunner.RenderHtmlFileBitmapPublic"/>:
-/// parse → DomBridge script/anchor resolution → serialize → engine layout → raster).
+/// End-to-end proof of the Phase 5 native <c>anchor-size()</c> cutover (P5.8d.2b) through
+/// the full WPT render pipeline (parse → DomBridge anchor resolution → serialize →
+/// HtmlPostProcessor → reparse → engine layout → raster).
 ///
 /// With the runner's <see cref="WptTestRunner.NativeAnchorPlacement"/> lever on, the bridge
-/// does <em>not</em> pre-bake a box positioned by <c>anchor()</c> functions in its physical
-/// insets (the MVP subset — <c>ResolveAnchorFunctions</c> skips it, so the
-/// <c>left/top: anchor(...)</c> CSS survives serialization); the box is instead placed by the
-/// Broiler.Layout engine's post-pass (<c>CssBox.TryApplyAnchorInsetPlacement</c>). The same
-/// fixture with the lever off (the bridge pre-bakes) lands the box in the same place, so the
-/// two paths agree.
+/// does <em>not</em> pre-bake a childless box whose <c>width</c>/<c>height</c> use
+/// <c>anchor-size()</c>; the box is instead sized by the Broiler.Layout engine's post-pass
+/// (<c>CssBox.TryApplyNativeAnchorSizing</c>). The same fixture with the lever off (the bridge
+/// pre-bakes) produces the same box, so the two paths agree.
 ///
 /// Fixture: a 200×200 <c>position:relative</c> containing block; a uniquely-named anchor
-/// <c>--a</c> (20×20 at (40,40), so its right/bottom edge is (60,60)); and a 30×30 red target
-/// whose <c>left</c>/<c>top</c> are <c>anchor(--a right)</c>/<c>anchor(--a bottom)</c>, so its
-/// left/top edge lands on the anchor's right/bottom edge — the red box occupies (60,60)–(89,89).
-/// This is strict MVP: a registered anchor, a single inset per axis, no scroll container, not
-/// fixed, no <c>position-try</c>/<c>anchor-size()</c>.
+/// <c>--a</c> (50×70, transparent); and a red target at (100,100) sized to
+/// <c>anchor-size(--a width)</c> × <c>anchor-size(--a height)</c> — so the red box occupies
+/// (100,100)–(149,169). Strict MVP: childless, absolutely positioned, no <c>position-area</c>,
+/// no zoom, no right/bottom inset, no <c>position-try</c>.
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
-public class NativeAnchorInsetWptTests : IDisposable
+public class NativeAnchorSizeWptTests : IDisposable
 {
     private readonly bool _previousLever = WptTestRunner.NativeAnchorPlacement;
 
@@ -38,8 +35,8 @@ public class NativeAnchorInsetWptTests : IDisposable
 <style>
   body { margin: 0; }
   #cb { position: relative; width: 200px; height: 200px; }
-  #anchor { position: absolute; left: 40px; top: 40px; width: 20px; height: 20px; anchor-name: --a; }
-  #target { position: absolute; width: 30px; height: 30px; left: anchor(--a right); top: anchor(--a bottom); background: #ff0000; }
+  #anchor { position: absolute; left: 40px; top: 40px; width: 50px; height: 70px; anchor-name: --a; }
+  #target { position: absolute; left: 100px; top: 100px; width: anchor-size(--a width); height: anchor-size(--a height); background: #ff0000; }
 </style>
 <div id=""cb""><div id=""anchor""></div><div id=""target""></div></div>";
 
@@ -65,7 +62,7 @@ public class NativeAnchorInsetWptTests : IDisposable
     private static (int x0, int y0, int x1, int y1, int count) Render(bool nativeAnchor)
     {
         WptTestRunner.NativeAnchorPlacement = nativeAnchor;
-        string dir = Path.Combine(Path.GetTempPath(), "broiler-native-anchor-inset-" + System.Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(Path.GetTempPath(), "broiler-native-anchor-size-" + System.Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
@@ -83,19 +80,19 @@ public class NativeAnchorInsetWptTests : IDisposable
     }
 
     [Fact]
-    public void NativeLeverOn_EnginePlacesAnchorInsetBox_AtAnchorEdges()
+    public void NativeLeverOn_EngineSizesAnchorSizeBox_ToAnchorDimensions()
     {
         var red = Render(nativeAnchor: true);
 
         Assert.True(red.count > 0, "red target box not painted under the native lever.");
-        Assert.True(System.Math.Abs(red.x0 - 60) <= 2, $"red left={red.x0}, expected ~60.");
-        Assert.True(System.Math.Abs(red.y0 - 60) <= 2, $"red top={red.y0}, expected ~60.");
-        Assert.True(System.Math.Abs(red.x1 - 89) <= 2, $"red right={red.x1}, expected ~89.");
-        Assert.True(System.Math.Abs(red.y1 - 89) <= 2, $"red bottom={red.y1}, expected ~89.");
+        Assert.True(System.Math.Abs(red.x0 - 100) <= 2, $"red left={red.x0}, expected ~100.");
+        Assert.True(System.Math.Abs(red.y0 - 100) <= 2, $"red top={red.y0}, expected ~100.");
+        Assert.True(System.Math.Abs(red.x1 - 149) <= 2, $"red right={red.x1}, expected ~149 (width 50).");
+        Assert.True(System.Math.Abs(red.y1 - 169) <= 2, $"red bottom={red.y1}, expected ~169 (height 70).");
     }
 
     [Fact]
-    public void BridgeAndEnginePaths_Agree_OnAnchorInsetBox()
+    public void BridgeAndEnginePaths_Agree_OnAnchorSizeBox()
     {
         var baked = Render(nativeAnchor: false);
         var native = Render(nativeAnchor: true);

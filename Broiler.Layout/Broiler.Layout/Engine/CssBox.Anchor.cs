@@ -135,6 +135,10 @@ partial class CssBox
         }
         else if (box.PositionArea == "none")
         {
+            // anchor-size() sizing (P5.8d.2b anchor-size() expansion): size a childless box
+            // to the anchor's width/height first, so any anchor()-inset placement that
+            // follows repositions against the resolved size.
+            box.TryApplyNativeAnchorSizing(registry);
             // anchor()/anchor-size() inset placement (P5.8d.2b anchor()-insets expansion):
             // a box positioned by anchor() functions in its left/right/top/bottom rather
             // than position-area.
@@ -380,6 +384,83 @@ partial class CssBox
         if (len.IsPercentage)
             return basis * len.Number;
         return len.Unit == CssUnit.Px ? len.Number : 0;
+    }
+
+    /// <summary>Whether a raw CSS value carries an <c>anchor-size()</c> function.</summary>
+    private static bool HasAnchorSize(string? value) =>
+        value != null && value.Contains("anchor-size(", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Sizes a childless box whose <c>width</c>/<c>height</c> use <c>anchor-size()</c> to the
+    /// named anchor's dimension (P5.8d.2b anchor-size() expansion) — the engine equivalent of
+    /// the bridge's <c>ResolveAnchorSizeFunctions</c> pre-bake. The resolved value is the used
+    /// content or border size per <c>box-sizing</c> (mirroring how the bridge writes the
+    /// property and the renderer applies it); the box is grown in place from its current
+    /// origin, so any following <c>anchor()</c>-inset placement repositions against the new
+    /// size. Returns <c>false</c> (size unchanged) when it is not an MVP anchor-size box or the
+    /// anchor is unregistered.
+    /// </summary>
+    internal bool TryApplyNativeAnchorSizing(AnchorRegistry registry)
+    {
+        if (Boxes.Count != 0 || Words.Count != 0)
+            return false; // childless only (a re-flow would be needed otherwise)
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        bool wAnchor = HasAnchorSize(Width), hAnchor = HasAnchorSize(Height);
+        if (!wAnchor && !hAnchor)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+
+        double? contentW = wAnchor ? ResolveAnchorSizeComponent(Width, registry, inScope) : null;
+        double? contentH = hAnchor ? ResolveAnchorSizeComponent(Height, registry, inScope) : null;
+        if (wAnchor && contentW is null) return false;
+        if (hAnchor && contentH is null) return false;
+
+        // box-sizing: content-box (default) — the resolved value is the content size, so add
+        // padding+border for the border box. border-box — it already is the border box (clamp
+        // to at least padding+border so the content stays non-negative). Font-free px, matching
+        // the bridge and the position-area sizing path.
+        bool borderBox = string.Equals(BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase);
+        double padBorderW =
+            NativeBorderPx(BorderLeftWidth, BorderLeftStyle) + NativePaddingPx(PaddingLeft)
+            + NativePaddingPx(PaddingRight) + NativeBorderPx(BorderRightWidth, BorderRightStyle);
+        double padBorderH =
+            NativeBorderPx(BorderTopWidth, BorderTopStyle) + NativePaddingPx(PaddingTop)
+            + NativePaddingPx(PaddingBottom) + NativeBorderPx(BorderBottomWidth, BorderBottomStyle);
+
+        float newW = Size.Width, newH = Size.Height;
+        if (contentW is double cw)
+            newW = (float)(borderBox ? System.Math.Max(cw, padBorderW) : cw + padBorderW);
+        if (contentH is double ch)
+            newH = (float)(borderBox ? System.Math.Max(ch, padBorderH) : ch + padBorderH);
+        Size = new System.Drawing.SizeF(newW, newH);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves a <c>width</c>/<c>height</c> value that uses <c>anchor-size()</c> to the
+    /// anchor's dimension (px). The default anchor is the box's <c>position-anchor</c> when the
+    /// function names none. Returns <c>null</c> for an unregistered anchor / non-numeric result.
+    /// </summary>
+    private double? ResolveAnchorSizeComponent(
+        string? value, AnchorRegistry registry, Func<object?, bool> inScope)
+    {
+        if (string.IsNullOrEmpty(value))
+            return null;
+        string rewritten = AnchorFunction.RewriteSize(value, r =>
+        {
+            string name = string.IsNullOrEmpty(r.Name) ? (PositionAnchor ?? string.Empty) : r.Name!;
+            if (string.IsNullOrEmpty(name) || name == "auto")
+                return "0px";
+            var size = registry.ResolveAnchorSize(name, r.Dimension, inScope);
+            return size is double s ? s.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px" : "0px";
+        });
+        var len = new CssLength(rewritten);
+        if (len.HasError || len.IsPercentage)
+            return null;
+        return len.Unit == CssUnit.Px ? len.Number : null;
     }
 
     /// <summary>Whether a raw CSS inset value carries an <c>anchor()</c> function.</summary>

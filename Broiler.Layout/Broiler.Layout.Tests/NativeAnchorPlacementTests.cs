@@ -429,6 +429,74 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(0, target.Location.Y, 3);
     }
 
+    // ------------------------------------------------------------------
+    // anchor-size() sizing (P5.8d.2b anchor-size() expansion)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AnchorSize_WidthAndHeight_SizeBoxToAnchorDimensions()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a is 20×20
+        target.Width = "anchor-size(--a width)";
+        target.Height = "anchor-size(--a height)";
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void AnchorSize_OnlyWidth_KeepsLaidOutHeight()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // laid-out 30×30
+        target.Width = "anchor-size(--a width)"; // 20
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(30, target.Size.Height, 3);  // height untouched
+    }
+
+    [Fact]
+    public void AnchorSize_ContentBox_AddsPaddingAndBorder()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)"; // content 20
+        target.PaddingLeft = "5px";
+        target.PaddingRight = "5px";
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);   // 20 + 5 + 5 border box
+    }
+
+    [Fact]
+    public void AnchorSize_BorderBox_UsesResolvedAsBorderBox()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)"; // 20
+        target.BoxSizing = "border-box";
+        target.PaddingLeft = "5px";
+        target.PaddingRight = "5px";
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);   // border box = resolved 20 (padding not added)
+    }
+
+    [Fact]
+    public void AnchorSize_ImplicitAnchor_UsesPositionAnchor()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.PositionAnchor = "--a";
+        target.Width = "anchor-size(width)";   // no name → position-anchor --a
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorSize_ChildfulBox_KeepsLaidOutSize()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)";
+        _ = Box(target, new PointF(0, 0), new SizeF(10, 10));  // has a child → excluded
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);  // unchanged (reposition/resize needs a re-flow)
+    }
+
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
     // childless absolutely-positioned "bottom right" target (30×30 at origin).
     private static (CssBox root, CssBox cb) FillCellFixture(out CssBox target)
