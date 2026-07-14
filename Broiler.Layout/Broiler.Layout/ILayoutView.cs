@@ -29,6 +29,14 @@ public interface ILayoutView : IDisposable
     /// <param name="document">The canonical document to lay out.</param>
     /// <param name="viewport">The viewport size to lay out against.</param>
     /// <param name="baseUrl">The document base URL used for resource resolution.</param>
+    /// <param name="contentDocumentResolver">
+    /// Optional host callback (HtmlBridge Phase 4 P4.4b) mapping a nested-browsing-context
+    /// container element (<c>&lt;iframe&gt;</c>/<c>&lt;object&gt;</c>/<c>&lt;frame&gt;</c>) to its
+    /// referenced content <see cref="DomDocument"/>. When supplied, a sub-document that is no
+    /// longer an in-tree child is projected into the box tree (and its geometry composed into the
+    /// main frame). Null preserves the legacy in-tree-materialisation behaviour.
+    /// </param>
     IReadOnlyDictionary<DomElement, BoxGeometry> GetGeometry(
-        DomDocument document, SizeF viewport, string baseUrl);
+        DomDocument document, SizeF viewport, string baseUrl,
+        Func<DomElement, DomDocument?>? contentDocumentResolver = null);
 }

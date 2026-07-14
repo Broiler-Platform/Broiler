@@ -944,8 +944,7 @@ public sealed partial class DomBridge
             return null;
         }
 
-        var subDocumentRoot = ChildElements(element).FirstOrDefault(child =>
-            string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        var subDocumentRoot = GetContentDocument(element);
         if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 

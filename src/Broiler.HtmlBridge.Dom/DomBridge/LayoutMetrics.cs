@@ -1524,13 +1524,12 @@ public sealed partial class DomBridge
         return string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static DomElement? GetOuterFrameElement(DomElement documentElement)
+    private DomElement? GetOuterFrameElement(DomElement documentElement)
     {
-        var docRoot = ParentEl(documentElement);
-        return docRoot != null &&
-               string.Equals(docRoot.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)
-            ? ParentEl(docRoot)
-            : null;
+        // A sub-document's documentElement (<html>) now hangs off its canonical DomDocument
+        // (the severed content document, P4.4b); recover the owning frame via the reverse map
+        // (was ParentEl(ParentEl(<html>)) through the #subdoc-root element).
+        return GetFrameForContentDocument(documentElement?.ParentNode);
     }
 
     private DomElement? GetOuterScrollContinuationElement(DomElement scrollContainer)

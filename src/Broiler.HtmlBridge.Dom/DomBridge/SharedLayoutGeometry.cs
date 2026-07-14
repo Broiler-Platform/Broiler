@@ -87,7 +87,10 @@ public sealed partial class DomBridge
         {
             var document = GetRenderDocument();
             var viewport = new SizeF(_viewportWidth, _viewportHeight);
-            return LayoutView.GetGeometry(document, viewport, _pageUrl);
+            // P4.4b: a materialised iframe/object sub-document is no longer an in-tree
+            // #subdoc-root child — hand the layout view the resolver so it projects each
+            // referenced content document as a sub-viewport and composes its geometry.
+            return LayoutView.GetGeometry(document, viewport, _pageUrl, ResolveContentDocumentForRender);
         }
         catch
         {
@@ -113,7 +116,8 @@ public sealed partial class DomBridge
     {
         public static readonly NullLayoutView Instance = new();
         public IReadOnlyDictionary<DomElement, BoxGeometry> GetGeometry(
-            DomDocument document, SizeF viewport, string baseUrl) => EmptySharedGeometry;
+            DomDocument document, SizeF viewport, string baseUrl,
+            Func<DomElement, DomDocument?>? contentDocumentResolver = null) => EmptySharedGeometry;
         public void Dispose() { }
     }
 }
