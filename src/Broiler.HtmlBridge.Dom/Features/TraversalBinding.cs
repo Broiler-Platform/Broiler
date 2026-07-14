@@ -364,7 +364,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// given <paramref name="index"/>, and prunes GC'd range references. Called by the bridge's
     /// mutation path.
     /// </summary>
-    internal void NotifyNodeRemoved(DomElement parent, DomNode removedChild, int index)
+    internal void NotifyNodeRemoved(DomNode parent, DomNode removedChild, int index)
     {
         for (var i = _activeRanges.Count - 1; i >= 0; i--)
         {

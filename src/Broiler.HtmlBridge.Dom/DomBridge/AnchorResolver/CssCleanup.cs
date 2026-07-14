@@ -23,27 +23,13 @@ public sealed partial class DomBridge
             // text node, mutating root.Children mid-enumeration ("Collection was
             // modified", WPT issue #1143). SnapshotChildren also guards the ToList()
             // copy overflow ("Destination array…"), same idiom as AnchorRegistry.
-            bool hadTextChild = false;
+            // Phase 4 item 3: the <style> CSS source is always a canonical DomText child
+            // (the parallel InnerHtml string is gone), so neutralizing the text node(s) in
+            // place covers every source the renderer reads via GetStyleElementSourceText.
             foreach (var child in SnapshotChildren(root))
             {
                 if (IsText(child) && !string.IsNullOrEmpty(BridgeText(child)))
-                {
                     SetBridgeText(child, RemoveUnsupportedCssRules(BridgeText(child)));
-                    hadTextChild = true;
-                }
-            }
-
-            // RF-BRIDGE-1c Phase F (F3c) follow-up: a <style> element's CSS can live in its
-            // InnerHtml runtime state with no DomText child (the same InnerHtml-backed state the
-            // animation/@position-try collectors handle). Neutralize that source too, so the
-            // renderer — which reads it back through GetStyleElementSourceText — does not re-apply
-            // anchor rules the resolver has already resolved into inline styles. Changing the
-            // source re-parses the sheet on next read (EnsureStyleSheetRulesCurrent).
-            if (!hadTextChild)
-            {
-                var state = GetElementRuntimeState(root);
-                if (!string.IsNullOrEmpty(state.InnerHtml))
-                    state.InnerHtml = RemoveUnsupportedCssRules(state.InnerHtml);
             }
         }
 

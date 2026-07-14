@@ -27,10 +27,10 @@ public sealed partial class DomBridge
         _jsContext = context;
         var document = new JSObject();
 
-        // Map the document JSObject to _documentNode so that ToJSObject(_documentNode) returns
-        // the same object as the 'document' variable visible in JS. This ensures
+        // Map the document JSObject to the canonical DomDocument so that ToJSObject(_document)
+        // returns the same object as the 'document' variable visible in JS. This ensures
         // strict equality checks like 'range.commonAncestorContainer === document' work.
-        _jsObjects.Set(_documentNode, document);
+        _jsObjects.Set(_document, document);
 
         RegisterDocumentBasics(context, document);
         RegisterDocumentEventsAndMutationObservers(context);

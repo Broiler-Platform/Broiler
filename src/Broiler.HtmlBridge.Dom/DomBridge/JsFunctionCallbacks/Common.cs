@@ -25,7 +25,9 @@ public sealed partial class DomBridge
             return new JSString(sb.ToString());
         }
 
-        return new JSString(GetElementRuntimeState(element).InnerHtml);
+        // A childless element has empty textContent (its content, if any, is canonical DomText
+        // children handled above — Phase 4 item 3 removed the parallel InnerHtml fallback).
+        return new JSString(string.Empty);
     }
 
 
@@ -56,7 +58,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(containerA, containerB))
             return offsetA > offsetB;
 
-        if (IsDescendant(containerA, containerB))
+        if (containerB.IsDescendantOf(containerA))
         {
             DomNode node = containerB;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
@@ -70,7 +72,7 @@ public sealed partial class DomBridge
             return false;
         }
 
-        if (IsDescendant(containerB, containerA))
+        if (containerA.IsDescendantOf(containerB))
         {
             DomNode node = containerA;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))

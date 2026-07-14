@@ -34,6 +34,13 @@ public sealed partial class DomBridge
         if (_jsObjects.TryGet(node, out var cached))
             return cached;
 
+        // Phase 4 item 1: a canonical DomDocument is the document root. The main document is in the
+        // node-wrapper map above; a sub-document root's wrapper lives in the document-wrapper map
+        // (P2.2/P4.4a). Resolve it here so e.g. documentElement.parentNode returns the document
+        // object, not a fallthrough character-data wrapper.
+        if (node is DomDocument documentNode && _jsObjects.TryGetDocument(documentNode, out var documentWrapper))
+            return documentWrapper;
+
         var obj = new JSObject();
         _jsObjects.Set(node, obj);
 
@@ -149,7 +156,15 @@ public sealed partial class DomBridge
         // style object — CSS property access and manipulation.
         // In browsers, `element.style` is a read-only property: assigning a
         // string sets `style.cssText` instead of replacing the object.
-        var styleObj = BuildStyleObject(element, () => bridge.InvalidateStyleScope(element));
+        // Phase 4 item 2: after every element.style mutation (per-property set, cssText, setProperty,
+        // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
+        // canonical style= attribute so element.style and getAttribute("style") observe one state,
+        // then invalidate computed style.
+        var styleObj = BuildStyleObject(element, () =>
+        {
+            bridge.SyncStyleAttributeFromInlineStyle(element);
+            bridge.InvalidateStyleScope(element);
+        });
         obj.FastAddProperty((KeyString)"style",
             new JSFunction((in a) => styleObj, "get style"),
             new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
@@ -188,7 +203,7 @@ public sealed partial class DomBridge
 
         // parentNode (read-only, dynamic)
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(element) != null ? ToJSObject(ParentEl(element)) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => element.ParentNode != null ? ToJSObject(element.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"isConnected",
@@ -777,7 +792,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(node) != null ? ToJSObject(ParentEl(node)) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"parentElement",
@@ -935,7 +950,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in a) => ParentEl(node) != null ? ToJSObject(ParentEl(node)!) : JSNull.Value, "get parentNode"),
+            new JSFunction((in a) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"parentElement",
@@ -1058,7 +1073,7 @@ public sealed partial class DomBridge
 
         // -- Tree navigation --
         obj.FastAddProperty((KeyString)"parentNode",
-            new JSFunction((in _) => ParentEl(node) != null ? ToJSObject(ParentEl(node)!) : JSNull.Value, "get parentNode"),
+            new JSFunction((in _) => node.ParentNode != null ? ToJSObject(node.ParentNode) : JSNull.Value, "get parentNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         obj.FastAddProperty((KeyString)"parentElement",
             new JSFunction((in a) => JsJsObjectsGetParentElement058Core(node, in a), "get parentElement"),
@@ -1123,7 +1138,7 @@ public sealed partial class DomBridge
                 var childEl = FindDomNodeByJSObject(childObj);
                 if (childEl == null)
                     return a[0];
-                if (ReferenceEquals(childEl, fragment) || IsDescendant(childEl, fragment))
+                if (ReferenceEquals(childEl, fragment) || fragment.IsDescendantOf(childEl))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 InsertNodeAt(fragment, childEl, fragment.ChildNodes.Count);
                 return a[0];
@@ -1137,7 +1152,7 @@ public sealed partial class DomBridge
                 var newEl = FindDomNodeByJSObject(newChildObj);
                 if (newEl == null)
                     return a[0];
-                if (ReferenceEquals(newEl, fragment) || IsDescendant(newEl, fragment))
+                if (ReferenceEquals(newEl, fragment) || fragment.IsDescendantOf(newEl))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {

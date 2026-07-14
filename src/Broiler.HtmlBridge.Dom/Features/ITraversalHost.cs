@@ -21,7 +21,7 @@ internal interface ITraversalHost
     JSContext JsContext { get; }
 
     /// <summary>The main document root node that owns a range created without an explicit root.</summary>
-    DomElement DocumentNode { get; }
+    DomNode DocumentNode { get; }
 
     /// <summary>Returns the single JS wrapper identity for <paramref name="node"/>.</summary>
     JSObject ToJSObject(DomNode node);

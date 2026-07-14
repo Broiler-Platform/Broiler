@@ -38,7 +38,7 @@ internal sealed class EventDispatchBinding(IEventDispatchHost host)
         var eventType = typeVal != null && typeVal is JSString ? typeVal.ToString() : "unknown";
 
         // Build the path from the root to the target
-        var path = new List<DomElement>();
+        var path = new List<DomNode>();
         var visited = new HashSet<DomElement>();
         var node = DomBridge.ParentEl(target);
         while (node != null && visited.Add(node)) { path.Add(node); node = DomBridge.ParentEl(node); }
@@ -174,7 +174,7 @@ internal sealed class EventDispatchBinding(IEventDispatchHost host)
         }
     }
 
-    private JSValue BuildComposedPathValue(DomNode target, IReadOnlyList<DomElement> path)
+    private JSValue BuildComposedPathValue(DomNode target, IReadOnlyList<DomNode> path)
     {
         var documentNode = _host.DocumentNode;
         var documentJSObject = _host.DocumentJSObject;

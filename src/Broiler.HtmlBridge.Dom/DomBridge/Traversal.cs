@@ -125,7 +125,7 @@ public sealed partial class DomBridge
         {
             var node = allNodes[i];
             // Only include top-level nodes (not descendants of already-included nodes)
-            var isDescendantOfIncluded = result.Any(r => IsDescendant(r, node));
+            var isDescendantOfIncluded = result.Any(r => node.IsDescendantOf(r));
             if (!isDescendantOfIncluded)
                 result.Add(node);
         }
@@ -136,14 +136,14 @@ public sealed partial class DomBridge
     /// Notifies all active ranges that a child was removed from <paramref name="parent"/>
     /// at the given <paramref name="index"/>.
     /// </summary>
-    private void NotifyChildAdded(DomElement parent, DomNode addedChild, int index)
+    private void NotifyChildAdded(DomNode parent, DomNode addedChild, int index)
     {
         var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
         var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
         NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
     }
 
-    private void NotifyChildRemoved(DomElement parent, DomNode removedChild, int index, DomNode? previousSibling = null, DomNode? nextSibling = null)
+    private void NotifyChildRemoved(DomNode parent, DomNode removedChild, int index, DomNode? previousSibling = null, DomNode? nextSibling = null)
     {
         // Range boundary adjustment for the removed child lives with the traversal feature module,
         // which owns the active-range registry.
@@ -158,7 +158,7 @@ public sealed partial class DomBridge
     // P3.2), which owns the observer registry. These thin delegators keep the bridge mutation path's
     // historical call sites (child add/remove here, attribute writes in Attributes.cs/JsObjects.cs,
     // character-data writes below) source-compatible.
-    private void NotifyMutationObservers(DomElement target,
+    private void NotifyMutationObservers(DomNode target,
         DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling) =>
         _mutations.DeliverChildListMutation(target, addedChild, removedChild, previousSibling, nextSibling);
 

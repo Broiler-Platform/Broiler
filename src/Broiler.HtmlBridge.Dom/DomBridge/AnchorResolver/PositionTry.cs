@@ -30,16 +30,11 @@ public sealed partial class DomBridge
     {
         if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            // RF-BRIDGE-1c Phase F (F3c) follow-up: read the <style> source through the
-            // canonical GetStyleElementSourceText accessor rather than hand-walking child
-            // text nodes. After Attach, a <style> element's CSS can live in its InnerHtml
-            // runtime state with no DomText child at all (childCount == 0) — the raw child
-            // walk then saw nothing, so @position-try rules were never collected and every
-            // fallback silently failed to apply (in both the resolve-only and full-render
-            // paths). GetStyleElementSourceText is the same source the cascade reads and
-            // covers both the DomText-child and InnerHtml-fallback cases. Use the raw source
-            // (not the serialized rule model): the CSS rule serializer does not round-trip
-            // the @position-try at-rule.
+            // Read the <style> source through the canonical GetStyleElementSourceText accessor
+            // (the same source the cascade reads) rather than hand-walking child text nodes, so
+            // @position-try rules are collected consistently in the resolve-only and full-render
+            // paths. Use the raw source (not the serialized rule model): the CSS rule serializer
+            // does not round-trip the @position-try at-rule.
             var raw = GetStyleElementSourceText(el);
             if (!string.IsNullOrEmpty(raw))
             {

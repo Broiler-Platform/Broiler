@@ -73,8 +73,8 @@ public sealed partial class DomBridge
 
         // Hand the collected sheets to the canonical scope builder in document order; it
         // gates each on the element's `media` attribute against the viewport and re-syncs the
-        // engine only when the effective set changes. Text extraction (InnerHtml / CSSOM rule
-        // text / external-sheet runtime state) stays here because it needs the DOM and loading.
+        // engine only when the effective set changes. Text extraction (canonical DomText children /
+        // CSSOM rule text / external-sheet runtime state) stays here because it needs the DOM and loading.
         var sources = new List<CssStyleScopeBuilder.StyleSource>(styleElements.Count);
         foreach (var styleEl in styleElements)
             sources.Add(new CssStyleScopeBuilder.StyleSource(

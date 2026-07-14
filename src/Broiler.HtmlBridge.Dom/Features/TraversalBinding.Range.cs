@@ -379,7 +379,7 @@ internal sealed partial class TraversalBinding
                 {
                     var node = allNodes[i];
                     // Skip descendants of start/end containers (already handled)
-                    if (DomBridge.IsDescendant(startContainer, node) || DomBridge.IsDescendant(endContainer, node))
+                    if (node.IsDescendantOf(startContainer) || node.IsDescendantOf(endContainer))
                         continue;
                     // Only collect from top-level nodes
                     if (DomBridge.IsText(node))

@@ -98,27 +98,41 @@ public sealed partial class DomBridge
             target[kv.Key] = kv.Value;
     }
 
+    /// <summary>
+    /// Serializes the element's authoritative inline-style dict back into its canonical
+    /// <c>style=</c> attribute in CSSOM serialization form (shorthand-first, <c>"; "</c>-joined),
+    /// removing the attribute when the dict is empty. This is the single inline-style write-through
+    /// (Phase 4 item 2): it runs at serialization (<see cref="ReflectRenderState"/>) and after every
+    /// script <c>element.style</c> mutation, so a JS style mutation and <c>getAttribute("style")</c>
+    /// observe the same state. Uses the node-model <see cref="SetAttr"/>/<see cref="RemoveAttr"/> (not
+    /// the JS <c>setAttribute</c> binding), so there is no reparse loop back into the dict.
+    /// </summary>
+    private void SyncStyleAttributeFromInlineStyle(DomElement element)
+    {
+        var style = InlineStyle(element);
+        if (style.Count == 0)
+        {
+            RemoveAttr(element, "style");
+            return;
+        }
+
+        var styleText = string.Join(
+            "; ",
+            style
+                .OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+                .Select(static kv => $"{kv.Key}: {kv.Value}"));
+        if (!TryGetAttribute(element, "style", out var currentStyle) ||
+            !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
+        {
+            SetAttr(element, "style", styleText);
+        }
+    }
+
     private void ReflectRenderState(DomElement element)
     {
         if (!IsText(element) && !element.TagName.StartsWith('#'))
         {
-            if (InlineStyle(element).Count == 0)
-            {
-                RemoveAttr(element, "style");
-            }
-            else
-            {
-                var styleText = string.Join(
-                    "; ",
-                    InlineStyle(element)
-                        .OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
-                        .Select(static kv => $"{kv.Key}: {kv.Value}"));
-                if (!TryGetAttribute(element, "style", out var currentStyle) ||
-                    !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
-                {
-                    SetAttr(element, "style", styleText);
-                }
-            }
+            SyncStyleAttributeFromInlineStyle(element);
 
             if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
                 !HasAttr(element, "value") &&
@@ -306,7 +320,6 @@ public sealed partial class DomBridge
             InlineStyle(element)["height"] = height;
 
         ClearChildren(element);
-        GetElementRuntimeState(element).InnerHtml = string.Empty;
 
         var fill = CreateBridgeElement("div");
         SetParent(fill, element);
@@ -833,8 +846,8 @@ public sealed partial class DomBridge
     // text/comment children serialize once construction flips to DomText/DomComment. GetKind keys
     // text/comment off NodeType (holds for facade and canonical char-data), and the remaining
     // special kinds off the facade #document-fragment/#subdoc-root/#doctype TagNames (still facade
-    // elements). GetName/GetAttributes/GetStyles/GetRawInnerHtml are only invoked for element/doctype
-    // nodes (see HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
+    // elements). GetName/GetAttributes/GetStyles are only invoked for element/doctype nodes (see
+    // HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
     private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter() => new(
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
@@ -876,7 +889,9 @@ public sealed partial class DomBridge
             DomCharacterData other => other.Data,
             _ => BridgeText(node),
         },
-        GetRawInnerHtml: static node => GetElementRuntimeState(node).InnerHtml);
+        // Phase 4 item 3: the parallel InnerHtml string is gone — raw-text content is always a
+        // canonical DomText child, serialized via GetChildren/GetText above. No raw fallback.
+        GetRawInnerHtml: static _ => null);
 
     /// <summary>Whether <paramref name="node"/>'s parent is an HTML raw-text element whose text
     /// content is serialized literally (not HTML-escaped). The standard raw-text element set is

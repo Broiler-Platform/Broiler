@@ -135,6 +135,8 @@ public sealed partial class DomBridge
                 GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
 
+            // Phase 4 item 2: write-through so getAttribute("style") observes the assignment.
+            bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);
         }
 
@@ -211,7 +213,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetIsConnected032Core(DomNode node, in Arguments _)
     {
         var root = GetTreeRoot(node);
-        return ReferenceEquals(root, _documentNode) ? JSBoolean.True : JSBoolean.False;
+        return ReferenceEquals(root, _document) ? JSBoolean.True : JSBoolean.False;
     }
 
     /// <summary>Whether <paramref name="node"/> is a sub-document root element (only elements can be).</summary>
@@ -289,10 +291,10 @@ public sealed partial class DomBridge
             return new JSNumber(10); // DOCUMENT_TYPE_NODE (canonical DomDocumentType)
         if (node is DomDocumentFragment)
             return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE (canonical DomDocumentFragment)
-        if (node is not DomElement element)
+        if (node is DomDocument)
+            return new JSNumber(9); // DOCUMENT_NODE (canonical DomDocument — the document root)
+        if (node is not DomElement)
             return new JSNumber(1); // canonical non-element char-data already handled above
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
-            return new JSNumber(9); // DOCUMENT_NODE
         return new JSNumber(1); // ELEMENT_NODE
     }
 
@@ -307,10 +309,10 @@ public sealed partial class DomBridge
             return new JSString(docType.Name); // doctype nodeName is its (already lowercased) name
         if (node is DomDocumentFragment)
             return new JSString("#document-fragment");
+        if (node is DomDocument)
+            return new JSString("#document"); // canonical DomDocument — the document root
         if (node is not DomElement element)
             return JSNull.Value;
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase))
-            return new JSString("#document");
 
         // Non-HTML namespace elements preserve original case (per DOM spec)
         if (!string.IsNullOrEmpty(element.NamespaceUri) && !string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
@@ -681,7 +683,7 @@ public sealed partial class DomBridge
             return JSBoolean.False;
         if (ReferenceEquals(node, other))
             return JSBoolean.True;
-        return IsDescendant(node, other) ? JSBoolean.True : JSBoolean.False;
+        return other.IsDescendantOf(node) ? JSBoolean.True : JSBoolean.False;
     }
 
 
@@ -699,9 +701,9 @@ public sealed partial class DomBridge
             return new JSNumber(0);
         if (!ReferenceEquals(GetTreeRoot(node), GetTreeRoot(other)))
             return new JSNumber(documentPositionDisconnected);
-        if (IsDescendant(node, other))
+        if (other.IsDescendantOf(node))
             return new JSNumber(documentPositionFollowing | documentPositionContainedBy);
-        if (IsDescendant(other, node))
+        if (node.IsDescendantOf(other))
             return new JSNumber(documentPositionPreceding | documentPositionContains);
         return new JSNumber(CompareTreeOrder(node, other) < 0 ? documentPositionFollowing : documentPositionPreceding);
     }
@@ -772,7 +774,7 @@ public sealed partial class DomBridge
         if (newEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
         {
@@ -891,7 +893,7 @@ public sealed partial class DomBridge
         if (childEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
+        if (ReferenceEquals(childEl, element) || element.IsDescendantOf(childEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         bridgeForAppend.InsertNodeAt(element, childEl, element.ChildNodes.Count);
         return a[0];
@@ -954,7 +956,7 @@ public sealed partial class DomBridge
         if (newEl == null || oldEl == null)
             return a[1];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         var idx = ChildIndexOf(element, oldEl);
         if (idx < 0)

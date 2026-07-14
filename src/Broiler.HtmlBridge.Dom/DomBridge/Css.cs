@@ -320,9 +320,9 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Raw author <em>source</em> text for a style element — its text-node children,
-    /// the <c>textContent</c>/<c>InnerHtml</c> fallback, or a cached/fetched linked
-    /// stylesheet — <em>without</em> any CSSOM <c>insertRule</c>/<c>deleteRule</c>
+    /// Raw author <em>source</em> text for a style element — its canonical text-node
+    /// children, or a cached/fetched linked stylesheet — <em>without</em> any CSSOM
+    /// <c>insertRule</c>/<c>deleteRule</c>
     /// mutations applied. This is the input from which the shared rule model is
     /// (re)parsed; <see cref="GetStyleElementCssText"/> applies mutations on top.
     /// </summary>
@@ -336,9 +336,6 @@ public sealed partial class DomBridge
             if (IsText(child))
                 cssText.Append(BridgeText(child));
         }
-
-        if (cssText.Length == 0 && !string.IsNullOrEmpty(GetElementRuntimeState(styleEl).InnerHtml))
-            cssText.Append(GetElementRuntimeState(styleEl).InnerHtml);
 
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&

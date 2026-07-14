@@ -244,20 +244,10 @@ public sealed partial class DomBridge
 
     private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
 
-    /// <summary>
-    /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
-    /// <paramref name="ancestor"/> in the DOM tree.
-    /// </summary>
-    internal static bool IsDescendant(DomNode ancestor, DomNode candidate)
-    {
-        var current = candidate.ParentNode;
-        while (current != null)
-        {
-            if (ReferenceEquals(current, ancestor)) return true;
-            current = current.ParentNode;
-        }
-        return false;
-    }
+    // Phase 4 item 5: the bridge's IsDescendant(ancestor, candidate) copy is deleted; call sites use
+    // the canonical Broiler.Dom.DomNode.IsDescendantOf(ancestor) instance method (identical ancestor
+    // walk; every bridge call site passes a non-null ancestor, so canonical's null-ancestor throw is
+    // unreachable).
 
     /// <summary>
     /// Compares two nodes in document tree order.
@@ -364,9 +354,6 @@ public sealed partial class DomBridge
         // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
         // their namespace rather than defaulting to HTML.
         var clone = CreateBridgeElementNS(element.NamespaceUri, element.TagName, element.Id, element.ClassName);
-        // RF-BRIDGE-1c Phase F: raw inner-HTML lives in ElementRuntimeState now; copy it across
-        // the clone (matching the prior facade behaviour of seeding InnerHtml at construction).
-        GetElementRuntimeState(clone).InnerHtml = GetElementRuntimeState(source).InnerHtml;
         // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
         // set so namespaced attributes (namespace, prefix, local name) survive the clone —
         // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
@@ -551,8 +538,8 @@ public sealed partial class DomBridge
         if (IsComment(node)) return 8;
         if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
         if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
-        if (node is not DomElement element) return 1;
-        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
+        if (node is DomDocument) return 9; // DOCUMENT_NODE (canonical DomDocument — document root)
+        if (node is not DomElement) return 1;
         return 1; // ELEMENT_NODE
     }
 

@@ -778,6 +778,210 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.10 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote the
+nearest-common-ancestor tree query to canonical `Broiler.Dom.DomNode.CommonAncestorWith`.** The bridge's
+`FindCommonAncestor(a, b)` (`Traversal.cs`) is a neutral tree walk — the deepest inclusive ancestor of
+two nodes, or `null` for disjoint trees — that belongs in canonical `Broiler.Dom`. Canonical had only a
+*private* range-scoped `FindCommonAncestor` (two boundary points, throws on disjoint) and the public
+`DomRange.CommonAncestorContainer`; neither is the null-tolerant node-level query the bridge needs, so
+this is a promotion (a public `DomNode.CommonAncestorWith(other) : DomNode?` addition), verified
+equivalent by delegating the bridge helper to it and running the range / `compareDocumentPosition`
+suites green (71 tests; only the standing headless `Range_GetBoundingClientRect` geometry failure, which
+reproduces on the baseline).
+
+Same submodule-scope outcome as P4.9: the `Broiler.DOM` push 403s, so it ships as
+`patches/0002-add-domnode-commonancestorwith.patch` (indexed in `patches/README.md`), the pointer is
+**unbumped**, and the bridge keeps `FindCommonAncestor` as the active fallback; the follow-up after the
+patch lands is to replace the helper body with `a.CommonAncestorWith(b)` (the four call sites already
+null-check). No main-repo behaviour change.
+
+**With P4.9 (`IsEqualNode`) and P4.10 (`CommonAncestorWith`), the clean, quirk-free neutral-algorithm
+promotions are exhausted.** The other promotion candidates are *not* clean: `GetNodesInRange`
+(`Traversal.cs`) walks via `GetDocumentOrderNodes`, which excludes `#subdoc-root` subtrees — the same
+regime-A layout coupling that blocks P4.4b — so a canonical (exclusion-free) version would not be
+behaviour-equivalent; and the range stringifier (`TraversalBinding.Range.cs`) has non-spec quirks
+(e.g. it omits end-container text) that need spec-correctness work before promotion. Both are recorded
+as blocked rather than merely push-gated.
+
+Status: **P4.9 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote node
+equality (`Node.isEqualNode`) to canonical `Broiler.Dom.DomNode.IsEqualNode`.** The bridge's
+`NodesAreEqual` / `CanonicalAttributesAreEqual` copies (`SubDocuments.cs`) duplicate a neutral DOM tree
+algorithm that belongs in canonical `Broiler.Dom` (the agent audit confirmed canonical had *no*
+equality operation, so this is a promotion — a submodule *addition* — not an in-repo reuse). The
+canonical `DomNode.IsEqualNode` was written and its equivalence to the bridge copy verified by
+delegating the bridge's `isEqualNode` binding to it and running the equality suites green (the bridge's
+element-text comparison via `BridgeText` is a no-op on the canonical tree — an element's `NodeValue` is
+null — so the spec algorithm is behaviour-equivalent).
+
+**The `Broiler.DOM` submodule push returned 403** (its `MaiRat/` remote is outside this session's
+GitHub scope — the documented egress caveat), so per `CLAUDE.md` this ships as
+`patches/0001-add-domnode-isequalnode.patch` (with a new `patches/README.md` index and apply
+instructions) and the **submodule pointer is left unbumped**. The bridge keeps its `NodesAreEqual`
+implementation as the **active fallback** so CI (which clones the submodule by pointer) still compiles;
+once a maintainer applies the patch and bumps the `Broiler.DOM` gitlink, the follow-up is to delete the
+bridge copy and delegate the binding to `node.IsEqualNode(other)`. Behaviour is pinned by
+`Broiler.Cli.Tests/IsEqualNodePromotionTests.cs` (equal/unequal element trees, attribute-order
+irrelevance, text-node data equality) — green today against the bridge copy and required to stay green
+after the canonical delegation. No main-repo behaviour change in this commit.
+
+The other item-4/5 residue stays as recorded under P4.8: the remaining Broiler.Dom promotions
+(`GetNodesInRange`, a `DomRange` stringifier) are the same submodule-push-gated shape; the `Normalize` /
+`CloneDomElement` swaps stay blocked by the side-effect / runtime-state coupling; `GetDocumentOrderNodes`
+stays blocked by the P4.4b regime-A layout coupling.
+
+Status: **P4.8 completed** 2026-07-13 (same branch) — **work item 5, first slice: reuse canonical
+`IsDescendantOf`; delete the bridge `IsDescendant` copy.** The bridge's
+`IsDescendant(ancestor, candidate)` static helper (an ancestor-walk in `Utilities.cs`) exactly
+duplicated canonical `Broiler.Dom.DomNode.IsDescendantOf(ancestor)`. All 13 call sites — `contains`,
+`compareDocumentPosition`, the `appendChild`/`insertBefore`/`replaceChild` circular-reference guards
+(element + fragment), `InsertNodeAt`, `GetNodesInRange`, the range boundary comparison
+(`IsPositionAfter`) and `TraversalBinding` range extraction — now call the canonical instance method
+(`candidate.IsDescendantOf(ancestor)`), and the bridge copy is deleted. Behaviour-preserving: the two
+algorithms are identical for non-null args, and every call site passes a **non-null ancestor** (all
+lookup-derived ancestors are null-guarded before the call), so canonical's `ArgumentNullException` on
+a null ancestor — the one semantic difference from the bridge's lenient `return false` — is
+unreachable. No public-API change (both were internal). Regression check vs the P4.7 baseline: the
+traversal / range / HtmlDomInterface / fragment-and-doctype-sentinel / cross-document / DOM-edge-case /
+Acid3-range suites pass (185 tests); the only failure (the headless `Range_GetBoundingClientRect`
+display-contents geometry test) reproduces identically on the baseline → zero regressions.
+
+Item 4 was found **already substantially complete** during this pass: the MutationObserver
+option-matching fully delegates to canonical `DomMutationObserverFilter.Matches` (P3.2), and the Range
+*content* operations (extract/clone/delete/insert/surround) delegate to canonical `DomRange` (P3.1).
+Its residue is either intentional bridge leniency (cross-tree boundary comparison returns `0` instead
+of throwing `WrongDocument`) or **Broiler.Dom submodule promotions** (a public `GetNodesInRange`, a
+`DomRange` stringifier, a canonical `IsEqualNode`) that need the submodule push/patch workflow. The
+remaining item-5 swaps (`Normalize`, `CloneDomElement`) stay **blocked** by the side-effect coupling
+the P4.1 note describes — the bridge versions fire MutationObserver / NodeIterator / live-range /
+computed-style side effects on an explicit bridge mutation path that canonical operations (which
+publish only to `DomDocument.Mutated`, a stream the bridge's observers do not subscribe to) would
+silently drop; `CloneDomElement` additionally copies bridge runtime state (inline style, form-control
+state, position-area memo) canonical `CloneNode` knows nothing about, so it is gated on the item-2
+inline-style/runtime-state convergence. `GetDocumentOrderNodes` stays blocked by the P4.4b regime-A
+`#subdoc-root` layout coupling (its walk excludes `#subdoc-root` subtrees; canonical
+`InclusiveDescendants` does not).
+
+Status: **P4.7 completed** 2026-07-13 (same branch) — **work item 2, the inline-style single authority
+(script-observable slice).** The bridge's kebab-case inline-style dict (`ElementRuntimeState.Style`,
+reached via `InlineStyle(element)`) was authoritative but only synced back to the canonical `style=`
+attribute at *serialization*, so after `element.style.color='red'` a script reading
+`getAttribute("style")` saw the stale author string (`setAttribute("style",…)` already kept both in
+sync; the CSSOM path did not). This closes that divergence with a **narrow write-through**: a single
+shared serializer, `SyncStyleAttributeFromInlineStyle` (extracted from `ReflectRenderState` so mid-run
+and final serialization use the *identical* CSSOM form — shorthand-first, `"; "`-joined, attribute
+removed when empty), now runs after every `element.style` mutation as well as at serialization. It is
+wired at exactly two seams: the style-object `onMutation` lambda (covers per-property set, `cssText`,
+`setProperty`, `removeProperty`, `cssFloat`) and `JsJsObjectsSetStyle025Core` (`element.style = "…"`).
+
+**Why write-through, not full elimination:** the dict has ~200 call sites (138 in the anchor resolver
+alone, doing tight per-property geometry read-modify-write); parse-on-read/serialize-on-write against
+the attribute would be a ~200-site rewrite with real hot-loop cost. Write-through satisfies the exit
+criterion's script-observable contract — `element.style`, `getAttribute("style")`, `getComputedStyle`
+and serialization now observe one state — while leaving the dict as the internal working store. It uses
+the node-model `SetAttr`/`RemoveAttr` (not the JS `setAttribute` binding), so there is no reparse loop,
+and touches **zero** anchor-resolver sites (those write the dict directly and legitimately do *not*
+leak resolved geometry into `getAttribute` mid-resolution). The invalidation half of the exit criterion
+was already met (every CSSOM mutation routes through `InvalidateStyleScope`).
+
+**Behavioral note (spec-correct):** after a CSSOM mutation `getAttribute("style")` returns the
+*serialized* declaration rather than the raw author string — matching real browsers. An un-mutated
+element still returns its exact author string (no seeding/normalization on read). No public-API change.
+Tests: `Broiler.Cli.Tests/InlineStyleWriteThroughTests.cs` (a `MARK=[…]` wrapper isolates the *live*
+`getAttribute` value from the end-of-run serialization: camelCase/setProperty/cssText/whole-assign
+reflect live, removeProperty empties, un-mutated returns raw, getComputedStyle + serialization
+preserved). Regression check vs the P4.6 baseline: the InlineStyle / CSSOM / CssStyleDeclaration /
+Selectors-CSSOM / attribute / computed-style / serializer / dialog / popover / position-area/try /
+sticky suites pass (250+ tests); the only failures (the `:lang` selector and the
+`ScriptEngineExecuteTests` zoom-serialization test) reproduce identically on the baseline → zero
+regressions. The full parallel-state elimination of the dict remains available as later work if a
+single-authority (no dict) model is wanted.
+
+Status: **P4.6 completed** 2026-07-13 (same branch) — **work item 1, the final sentinel: `#document`.**
+The `#document` wrapper element (`_documentNode`, a fake-tag `DomElement` that sat between the
+canonical `_document` and `<html>`) is deleted; the JS `document` object now maps directly to the
+canonical `Broiler.Dom.DomDocument`, and `<html>`/doctype are its direct children. This is the *last*
+`#document`-family sentinel (doctype P4.2, fragment P4.3, subdoc-root-regime-B P4.4a; regime-A
+`#subdoc-root` remains blocked below the bridge per P4.4b).
+
+**No layout blocker (unlike `#subdoc-root`).** `Broiler.Layout` has zero `#document` references; the
+renderer's `DomDocument→CssBox` builder (`Broiler.HTML .../HtmlParser.cs`) already *special-cased and
+discarded* the sentinel (a zero-width box that would collapse layout), so with the sentinel gone the
+bridge's tree flows through the renderer's normal `<html>`-rooted path and produces an identical box
+tree — the workaround becomes dead code. Precedent: P4.4a already proved a canonical `DomDocument`
+root works (sub-documents), including pre-insert validity and the JS-document-over-`DomDocument`
+wrapper.
+
+Change surface (well-bounded, ~16 files, +66/−58): constructor + `ParseHtml` retarget to `_document`
+(the doctype-then-`<html>` append order already satisfies canonical `DomDocument` validity —
+one documentElement, doctype-first — and `ParseHtml` now clears `_document` first so re-parse stays
+valid); `_jsObjects.Set(_document, document)` remaps the JS wrapper; `ITraversalHost`/
+`IEventDispatchHost.DocumentNode` and the event-dispatch propagation `path` widen `DomElement`→
+`DomNode`; the child-mutation notify chain (`NotifyChildAdded`/`NotifyChildRemoved`/
+`NotifyMutationObservers`/`TraversalBinding.NotifyNodeRemoved`/`DeliverChildListMutation`) widens to
+`DomNode` so `document.appendChild`/`removeChild` MutationObserver delivery is preserved; the generic
+`nodeType`/`nodeName` sites gain a `DomDocument` branch (canonical `NodeType` is already Document/9).
+
+**Two semantic fixes the migration required** (both because the document parent is now a non-element
+`DomDocument`, which the element-only `ParentEl` nulls): (1) `GetTreeRoot` now walks to the *absolute*
+root so `getRootNode()`/`isConnected`/`compareDocumentPosition` return the document, not `<html>`; and
+(2) the four `parentNode` getters (element/char-data/doctype/fragment wrappers) read the raw
+`ParentNode` instead of `ParentEl`, so `document.documentElement.parentNode` and `doctype.parentNode`
+resolve to the document (a `parentNode`-vs-`parentElement` correctness fix — `parentElement` correctly
+stays element-only and is now null for the documentElement). `ToJSObject` also gained a `DomDocument`
+branch resolving a sub-document root to its document wrapper. **Behavioral note:** `document.appendChild`
+of a second element / text node now throws `HierarchyRequestError` (canonical validity), which is
+spec-correct — the sentinel previously permitted it silently.
+
+Behaviour-preserving on every normal path; no public-API change (the widened interfaces are internal).
+Tests: `Broiler.Cli.Tests/DocumentSentinelMigrationTests.cs` (nodeType/nodeName, documentElement/
+head/body, firstChild=doctype, getElementById/querySelector, `getRootNode()`/`isConnected`,
+serialization round-trip). Regression check vs the P4.5 baseline: the DOM / events / mutation-observer
+/ shadow-DOM / traversal-range / HtmlDomInterface / sentinel-migration / sub-document / messaging /
+serializer / namespace / public-API-snapshot / architecture-guard suites pass (300+ tests); every
+observed failure (the `:lang`/CssEscape/CssExtraction structural guards, the `<select>` writing-mode
+layout test, the `ScriptEngineExecuteTests` iframe-scroll/zoom serialization tests, the headless
+`Range_GetBoundingClientRect` and iframe-HTTP tests) reproduces identically with the change stashed →
+zero regressions.
+
+Status: **P4.5 completed** 2026-07-13 (branch `claude/htmlbridge-phase-4-a4w8vp`) — **work item 3, the
+parallel `InnerHtml` string.** `ElementRuntimeState.InnerHtml` (the bridge-side raw-text mirror for
+`<style>`/`<script>`/`<textarea>`, the historical `innerHTML`-getter fallback, and the
+serialization round-trip value) is **deleted**. The `innerHTML` getter already served canonical
+children (`SerializeChildrenToHtml`), and `SetElementInnerHtml` already parses/replaces into canonical
+children — so the string was pure shadow state. All nine accesses were removed: the two write sites in
+`SetElementInnerHtml` (`SubDocuments.cs`) and `CloneDomElement` (`Utilities.cs`, a clone now carries
+content only via its deep-cloned DomText children — shallow clone correctly drops it, per DOM); the
+progress/meter placeholder reset (`Serialization.cs`); the `<style>` source fallback in
+`GetStyleElementSourceText` (`Css.cs`); the `textContent` fallback for a childless element
+(`Common.cs`, now returns `""` per DOM); the serializer's `GetRawInnerHtml` adapter (now `_ => null`,
+matching the canonical default); and the anchor-cleanup `!hadTextChild` InnerHtml branch
+(`AnchorResolver/CssCleanup.cs`), which neutralized a source that no longer exists.
+
+**The load-bearing invariant — proven, not assumed:** raw-text element content is *always* a canonical
+`DomText` child (initial parse via `HtmlDocumentParser`, and the `innerHTML` setter's fragment parse,
+both emit one), even after the full anchor/render resolve pipeline (`NeutralizeStyleElementsForAnchorRules`
+rewrites the text node **in place** via `SetBridgeText`, never migrating content to a string). The
+childless-`<style>`-with-content state that `AnimationResolver`/`PositionTry`/`CssCleanup` carried
+defensive InnerHtml-fallback handling for is **unreachable through the public API** — the former
+`AnimationInnerHtmlStyleTests` had to fabricate it by reflection. Those two tests were rewritten to
+exercise the same `@keyframes` / stylesheet-`animation` collection through a real DomText-backed
+`<style>` (their production shape); the stale "CSS can live in InnerHtml with no DomText child"
+comments across those three resolvers were corrected. Behaviour-preserving; no public-API change (the
+field was `private`). Tests: `Broiler.Cli.Tests/InnerHtmlParallelStateRemovalTests.cs` (invariant
+probe: a `<style>` keeps its DomText child through `ResolveAnchorPositions`; plus getter/setter/
+textContent/clone/serialization/cascade characterizations). Regression check vs the P4.4a baseline: see
+below.
+
+**Finding recorded for P4.4c (eliminate `OwnerDocRoot`): it is effectively gated on P4.4b, contrary to
+this roadmap's earlier "independent of this blocker" note.** A full audit found `OwnerDocRoot`'s
+`ownerDocument`-getter read and its `_documentWrappers` key have **no canonical substitute** for
+regime-A (`#subdoc-root`) iframe nodes and shadow roots: those nodes are not children of a canonical
+`DomDocument`, so canonical `node.OwnerDocument` returns the *main* document for them. The property
+cannot be removed until regime-A roots become canonical documents (the same P4.4b layout blocker). The
+only safe isolated changes here are preparatory convergence (trimming the redundant regime-B
+`OwnerDocRoot` writes that duplicate `AppendChild`'s `AdoptNode`, and adopting detached
+sub-document-created nodes so canonical `OwnerDocument` matches) — non-terminal, so deferred.
+
 Status: **P4.4a completed** 2026-07-13 (same branch) — work item 1, third sentinel (`#subdoc-root`),
 **stage a of a multi-stage remodel**. `#subdoc-root` cannot become a canonical `DomDocument` in place
 because the iframe/object/frame roots (regime A) are live *tree children* of their container, which a

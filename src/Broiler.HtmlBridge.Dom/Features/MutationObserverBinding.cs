@@ -127,7 +127,7 @@ internal sealed class MutationObserverBinding(IMutationObserverHost host)
     // -------- Record delivery --------
 
     /// <summary>Delivers a <c>childList</c> mutation record to every matching registered observer.</summary>
-    internal void DeliverChildListMutation(DomElement target,
+    internal void DeliverChildListMutation(DomNode target,
         DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling)
     {
         if (_hub.Count == 0)
