@@ -172,15 +172,24 @@ partial class CssBox
     /// </summary>
     private void ApplyPercentBoxPropsPlacement(PositionAreaBox target, PositionAreaCell cell)
     {
-        double cellW = cell.Width;
+        // CSS Writing Modes §7.4: percentage margins and padding resolve against the
+        // INLINE size of the containing block. The containing block here is the
+        // position-area cell in the containing block's writing mode, so the inline size is
+        // the cell width for a horizontal CB and the cell HEIGHT for a vertical one.
+        // (Insets keep resolving against their own physical axis — done in ResolveInset.)
+        var cbBox = FindPositionedContainingBlock();
+        double inlineSize = cbBox != null && IsVerticalWritingMode(cbBox.WritingMode)
+            ? cell.Height
+            : cell.Width;
 
-        // Margins and padding: percentage against the cell inline size, else px (CSS
-        // %-margin/padding always resolve against the containing block's inline size,
-        // which is the cell here — matching the bridge's ResolvePctOrPx(..., cellW)).
-        double mT = ResolveEdgeAgainstCell(MarginTop, cellW), mR = ResolveEdgeAgainstCell(MarginRight, cellW);
-        double mB = ResolveEdgeAgainstCell(MarginBottom, cellW), mL = ResolveEdgeAgainstCell(MarginLeft, cellW);
-        double pT = ResolveEdgeAgainstCell(PaddingTop, cellW), pR = ResolveEdgeAgainstCell(PaddingRight, cellW);
-        double pB = ResolveEdgeAgainstCell(PaddingBottom, cellW), pL = ResolveEdgeAgainstCell(PaddingLeft, cellW);
+        // Margins and padding: percentage against the cell inline size, else px (matching
+        // the bridge's ResolvePctOrPx — but the bridge always used the width, so this
+        // diverges from the baked path only for a vertical containing block, which the
+        // bridge gets wrong).
+        double mT = ResolveEdgeAgainstCell(MarginTop, inlineSize), mR = ResolveEdgeAgainstCell(MarginRight, inlineSize);
+        double mB = ResolveEdgeAgainstCell(MarginBottom, inlineSize), mL = ResolveEdgeAgainstCell(MarginLeft, inlineSize);
+        double pT = ResolveEdgeAgainstCell(PaddingTop, inlineSize), pR = ResolveEdgeAgainstCell(PaddingRight, inlineSize);
+        double pB = ResolveEdgeAgainstCell(PaddingBottom, inlineSize), pL = ResolveEdgeAgainstCell(PaddingLeft, inlineSize);
         double bT = NativeBorderPx(BorderTopWidth, BorderTopStyle), bR = NativeBorderPx(BorderRightWidth, BorderRightStyle);
         double bB = NativeBorderPx(BorderBottomWidth, BorderBottomStyle), bL = NativeBorderPx(BorderLeftWidth, BorderLeftStyle);
 

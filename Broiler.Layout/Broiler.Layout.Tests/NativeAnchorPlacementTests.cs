@@ -261,6 +261,40 @@ public sealed class NativeAnchorPlacementTests
     }
 
     [Fact]
+    public void Pass_PercentBoxProps_ResolveAgainstCellHeight_ForVerticalContainingBlock()
+    {
+        // A non-square cell in a vertical-writing-mode CB: percentage margins/padding must
+        // resolve against the cell's INLINE size, which is the cell HEIGHT here (CSS
+        // Writing Modes §7.4) — not the width the bridge always used.
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        var cb = Box(root, new PointF(0, 0), new SizeF(200, 100));
+        cb.Position = "relative";
+        cb.Display = "block";
+        cb.WritingMode = "vertical-rl";
+        var anchor = Box(cb, new PointF(40, 40), new SizeF(20, 20));
+        anchor.AnchorName = "--a";
+        var target = Box(cb, new PointF(0, 0), new SizeF(30, 30));
+        target.Position = "absolute";
+        target.Display = "block";
+        target.PositionArea = "bottom right"; // cell = (60,60,140,40): cellW 140, cellH 40
+        target.PositionAnchor = "--a";
+        target.MarginLeft = "10%"; // 10% of cell HEIGHT 40 = 4 (NOT 14 = 10% of width)
+
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        // border box width = imcb 140 - margin 4 = 136; positioned at imcbLeft 60 + margin 4.
+        Assert.Equal(136, target.Size.Width, 3);
+        Assert.Equal(40, target.Size.Height, 3);
+        Assert.Equal(64, target.Location.X, 3);
+        Assert.Equal("4px", target.MarginLeft);
+    }
+
+    [Fact]
     public void Pass_SharedAnchorName_BindsWithinOwnContainingBlockScope()
     {
         // Two sibling relative containers each declare anchor-name --a and hold a
