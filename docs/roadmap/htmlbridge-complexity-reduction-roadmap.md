@@ -1803,13 +1803,34 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   **uniqueness / `anchor-scope`** gate is the more impactful next blocker — it is what actually excludes
   `percents-001` and any multi-anchor scenario, so the engine's flat last-wins `AnchorRegistry` needs
   scope awareness before those boxes can go native.
+- **P5.8d.2b — anchor-name scope / uniqueness (fourth expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout + bridge, both parent-repo, additive, default-off). The engine's flat last-wins
+  `AnchorRegistry` gains **scope awareness**: each name keeps *all* candidates in tree order, each with an
+  opaque caller-supplied scope token, and the resolve methods take an optional `inScope` predicate —
+  binding a query to the LAST candidate in its own scope, else last-wins (mirrors the bridge's
+  `ResolveAnchorForElement`). The registry stays box-tree/DOM-free (the token is `object?`; the caller
+  interprets it). The engine pass registers each anchor with its **source box** as the token and resolves
+  with "anchor box is a descendant of the query's positioned containing block" (`IsBoxDescendantOf`);
+  `TryResolvePositionAreaTarget` now threads that predicate. The bridge's `IsMvpNativeAnchorBox`
+  **uniqueness gate is relaxed** — shared anchor-names may now go native (only "name is registered"
+  remains). Backward-compatible: scope-free `Register`/`Resolve` keep last-wins, so the 7 existing
+  `AnchorRegistry` tests are unchanged. Tests: `AnchorRegistryTests` +2 (scoped last-in-scope /
+  single-candidate ignores scope); `NativeAnchorPlacementTests` +1 (two sibling containers sharing `--a`
+  bind within their own CB — a flat registry would collapse the first's cell). Regression check: full
+  `Broiler.Layout.Tests` (133) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on
+  unchanged (7-fail / 32-pass)** with `position-area-percents-001` improving 98.3 %→98.7 % (its shared-`--foo`
+  boxes now go native, scope-resolved per container, via the percentage-box-props path; only the
+  writing-mode containers still fail). **`AnchorNameScopeTests`** — which regressed when the uniqueness
+  gate was first added — now passes **both** default-off and lever-on in isolation. This is the first
+  expansion with observable pixel-test movement (the size expansions had none, being gate-masked).
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
-  anchor-name scope/uniqueness (engine `AnchorRegistry` is flat last-wins) → inline-CB promotion (DOM
-  moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
-  (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, AND percentage margin/padding/inset
-  box props now land natively — see the three size expansions above.) Each remaining feature is currently
-  excluded by `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
+  ~~anchor-name scope/uniqueness~~ → inline-CB promotion (DOM moves) → scroll simulation →
+  `position-visibility` → dialog/backdrop → `anchor()` insets → position-try (and **writing-mode**
+  position-area, which blocks `percents-001` fully passing). (Childless auto/explicit/percentage sizing,
+  `box-sizing:border-box`, percentage margin/padding/inset box props, AND shared-name scope resolution now
+  land natively — see the four expansions above.) Each remaining feature is currently excluded by
+  `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
   `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
   widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
