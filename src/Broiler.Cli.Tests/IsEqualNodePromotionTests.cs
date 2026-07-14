@@ -1,16 +1,15 @@
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Phase 4 items 4/5: node equality (<c>Node.isEqualNode()</c>) is slated to move to the canonical
-/// <c>Broiler.Dom.DomNode.IsEqualNode</c> tree algorithm, with the bridge's <c>NodesAreEqual</c> copy
-/// deleted and its <c>isEqualNode</c> binding delegating. That promotion is a Broiler.DOM submodule
-/// change; the submodule push is outside this session's GitHub scope (403), so it ships as
-/// <c>patches/0001-add-domnode-isequalnode.patch</c> and the bridge keeps its <c>NodesAreEqual</c>
-/// implementation as the active fallback until the patch lands and the pointer is bumped.
+/// Phase 4 items 4/5: node equality (<c>Node.isEqualNode()</c>) was promoted to the canonical
+/// <c>Broiler.Dom.DomNode.IsEqualNode</c> tree algorithm (<c>patches/0001-add-domnode-isequalnode.patch</c>,
+/// since applied by the maintainer and pinned in the <c>Broiler.DOM</c> submodule). The bridge's
+/// <c>NodesAreEqual</c> / <c>CanonicalAttributesAreEqual</c> copies are now deleted and the
+/// <c>isEqualNode</c> binding delegates to <c>node.IsEqualNode(other)</c>.
 ///
-/// These end-to-end characterizations pin the observable <c>isEqualNode</c> behaviour so the
-/// eventual delegation is provably equivalent (they pass against the bridge copy today and must keep
-/// passing after the canonical delegation).
+/// These end-to-end characterizations pinned the observable <c>isEqualNode</c> behaviour so the
+/// delegation is provably equivalent — they passed against the former bridge copy and must keep
+/// passing against the canonical delegation.
 /// </summary>
 public sealed class IsEqualNodePromotionTests
 {

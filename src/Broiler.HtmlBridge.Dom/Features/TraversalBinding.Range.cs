@@ -21,9 +21,9 @@ internal sealed partial class TraversalBinding
 
     private JSValue RangeGetCommonAncestorContainer(DomRange state, in Arguments a)
     {
-        // FindCommonAncestor returns null for boundaries in different trees, preserving the lenient
-        // JSNull result; the canonical CommonAncestorContainer would throw.
-        var ancestor = DomBridge.FindCommonAncestor(state.StartContainer, state.EndContainer);
+        // CommonAncestorWith returns null for boundaries in different trees, preserving the lenient
+        // JSNull result; the canonical DomRange.CommonAncestorContainer would throw.
+        var ancestor = state.StartContainer.CommonAncestorWith(state.EndContainer);
         return ancestor != null ? _host.ToJSObject(ancestor) : JSNull.Value;
     }
 
@@ -352,7 +352,7 @@ internal sealed partial class TraversalBinding
         }
 
         // Middle nodes: collect all text from nodes between start and end paths
-        var ancestor = DomBridge.FindCommonAncestor(startContainer, endContainer);
+        var ancestor = startContainer.CommonAncestorWith(endContainer);
         if (ancestor != null)
         {
             var allNodes = DomBridge.GetDocumentOrderNodes(ancestor);

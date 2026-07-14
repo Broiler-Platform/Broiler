@@ -915,91 +915,12 @@ public sealed partial class DomBridge
         NotifyChildRemoved(parent, child, index);
     }
 
-    private static bool NodesAreEqual(DomNode first, DomNode second)
-    {
-        if (ReferenceEquals(first, second))
-            return true;
-
-        if (first.NodeType != second.NodeType)
-            return false;
-
-        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (text/comment) have no
-        // TagName/attributes — they are equal iff their data matches. Dead on today's homogeneous
-        // facade tree (facade text/comment are Broiler.Dom.DomElement and take the element path below); live
-        // once construction flips to canonical DomText/DomComment.
-        if (first is DomCharacterData || second is DomCharacterData)
-            return string.Equals(BridgeText(first), BridgeText(second), StringComparison.Ordinal);
-
-        // Phase 4 item 1: two DocumentType nodes are equal iff their name/publicId/systemId match
-        // (per DOM isEqualNode). Both have NodeType == DocumentType by the check above.
-        if (first is DomDocumentType firstDocType && second is DomDocumentType secondDocType)
-            return string.Equals(firstDocType.Name, secondDocType.Name, StringComparison.Ordinal) &&
-                   string.Equals(firstDocType.PublicId, secondDocType.PublicId, StringComparison.Ordinal) &&
-                   string.Equals(firstDocType.SystemId, secondDocType.SystemId, StringComparison.Ordinal);
-
-        // Phase 4 item 1: two DocumentFragment nodes (no attributes/tag) are equal iff their children
-        // are equal — fall through to the child-count + per-child comparison below, which operates on
-        // the raw ChildNodes and needs no element cast.
-        if (first is DomDocumentFragment || second is DomDocumentFragment)
-        {
-            if (first is not DomDocumentFragment || second is not DomDocumentFragment ||
-                first.ChildNodes.Count != second.ChildNodes.Count)
-                return false;
-            for (var index = 0; index < first.ChildNodes.Count; index++)
-                if (!NodesAreEqual(ChildAt(first, index), ChildAt(second, index)))
-                    return false;
-            return true;
-        }
-
-        var firstEl = (DomElement)first;
-        var secondEl = (DomElement)second;
-        if (!string.Equals(firstEl.TagName, secondEl.TagName, StringComparison.Ordinal) ||
-            !string.Equals(firstEl.NamespaceUri, secondEl.NamespaceUri, StringComparison.Ordinal) ||
-            !string.Equals(BridgeText(firstEl), BridgeText(secondEl), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!CanonicalAttributesAreEqual(firstEl, secondEl) ||
-            firstEl.ChildNodes.Count != secondEl.ChildNodes.Count)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < firstEl.ChildNodes.Count; index++)
-        {
-            if (!NodesAreEqual(ChildAt(firstEl, index), ChildAt(secondEl, index)))
-                return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// RF-BRIDGE-1c Phase C2: isEqualNode attribute comparison over the canonical
-    /// namespace-keyed attribute set — which encodes namespace, local name, qualified
-    /// name, and value in one place, replacing the former flat-snapshot + NsAttrMap pair.
-    /// Two attribute sets are equal when they have the same count and each (namespace,
-    /// local name) key maps to the same value and qualified name (the qualified-name
-    /// check preserves the prefix sensitivity the snapshot comparison had).
-    /// </summary>
-    private static bool CanonicalAttributesAreEqual(DomElement first, DomElement second)
-    {
-        if (first.Attributes.Count != second.Attributes.Count)
-            return false;
-
-        foreach (var (key, attribute) in first.Attributes)
-        {
-            if (!second.Attributes.TryGetValue(key, out var other) ||
-                !string.Equals(attribute.Value, other.Value, StringComparison.Ordinal) ||
-                !string.Equals(attribute.QualifiedName, other.QualifiedName, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    // Phase 4 items 4/5 (P4.9 follow-up): the bridge's NodesAreEqual / CanonicalAttributesAreEqual
+    // copies were deleted after their promotion to canonical Broiler.Dom.DomNode.IsEqualNode landed
+    // in the pinned submodule (patches/0001, applied by the maintainer). The isEqualNode binding now
+    // delegates to node.IsEqualNode(other); behaviour is pinned by IsEqualNodePromotionTests. The
+    // canonical algorithm drops the bridge copy's element-level BridgeText comparison, which was a
+    // no-op on the canonical tree (an element's NodeValue is null) — so it is behaviour-equivalent.
 
     private string NormalizeInsertAdjacentPosition(JSValue? value)
     {

@@ -86,7 +86,7 @@ public sealed partial class DomBridge
             return true;
         }
 
-        var commonRoot = FindCommonAncestor(containerA, containerB) ?? docRoot;
+        var commonRoot = containerA.CommonAncestorWith(containerB) ?? docRoot;
         var allNodes = GetDocumentOrderNodes(commonRoot);
         var idxA = allNodes.IndexOf(containerA);
         var idxB = allNodes.IndexOf(containerB);
