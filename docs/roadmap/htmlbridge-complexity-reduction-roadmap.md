@@ -778,6 +778,32 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.9 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote node
+equality (`Node.isEqualNode`) to canonical `Broiler.Dom.DomNode.IsEqualNode`.** The bridge's
+`NodesAreEqual` / `CanonicalAttributesAreEqual` copies (`SubDocuments.cs`) duplicate a neutral DOM tree
+algorithm that belongs in canonical `Broiler.Dom` (the agent audit confirmed canonical had *no*
+equality operation, so this is a promotion — a submodule *addition* — not an in-repo reuse). The
+canonical `DomNode.IsEqualNode` was written and its equivalence to the bridge copy verified by
+delegating the bridge's `isEqualNode` binding to it and running the equality suites green (the bridge's
+element-text comparison via `BridgeText` is a no-op on the canonical tree — an element's `NodeValue` is
+null — so the spec algorithm is behaviour-equivalent).
+
+**The `Broiler.DOM` submodule push returned 403** (its `MaiRat/` remote is outside this session's
+GitHub scope — the documented egress caveat), so per `CLAUDE.md` this ships as
+`patches/0001-add-domnode-isequalnode.patch` (with a new `patches/README.md` index and apply
+instructions) and the **submodule pointer is left unbumped**. The bridge keeps its `NodesAreEqual`
+implementation as the **active fallback** so CI (which clones the submodule by pointer) still compiles;
+once a maintainer applies the patch and bumps the `Broiler.DOM` gitlink, the follow-up is to delete the
+bridge copy and delegate the binding to `node.IsEqualNode(other)`. Behaviour is pinned by
+`Broiler.Cli.Tests/IsEqualNodePromotionTests.cs` (equal/unequal element trees, attribute-order
+irrelevance, text-node data equality) — green today against the bridge copy and required to stay green
+after the canonical delegation. No main-repo behaviour change in this commit.
+
+The other item-4/5 residue stays as recorded under P4.8: the remaining Broiler.Dom promotions
+(`GetNodesInRange`, a `DomRange` stringifier) are the same submodule-push-gated shape; the `Normalize` /
+`CloneDomElement` swaps stay blocked by the side-effect / runtime-state coupling; `GetDocumentOrderNodes`
+stays blocked by the P4.4b regime-A layout coupling.
+
 Status: **P4.8 completed** 2026-07-13 (same branch) — **work item 5, first slice: reuse canonical
 `IsDescendantOf`; delete the bridge `IsDescendant` copy.** The bridge's
 `IsDescendant(ancestor, candidate)` static helper (an ancestor-walk in `Utilities.cs`) exactly
