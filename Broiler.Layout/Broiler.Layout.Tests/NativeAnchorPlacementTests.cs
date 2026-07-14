@@ -260,6 +260,50 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal("14px", target.PaddingRight);
     }
 
+    [Fact]
+    public void Pass_SharedAnchorName_BindsWithinOwnContainingBlockScope()
+    {
+        // Two sibling relative containers each declare anchor-name --a and hold a
+        // "bottom right" target. With scope-aware resolution each target must bind to the
+        // anchor in ITS OWN container — not the global last-registered --a.
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+
+        CssBox MakeContainer(float x, out CssBox target)
+        {
+            var cb = Box(root, new PointF(x, 0), new SizeF(200, 200));
+            cb.Position = "relative";
+            cb.Display = "block";
+            var anchor = Box(cb, new PointF(x + 40, 40), new SizeF(20, 20));
+            anchor.AnchorName = "--a";
+            target = Box(cb, new PointF(0, 0), new SizeF(30, 30));
+            target.Position = "absolute";
+            target.Display = "block";
+            target.PositionArea = "bottom right";
+            target.PositionAnchor = "--a";
+            target.Width = "30px";
+            target.Height = "30px";
+            return cb;
+        }
+
+        MakeContainer(0, out var targetA);
+        MakeContainer(300, out var targetB);
+
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        // targetA binds anchorA (right/bottom = 60) in container A → (60,60).
+        Assert.Equal(60, targetA.Location.X, 3);
+        Assert.Equal(60, targetA.Location.Y, 3);
+        // targetB binds anchorB (at x=340 → right 360, bottom 60) in container B → (360,60).
+        // A flat last-wins registry would bind BOTH to anchorB, collapsing targetA's cell.
+        Assert.Equal(360, targetB.Location.X, 3);
+        Assert.Equal(60, targetB.Location.Y, 3);
+    }
+
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
     // childless absolutely-positioned "bottom right" target (30×30 at origin).
     private static (CssBox root, CssBox cb) FillCellFixture(out CssBox target)

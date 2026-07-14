@@ -52,11 +52,27 @@ partial class CssBox
         if (!string.IsNullOrEmpty(name) && name != "none")
         {
             var b = box.Bounds;
-            registry.Register(name, new AnchorRect(b.X, b.Y, b.Width, b.Height));
+            // The anchor box itself is the scope token: a query binds to the candidate in
+            // its own containing block when several elements share a name (see
+            // ResolveScopedAnchorTarget). Registration order is tree/document order.
+            registry.Register(name, new AnchorRect(b.X, b.Y, b.Width, b.Height), box);
         }
 
         foreach (var child in box.Boxes)
             CollectAnchors(child, registry);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="descendant"/> is a strict box-tree descendant of
+    /// <paramref name="ancestor"/> (used as the anchor-name scope test: an anchor is in a
+    /// query's scope when its box is inside the query's containing block).
+    /// </summary>
+    private static bool IsBoxDescendantOf(CssBox descendant, CssBox ancestor)
+    {
+        for (var p = descendant.ParentBox; p != null; p = p.ParentBox)
+            if (p == ancestor)
+                return true;
+        return false;
     }
 
     private static void ApplyNativeAnchorPlacement(CssBox box, AnchorRegistry registry)
@@ -268,7 +284,11 @@ partial class CssBox
         GetAbsoluteContainingBlockPaddingBox(cb, out double cbX, out double cbY, out double cbW, out double cbH);
 
         var parsed = PositionAreaValue.Parse(area);
-        var resolved = registry.ResolvePositionAreaCell(anchorName, parsed, cbX, cbY, cbW, cbH);
+        // Scope resolution: when several elements share this anchor-name, bind to the
+        // candidate inside the query's own containing block (the anchor box a descendant of
+        // `cb`), mirroring the bridge's ResolveAnchorForElement; unique names are unaffected.
+        var resolved = registry.ResolvePositionAreaCell(anchorName, parsed, cbX, cbY, cbW, cbH,
+            inScope: scope => scope is CssBox src && IsBoxDescendantOf(src, cb));
         if (resolved is not { } c)
             return false; // Anchor not registered.
         cell = c;
