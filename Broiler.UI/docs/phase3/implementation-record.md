@@ -76,7 +76,7 @@ The Phase 3 tests prove:
 
 ```powershell
 dotnet test Broiler.UI\Broiler.UI.slnx
-dotnet build src\Broiler.App.Graphics\Broiler.App.Graphics.csproj
+dotnet build src\Broiler.Browser.Windows\Broiler.Browser.Windows.csproj
 dotnet build Broiler.UI\Broiler.UI.slnx -p:EnableWindowsTargeting=false --no-restore
 dotnet build Broiler.slnx
 ```
@@ -84,5 +84,5 @@ dotnet build Broiler.slnx
 The app preview can be launched with:
 
 ```powershell
-dotnet run --project src\Broiler.App.Graphics\Broiler.App.Graphics.csproj -- --ui-phase3
+dotnet run --project src\Broiler.Browser.Windows\Broiler.Browser.Windows.csproj -- --ui-phase3
 ```

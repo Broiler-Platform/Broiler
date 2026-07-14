@@ -1,4 +1,4 @@
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 /// <summary>
 /// Minimal file logger. Exceptions thrown out of a Win32 window-procedure callback cross the

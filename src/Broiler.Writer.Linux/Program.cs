@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 
 namespace Broiler.Writer;
 
+/// <summary>Linux entry point for Broiler Writer.</summary>
 internal static class Program
 {
     private static async Task<int> Main(string[] args)

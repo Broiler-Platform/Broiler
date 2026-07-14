@@ -1,7 +1,7 @@
 using Broiler.Graphics;
 using Broiler.UI;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 internal sealed class BrowserUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost, IDisposable
 {

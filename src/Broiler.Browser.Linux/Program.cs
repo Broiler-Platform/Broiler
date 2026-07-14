@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 internal static class Program
 {

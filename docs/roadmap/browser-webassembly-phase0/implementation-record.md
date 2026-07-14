@@ -13,7 +13,7 @@ The approved first target is the roadmap's **T2 interactive desktop-browser
 preview**. Development starts with Chromium and Firefox; automated WebKit is a
 T2 completion lane. The first real application target is the UI-application
 track: a browser-hosted Broiler Writer editing slice. The full
-`Broiler.App.Graphics` HTML/DOM/JavaScript browser engine remains the separately
+`Broiler.Browser.Windows` HTML/DOM/JavaScript browser engine remains the separately
 gated Phase 6B workstream.
 
 The initial implementation rule is unchanged:
@@ -96,7 +96,7 @@ No Phase 1 owner is unresolved.
 | Phase 0 dependency/artifact verifier | `tests/browser-wasm-phase0/Broiler.BrowserWasm.Phase0` |
 | Browser RID | `browser-wasm` |
 
-`Broiler.Graphics.Browser` remains reserved because it is already the assembly
+`Broiler.Browser.Windows` remains reserved because it is already the assembly
 name of the desktop Broiler browser executable. No platform-specific runtime
 project is added below `Broiler.UI/src`.
 

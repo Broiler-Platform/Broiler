@@ -30,7 +30,7 @@
          web assets pipeline re-fingerprint or rewrite it. -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
 
-    <WriterClientProject>..\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
+    <WriterClientProject>..\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
     <!-- Absolute: this PublishDir is handed to the client's build, where a relative path would resolve
          against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
          is set early and reliably; IntermediateOutputPath is not yet populated at this point. -->

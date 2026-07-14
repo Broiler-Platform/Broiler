@@ -9,6 +9,7 @@ using Broiler.UI.Standard;
 
 namespace Broiler.Writer;
 
+/// <summary>Win32/Direct2D host for the platform-neutral Writer application.</summary>
 [SupportedOSPlatform("windows7.0")]
 internal sealed class WriterWindow : Direct2DWindow
 {

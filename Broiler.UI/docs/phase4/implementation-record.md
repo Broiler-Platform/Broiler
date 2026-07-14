@@ -105,12 +105,12 @@ dotnet build Broiler.UI\Broiler.UI.slnx -p:EnableWindowsTargeting=false --no-res
 dotnet build Broiler.Input\Broiler.Input.slnx
 dotnet run --project Broiler.Input\Broiler.Input.Contract.Tests\Broiler.Input.Contract.Tests.csproj --no-build
 dotnet run --project Broiler.Graphics\Broiler.Graphics.Tests\Broiler.Graphics.Tests.csproj --no-build
-dotnet build src\Broiler.App.Graphics\Broiler.App.Graphics.csproj
+dotnet build src\Broiler.Browser.Windows\Broiler.Browser.Windows.csproj
 dotnet build Broiler.slnx
 ```
 
 The app preview can be launched with:
 
 ```powershell
-dotnet run --project src\Broiler.App.Graphics\Broiler.App.Graphics.csproj -- --ui-phase4-toolbar
+dotnet run --project src\Broiler.Browser.Windows\Broiler.Browser.Windows.csproj -- --ui-phase4-toolbar
 ```

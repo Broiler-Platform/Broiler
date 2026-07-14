@@ -22,7 +22,8 @@ lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 | `Broiler.JS` | JavaScript parser, compiler, runtime, built-ins, and host integration; derived in part from Yantra JS |
 | `Broiler.HtmlBridge` | DOM, renderer, and JavaScript integration |
 | `Broiler.App` | WPF browser application |
-| `Broiler.App.Graphics` | Win32/Direct2D preview browser application |
+| `Broiler.Browser.Windows` / `Broiler.Browser.Linux` | Platform-specific browser applications sharing `Broiler.Browser.Core` |
+| `Broiler.Writer.Windows` / `Broiler.Writer.Linux` / `Broiler.Writer.WebAssembly` | Platform-specific Writer applications sharing the desktop `Broiler.Writer.Core` |
 | `Broiler.Cli`, `Broiler.Wpt` | Rendering and web-platform-test tooling |
 | `Broiler.DevConsole`, `Broiler.DevSite` | Development and diagnostics tools |
 
@@ -131,7 +132,7 @@ dotnet run --project src/Broiler.App/Broiler.App.csproj
 Run the Win32/Direct2D application on Windows:
 
 ```bash
-dotnet run --project src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
+dotnet run --project src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj --configuration Debug-Windows
 ```
 
 Each submodule README contains its standalone build and test commands. Broiler.HTML also

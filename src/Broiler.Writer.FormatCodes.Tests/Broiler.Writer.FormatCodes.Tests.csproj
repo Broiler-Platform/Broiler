@@ -17,8 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Writer.FormatCodes\Broiler.Writer.FormatCodes.csproj" />
-    <ProjectReference Include="..\Broiler.Writer\Broiler.Writer.csproj" />
-    <ProjectReference Include="..\Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj" />
+    <ProjectReference Include="..\Broiler.Writer\Broiler.Writer.Core.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj" />
   </ItemGroup>
 
   <ItemGroup>

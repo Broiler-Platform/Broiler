@@ -10,7 +10,7 @@ host seams. Adding browser types to either core before exercising those seams
 would create coupling without evidence.
 
 The UI topology ADR also keeps platform host code in samples/hosts or outside UI
-runtime assemblies. The assembly name `Broiler.Graphics.Browser` is already used
+runtime assemblies. The assembly name `Broiler.Browser.Windows` is already used
 by the desktop Broiler browser application.
 
 ## Decision
@@ -43,4 +43,4 @@ only before a second consumer or productized provider claim. No
   statement must name them as sample-owned.
 - Reusable provider changes land in their canonical component first, then in
   consumers, then in aggregate/nested checkout pointers.
-- Full `Broiler.App.Graphics` engine hosting is not implied by the UI sample.
+- Full `Broiler.Browser.Windows` engine hosting is not implied by the UI sample.

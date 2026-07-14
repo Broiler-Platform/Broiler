@@ -8,6 +8,10 @@ on:
       - 'Broiler.Graphics/**'
       - 'Broiler.Input/**'
       - 'Broiler.UI/**'
+      - 'src/Broiler.Browser.Core/**'
+      - 'src/Broiler.Browser.Linux/**'
+      - 'src/Broiler.Writer/**'
+      - 'src/Broiler.Writer.Linux/**'
       - 'docs/roadmap/linux-*.md'
   push:
     branches:
@@ -17,6 +21,10 @@ on:
       - 'Broiler.Graphics/**'
       - 'Broiler.Input/**'
       - 'Broiler.UI/**'
+      - 'src/Broiler.Browser.Core/**'
+      - 'src/Broiler.Browser.Linux/**'
+      - 'src/Broiler.Writer/**'
+      - 'src/Broiler.Writer.Linux/**'
       - 'docs/roadmap/linux-*.md'
 
 env:
@@ -55,6 +63,16 @@ jobs:
 
       - name: Build Input Linux diagnostic
         run: dotnet build Broiler.Input/Broiler.Input.Linux.Diagnostic/Broiler.Input.Linux.Diagnostic.csproj --configuration "$CONFIGURATION"
+
+      - name: Build Linux applications
+        run: |
+          dotnet build src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj --configuration "$CONFIGURATION"
+          dotnet build src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj --configuration "$CONFIGURATION"
+
+      - name: Run Linux application smoke tests
+        run: |
+          dotnet run --project src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj --configuration "$CONFIGURATION" --no-build -- --offscreen --duration-ms=1
+          dotnet run --project src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj --configuration "$CONFIGURATION" --no-build -- --offscreen --duration-ms=1
 
       - name: Publish self-contained Linux demo
         run: |

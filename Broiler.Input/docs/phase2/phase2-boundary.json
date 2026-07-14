@@ -27,7 +27,7 @@
   ],
   "deferredBecauseOtherComponentsCannotBeModified": [
     "Direct2DWindow final-path extraction",
-    "Broiler.App.Graphics direct consumption of Input abstractions",
+    "Broiler.Browser.Windows direct consumption of Input abstractions",
     "existing browser interaction test migration",
     "removal of Graphics native input parsing"
   ],

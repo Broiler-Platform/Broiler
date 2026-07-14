@@ -36,7 +36,7 @@ submodule at commit `94e6709fd05f8828d188d95539be54c50e93d628`.
 ## Application Consumers
 
 The only current app consumer found under `src` is
-`src/Broiler.App.Graphics/BrowserWindow.cs`.
+`src/Broiler.Browser.Windows/BrowserWindow.cs`.
 
 | Consumer area | Current dependency | Baseline behavior |
 |---|---|---|
@@ -55,7 +55,7 @@ without deleting or changing the compatibility surface above.
 
 ## Migration Consumers of Record
 
-1. `src/Broiler.App.Graphics/BrowserWindow.cs` application chrome.
+1. `src/Broiler.Browser.Windows/BrowserWindow.cs` application chrome.
 2. `Broiler.Graphics/Broiler.Graphics.Windows/Direct2DControls.cs` native child
    controls.
 3. `Broiler.Graphics/Broiler.Graphics.Windows/Direct2DWindow.cs` legacy input,

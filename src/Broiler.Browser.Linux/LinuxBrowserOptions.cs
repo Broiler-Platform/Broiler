@@ -1,4 +1,4 @@
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 internal sealed record LinuxBrowserOptions(
     bool ShowHelp,

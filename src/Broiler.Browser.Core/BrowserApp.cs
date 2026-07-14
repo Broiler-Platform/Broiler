@@ -1,4 +1,5 @@
 using System.Drawing;
+using Broiler.App;
 using Broiler.App.Rendering;
 using Broiler.Graphics;
 using Broiler.HTML.Core.Entities;
@@ -15,7 +16,7 @@ using Broiler.UI.Standard;
 using Broiler.UI.Window.Standard;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 internal sealed class BrowserApp : IDisposable
 {

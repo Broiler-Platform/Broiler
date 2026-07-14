@@ -24,7 +24,7 @@
     "sample": "Broiler.UI.WebAssembly.Demo",
     "application": "Broiler.App.WebAssembly",
     "conditionalGraphicsBackend": "Broiler.Graphics.WebAssembly",
-    "reservedExistingAssembly": "Broiler.Graphics.Browser",
+    "reservedExistingAssembly": "Broiler.Browser.Windows",
     "runtimeIdentifier": "browser-wasm"
   },
   "coreChangesAllowed": false,

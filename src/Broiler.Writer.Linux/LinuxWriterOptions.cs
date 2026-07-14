@@ -3,6 +3,7 @@ using System.Globalization;
 
 namespace Broiler.Writer;
 
+/// <summary>Command-line and windowing options for the Linux Writer host.</summary>
 internal sealed record LinuxWriterOptions(
     bool OpenWindow,
     bool EnableEvdevInput,

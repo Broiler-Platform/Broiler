@@ -1,6 +1,6 @@
 using Broiler.Graphics;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 internal static class BrowserPalette
 {

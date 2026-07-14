@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Runtime.Versioning;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 /// <summary>
 /// Entry point for the Broiler browser built on Broiler.Graphics (Win32 + Direct2D).

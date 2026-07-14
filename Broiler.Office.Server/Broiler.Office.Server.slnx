@@ -1,5 +1,5 @@
 <Solution>
   <Project Path="Broiler.Office.Server.csproj" />
-  <Project Path="../Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj" />
+  <Project Path="../src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj" />
   <Project Path="../Broiler.Graphics/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj" />
 </Solution>

@@ -70,9 +70,9 @@ backend rather than a core rewrite. `Broiler.UI` changes become necessary only
 for higher support tiers whose browser semantics cannot be expressed correctly
 by the current neutral contracts.
 
-The name `Broiler.Graphics.Browser` must not be used for a new backend. It is
+The name `Broiler.Browser.Windows` must not be used for a new backend. It is
 already the assembly name of the desktop application in
-`src/Broiler.App.Graphics`. Public project names in this work use
+`src/Broiler.Browser.Windows`. Public project names in this work use
 `WebAssembly`; `browser-wasm` is reserved for the .NET runtime identifier.
 
 ## 2. Support tiers and success claims
@@ -104,7 +104,7 @@ There are two materially different “Broiler application” targets:
 1. **UI application track:** a Writer-like or purpose-built application using
    Broiler.UI, Graphics, Input, and application/domain libraries. The estimates
    in Phases 0-6A and 7 cover this track.
-2. **Full Broiler browser-engine track:** port `Broiler.App.Graphics`, including
+2. **Full Broiler browser-engine track:** port `Broiler.Browser.Windows`, including
    HTML.Graphics, DOM, `Broiler.JavaScript.All`, HtmlBridge, page loading,
    persistence, and web security policy. This is not merely a UI/Graphics host
    port and receives a separate Phase 6B audit/workstream.
@@ -327,9 +327,9 @@ src/
   Broiler.App.WebAssembly/
 ```
 
-Do not initially add `browser-wasm` to `src/Broiler.App.Graphics`. Its current
+Do not initially add `browser-wasm` to `src/Broiler.Browser.Windows`. Its current
 plain `net10.0` condition selects Linux Graphics/Input providers, and its
-assembly name is already `Broiler.Graphics.Browser`. A separate composition root
+assembly name is already `Broiler.Browser.Windows`. A separate composition root
 avoids native dependency leakage and naming ambiguity.
 
 ### 7.3 Conditional reusable projects
@@ -906,7 +906,7 @@ Exit criteria:
 
 - no unresolved owner exists for canvas, scheduling, resize, input, text,
   clipboard, accessibility, file selection, or deployment;
-- no new project collides with the existing `Broiler.Graphics.Browser` assembly;
+- no new project collides with the existing `Broiler.Browser.Windows` assembly;
 - unsupported controls do not enter the first dependency graph; and
 - T0 build commands are reproducible in CI for the foundations and for the exact
   selected T2 control/application dependency closure.
@@ -1441,7 +1441,7 @@ not an acceptance result.
 | AOT increases payload more than it helps runtime | Slow cold load | Benchmark interpreted versus AOT and choose per evidence |
 | Browser event listeners survive navigation | Leaks and duplicate input | Explicit lifetime object and teardown-loop tests |
 | Platform code is added under UI runtime | Architecture regression | Keep first host in sample/app; preserve ADR/topology tests |
-| New backend name collides with desktop browser app | Confusing packages/assemblies | Use `WebAssembly`; reserve existing `Broiler.Graphics.Browser` name |
+| New backend name collides with desktop browser app | Confusing packages/assemblies | Use `WebAssembly`; reserve existing `Broiler.Browser.Windows` name |
 | Nested Graphics checkouts drift | Broken aggregate builds | Provider-first landing and coherent submodule pointer updates |
 
 ## 18. Required ADRs and decision records
@@ -1510,7 +1510,7 @@ T3 is complete when, in addition:
 - navigation/teardown and ten-minute soak tests show no retained-lifetime leak.
 
 This T3 definition covers the UI application track. A full
-`Broiler.App.Graphics`-equivalent engine claim additionally requires Phase 6B
+`Broiler.Browser.Windows`-equivalent engine claim additionally requires Phase 6B
 and its separately approved engine definition of done.
 
 ### 19.3 T4 production support
@@ -1537,7 +1537,7 @@ T4 additionally requires:
    require a separate Phase 6B audit/plan for the full Broiler browser engine.
 6. Approve CPU raster-to-canvas as the correctness path and measurement baseline.
 7. Approve conditional extraction to `Broiler.Graphics.WebAssembly`, not the
-   already-used `Broiler.Graphics.Browser` name.
+   already-used `Broiler.Browser.Windows` name.
 8. Approve direct Canvas 2D before considering WebGL/WebGPU.
 9. Approve sample-local input translation for the spike and extraction into
    per-kind Input WebAssembly assemblies before reuse/productization.

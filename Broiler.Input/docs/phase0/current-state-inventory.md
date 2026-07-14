@@ -42,7 +42,7 @@ The current application input consumer inventory is:
 
 | File | Usage |
 |---|---|
-| `src/Broiler.App.Graphics/BrowserWindow.cs` | Overrides Graphics pointer, wheel, key, and text callbacks for browser interaction |
+| `src/Broiler.Browser.Windows/BrowserWindow.cs` | Overrides Graphics pointer, wheel, key, and text callbacks for browser interaction |
 
 This inventory is intentionally narrow. New permanent consumers should target
 the Broiler.Input abstraction assemblies instead of adding new dependencies on

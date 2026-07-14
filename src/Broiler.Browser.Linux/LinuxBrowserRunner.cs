@@ -1,63 +1,73 @@
-using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Broiler.Graphics;
 using Broiler.Graphics.Linux;
 using Broiler.Graphics.Linux.OpenGL;
+using Broiler.App;
 
-namespace Broiler.Writer;
+namespace Broiler.Browser;
 
-internal static class LinuxWriterRunner
+internal static class LinuxBrowserRunner
 {
     private static readonly TimeSpan InteractivePollInterval = TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan OffscreenPollInterval = TimeSpan.FromMilliseconds(1);
+    private static readonly TimeSpan AnimationInterval = TimeSpan.FromMilliseconds(16);
     private static readonly BRenderOptions RenderOptions = new(Antialias: true, VSync: true, SubpixelText: true);
 
-    public static async Task<int> RunAsync(LinuxWriterOptions options, CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(LinuxBrowserOptions options, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        Console.WriteLine("Broiler Writer");
+        Console.WriteLine("Broiler Browser");
+        Console.WriteLine();
+        Console.WriteLine("Preview safety notice: use controlled content only. JavaScript is not a sandbox.");
         Console.WriteLine();
         PrintRuntime(LinuxGraphicsRuntimeDiagnostics.Capture());
         Print("Windowing baseline", LinuxGraphicsDependencies.CheckWindowingBaseline());
         Print("OpenGL", LinuxOpenGlRenderer.CheckDependencies());
 
-        bool closeRequested = false;
         long frameIndex = 0;
         long renderTicks = 0;
         int renderedFrames = 0;
         BFrameContext lastFrameContext = BFrameContext.Default;
+        var postedActions = new ConcurrentQueue<Action>();
 
         using LinuxOpenGlRenderer renderer = new();
         BSurfaceDescriptor descriptor = BSurfaceDescriptor.Default(new BSize(options.Width, options.Height));
         using IBroilerSurface surface = options.OpenWindow
-            ? renderer.CreateX11WindowSurface(descriptor, "Broiler Writer")
+            ? renderer.CreateX11WindowSurface(descriptor, "Broiler Browser")
             : renderer.CreateSurface(descriptor);
 
         LinuxOpenGlX11WindowSurface? x11Window = surface as LinuxOpenGlX11WindowSurface;
-        bool canUseEvdev = options.EnableEvdevInput && x11Window is not null;
-        if (options.EnableEvdevInput && x11Window is null)
-            Console.WriteLine("evdev input requested, but no focus-capable X11 window exists; input is disabled.");
+        bool canUseEvdev = x11Window is not null;
 
-        using WriterUiHost host = new(
+        using BrowserUiHost host = new(
             () => surface.Size,
             () => surface.DpiScale,
             static () => { },
             renderList =>
             {
-                lastFrameContext = new BFrameContext(WriterPalette.Canvas, frameIndex++, RenderOptions);
+                lastFrameContext = new BFrameContext(BrowserPalette.Canvas, frameIndex++, RenderOptions);
                 renderer.Render(surface, renderList, lastFrameContext);
+            },
+            action =>
+            {
+                postedActions.Enqueue(action);
+                return true;
             });
-        using WriterApp app = new(host, () => closeRequested = true);
+        using BrowserApp app = new(host, () => renderer, options.InitialUrl, static _ => { });
 
-        await using LinuxWriterInputCoordinator input = new(canUseEvdev, Console.WriteLine, externalPointer: x11Window is not null);
+        await using LinuxInputCoordinator input = new(
+            canUseEvdev,
+            Console.WriteLine,
+            externalPointer: x11Window is not null,
+            applicationName: "Broiler Browser");
         await input.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         DateTimeOffset start = DateTimeOffset.UtcNow;
+        DateTimeOffset nextAnimationUpdate = DateTimeOffset.MinValue;
+        BSize lastSurfaceSize = surface.Size;
         using PeriodicTimer timer = new(options.OpenWindow ? InteractivePollInterval : OffscreenPollInterval);
         do
         {
@@ -66,8 +76,12 @@ internal static class LinuxWriterRunner
             if (x11Window is not null)
             {
                 processedWindowEvents = x11Window.ProcessPendingEvents();
-                bool inputActive = options.IgnoreInputFocus || x11Window.IsFocused;
-                await input.SetActiveAsync(inputActive, cancellationToken).ConfigureAwait(false);
+                await input.SetActiveAsync(x11Window.IsFocused, cancellationToken).ConfigureAwait(false);
+                if (!surface.Size.Equals(lastSurfaceSize))
+                {
+                    app.Invalidate();
+                    lastSurfaceSize = surface.Size;
+                }
             }
 
             input.SetViewport(host.ViewportSize);
@@ -77,9 +91,17 @@ internal static class LinuxWriterRunner
                 input.SetExternalPointer(pointerX / scale, pointerY / scale);
             }
 
-            input.Drain(app.Dispatch);
+            int posted = DrainPostedActions(postedActions);
+            int inputEvents = input.Drain(app.Dispatch);
 
-            if (host.IsInvalidated || processedWindowEvents)
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (app.HasPendingWork && now >= nextAnimationUpdate)
+            {
+                app.StepAnimation();
+                nextAnimationUpdate = now + AnimationInterval;
+            }
+
+            if (host.IsInvalidated || processedWindowEvents || posted > 0 || inputEvents > 0)
             {
                 Stopwatch stopwatch = Stopwatch.StartNew();
                 app.RenderFrame();
@@ -88,31 +110,57 @@ internal static class LinuxWriterRunner
                 renderedFrames++;
             }
 
-            if (!options.OpenWindow)
+            if (!options.OpenWindow && !ShouldContinueOffscreen(app, host, postedActions, start, options.DurationMilliseconds))
                 break;
 
-            if (!options.RunUntilClose &&
+            if (options.OpenWindow &&
+                !options.RunUntilClose &&
                 (DateTimeOffset.UtcNow - start).TotalMilliseconds >= options.DurationMilliseconds)
             {
                 break;
             }
         }
-        while (!closeRequested &&
-               !input.QuitRequested &&
+        while (!input.QuitRequested &&
                (x11Window is null || !x11Window.IsCloseRequested) &&
                await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
 
         await input.SetActiveAsync(false, cancellationToken).ConfigureAwait(false);
         using BBitmap bitmap = ReadSurface(surface);
-        Console.WriteLine("Writer presentation:");
+        Console.WriteLine("Browser presentation:");
         Console.WriteLine("  presentation: " + PresentationState(surface));
         Console.WriteLine("  diagnostic: " + SurfaceDiagnostic(surface));
+        Console.WriteLine("  page: " + app.Status);
         Console.WriteLine("  bitmap: " + bitmap.Width.ToString(CultureInfo.InvariantCulture) + "x" + bitmap.Height.ToString(CultureInfo.InvariantCulture));
         Console.WriteLine("  render-time: " + FormatMilliseconds(renderTicks) + " ms total across " + renderedFrames.ToString(CultureInfo.InvariantCulture) + " frame(s)");
         Console.WriteLine("  input: " + InputSummary(input.Snapshot));
-        SaveArtifacts(options, bitmap, host.LastRenderList, descriptor, lastFrameContext);
+        SaveArtifacts(options, surface, bitmap, host.LastRenderList, lastFrameContext);
         Console.WriteLine();
         return 0;
+    }
+
+    private static int DrainPostedActions(ConcurrentQueue<Action> actions)
+    {
+        int count = 0;
+        while (actions.TryDequeue(out Action? action))
+        {
+            action();
+            count++;
+        }
+
+        return count;
+    }
+
+    private static bool ShouldContinueOffscreen(
+        BrowserApp app,
+        BrowserUiHost host,
+        ConcurrentQueue<Action> postedActions,
+        DateTimeOffset start,
+        int durationMilliseconds)
+    {
+        if ((DateTimeOffset.UtcNow - start).TotalMilliseconds >= durationMilliseconds)
+            return false;
+
+        return app.IsBusy || app.HasPendingWork || host.IsInvalidated || !postedActions.IsEmpty;
     }
 
     private static BBitmap ReadSurface(IBroilerSurface surface) =>
@@ -120,7 +168,7 @@ internal static class LinuxWriterRunner
         {
             LinuxOpenGlSurface openGlSurface => openGlSurface.ReadToBitmap(),
             LinuxOpenGlX11WindowSurface x11Surface => x11Surface.ReadToBitmap(),
-            _ => throw new InvalidOperationException("Unexpected Linux writer surface."),
+            _ => throw new InvalidOperationException("Unexpected Linux browser surface."),
         };
 
     private static string PresentationState(IBroilerSurface surface) =>
@@ -140,24 +188,24 @@ internal static class LinuxWriterRunner
         };
 
     private static void SaveArtifacts(
-        LinuxWriterOptions options,
+        LinuxBrowserOptions options,
+        IBroilerSurface surface,
         BBitmap backendBitmap,
         BRenderList? renderList,
-        BSurfaceDescriptor descriptor,
         BFrameContext frameContext)
     {
         if (options.ArtifactDirectory is null)
             return;
 
         Directory.CreateDirectory(options.ArtifactDirectory);
-        string backendPath = Path.Combine(options.ArtifactDirectory, "broiler-writer-linux-opengl.png");
+        string backendPath = Path.Combine(options.ArtifactDirectory, "broiler-browser-linux-opengl.png");
         backendBitmap.Save(backendPath);
 
         if (renderList is not null)
         {
             using BImageRenderer cpu = new();
-            using BBitmap cpuBitmap = cpu.RenderToImage(renderList, descriptor, frameContext);
-            string cpuPath = Path.Combine(options.ArtifactDirectory, "broiler-writer-linux-cpu.png");
+            using BBitmap cpuBitmap = cpu.RenderToImage(renderList, new BSurfaceDescriptor(surface.Size, surface.DpiScale), frameContext);
+            string cpuPath = Path.Combine(options.ArtifactDirectory, "broiler-browser-linux-cpu.png");
             cpuBitmap.Save(cpuPath);
             Console.WriteLine("  artifacts: " + cpuPath + "; " + backendPath);
             return;

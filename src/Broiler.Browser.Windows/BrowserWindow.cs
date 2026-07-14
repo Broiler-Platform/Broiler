@@ -9,7 +9,7 @@ using Broiler.Input.Mouse.Windows;
 using Broiler.Input.Windows;
 using Broiler.UI;
 
-namespace Broiler.App.Graphics;
+namespace Broiler.Browser;
 
 [SupportedOSPlatform("windows7.0")]
 internal sealed class BrowserWindow : Direct2DWindow, IWindowsInputHost

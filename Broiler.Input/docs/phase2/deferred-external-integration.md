@@ -6,7 +6,7 @@
 The roadmap includes integration work outside the new component:
 
 - move native message parsing out of `Direct2DWindow`;
-- migrate `Broiler.App.Graphics` to consume Input abstractions directly;
+- migrate `Broiler.Browser.Windows` to consume Input abstractions directly;
 - prove existing browser interaction tests are behaviorally equivalent; and
 - remove Graphics native input parsing from the final path.
 

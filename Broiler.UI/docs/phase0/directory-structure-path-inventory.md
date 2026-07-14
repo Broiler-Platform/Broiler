@@ -27,8 +27,8 @@ These files must be updated as part of the runtime/test/sample directory moves:
 | Component solution | `Broiler.UI/Broiler.UI.slnx` | Contains every UI project path and solution folder grouping |
 | Aggregate solution | `Broiler.slnx` | Contains aggregate project paths for UI runtime, tests, and demos |
 | UI project references | `Broiler.UI/**/*.csproj` | Most UI projects reference sibling UI projects by relative path |
-| Browser graphics app | `src/Broiler.App.Graphics/Broiler.App.Graphics.csproj` | References selected standard UI controls |
-| Writer app | `Broiler.Writer/Broiler.Writer.csproj` | References selected standard UI controls, RichEdit, and dialogs |
+| Browser graphics app | `src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj` | References selected standard UI controls |
+| Writer app | `src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj` | References selected standard UI controls, RichEdit, and dialogs |
 | Packaging script | `scripts/pack-all.ps1` | Packs `Broiler.UI.slnx` and `Broiler.UI.All` by path |
 | Packaging sync script | `scripts/sync-packaging.ps1` | Contains the `Broiler.UI` component directory name |
 | Linux CI | `.github/workflows/linux-port-build.yml` | Publishes the Linux UI demo by project path |

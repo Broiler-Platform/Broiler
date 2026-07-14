@@ -91,7 +91,7 @@ component.
 
 ### 2.3 Application code consumes the Graphics callbacks directly
 
-`src/Broiler.App.Graphics/BrowserWindow.cs` overrides the Graphics callbacks and
+`src/Broiler.Browser.Windows/BrowserWindow.cs` overrides the Graphics callbacks and
 forwards mouse operations into the HTML container. Wheel and selected keys are
 handled as browser scrolling and navigation commands. The WPF application also
 handles WPF `KeyDown` events directly for browser chrome such as Enter and F12.
@@ -995,7 +995,7 @@ Deliverables:
 - Add missing key metadata, X buttons, horizontal wheel, coordinate-space labels,
   capture-lost state, and device hot-plug reporting.
 - Add a compatibility adapter for existing `BWindow` callbacks.
-- Migrate `Broiler.App.Graphics` to consume Input abstractions directly.
+- Migrate `Broiler.Browser.Windows` to consume Input abstractions directly.
 
 Exit criteria:
 

@@ -71,7 +71,7 @@
     "BTextMeasurer"
   ],
   "appPreview": {
-    "project": "src/Broiler.App.Graphics/Broiler.App.Graphics.csproj",
+    "project": "src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj",
     "argument": "--ui-phase3",
     "windowsSpecificCodeLocation": "application host only"
   },

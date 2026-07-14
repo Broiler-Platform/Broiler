@@ -99,7 +99,7 @@ become the permanent public contract.
 
 ### 2.4 Application chrome is the first real consumer
 
-`src/Broiler.App.Graphics/BrowserWindow.cs` currently builds its navigation bar
+`src/Broiler.Browser.Windows/BrowserWindow.cs` currently builds its navigation bar
 with `BButtonControl` and `BEditControl`. This is the first migration target
 because it exercises:
 
@@ -1298,7 +1298,7 @@ Exit gate:
 
 Tasks:
 
-- Migrate `Broiler.App.Graphics` navigation/favorites chrome to standard UI
+- Migrate `Broiler.Browser.Windows` navigation/favorites chrome to standard UI
   controls in small, reversible steps.
 - Preserve browser surface input routing separately from chrome routing.
 - Remove application dependencies on `BButtonControl`, `BEditControl`,

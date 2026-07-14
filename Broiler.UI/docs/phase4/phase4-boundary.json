@@ -63,7 +63,7 @@
     "BTextMetrics"
   ],
   "appPreview": {
-    "project": "src/Broiler.App.Graphics/Broiler.App.Graphics.csproj",
+    "project": "src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj",
     "argument": "--ui-phase4-toolbar",
     "proofControls": [
       "StandardWindow",

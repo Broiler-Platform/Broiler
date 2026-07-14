@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PROJECT_PATH: src/Broiler.App.Graphics/Broiler.App.Graphics.csproj
+  PROJECT_PATH: src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj
   CONFIGURATION: Release-Windows
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
@@ -91,7 +91,7 @@ jobs:
             -p:PublishSingleFile=true `
             -p:EnableCompressionInSingleFile=true
 
-          $publishedExe = Join-Path $output 'Broiler.Graphics.Browser.exe'
+          $publishedExe = Join-Path $output 'Broiler.Browser.Windows.exe'
           $exe = Join-Path $output 'Broiler.exe'
           Move-Item -LiteralPath $publishedExe -Destination $exe -Force
 
@@ -113,7 +113,7 @@ jobs:
             -p:PublishSingleFile=true `
             -p:UseAppHost=true
 
-          $publishedExe = Join-Path $output 'Broiler.Graphics.Browser.exe'
+          $publishedExe = Join-Path $output 'Broiler.Browser.Windows.exe'
           $exe = Join-Path $output 'Broiler.exe'
           Move-Item -LiteralPath $publishedExe -Destination $exe -Force
 

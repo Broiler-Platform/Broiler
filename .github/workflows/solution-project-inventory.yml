@@ -1,0 +1,50 @@
+name: Solution project inventory
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/solution-project-inventory.yml'
+      - '.gitmodules'
+      - 'Broiler.slnx'
+      - 'scripts/verify-solution-projects.ps1'
+      - '**/*.csproj'
+      - '**/*.fsproj'
+      - '**/*.vbproj'
+      - 'Broiler.CSS'
+      - 'Broiler.DOM'
+      - 'Broiler.Graphics'
+      - 'Broiler.HTML'
+      - 'Broiler.JS'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/solution-project-inventory.yml'
+      - '.gitmodules'
+      - 'Broiler.slnx'
+      - 'scripts/verify-solution-projects.ps1'
+      - '**/*.csproj'
+      - '**/*.fsproj'
+      - '**/*.vbproj'
+      - 'Broiler.CSS'
+      - 'Broiler.DOM'
+      - 'Broiler.Graphics'
+      - 'Broiler.HTML'
+      - 'Broiler.JS'
+
+jobs:
+  verify-solution-projects:
+    name: Verify canonical project inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Compare Broiler.slnx with the repository
+        shell: pwsh
+        run: ./scripts/verify-solution-projects.ps1

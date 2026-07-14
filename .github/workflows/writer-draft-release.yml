@@ -24,8 +24,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PROJECT_PATH: Broiler.Writer/Broiler.Writer.csproj
-  APP_NAME: Broiler.Writer
   RELEASE_NAME: Broiler Writer
   WINDOWS_CONFIGURATION: Release-Windows
   LINUX_CONFIGURATION: Release-Linux
@@ -38,6 +36,9 @@ jobs:
     if: ${{ github.event.inputs.target_platform == 'Windows' }}
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      PROJECT_PATH: src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj
+      APP_NAME: Broiler.Writer.Windows
 
     steps:
       - name: Checkout selected branch
@@ -142,14 +143,14 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Windows-self-contained
-          path: ${{ runner.temp }}/publish/windows-self-contained/Broiler.Writer.exe
+          path: ${{ runner.temp }}/publish/windows-self-contained/Broiler.Writer.Windows.exe
           if-no-files-found: error
 
       - name: Upload framework-dependent artifact
         uses: actions/upload-artifact@v6
         with:
           name: Broiler-Writer-Windows-framework-dependent
-          path: ${{ runner.temp }}/publish/windows-framework-dependent/Broiler.Writer.exe
+          path: ${{ runner.temp }}/publish/windows-framework-dependent/Broiler.Writer.Windows.exe
           if-no-files-found: error
 
       - name: Create draft GitHub release
@@ -170,8 +171,8 @@ jobs:
           Target platform: $env:TARGET_PLATFORM
 
           Assets:
-          - Broiler-Writer-Windows-self-contained.zip: contains self-contained single-file Broiler.Writer.exe.
-          - Broiler-Writer-Windows-framework-dependent.zip: contains framework-dependent single-file Broiler.Writer.exe.
+          - Broiler-Writer-Windows-self-contained.zip: contains self-contained single-file Broiler.Writer.Windows.exe.
+          - Broiler-Writer-Windows-framework-dependent.zip: contains framework-dependent single-file Broiler.Writer.Windows.exe.
           "@
 
           $bodyPath = Join-Path $env:RUNNER_TEMP 'writer-draft-release-notes.md'
@@ -190,6 +191,9 @@ jobs:
     if: ${{ github.event.inputs.target_platform == 'Linux' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      PROJECT_PATH: src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj
+      APP_NAME: Broiler.Writer.Linux
 
     steps:
       - name: Checkout selected branch
@@ -341,8 +345,8 @@ jobs:
           Target platform: $env:TARGET_PLATFORM
 
           Assets:
-          - Broiler-Writer-Linux-self-contained.tar.gz: contains self-contained single-file Broiler.Writer.
-          - Broiler-Writer-Linux-framework-dependent.tar.gz: contains framework-dependent single-file Broiler.Writer.
+          - Broiler-Writer-Linux-self-contained.tar.gz: contains self-contained single-file Broiler.Writer.Linux.
+          - Broiler-Writer-Linux-framework-dependent.tar.gz: contains framework-dependent single-file Broiler.Writer.Linux.
           "@
 
           $bodyPath = Join-Path $env:RUNNER_TEMP 'writer-draft-release-notes.md'

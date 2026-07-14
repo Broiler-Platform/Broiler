@@ -193,17 +193,17 @@ deferred list is explicit and documented.
 with the WPF shell's browsing essentials.*
 
 Strategy: **promote the `Broiler.HTML.Graphics.Win32.Demo` PoC into a real app
-project** (`Broiler.App.Graphics`) rather than mutating the WPF app in place.
+project** (`Broiler.Browser.Windows`) rather than mutating the WPF app in place.
 Keep the WPF app buildable until parity is reached, then switch the shipped artifact.
 
 **Status: core shell implemented and running (2.1–2.4, 2.6 done; 2.5 partial; 2.7
-not started; 2.8 partial).** New project `src/Broiler.App.Graphics` (assembly
-`Broiler.Graphics.Browser`) builds and launches a Direct2D browser that renders
+not started; 2.8 partial).** New project `src/Broiler.Browser.Windows` (assembly
+`Broiler.Browser.Windows`) builds and launches a Direct2D browser that renders
 URLs/local files, navigates, scrolls, and steps script-driven animations — no WPF.
 
 | # | Task | Status | Delivered / Notes | Exit |
 |---|------|--------|-------------------|------|
-| 2.1 | Scaffold `Broiler.App.Graphics` | ✅ Done | `BrowserWindow : Direct2DWindow` hosts `Broiler.HTML.Graphics.HtmlContainer`. Reuses the platform-neutral `RenderingPipeline.cs` / `PageLoader.cs` / `IPageLoader.cs` / `FavoritesManager.cs` from `Broiler.App` via linked `<Compile>` (no source duplication, WPF app untouched). `Program.cs` is the Win32 entry point. | Window opens, renders a URL ✅ |
+| 2.1 | Scaffold `Broiler.Browser.Windows` | ✅ Done | `BrowserWindow : Direct2DWindow` hosts `Broiler.HTML.Graphics.HtmlContainer`. Reuses the platform-neutral `RenderingPipeline.cs` / `PageLoader.cs` / `IPageLoader.cs` / `FavoritesManager.cs` from `Broiler.App` via linked `<Compile>` (no source duplication, WPF app untouched). `Program.cs` is the Win32 entry point. | Window opens, renders a URL ✅ |
 | 2.2 | Navigation chrome | ✅ Done | Toolbar (Back/Forward/Refresh, address `BEditControl`, ☆ favorite toggle, Go) + a favorites bar of `BButtonControl`s rebuilt from `FavoritesManager` (shares the same `favorites.json` as the WPF app). History stack with fragment-anchor resolution. | Can navigate by typing a URL ✅ |
 | 2.3 | Input translation | ✅ Done | **Extended `Broiler.Graphics`**: added `BPointerEventArgs`/`BMouseWheelEventArgs`/`BKeyEventArgs`/`BTextInputEventArgs` + virtual `OnPointer*`/`OnMouseWheel`/`OnKey*`/`OnTextInput` hooks on `BWindow`, wired in `Direct2DWindow`'s render-host window-proc (`WM_MOUSE*`/`WM_KEY*`/`WM_CHAR`/`WM_MOUSEWHEEL`, with screen→client + DIP conversion, mouse-leave tracking, focus-on-click). App maps these to `HtmlContainer.HandleMouse*`; link clicks drive navigation via the `LinkClicked` event. | Links clickable ✅ (hover re-render not wired) |
 | 2.4 | Scrolling & viewport | ✅ Done | Scroll-offset state via `HtmlContainer.ScrollOffset`; mouse-wheel + keyboard (arrows/PageUp-Down/Home/End) scrolling, clamped to content height (`ActualSize`). Layout cached; only the render list rebuilds on scroll. Re-layout on `OnResized` (verified repaint after resize). No visible scrollbar yet. | Long pages scroll smoothly ✅ |

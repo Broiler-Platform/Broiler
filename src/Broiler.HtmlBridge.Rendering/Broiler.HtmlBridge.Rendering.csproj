@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler" />
-    <InternalsVisibleTo Include="Broiler.Graphics.Browser" />
+    <InternalsVisibleTo Include="Broiler.Browser.Core" />
     <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />

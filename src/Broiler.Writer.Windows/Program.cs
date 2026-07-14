@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 
 namespace Broiler.Writer;
 
+/// <summary>Windows entry point for Broiler Writer.</summary>
 [SupportedOSPlatform("windows7.0")]
 internal static class Program
 {

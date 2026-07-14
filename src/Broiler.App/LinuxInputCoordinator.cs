@@ -14,9 +14,9 @@ using Broiler.Input.Mouse;
 using Broiler.Input.Mouse.Linux;
 using Broiler.UI;
 
-namespace Broiler.Writer;
+namespace Broiler.App;
 
-internal sealed class LinuxWriterInputCoordinator : IAsyncDisposable
+internal sealed class LinuxInputCoordinator : IAsyncDisposable
 {
     private readonly bool _enabled;
     private readonly bool _externalPointer;
@@ -47,7 +47,7 @@ internal sealed class LinuxWriterInputCoordinator : IAsyncDisposable
     private string? _mouseSummary;
     private bool _quitRequested;
 
-    public LinuxWriterInputCoordinator(bool enabled, Action<string> log, bool externalPointer = false, string applicationName = "Broiler Writer")
+    public LinuxInputCoordinator(bool enabled, Action<string> log, bool externalPointer = false, string applicationName = "Broiler Writer")
     {
         _enabled = enabled;
         _log = log ?? throw new ArgumentNullException(nameof(log));

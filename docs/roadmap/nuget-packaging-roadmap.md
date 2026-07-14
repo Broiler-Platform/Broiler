@@ -2,7 +2,7 @@
 
 Goal: ship every reusable **Broiler component library** as a published NuGet
 package. The two end-user **applications** — `Broiler.Writer` and the browser
-(`Broiler.App` / `Broiler.App.Graphics`) — are **out of scope**, as is the
+(`Broiler.App` / `Broiler.Browser.Windows`) — are **out of scope**, as is the
 tooling (`Broiler.Cli`, `Broiler.Wpt`, `Broiler.DevConsole`, `Broiler.DevSite`,
 `Broiler.Engines.Baseline`) and every `*.Tests`, `*.Demo`, and `*.Diagnostic`
 project.
