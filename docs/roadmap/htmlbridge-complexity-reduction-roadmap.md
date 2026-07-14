@@ -1987,28 +1987,59 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   not geometry. Zero regressions. (True §9.7 abspos blockification of computed `display` remains a separate,
   broader engine concern; it is not needed for the abs-inline-container placement and no corpus test requires
   it here.)
+- **P5.8d.2b — intervening scroll container (eleventh expansion) — COMPLETED** 2026-07-14
+  (branch `claude/htmlbridge-phase-5-sy7bkr`; **bridge only, additive, default-off**). A `position-area` box
+  whose containing block is the **anchor's scroll container** (an *intervening scroll container* — the target
+  is a descendant of the scroll container the anchor lives in) now goes native — the case the MVP subset
+  excluded from the start via the `IsMvpNativeAnchorBox` `scrollContainer != null` gate. **No engine change
+  needed:** the bridge's `ApplyScrollSimulation` pre-pass already DOM-shifts a scrolled container's content
+  (wrapping it in a `position:relative` offset div with `top:-scrollTop`/`left:-scrollLeft`) *before* the
+  final render, so the engine's box tree already carries the scrolled anchor's border-box geometry; the
+  native post-pass reads that shifted anchor rect (`box.Bounds`) and places the target against it, exactly as
+  for any other anchor. The two bridge changes:
+  - **Gate.** The `scrollContainer != null` early-return in `IsMvpNativeAnchorBox` is removed (position-try
+    and `anchor()`/`anchor-size()` remain the only position-area exclusions).
+  - **CB parity.** The baked path registers the scroll container in `scrollContainersNeedingRelative` (so it
+    gets `position:relative` and becomes the target's containing block) *inside* the `rect != null` bake
+    block; native (un-baked) boxes now register it too, so the CB frame the engine resolves is identical to
+    the baked path whether or not the scroll container was already positioned.
+  Validation (this expansion is the render-parity model — the corpus `position-area-scrolling-001/003`
+  cannot exercise it because their targets **vanish in both the baked and native paths** due to a separate
+  pre-existing rendering bug, so they fail identically default-off and lever-on; `scrolling-002`, whose
+  target is *outside* the scroll container, already went native): `Broiler.Wpt.Tests/
+  ScrollContainerAnchorParityTests.cs` (full render pipeline: a scroll-container `position-area: bottom
+  right` target renders **pixel-identically** baked vs native — positioned and static scroll containers, with
+  and without a JS scroll offset; a `scrollTop:50`/`scrollLeft:30` offset shifts the native placement to the
+  scrolled anchor's edge exactly as baked) plus `Broiler.Cli.Tests/NativeAnchorScrollContainerModeTests.cs`
+  (bridge half: native mode leaves the scroll-container target un-baked — no inline `left`/`top`/
+  `position-area: none` — while default mode bakes it, so the parity above is genuinely the engine's doing).
+  Regression check: full Cli `~NativeAnchor` (15) and the anchor Wpt suites (`~AnchorScrollTracking`/
+  `~AnchorNameScope`/`~AnchorInlineContainingBlock`/`~PositionTryFallback`/`~NativeAnchor`/`~ScrollContainer`,
+  18) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged (7-fail / 32-pass)** with
+  the identical pre-existing anchor-tail fail *set* — zero regressions.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
-  scroll simulation → `position-visibility` → dialog/backdrop → position-try.
+  ~~scroll simulation~~ → `position-visibility` → dialog/backdrop → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
   props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
-  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, opposing-inset sizing, AND
-  abspos-inline containing blocks now land natively — see the ten expansions above.) Each remaining feature
-  is currently excluded by
+  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, opposing-inset sizing, abspos-inline
+  containing blocks, AND intervening scroll containers now land natively — see the eleven expansions above.)
+  Each remaining feature is currently excluded by
   `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`)
   and stays on the bridge path (baked + `position-area: none`), so enabling the lever globally is already safe
   (proven above); the expansions widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
-The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree, and both the
+The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; both the
 relatively- and absolutely-positioned inline-CB cases now handled by the engine's real §10.1 inline-box
-geometry rather than the bridge's DOM-move estimator; but scroll simulation, `position-visibility`,
-dialog/backdrop, `anchor-scope`/scoping) are the hard part of the later cutover expansions: the engine
-operates on boxes, not the DOM, so these are re-implementations, not moves — which is why the MVP subset
-deliberately excludes them.
+geometry rather than the bridge's DOM-move estimator; and an intervening scroll container now handled by
+reading the anchor's already-`ApplyScrollSimulation`-shifted box geometry rather than re-simulating scroll
+in the engine; but `position-visibility`, dialog/backdrop, `anchor-scope`/scoping) are the hard part of the
+later cutover expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not
+moves — which is why the MVP subset deliberately excludes them.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
