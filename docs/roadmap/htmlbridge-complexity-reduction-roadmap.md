@@ -1783,13 +1783,33 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   green in isolation; the css-anchor-position **pixel** subset stays **byte-identical default-off (8-fail /
   31-pass)**, and **lever-on improves to 7-fail / 32-pass** — `position-area-scrolling-002` flips to
   passing (its border-box box now sizes to match the reference) with **zero regressions**.
+- **P5.8d.2b — native percentage box props (third expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). `CanApplyNativeAnchorSize` now admits percentage
+  margin/padding/inset boxes (it is just childless-and-no-words); a new `ApplyPercentBoxPropsPlacement`
+  mirrors the bridge's `hasPercentBoxProps` branch — percentage margins/padding resolve against the cell
+  inline size (`ResolveEdgeAgainstCell`, the bridge's `ResolvePctOrPx`), the margin box stretches to fill
+  the IMCB, content size = `PositionAreaGrid.ContentSizeFillingImcb(imcb, margin, border, padding)`, the
+  resolved padding is written back as px so the content-box background paints right, and the border box is
+  positioned with its margin-box origin at the IMCB origin. `TryResolvePositionAreaTarget` now also outs
+  the `PositionAreaCell` (the percent resolution needs the cell inline size). Tests:
+  `NativeAnchorPlacementTests.cs` → 22 (percent margin shrinks+shifts the border box; percent padding
+  resolves against the cell — not the box's own width — and fills the IMCB). Regression check: full
+  `Broiler.Layout.Tests` (130) green; native e2e (2) green in isolation; the css-anchor-position **pixel**
+  subset stays **byte-identical default-off (8-fail / 31-pass)** and **lever-on unchanged (7-fail /
+  32-pass)** — zero regressions. **No corpus pixel test exercises this path:** the only percentage-box-props
+  test, `position-area-percents-001`, shares `anchor-name: --foo` across four anchors, so the bridge's
+  **uniqueness gate keeps it baked** (and it also needs writing-mode support neither path has). Validation
+  is therefore unit-test geometry (pinned to the promoted `ContentSizeFillingImcb`) plus no-regression. The
+  **uniqueness / `anchor-scope`** gate is the more impactful next blocker — it is what actually excludes
+  `percents-001` and any multi-anchor scenario, so the engine's flat last-wins `AnchorRegistry` needs
+  scope awareness before those boxes can go native.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
-  inline-CB promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop →
-  `anchor()` insets → position-try. (Childless auto/explicit/percentage sizing AND `box-sizing:border-box`
-  now land natively — see the two size expansions above; percentage *box props* — margin/padding/inset
-  resolved against the cell — are still bridge-baked.) Each remaining feature is currently excluded by
-  `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
+  anchor-name scope/uniqueness (engine `AnchorRegistry` is flat last-wins) → inline-CB promotion (DOM
+  moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
+  (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, AND percentage margin/padding/inset
+  box props now land natively — see the three size expansions above.) Each remaining feature is currently
+  excluded by `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
   `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
   widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
