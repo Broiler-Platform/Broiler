@@ -108,24 +108,28 @@ public sealed partial class DomBridge
         if (!IsText(element) && !element.TagName.StartsWith('#'))
             InvalidateElementStyles(element);
 
+        // Sub-documents keep their own style scope, but since P4.4b severed the #subdoc-root element
+        // they are no longer in-tree children, so this walk never crosses a sub-document boundary.
         foreach (var child in ChildElements(element))
         {
-            if (!IsText(child) && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+            if (!IsText(child))
                 InvalidateStyleScopeRecursive(child);
         }
     }
 
     /// <summary>
-    /// Finds the document root ancestor for the given element by walking up the
-    /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
-    /// Returns the topmost node within the element's document scope.
+    /// Finds the style-scope root ancestor for the given element by walking up the
+    /// parent chain. Stops at a <c>#</c>-prefixed boundary element (a <c>#shadow-root</c>;
+    /// the document/sub-document sentinels are gone — the canonical <c>DomDocument</c> parent
+    /// is not a <c>DomElement</c>, so <see cref="ParentEl"/> already stops the walk there).
+    /// Returns the topmost element within the element's scope.
     /// </summary>
     private static DomElement GetDocumentRootFor(DomElement el)
     {
         var root = el;
         while (ParentEl(root) != null)
         {
-            // If we've reached a document root, stop here
+            // If we've reached a scope root (shadow root), stop here
             if (root.TagName.StartsWith('#'))
                 return root;
             root = ParentEl(root);
@@ -135,7 +139,9 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
-    /// Does not descend into sub-document boundaries (<c>#subdoc-root</c>).
+    /// Sub-documents keep their own style scope, but since P4.4b severed the
+    /// <c>#subdoc-root</c> element they are no longer in-tree children, so this walk
+    /// never crosses a sub-document boundary.
     /// </summary>
     private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
@@ -148,9 +154,7 @@ public sealed partial class DomBridge
                 else if (IsExternalStylesheet(child))
                     styleElements.Add(child);
 
-                // Don't descend into sub-document roots (they have their own style scope)
-                if (!child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
-                    CollectStyleElementsInTree(child, styleElements);
+                CollectStyleElementsInTree(child, styleElements);
             }
         }
     }

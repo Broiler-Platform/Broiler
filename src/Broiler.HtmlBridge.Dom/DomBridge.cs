@@ -843,8 +843,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
                     frames.Add(GetOrCreateSubWindow(child));
             }
 
-            if (!string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
-                CollectWindowFrames(child, frames);
+            // Sub-documents are severed (P4.4b) — never in-tree children — so the walk always
+            // descends normal element children.
+            CollectWindowFrames(child, frames);
         }
     }
 

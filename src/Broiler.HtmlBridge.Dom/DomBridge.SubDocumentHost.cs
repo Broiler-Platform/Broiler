@@ -34,8 +34,15 @@ public sealed partial class DomBridge : ISubDocumentHost
 
     bool ISubDocumentHost.TryGetNodeWrapper(DomNode node, out JSObject wrapper) => _jsObjects.TryGet(node, out wrapper);
 
-    void ISubDocumentHost.SetOwnerDocRoot(DomNode node, DomNode docRoot) =>
-        GetElementRuntimeState(node).OwnerDocRoot = docRoot;
+    // Phase 4 item 1 (P4.4c): a sub-document createElement/… node is minted from the main _document
+    // and returned detached, so its canonical OwnerDocument would be the main document. Adopt it into
+    // the sub-document's content DomDocument (a no-op RemoveChild since it is parentless) so
+    // GetOwningDocument's detached fallback (node.OwnerDocument) reports the sub-document.
+    void ISubDocumentHost.AdoptDetachedNode(DomNode node, DomNode docRoot)
+    {
+        if (docRoot is DomDocument document)
+            document.AdoptNode(node);
+    }
 
     DomElement ISubDocumentHost.CreateElement(string tagName) => CreateBridgeElement(tagName);
     DomElement ISubDocumentHost.CreateElementNS(string ns, string localName) => CreateBridgeElementNS(ns, localName);

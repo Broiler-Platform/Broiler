@@ -789,7 +789,6 @@ public sealed partial class DomBridge
                 if (kvp.Value == dtObj && kvp.Key is DomNode dtNode)
                 {
                     docRoot.AppendChild(dtNode);
-                    GetElementRuntimeState(dtNode).OwnerDocRoot = docRoot;
                     break;
                 }
             }
@@ -802,7 +801,6 @@ public sealed partial class DomBridge
                 ? CreateBridgeElement(qName)
                 : CreateBridgeElementNS(ns, qName);
             docRoot.AppendChild(docEl);
-            GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
         }
 
         return _subDocuments.BuildDocument(docRoot);
@@ -814,34 +812,30 @@ public sealed partial class DomBridge
         var title = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         // Phase 4 item 1 (P4.4a): a createHTMLDocument root is a canonical DomDocument (was a
         // #subdoc-root sentinel element); doctype + <html> are appended as canonical document children.
+        // Phase 4 item 1 (P4.4c): structural nodes are appended under docRoot (a canonical
+        // DomDocument), so GetOwningDocument derives their owner from tree position — no OwnerDocRoot.
         var docRoot = CreateBrowsingContextDocument();
         var doctype = CreateBridgeDocumentType("html", string.Empty, string.Empty);
         docRoot.AppendChild(doctype);
-        GetElementRuntimeState(doctype).OwnerDocRoot = docRoot;
         // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
         var htmlEl = CreateBridgeElement("html");
         docRoot.AppendChild(htmlEl);
-        GetElementRuntimeState(htmlEl).OwnerDocRoot = docRoot;
         var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
-        GetElementRuntimeState(headEl).OwnerDocRoot = docRoot;
         htmlEl.AppendChild(headEl);
         // Add <title> element if title argument is provided
         if (title != null)
         {
             var titleEl = CreateBridgeElement("title");
             SetParent(titleEl, headEl);
-            GetElementRuntimeState(titleEl).OwnerDocRoot = docRoot;
             headEl.AppendChild(titleEl);
             var titleText = CreateBridgeTextNode(title);
             SetParent(titleText, titleEl);
-            GetElementRuntimeState(titleText).OwnerDocRoot = docRoot;
             titleEl.AppendChild(titleText);
         }
 
         var bodyEl = CreateBridgeElement("body");
         SetParent(bodyEl, htmlEl);
-        GetElementRuntimeState(bodyEl).OwnerDocRoot = docRoot;
         htmlEl.AppendChild(bodyEl);
         return _subDocuments.BuildDocument(docRoot);
     }

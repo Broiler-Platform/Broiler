@@ -20,7 +20,7 @@ internal sealed partial class SubDocumentBinding
         DomBridge.ValidateElementName(tagName, _host.JsContext);
         tagName = DomBridge.AsciiToLower(tagName);
         var el = _host.CreateElement(tagName);
-        _host.SetOwnerDocRoot(el, docRoot);
+        _host.AdoptDetachedNode(el, docRoot);
         return _host.ToJSObject(el);
     }
 
@@ -28,7 +28,7 @@ internal sealed partial class SubDocumentBinding
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = _host.CreateTextNode(text);
-        _host.SetOwnerDocRoot(el, docRoot);
+        _host.AdoptDetachedNode(el, docRoot);
         return _host.ToJSObject(el);
     }
 
@@ -36,7 +36,7 @@ internal sealed partial class SubDocumentBinding
     {
         var data = a.Length > 0 ? a[0].ToString() : string.Empty;
         var el = _host.CreateComment(data);
-        _host.SetOwnerDocRoot(el, docRoot);
+        _host.AdoptDetachedNode(el, docRoot);
         return _host.ToJSObject(el);
     }
 
@@ -48,7 +48,7 @@ internal sealed partial class SubDocumentBinding
         var el = string.IsNullOrEmpty(ns)
             ? _host.CreateElement(localName)
             : _host.CreateElementNS(ns, localName);
-        _host.SetOwnerDocRoot(el, docRoot);
+        _host.AdoptDetachedNode(el, docRoot);
         return _host.ToJSObject(el);
     }
 
@@ -141,7 +141,6 @@ internal sealed partial class SubDocumentBinding
             if (DomBridge.ParentEl(child) != null)
                 child.Remove();
             DomBridge.SetParent(child, docRoot);
-            DomBridge.AdoptSubtreeIntoDocument(child, docRoot);
             docRoot.AppendChild(child);
             return childObj;
         }

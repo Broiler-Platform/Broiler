@@ -235,8 +235,6 @@ public sealed partial class DomBridge
     private DomNode? FindDomNodeByJSObject(JSObject jsObj) =>
         _jsObjects.TryGetNode(jsObj, out var node) ? node : null;
 
-    private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
-
     // Phase 4 item 5: the bridge's IsDescendant(ancestor, candidate) copy is deleted; call sites use
     // the canonical Broiler.Dom.DomNode.IsDescendantOf(ancestor) instance method (identical ancestor
     // walk; every bridge call site passes a non-null ancestor, so canonical's null-ancestor throw is
@@ -290,24 +288,19 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Updates the owning document root for <paramref name="node"/> and its
-    /// descendants when the subtree is inserted into another document.
-    /// Nested sub-document roots remain isolated browsing contexts and are not
-    /// re-owned by the outer document.
+    /// The canonical <see cref="DomDocument"/> that owns <paramref name="node"/> (Phase 4 item 1,
+    /// P4.4c). For a connected node this is the absolute tree root: after P4.4b a (sub-)document root
+    /// is a canonical <see cref="DomDocument"/>, so ownership is derived from tree position — no
+    /// parallel <c>OwnerDocRoot</c> field. A detached node falls back to the canonical owner-document
+    /// set at construction/adoption (a sub-document's <c>createElement</c> node was adopted into its
+    /// content document; every other node was minted from the main <c>_document</c>).
     /// </summary>
-    internal static void AdoptSubtreeIntoDocument(DomNode node, DomNode? ownerDocRoot)
+    internal static DomDocument GetOwningDocument(DomNode node)
     {
-        GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
-
-        // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so char-data children are adopted
-        // too. Behaviour-preserving on today's homogeneous tree (every child is an element).
-        foreach (var child in node.ChildNodes)
-        {
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
-                continue;
-
-            AdoptSubtreeIntoDocument(child, ownerDocRoot);
-        }
+        DomNode root = node;
+        while (root.ParentNode is { } parent)
+            root = parent;
+        return root as DomDocument ?? node.OwnerDocument;
     }
 
     /// <summary>
@@ -486,12 +479,11 @@ public sealed partial class DomBridge
         // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so document-order traversal
         // includes text/comment nodes (range boundary indexing needs them). Behaviour-preserving
         // on today's homogeneous tree where every child is an element.
+        // Sub-documents are separate document trees, but since P4.4b severed the #subdoc-root
+        // element they are no longer in-tree children here, so document-order traversal never
+        // crosses a sub-document boundary.
         foreach (var child in root.ChildNodes)
         {
-            // Skip sub-document roots — they are separate document trees
-            // and must not be traversed as part of the parent document.
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
-                continue;
             result.Add(child);
             CollectDescendants(child, result);
         }

@@ -844,35 +844,24 @@ public sealed partial class DomBridge
 
     // RF-BRIDGE-1c Phase F (F3c part 2c): the serialization adapter is over canonical DomNode so
     // text/comment children serialize once construction flips to DomText/DomComment. GetKind keys
-    // text/comment off NodeType (holds for facade and canonical char-data), and the remaining
-    // special kinds off the facade #document-fragment/#subdoc-root/#doctype TagNames (still facade
-    // elements). GetName/GetAttributes/GetStyles are only invoked for element/doctype nodes (see
-    // HtmlSerializer.Append), so their Broiler.Dom.DomElement narrowing is always satisfied.
+    // text/comment off NodeType (holds for facade and canonical char-data) and the doctype/fragment
+    // kinds off the canonical node types; everything else is an element. GetName/GetAttributes/
+    // GetStyles are only invoked for element/doctype nodes (see HtmlSerializer.Append), so their
+    // Broiler.Dom.DomElement narrowing is always satisfied.
     private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter() => new(
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
             : IsComment(node) ? HtmlSerializationNodeKind.Comment
             : node is DomDocumentType ? HtmlSerializationNodeKind.DocumentType
             : node is DomDocumentFragment ? HtmlSerializationNodeKind.Fragment
-            : node is DomElement element
-                ? element.TagName.ToLowerInvariant() switch
-                {
-                    "#subdoc-root" => HtmlSerializationNodeKind.DocumentRoot,
-                    _ => HtmlSerializationNodeKind.Element
-                }
-                : HtmlSerializationNodeKind.Element,
+            : HtmlSerializationNodeKind.Element,
         GetName: static node => node is DomDocumentType docType ? docType.Name
             : node is DomElement element ? element.TagName : string.Empty,
-        // Never serialise a materialised nested-browsing-context (#subdoc-root) into
-        // its container.  A sub-document is fetched and attached to its <iframe>/
-        // <object>/<frame> so scripts can reach contentDocument and onload can fire,
-        // but it is a *separate* document — emitting it inline leaks its <style> into
-        // the parent's cascade (WPT css/CSS2/box-display/root-canvas-001, where the
-        // embedded p{background:green;height:100%} painted the whole parent green).
-        // The renderer rasterises each embedded document in isolation instead
-        // (srcdoc content is round-tripped via the srcdoc attribute).
-        GetChildren: static node => node.ChildNodes.Where(static child =>
-            !(child is DomElement childElement && string.Equals(childElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))),
+        // A materialised nested-browsing-context document is no longer an in-tree child (P4.4b
+        // severed the #subdoc-root element); it is referenced off its <iframe>/<object>/<frame>
+        // container and rasterised in isolation (srcdoc content round-trips via the srcdoc
+        // attribute), so it can never appear in ChildNodes and needs no serialization skip.
+        GetChildren: static node => node.ChildNodes,
         GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
         GetStyles: static node => node is DomElement element
             ? InlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
