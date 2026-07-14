@@ -1961,27 +1961,54 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the anchor()-function expansions:** `anchor-position-borders-002` (a testharness test whose `.target` boxes are
   auto-size, four-inset `anchor()` spanners) improves **99.38 %→99.99 %** — those targets now size natively
   (more precisely than the bridge estimator) — with no other test moving and no regression.
+- **P5.8d.2b — abspos-inline containing block (tenth expansion) — COMPLETED** 2026-07-14
+  (branch `claude/htmlbridge-phase-5-pnf1sb`; **bridge only, additive, default-off**). A `position-area` box
+  whose containing block is an **absolutely/fixed-positioned** inline element (a `position:absolute`
+  `<span>`) now goes native — the case the sixth (inline-CB) expansion deliberately left baked. **The
+  roadmap's premise for keeping it baked was wrong:** it assumed the engine blockifies the abspos inline
+  element (CSS2.1 §9.7) and so disagreed with the bridge's `IsInlineElement` on the CB extent. It does not —
+  the cascade's §9.7 `display` adjustment fires **only for `float`** (`DomParser.CascadeApplyStyles`,
+  `Broiler.HTML …/Parse/DomParser.cs:253`), so the engine keeps the abspos `<span>` at `Display==inline` and
+  reads its **inline bounding box** (`CssBox.GetInlineBoundingBox`, CSS2.1 §10.1). For an out-of-flow inline
+  whose content is a simple run, that bounding box equals the block shrink-to-fit extent — i.e. the correct
+  containing-block rect — so the anchored boxes place identically to a relatively-positioned inline CB, with
+  **no engine change needed**. A pipeline probe confirmed the four corner boxes land at the grid-derived
+  corners (`tl(0,0)`/`tr(300,0)`/`bl(0,75)`/`br(300,75)` for a 400×100 CB with a (100,25)200×50 anchor),
+  while the bridge's baked estimator collapses them to 0×0 (it cannot place a box inside an abspos inline CB).
+  - **Change.** The single `IsMvpNativeAnchorBox` abspos/fixed inline-CB exclusion is removed (the last
+    inline-CB carve-out); the promotion-skip already handles it (`IsNativeMvpPositionAreaBox` → the relaxed
+    gate → `CollectInlineCBPromotions` leaves the inline CB's subtree intact for the engine).
+  Tests: `Broiler.Cli.Tests/NativeAnchorAbsInlineCbPipelineTests.cs` (real parse→cascade→layout pipeline:
+  the four corner boxes at the grid corners with the flag on; a flag-off control pins the placement to the
+  post-pass). Regression check: full Cli `~NativeAnchor` (13) and Wpt `~NativeAnchor|~AnchorInlineContainingBlock|
+  ~AnchorNameScope` (10) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged fail
+  set (7-fail / 32-pass) with `position-area-abs-inline-container` improving 92.1 %→95.8 %** — the same
+  residual as its sibling `position-area-inline-container` (also 95.8 %), i.e. inline-CB rendering fidelity,
+  not geometry. Zero regressions. (True §9.7 abspos blockification of computed `display` remains a separate,
+  broader engine concern; it is not needed for the abs-inline-container placement and no corpus test requires
+  it here.)
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
-  CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → abspos-inline CB
-  (blockification reconciliation) → scroll simulation → `position-visibility` → dialog/backdrop → position-try.
+  CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
+  scroll simulation → `position-visibility` → dialog/backdrop → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
   props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
-  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, AND opposing-inset sizing now land
-  natively — see the nine expansions above.) Each remaining feature is currently excluded by
+  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, opposing-inset sizing, AND
+  abspos-inline containing blocks now land natively — see the ten expansions above.) Each remaining feature
+  is currently excluded by
   `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`)
   and stays on the bridge path (baked + `position-area: none`), so enabling the lever globally is already safe
   (proven above); the expansions widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
-The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree, and the
-relatively-positioned inline-CB case now handled by the engine's real §10.1 inline-box geometry rather
-than the bridge's DOM-move estimator; but abspos-inline blockification reconciliation, scroll simulation,
-`position-visibility`, dialog/backdrop, `anchor-scope`/scoping) are the hard part of the later cutover
-expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not moves — which
-is why the MVP subset deliberately excludes them.
+The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree, and both the
+relatively- and absolutely-positioned inline-CB cases now handled by the engine's real §10.1 inline-box
+geometry rather than the bridge's DOM-move estimator; but scroll simulation, `position-visibility`,
+dialog/backdrop, `anchor-scope`/scoping) are the hard part of the later cutover expansions: the engine
+operates on boxes, not the DOM, so these are re-implementations, not moves — which is why the MVP subset
+deliberately excludes them.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
