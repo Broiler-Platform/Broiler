@@ -778,6 +778,41 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.7 completed** 2026-07-13 (same branch) — **work item 2, the inline-style single authority
+(script-observable slice).** The bridge's kebab-case inline-style dict (`ElementRuntimeState.Style`,
+reached via `InlineStyle(element)`) was authoritative but only synced back to the canonical `style=`
+attribute at *serialization*, so after `element.style.color='red'` a script reading
+`getAttribute("style")` saw the stale author string (`setAttribute("style",…)` already kept both in
+sync; the CSSOM path did not). This closes that divergence with a **narrow write-through**: a single
+shared serializer, `SyncStyleAttributeFromInlineStyle` (extracted from `ReflectRenderState` so mid-run
+and final serialization use the *identical* CSSOM form — shorthand-first, `"; "`-joined, attribute
+removed when empty), now runs after every `element.style` mutation as well as at serialization. It is
+wired at exactly two seams: the style-object `onMutation` lambda (covers per-property set, `cssText`,
+`setProperty`, `removeProperty`, `cssFloat`) and `JsJsObjectsSetStyle025Core` (`element.style = "…"`).
+
+**Why write-through, not full elimination:** the dict has ~200 call sites (138 in the anchor resolver
+alone, doing tight per-property geometry read-modify-write); parse-on-read/serialize-on-write against
+the attribute would be a ~200-site rewrite with real hot-loop cost. Write-through satisfies the exit
+criterion's script-observable contract — `element.style`, `getAttribute("style")`, `getComputedStyle`
+and serialization now observe one state — while leaving the dict as the internal working store. It uses
+the node-model `SetAttr`/`RemoveAttr` (not the JS `setAttribute` binding), so there is no reparse loop,
+and touches **zero** anchor-resolver sites (those write the dict directly and legitimately do *not*
+leak resolved geometry into `getAttribute` mid-resolution). The invalidation half of the exit criterion
+was already met (every CSSOM mutation routes through `InvalidateStyleScope`).
+
+**Behavioral note (spec-correct):** after a CSSOM mutation `getAttribute("style")` returns the
+*serialized* declaration rather than the raw author string — matching real browsers. An un-mutated
+element still returns its exact author string (no seeding/normalization on read). No public-API change.
+Tests: `Broiler.Cli.Tests/InlineStyleWriteThroughTests.cs` (a `MARK=[…]` wrapper isolates the *live*
+`getAttribute` value from the end-of-run serialization: camelCase/setProperty/cssText/whole-assign
+reflect live, removeProperty empties, un-mutated returns raw, getComputedStyle + serialization
+preserved). Regression check vs the P4.6 baseline: the InlineStyle / CSSOM / CssStyleDeclaration /
+Selectors-CSSOM / attribute / computed-style / serializer / dialog / popover / position-area/try /
+sticky suites pass (250+ tests); the only failures (the `:lang` selector and the
+`ScriptEngineExecuteTests` zoom-serialization test) reproduce identically on the baseline → zero
+regressions. The full parallel-state elimination of the dict remains available as later work if a
+single-authority (no dict) model is wanted.
+
 Status: **P4.6 completed** 2026-07-13 (same branch) — **work item 1, the final sentinel: `#document`.**
 The `#document` wrapper element (`_documentNode`, a fake-tag `DomElement` that sat between the
 canonical `_document` and `<html>`) is deleted; the JS `document` object now maps directly to the

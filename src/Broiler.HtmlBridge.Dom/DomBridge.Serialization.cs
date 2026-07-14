@@ -98,27 +98,41 @@ public sealed partial class DomBridge
             target[kv.Key] = kv.Value;
     }
 
+    /// <summary>
+    /// Serializes the element's authoritative inline-style dict back into its canonical
+    /// <c>style=</c> attribute in CSSOM serialization form (shorthand-first, <c>"; "</c>-joined),
+    /// removing the attribute when the dict is empty. This is the single inline-style write-through
+    /// (Phase 4 item 2): it runs at serialization (<see cref="ReflectRenderState"/>) and after every
+    /// script <c>element.style</c> mutation, so a JS style mutation and <c>getAttribute("style")</c>
+    /// observe the same state. Uses the node-model <see cref="SetAttr"/>/<see cref="RemoveAttr"/> (not
+    /// the JS <c>setAttribute</c> binding), so there is no reparse loop back into the dict.
+    /// </summary>
+    private void SyncStyleAttributeFromInlineStyle(DomElement element)
+    {
+        var style = InlineStyle(element);
+        if (style.Count == 0)
+        {
+            RemoveAttr(element, "style");
+            return;
+        }
+
+        var styleText = string.Join(
+            "; ",
+            style
+                .OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+                .Select(static kv => $"{kv.Key}: {kv.Value}"));
+        if (!TryGetAttribute(element, "style", out var currentStyle) ||
+            !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
+        {
+            SetAttr(element, "style", styleText);
+        }
+    }
+
     private void ReflectRenderState(DomElement element)
     {
         if (!IsText(element) && !element.TagName.StartsWith('#'))
         {
-            if (InlineStyle(element).Count == 0)
-            {
-                RemoveAttr(element, "style");
-            }
-            else
-            {
-                var styleText = string.Join(
-                    "; ",
-                    InlineStyle(element)
-                        .OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
-                        .Select(static kv => $"{kv.Key}: {kv.Value}"));
-                if (!TryGetAttribute(element, "style", out var currentStyle) ||
-                    !string.Equals(currentStyle, styleText, StringComparison.Ordinal))
-                {
-                    SetAttr(element, "style", styleText);
-                }
-            }
+            SyncStyleAttributeFromInlineStyle(element);
 
             if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
                 !HasAttr(element, "value") &&

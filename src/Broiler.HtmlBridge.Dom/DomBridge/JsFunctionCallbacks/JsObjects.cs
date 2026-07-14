@@ -135,6 +135,8 @@ public sealed partial class DomBridge
                 GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
             }
 
+            // Phase 4 item 2: write-through so getAttribute("style") observes the assignment.
+            bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);
         }
 

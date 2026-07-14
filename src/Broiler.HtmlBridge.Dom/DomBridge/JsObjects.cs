@@ -156,7 +156,15 @@ public sealed partial class DomBridge
         // style object — CSS property access and manipulation.
         // In browsers, `element.style` is a read-only property: assigning a
         // string sets `style.cssText` instead of replacing the object.
-        var styleObj = BuildStyleObject(element, () => bridge.InvalidateStyleScope(element));
+        // Phase 4 item 2: after every element.style mutation (per-property set, cssText, setProperty,
+        // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
+        // canonical style= attribute so element.style and getAttribute("style") observe one state,
+        // then invalidate computed style.
+        var styleObj = BuildStyleObject(element, () =>
+        {
+            bridge.SyncStyleAttributeFromInlineStyle(element);
+            bridge.InvalidateStyleScope(element);
+        });
         obj.FastAddProperty((KeyString)"style",
             new JSFunction((in a) => styleObj, "get style"),
             new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
