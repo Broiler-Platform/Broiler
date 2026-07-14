@@ -716,7 +716,12 @@ public sealed partial class DomBridge
         if (a.Length == 0 || a[0] is not JSObject otherObj)
             return JSBoolean.False;
         var other = FindDomNodeByJSObject(otherObj);
-        return other != null && NodesAreEqual(node, other) ? JSBoolean.True : JSBoolean.False;
+        // Phase 4 items 4/5: delegate to the canonical Broiler.Dom.DomNode.IsEqualNode tree
+        // algorithm (promoted via patches/0001, now applied and pinned in the submodule). The
+        // canonical operation is null-tolerant (IsEqualNode(null) == false), so the former explicit
+        // null check is subsumed. The old bridge copy (NodesAreEqual/CanonicalAttributesAreEqual) is
+        // deleted; behaviour is pinned by IsEqualNodePromotionTests.
+        return node.IsEqualNode(other) ? JSBoolean.True : JSBoolean.False;
     }
 
 

@@ -27,26 +27,10 @@ public sealed partial class DomBridge
     private JSObject BuildRange(DomNode? documentRoot = null) =>
         _traversal.BuildRange(documentRoot);
 
-    /// <summary>
-    /// Finds the common ancestor of two nodes.
-    /// </summary>
-    internal static DomNode? FindCommonAncestor(DomNode a, DomNode b)
-    {
-        var ancestors = new HashSet<DomNode>(ReferenceEqualityComparer.Instance);
-        DomNode? current = a;
-        while (current != null)
-        {
-            ancestors.Add(current);
-            current = current.ParentNode;
-        }
-        current = b;
-        while (current != null)
-        {
-            if (ancestors.Contains(current)) return current;
-            current = current.ParentNode;
-        }
-        return null;
-    }
+    // Phase 4 items 4/5 (P4.10 follow-up): the bridge's FindCommonAncestor copy was deleted after its
+    // promotion to canonical Broiler.Dom.DomNode.CommonAncestorWith landed in the pinned submodule
+    // (patches/0002, applied by the maintainer). Call sites use a.CommonAncestorWith(b), which is
+    // null-tolerant and returns null for nodes in different trees — matching the deleted helper.
 
     private JSObject CreateDomRectObject((double Left, double Top, double Width, double Height) rectData)
     {
@@ -113,7 +97,7 @@ public sealed partial class DomBridge
         }
 
         // Different containers — collect nodes between start and end
-        var ancestor = FindCommonAncestor(startContainer, endContainer);
+        var ancestor = startContainer.CommonAncestorWith(endContainer);
         if (ancestor == null) return result;
 
         var allNodes = GetDocumentOrderNodes(ancestor);

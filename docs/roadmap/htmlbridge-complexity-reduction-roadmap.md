@@ -860,6 +860,36 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.9/P4.10 delegation landed** 2026-07-14 — **work items 4/5, post-patch follow-up: the bridge
+equality/common-ancestor copies are now deleted and delegate to canonical `Broiler.Dom.DomNode`.** The
+maintainer applied `patches/0001` (`IsEqualNode`) and `patches/0002` (`CommonAncestorWith`) and bumped the
+`Broiler.DOM` pointer (parent commit `4be3faea`; submodule `8a48f1b`, with `DomNode.IsEqualNode` and
+`DomNode.CommonAncestorWith` now present), then removed the patch files. That un-gated the follow-up P4.9/P4.10
+explicitly deferred to "once the patch lands":
+
+- **`isEqualNode`:** the bridge's `NodesAreEqual` / `CanonicalAttributesAreEqual` (`SubDocuments.cs`) are
+  deleted; `JsJsObjectsIsEqualNode077Core` now delegates to `node.IsEqualNode(other)` (the canonical op is
+  null-tolerant, subsuming the old explicit null check; it drops the bridge copy's element-level `BridgeText`
+  comparison, a no-op on the canonical tree — so it is behaviour-equivalent). `IsEqualNodePromotionTests`
+  (which pinned the observable behaviour against the former bridge copy) stays green against the delegation.
+- **`FindCommonAncestor`:** the bridge helper (`Traversal.cs`) is deleted; its four call sites
+  (`compareDocumentPosition` boundary compare in `Common.cs`, `GetNodesInRange` in `Traversal.cs`, and the
+  Range `commonAncestorContainer` / stringifier paths in `TraversalBinding.Range.cs`) now call
+  `a.CommonAncestorWith(b)` — null-tolerant and null-returning for disjoint trees, matching the deleted helper;
+  every site already passes a non-null `a` and null-checks the result.
+
+Behaviour-preserving; no public-API change (all deleted members were `private`/`internal`). Build clean
+(0 warnings); the isEqualNode / range / compareDocumentPosition / DomTraversal / SubDocument / Acid3Phase4 /
+DomEdgeCase / CrossDocument suites pass (113 tests), with only the two standing environmental failures — the
+headless `Range_GetBoundingClientRect` geometry test and the real-HTTP `HttpSubResourceTests.Iframe_*` test —
+reproducing identically with the change stashed → zero regressions.
+
+**This exhausts the clean, in-repo item-4/5 promotion follow-ups.** What remains is unchanged: `Normalize` /
+`CloneDomElement` stay blocked by side-effect / runtime-state coupling; a *further* `GetNodesInRange` /
+`DomRange`-stringifier promotion to canonical would be a new submodule addition (its old `#subdoc-root`
+regime-A blocker is gone now that P4.4b/P4.11 eliminated the sentinel, but promoting it still needs the
+submodule push/patch workflow, and the stringifier additionally has non-spec quirks to resolve first).
+
 Status: **P4.4c completed** 2026-07-14 (branch `htmlbridge-phase4-remove-subdocroot-guards`) — **work item 1:
 eliminate the `OwnerDocRoot` parallel-state field.** `ElementRuntimeState.OwnerDocRoot` (a per-node
 back-reference to the owning browsing-context root — null for main-document nodes, the sub-document root
@@ -938,12 +968,15 @@ set) → zero regressions.
 
 **This closes the item-1 sentinel work: every `#document`/`#document-fragment`/`#doctype`/`#subdoc-root`
 fake-tag element is gone (P4.2/P4.3/P4.4a/P4.4b/P4.6) and the residual dead tag-name guards they left behind
-are now removed.** The remaining Phase 4 residue is unchanged and still blocked/gated as recorded below:
-item 2's full inline-style dict elimination (P4.7 shipped the script-observable write-through slice; the
-~200-site dict rewrite is deferred), item 4/5's submodule-push-gated promotions (`IsEqualNode` P4.9,
-`CommonAncestorWith` P4.10) and the `GetNodesInRange` / `DomRange`-stringifier / `Normalize` / `CloneDomElement`
-swaps blocked by regime-A layout coupling or side-effect coupling. (P4.4c `OwnerDocRoot` — the last independent
-in-repo residue — is now also done; see the P4.4c entry above.)
+are now removed.** The remaining Phase 4 residue: item 2's full inline-style dict elimination (P4.7 shipped
+the script-observable write-through slice; the ~200-site dict rewrite is deferred), and the item 4/5
+`Normalize` / `CloneDomElement` swaps blocked by side-effect / runtime-state coupling. The item 4/5
+`IsEqualNode` (P4.9) and `CommonAncestorWith` (P4.10) promotions are **no longer push-gated** — the patches
+were applied, the pointer bumped, and the bridge copies deleted in favour of canonical delegation (see the
+top-of-Phase-4 P4.9/P4.10 delegation entry). A further `GetNodesInRange` / `DomRange`-stringifier promotion
+remains a new submodule addition (its old regime-A blocker is gone, but the push/patch workflow and the
+stringifier's non-spec quirks remain). (P4.4c `OwnerDocRoot` — the last independent in-repo residue — is now
+also done; see the P4.4c entry above.)
 
 Status: **P4.10 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote the
 nearest-common-ancestor tree query to canonical `Broiler.Dom.DomNode.CommonAncestorWith`.** The bridge's
@@ -960,7 +993,9 @@ Same submodule-scope outcome as P4.9: the `Broiler.DOM` push 403s, so it ships a
 `patches/0002-add-domnode-commonancestorwith.patch` (indexed in `patches/README.md`), the pointer is
 **unbumped**, and the bridge keeps `FindCommonAncestor` as the active fallback; the follow-up after the
 patch lands is to replace the helper body with `a.CommonAncestorWith(b)` (the four call sites already
-null-check). No main-repo behaviour change.
+null-check). No main-repo behaviour change. **(Follow-up since landed — see the P4.9/P4.10 delegation entry
+at the top of Phase 4: the patch was applied, the pointer bumped, and the bridge helper deleted in favour of
+`a.CommonAncestorWith(b)`.)**
 
 **With P4.9 (`IsEqualNode`) and P4.10 (`CommonAncestorWith`), the clean, quirk-free neutral-algorithm
 promotions are exhausted.** The other promotion candidates are *not* clean: `GetNodesInRange`
@@ -986,7 +1021,8 @@ GitHub scope — the documented egress caveat), so per `CLAUDE.md` this ships as
 instructions) and the **submodule pointer is left unbumped**. The bridge keeps its `NodesAreEqual`
 implementation as the **active fallback** so CI (which clones the submodule by pointer) still compiles;
 once a maintainer applies the patch and bumps the `Broiler.DOM` gitlink, the follow-up is to delete the
-bridge copy and delegate the binding to `node.IsEqualNode(other)`. Behaviour is pinned by
+bridge copy and delegate the binding to `node.IsEqualNode(other)`. **(Follow-up since landed — see the
+P4.9/P4.10 delegation entry at the top of Phase 4.)** Behaviour is pinned by
 `Broiler.Cli.Tests/IsEqualNodePromotionTests.cs` (equal/unequal element trees, attribute-order
 irrelevance, text-node data equality) — green today against the bridge copy and required to stay green
 after the canonical delegation. No main-repo behaviour change in this commit.
