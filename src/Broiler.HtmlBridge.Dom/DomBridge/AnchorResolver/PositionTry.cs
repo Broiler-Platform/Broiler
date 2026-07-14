@@ -1,6 +1,7 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
+using Broiler.CSS;
 using Broiler.Dom;
+using Broiler.Layout;
 
 namespace Broiler.HtmlBridge;
 
@@ -9,10 +10,6 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
     // @position-try parsing and fallback resolution
     // -----------------------------------------------------------------
-
-    private static readonly Regex PositionTryParsePattern = PositionTryParsePatternRegex();
-
-    private static readonly Regex CssCommentPattern = CssCommentPatternRegex();
 
     /// <summary>
     /// Parses all <c>@position-try</c> at-rules from <c>&lt;style&gt;</c>
@@ -38,27 +35,12 @@ public sealed partial class DomBridge
             var raw = GetStyleElementSourceText(el);
             if (!string.IsNullOrEmpty(raw))
             {
-                // Strip CSS comments first: a comment inside a @position-try
-                // body (common in WPT, e.g. "/* 2: position right */") contains
-                // ':' and ';' that would otherwise corrupt declaration parsing.
-                var styleText = CssCommentPattern.Replace(raw, " ");
-                foreach (Match m in PositionTryParsePattern.Matches(styleText))
-                {
-                    var name = m.Groups["name"].Value;
-                    var body = m.Groups["body"].Value;
-                    var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var decl in body.Split(';'))
-                    {
-                        var trimmed = decl.Trim();
-                        if (string.IsNullOrEmpty(trimmed)) continue;
-                        var colonIdx = trimmed.IndexOf(':');
-                        if (colonIdx < 0) continue;
-                        var propName = trimmed[..colonIdx].Trim();
-                        var propValue = trimmed[(colonIdx + 1)..].Trim();
-                        props[propName] = propValue;
-                    }
-                    result[name] = props;
-                }
+                // The @position-try at-rule grammar (comment stripping + rule and
+                // declaration parsing) is the canonical Broiler.CSS.PositionTryRule
+                // model (Phase 5 item 4). Merge each <style>'s rules into the
+                // document-wide accumulator (later duplicates win, in document order).
+                foreach (var rule in PositionTryRule.Parse(raw))
+                    result[rule.Key] = rule.Value;
             }
         }
 
@@ -131,17 +113,14 @@ public sealed partial class DomBridge
             baseWidth = EstimateMinContentWidth(element);
         }
 
-        bool baseOverflows = baseLeft < 0 || baseTop < 0 ||
-                             baseLeft + baseWidth > cbWidth ||
-                             baseTop + baseHeight > cbHeight ||
-                             (imcbWidth < baseWidth && imcbWidth >= 0) ||
-                             (imcbHeight < baseHeight && imcbHeight >= 0);
+        bool baseOverflows = AnchorGeometry.Overflows(
+            baseLeft, baseTop, baseWidth, baseHeight, cbWidth, cbHeight, imcbWidth, imcbHeight);
 
         if (!baseOverflows)
             return; // Base style fits; no fallback needed.
 
         // Parse the fallback list (comma-separated @position-try names).
-        var names = fallbackList.Split(',').Select(n => n.Trim()).ToArray();
+        var names = PositionTryRule.ParseFallbackList(fallbackList);
 
         // Get implicit anchor name from position-anchor.
         string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
@@ -193,15 +172,15 @@ public sealed partial class DomBridge
 
             if (merged.TryGetValue("left", out var lv) && lv != "auto")
             {
-                var resolvedL = AnchorFunctionPattern.Replace(lv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "left", cbWidth, cbHeight, implicitAnchor));
+                var resolvedL = AnchorFunction.Rewrite(lv, r =>
+                    ResolveAnchorEdge(r, anchorRegistry, "left", cbWidth, cbHeight, implicitAnchor));
                 tryLeft = TryParsePx(resolvedL) ?? 0;
             }
 
             if (merged.TryGetValue("right", out var rv) && rv != "auto")
             {
-                var resolvedR = AnchorFunctionPattern.Replace(rv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "right", cbWidth, cbHeight, implicitAnchor));
+                var resolvedR = AnchorFunction.Rewrite(rv, r =>
+                    ResolveAnchorEdge(r, anchorRegistry, "right", cbWidth, cbHeight, implicitAnchor));
                 var rightPx = TryParsePx(resolvedR);
                 if (rightPx.HasValue)
                 {
@@ -221,15 +200,15 @@ public sealed partial class DomBridge
 
             if (merged.TryGetValue("top", out var tv) && tv != "auto")
             {
-                var resolvedT = AnchorFunctionPattern.Replace(tv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "top", cbWidth, cbHeight, implicitAnchor));
+                var resolvedT = AnchorFunction.Rewrite(tv, r =>
+                    ResolveAnchorEdge(r, anchorRegistry, "top", cbWidth, cbHeight, implicitAnchor));
                 tryTop = TryParsePx(resolvedT) ?? 0;
             }
 
             if (merged.TryGetValue("bottom", out var bv) && bv != "auto")
             {
-                var resolvedB = AnchorFunctionPattern.Replace(bv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "bottom", cbWidth, cbHeight, implicitAnchor));
+                var resolvedB = AnchorFunction.Rewrite(bv, r =>
+                    ResolveAnchorEdge(r, anchorRegistry, "bottom", cbWidth, cbHeight, implicitAnchor));
                 var bottomPx = TryParsePx(resolvedB);
                 if (bottomPx.HasValue)
                 {
@@ -245,9 +224,7 @@ public sealed partial class DomBridge
                 }
             }
 
-            bool fits = tryLeft >= 0 && tryTop >= 0 &&
-                        tryLeft + tryWidth <= cbWidth &&
-                        tryTop + tryHeight <= cbHeight;
+            bool fits = AnchorGeometry.Fits(tryLeft, tryTop, tryWidth, tryHeight, cbWidth, cbHeight);
 
             if (fits)
             {
@@ -285,40 +262,22 @@ public sealed partial class DomBridge
         }
         return maxWidth;
     }
-    private static string ResolveAnchorEdge(Match m, Dictionary<string, AnchorInfo> registry,
+    private static string ResolveAnchorEdge(AnchorFunctionRef reference, Dictionary<string, AnchorInfo> registry,
         string contextProp, double cbWidth, double cbHeight, string? implicitAnchor = null)
     {
-        var anchorName = m.Groups["name"].Value;
-        if (string.IsNullOrEmpty(anchorName))
-            anchorName = implicitAnchor ?? string.Empty;
-        var edge = m.Groups["edge"].Value.ToLowerInvariant();
+        var anchorName = string.IsNullOrEmpty(reference.Name)
+            ? (implicitAnchor ?? string.Empty)
+            : reference.Name!;
 
         if (!registry.TryGetValue(anchorName, out var anchor))
             return "0px";
 
-        double rawValue = edge switch
-        {
-            "top" => anchor.Top,
-            "right" => anchor.Right,
-            "bottom" => anchor.Bottom,
-            "left" => anchor.Left,
-            "center" => (anchor.Top + anchor.Bottom) / 2,
-            _ => 0,
-        };
-
-        // For right/bottom properties, return distance from the opposite CB edge.
-        double value = contextProp switch
-        {
-            "right" => cbWidth - rawValue,
-            "bottom" => cbHeight - rawValue,
-            _ => rawValue,
-        };
+        // Edge coordinate math (no scroll adjustment on the fallback path) is the
+        // canonical Broiler.Layout.AnchorGeometry model (Phase 5 item 3).
+        double value = AnchorGeometry.ResolveEdge(
+            anchor.Left, anchor.Top, anchor.Right, anchor.Bottom,
+            reference.Side, 0, 0, MapAnchorInsetProperty(contextProp), cbWidth, cbHeight);
 
         return $"{value.ToString(CultureInfo.InvariantCulture)}px";
     }
-
-    [GeneratedRegex(@"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex PositionTryParsePatternRegex();
-    [GeneratedRegex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Singleline)]
-    private static partial Regex CssCommentPatternRegex();
 }

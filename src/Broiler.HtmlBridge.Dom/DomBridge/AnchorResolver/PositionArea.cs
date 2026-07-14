@@ -1,5 +1,7 @@
 using System.Globalization;
+using Broiler.CSS;
 using Broiler.Dom;
+using Broiler.Layout;
 
 namespace Broiler.HtmlBridge;
 
@@ -109,15 +111,6 @@ public sealed partial class DomBridge
                             insetLeft = ResolvePctOrPx(rawLeft2, cellW);
                     }
 
-                    // The IMCB (Inset-Modified Containing Block) is the cell
-                    // after applying insets.
-                    double imcbLeft = rect.Value.Left + insetLeft;
-                    double imcbTop = rect.Value.Top + insetTop;
-                    double imcbW = cellW - insetLeft - insetRight;
-                    double imcbH = cellH - insetTop - insetBottom;
-                    if (imcbW < 0) imcbW = 0;
-                    if (imcbH < 0) imcbH = 0;
-
                     // Resolve percentage margins against the cell width
                     // (CSS spec: margin % always resolves against inline dimension).
                     double marginTop2 = ResolvePctOrPx(
@@ -180,41 +173,26 @@ public sealed partial class DomBridge
                     if (cssProps.TryGetValue("padding-left", out var pl))
                         padLeft = ResolvePctOrPx(pl, cellW);
 
-                    // Resolve element dimensions.  Percentage values are
-                    // resolved against the position-area cell dimensions.
-                    // Explicit pixel values are used directly.
-                    double resolvedW = imcbW;
-                    double resolvedH = imcbH;
-
+                    // Resolve the element's box within the cell — the IMCB
+                    // (inset-modified containing block), the used width/height
+                    // (percentages against the cell, explicit lengths clamped to it,
+                    // else fill the IMCB) and the alignment-based position — via the
+                    // canonical Broiler.Layout model (Phase 5 item 3). The bridge keeps
+                    // the CSS parsing above and the box-sizing / percentage-box
+                    // branches below.
                     string? rawW = cssProps.GetValueOrDefault("width");
                     string? rawH = cssProps.GetValueOrDefault("height");
+                    var box = PositionAreaGrid.ResolveElementBox(
+                        rect.Value,
+                        insetTop, insetRight, insetBottom, insetLeft,
+                        TryParsePx(rawW), TryParsePercent(rawW),
+                        TryParsePx(rawH), TryParsePercent(rawH),
+                        PositionAreaValue.Parse(positionArea));
 
-                    double? explicitW = TryParsePx(rawW);
-                    double? explicitH = TryParsePx(rawH);
-                    double? pctW = TryParsePercent(rawW);
-                    double? pctH = TryParsePercent(rawH);
-
-                    if (pctW.HasValue)
-                        resolvedW = cellW * pctW.Value / 100.0;
-                    else if (explicitW.HasValue && explicitW.Value > 0)
-                        resolvedW = Math.Min(explicitW.Value, cellW);
-
-                    if (pctH.HasValue)
-                        resolvedH = cellH * pctH.Value / 100.0;
-                    else if (explicitH.HasValue && explicitH.Value > 0)
-                        resolvedH = Math.Min(explicitH.Value, cellH);
-
-                    // Compute alignment-based offset within the cell.
-                    // Parse the position-area to determine alignment.
-                    ParsePositionArea(positionArea, out var blockAlign, out var inlineAlign);
-
-                    double offsetX = ComputeAlignmentOffset(
-                        inlineAlign, cellW, resolvedW, isInlineAxis: true);
-                    double offsetY = ComputeAlignmentOffset(
-                        blockAlign, cellH, resolvedH, isInlineAxis: false);
-
-                    double finalLeft = rect.Value.Left + offsetX;
-                    double finalTop = rect.Value.Top + offsetY;
+                    double imcbLeft = box.ImcbLeft, imcbTop = box.ImcbTop;
+                    double imcbW = box.ImcbWidth, imcbH = box.ImcbHeight;
+                    double resolvedW = box.Width, resolvedH = box.Height;
+                    double finalLeft = box.Left, finalTop = box.Top;
 
                     // Broiler's renderer cannot place absolutely positioned
                     // children inside inline elements (e.g. <span> with
@@ -304,12 +282,13 @@ public sealed partial class DomBridge
                             }
                         }
 
-                        double contentW = imcbW - marginLeft2 - marginRight2
-                            - borderW - borderE - padLeft - padRight;
-                        double contentH = imcbH - marginTop2 - marginBottom2
-                            - borderN - borderS - padTop - padBottom;
-                        if (contentW < 0) contentW = 0;
-                        if (contentH < 0) contentH = 0;
+                        // Content = IMCB minus margin/border/padding on each axis
+                        // (canonical Broiler.Layout used-value math, Phase 5 item 3).
+                        var (contentW, contentH) = PositionAreaGrid.ContentSizeFillingImcb(
+                            imcbW, imcbH,
+                            new PositionAreaEdges(marginTop2, marginRight2, marginBottom2, marginLeft2),
+                            new PositionAreaEdges(borderN, borderE, borderS, borderW),
+                            new PositionAreaEdges(padTop, padRight, padBottom, padLeft));
 
                         finalLeft = imcbLeft;
                         finalTop = imcbTop;
@@ -352,10 +331,12 @@ public sealed partial class DomBridge
                         double bdrT = ResolveBorderWidth(cssProps, "border-top-width", "border");
                         double bdrB = ResolveBorderWidth(cssProps, "border-bottom-width", "border");
 
-                        resolvedW -= bdrL + bdrR + padLeft + padRight;
-                        resolvedH -= bdrT + bdrB + padTop + padBottom;
-                        if (resolvedW < 0) resolvedW = 0;
-                        if (resolvedH < 0) resolvedH = 0;
+                        // border-box → content-box: subtract border + padding per axis
+                        // (canonical Broiler.Layout used-value math, Phase 5 item 3).
+                        (resolvedW, resolvedH) = PositionAreaGrid.BorderBoxToContentSize(
+                            resolvedW, resolvedH,
+                            new PositionAreaEdges(bdrT, bdrR, bdrB, bdrL),
+                            new PositionAreaEdges(padTop, padRight, padBottom, padLeft));
 
                         // Override border-width with explicit pixel values so
                         // the renderer doesn't use its own keyword mapping
@@ -399,16 +380,14 @@ public sealed partial class DomBridge
                 deferredDomMoves);
     }
 
-    private readonly record struct PositionAreaRect(double Left, double Top, double Width, double Height);
-
     /// <summary>
-    /// Computes the rectangle for a given <c>position-area</c> value using
+    /// Computes the grid cell for a given <c>position-area</c> value using
     /// the 3×3 grid defined by the anchor element and containing block.
     /// When <paramref name="scrollContainer"/> is provided, the grid is
     /// computed relative to that container (the anchor's scroll container)
     /// rather than the target element's normal containing block.
     /// </summary>
-    private PositionAreaRect? ComputePositionAreaRect(DomElement element, AnchorInfo anchor, string positionArea,
+    private PositionAreaCell? ComputePositionAreaRect(DomElement element, AnchorInfo anchor, string positionArea,
         DomElement? scrollContainer = null)
     {
         double cbWidth, cbHeight;
@@ -513,61 +492,14 @@ public sealed partial class DomBridge
             }
         }
 
-        // Grid column edges: extend to include both the CB and the anchor.
-        double gridLeft = Math.Min(cbOffsetX, anchorLeft);
-        double gridRight = Math.Max(cbOffsetX + cbWidth, anchorRight);
-
-        // Grid row edges.
-        double gridTop = Math.Min(cbOffsetY, anchorTop);
-        double gridBottom = Math.Max(cbOffsetY + cbHeight, anchorBottom);
-
-        // Parse the position-area value into block and inline axis selections.
-        ParsePositionArea(positionArea, out var blockSel, out var inlineSel);
-
-        // Compute column range.
-        double colStart, colEnd;
-        switch (inlineSel)
-        {
-            case AxisSelection.Start:
-                colStart = gridLeft; colEnd = anchorLeft; break;
-            case AxisSelection.Center:
-                colStart = anchorLeft; colEnd = anchorRight; break;
-            case AxisSelection.End:
-                colStart = anchorRight; colEnd = gridRight; break;
-            case AxisSelection.SpanStart:
-                colStart = gridLeft; colEnd = anchorRight; break;
-            case AxisSelection.SpanEnd:
-                colStart = anchorLeft; colEnd = gridRight; break;
-            case AxisSelection.SpanAll:
-                colStart = gridLeft; colEnd = gridRight; break;
-            default:
-                colStart = gridLeft; colEnd = gridRight; break;
-        }
-
-        // Compute row range.
-        double rowStart, rowEnd;
-        switch (blockSel)
-        {
-            case AxisSelection.Start:
-                rowStart = gridTop; rowEnd = anchorTop; break;
-            case AxisSelection.Center:
-                rowStart = anchorTop; rowEnd = anchorBottom; break;
-            case AxisSelection.End:
-                rowStart = anchorBottom; rowEnd = gridBottom; break;
-            case AxisSelection.SpanStart:
-                rowStart = gridTop; rowEnd = anchorBottom; break;
-            case AxisSelection.SpanEnd:
-                rowStart = anchorTop; rowEnd = gridBottom; break;
-            case AxisSelection.SpanAll:
-                rowStart = gridTop; rowEnd = gridBottom; break;
-            default:
-                rowStart = gridTop; rowEnd = gridBottom; break;
-        }
-
-        double width = Math.Max(0, colEnd - colStart);
-        double height = Math.Max(0, rowEnd - rowStart);
-
-        return new PositionAreaRect(colStart, rowStart, width, height);
+        // The 3×3 grid geometry (edges from the CB∪anchor union, cell selection per
+        // block/inline span) is the canonical Broiler.Layout.PositionAreaGrid model
+        // (Phase 5 item 3). This method keeps the DOM-dependent resolution of the CB
+        // frame and the anchor's edges above; the neutral grid math is delegated.
+        return PositionAreaGrid.ComputeCell(
+            cbOffsetX, cbOffsetY, cbWidth, cbHeight,
+            anchorLeft, anchorTop, anchorRight, anchorBottom,
+            PositionAreaValue.Parse(positionArea));
     }
 
     /// <summary>
@@ -679,74 +611,4 @@ public sealed partial class DomBridge
         }
         return false;
     }
-    private enum AxisSelection { Start, Center, End, SpanStart, SpanEnd, SpanAll }
-
-    /// <summary>
-    /// Parses a position-area value into block and inline axis selections.
-    /// Block keywords: top, bottom, span-top, span-bottom.
-    /// Inline keywords: left, right, span-left, span-right.
-    /// Ambiguous: center, span-all (assigned to whichever axis needs it).
-    /// </summary>
-    private static void ParsePositionArea(string value, out AxisSelection blockSel, out AxisSelection inlineSel)
-    {
-        blockSel = AxisSelection.SpanAll;
-        inlineSel = AxisSelection.SpanAll;
-
-        var parts = value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) return;
-
-        if (parts.Length == 1)
-        {
-            var sel = MapKeyword(parts[0]);
-            var axis = ClassifyKeyword(parts[0]);
-            if (axis == KeywordAxis.Block)
-                blockSel = sel;
-            else if (axis == KeywordAxis.Inline)
-                inlineSel = sel;
-            else // ambiguous single keyword
-            {
-                blockSel = sel;
-                inlineSel = sel;
-            }
-            return;
-        }
-
-        // Two keywords: disambiguate axes.
-        var sel1 = MapKeyword(parts[0]);
-        var sel2 = MapKeyword(parts[1]);
-        var axis1 = ClassifyKeyword(parts[0]);
-        var axis2 = ClassifyKeyword(parts[1]);
-
-        if (axis1 == KeywordAxis.Block && axis2 == KeywordAxis.Inline)
-        { blockSel = sel1; inlineSel = sel2; }
-        else if (axis1 == KeywordAxis.Inline && axis2 == KeywordAxis.Block)
-        { inlineSel = sel1; blockSel = sel2; }
-        else if (axis1 == KeywordAxis.Block && axis2 != KeywordAxis.Block)
-        { blockSel = sel1; inlineSel = sel2; }
-        else if (axis1 == KeywordAxis.Inline && axis2 != KeywordAxis.Inline)
-        { inlineSel = sel1; blockSel = sel2; }
-        else if (axis2 == KeywordAxis.Block)
-        { inlineSel = sel1; blockSel = sel2; }
-        else if (axis2 == KeywordAxis.Inline)
-        { blockSel = sel1; inlineSel = sel2; }
-        else
-        { blockSel = sel1; inlineSel = sel2; } // both ambiguous → first=block, second=inline
-    }
-    private enum KeywordAxis { Block, Inline, Ambiguous }
-    private static KeywordAxis ClassifyKeyword(string kw) => kw.Trim().ToLowerInvariant() switch
-    {
-        "top" or "bottom" or "span-top" or "span-bottom" or "block-start" or "block-end" => KeywordAxis.Block,
-        "left" or "right" or "span-left" or "span-right" or "inline-start" or "inline-end" => KeywordAxis.Inline,
-        _ => KeywordAxis.Ambiguous,
-    };
-    private static AxisSelection MapKeyword(string kw) => kw.Trim().ToLowerInvariant() switch
-    {
-        "top" or "left" or "start" or "block-start" or "inline-start" => AxisSelection.Start,
-        "center" => AxisSelection.Center,
-        "bottom" or "right" or "end" or "block-end" or "inline-end" => AxisSelection.End,
-        "span-top" or "span-left" or "span-start" => AxisSelection.SpanStart,
-        "span-bottom" or "span-right" or "span-end" => AxisSelection.SpanEnd,
-        "span-all" or "all" => AxisSelection.SpanAll,
-        _ => AxisSelection.SpanAll,
-    };
 }

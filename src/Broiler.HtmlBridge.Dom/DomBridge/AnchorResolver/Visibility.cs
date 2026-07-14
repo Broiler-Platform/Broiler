@@ -1,3 +1,4 @@
+using Broiler.CSS;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -68,10 +69,9 @@ public sealed partial class DomBridge
                         {
                             if (kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
                             {
-                                var m = AnchorFunctionPattern.Match(kv.Value);
-                                if (m.Success)
+                                if (AnchorFunction.TryGetFirst(kv.Value, out var reference))
                                 {
-                                    string name = m.Groups["name"].Value;
+                                    string name = reference.Name ?? string.Empty;
                                     if (anchorRegistry.ContainsKey(name))
                                     { hasValidAnchor = true; break; }
                                 }

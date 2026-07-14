@@ -91,6 +91,10 @@ internal static partial class CssUtils
             "float" => cssBox.Float,
             "clear" => cssBox.Clear,
             "position" => cssBox.Position,
+            "anchor-name" => cssBox.AnchorName,
+            "position-anchor" => cssBox.PositionAnchor,
+            "position-area" => cssBox.PositionArea,
+            "position-try" => cssBox.PositionTry,
             "line-height" => cssBox.LineHeight,
             "vertical-align" => cssBox.VerticalAlign,
             "text-indent" => cssBox.TextIndent,
@@ -574,6 +578,18 @@ internal static partial class CssUtils
                 break;
             case "position":
                 cssBox.Position = value;
+                break;
+            case "anchor-name":
+                cssBox.AnchorName = value;
+                break;
+            case "position-anchor":
+                cssBox.PositionAnchor = value;
+                break;
+            case "position-area":
+                cssBox.PositionArea = value;
+                break;
+            case "position-try":
+                cssBox.PositionTry = value;
                 break;
             case "line-height":
                 cssBox.LineHeight = value;

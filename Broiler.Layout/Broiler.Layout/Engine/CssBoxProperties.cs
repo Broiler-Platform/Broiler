@@ -638,6 +638,16 @@ internal abstract partial class CssBoxProperties
     public string Clear { get; set; } = "none";
     public string Position { get; set; } = "static";
 
+    // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
+    // layout engine's anchor-placement post-pass can read them (HtmlBridge
+    // complexity-reduction roadmap Phase 5 item 3, P5.8b). They are populated by
+    // CssUtils.SetPropertyValue from the declared cascade like any other longhand;
+    // the engine does not yet consume them (that is gated behind the P5.8c post-pass).
+    public string AnchorName { get; set; } = "none";
+    public string PositionAnchor { get; set; } = "auto";
+    public string PositionArea { get; set; } = "none";
+    public string PositionTry { get; set; } = "normal";
+
     public string LineHeight
     {
         get { return _lineHeight; }

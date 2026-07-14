@@ -382,6 +382,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // frame's srcdoc and rasterises it separately), so it cannot affect painting.
             if (ParentBox == null)
                 LayoutNestedBrowsingContexts(this, g);
+
+            // Phase 5 item 3 (P5.8c): native CSS anchor-positioning placement. A root
+            // post-pass — every anchor now has final geometry — gated off by default.
+            // Runs before the fragment tree is built (that happens after PerformLayout).
+            if (ParentBox == null && NativeAnchorPlacement.Enabled)
+                RunNativeAnchorPlacement(this);
         }
         catch (Exception ex)
         {
