@@ -430,6 +430,70 @@ public sealed class NativeAnchorPlacementTests
     }
 
     // ------------------------------------------------------------------
+    // opposing-inset sizing (P5.8d.2b)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AnchorInset_OpposingLeftRight_SizesBoxBetweenInsets()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: left 40, right 60
+        target.Left = "anchor(--a left)";    // box left edge at 40
+        target.Right = "anchor(--a right)";  // box right edge at 60
+        // Width auto (default) → the two insets size it: 60 - 40 = 20.
+        RunPass(root);
+        Assert.Equal(40, target.Location.X, 3);
+        Assert.Equal(20, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingTopBottom_SizesBoxBetweenInsets()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: top 40, bottom 60
+        target.Top = "anchor(--a top)";
+        target.Bottom = "anchor(--a bottom)";
+        RunPass(root);
+        Assert.Equal(40, target.Location.Y, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingWithMargins_ShrinksBorderBox()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";    // 40
+        target.Right = "anchor(--a right)";  // right inset resolves so margin box spans 40..60
+        target.MarginLeft = "3px";
+        target.MarginRight = "5px";
+        RunPass(root);
+        // border box = (60-40) - 3 - 5 = 12; positioned at 40 + marginLeft 3 = 43.
+        Assert.Equal(43, target.Location.X, 3);
+        Assert.Equal(12, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingButExplicitWidth_KeepsWidth()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";
+        target.Right = "anchor(--a right)";
+        target.Width = "30px";  // explicit → over-constrained; reposition-only by left.
+        RunPass(root);
+        Assert.Equal(40, target.Location.X, 3);
+        Assert.Equal(30, target.Size.Width, 3);  // size kept
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingButChildful_KeepsSize()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";
+        target.Right = "anchor(--a right)";
+        _ = Box(target, new PointF(0, 0), new SizeF(10, 10));  // childful → no resize
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);  // laid-out 30 kept (a re-flow would be needed)
+    }
+
+    // ------------------------------------------------------------------
     // anchor-size() sizing (P5.8d.2b anchor-size() expansion)
     // ------------------------------------------------------------------
 

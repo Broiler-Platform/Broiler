@@ -213,10 +213,17 @@ public sealed partial class DomBridge
         if (!anyAnchorInset)
             return false;
 
-        // Reposition-only: opposing insets on an axis would size the box (needs a re-flow).
-        if (HasInset(merged, "left") && HasInset(merged, "right"))
+        // Opposing insets on an axis size the box. The engine resolves that size (border box
+        // fills the inset-modified CB minus margins) only for a childless box with an auto
+        // length on that axis; a childful box (needs a re-flow) or an explicit length
+        // (over-constrained) stays baked.
+        bool childless = !ChildElements(element).Any()
+            && string.IsNullOrWhiteSpace(GetElementTextContent(element));
+        if (HasInset(merged, "left") && HasInset(merged, "right")
+            && !(childless && IsAutoLength(merged.GetValueOrDefault("width"))))
             return false;
-        if (HasInset(merged, "top") && HasInset(merged, "bottom"))
+        if (HasInset(merged, "top") && HasInset(merged, "bottom")
+            && !(childless && IsAutoLength(merged.GetValueOrDefault("height"))))
             return false;
 
         // Every referenced anchor must be registered, accessible, and moved by no scroll
@@ -259,6 +266,11 @@ public sealed partial class DomBridge
     /// <c>auto</c>.</summary>
     private static bool HasInset(Dictionary<string, string> props, string name) =>
         props.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) && v.Trim() != "auto";
+
+    /// <summary>Whether a <c>width</c>/<c>height</c> value is <c>auto</c> (or unset), so an
+    /// opposing pair of insets determines the used size.</summary>
+    private static bool IsAutoLength(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value!.Trim() == "auto";
 
     /// <summary>
     /// Whether an element's <c>anchor-size()</c> sizing is the MVP subset the engine's native

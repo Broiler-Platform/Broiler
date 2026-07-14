@@ -463,6 +463,11 @@ partial class CssBox
         return len.Unit == CssUnit.Px ? len.Number : null;
     }
 
+    /// <summary>Whether a CSS <c>width</c>/<c>height</c> value is <c>auto</c> (or unset), so an
+    /// opposing pair of insets determines the used size.</summary>
+    private static bool IsAutoLength(string? value) =>
+        string.IsNullOrEmpty(value) || value == CssConstants.Auto;
+
     /// <summary>Whether a raw CSS inset value carries an <c>anchor()</c> function.</summary>
     private static bool InsetHasAnchor(string? value) =>
         value != null && value.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase)
@@ -508,9 +513,23 @@ partial class CssBox
 
         double bw = Size.Width, bh = Size.Height;
 
+        // Opposing-inset sizing (P5.8d.2b): both insets present on an axis + an auto length +
+        // a childless box → the used size is determined by the two insets (CSS 2.1 §10.3.7 /
+        // §10.6.4: the border box fills the inset-modified containing block minus margins).
+        // Childless-only so no subtree needs a re-flow; an explicit length keeps its size
+        // (the reposition-only branch below positions by the start inset). Grow from the
+        // resolved size before positioning.
+        bool childless = Boxes.Count == 0 && Words.Count == 0;
+        if (childless && leftInset is double li && rightInset is double ri && IsAutoLength(Width))
+            bw = System.Math.Max(0, cbW - li - ri - ActualMarginLeft - ActualMarginRight);
+        if (childless && topInset is double ti && bottomInset is double bi && IsAutoLength(Height))
+            bh = System.Math.Max(0, cbH - ti - bi - ActualMarginTop - ActualMarginBottom);
+        if (bw != Size.Width || bh != Size.Height)
+            Size = new System.Drawing.SizeF((float)bw, (float)bh);
+
         // Horizontal: the inset is measured from the CB padding edge to the box's MARGIN
-        // edge; add/subtract the used margin to reach the border box (reposition-only, so
-        // the laid-out width is kept). Prefer left; else right.
+        // edge; add/subtract the used margin to reach the border box. When only one inset is
+        // present the laid-out (or opposing-inset-resolved) size is kept. Prefer left; else right.
         double? borderLeft = null;
         if (leftInset is double L)
             borderLeft = cbX + L + ActualMarginLeft;
