@@ -53,7 +53,7 @@ public sealed partial class DomBridge
             Height = height,
         });
 
-    private static void ClearPositionAreaResolution(DomElement element) =>
+    internal static void ClearPositionAreaResolution(DomElement element) =>
         PositionAreaResolutions.Remove(element);
 
     private static void CopyPositionAreaResolution(DomElement source, DomElement target)

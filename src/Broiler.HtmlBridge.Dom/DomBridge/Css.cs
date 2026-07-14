@@ -216,33 +216,10 @@ public sealed partial class DomBridge
         return snapshot;
     }
 
-    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
-    {
-        var computed = BuildComputedStyleMap(element, pseudoElement);
-        var propertyNames = computed.Keys.ToList();
-        var obj = new JSObject();
-
-        // Expose all computed properties as both camelCase and kebab-case
-        foreach (var kv in computed)
-        {
-            var camel = CssPropertyNames.ToDomPropertyName(kv.Key);
-            var normalized = CssPriority.Strip(kv.Value);
-            obj.FastAddValue((KeyString)kv.Key, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
-            if (camel != kv.Key)
-                obj.FastAddValue((KeyString)camel, new JSString(normalized), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-
-        // getPropertyValue method (supports both kebab-case and camelCase lookups)
-        obj.FastAddValue((KeyString)"getPropertyValue", new JSFunction((in a) => JsCssGetPropertyValue001Core(computed, in a), "getPropertyValue", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        obj.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(propertyNames.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddValue((KeyString)"item", new JSFunction((in a) => JsCssItem003Core(propertyNames, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        obj.FastAddValue((KeyString)"getPropertyPriority", new JSFunction((in _) => new JSString(string.Empty), "getPropertyPriority", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddProperty((KeyString)"parentRule", NullFunction("get parentRule"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        return obj;
-    }
+    // The getComputedStyle result object is built by the Phase 3 (P3.14) StyleDeclarationBinding
+    // feature module; the bridge still produces the engine-cascaded computed map here.
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null) =>
+        Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(BuildComputedStyleMap(element, pseudoElement));
 
     private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
     {
@@ -475,7 +452,7 @@ public sealed partial class DomBridge
     /// had drifted to a narrower subset: no <c>outline</c>, no <c>font</c> slash line-height, and a
     /// single-layer <c>background</c> parser) is deleted so it can no longer drift from the engine.
     /// </summary>
-    private static void ExpandCssShorthands(Dictionary<string, string> computed)
+    internal static void ExpandCssShorthands(Dictionary<string, string> computed)
         => CssStyleEngine.ExpandShorthands(computed);
 
     /// <summary>

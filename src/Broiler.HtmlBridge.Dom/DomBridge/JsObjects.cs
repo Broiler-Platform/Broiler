@@ -160,7 +160,7 @@ public sealed partial class DomBridge
         // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
         // canonical style= attribute so element.style and getAttribute("style") observe one state,
         // then invalidate computed style.
-        var styleObj = BuildStyleObject(element, () =>
+        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(element, () =>
         {
             bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);

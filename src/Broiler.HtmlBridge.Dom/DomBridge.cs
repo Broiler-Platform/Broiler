@@ -425,7 +425,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             parent.AppendChild(child);
     }
 
-    private static Dictionary<string, string> InlineStyle(DomElement element)
+    internal static Dictionary<string, string> InlineStyle(DomElement element)
     {
         var state = GetElementRuntimeState(element);
         if (!state.StyleSeeded)
@@ -440,6 +440,22 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         }
         return state.Style;
     }
+
+    // Named bookkeeping seams for the set of inline-style properties explicitly set via JS
+    // (element.style.foo = …, setProperty, cssText). The Phase 3 (P3.14) StyleDeclarationBinding module
+    // records/clears these through these helpers instead of touching the runtime-state object directly;
+    // the bridge's own serialization/computed-style paths read GetElementRuntimeState(...).JsSetStyleProps.
+    internal static void MarkInlineStylePropSetByJs(DomElement element, string property) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Add(property);
+
+    internal static void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Remove(property);
+
+    internal static void ClearInlineStylePropsSetByJs(DomElement element) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Clear();
+
+    internal static IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
+        GetElementRuntimeState(element).JsSetStyleProps;
 
     /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
     /// dictionary the anchor resolver reads and writes (display:none, resolved left/top/width/height,
@@ -928,7 +944,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// reaches the rendered output); leave it off for query/bookkeeping re-parses and for
     /// stylesheet-rule / descriptor parsing (cascade drops the style engine already reports).
     /// </param>
-    private static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
+    internal static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var declarations = new CSS.CssParser().ParseDeclarations(styleValue);
@@ -971,7 +987,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// The value may carry a trailing <c>!important</c>, which is stripped before validation;
     /// unknown and custom (<c>--*</c>) properties are always accepted (the validator's default).
     /// </summary>
-    private static bool IsAcceptableInlineValue(string property, string value) =>
+    internal static bool IsAcceptableInlineValue(string property, string value) =>
         CssDeclarationValidator.IsAcceptableDeclarationValue(property, CssPriority.Strip(value));
 
     [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]

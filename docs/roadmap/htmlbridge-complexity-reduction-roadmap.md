@@ -795,9 +795,41 @@ font/`:lang`/CssEscape environmental set) reproduces identically with the change
 zero regressions (verified in isolation, since the full Cli.Tests run is non-deterministic under parallel
 early-abort).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.13 named-accessor / relocated-infra /
-shared-write-hub / wide-explicit-host pattern is the template for any residual coupling: CSSOM/computed
-style, Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
+Status: **P3.14 completed** 2026-07-14 (branch `htmlbridge-phase3-subdocument-module`) — the **CSSOM style
+declaration** slice. The JS `CSSStyleDeclaration` object in all three flavours is the fourteenth co-located
+module: `StyleDeclarationBinding` (namespace `Broiler.HtmlBridge.Dom.Features`, split
+`StyleDeclarationBinding.cs` / `.Callbacks.cs`) owns the writable `element.style` (`BuildInlineDeclaration`,
+was `BuildStyleObject(element,…)`), the writable rule declaration (`BuildRuleDeclaration`, was
+`BuildStyleObject(styleMap,…)` — the 6 `rule.style` sites in `StyleSheets.cs`), and the read-only
+`getComputedStyle` result (`BuildComputedDeclaration`, was the object half of `BuildComputedStyleObject`) —
+each exposing cssText/setProperty/getPropertyValue/removeProperty/cssFloat/length/item/getPropertyPriority/
+parentRule plus camelCase↔kebab bracket access. It owns the `CssStyleDeclaration`/`CssRuleStyleDeclaration`
+`JSObject` subclasses, the ~20 numbered callbacks (`JsUtilities…003…023Core` → semantic `Inline*`/`Rule*`;
+`JsCss…001/003Core` → `Computed*`; the deleted `JsFunctionCallbacks/Css.cs`), and the declaration-only
+helpers (`GetStylePropertyNames`, `TryGetStylePropertyRawValue`, `TryGetExpandedInlineStyleRawValue`,
+`BuildDeclaredInlineStyleMap`, `CssStyleDeclarationNonCssNames`).
+
+**Like `ClassListBinding` (P3.6) it is an internal *static* class with no host contract** — pure CSSOM-IDL
+logic over an inline-style dictionary and the canonical `CssPropertyNames`/`CssPriority` helpers. The map
+*production* and the invalidation side effects stay in the bridge: `element.style`'s caller passes the
+`onMutation` (P4.7 write-through + `InvalidateStyleScope`), the bridge's thin `BuildComputedStyleObject`
+wrapper passes the engine-cascaded computed map, and the module reaches the shared inline-style store /
+"set-via-JS" bookkeeping through neutral static `DomBridge` helpers (`InlineStyle`, `ParseStyle`,
+`IsAcceptableInlineValue`, `ExpandCssShorthands`, `ClearPositionAreaResolution` widened
+`private`→`internal static`; plus four new named `Mark`/`Unmark`/`Clear`/`InlineStylePropsSetByJs`
+bookkeeping seams so the module never touches the runtime-state `JsSetStyleProps` set directly). No
+public-API change. Tests: `Broiler.Cli.Tests/StyleDeclarationBindingModuleTests.cs` (co-location/static
+guard + camelCase/kebab/cssText one-state, removeProperty/length/item, cssFloat→float, getComputedStyle
+read consistency, and stylesheet `rule.style` mutation). Regression check vs the P3.13 baseline: the CSSOM
+/ style-declaration / stylesheets / selectors / anchor / position-area / serialization / animation suites
+pass unchanged; the only failures (the `:lang` selector, the three zoom/srcdoc
+`ScriptEngineExecuteTests.DomBridge_SerializeToHtml_*`, and the `HttpClientMigrationTests` reflection guard)
+are the standing environmental set, confirmed identical at baseline in isolation → zero regressions.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.14 named-accessor / relocated-infra /
+shared-write-hub / wide-explicit-host / no-host-static pattern is the template for any residual coupling:
+the CSSOM **stylesheet** objects (CSSStyleSheet/CSSRule in `StyleSheets.cs`, the sibling of P3.14's
+declaration), Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
 `BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
 `WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
