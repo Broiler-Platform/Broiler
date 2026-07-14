@@ -361,12 +361,37 @@ public sealed partial class DomBridge
                 InlineStyle(blockAncestor)["position"] = "relative";
         }
     }
+    /// <summary>
+    /// Whether the inline containing block <paramref name="inlineCB"/> directly holds an
+    /// absolutely-positioned <c>position-area</c> box that native mode routes to the
+    /// engine (<see cref="IsNativeMvpPositionAreaBox"/>). When it does, the whole inline
+    /// CB is left un-promoted so the engine can lay out the intact anchor + target subtree
+    /// (P5.8d.2b inline-CB expansion).
+    /// </summary>
+    private bool InlineCbHasNativeAnchorBox(DomElement inlineCB)
+    {
+        foreach (var child in SnapshotChildren(inlineCB))
+        {
+            if (IsText(child)) continue;
+            if (IsNativeMvpPositionAreaBox(child))
+                return true;
+        }
+        return false;
+    }
+
     private void CollectInlineCBPromotions(
         DomElement element,
         List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
             double offX, double offY)> promotions)
     {
-        if (!IsText(element) && IsInlineContainingBlock(element))
+        // Native mode (P5.8d.2b inline-CB expansion): when an inline containing block holds
+        // a native-MVP position-area box, the engine lays out the whole inline subtree
+        // (anchor + positioned boxes) against the real inline-box geometry, so this bridge
+        // promotion must NOT DOM-move any of that inline CB's abspos children — doing so
+        // would tear the anchor out of the target's containing block and break the native
+        // placement. Skip collecting from such an inline CB (still recurse for nested ones).
+        if (!IsText(element) && IsInlineContainingBlock(element) &&
+            !(NativeAnchorPlacement && InlineCbHasNativeAnchorBox(element)))
         {
             var (offX, offY, blockAncestor) = ComputeInlineCBOffset(element);
             if (blockAncestor != null)

@@ -1841,24 +1841,59 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   by **1.26 %**. So the residual is Broiler-vs-Chromium anti-aliasing/border fidelity (a separate,
   pre-existing rendering concern), and the anchor geometry is exact. `percents-001` will not cross the 99 %
   pixel threshold from anchor work alone.
+- **P5.8d.2b — inline containing-block promotion (sixth expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; bridge only, additive, default-off). A
+  `position-area` box whose containing block is a **relatively-positioned inline element** (a
+  `position:relative` `<span>`) now goes native. The engine already resolves this case correctly: an abspos
+  box inside an inline CB is placed against the inline element's real line-box bounding box
+  (`CssBox.GetInlineBoundingBox`, CSS2.1 §10.1) — the very thing the bridge's estimator could **not** do,
+  which is why the bridge's `PromoteAbsPosFromInlineCBs` DOM-moves abspos children out of inline CBs (~250
+  lines of inline-flow-offset estimation) on the baked path. So this expansion is bridge-gate-only, no
+  Broiler.Layout change:
+  - **Gate.** `IsMvpNativeAnchorBox` no longer excludes an inline CB. It still excludes an inline CB that is
+    **itself** `position:absolute`/`fixed`: the engine blockifies such an element (CSS2.1 §9.7 forces
+    `display:block`) so it treats that CB as a *block*, while the bridge's `IsInlineElement` still treats it
+    as inline — the two disagree on the CB extent, so that case stays baked until reconciled (this is exactly
+    `position-area-abs-inline-container`, kept on the bridge path).
+  - **Promotion skip.** In native mode `CollectInlineCBPromotions` skips the **whole** inline CB when it
+    directly holds a native-MVP `position-area` box (`InlineCbHasNativeAnchorBox` →
+    `IsNativeMvpPositionAreaBox`, a reusable "would native mode hand this off?" predicate): the engine lays
+    out the intact anchor+target subtree, so DOM-moving any of that inline CB's abspos children would tear
+    the anchor out of the target's containing block and break the native placement. Other inline CBs still
+    promote as before.
+  Tests: `Broiler.Cli.Tests/NativeAnchorInlineCbPipelineTests.cs` (real parse→cascade→layout pipeline: the
+  engine places the abspos anchor at its inset position inside a `position:relative` inline CB — `(100,25)`,
+  not the inline-flow position — and the `bottom right` cell at the grid corner `(300,75)` 100×25, matching
+  the baked `AnchorInlineContainingBlockTests` corner; a flag-off control pins the placement to the
+  post-pass). Regression check: **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged
+  (7-fail / 32-pass)**, the only corpus movement being `position-area-inline-container` 83.30 %→83.10 %
+  (−0.2 %, run noise — that test is corrupted by a **pre-existing, unrelated `&nbsp;`-not-decoded rendering
+  bug** that renders the entity as literal text, so it fails ~83 % on *both* paths and cannot pass from
+  anchor work). `position-area-abs-inline-container` is unchanged (kept baked by the abspos-inline
+  exception). No passing test regresses on either path; the baked-path `AnchorInlineContainingBlockTests`
+  (26) and native WPT/scope suites stay green. Validation is therefore the exact-geometry pipeline test plus
+  no-regression (the percentage-box-props precedent). The `abs-inline-container` bridge/engine
+  blockification disagreement is the follow-up before that test can also go native.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
-  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → inline-CB promotion (DOM moves) →
-  scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
+  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
+  CB)~~ → abspos-inline CB (blockification reconciliation) → scroll simulation → `position-visibility` →
+  dialog/backdrop → `anchor()` insets → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
-  props, shared-name scope resolution, AND writing-mode percentage basis now land natively — see the five
-  expansions above.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
-  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
-  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as the
-  engine grows to reproduce them.
+  props, shared-name scope resolution, writing-mode percentage basis, AND relatively-positioned inline
+  containing blocks now land natively — see the six expansions above.) Each remaining feature is currently
+  excluded by `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
+  `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
+  widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
-The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; but
-inline-CB promotion with DOM moves, scroll simulation, `position-visibility`, dialog/backdrop,
-`anchor-scope`/scoping) are the hard part of the later cutover expansions: the engine operates on boxes,
-not the DOM, so these are re-implementations, not moves — which is why the MVP subset deliberately
-excludes them.
+The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree, and the
+relatively-positioned inline-CB case now handled by the engine's real §10.1 inline-box geometry rather
+than the bridge's DOM-move estimator; but abspos-inline blockification reconciliation, scroll simulation,
+`position-visibility`, dialog/backdrop, `anchor-scope`/scoping) are the hard part of the later cutover
+expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not moves — which
+is why the MVP subset deliberately excludes them.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

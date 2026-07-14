@@ -426,11 +426,27 @@ public sealed partial class DomBridge
         if (_anchorCandidates == null || !_anchorCandidates.ContainsKey(anchorName))
             return false;
 
-        // A non-inline containing block (the engine cannot yet promote abs-pos boxes
-        // out of inline containing blocks the way the bridge does).
+        // A non-abspos inline containing block is now IN the MVP subset (P5.8d.2b
+        // inline-CB expansion): the engine's abspos layout places a box inside an inline
+        // element against the real inline-box bounding box (CssBox.GetInlineBoundingBox,
+        // CSS2.1 §10.1), which the bridge's estimator could not — so, unlike every other
+        // gate, a relatively-positioned inline CB no longer forces the bridge path. The box
+        // stays inside the inline CB (PromoteAbsPosFromInlineCBs skips the whole inline CB
+        // in native mode — see InlineCbHasNativeAnchorBox) so the engine lays out the
+        // intact subtree.
+        //
+        // Exception: an inline element that is ITSELF absolutely/fixed positioned is
+        // blockified by the engine (CSS2.1 §9.7: position:absolute forces display:block),
+        // so the engine treats it as a block containing block while the bridge's
+        // IsInlineElement still treats it as inline — the two disagree on the CB's extent.
+        // Keep such a box on the bridge bake path until that is reconciled.
         var cb = FindContainingBlockElement(element);
         if (cb != null && IsInlineContainingBlock(cb))
-            return false;
+        {
+            var cbPos = GetComputedProps(cb).GetValueOrDefault("position");
+            if (cbPos is "absolute" or "fixed")
+                return false;
+        }
 
         // position-try and anchor()/anchor-size() are out of the MVP subset.
         if (cssProps.ContainsKey("position-try-fallbacks") || cssProps.ContainsKey("position-try"))
@@ -443,6 +459,43 @@ public sealed partial class DomBridge
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Whether native mode would hand this element's <c>position-area</c> off to the
+    /// engine's placement post-pass instead of pre-baking it — i.e. it satisfies
+    /// <see cref="IsMvpNativeAnchorBox"/> under the same computed-property, anchor and
+    /// scroll-container resolution <see cref="ResolvePositionAreaValues"/> uses. Used by
+    /// the inline-CB promotion pass to leave such a box (and its inline containing block's
+    /// subtree) intact for the engine rather than DOM-moving it out. Returns
+    /// <c>false</c> when the element has no resolvable <c>position-area</c>/anchor.
+    /// </summary>
+    private bool IsNativeMvpPositionAreaBox(DomElement element)
+    {
+        if (IsText(element))
+            return false;
+
+        var cssProps = CollectMatchedRuleProperties(element);
+        foreach (var kv in InlineStyle(element))
+            cssProps[kv.Key] = kv.Value;
+
+        string? positionArea = cssProps.GetValueOrDefault("position-area");
+        string? positionAnchor = cssProps.GetValueOrDefault("position-anchor");
+        if (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none" ||
+            string.IsNullOrWhiteSpace(positionAnchor))
+            return false;
+
+        // The registration check lives in IsMvpNativeAnchorBox (via _anchorCandidates,
+        // which is populated alongside the full anchor registry), so an unregistered
+        // anchor already yields false there — no separate anchor lookup needed.
+        var anchorEl = FindElementByAnchorName(positionAnchor);
+        var rawScrollContainer = anchorEl != null ? FindNearestScrollContainer(anchorEl) : null;
+        var scrollContainer = rawScrollContainer != null &&
+            IsDescendantOfElement(element, rawScrollContainer)
+                ? rawScrollContainer
+                : null;
+
+        return IsMvpNativeAnchorBox(element, positionAnchor, cssProps, scrollContainer);
     }
 
     /// <summary>
