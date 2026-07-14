@@ -805,7 +805,7 @@ public sealed partial class DomBridge
             GetElementRuntimeState(docEl).OwnerDocRoot = docRoot;
         }
 
-        return BuildSubDocument(docRoot);
+        return _subDocuments.BuildDocument(docRoot);
     }
 
 
@@ -843,7 +843,7 @@ public sealed partial class DomBridge
         SetParent(bodyEl, htmlEl);
         GetElementRuntimeState(bodyEl).OwnerDocRoot = docRoot;
         htmlEl.AppendChild(bodyEl);
-        return BuildSubDocument(docRoot);
+        return _subDocuments.BuildDocument(docRoot);
     }
 
 

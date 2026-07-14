@@ -49,7 +49,7 @@ public sealed partial class DomBridge
     // or — for an element root with none — the root itself (the prior `?? docRoot` fallback). A
     // canonical DomDocument with no documentElement yields null (per DOM; e.g. createDocument with an
     // empty qualifiedName), so callers must null-check.
-    private static DomElement? GetDocumentElement(DomNode docRoot) =>
+    internal static DomElement? GetDocumentElement(DomNode docRoot) =>
         ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#')) ?? docRoot as DomElement;
 
 

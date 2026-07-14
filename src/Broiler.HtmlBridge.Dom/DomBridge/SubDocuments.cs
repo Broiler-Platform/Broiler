@@ -221,7 +221,7 @@ public sealed partial class DomBridge
             }
         }
 
-        var doc = BuildSubDocument(docRoot);
+        var doc = _subDocuments.BuildDocument(docRoot);
         _subDocumentCache[containerElement] = doc;
         if (executeHtmlScripts && !string.IsNullOrEmpty(htmlToExecute))
             ExecuteSubDocumentScripts(containerElement, htmlToExecute);

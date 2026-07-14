@@ -746,11 +746,61 @@ MutationObserver, HtmlDomInterface and namespace suites pass unchanged (140 test
 pre-existing environmental failures (the three `ScriptEngineExecuteTests` zoom/iframe serialization tests
 and the two `SelectorsAndCssomTests` `:root`/`:lang`) fail identically on both sides → zero regressions.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.12 named-accessor / relocated-infra /
-shared-write-hub pattern is the template for any residual coupling: CSSOM/computed style,
-Element/geometry, Window/Document, SVG, Frames/browsing-contexts (SubDocuments), Canvas (better done with
-Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge
-500-800-line facade target.
+Status: **P3.13 completed** 2026-07-14 (branch `htmlbridge-phase3-subdocument-module`) — the first
+**browsing-context feature** slice, and the one **Phase 4 (P4.4b) unblocked.** The nested-browsing-context
+**`document` object surface** is the thirteenth co-located module: `SubDocumentBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`, split into `SubDocumentBinding.cs` / `.Nodes.cs` / `.Implementation.cs`
+/ `.Events.cs` to stay under the 750-line/file guideline) owns `BuildDocument` (was `BuildSubDocument`)
+and every `document`-object callback it wires — documentElement/body/head/title/forms/childNodes,
+getElementById/getElementsByTagName/querySelector(All)/elementFromPoint(s), createElement/TextNode/
+Comment/ElementNS, the legacy `createEvent` + `initEvent`/`initMouseEvent`/… mutator family,
+open/write, images/links/styleSheets, appendChild/removeChild/append/prepend, `document.implementation`
+(createDocumentType/createDocument/createHTMLDocument) and createTreeWalker/NodeIterator/Range — the
+~35 numbered `JsSubDocumentObjects…003…052Core` callbacks renamed to semantic names and moved out of the
+755-line `JsFunctionCallbacks/SubDocumentObjects.cs` (deleted) plus `BuildSubDocument` out of
+`SubDocumentObjects.cs` (which now retains only the shared `FindInSubTree`/`FindInTree` tree-search
+helpers, widened `private`→`internal static` because the **main** document's getElementById
+(`Registration.cs`) and `LayoutMetrics` also call them).
+
+**Why this slice, and why now:** P4.4b severed the `#subdoc-root` sentinel, so a sub-document root is a
+canonical `DomNode`/`DomDocument` and the whole surface operates cleanly over a `DomNode docRoot`. The
+sub-document *document* object is the largest self-contained JS surface of the frames feature; the
+browsing-context **infrastructure** (the `_subDocumentCache`/`_subWindowCache`/content-document maps, the
+`GetOrCreateSubDocument`/`GetOrCreateSubWindow` builders, resource loading, onload, and the sub-*window*
+object with its scroll/getComputedStyle callbacks) stays bridge-owned pending a future
+`BrowsingContextManager` — exactly as P3.10 left `WindowContext.cs`. The two bridge entry points that
+build a document (`GetOrCreateSubDocument` and the **main** document's
+`createDocument`/`createHTMLDocument` in `Registration.cs`) now call `_subDocuments.BuildDocument(docRoot)`.
+
+Because a document surface is essentially the whole DOM re-projected onto a root node, it genuinely needs
+many bridge services, so the `ISubDocumentHost` contract is **wider than the small feature contracts**
+(JS-wrapper identity + reverse lookup, the node-construction funnels, `SetOwnerDocRoot`, and the shared
+sub-surface builders — Range/TreeWalker/NodeIterator/styleSheets/hit-testing/collect-by-tag/matching);
+every seam is explicit via `DomBridge.SubDocumentHost.cs` (explicit interface members), so no callback
+reaches an arbitrary bridge private field, and the assembly's neutral static `DomBridge` tree/selector
+helpers (`ChildElements`/`ChildAt`/`GetDocumentElement`/`CollectTextContent`/`MatchesSelector`/`SetParent`/
+`ValidateElementName`/`AdoptSubtreeIntoDocument`/`BuildDocumentTree`/… widened `private`→`internal static`
+in place) are called directly and are **not** part of the contract. The `Entries`-scan node lookups in
+appendChild/createDocument became the equivalent `FindDomNodeByJSObject`. Behaviour-preserving; no
+public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/SubDocumentBindingModuleTests.cs` (co-location / host-contract guards +
+createHTMLDocument structure/lookup, createDocument nodeType/doctype, createEvent+initEvent,
+append/remove, and the **regime-A `<iframe srcdoc>` `contentDocument`** surface — the P4.4b path — all
+network-free through `document.implementation` + srcdoc). Regression check vs the P3.12/P4-merged
+baseline: the SubDocument / Iframe / Frame / Doctype / DocumentFragment / DocumentSentinel /
+HtmlDomInterface / DomTraversal / serialization / messaging / shadow-DOM suites pass unchanged; every
+observed failure (the headless `Range_GetBoundingClientRect`, the real-HTTP `HttpSubResourceTests.Iframe_*`,
+the zoom/srcdoc `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_*`, and the standing pixel/graphics/
+font/`:lang`/CssEscape environmental set) reproduces identically with the change stashed and rebuilt →
+zero regressions (verified in isolation, since the full Cli.Tests run is non-deterministic under parallel
+early-abort).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.13 named-accessor / relocated-infra /
+shared-write-hub / wide-explicit-host pattern is the template for any residual coupling: CSSOM/computed
+style, Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
+`BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
+`WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

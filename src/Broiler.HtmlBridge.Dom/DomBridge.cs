@@ -110,6 +110,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // path's cross-cutting side effects (inline style, inline event handlers, style invalidation,
     // mutation records). The low-level attribute scans stay shared static helpers on DomBridge.
     private readonly Dom.Features.AttributesBinding _attributes;
+    // Phase 3 (P3.13): the nested-browsing-context `document` object surface (BuildDocument + every
+    // getElementById/createElement/querySelector/… callback + document.implementation) lives in
+    // SubDocumentBinding, reached through the ISubDocumentHost contract (see DomBridge.SubDocumentHost.cs).
+    // Unblocked by P4.4b's #subdoc-root sever — a sub-document root is now a canonical DomNode. The
+    // browsing-context infrastructure (sub-document/-window caches, content-document maps, resource
+    // loading, onload, the sub-window object) stays bridge-owned pending a future BrowsingContextManager.
+    private readonly Dom.Features.SubDocumentBinding _subDocuments;
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -169,6 +176,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
+        _subDocuments = new Dom.Features.SubDocumentBinding(this);
         _document = new DomDocument();
         DocumentElement = CreateBridgeElement("html");
         // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS
@@ -229,7 +237,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
     /// from-end indexer.</summary>
-    private static DomNode ChildAt(DomNode element, Index index) =>
+    internal static DomNode ChildAt(DomNode element, Index index) =>
         element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
@@ -269,10 +277,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Old raw <c>Children.RemoveAt(index)</c> (no mutation notifications — matches the
     /// LegacyChildList primitive; distinct from the notifying <c>RemoveChildAt</c> helper).</summary>
-    private static void RemoveNthChild(DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
+    internal static void RemoveNthChild(DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
 
     /// <summary>Old <c>Children.Clear()</c>.</summary>
-    private static void ClearChildren(DomNode parent)
+    internal static void ClearChildren(DomNode parent)
     {
         foreach (var child in parent.ChildNodes.ToArray())
             parent.RemoveChild(child);

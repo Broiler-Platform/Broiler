@@ -1,0 +1,69 @@
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Dom.Features;
+using Broiler.Dom;
+
+namespace Broiler.HtmlBridge;
+
+/// <summary>
+/// <see cref="DomBridge"/>'s implementation of <see cref="ISubDocumentHost"/>, the contract the
+/// extracted <see cref="Broiler.HtmlBridge.Dom.Features.SubDocumentBinding"/> feature module consumes
+/// (HtmlBridge complexity-reduction roadmap Phase 3, P3.13). Explicit interface members, so these seams
+/// do not widen the public <c>DomBridge</c> surface. The bridge keeps the browsing-context
+/// infrastructure (the sub-document/-window caches, the content-document maps, resource loading and
+/// onload) — the module owns only the <c>document</c> object surface built over a root node.
+/// </summary>
+public sealed partial class DomBridge : ISubDocumentHost
+{
+    JSContext ISubDocumentHost.JsContext => _jsContext!;
+    JSObject? ISubDocumentHost.WindowJSObject => _windowJSObject;
+
+    JSObject ISubDocumentHost.ToJSObject(DomNode node) => ToJSObject(node);
+    DomElement? ISubDocumentHost.FindDomElementByJSObject(JSObject jsObj) => FindDomElementByJSObject(jsObj);
+    DomNode? ISubDocumentHost.FindDomNodeByJSObject(JSObject jsObj) => FindDomNodeByJSObject(jsObj);
+
+    void ISubDocumentHost.RegisterDocumentWrapper(DomNode docRoot, JSObject doc)
+    {
+        _jsObjects.SetDocument(docRoot, doc);
+        // Map docRoot → doc JSObject so ToJSObject(docRoot) returns the doc object; this makes strict
+        // equality checks like `range.startContainer === doc` work.
+        _jsObjects.Set(docRoot, doc);
+    }
+
+    bool ISubDocumentHost.TryGetNodeWrapper(DomNode node, out JSObject wrapper) => _jsObjects.TryGet(node, out wrapper);
+
+    void ISubDocumentHost.SetOwnerDocRoot(DomNode node, DomNode docRoot) =>
+        GetElementRuntimeState(node).OwnerDocRoot = docRoot;
+
+    DomElement ISubDocumentHost.CreateElement(string tagName) => CreateBridgeElement(tagName);
+    DomElement ISubDocumentHost.CreateElementNS(string ns, string localName) => CreateBridgeElementNS(ns, localName);
+    DomText ISubDocumentHost.CreateTextNode(string data) => CreateBridgeTextNode(data);
+    DomComment ISubDocumentHost.CreateComment(string data) => CreateBridgeCommentNode(data);
+    DomDocumentType ISubDocumentHost.CreateDocumentType(string name, string publicId, string systemId) =>
+        CreateBridgeDocumentType(name, publicId, systemId);
+    DomDocument ISubDocumentHost.CreateBrowsingContextDocument() => CreateBrowsingContextDocument();
+    DomDocumentType? ISubDocumentHost.ParseDocType(string html) => ParseDocType(html);
+
+    void ISubDocumentHost.SetElementTextContent(DomElement element, string? value) => SetElementTextContent(element, value);
+    IReadOnlyList<DomElement> ISubDocumentHost.HitTestDocumentPoint(DomNode docRoot, double x, double y) =>
+        HitTestDocumentPoint(docRoot, x, y);
+    JSArray ISubDocumentHost.BuildStyleSheetsCollection(DomNode docRoot) => BuildStyleSheetsCollection(docRoot);
+    JSObject ISubDocumentHost.BuildRange(DomNode docRoot) => BuildRange(docRoot);
+    JSObject ISubDocumentHost.BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn) =>
+        BuildTreeWalker(root, whatToShow, filterFn);
+    JSObject ISubDocumentHost.BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn) =>
+        BuildNodeIterator(root, whatToShow, filterFn);
+    void ISubDocumentHost.CollectByTagName(DomNode root, string tag, List<JSValue> results) =>
+        CollectByTagName(root, tag, results);
+    void ISubDocumentHost.CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results) =>
+        CollectMatching(root, predicate, results);
+
+    List<DomNode> ISubDocumentHost.BuildChildNodeArgumentNodes(in Arguments arguments) =>
+        BuildChildNodeArgumentNodes(arguments);
+    void ISubDocumentHost.InsertNodeAt(DomNode parent, DomNode node, int index) => InsertNodeAt(parent, node, index);
+    void ISubDocumentHost.NotifyNodeIteratorPreRemoval(DomNode node) => NotifyNodeIteratorPreRemoval(node);
+    void ISubDocumentHost.NotifyChildRemoved(DomElement parent, DomNode removedChild, int index) =>
+        NotifyChildRemoved(parent, removedChild, index);
+}

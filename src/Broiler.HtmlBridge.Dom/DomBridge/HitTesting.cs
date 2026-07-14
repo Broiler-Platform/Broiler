@@ -5,7 +5,7 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private static double GetCoordinateArgument(in Arguments args, int index) =>
+    internal static double GetCoordinateArgument(in Arguments args, int index) =>
         args.Length > index && !args[index].IsNull && !args[index].IsUndefined
             ? args[index].DoubleValue
             : double.NaN;

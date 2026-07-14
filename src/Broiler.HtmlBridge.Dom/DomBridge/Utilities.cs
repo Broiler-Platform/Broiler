@@ -302,7 +302,7 @@ public sealed partial class DomBridge
     /// Nested sub-document roots remain isolated browsing contexts and are not
     /// re-owned by the outer document.
     /// </summary>
-    private static void AdoptSubtreeIntoDocument(DomNode node, DomNode? ownerDocRoot)
+    internal static void AdoptSubtreeIntoDocument(DomNode node, DomNode? ownerDocRoot)
     {
         GetElementRuntimeState(node).OwnerDocRoot = ownerDocRoot;
 
@@ -999,7 +999,7 @@ public sealed partial class DomBridge
     /// Validates an element/doctype name per the XML spec.
     /// Throws a DOMException with INVALID_CHARACTER_ERR (code 5) for invalid names.
     /// </summary>
-    private static void ValidateElementName(string name, JSContext context)
+    internal static void ValidateElementName(string name, JSContext context)
     {
         if (string.IsNullOrEmpty(name) || name.Contains('\0') || !ValidXmlNamePattern.IsMatch(name))
         {
@@ -1013,7 +1013,7 @@ public sealed partial class DomBridge
     /// Validates a qualified name and namespace per the Namespaces in XML spec.
     /// Throws a DOMException with NAMESPACE_ERR (code 14) for namespace violations.
     /// </summary>
-    private static void ValidateQualifiedName(string qualifiedName, string? ns, JSContext context)
+    internal static void ValidateQualifiedName(string qualifiedName, string? ns, JSContext context)
     {
         // Check for empty prefix (e.g., ":div") first — this is a NamespaceError
         if (!string.IsNullOrEmpty(qualifiedName) && qualifiedName.StartsWith(':'))
