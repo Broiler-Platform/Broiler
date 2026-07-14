@@ -25,6 +25,9 @@
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
     <InternalsVisibleTo Include="Broiler.Layout.Tests" />
+    <!-- The WPT runner sets NativeAnchorPlacement.Enabled around only the final
+         render during the Phase 5 native anchor-placement cutover (P5.8d.2b). -->
+    <InternalsVisibleTo Include="Broiler.Wpt" />
   </ItemGroup>
 
 </Project>

@@ -324,6 +324,19 @@ internal sealed class WptTestRunner
         Environment.GetEnvironmentVariable("BROILER_WPT_DEFER_PROMISE_TESTS") is "1" or "true" or "TRUE";
 
     /// <summary>
+    /// Native anchor-placement cutover lever (HtmlBridge complexity-reduction roadmap
+    /// Phase 5, P5.8d.2b). Default <c>false</c>. When on, the runner puts the DomBridge
+    /// into native anchor mode (so MVP-subset <c>position-area</c> boxes keep their CSS
+    /// instead of being pre-baked) and enables the Broiler.Layout engine's placement
+    /// post-pass (<c>NativeAnchorPlacement.Enabled</c>) around only the final render, so
+    /// the engine — not the bridge — positions those boxes. Overridden by the
+    /// <c>BROILER_WPT_NATIVE_ANCHOR</c> environment variable. Kept default-off until
+    /// pixel parity is proven feature-by-feature across the css-anchor-position suite.
+    /// </summary>
+    internal static bool NativeAnchorPlacement { get; set; } =
+        Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_ANCHOR") is "1" or "true" or "TRUE";
+
+    /// <summary>
     /// File extensions treated as test files.
     /// </summary>
     private static readonly HashSet<string> TestExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -1474,9 +1487,9 @@ internal sealed class WptTestRunner
         HTML.Image.BBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+            rendered = RenderWithNativeAnchor(() => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
                 backgroundColor: BColor.White,
-                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
+                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
         }
         catch (Exception ex)
         {
@@ -1761,9 +1774,32 @@ internal sealed class WptTestRunner
             };
         }
 
-        return HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+        return RenderWithNativeAnchor(() => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
             backgroundColor: BColor.White,
-            stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
+            stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+    }
+
+    /// <summary>
+    /// Runs <paramref name="render"/> with the Broiler.Layout engine's native
+    /// anchor-placement post-pass enabled iff the runner lever is on (P5.8d.2b). The
+    /// engine flag is <c>[ThreadStatic]</c>, so enabling it here scopes it to this one
+    /// render on this thread — the earlier bridge geometry snapshots are unaffected.
+    /// </summary>
+    private static HTML.Image.BBitmap RenderWithNativeAnchor(Func<HTML.Image.BBitmap> render)
+    {
+        if (!NativeAnchorPlacement)
+            return render();
+
+        var previous = Broiler.Layout.Engine.NativeAnchorPlacement.Enabled;
+        Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = true;
+        try
+        {
+            return render();
+        }
+        finally
+        {
+            Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = previous;
+        }
     }
 
     internal HTML.Image.BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
@@ -1988,7 +2024,7 @@ internal sealed class WptTestRunner
             // Even with no inline scripts, we still need to process anchor
             // positioning, animation snapshots, etc. via the DomBridge.
             using var context2 = new JSContext();
-            var bridge2 = new DomBridge();
+            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -2001,7 +2037,7 @@ internal sealed class WptTestRunner
         }
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {

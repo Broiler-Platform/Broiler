@@ -1709,24 +1709,45 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   identical 9 deterministic anchor-tail fails. Zero regressions. (A default-mode strip assertion was
   dropped as unreliable in the raw-string `Attach` harness — the `<style>` InnerHtml-vs-DomText nuance +
   no real layout make it diverge from the full WPT pipeline; default-off safety is proven by the WPT run.)
-- **P5.8d.2b — runner lever + full render parity (NOT started, the concentrated risk):** add
-  `<InternalsVisibleTo Include="Broiler.Wpt" />` to `Broiler.Layout.csproj` (the runner can already set the
-  bridge flag via bridge IVT; this lets it also set `NativeAnchorPlacement.Enabled` around **only** the
-  final `RenderToImageWithStyleSet` — not the earlier geometry snapshots). Gate both behind a default-off
-  runner lever (env var, like `UseSharedLayoutGeometry`). Then prove pixel parity on the **MVP subset**
-  (position-area + explicit `position-anchor` + uniquely-named anchor + non-inline CB + no scroll
-  container); for mixed MVP/non-MVP rules, add per-element suppression (write `position-area: none` inline
-  on bridge-baked boxes so the engine skips them). Expand feature-by-feature (percentage box props →
-  box-sizing → inline-CB promotion → scroll simulation → `position-visibility` → dialog/backdrop →
-  `anchor()` insets → position-try), each its own PR + parity gate. Start with the **MVP subset**:
-  `position-area` with an explicit `position-anchor`, a uniquely-named anchor, a non-inline containing
-  block, and no intervening scroll container (`scrollContainer == null` and `!IsInlineContainingBlock`).
-  For those boxes the bridge's `ResolvePositionAreaValues` returns early (leaving the CSS intact) and the
-  engine places them; everything else stays on the bridge path. Prove parity per-test in isolation
-  against the css-anchor-position baseline, then expand coverage one entangled feature at a time
-  (percentage box props → box-sizing → inline-CB promotion → scroll simulation → `position-visibility` →
-  dialog/backdrop → `anchor()` insets → position-try). Each expansion is its own PR with its own parity
-  gate.
+- **P5.8d.2b — runner lever + MVP-subset render parity — FIRST SLICE COMPLETED** 2026-07-14 (branch
+  `htmlbridge-phase5-native-anchor-cutover`). The production-flip *infrastructure* is in and proven on the
+  strict MVP subset; the lever is default-off and expansion to the entangled features is still to come.
+  Landed:
+  - **Engine reach.** `<InternalsVisibleTo Include="Broiler.Wpt" />` on `Broiler.Layout.csproj` plus a
+    direct `Broiler.Wpt`→`Broiler.Layout` `ProjectReference` (it only reached Layout transitively before),
+    so the runner can name and set the `[ThreadStatic]` `Broiler.Layout.Engine.NativeAnchorPlacement.Enabled`.
+  - **Bridge: whole-function skip → per-element MVP gating.** P5.8d.2a's all-or-nothing
+    `if (!NativeAnchorPlacement)` around `ResolvePositionAreaValues` is replaced by a per-box decision
+    inside it: `rect = NativeAnchorPlacement && IsMvpNativeAnchorBox(...) ? null : ComputePositionAreaRect(...)`
+    (null rect ⇒ the whole baking block is skipped, leaving the box's `position-area`/`position-anchor`/
+    `anchor-name` CSS intact for the engine). `IsMvpNativeAnchorBox` requires: an explicit dashed-ident
+    `position-anchor`, a **uniquely-named** anchor (`_anchorCandidates[name].Count == 1` — the engine's
+    `AnchorRegistry` is a flat ordinal last-wins map with no scope awareness), a non-inline containing
+    block, no intervening scroll container, and no `position-try`/`anchor()`/`anchor-size()` on the box.
+    Every **non-MVP** box under native mode is still baked as before **and** gets `position-area: none`
+    written inline so the engine post-pass skips the already-placed box (the mixed-doc suppression the
+    plan called for). `NeutralizeStyleElementsForAnchorRules` stays skipped in native mode (MVP boxes need
+    their stylesheet `position-area`/`anchor-name` to survive; baked non-MVP boxes are inline-overridden).
+  - **Runner lever.** `BROILER_WPT_NATIVE_ANCHOR` (default off, static like `DeferPromiseTests`) sets
+    `bridge.NativeAnchorPlacement` on both `DomBridge` instances in `ExecuteScriptsWithDom`, and a
+    `RenderWithNativeAnchor(...)` wrapper enables the engine flag around **only** the two final
+    `RenderToImageWithStyleSet` calls (`[ThreadStatic]`, restored in `finally`).
+  - **Validation.** Default-off is byte-identical (the gates are all `if (NativeAnchorPlacement)`): the
+    `~Anchor|~Position|~Sticky` WPT suite is the same **9 anchor-tail fails / 54 pass** as baseline.
+    **Lever-on across the whole suite reproduces the identical 9/54 set** — MVP boxes route through the
+    engine, everything else stays baked, zero regressions. (An initial lever-on run regressed
+    `AnchorNameScopeTests` — a shared `--a` across two scopes — which is exactly what the *uniqueness* gate
+    now excludes.) New `Broiler.Wpt.Tests/NativeAnchorPlacementWptTests.cs` proves the engine places a
+    strict-MVP `position-area: bottom right` box at the grid-derived (60,60)–(89,89) through the **full**
+    `RenderHtmlFileBitmapPublic` pipeline (bridge in native mode does **not** bake — see
+    `NativeAnchorBridgeModeTests` — so the correct placement is the engine's), and that the baked and
+    native paths agree pixel-wise. Cli `~NativeAnchor` (3) and `~Anchor|~PositionArea` (13) green.
+- **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
+  default-off until each feature is on the engine path — percentage box props → box-sizing → inline-CB
+  promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets
+  → position-try. Each is currently excluded by `IsMvpNativeAnchorBox` and stays on the bridge path
+  (baked + `position-area: none`), so enabling the lever globally is already safe (proven above); the
+  expansions widen the MVP gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
