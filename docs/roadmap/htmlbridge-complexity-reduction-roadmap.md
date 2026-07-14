@@ -1867,13 +1867,26 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the baked `AnchorInlineContainingBlockTests` corner; a flag-off control pins the placement to the
   post-pass). Regression check: **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged
   (7-fail / 32-pass)**, the only corpus movement being `position-area-inline-container` 83.30 %→83.10 %
-  (−0.2 %, run noise — that test is corrupted by a **pre-existing, unrelated `&nbsp;`-not-decoded rendering
-  bug** that renders the entity as literal text, so it fails ~83 % on *both* paths and cannot pass from
-  anchor work). `position-area-abs-inline-container` is unchanged (kept baked by the abspos-inline
-  exception). No passing test regresses on either path; the baked-path `AnchorInlineContainingBlockTests`
-  (26) and native WPT/scope suites stay green. Validation is therefore the exact-geometry pipeline test plus
-  no-regression (the percentage-box-props precedent). The `abs-inline-container` bridge/engine
-  blockification disagreement is the follow-up before that test can also go native.
+  (−0.2 %, run noise — that test was corrupted by a then-unrelated `&nbsp;`-not-decoded rendering bug that
+  rendered the entity as literal text). `position-area-abs-inline-container` is unchanged (kept baked by the
+  abspos-inline exception). No passing test regresses on either path; the baked-path
+  `AnchorInlineContainingBlockTests` (26) and native WPT/scope suites stay green. Validation is therefore the
+  exact-geometry pipeline test plus no-regression (the percentage-box-props precedent). The
+  `abs-inline-container` bridge/engine blockification disagreement is the follow-up before that test can also
+  go native.
+  - **Follow-up — the `&nbsp;`-not-decoded rendering bug is now FIXED** (2026-07-14; `Broiler.DOM`
+    submodule, `HtmlTokenizer`). Root cause: the shared WHATWG tokenizer emitted character data verbatim, so
+    named/decimal/hex character references (`&nbsp;`, `&#160;`, `&#xA0;`) stayed literal in the DOM; the
+    serializer then HTML-encoded them, so the bridge→serialize→reparse render path double-encoded to
+    `&amp;nbsp;` and painted the literal entity. The tokenizer now decodes references in Data-state character
+    tokens (raw-text `<script>`/`<style>` stay verbatim; attribute decoding left to the downstream
+    `Broiler.HTML` `HtmlParser` to avoid a double-decode). Impact on the inline-container family:
+    `position-area-inline-container` 83 %→**95.8 %** (lever-on) / 91.9 % (default-off),
+    `position-area-abs-inline-container` 88 %→92 % — both substantially improved (the residual gap is inline-CB
+    position-area geometry precision, not the entity bug). Zero regressions: full `Broiler.Cli.Tests` diffed
+    stash-vs-change is **0 new failures, +1 fixed** (`Acid3_Score_Position_With_Negative_Margin`); the
+    css-anchor-position subset passing set is unchanged both modes. Regression test:
+    `Broiler.Cli.Tests/HtmlEntityDecodingTests.cs`.
 - **P5.8d.2b — `anchor()` inset placement (seventh expansion) — COMPLETED** 2026-07-14
   (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, both parent-repo, additive,
   default-off). A box positioned by `anchor()` functions in its physical insets (`left`/`right`/`top`/
