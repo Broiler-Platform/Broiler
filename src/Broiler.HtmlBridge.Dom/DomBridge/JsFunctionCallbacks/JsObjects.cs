@@ -216,18 +216,11 @@ public sealed partial class DomBridge
         return ReferenceEquals(root, _document) ? JSBoolean.True : JSBoolean.False;
     }
 
-    /// <summary>Whether <paramref name="node"/> is a sub-document root element (only elements can be).</summary>
-    private static bool IsSubDocRootNode(DomNode node) =>
-        node is DomElement element && IsSubDocRoot(element);
-
     private JSValue JsJsObjectsGetChildNodes033Core(DomNode node, in Arguments a)
     {
         var children = new List<JSValue>();
         foreach (var child in node.ChildNodes)
-        {
-            if (!IsSubDocRootNode(child))
-                children.Add(ToJSObject(child));
-        }
+            children.Add(ToJSObject(child));
 
         return new JSArray(children);
     }
@@ -235,14 +228,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetFirstChild034Core(DomNode node, in Arguments a)
     {
-        var first = node.ChildNodes.FirstOrDefault(c => !IsSubDocRootNode(c));
+        var first = node.ChildNodes.FirstOrDefault();
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
     private JSValue JsJsObjectsGetLastChild035Core(DomNode node, in Arguments a)
     {
-        var last = node.ChildNodes.LastOrDefault(c => !IsSubDocRootNode(c));
+        var last = node.ChildNodes.LastOrDefault();
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
@@ -254,13 +247,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var siblings = parent.ChildNodes;
         var idx = ChildIndexOf(parent, node);
-        for (var i = idx + 1; i < siblings.Count; i++)
-        {
-            if (!IsSubDocRootNode(siblings[i]))
-                return ToJSObject(siblings[i]);
-        }
-
-        return JSNull.Value;
+        return idx >= 0 && idx + 1 < siblings.Count ? ToJSObject(siblings[idx + 1]) : JSNull.Value;
     }
 
 
@@ -271,13 +258,7 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var siblings = parent.ChildNodes;
         var idx = ChildIndexOf(parent, node);
-        for (var i = idx - 1; i >= 0; i--)
-        {
-            if (!IsSubDocRootNode(siblings[i]))
-                return ToJSObject(siblings[i]);
-        }
-
-        return JSNull.Value;
+        return idx - 1 >= 0 ? ToJSObject(siblings[idx - 1]) : JSNull.Value;
     }
 
 
@@ -802,7 +783,7 @@ public sealed partial class DomBridge
         var result = new List<JSValue>();
         foreach (var child in ChildElements(element))
         {
-            if (!IsText(child) && !IsSubDocRoot(child))
+            if (!IsText(child))
                 result.Add(ToJSObject(child));
         }
 
@@ -812,14 +793,14 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetFirstElementChild083Core(DomElement element, in Arguments a)
     {
-        var first = ChildElements(element).FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+        var first = ChildElements(element).FirstOrDefault(c => !IsText(c));
         return first != null ? ToJSObject(first) : JSNull.Value;
     }
 
 
     private JSValue JsJsObjectsGetLastElementChild084Core(DomElement element, in Arguments a)
     {
-        var last = ChildElements(element).LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+        var last = ChildElements(element).LastOrDefault(c => !IsText(c));
         return last != null ? ToJSObject(last) : JSNull.Value;
     }
 
@@ -832,7 +813,7 @@ public sealed partial class DomBridge
         var idx = siblings.IndexOf(element);
         for (var i = idx + 1; i < siblings.Count; i++)
         {
-            if (!IsText(siblings[i]) && !IsSubDocRoot(siblings[i]))
+            if (!IsText(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 
@@ -848,7 +829,7 @@ public sealed partial class DomBridge
         var idx = siblings.IndexOf(element);
         for (var i = idx - 1; i >= 0; i--)
         {
-            if (!IsText(siblings[i]) && !IsSubDocRoot(siblings[i]))
+            if (!IsText(siblings[i]))
                 return ToJSObject(siblings[i]);
         }
 

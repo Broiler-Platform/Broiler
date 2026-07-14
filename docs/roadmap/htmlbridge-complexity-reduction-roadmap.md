@@ -860,6 +860,47 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.11 completed** 2026-07-14 (branch `htmlbridge-phase4-remove-subdocroot-guards`) — **work item 1,
+final cleanup: delete the now-inert `#subdoc-root` tag-name special cases.** P4.4b severed the materialized
+nested browsing context from the `_document` tree (a sub-document is a canonical `Broiler.Dom.DomDocument`
+referenced through a container↔document map, never an in-tree `#subdoc-root` sentinel child) and left the
+element with **zero creation sites**, so every remaining `IsSubDocRoot` guard and `"#subdoc-root"` TagName
+check across the bridge became dead code — provably unreachable, never firing. This removes them all: the
+`IsSubDocRoot(DomElement)` (`Utilities.cs`) and `IsSubDocRootNode(DomNode)` (`JsFunctionCallbacks/JsObjects.cs`)
+helpers plus their ~15 call sites — the node child/sibling navigation (`childNodes`/`firstChild`/`lastChild`/
+`nextSibling`/`previousSibling`), the element navigation (`children`/`childElementCount`/`firstElementChild`/
+`lastElementChild`/`nextElementSibling`/`previousElementSibling`), the fragment `children` view, `CollectDescendants`
+and `AdoptSubtreeIntoDocument`; the `CollectWindowFrames` recursion skip (`DomBridge.cs`); the serialization
+`GetKind` `DocumentRoot` arm and the `GetChildren` sub-document skip (`DomBridge.Serialization.cs`, which
+collapse to "always element" / "all children" now that a severed sub-document can never appear in `ChildNodes`);
+the `CollectStyleElementsInTree` and `InvalidateStyleScopeRecursive` `#subdoc` recursion guards (`Css.cs`); the
+`ToJSRootNode` `#subdoc-root` branch (`ShadowDom.cs`, whose fall-through `ToJSObject` already resolves a
+canonical `DomDocument` root to its document wrapper via the P4.6 branch); and the document-level
+`surroundContents` sentinel guard (`TraversalBinding.Range.cs`, whose `#document`/`#subdoc-root` element check
+is dead now that the document root is a canonical `DomDocument` — the canonical `SurroundContents` enforces the
+single-document-element hierarchy rule directly). The generic `#`-prefix stop in `GetDocumentRootFor` stays —
+it is still live for `#shadow-root` (the one remaining `#`-prefixed bridge element); only its stale doc comment
+was corrected. Behaviour-preserving (every removed guard was unreachable); no public-API change (all helpers
+were private). Tests: `Broiler.Cli.Tests/SubdocRootGuardRemovalTests.cs` (reflection guards that
+`IsSubDocRoot`/`IsSubDocRootNode` are gone and must not return, + node/element child-and-sibling navigation,
+`getRootNode()`, and iframe-host navigation/serialization/style-collection characterizations pinning that the
+severed sub-document neither appears in the main tree nor leaks its `<style>` into the parent cascade).
+Regression check vs the P4.10/merged baseline: the SubDocument / Range / Serialization / ShadowDom / sentinel-
+migration / KnownNodes / BrowsingContextRoot / HtmlDomInterface / DomTraversal / Acid3 / DomEvents / Attributes
+suites reproduce an **identical** failure set with the change stashed (the standing headless
+`Range_GetBoundingClientRect`, the real-HTTP `HttpSubResourceTests.Iframe_*`, the zoom/srcdoc
+`ScriptEngineExecuteTests.DomBridge_SerializeToHtml_*`, and the flaky Acid3 score/border/cascade/NodeIterator
+set) → zero regressions.
+
+**This closes the item-1 sentinel work: every `#document`/`#document-fragment`/`#doctype`/`#subdoc-root`
+fake-tag element is gone (P4.2/P4.3/P4.4a/P4.4b/P4.6) and the residual dead tag-name guards they left behind
+are now removed.** The remaining Phase 4 residue is unchanged and still blocked/gated as recorded below:
+item 2's full inline-style dict elimination (P4.7 shipped the script-observable write-through slice; the
+~200-site dict rewrite is deferred), item 4/5's submodule-push-gated promotions (`IsEqualNode` P4.9,
+`CommonAncestorWith` P4.10) and the `GetNodesInRange` / `DomRange`-stringifier / `Normalize` / `CloneDomElement`
+swaps blocked by regime-A layout coupling or side-effect coupling, and P4.4c (`OwnerDocRoot`) which still needs
+regime-A content-node adoption.
+
 Status: **P4.10 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote the
 nearest-common-ancestor tree query to canonical `Broiler.Dom.DomNode.CommonAncestorWith`.** The bridge's
 `FindCommonAncestor(a, b)` (`Traversal.cs`) is a neutral tree walk — the deepest inclusive ancestor of

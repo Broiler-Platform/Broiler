@@ -425,14 +425,14 @@ public sealed partial class DomBridge
             new JSFunction((in a) => JsJsObjectsInsertBefore080Core(bridgeForInsert, element, in a), "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // children (read-only) — element children only (no text nodes, no #subdoc-root)
+        // children (read-only) — element children only (no text nodes)
         obj.FastAddProperty((KeyString)"children",
             new JSFunction((in a) => JsJsObjectsGetChildren081Core(element, in a), "get children"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // childElementCount (read-only)
         obj.FastAddProperty((KeyString)"childElementCount",
-            new JSFunction((in a) => new JSNumber(ChildElements(element).Count(c => !IsText(c) && !IsSubDocRoot(c))), "get childElementCount"),
+            new JSFunction((in a) => new JSNumber(ChildElements(element).Count(c => !IsText(c))), "get childElementCount"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // firstElementChild (read-only)
@@ -1096,22 +1096,22 @@ public sealed partial class DomBridge
 
         // -- ParentNode mixin (element views) --
         obj.FastAddProperty((KeyString)"children",
-            new JSFunction((in _) => new JSArray([.. ChildElements(fragment).Where(c => !IsText(c) && !IsSubDocRoot(c)).Select(c => (JSValue)ToJSObject(c))]), "get children"),
+            new JSFunction((in _) => new JSArray([.. ChildElements(fragment).Where(c => !IsText(c)).Select(c => (JSValue)ToJSObject(c))]), "get children"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         obj.FastAddProperty((KeyString)"childElementCount",
-            new JSFunction((in _) => new JSNumber(ChildElements(fragment).Count(c => !IsText(c) && !IsSubDocRoot(c))), "get childElementCount"),
+            new JSFunction((in _) => new JSNumber(ChildElements(fragment).Count(c => !IsText(c))), "get childElementCount"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         obj.FastAddProperty((KeyString)"firstElementChild",
             new JSFunction((in _) =>
             {
-                var first = ChildElements(fragment).FirstOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+                var first = ChildElements(fragment).FirstOrDefault(c => !IsText(c));
                 return first != null ? ToJSObject(first) : JSNull.Value;
             }, "get firstElementChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         obj.FastAddProperty((KeyString)"lastElementChild",
             new JSFunction((in _) =>
             {
-                var last = ChildElements(fragment).LastOrDefault(c => !IsText(c) && !IsSubDocRoot(c));
+                var last = ChildElements(fragment).LastOrDefault(c => !IsText(c));
                 return last != null ? ToJSObject(last) : JSNull.Value;
             }, "get lastElementChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);

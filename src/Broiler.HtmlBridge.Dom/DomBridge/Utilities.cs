@@ -235,8 +235,6 @@ public sealed partial class DomBridge
     private DomNode? FindDomNodeByJSObject(JSObject jsObj) =>
         _jsObjects.TryGetNode(jsObj, out var node) ? node : null;
 
-    private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
-
     // Phase 4 item 5: the bridge's IsDescendant(ancestor, candidate) copy is deleted; call sites use
     // the canonical Broiler.Dom.DomNode.IsDescendantOf(ancestor) instance method (identical ancestor
     // walk; every bridge call site passes a non-null ancestor, so canonical's null-ancestor throw is
@@ -301,13 +299,10 @@ public sealed partial class DomBridge
 
         // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so char-data children are adopted
         // too. Behaviour-preserving on today's homogeneous tree (every child is an element).
+        // Nested browsing-context documents are no longer in-tree children (P4.4b severed the
+        // #subdoc-root element), so a subtree walk never crosses a sub-document boundary.
         foreach (var child in node.ChildNodes)
-        {
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
-                continue;
-
             AdoptSubtreeIntoDocument(child, ownerDocRoot);
-        }
     }
 
     /// <summary>
@@ -486,12 +481,11 @@ public sealed partial class DomBridge
         // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so document-order traversal
         // includes text/comment nodes (range boundary indexing needs them). Behaviour-preserving
         // on today's homogeneous tree where every child is an element.
+        // Sub-documents are separate document trees, but since P4.4b severed the #subdoc-root
+        // element they are no longer in-tree children here, so document-order traversal never
+        // crosses a sub-document boundary.
         foreach (var child in root.ChildNodes)
         {
-            // Skip sub-document roots — they are separate document trees
-            // and must not be traversed as part of the parent document.
-            if (child is DomElement childElement && IsSubDocRoot(childElement))
-                continue;
             result.Add(child);
             CollectDescendants(child, result);
         }

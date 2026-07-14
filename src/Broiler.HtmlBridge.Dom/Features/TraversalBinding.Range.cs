@@ -234,25 +234,10 @@ internal sealed partial class TraversalBinding
         if (newParent == null)
             return JSUndefined.Value;
 
-        // Bridge-specific compatibility guard (not part of canonical surroundContents): the
-        // #document / #subdoc-root sentinels are plain elements to the canonical DOM, so its
-        // single-document-element hierarchy rule does not fire. Preserve the Acid3-era check that
-        // surrounding at the document level cannot introduce a second element child.
-        if (state.StartContainer is DomElement startContainerElement &&
-            (string.Equals(startContainerElement.TagName, "#document", StringComparison.OrdinalIgnoreCase) || string.Equals(startContainerElement.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)))
-        {
-            var nodes = DomBridge.GetNodesInRange(state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
-            var elemCount = DomBridge.ChildElements(startContainerElement).Count(c => !DomBridge.IsText(c) && !DomBridge.IsComment(c));
-            var removedElems = nodes.Count(n => !DomBridge.IsText(n) && !DomBridge.IsComment(n));
-            // newParent is always a real element here (a canonical DomDocumentFragment / DomComment
-            // is not a DomElement, so FindDomElementByJSObject returned null and we returned above) —
-            // the former "#document-fragment" sentinel-tag exclusion is dead.
-            if (elemCount - removedElems + 1 > 1 || !DomBridge.IsComment(newParent))
-            {
-                DomBridge.ThrowDOMException(_host.JsContext, "Hierarchy request error", "HierarchyRequestError");
-                return JSUndefined.Value;
-            }
-        }
+        // The document root is now a canonical DomDocument (P4.6) and sub-document roots are severed
+        // canonical DomDocuments (P4.4b) — neither is a DomElement — so the canonical
+        // SurroundContents below enforces the single-document-element hierarchy rule directly; the
+        // former #document / #subdoc-root sentinel guard here is dead and removed.
 
         // The canonical algorithm handles the partial-non-text (InvalidStateError, incl. comment
         // boundaries) and invalid-newParent (InvalidNodeTypeError) checks, the extract, and the wrap.

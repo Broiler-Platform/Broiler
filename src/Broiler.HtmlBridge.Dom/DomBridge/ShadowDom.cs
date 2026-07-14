@@ -57,9 +57,8 @@ public sealed partial class DomBridge
         if (ReferenceEquals(root, _document))
             return _documentJSObject ?? JSNull.Value;
 
-        if (root is DomElement rootEl && IsSubDocRoot(rootEl) && _jsObjects.TryGetDocument(rootEl, out var subDocument))
-            return subDocument;
-
+        // A severed sub-document root is a canonical DomDocument (P4.4b); ToJSObject resolves it to
+        // its document wrapper via the document-wrapper map, so no #subdoc-root special case remains.
         return ToJSObject(root);
     }
 
