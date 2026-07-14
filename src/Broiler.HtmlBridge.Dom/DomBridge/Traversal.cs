@@ -125,7 +125,7 @@ public sealed partial class DomBridge
         {
             var node = allNodes[i];
             // Only include top-level nodes (not descendants of already-included nodes)
-            var isDescendantOfIncluded = result.Any(r => IsDescendant(r, node));
+            var isDescendantOfIncluded = result.Any(r => node.IsDescendantOf(r));
             if (!isDescendantOfIncluded)
                 result.Add(node);
         }

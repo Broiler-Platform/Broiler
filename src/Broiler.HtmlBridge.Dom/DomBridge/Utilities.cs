@@ -244,20 +244,10 @@ public sealed partial class DomBridge
 
     private static bool IsSubDocRoot(DomElement element) => string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
 
-    /// <summary>
-    /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
-    /// <paramref name="ancestor"/> in the DOM tree.
-    /// </summary>
-    internal static bool IsDescendant(DomNode ancestor, DomNode candidate)
-    {
-        var current = candidate.ParentNode;
-        while (current != null)
-        {
-            if (ReferenceEquals(current, ancestor)) return true;
-            current = current.ParentNode;
-        }
-        return false;
-    }
+    // Phase 4 item 5: the bridge's IsDescendant(ancestor, candidate) copy is deleted; call sites use
+    // the canonical Broiler.Dom.DomNode.IsDescendantOf(ancestor) instance method (identical ancestor
+    // walk; every bridge call site passes a non-null ancestor, so canonical's null-ancestor throw is
+    // unreachable).
 
     /// <summary>
     /// Compares two nodes in document tree order.

@@ -1018,7 +1018,7 @@ public sealed partial class DomBridge
     // firing below already guards on `node is DomElement`. Behaviour for element parents is identical.
     private void InsertNodeAt(DomNode parent, DomNode node, int index)
     {
-        if (ReferenceEquals(node, parent) || IsDescendant(node, parent))
+        if (ReferenceEquals(node, parent) || parent.IsDescendantOf(node))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
 
         if (index < 0)

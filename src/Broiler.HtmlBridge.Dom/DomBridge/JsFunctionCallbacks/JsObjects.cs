@@ -683,7 +683,7 @@ public sealed partial class DomBridge
             return JSBoolean.False;
         if (ReferenceEquals(node, other))
             return JSBoolean.True;
-        return IsDescendant(node, other) ? JSBoolean.True : JSBoolean.False;
+        return other.IsDescendantOf(node) ? JSBoolean.True : JSBoolean.False;
     }
 
 
@@ -701,9 +701,9 @@ public sealed partial class DomBridge
             return new JSNumber(0);
         if (!ReferenceEquals(GetTreeRoot(node), GetTreeRoot(other)))
             return new JSNumber(documentPositionDisconnected);
-        if (IsDescendant(node, other))
+        if (other.IsDescendantOf(node))
             return new JSNumber(documentPositionFollowing | documentPositionContainedBy);
-        if (IsDescendant(other, node))
+        if (node.IsDescendantOf(other))
             return new JSNumber(documentPositionPreceding | documentPositionContains);
         return new JSNumber(CompareTreeOrder(node, other) < 0 ? documentPositionFollowing : documentPositionPreceding);
     }
@@ -774,7 +774,7 @@ public sealed partial class DomBridge
         if (newEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
         {
@@ -893,7 +893,7 @@ public sealed partial class DomBridge
         if (childEl == null)
             return a[0];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
+        if (ReferenceEquals(childEl, element) || element.IsDescendantOf(childEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         bridgeForAppend.InsertNodeAt(element, childEl, element.ChildNodes.Count);
         return a[0];
@@ -956,7 +956,7 @@ public sealed partial class DomBridge
         if (newEl == null || oldEl == null)
             return a[1];
         // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
             ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         var idx = ChildIndexOf(element, oldEl);
         if (idx < 0)

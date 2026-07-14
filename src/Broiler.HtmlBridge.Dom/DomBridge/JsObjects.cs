@@ -1138,7 +1138,7 @@ public sealed partial class DomBridge
                 var childEl = FindDomNodeByJSObject(childObj);
                 if (childEl == null)
                     return a[0];
-                if (ReferenceEquals(childEl, fragment) || IsDescendant(childEl, fragment))
+                if (ReferenceEquals(childEl, fragment) || fragment.IsDescendantOf(childEl))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 InsertNodeAt(fragment, childEl, fragment.ChildNodes.Count);
                 return a[0];
@@ -1152,7 +1152,7 @@ public sealed partial class DomBridge
                 var newEl = FindDomNodeByJSObject(newChildObj);
                 if (newEl == null)
                     return a[0];
-                if (ReferenceEquals(newEl, fragment) || IsDescendant(newEl, fragment))
+                if (ReferenceEquals(newEl, fragment) || fragment.IsDescendantOf(newEl))
                     ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {

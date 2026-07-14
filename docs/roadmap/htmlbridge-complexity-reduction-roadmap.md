@@ -778,6 +778,38 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.8 completed** 2026-07-13 (same branch) — **work item 5, first slice: reuse canonical
+`IsDescendantOf`; delete the bridge `IsDescendant` copy.** The bridge's
+`IsDescendant(ancestor, candidate)` static helper (an ancestor-walk in `Utilities.cs`) exactly
+duplicated canonical `Broiler.Dom.DomNode.IsDescendantOf(ancestor)`. All 13 call sites — `contains`,
+`compareDocumentPosition`, the `appendChild`/`insertBefore`/`replaceChild` circular-reference guards
+(element + fragment), `InsertNodeAt`, `GetNodesInRange`, the range boundary comparison
+(`IsPositionAfter`) and `TraversalBinding` range extraction — now call the canonical instance method
+(`candidate.IsDescendantOf(ancestor)`), and the bridge copy is deleted. Behaviour-preserving: the two
+algorithms are identical for non-null args, and every call site passes a **non-null ancestor** (all
+lookup-derived ancestors are null-guarded before the call), so canonical's `ArgumentNullException` on
+a null ancestor — the one semantic difference from the bridge's lenient `return false` — is
+unreachable. No public-API change (both were internal). Regression check vs the P4.7 baseline: the
+traversal / range / HtmlDomInterface / fragment-and-doctype-sentinel / cross-document / DOM-edge-case /
+Acid3-range suites pass (185 tests); the only failure (the headless `Range_GetBoundingClientRect`
+display-contents geometry test) reproduces identically on the baseline → zero regressions.
+
+Item 4 was found **already substantially complete** during this pass: the MutationObserver
+option-matching fully delegates to canonical `DomMutationObserverFilter.Matches` (P3.2), and the Range
+*content* operations (extract/clone/delete/insert/surround) delegate to canonical `DomRange` (P3.1).
+Its residue is either intentional bridge leniency (cross-tree boundary comparison returns `0` instead
+of throwing `WrongDocument`) or **Broiler.Dom submodule promotions** (a public `GetNodesInRange`, a
+`DomRange` stringifier, a canonical `IsEqualNode`) that need the submodule push/patch workflow. The
+remaining item-5 swaps (`Normalize`, `CloneDomElement`) stay **blocked** by the side-effect coupling
+the P4.1 note describes — the bridge versions fire MutationObserver / NodeIterator / live-range /
+computed-style side effects on an explicit bridge mutation path that canonical operations (which
+publish only to `DomDocument.Mutated`, a stream the bridge's observers do not subscribe to) would
+silently drop; `CloneDomElement` additionally copies bridge runtime state (inline style, form-control
+state, position-area memo) canonical `CloneNode` knows nothing about, so it is gated on the item-2
+inline-style/runtime-state convergence. `GetDocumentOrderNodes` stays blocked by the P4.4b regime-A
+`#subdoc-root` layout coupling (its walk excludes `#subdoc-root` subtrees; canonical
+`InclusiveDescendants` does not).
+
 Status: **P4.7 completed** 2026-07-13 (same branch) — **work item 2, the inline-style single authority
 (script-observable slice).** The bridge's kebab-case inline-style dict (`ElementRuntimeState.Style`,
 reached via `InlineStyle(element)`) was authoritative but only synced back to the canonical `style=`

@@ -58,7 +58,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(containerA, containerB))
             return offsetA > offsetB;
 
-        if (IsDescendant(containerA, containerB))
+        if (containerB.IsDescendantOf(containerA))
         {
             DomNode node = containerB;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
@@ -72,7 +72,7 @@ public sealed partial class DomBridge
             return false;
         }
 
-        if (IsDescendant(containerB, containerA))
+        if (containerA.IsDescendantOf(containerB))
         {
             DomNode node = containerA;
             while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))
