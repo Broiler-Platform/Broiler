@@ -778,6 +778,31 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.10 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote the
+nearest-common-ancestor tree query to canonical `Broiler.Dom.DomNode.CommonAncestorWith`.** The bridge's
+`FindCommonAncestor(a, b)` (`Traversal.cs`) is a neutral tree walk — the deepest inclusive ancestor of
+two nodes, or `null` for disjoint trees — that belongs in canonical `Broiler.Dom`. Canonical had only a
+*private* range-scoped `FindCommonAncestor` (two boundary points, throws on disjoint) and the public
+`DomRange.CommonAncestorContainer`; neither is the null-tolerant node-level query the bridge needs, so
+this is a promotion (a public `DomNode.CommonAncestorWith(other) : DomNode?` addition), verified
+equivalent by delegating the bridge helper to it and running the range / `compareDocumentPosition`
+suites green (71 tests; only the standing headless `Range_GetBoundingClientRect` geometry failure, which
+reproduces on the baseline).
+
+Same submodule-scope outcome as P4.9: the `Broiler.DOM` push 403s, so it ships as
+`patches/0002-add-domnode-commonancestorwith.patch` (indexed in `patches/README.md`), the pointer is
+**unbumped**, and the bridge keeps `FindCommonAncestor` as the active fallback; the follow-up after the
+patch lands is to replace the helper body with `a.CommonAncestorWith(b)` (the four call sites already
+null-check). No main-repo behaviour change.
+
+**With P4.9 (`IsEqualNode`) and P4.10 (`CommonAncestorWith`), the clean, quirk-free neutral-algorithm
+promotions are exhausted.** The other promotion candidates are *not* clean: `GetNodesInRange`
+(`Traversal.cs`) walks via `GetDocumentOrderNodes`, which excludes `#subdoc-root` subtrees — the same
+regime-A layout coupling that blocks P4.4b — so a canonical (exclusion-free) version would not be
+behaviour-equivalent; and the range stringifier (`TraversalBinding.Range.cs`) has non-spec quirks
+(e.g. it omits end-container text) that need spec-correctness work before promotion. Both are recorded
+as blocked rather than merely push-gated.
+
 Status: **P4.9 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote node
 equality (`Node.isEqualNode`) to canonical `Broiler.Dom.DomNode.IsEqualNode`.** The bridge's
 `NodesAreEqual` / `CanonicalAttributesAreEqual` copies (`SubDocuments.cs`) duplicate a neutral DOM tree
