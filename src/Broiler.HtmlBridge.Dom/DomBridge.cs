@@ -110,6 +110,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // path's cross-cutting side effects (inline style, inline event handlers, style invalidation,
     // mutation records). The low-level attribute scans stay shared static helpers on DomBridge.
     private readonly Dom.Features.AttributesBinding _attributes;
+    // Phase 3 (P3.13): the nested-browsing-context `document` object surface (BuildDocument + every
+    // getElementById/createElement/querySelector/… callback + document.implementation) lives in
+    // SubDocumentBinding, reached through the ISubDocumentHost contract (see DomBridge.SubDocumentHost.cs).
+    // Unblocked by P4.4b's #subdoc-root sever — a sub-document root is now a canonical DomNode. The
+    // browsing-context infrastructure (sub-document/-window caches, content-document maps, resource
+    // loading, onload, the sub-window object) stays bridge-owned pending a future BrowsingContextManager.
+    private readonly Dom.Features.SubDocumentBinding _subDocuments;
     private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
@@ -169,6 +176,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
+        _subDocuments = new Dom.Features.SubDocumentBinding(this);
         _document = new DomDocument();
         DocumentElement = CreateBridgeElement("html");
         // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS
@@ -229,7 +237,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>The child node at <paramref name="index"/>, supporting from-end indices like <c>^1</c>
     /// (old <c>Children[^1]</c>); canonical <c>ChildNodes</c> is an <c>IReadOnlyList</c> with no
     /// from-end indexer.</summary>
-    private static DomNode ChildAt(DomNode element, Index index) =>
+    internal static DomNode ChildAt(DomNode element, Index index) =>
         element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
@@ -269,10 +277,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     /// <summary>Old raw <c>Children.RemoveAt(index)</c> (no mutation notifications — matches the
     /// LegacyChildList primitive; distinct from the notifying <c>RemoveChildAt</c> helper).</summary>
-    private static void RemoveNthChild(DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
+    internal static void RemoveNthChild(DomNode parent, int index) => parent.RemoveChild(parent.ChildNodes[index]);
 
     /// <summary>Old <c>Children.Clear()</c>.</summary>
-    private static void ClearChildren(DomNode parent)
+    internal static void ClearChildren(DomNode parent)
     {
         foreach (var child in parent.ChildNodes.ToArray())
             parent.RemoveChild(child);
@@ -417,7 +425,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             parent.AppendChild(child);
     }
 
-    private static Dictionary<string, string> InlineStyle(DomElement element)
+    internal static Dictionary<string, string> InlineStyle(DomElement element)
     {
         var state = GetElementRuntimeState(element);
         if (!state.StyleSeeded)
@@ -432,6 +440,22 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         }
         return state.Style;
     }
+
+    // Named bookkeeping seams for the set of inline-style properties explicitly set via JS
+    // (element.style.foo = …, setProperty, cssText). The Phase 3 (P3.14) StyleDeclarationBinding module
+    // records/clears these through these helpers instead of touching the runtime-state object directly;
+    // the bridge's own serialization/computed-style paths read GetElementRuntimeState(...).JsSetStyleProps.
+    internal static void MarkInlineStylePropSetByJs(DomElement element, string property) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Add(property);
+
+    internal static void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Remove(property);
+
+    internal static void ClearInlineStylePropsSetByJs(DomElement element) =>
+        GetElementRuntimeState(element).JsSetStyleProps.Clear();
+
+    internal static IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
+        GetElementRuntimeState(element).JsSetStyleProps;
 
     /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
     /// dictionary the anchor resolver reads and writes (display:none, resolved left/top/width/height,
@@ -920,7 +944,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// reaches the rendered output); leave it off for query/bookkeeping re-parses and for
     /// stylesheet-rule / descriptor parsing (cascade drops the style engine already reports).
     /// </param>
-    private static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
+    internal static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var declarations = new CSS.CssParser().ParseDeclarations(styleValue);
@@ -963,7 +987,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// The value may carry a trailing <c>!important</c>, which is stripped before validation;
     /// unknown and custom (<c>--*</c>) properties are always accepted (the validator's default).
     /// </summary>
-    private static bool IsAcceptableInlineValue(string property, string value) =>
+    internal static bool IsAcceptableInlineValue(string property, string value) =>
         CssDeclarationValidator.IsAcceptableDeclarationValue(property, CssPriority.Strip(value));
 
     [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]

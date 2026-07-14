@@ -18,7 +18,7 @@ public sealed partial class DomBridge
     /// canonical <c>&lt;html&gt;</c> root, the non-structural node registration list, and the title.
     /// Replaces the retired <c>HtmlTreeBuilder.Build</c>.
     /// </summary>
-    private static (DomElement DocumentElement, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
+    internal static (DomElement DocumentElement, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
     {
         var parsed = new HtmlDocumentParser().ParseDocument(html);
         var root = parsed.Document.DocumentElement ??

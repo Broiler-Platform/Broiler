@@ -15,9 +15,9 @@ public sealed partial class DomBridge
 
     internal static JSFunction UndefinedFunction(string name, int length = 0) => new(ReturnUndefinedDelegate, name, length);
 
-    private static JSFunction NullFunction(string name, int length = 0) => new(ReturnNullDelegate, name, length);
+    internal static JSFunction NullFunction(string name, int length = 0) => new(ReturnNullDelegate, name, length);
 
-    private static JSFunction TrueFunction(string name, int length = 0) => new(ReturnTrueDelegate, name, length);
+    internal static JSFunction TrueFunction(string name, int length = 0) => new(ReturnTrueDelegate, name, length);
 
     private static JSFunction ZeroFunction(string name, int length = 0) => new(ReturnZeroDelegate, name, length);
 

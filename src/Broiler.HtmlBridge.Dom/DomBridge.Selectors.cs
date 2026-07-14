@@ -11,7 +11,7 @@ public sealed partial class DomBridge
     private static readonly CssSelectorMatcher SharedSelectorMatcher =
         new(new BridgeSelectorStateProvider());
 
-    private static bool MatchesSelector(
+    internal static bool MatchesSelector(
         DomElement element,
         string selector,
         DomElement? scope = null) =>
@@ -30,7 +30,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private static string AsciiToLower(string input)
+    internal static string AsciiToLower(string input)
     {
         var characters = input.ToCharArray();
         for (var index = 0; index < characters.Length; index++)

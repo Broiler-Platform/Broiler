@@ -232,7 +232,7 @@ public sealed partial class DomBridge
             new JSFunction((in _) => JsStyleSheetsGetCssText013Core(keyText, ruleObj, in _), "get cssText"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        var styleObj = BuildStyleObject(ParseStyle(CssSerializer.Serialize(styleRule.Declarations)), ruleObj);
+        var styleObj = Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(ParseStyle(CssSerializer.Serialize(styleRule.Declarations)), ruleObj);
         ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
         return ruleObj;
@@ -265,7 +265,7 @@ public sealed partial class DomBridge
             {
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleMap = ParseStyle(declarations);
-                var styleObj = BuildStyleObject(styleMap, ruleObj);
+                var styleObj = Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
@@ -322,7 +322,7 @@ public sealed partial class DomBridge
             var map = block is null
                 ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 : ParseStyle(CssSerializer.Serialize(block));
-            return BuildStyleObject(map, ruleObj);
+            return Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(map, ruleObj);
         }
 
         switch (kind)
@@ -637,7 +637,7 @@ public sealed partial class DomBridge
             {
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleMap = ParseStyle(declarations);
-                var styleObj = BuildStyleObject(styleMap, ruleObj);
+                var styleObj = Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
                 ruleObj.FastAddProperty((KeyString)"cssText",
                     new JSFunction((in _) => JsStyleSheetsGetCssText019Core(styleObj, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -836,7 +836,7 @@ public sealed partial class DomBridge
                 var selectorText = ruleText[5..braceOpen].Trim();
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleMap = ParseStyle(declarations);
-                var styleObj = BuildStyleObject(styleMap, ruleObj);
+                var styleObj = Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
 
                 ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
                 ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -865,7 +865,7 @@ public sealed partial class DomBridge
                 {
                     var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                     var styleMap = ParseStyle(declarations);
-                    var styleObj = BuildStyleObject(styleMap, ruleObj);
+                    var styleObj = Dom.Features.StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
                     ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                 }
             }
