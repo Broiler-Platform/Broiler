@@ -1742,12 +1742,42 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
     `RenderHtmlFileBitmapPublic` pipeline (bridge in native mode does **not** bake — see
     `NativeAnchorBridgeModeTests` — so the correct placement is the engine's), and that the baked and
     native paths agree pixel-wise. Cli `~NativeAnchor` (3) and `~Anchor|~PositionArea` (13) green.
+- **P5.8d.2b — native used-SIZE (first expansion) — COMPLETED** 2026-07-14 (Broiler.Layout only,
+  additive, behind the default-OFF flag). The P5.8c pass was reposition-only (the box's already-laid-out
+  border-box size was kept). It now also applies the grid-derived used **size** — fill-the-cell (the
+  `place-self: stretch` default), an explicit length, or a percentage of the cell — to the boxes the
+  engine can size without re-flowing a subtree: a **childless**, **content-box**, no-percentage-box-props
+  `position-area` box (`CanApplyNativeAnchorSize` in `Engine/CssBox.Anchor.cs`). For such a box
+  `TryResolvePositionAreaTarget` feeds the box's authored CSS width/height into
+  `PositionAreaGrid.ResolveElementBox` (bridge-matching `ParseSizeComponent`, so px/`%`/`auto` map exactly
+  as the bridge's `TryParsePx`/`TryParsePercent`), and `ApplyNativeAnchorPlacement` sets the border box =
+  content size + font-free padding/border (`NativeBorderPx`/`NativePaddingPx` mirror the bridge's
+  `ResolveBorderWidth` thin/medium/thick→1/3/4 map, avoiding the layout font the `Actual*` getters
+  resolve). Every other box (childful, `box-sizing:border-box`, percentage margin/padding/inset) keeps the
+  reposition-only behaviour and stays on the bridge bake path. Same box *set* flows to the engine as
+  before (the bridge's `IsMvpNativeAnchorBox` gate is unchanged); the engine just sizes the childless ones
+  to match the baked path instead of keeping their flow size. Tests: `Broiler.Layout.Tests/
+  NativeAnchorPlacementTests.cs` grows to 19 (fill-cell, percentage-of-cell, content+padding border box,
+  childful/border-box reposition-only fallbacks, `ParseSizeComponent` parity theory) — needing a minimal
+  fake `ILayoutEnvironment`/`ILayoutFont` so the synthetic block CBs can resolve Actual border widths.
+  Regression check: full `Broiler.Layout.Tests` (127) green; the css-anchor-position **pixel** subset
+  reproduces the identical **8-fail / 31-pass** set both default-off (byte-identical) and lever-on (no
+  passing test regresses); `NativeAnchorPlacementWptTests` (bridge/engine paths agree pixel-wise) green in
+  isolation. Also fixed a pre-existing arch-guard fail from the P5.8d.2b IVT addition
+  (`LayoutArchitectureTests.Internal_Consumers_Are_Explicit_And_Minimal` did not list `Broiler.Wpt`). One
+  observed non-blocker: lever-on `position-area-scrolling-002` (already failing) drops 97.7 %→68.5 % —
+  native sizing amplifies the deferred scrolled-anchor placement divergence on an admitted box; it does
+  not change the fail *set* and production is default-off. The scroll case is excluded from correctness
+  until the scroll-simulation expansion.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
-  default-off until each feature is on the engine path — percentage box props → box-sizing → inline-CB
+  default-off until each feature is on the engine path — ~~percentage box props~~ → box-sizing → inline-CB
   promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets
-  → position-try. Each is currently excluded by `IsMvpNativeAnchorBox` and stays on the bridge path
-  (baked + `position-area: none`), so enabling the lever globally is already safe (proven above); the
-  expansions widen the MVP gate one feature at a time as the engine grows to reproduce them.
+  → position-try. (Childless auto/explicit/percentage sizing now lands natively — see the size expansion
+  above; percentage *box props* — margin/padding/inset resolved against the cell — and `box-sizing` are
+  still bridge-baked.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
+  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
+  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
+  the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 

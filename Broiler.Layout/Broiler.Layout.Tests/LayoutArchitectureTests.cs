@@ -51,6 +51,9 @@ public sealed class LayoutArchitectureTests
                 "Broiler.HTML.Dom",
                 "Broiler.HTML.Orchestration",
                 "Broiler.Layout.Tests",
+                // The WPT runner toggles NativeAnchorPlacement.Enabled around the final
+                // render for the Phase 5 native anchor-placement cutover (P5.8d.2b).
+                "Broiler.Wpt",
             ],
             friends);
     }
