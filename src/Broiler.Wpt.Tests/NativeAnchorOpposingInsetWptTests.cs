@@ -4,28 +4,17 @@ using Broiler.HTML.Image;
 namespace Broiler.Wpt.Tests;
 
 /// <summary>
-/// End-to-end proof of the Phase 5 native anchor-placement cutover (P5.8d.2b) through
-/// the full WPT render pipeline (<see cref="WptTestRunner.RenderHtmlFileBitmapPublic"/>:
-/// parse → DomBridge script/anchor resolution → serialize → engine layout → raster).
+/// End-to-end proof of native opposing-inset sizing (P5.8d.2b) through the full WPT render
+/// pipeline. With the lever on, the bridge does not pre-bake a childless box that has
+/// <c>anchor()</c> on both insets of an axis (auto length); the Broiler.Layout engine sizes
+/// it to span between the resolved insets. The lever-off (baked) path lands the same box.
 ///
-/// With the runner's <see cref="WptTestRunner.NativeAnchorPlacement"/> lever on, the
-/// bridge does <em>not</em> pre-bake an MVP-subset <c>position-area</c> box (proven at
-/// the bridge level by <c>NativeAnchorBridgeModeTests</c> — the CSS survives
-/// serialization), yet the box is still positioned in the correct grid cell: that
-/// placement is the Broiler.Layout engine's post-pass. The same fixture with the lever
-/// off (the bridge pre-bakes) lands in the same cell, so the two paths agree.
-///
-/// Fixture (mirrors the P5.8d.1 pipeline test): a 200×200 <c>position:relative</c>
-/// containing block; a uniquely-named anchor <c>--a</c> (20×20 at (40,40), so its
-/// right/bottom edge is (60,60)); and a 30×30 red target with
-/// <c>position-area: bottom right</c> anchored to <c>--a</c>. The bottom-right cell is
-/// [60..200]×[60..200] and End alignment puts the 30×30 box at the cell start — so the
-/// red box occupies (60,60)–(89,89). This is strict MVP: an explicit uniquely-named
-/// anchor, a non-inline containing block, no scroll container, and no
-/// <c>position-try</c>/<c>anchor()</c>.
+/// Fixture: a 200×200 <c>position:relative</c> containing block; a transparent anchor
+/// <c>--a</c> (50×30 at (60,50)); and a red target that anchors all four insets to it with
+/// auto width/height → the red box occupies (60,50)–(109,79).
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
-public class NativeAnchorPlacementWptTests : IDisposable
+public class NativeAnchorOpposingInsetWptTests : IDisposable
 {
     private readonly bool _previousLever = WptTestRunner.NativeAnchorPlacement;
 
@@ -39,8 +28,8 @@ public class NativeAnchorPlacementWptTests : IDisposable
 <style>
   body { margin: 0; }
   #cb { position: relative; width: 200px; height: 200px; }
-  #anchor { position: absolute; left: 40px; top: 40px; width: 20px; height: 20px; anchor-name: --a; }
-  #target { position: absolute; width: 30px; height: 30px; position-anchor: --a; position-area: bottom right; background: #ff0000; }
+  #anchor { position: absolute; left: 60px; top: 50px; width: 50px; height: 30px; anchor-name: --a; }
+  #target { position: absolute; left: anchor(--a left); right: anchor(--a right); top: anchor(--a top); bottom: anchor(--a bottom); background: #ff0000; }
 </style>
 <div id=""cb""><div id=""anchor""></div><div id=""target""></div></div>";
 
@@ -66,7 +55,7 @@ public class NativeAnchorPlacementWptTests : IDisposable
     private static (int x0, int y0, int x1, int y1, int count) Render(bool nativeAnchor)
     {
         WptTestRunner.NativeAnchorPlacement = nativeAnchor;
-        string dir = Path.Combine(Path.GetTempPath(), "broiler-native-anchor-" + System.Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(Path.GetTempPath(), "broiler-native-anchor-opp-" + System.Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
@@ -84,22 +73,20 @@ public class NativeAnchorPlacementWptTests : IDisposable
     }
 
     [Fact]
-    public void NativeLeverOn_EnginePlacesMvpPositionAreaBox_InBottomRightCell()
+    public void NativeLeverOn_EngineSizesBoxToSpanAnchor()
     {
         var red = Render(nativeAnchor: true);
 
         Assert.True(red.count > 0, "red target box not painted under the native lever.");
         Assert.True(System.Math.Abs(red.x0 - 60) <= 2, $"red left={red.x0}, expected ~60.");
-        Assert.True(System.Math.Abs(red.y0 - 60) <= 2, $"red top={red.y0}, expected ~60.");
-        Assert.True(System.Math.Abs(red.x1 - 89) <= 2, $"red right={red.x1}, expected ~89.");
-        Assert.True(System.Math.Abs(red.y1 - 89) <= 2, $"red bottom={red.y1}, expected ~89.");
+        Assert.True(System.Math.Abs(red.y0 - 50) <= 2, $"red top={red.y0}, expected ~50.");
+        Assert.True(System.Math.Abs(red.x1 - 109) <= 2, $"red right={red.x1}, expected ~109 (width 50).");
+        Assert.True(System.Math.Abs(red.y1 - 79) <= 2, $"red bottom={red.y1}, expected ~79 (height 30).");
     }
 
     [Fact]
-    public void BridgeAndEnginePaths_Agree_OnMvpPositionAreaBox()
+    public void BridgeAndEnginePaths_Agree_OnOpposingInsetBox()
     {
-        // Lever off → the bridge pre-bakes; lever on → the engine post-pass places.
-        // Both must land the box in the same cell (native placement parity).
         var baked = Render(nativeAnchor: false);
         var native = Render(nativeAnchor: true);
 

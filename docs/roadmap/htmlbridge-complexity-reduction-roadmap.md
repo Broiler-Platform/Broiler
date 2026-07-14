@@ -1841,24 +1841,147 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   by **1.26 %**. So the residual is Broiler-vs-Chromium anti-aliasing/border fidelity (a separate,
   pre-existing rendering concern), and the anchor geometry is exact. `percents-001` will not cross the 99 %
   pixel threshold from anchor work alone.
+- **P5.8d.2b — inline containing-block promotion (sixth expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; bridge only, additive, default-off). A
+  `position-area` box whose containing block is a **relatively-positioned inline element** (a
+  `position:relative` `<span>`) now goes native. The engine already resolves this case correctly: an abspos
+  box inside an inline CB is placed against the inline element's real line-box bounding box
+  (`CssBox.GetInlineBoundingBox`, CSS2.1 §10.1) — the very thing the bridge's estimator could **not** do,
+  which is why the bridge's `PromoteAbsPosFromInlineCBs` DOM-moves abspos children out of inline CBs (~250
+  lines of inline-flow-offset estimation) on the baked path. So this expansion is bridge-gate-only, no
+  Broiler.Layout change:
+  - **Gate.** `IsMvpNativeAnchorBox` no longer excludes an inline CB. It still excludes an inline CB that is
+    **itself** `position:absolute`/`fixed`: the engine blockifies such an element (CSS2.1 §9.7 forces
+    `display:block`) so it treats that CB as a *block*, while the bridge's `IsInlineElement` still treats it
+    as inline — the two disagree on the CB extent, so that case stays baked until reconciled (this is exactly
+    `position-area-abs-inline-container`, kept on the bridge path).
+  - **Promotion skip.** In native mode `CollectInlineCBPromotions` skips the **whole** inline CB when it
+    directly holds a native-MVP `position-area` box (`InlineCbHasNativeAnchorBox` →
+    `IsNativeMvpPositionAreaBox`, a reusable "would native mode hand this off?" predicate): the engine lays
+    out the intact anchor+target subtree, so DOM-moving any of that inline CB's abspos children would tear
+    the anchor out of the target's containing block and break the native placement. Other inline CBs still
+    promote as before.
+  Tests: `Broiler.Cli.Tests/NativeAnchorInlineCbPipelineTests.cs` (real parse→cascade→layout pipeline: the
+  engine places the abspos anchor at its inset position inside a `position:relative` inline CB — `(100,25)`,
+  not the inline-flow position — and the `bottom right` cell at the grid corner `(300,75)` 100×25, matching
+  the baked `AnchorInlineContainingBlockTests` corner; a flag-off control pins the placement to the
+  post-pass). Regression check: **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged
+  (7-fail / 32-pass)**, the only corpus movement being `position-area-inline-container` 83.30 %→83.10 %
+  (−0.2 %, run noise — that test was corrupted by a then-unrelated `&nbsp;`-not-decoded rendering bug that
+  rendered the entity as literal text). `position-area-abs-inline-container` is unchanged (kept baked by the
+  abspos-inline exception). No passing test regresses on either path; the baked-path
+  `AnchorInlineContainingBlockTests` (26) and native WPT/scope suites stay green. Validation is therefore the
+  exact-geometry pipeline test plus no-regression (the percentage-box-props precedent). The
+  `abs-inline-container` bridge/engine blockification disagreement is the follow-up before that test can also
+  go native.
+  - **Follow-up — the `&nbsp;`-not-decoded rendering bug is now FIXED** (2026-07-14; `Broiler.DOM`
+    submodule, `HtmlTokenizer`). Root cause: the shared WHATWG tokenizer emitted character data verbatim, so
+    named/decimal/hex character references (`&nbsp;`, `&#160;`, `&#xA0;`) stayed literal in the DOM; the
+    serializer then HTML-encoded them, so the bridge→serialize→reparse render path double-encoded to
+    `&amp;nbsp;` and painted the literal entity. The tokenizer now decodes references in Data-state character
+    tokens (raw-text `<script>`/`<style>` stay verbatim; attribute decoding left to the downstream
+    `Broiler.HTML` `HtmlParser` to avoid a double-decode). Impact on the inline-container family:
+    `position-area-inline-container` 83 %→**95.8 %** (lever-on) / 91.9 % (default-off),
+    `position-area-abs-inline-container` 88 %→92 % — both substantially improved (the residual gap is inline-CB
+    position-area geometry precision, not the entity bug). Zero regressions: full `Broiler.Cli.Tests` diffed
+    stash-vs-change is **0 new failures, +1 fixed** (`Acid3_Score_Position_With_Negative_Margin`); the
+    css-anchor-position subset passing set is unchanged both modes. Regression test:
+    `Broiler.Cli.Tests/HtmlEntityDecodingTests.cs`.
+- **P5.8d.2b — `anchor()` inset placement (seventh expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). A box positioned by `anchor()` functions in its physical insets (`left`/`right`/`top`/
+  `bottom`) rather than `position-area` now goes native — the engine equivalent of the bridge's
+  `ResolveAnchorFunctions` pre-bake, and the first native path that is **not** driven by `position-area`.
+  The raw `anchor()` inset survives the cascade onto `CssBox.Left`/`Top`/`Right`/`Bottom` (verified by probe),
+  so:
+  - **Engine.** `CssBox.TryApplyAnchorInsetPlacement` (in `CssBox.Anchor.cs`, run from the root post-pass
+    when `PositionArea == "none"`) resolves each anchor() inset against the named anchor's document-absolute
+    rect converted to the CB frame, via the already-promoted `AnchorGeometry.ResolveEdge` (mirroring the
+    bridge's bake exactly), then places the box's document-absolute margin edge at the resolved inset and
+    offsets the border box there. MVP: reposition-only (laid-out size kept), at most one inset per axis
+    (opposing-inset sizing needs a re-flow and stays baked); a plain length or a percentage on the other axis
+    resolves normally. `AnchorRegistry` gains a public `TryResolveRect` (scoped rect getter) so the caller can
+    build the CB-frame inset itself. Scope binding reuses the position-area predicate.
+  - **Bridge.** `ResolveAnchorFunctions` skips baking (`hasAnchorRef = false`) for a native-MVP anchor()-inset
+    box (`IsMvpNativeAnchorInsetBox`: every anchor() is in a physical inset naming a registered accessible
+    anchor; no `anchor-size()`; single inset per axis; not fixed/modal; no intervening scroll offset — the
+    engine uses no scroll adjustment; no `position-try`), leaving the `anchor()` CSS to survive to the engine.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +5 (left/top, right/bottom far-edge, mixed
+  anchor+length, implicit `position-anchor`, unregistered→fallback); `Broiler.Cli.Tests/
+  NativeAnchorInsetPipelineTests.cs` (real pipeline: a `left/top: anchor(--a right/bottom)` box lands at the
+  anchor's right/bottom edge); `Broiler.Wpt.Tests/NativeAnchorInsetWptTests.cs` (full render pipeline: engine
+  places it, baked & native paths agree pixel-wise). Regression check: full `Broiler.Layout.Tests` (139)
+  green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged (7-fail / 32-pass) with zero
+  per-test movement.** As with the percentage-box-props expansion, **no corpus pixel test exercises the
+  anchor()-inset MVP path** (the corpus's anchor() tests are testharness/JS — unaffected by the render-only
+  lever — or gate-excluded), so validation is the exact-geometry unit + pipeline + full-render tests plus
+  no-regression.
+- **P5.8d.2b — `anchor-size()` sizing (eighth expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). Completes the `anchor()` function family (insets + sizing). A **childless** box whose
+  `width`/`height` use `anchor-size()` is now sized natively by the engine (the equivalent of the bridge's
+  `ResolveAnchorSizeFunctions`). The raw `anchor-size()` value survives onto `CssBox.Width`/`Height`, so:
+  - **Engine.** `CssBox.TryApplyNativeAnchorSizing` (run from the post-pass when `PositionArea == "none"`,
+    *before* the anchor()-inset placement so a repositioning uses the resolved size) resolves each
+    `anchor-size()` to the named anchor's dimension via `AnchorRegistry.ResolveAnchorSize` (dimensions are
+    frame-independent, so no CB conversion), then sets the used border box per `box-sizing` (content+pad/border,
+    or border-box clamped) with the font-free `NativeBorderPx`/`NativePaddingPx` helpers, growing the box in
+    place from its laid-out origin. Childless only (a re-flow would be needed otherwise).
+  - **Bridge.** `ResolveAnchorFunctions` skips baking the `anchor-size()` (`IsMvpNativeAnchorSizeBox`: an
+    absolutely-positioned childless box; `anchor-size()` only in `width`/`height` naming a registered
+    accessible anchor; no `anchor()` inset — the combined case stays baked; no `position-area`; no right/bottom
+    inset; **no CSS `zoom`**; not modal; no `position-try`), leaving the CSS for the engine.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +6 (width+height, width-only, content-box
+  pad/border, border-box, implicit `position-anchor`, childful fallback); `Broiler.Cli.Tests/
+  NativeAnchorSizePipelineTests.cs` (real pipeline sizes the box to the anchor's 50×70);
+  `Broiler.Wpt.Tests/NativeAnchorSizeWptTests.cs` (full render; baked & native agree). Regression check: full
+  `Broiler.Layout.Tests` (145) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged
+  (7-fail / 32-pass) with zero per-test movement.** The two corpus `anchor-size()` pixel tests stay baked and
+  **pass** as before — `anchor-size-css-zoom` (excluded by the `zoom` gate) and `transform-005` (excluded by
+  the `position-area` gate; it combines `anchor-size()` with `position-area` and 3D transforms) — so the clean
+  `anchor-size()` path is unit + pipeline + full-render validated with no corpus movement. (Also serialized
+  the three native-anchor WPT render test classes into one `[Collection("NativeAnchorWpt")]`: they toggle the
+  process-wide `WptTestRunner.NativeAnchorPlacement` static around a render, so running them in parallel let
+  one class's baked render stomp another's native render — a shared-static test race, not a product bug.)
+- **P5.8d.2b — opposing-inset sizing (ninth expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, additive, default-off). Directly
+  completes the `anchor()`-insets feature: when both physical insets of an axis are present (at least one an
+  `anchor()`), a **childless** box with an **auto** length on that axis is now *sized* to span between the two
+  resolved insets, not just repositioned (CSS 2.1 §10.3.7/§10.6.4: the border box fills the inset-modified
+  containing block minus margins). `CssBox.TryApplyAnchorInsetPlacement` grows the box from the resolved size
+  before positioning at the start inset; a childful box (needs a re-flow) or an explicit length
+  (over-constrained) keeps the reposition-only behaviour. The bridge's `IsMvpNativeAnchorInsetBox` opposing-inset
+  exclusion is relaxed to admit exactly that childless-and-auto case (via `ChildElements`/`GetElementTextContent`
+  + `IsAutoLength`); every other opposing-inset box stays baked. Tests: `Broiler.Layout.Tests/
+  NativeAnchorPlacementTests.cs` +5 (span left/right, span top/bottom, margins shrink the border box, explicit
+  width keeps size, childful keeps size); `Broiler.Cli.Tests/NativeAnchorOpposingInsetPipelineTests.cs` (real
+  pipeline: a four-inset box spans the anchor); `Broiler.Wpt.Tests/NativeAnchorOpposingInsetWptTests.cs` (full
+  render). Regression check: full `Broiler.Layout.Tests` (150) green; **default-off byte-identical (8-fail /
+  31-pass)**; **lever-on 7-fail / 32-pass, passing set unchanged, with the FIRST corpus pixel improvement of
+  the anchor()-function expansions:** `anchor-position-borders-002` (a testharness test whose `.target` boxes are
+  auto-size, four-inset `anchor()` spanners) improves **99.38 %→99.99 %** — those targets now size natively
+  (more precisely than the bridge estimator) — with no other test moving and no regression.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
-  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → inline-CB promotion (DOM moves) →
-  scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
+  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
+  CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → abspos-inline CB
+  (blockification reconciliation) → scroll simulation → `position-visibility` → dialog/backdrop → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
-  props, shared-name scope resolution, AND writing-mode percentage basis now land natively — see the five
-  expansions above.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
-  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
-  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as the
-  engine grows to reproduce them.
+  props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
+  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, AND opposing-inset sizing now land
+  natively — see the nine expansions above.) Each remaining feature is currently excluded by
+  `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`)
+  and stays on the bridge path (baked + `position-area: none`), so enabling the lever globally is already safe
+  (proven above); the expansions widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
-The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; but
-inline-CB promotion with DOM moves, scroll simulation, `position-visibility`, dialog/backdrop,
-`anchor-scope`/scoping) are the hard part of the later cutover expansions: the engine operates on boxes,
-not the DOM, so these are re-implementations, not moves — which is why the MVP subset deliberately
-excludes them.
+The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree, and the
+relatively-positioned inline-CB case now handled by the engine's real §10.1 inline-box geometry rather
+than the bridge's DOM-move estimator; but abspos-inline blockification reconciliation, scroll simulation,
+`position-visibility`, dialog/backdrop, `anchor-scope`/scoping) are the hard part of the later cutover
+expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not moves — which
+is why the MVP subset deliberately excludes them.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

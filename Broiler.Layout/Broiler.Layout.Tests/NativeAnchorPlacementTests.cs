@@ -338,6 +338,229 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(60, targetB.Location.Y, 3);
     }
 
+    // ------------------------------------------------------------------
+    // anchor() inset placement (P5.8d.2b anchor()-insets expansion)
+    // ------------------------------------------------------------------
+
+    // CB 200×200 at origin; anchor --a is a 20×20 box at (40,40) → right/bottom 60,
+    // left/top 40. Returns a childless 30×30 abspos target at the origin for the caller
+    // to give anchor() insets.
+    private static (CssBox root, CssBox cb) AnchorInsetFixture(out CssBox target)
+    {
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        var cb = Box(root, new PointF(0, 0), new SizeF(200, 200));
+        cb.Position = "relative";
+        cb.Display = "block";
+        var anchor = Box(cb, new PointF(40, 40), new SizeF(20, 20));
+        anchor.AnchorName = "--a";
+        target = Box(cb, new PointF(0, 0), new SizeF(30, 30));
+        target.Position = "absolute";
+        return (root, cb);
+    }
+
+    private static void RunPass(CssBox root)
+    {
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+    }
+
+    [Fact]
+    public void AnchorInset_LeftTop_PlacesMarginEdgeAtAnchorEdges()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a right)";  // box left edge = anchor right = 60
+        target.Top = "anchor(--a bottom)";  // box top edge  = anchor bottom = 60
+        RunPass(root);
+        Assert.Equal(60, target.Location.X, 3);
+        Assert.Equal(60, target.Location.Y, 3);
+        Assert.Equal(30, target.Size.Width, 3);  // reposition-only: size kept
+        Assert.Equal(30, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_RightBottom_PlacesFarMarginEdgeAtAnchorEdges()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        // right: anchor(--a left) → box RIGHT edge lands on the anchor's left edge (40),
+        // so with a 30-wide box the left edge is at 10. Likewise bottom → box bottom at 40.
+        target.Right = "anchor(--a left)";
+        target.Bottom = "anchor(--a top)";
+        RunPass(root);
+        Assert.Equal(10, target.Location.X, 3);   // 40 - 30
+        Assert.Equal(10, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_MixedAnchorAndPlainLength_ResolvesEach()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a right)";  // 60
+        target.Top = "15px";                // plain length → box top edge at 15
+        RunPass(root);
+        Assert.Equal(60, target.Location.X, 3);
+        Assert.Equal(15, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_ImplicitAnchor_UsesPositionAnchor()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.PositionAnchor = "--a";
+        target.Left = "anchor(right)";   // no name in the function → position-anchor --a
+        target.Top = "anchor(bottom)";
+        RunPass(root);
+        Assert.Equal(60, target.Location.X, 3);
+        Assert.Equal(60, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_UnregisteredAnchor_LeavesBoxPut()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--missing right)";
+        target.Top = "anchor(--missing bottom)";
+        RunPass(root);
+        // Fallback 0px → box left/top margin edge at the CB origin (0,0), not the anchor.
+        Assert.Equal(0, target.Location.X, 3);
+        Assert.Equal(0, target.Location.Y, 3);
+    }
+
+    // ------------------------------------------------------------------
+    // opposing-inset sizing (P5.8d.2b)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AnchorInset_OpposingLeftRight_SizesBoxBetweenInsets()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: left 40, right 60
+        target.Left = "anchor(--a left)";    // box left edge at 40
+        target.Right = "anchor(--a right)";  // box right edge at 60
+        // Width auto (default) → the two insets size it: 60 - 40 = 20.
+        RunPass(root);
+        Assert.Equal(40, target.Location.X, 3);
+        Assert.Equal(20, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingTopBottom_SizesBoxBetweenInsets()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: top 40, bottom 60
+        target.Top = "anchor(--a top)";
+        target.Bottom = "anchor(--a bottom)";
+        RunPass(root);
+        Assert.Equal(40, target.Location.Y, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingWithMargins_ShrinksBorderBox()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";    // 40
+        target.Right = "anchor(--a right)";  // right inset resolves so margin box spans 40..60
+        target.MarginLeft = "3px";
+        target.MarginRight = "5px";
+        RunPass(root);
+        // border box = (60-40) - 3 - 5 = 12; positioned at 40 + marginLeft 3 = 43.
+        Assert.Equal(43, target.Location.X, 3);
+        Assert.Equal(12, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingButExplicitWidth_KeepsWidth()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";
+        target.Right = "anchor(--a right)";
+        target.Width = "30px";  // explicit → over-constrained; reposition-only by left.
+        RunPass(root);
+        Assert.Equal(40, target.Location.X, 3);
+        Assert.Equal(30, target.Size.Width, 3);  // size kept
+    }
+
+    [Fact]
+    public void AnchorInset_OpposingButChildful_KeepsSize()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Left = "anchor(--a left)";
+        target.Right = "anchor(--a right)";
+        _ = Box(target, new PointF(0, 0), new SizeF(10, 10));  // childful → no resize
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);  // laid-out 30 kept (a re-flow would be needed)
+    }
+
+    // ------------------------------------------------------------------
+    // anchor-size() sizing (P5.8d.2b anchor-size() expansion)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AnchorSize_WidthAndHeight_SizeBoxToAnchorDimensions()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // anchor --a is 20×20
+        target.Width = "anchor-size(--a width)";
+        target.Height = "anchor-size(--a height)";
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void AnchorSize_OnlyWidth_KeepsLaidOutHeight()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);  // laid-out 30×30
+        target.Width = "anchor-size(--a width)"; // 20
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(30, target.Size.Height, 3);  // height untouched
+    }
+
+    [Fact]
+    public void AnchorSize_ContentBox_AddsPaddingAndBorder()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)"; // content 20
+        target.PaddingLeft = "5px";
+        target.PaddingRight = "5px";
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);   // 20 + 5 + 5 border box
+    }
+
+    [Fact]
+    public void AnchorSize_BorderBox_UsesResolvedAsBorderBox()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)"; // 20
+        target.BoxSizing = "border-box";
+        target.PaddingLeft = "5px";
+        target.PaddingRight = "5px";
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);   // border box = resolved 20 (padding not added)
+    }
+
+    [Fact]
+    public void AnchorSize_ImplicitAnchor_UsesPositionAnchor()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.PositionAnchor = "--a";
+        target.Width = "anchor-size(width)";   // no name → position-anchor --a
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+    }
+
+    [Fact]
+    public void AnchorSize_ChildfulBox_KeepsLaidOutSize()
+    {
+        var (root, _) = AnchorInsetFixture(out var target);
+        target.Width = "anchor-size(--a width)";
+        _ = Box(target, new PointF(0, 0), new SizeF(10, 10));  // has a child → excluded
+        RunPass(root);
+        Assert.Equal(30, target.Size.Width, 3);  // unchanged (reposition/resize needs a re-flow)
+    }
+
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
     // childless absolutely-positioned "bottom right" target (30×30 at origin).
     private static (CssBox root, CssBox cb) FillCellFixture(out CssBox target)

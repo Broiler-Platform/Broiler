@@ -133,6 +133,17 @@ partial class CssBox
             box.OffsetLeft(target.Left - box.Location.X);
             box.OffsetTop(target.Top - box.Location.Y);
         }
+        else if (box.PositionArea == "none")
+        {
+            // anchor-size() sizing (P5.8d.2b anchor-size() expansion): size a childless box
+            // to the anchor's width/height first, so any anchor()-inset placement that
+            // follows repositions against the resolved size.
+            box.TryApplyNativeAnchorSizing(registry);
+            // anchor()/anchor-size() inset placement (P5.8d.2b anchor()-insets expansion):
+            // a box positioned by anchor() functions in its left/right/top/bottom rather
+            // than position-area.
+            box.TryApplyAnchorInsetPlacement(registry);
+        }
 
         foreach (var child in box.Boxes)
             ApplyNativeAnchorPlacement(child, registry);
@@ -373,5 +384,215 @@ partial class CssBox
         if (len.IsPercentage)
             return basis * len.Number;
         return len.Unit == CssUnit.Px ? len.Number : 0;
+    }
+
+    /// <summary>Whether a raw CSS value carries an <c>anchor-size()</c> function.</summary>
+    private static bool HasAnchorSize(string? value) =>
+        value != null && value.Contains("anchor-size(", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Sizes a childless box whose <c>width</c>/<c>height</c> use <c>anchor-size()</c> to the
+    /// named anchor's dimension (P5.8d.2b anchor-size() expansion) — the engine equivalent of
+    /// the bridge's <c>ResolveAnchorSizeFunctions</c> pre-bake. The resolved value is the used
+    /// content or border size per <c>box-sizing</c> (mirroring how the bridge writes the
+    /// property and the renderer applies it); the box is grown in place from its current
+    /// origin, so any following <c>anchor()</c>-inset placement repositions against the new
+    /// size. Returns <c>false</c> (size unchanged) when it is not an MVP anchor-size box or the
+    /// anchor is unregistered.
+    /// </summary>
+    internal bool TryApplyNativeAnchorSizing(AnchorRegistry registry)
+    {
+        if (Boxes.Count != 0 || Words.Count != 0)
+            return false; // childless only (a re-flow would be needed otherwise)
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        bool wAnchor = HasAnchorSize(Width), hAnchor = HasAnchorSize(Height);
+        if (!wAnchor && !hAnchor)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+
+        double? contentW = wAnchor ? ResolveAnchorSizeComponent(Width, registry, inScope) : null;
+        double? contentH = hAnchor ? ResolveAnchorSizeComponent(Height, registry, inScope) : null;
+        if (wAnchor && contentW is null) return false;
+        if (hAnchor && contentH is null) return false;
+
+        // box-sizing: content-box (default) — the resolved value is the content size, so add
+        // padding+border for the border box. border-box — it already is the border box (clamp
+        // to at least padding+border so the content stays non-negative). Font-free px, matching
+        // the bridge and the position-area sizing path.
+        bool borderBox = string.Equals(BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase);
+        double padBorderW =
+            NativeBorderPx(BorderLeftWidth, BorderLeftStyle) + NativePaddingPx(PaddingLeft)
+            + NativePaddingPx(PaddingRight) + NativeBorderPx(BorderRightWidth, BorderRightStyle);
+        double padBorderH =
+            NativeBorderPx(BorderTopWidth, BorderTopStyle) + NativePaddingPx(PaddingTop)
+            + NativePaddingPx(PaddingBottom) + NativeBorderPx(BorderBottomWidth, BorderBottomStyle);
+
+        float newW = Size.Width, newH = Size.Height;
+        if (contentW is double cw)
+            newW = (float)(borderBox ? System.Math.Max(cw, padBorderW) : cw + padBorderW);
+        if (contentH is double ch)
+            newH = (float)(borderBox ? System.Math.Max(ch, padBorderH) : ch + padBorderH);
+        Size = new System.Drawing.SizeF(newW, newH);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves a <c>width</c>/<c>height</c> value that uses <c>anchor-size()</c> to the
+    /// anchor's dimension (px). The default anchor is the box's <c>position-anchor</c> when the
+    /// function names none. Returns <c>null</c> for an unregistered anchor / non-numeric result.
+    /// </summary>
+    private double? ResolveAnchorSizeComponent(
+        string? value, AnchorRegistry registry, Func<object?, bool> inScope)
+    {
+        if (string.IsNullOrEmpty(value))
+            return null;
+        string rewritten = AnchorFunction.RewriteSize(value, r =>
+        {
+            string name = string.IsNullOrEmpty(r.Name) ? (PositionAnchor ?? string.Empty) : r.Name!;
+            if (string.IsNullOrEmpty(name) || name == "auto")
+                return "0px";
+            var size = registry.ResolveAnchorSize(name, r.Dimension, inScope);
+            return size is double s ? s.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px" : "0px";
+        });
+        var len = new CssLength(rewritten);
+        if (len.HasError || len.IsPercentage)
+            return null;
+        return len.Unit == CssUnit.Px ? len.Number : null;
+    }
+
+    /// <summary>Whether a CSS <c>width</c>/<c>height</c> value is <c>auto</c> (or unset), so an
+    /// opposing pair of insets determines the used size.</summary>
+    private static bool IsAutoLength(string? value) =>
+        string.IsNullOrEmpty(value) || value == CssConstants.Auto;
+
+    /// <summary>Whether a raw CSS inset value carries an <c>anchor()</c> function.</summary>
+    private static bool InsetHasAnchor(string? value) =>
+        value != null && value.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase)
+        && !value.Contains("anchor-size(", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Places a box positioned by <c>anchor()</c> functions in its physical insets
+    /// (<c>left</c>/<c>right</c>/<c>top</c>/<c>bottom</c>) — the engine equivalent of the
+    /// bridge's <c>ResolveAnchorFunctions</c> pre-bake (P5.8d.2b anchor()-insets expansion).
+    /// MVP: reposition-only (the box's already-laid-out size is kept), at most one inset per
+    /// axis (opposing-inset sizing stays on the bridge path). For each present inset it
+    /// resolves the anchor() reference to a CB-frame inset value via the promoted
+    /// <see cref="AnchorGeometry.ResolveEdge"/> (mirroring the bridge exactly), converts it to
+    /// the box's document-absolute margin edge, and offsets the border box there. Returns
+    /// <c>false</c> (leaves the box put) when it is not an anchor()-inset box or its anchor is
+    /// unregistered.
+    /// </summary>
+    internal bool TryApplyAnchorInsetPlacement(AnchorRegistry registry)
+    {
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        bool anchorLeft = InsetHasAnchor(Left), anchorRight = InsetHasAnchor(Right);
+        bool anchorTop = InsetHasAnchor(Top), anchorBottom = InsetHasAnchor(Bottom);
+        if (!anchorLeft && !anchorRight && !anchorTop && !anchorBottom)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        GetAbsoluteContainingBlockPaddingBox(cb, out double cbX, out double cbY, out double cbW, out double cbH);
+        // Scope resolution mirrors the position-area path: bind a shared anchor-name to the
+        // candidate inside the query's own containing block.
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+
+        double? leftInset = ResolveInsetMaybeAnchor(Left, AnchorInsetProperty.Left, registry, inScope, cbX, cbY, cbW, cbH);
+        double? rightInset = ResolveInsetMaybeAnchor(Right, AnchorInsetProperty.Right, registry, inScope, cbX, cbY, cbW, cbH);
+        double? topInset = ResolveInsetMaybeAnchor(Top, AnchorInsetProperty.Top, registry, inScope, cbX, cbY, cbW, cbH);
+        double? bottomInset = ResolveInsetMaybeAnchor(Bottom, AnchorInsetProperty.Bottom, registry, inScope, cbX, cbY, cbW, cbH);
+
+        // MVP requires an anchor-resolved inset to have succeeded on the anchored axis.
+        if (anchorLeft && leftInset is null) return false;
+        if (anchorRight && rightInset is null) return false;
+        if (anchorTop && topInset is null) return false;
+        if (anchorBottom && bottomInset is null) return false;
+
+        double bw = Size.Width, bh = Size.Height;
+
+        // Opposing-inset sizing (P5.8d.2b): both insets present on an axis + an auto length +
+        // a childless box → the used size is determined by the two insets (CSS 2.1 §10.3.7 /
+        // §10.6.4: the border box fills the inset-modified containing block minus margins).
+        // Childless-only so no subtree needs a re-flow; an explicit length keeps its size
+        // (the reposition-only branch below positions by the start inset). Grow from the
+        // resolved size before positioning.
+        bool childless = Boxes.Count == 0 && Words.Count == 0;
+        if (childless && leftInset is double li && rightInset is double ri && IsAutoLength(Width))
+            bw = System.Math.Max(0, cbW - li - ri - ActualMarginLeft - ActualMarginRight);
+        if (childless && topInset is double ti && bottomInset is double bi && IsAutoLength(Height))
+            bh = System.Math.Max(0, cbH - ti - bi - ActualMarginTop - ActualMarginBottom);
+        if (bw != Size.Width || bh != Size.Height)
+            Size = new System.Drawing.SizeF((float)bw, (float)bh);
+
+        // Horizontal: the inset is measured from the CB padding edge to the box's MARGIN
+        // edge; add/subtract the used margin to reach the border box. When only one inset is
+        // present the laid-out (or opposing-inset-resolved) size is kept. Prefer left; else right.
+        double? borderLeft = null;
+        if (leftInset is double L)
+            borderLeft = cbX + L + ActualMarginLeft;
+        else if (rightInset is double R)
+            borderLeft = cbX + cbW - R - ActualMarginRight - bw;
+
+        double? borderTop = null;
+        if (topInset is double T)
+            borderTop = cbY + T + ActualMarginTop;
+        else if (bottomInset is double B)
+            borderTop = cbY + cbH - B - ActualMarginBottom - bh;
+
+        if (borderLeft is double bl)
+            OffsetLeft((float)(bl - Location.X));
+        if (borderTop is double bt)
+            OffsetTop((float)(bt - Location.Y));
+        return borderLeft != null || borderTop != null;
+    }
+
+    /// <summary>
+    /// Resolves one physical inset that may contain an <c>anchor()</c> function to a CB-frame
+    /// length (px). A plain length/percentage resolves normally; an <c>anchor()</c> reference
+    /// resolves against the named anchor's document-absolute rect (converted to the CB frame)
+    /// via <see cref="AnchorGeometry.ResolveEdge"/> — the same math the bridge bakes. Returns
+    /// <c>null</c> for <c>auto</c>/absent/unparseable/unregistered, or a value the reposition
+    /// MVP does not model (e.g. a <c>calc()</c> the rewrite leaves non-numeric).
+    /// </summary>
+    private double? ResolveInsetMaybeAnchor(
+        string? value, AnchorInsetProperty property, AnchorRegistry registry,
+        Func<object?, bool> inScope, double cbX, double cbY, double cbW, double cbH)
+    {
+        if (string.IsNullOrEmpty(value) || value == CssConstants.Auto)
+            return null;
+
+        double basis = property is AnchorInsetProperty.Left or AnchorInsetProperty.Right ? cbW : cbH;
+
+        if (!InsetHasAnchor(value))
+        {
+            var plain = new CssLength(value);
+            if (plain.HasError) return null;
+            if (plain.IsPercentage) return basis * plain.Number;
+            return plain.Unit == CssUnit.Px ? plain.Number : null;
+        }
+
+        // Rewrite each anchor() reference to a px string against the resolved anchor rect,
+        // then parse the (now numeric) result. The default anchor is the box's
+        // position-anchor when the function names none.
+        string rewritten = AnchorFunction.Rewrite(value, r =>
+        {
+            string name = string.IsNullOrEmpty(r.Name) ? (PositionAnchor ?? string.Empty) : r.Name!;
+            if (string.IsNullOrEmpty(name) || name == "auto" ||
+                !registry.TryResolveRect(name, inScope, out var a))
+                return r.Fallback ?? "0px";
+
+            double v = AnchorGeometry.ResolveEdge(
+                a.Left - cbX, a.Top - cbY, a.Right - cbX, a.Bottom - cbY,
+                r.Side, 0, 0, property, cbW, cbH);
+            return v.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        });
+
+        var len = new CssLength(rewritten);
+        if (len.HasError) return null;
+        if (len.IsPercentage) return basis * len.Number;
+        return len.Unit == CssUnit.Px ? len.Number : null;
     }
 }
