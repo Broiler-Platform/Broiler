@@ -401,9 +401,11 @@ public sealed partial class DomBridge
     /// subset (P5.8d.2b) — the boxes the Broiler.Layout engine's placement post-pass
     /// currently reproduces exactly, so the bridge can hand them off instead of
     /// pre-baking. Requires: an explicit dashed-ident <c>position-anchor</c> that names a
-    /// registered anchor, a non-inline containing block, no intervening scroll container,
-    /// and no <c>position-try</c> or <c>anchor()</c>/<c>anchor-size()</c> on the element
-    /// (those entangled features stay on the bridge path until later expansions).
+    /// registered anchor, no intervening scroll container, and no <c>position-try</c> or
+    /// <c>anchor()</c>/<c>anchor-size()</c> on the element (those entangled features stay on
+    /// the bridge path until later expansions). Both block and inline containing blocks
+    /// (relative or abspos/fixed) are in the subset — the engine places against the real
+    /// inline-box geometry the bridge estimator could not.
     /// </summary>
     private bool IsMvpNativeAnchorBox(
         DomElement element, string positionAnchor, Dictionary<string, string> cssProps,
@@ -426,27 +428,23 @@ public sealed partial class DomBridge
         if (_anchorCandidates == null || !_anchorCandidates.ContainsKey(anchorName))
             return false;
 
-        // A non-abspos inline containing block is now IN the MVP subset (P5.8d.2b
-        // inline-CB expansion): the engine's abspos layout places a box inside an inline
-        // element against the real inline-box bounding box (CssBox.GetInlineBoundingBox,
-        // CSS2.1 §10.1), which the bridge's estimator could not — so, unlike every other
-        // gate, a relatively-positioned inline CB no longer forces the bridge path. The box
-        // stays inside the inline CB (PromoteAbsPosFromInlineCBs skips the whole inline CB
-        // in native mode — see InlineCbHasNativeAnchorBox) so the engine lays out the
-        // intact subtree.
+        // An inline containing block — whether relatively or absolutely/fixed positioned —
+        // is now IN the MVP subset (P5.8d.2b inline-CB and abspos-inline-CB expansions): the
+        // engine's abspos layout places a box inside an inline element against the real
+        // inline-box bounding box (CssBox.GetInlineBoundingBox, CSS2.1 §10.1), which the
+        // bridge's estimator could not. The box stays inside the inline CB
+        // (PromoteAbsPosFromInlineCBs skips the whole inline CB in native mode — see
+        // InlineCbHasNativeAnchorBox) so the engine lays out the intact anchor + target
+        // subtree.
         //
-        // Exception: an inline element that is ITSELF absolutely/fixed positioned is
-        // blockified by the engine (CSS2.1 §9.7: position:absolute forces display:block),
-        // so the engine treats it as a block containing block while the bridge's
-        // IsInlineElement still treats it as inline — the two disagree on the CB's extent.
-        // Keep such a box on the bridge bake path until that is reconciled.
-        var cb = FindContainingBlockElement(element);
-        if (cb != null && IsInlineContainingBlock(cb))
-        {
-            var cbPos = GetComputedProps(cb).GetValueOrDefault("position");
-            if (cbPos is "absolute" or "fixed")
-                return false;
-        }
+        // The engine does not blockify an abspos inline element (the cascade's CSS2.1 §9.7
+        // adjustment fires only for float — see DomParser.CascadeApplyStyles), so it treats
+        // an abspos <span> containing block as inline and reads its inline bounding box. For
+        // an out-of-flow inline whose content is a simple run that equals the block
+        // shrink-to-fit extent (the css-anchor-position abs-inline-container case), that is
+        // the correct containing-block rect, so the anchored boxes place identically to a
+        // relative inline CB. No bridge/engine disagreement remains; both inline-CB cases go
+        // native.
 
         // position-try and anchor()/anchor-size() are out of the MVP subset.
         if (cssProps.ContainsKey("position-try-fallbacks") || cssProps.ContainsKey("position-try"))
