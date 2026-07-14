@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Direct reference so the runner can set the engine's native anchor-placement
+         flag (Broiler.Layout.Engine.NativeAnchorPlacement) around the final render;
+         Broiler.Layout grants Broiler.Wpt InternalsVisibleTo for P5.8d.2b. -->
+    <ProjectReference Include="..\..\Broiler.Layout\Broiler.Layout\Broiler.Layout.csproj" />
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Core\Broiler.HtmlBridge.Core.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Dom\Broiler.HtmlBridge.Dom.csproj" />

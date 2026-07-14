@@ -18,12 +18,18 @@ public sealed partial class DomBridge
     /// <summary>
     /// Native anchor-placement mode (HtmlBridge complexity-reduction roadmap Phase 5
     /// item 3, P5.8d). Default off. When on, the bridge stops pre-baking
-    /// <c>position-area</c> into inline pixel styles and leaves the
-    /// <c>position-area</c>/<c>anchor-name</c>/<c>position-anchor</c> CSS intact, so the
+    /// <c>position-area</c> into inline pixel styles <em>for the MVP subset</em> —
+    /// a box with <c>position-area</c>, an explicit dashed-ident <c>position-anchor</c>,
+    /// a non-inline containing block, no intervening scroll container, and no
+    /// <c>position-try</c>/<c>anchor()</c> — leaving that box's
+    /// <c>position-area</c>/<c>anchor-name</c>/<c>position-anchor</c> CSS intact so the
     /// Broiler.Layout engine's anchor-placement post-pass (gated by
-    /// <c>Broiler.Layout.Engine.NativeAnchorPlacement.Enabled</c>) can place the boxes
-    /// natively during the final render. Internal: driven by the WPT runner lever and
-    /// tests; off in production until the cutover is complete.
+    /// <c>Broiler.Layout.Engine.NativeAnchorPlacement.Enabled</c>) places it during the
+    /// final render. Boxes outside the MVP subset stay on the bridge path: they are
+    /// baked as usual and marked <c>position-area: none</c> inline so the engine
+    /// post-pass skips them. When off, every box is baked exactly as today.
+    /// Internal: driven by the WPT runner lever and tests; off in production until the
+    /// cutover is complete.
     /// </summary>
     internal bool NativeAnchorPlacement { get; set; }
 
@@ -68,12 +74,12 @@ public sealed partial class DomBridge
         //    so IsAnchorVisibleForTarget is not affected by the new CB.
         var scrollContainersNeedingRelative = new HashSet<DomElement>();
         var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
-        // Native mode (P5.8d): skip position-area pre-baking so the value survives to
-        // the render and the Broiler.Layout engine places the box natively.
-        if (!NativeAnchorPlacement)
-            ResolvePositionAreaValues(
-                DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
-                deferredDomMoves);
+        // Native mode (P5.8d) makes this a per-element decision: MVP-subset boxes are
+        // left un-baked (their CSS survives for the engine post-pass) while every other
+        // box is baked as usual — see ResolvePositionAreaValues.
+        ResolvePositionAreaValues(
+            DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
+            deferredDomMoves);
 
         // 3a2. Resolve align-self/justify-self: anchor-center on elements
         //      that have position-anchor but no position-area.

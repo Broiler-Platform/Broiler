@@ -53,8 +53,17 @@ public sealed partial class DomBridge
 
                 // Compute the grid cell using the anchor's scroll container
                 // (or the element's own CB) as the containing block.
-                var rect = ComputePositionAreaRect(
-                    element, anchor, positionArea, scrollContainer);
+                //
+                // Native mode (P5.8d): for the MVP subset, skip pre-baking entirely
+                // (rect stays null) so the box's position-area/position-anchor CSS
+                // survives to the render and the Broiler.Layout engine's placement
+                // post-pass positions it natively. Every other box is baked below.
+                var rect =
+                    NativeAnchorPlacement &&
+                    IsMvpNativeAnchorBox(element, positionAnchor, cssProps, scrollContainer)
+                        ? null
+                        : ComputePositionAreaRect(
+                            element, anchor, positionArea, scrollContainer);
                 if (rect != null)
                 {
                     // Preserve position:fixed when the element already has it;
@@ -361,6 +370,13 @@ public sealed partial class DomBridge
                     // Store resolved offsets for JS offset property queries.
                     // Use border-box dimensions (matching offsetWidth/offsetHeight).
                     SetPositionAreaResolution(element, finalLeft, finalTop, borderBoxW, borderBoxH);
+
+                    // Native mode (P5.8d), non-MVP box: this box was just baked into
+                    // explicit inline pixel values, so neutralize position-area on it
+                    // (inline wins the cascade) to stop the engine's placement post-pass
+                    // from repositioning an already-placed box.
+                    if (NativeAnchorPlacement)
+                        InlineStyle(element)["position-area"] = "none";
                 }
             }
         }
@@ -378,6 +394,59 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(element))
             ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative,
                 deferredDomMoves);
+    }
+
+    /// <summary>
+    /// Decides whether a <c>position-area</c> box belongs to the native-placement MVP
+    /// subset (P5.8d.2b) — the boxes the Broiler.Layout engine's placement post-pass
+    /// currently reproduces exactly, so the bridge can hand them off instead of
+    /// pre-baking. Requires: an explicit dashed-ident <c>position-anchor</c>, a
+    /// non-inline containing block, no intervening scroll container, and no
+    /// <c>position-try</c> or <c>anchor()</c>/<c>anchor-size()</c> on the element
+    /// (those entangled features stay on the bridge path until later expansions).
+    /// </summary>
+    private bool IsMvpNativeAnchorBox(
+        DomElement element, string positionAnchor, Dictionary<string, string> cssProps,
+        DomElement? scrollContainer)
+    {
+        // No intervening scroll container (the anchor's scroll container is not this
+        // box's containing block).
+        if (scrollContainer != null)
+            return false;
+
+        // An explicit, named anchor — a dashed-ident like `--a`, not the default `auto`.
+        var anchorName = positionAnchor.Trim();
+        if (!anchorName.StartsWith("--", StringComparison.Ordinal))
+            return false;
+
+        // A *uniquely*-named anchor. The engine's AnchorRegistry is a flat,
+        // ordinal last-wins name→rect map with no scope awareness, so when several
+        // elements share an anchor-name the box must stay on the bridge's scoped
+        // resolution path (ResolveAnchorForElement binds within the query's own
+        // containing block). _anchorCandidates is built (BuildAnchorRegistry) before
+        // this pass, so its per-name candidate count is available here.
+        if (_anchorCandidates == null ||
+            !_anchorCandidates.TryGetValue(anchorName, out var candidates) ||
+            candidates.Count != 1)
+            return false;
+
+        // A non-inline containing block (the engine cannot yet promote abs-pos boxes
+        // out of inline containing blocks the way the bridge does).
+        var cb = FindContainingBlockElement(element);
+        if (cb != null && IsInlineContainingBlock(cb))
+            return false;
+
+        // position-try and anchor()/anchor-size() are out of the MVP subset.
+        if (cssProps.ContainsKey("position-try-fallbacks") || cssProps.ContainsKey("position-try"))
+            return false;
+        foreach (var value in cssProps.Values)
+        {
+            if (value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
+                value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>
