@@ -1,4 +1,3 @@
-using System.Text;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Array;
@@ -293,100 +292,20 @@ internal sealed partial class TraversalBinding
 
     private static JSValue RangeToString(DomRange state, in Arguments a)
     {
-        var sb = new StringBuilder();
-        // Handle case where range is within a single text/comment node
-        if (ReferenceEquals(state.StartContainer, state.EndContainer) && (DomBridge.IsText(state.StartContainer) || DomBridge.IsComment(state.StartContainer)))
+        // A range within a single Comment node stringifies to the selected substring — a deliberate
+        // deviation from the DOM §4.5 stringifier, which is Text-only (a Comment range would yield
+        // ""), retained for Acid3 Test 11. Every other case delegates to the canonical spec-correct
+        // Range stringifier (Broiler.Dom.DomRange.ToString), which the bridge's former CollectRangeText
+        // copy shadowed — and shadowed with a bug: it omitted the end-container Text node's head.
+        if (ReferenceEquals(state.StartContainer, state.EndContainer) && DomBridge.IsComment(state.StartContainer))
         {
             var text = DomBridge.BridgeText(state.StartContainer);
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));
             var e = Math.Max(s, Math.Min(state.EndOffset, text.Length));
-            sb.Append(text, s, e - s);
-        }
-        else
-        {
-            // Cross-node range: collect text with proper offset handling
-            CollectRangeText(sb, state.StartContainer, state.StartOffset, state.EndContainer, state.EndOffset);
+            return new JSString(text.Substring(s, e - s));
         }
 
-        return new JSString(sb.ToString());
-    }
-
-    // -------- Range content helpers --------
-
-    /// <summary>
-    /// Collects text content from a range that spans across nodes.
-    /// Handles start/end offset boundaries properly for text nodes.
-    /// </summary>
-    private static void CollectRangeText(StringBuilder sb, DomNode startContainer, int startOffset, DomNode endContainer, int endOffset)
-    {
-        if (ReferenceEquals(startContainer, endContainer))
-        {
-            // Same container
-            if (DomBridge.IsText(startContainer))
-            {
-                var text = DomBridge.BridgeText(startContainer);
-                var s = Math.Max(0, Math.Min(startOffset, text.Length));
-                var e = Math.Max(s, Math.Min(endOffset, text.Length));
-                sb.Append(text, s, e - s);
-            }
-            else
-            {
-                // Element container — collect text from children between offsets
-                for (var i = startOffset; i < Math.Min(endOffset, startContainer.ChildNodes.Count); i++)
-                    DomBridge.CollectTextContent(DomBridge.ChildAt(startContainer, i), sb);
-            }
-            return;
-        }
-
-        // Start container: collect from startOffset to end
-        if (DomBridge.IsText(startContainer))
-        {
-            var text = DomBridge.BridgeText(startContainer);
-            if (startOffset < text.Length)
-                sb.Append(text.AsSpan(startOffset));
-        }
-        else
-        {
-            for (var i = startOffset; i < startContainer.ChildNodes.Count; i++)
-                DomBridge.CollectTextContent(DomBridge.ChildAt(startContainer, i), sb);
-        }
-
-        // Middle nodes: collect all text from nodes between start and end paths
-        var ancestor = startContainer.CommonAncestorWith(endContainer);
-        if (ancestor != null)
-        {
-            var allNodes = DomBridge.GetDocumentOrderNodes(ancestor);
-            var startIdx = allNodes.IndexOf(startContainer);
-            var endIdx = allNodes.IndexOf(endContainer);
-            if (startIdx >= 0 && endIdx >= 0)
-            {
-                for (var i = startIdx + 1; i < endIdx; i++)
-                {
-                    var node = allNodes[i];
-                    // Skip descendants of start/end containers (already handled)
-                    if (node.IsDescendantOf(startContainer) || node.IsDescendantOf(endContainer))
-                        continue;
-                    // Only collect from top-level nodes
-                    if (DomBridge.IsText(node))
-                        sb.Append(DomBridge.BridgeText(node));
-                    else if (node.ChildNodes.Count == 0)
-                        continue; // element with no text children
-                    // Don't double-collect descendants
-                }
-            }
-        }
-
-        // End container: collect from 0 to endOffset
-        if (DomBridge.IsText(endContainer))
-        {
-            // Don't include end container text for Range.toString()
-            // (end boundary is exclusive for text)
-        }
-        else
-        {
-            for (var i = 0; i < Math.Min(endOffset, endContainer.ChildNodes.Count); i++)
-                DomBridge.CollectTextContent(DomBridge.ChildAt(endContainer, i), sb);
-        }
+        return new JSString(state.ToString());
     }
 
     private static (double Left, double Top, double Width, double Height) UnionClientRects(

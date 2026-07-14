@@ -470,25 +470,6 @@ public sealed partial class DomBridge
     // form.elements collection (indexed + named access) moved to the Phase 3 FormBinding feature
     // module (Broiler.HtmlBridge.Dom.Features).
 
-    /// <summary>
-    /// Collects all descendants of <paramref name="root"/> in document order
-    /// (depth-first pre-order).
-    /// </summary>
-    private static void CollectDescendants(DomNode root, List<DomNode> result)
-    {
-        // RF-BRIDGE-1c Phase F (F3c part 2b): walk raw ChildNodes so document-order traversal
-        // includes text/comment nodes (range boundary indexing needs them). Behaviour-preserving
-        // on today's homogeneous tree where every child is an element.
-        // Sub-documents are separate document trees, but since P4.4b severed the #subdoc-root
-        // element they are no longer in-tree children here, so document-order traversal never
-        // crosses a sub-document boundary.
-        foreach (var child in root.ChildNodes)
-        {
-            result.Add(child);
-            CollectDescendants(child, result);
-        }
-    }
-
 
     /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).
@@ -501,17 +482,6 @@ public sealed partial class DomBridge
                 results.Add(bridge.ToJSObject(child));
             CollectDescendantsByTag(child, tagName, results, bridge);
         }
-    }
-
-    /// <summary>
-    /// Returns a flat list of all nodes in the subtree rooted at
-    /// <paramref name="root"/> in document order (including the root).
-    /// </summary>
-    internal static List<DomNode> GetDocumentOrderNodes(DomNode root)
-    {
-        var list = new List<DomNode> { root };
-        CollectDescendants(root, list);
-        return list;
     }
 
     /// <summary>

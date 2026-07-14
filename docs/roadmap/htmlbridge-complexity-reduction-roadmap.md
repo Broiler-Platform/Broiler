@@ -860,6 +860,44 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.12 completed** 2026-07-14 (branch `htmlbridge-phase4-range-stringifier`) — **work items 4/5: the
+Range stringifier is promoted to a spec-correct canonical `Broiler.Dom.DomRange.ToString()`, and the bridge's
+`GetDocumentOrderNodes` document-order flatten is deleted in favour of canonical `DomNode.InclusiveDescendants`.**
+Two separable pieces:
+
+- **Range stringifier → canonical (promotion + bug fix).** The bridge's `CollectRangeText` (`TraversalBinding.Range.cs`)
+  reimplemented the DOM §4.5 `Range` stringifier and did so with a non-spec bug: it *omitted the end-container
+  Text node's head* (treated the end boundary as exclusive for text). A new `public override string DomRange.ToString()`
+  implements the spec algorithm properly — start-Text tail + every fully-contained Text node in tree order + end-Text
+  head — reusing canonical's existing `IsContained` / `InclusiveDescendants`. `RangeToString` now delegates to it and
+  `CollectRangeText` is deleted. The one deliberate deviation retained in the bridge wrapper: a range within a **single
+  Comment node** still stringifies to the selected substring (Acid3 Test 11 pins `'DEFG'`; the spec, being Text-only,
+  would yield `""`). Observable change: a range spanning distinct Text nodes now includes the end node's head (spec-correct;
+  no unit test pinned the old omission). Canonical tests: 5 new in `Broiler.Dom.Tests/DomRangeTests.cs`; bridge
+  characterization: `DomTraversalAndRangeTests.Range_ToString_Across_Text_Nodes_Includes_End_Container_Text` (plus the
+  existing `Range_ToString` / comment / single-text cases still green).
+- **`GetDocumentOrderNodes` → `InclusiveDescendants` (item-5 reuse).** The bridge helper
+  (`[root] + preorder(ChildNodes)`, `Utilities.cs`) exactly equalled canonical `DomNode.InclusiveDescendants()`, so its
+  three callers (`GetNodesInRange` in `Traversal.cs`, `IsPositionAfter`/`compareBoundaryPoints` in `Common.cs`, and the
+  now-deleted `CollectRangeText`) call `node.InclusiveDescendants().ToList()`, and `GetDocumentOrderNodes` plus its
+  now-orphaned `CollectDescendants` recursion are deleted. `GetNodesInRange` itself **stays bridge-owned** — it is a
+  non-spec client-rect geometry heuristic (it includes partially-overlapping elements, unlike canonical `IsContained`),
+  so it is the wrong shape for canonical `Broiler.Dom`. Its old regime-A `#subdoc-root` exclusion blocker is gone
+  (P4.4b/P4.11), which is what let its document-order source be reused.
+
+The canonical `DomRange.ToString()` addition shipped as `Broiler.DOM` submodule commit `f7f0d4f` (branch
+`claude/domrange-stringifier`) — the push **succeeded** (the `MaiRat/` remote redirects in-scope to
+`Broiler-Platform/Broiler.DOM`), so the submodule pointer is bumped (no patch fallback). Behaviour-preserving except the
+end-Text bug fix; no public-API change in the bridge (all deleted members were `private`/`internal`). Regression check
+vs the merge-base with the same filter: the DomTraversalAndRange / TraversalBindingModule / Acid3 suites reproduce an
+**identical** 7-test failure set with the change stashed (the standing headless `Range_GetBoundingClientRect` geometry
+test and the flaky Acid3 score/border/cascade/NodeIterator/image set), and DomEdgeCase / CrossDocument / Serialization /
+DomEvents (98) pass → zero regressions.
+
+**This exhausts the clean item-4/5 promotions.** Remaining Phase 4 residue is unchanged: item 2's full inline-style dict
+elimination (P4.7 shipped the write-through slice; the ~200-site rewrite is Phase-5-entangled via the anchor resolver),
+and the item 5 `Normalize` / `CloneDomElement` swaps still blocked by side-effect / runtime-state coupling.
+
 Status: **P4.9/P4.10 delegation landed** 2026-07-14 — **work items 4/5, post-patch follow-up: the bridge
 equality/common-ancestor copies are now deleted and delegate to canonical `Broiler.Dom.DomNode`.** The
 maintainer applied `patches/0001` (`IsEqualNode`) and `patches/0002` (`CommonAncestorWith`) and bumped the
