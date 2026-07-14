@@ -400,9 +400,9 @@ public sealed partial class DomBridge
     /// Decides whether a <c>position-area</c> box belongs to the native-placement MVP
     /// subset (P5.8d.2b) — the boxes the Broiler.Layout engine's placement post-pass
     /// currently reproduces exactly, so the bridge can hand them off instead of
-    /// pre-baking. Requires: an explicit dashed-ident <c>position-anchor</c>, a
-    /// non-inline containing block, no intervening scroll container, and no
-    /// <c>position-try</c> or <c>anchor()</c>/<c>anchor-size()</c> on the element
+    /// pre-baking. Requires: an explicit dashed-ident <c>position-anchor</c> that names a
+    /// registered anchor, a non-inline containing block, no intervening scroll container,
+    /// and no <c>position-try</c> or <c>anchor()</c>/<c>anchor-size()</c> on the element
     /// (those entangled features stay on the bridge path until later expansions).
     /// </summary>
     private bool IsMvpNativeAnchorBox(
@@ -419,15 +419,11 @@ public sealed partial class DomBridge
         if (!anchorName.StartsWith("--", StringComparison.Ordinal))
             return false;
 
-        // A *uniquely*-named anchor. The engine's AnchorRegistry is a flat,
-        // ordinal last-wins name→rect map with no scope awareness, so when several
-        // elements share an anchor-name the box must stay on the bridge's scoped
-        // resolution path (ResolveAnchorForElement binds within the query's own
-        // containing block). _anchorCandidates is built (BuildAnchorRegistry) before
-        // this pass, so its per-name candidate count is available here.
-        if (_anchorCandidates == null ||
-            !_anchorCandidates.TryGetValue(anchorName, out var candidates) ||
-            candidates.Count != 1)
+        // The anchor-name must be registered. Shared names are now allowed: the engine's
+        // AnchorRegistry keeps every candidate and binds a query to the one in its own
+        // containing-block scope (matching the bridge's ResolveAnchorForElement), so a
+        // duplicate name no longer forces the bridge path.
+        if (_anchorCandidates == null || !_anchorCandidates.ContainsKey(anchorName))
             return false;
 
         // A non-inline containing block (the engine cannot yet promote abs-pos boxes

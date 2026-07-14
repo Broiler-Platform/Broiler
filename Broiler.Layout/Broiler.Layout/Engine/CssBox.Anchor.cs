@@ -12,13 +12,14 @@ namespace Broiler.Layout.Engine;
 /// </summary>
 /// <remarks>
 /// Gated by <see cref="NativeAnchorPlacement.Enabled"/> (default off), so this is
-/// inert until the P5.8d cutover. The current pass handles the MVP subset:
-/// <c>position-area</c> with an explicit <c>position-anchor</c>, a registered anchor,
-/// and a box with a definite size — for which placement is a pure reposition (the
-/// grid cell + inset-modified containing block + within-cell alignment decide the
-/// box's origin; its already-laid-out size is kept). Auto/fill-the-cell sizing,
-/// box-sizing, inline-CB promotion, scrolling, <c>anchor()</c> insets and position-try
-/// are out of MVP and stay on the bridge path until later P5.8d expansions.
+/// inert until the P5.8d cutover. The pass handles <c>position-area</c> with an explicit
+/// <c>position-anchor</c> and a registered anchor. For a childless, content-box box with
+/// no percentage box properties it also applies the grid-derived used <b>size</b>
+/// (fill-the-cell / explicit / percentage width+height — the P5.8d.2b sizing expansion);
+/// every other box keeps the reposition-only behaviour (its already-laid-out size is
+/// kept). <c>box-sizing: border-box</c>, percentage margin/padding/inset box props,
+/// inline-CB promotion, scrolling, <c>anchor()</c> insets and position-try are still out
+/// of scope and stay on the bridge path until later P5.8d expansions.
 /// </remarks>
 partial class CssBox
 {
@@ -51,19 +52,84 @@ partial class CssBox
         if (!string.IsNullOrEmpty(name) && name != "none")
         {
             var b = box.Bounds;
-            registry.Register(name, new AnchorRect(b.X, b.Y, b.Width, b.Height));
+            // The anchor box itself is the scope token: a query binds to the candidate in
+            // its own containing block when several elements share a name (see
+            // ResolveScopedAnchorTarget). Registration order is tree/document order.
+            registry.Register(name, new AnchorRect(b.X, b.Y, b.Width, b.Height), box);
         }
 
         foreach (var child in box.Boxes)
             CollectAnchors(child, registry);
     }
 
+    /// <summary>
+    /// Whether <paramref name="descendant"/> is a strict box-tree descendant of
+    /// <paramref name="ancestor"/> (used as the anchor-name scope test: an anchor is in a
+    /// query's scope when its box is inside the query's containing block).
+    /// </summary>
+    private static bool IsBoxDescendantOf(CssBox descendant, CssBox ancestor)
+    {
+        for (var p = descendant.ParentBox; p != null; p = p.ParentBox)
+            if (p == ancestor)
+                return true;
+        return false;
+    }
+
     private static void ApplyNativeAnchorPlacement(CssBox box, AnchorRegistry registry)
     {
-        if (box.PositionArea != "none" && box.TryResolvePositionAreaTarget(registry, out var target))
+        if (box.PositionArea != "none" && box.TryResolvePositionAreaTarget(registry, out var target, out var cell))
         {
+            // Percentage box props (margin/padding/inset resolved against the cell): the
+            // box's margin box stretches to fill the inset-modified containing block, so
+            // its geometry is derived differently — handle it in its own path (which also
+            // writes the resolved px padding so the content-box background paints right).
+            if (box.CanApplyNativeAnchorSize() && box.HasPercentBoxProps())
+            {
+                box.ApplyPercentBoxPropsPlacement(target, cell);
+                foreach (var pchild in box.Boxes)
+                    ApplyNativeAnchorPlacement(pchild, registry);
+                return;
+            }
+
+            // Apply the used SIZE first (P5.8d.2b sizing slices) for the boxes the engine
+            // can size without re-flowing a subtree: a childless box (no in-flow children
+            // or words). For such a box the grid-derived used size fills the cell / honours
+            // an explicit or percentage length exactly as the baked bridge path does;
+            // setting its border box repaints correctly with no children to re-flow. Every
+            // other box keeps the reposition-only behaviour (its already-laid-out size is
+            // preserved).
+            if (box.CanApplyNativeAnchorSize())
+            {
+                // The box's own padding + border, read font-free (px + the CSS
+                // thin/medium/thick keyword map, style:none → 0 — matching the bridge's
+                // ResolveBorderWidth and avoiding the layout font the Actual* getters
+                // resolve; percentage padding is excluded by the gate).
+                double padBorderW =
+                    box.NativeBorderPx(box.BorderLeftWidth, box.BorderLeftStyle)
+                    + box.NativePaddingPx(box.PaddingLeft) + box.NativePaddingPx(box.PaddingRight)
+                    + box.NativeBorderPx(box.BorderRightWidth, box.BorderRightStyle);
+                double padBorderH =
+                    box.NativeBorderPx(box.BorderTopWidth, box.BorderTopStyle)
+                    + box.NativePaddingPx(box.PaddingTop) + box.NativePaddingPx(box.PaddingBottom)
+                    + box.NativeBorderPx(box.BorderBottomWidth, box.BorderBottomStyle);
+
+                // box-sizing: content-box (default) — target.Width/Height are the content
+                // size, so the border box adds padding+border. box-sizing: border-box —
+                // target.Width/Height already ARE the (cell-clamped/filled) border box, so
+                // use them directly, clamped to at least padding+border so the content box
+                // stays non-negative (mirrors the bridge's BorderBoxToContentSize + re-add).
+                bool borderBox = string.Equals(box.BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase);
+                double borderBoxW = borderBox
+                    ? System.Math.Max(target.Width, padBorderW)
+                    : target.Width + padBorderW;
+                double borderBoxH = borderBox
+                    ? System.Math.Max(target.Height, padBorderH)
+                    : target.Height + padBorderH;
+                box.Size = new System.Drawing.SizeF((float)borderBoxW, (float)borderBoxH);
+            }
+
             // Reposition the box (and its subtree) so its border-box origin lands at the
-            // grid-resolved position. Size is left as laid out (MVP: definite-size boxes).
+            // grid-resolved position.
             box.OffsetLeft(target.Left - box.Location.X);
             box.OffsetTop(target.Top - box.Location.Y);
         }
@@ -73,13 +139,146 @@ partial class CssBox
     }
 
     /// <summary>
+    /// Whether the native placement post-pass may set this box's used size directly
+    /// (rather than only repositioning). True when doing so cannot mis-render: the box has
+    /// no in-flow children or words to re-flow. Both <c>content-box</c> and
+    /// <c>border-box</c> sizing and percentage margin/padding/inset box props are handled
+    /// (the caller forms the border box / margin-box-fills-IMCB geometry accordingly).
+    /// Matches the boxes for which the engine's grid-derived size equals the baked bridge
+    /// result.
+    /// </summary>
+    private bool CanApplyNativeAnchorSize() => Boxes.Count == 0 && Words.Count == 0;
+
+    /// <summary>
+    /// Whether the box carries a percentage margin, padding, or inset — the CSS that
+    /// resolves against the position-area cell and drives the <c>place-self: stretch</c>
+    /// margin-box-fills-IMCB path (mirrors the bridge's <c>hasPercentBoxProps</c>).
+    /// </summary>
+    private bool HasPercentBoxProps() =>
+        HasPercent(MarginTop) || HasPercent(MarginRight) || HasPercent(MarginBottom) || HasPercent(MarginLeft)
+        || HasPercent(PaddingTop) || HasPercent(PaddingRight) || HasPercent(PaddingBottom) || HasPercent(PaddingLeft)
+        || HasPercent(Top) || HasPercent(Right) || HasPercent(Bottom) || HasPercent(Left);
+
+    /// <summary>
+    /// Places a childless <c>position-area</c> box whose margin/padding/inset carry
+    /// percentages (<see cref="HasPercentBoxProps"/>). Mirrors the bridge's
+    /// <c>hasPercentBoxProps</c> branch: percentage margins and padding resolve against the
+    /// cell inline size, the element's margin box stretches to fill the inset-modified
+    /// containing block (IMCB), and the content size is the IMCB minus margin+border+padding
+    /// (<see cref="PositionAreaGrid.ContentSizeFillingImcb"/>). The resolved padding is
+    /// written back as px so the content-box background paints at the right place; the
+    /// border box is set from the content size + padding + border, positioned so the margin
+    /// box's origin sits at the IMCB origin.
+    /// </summary>
+    private void ApplyPercentBoxPropsPlacement(PositionAreaBox target, PositionAreaCell cell)
+    {
+        // CSS Writing Modes §7.4: percentage margins and padding resolve against the
+        // INLINE size of the containing block. The containing block here is the
+        // position-area cell in the containing block's writing mode, so the inline size is
+        // the cell width for a horizontal CB and the cell HEIGHT for a vertical one.
+        // (Insets keep resolving against their own physical axis — done in ResolveInset.)
+        var cbBox = FindPositionedContainingBlock();
+        double inlineSize = cbBox != null && IsVerticalWritingMode(cbBox.WritingMode)
+            ? cell.Height
+            : cell.Width;
+
+        // Margins and padding: percentage against the cell inline size, else px (matching
+        // the bridge's ResolvePctOrPx — but the bridge always used the width, so this
+        // diverges from the baked path only for a vertical containing block, which the
+        // bridge gets wrong).
+        double mT = ResolveEdgeAgainstCell(MarginTop, inlineSize), mR = ResolveEdgeAgainstCell(MarginRight, inlineSize);
+        double mB = ResolveEdgeAgainstCell(MarginBottom, inlineSize), mL = ResolveEdgeAgainstCell(MarginLeft, inlineSize);
+        double pT = ResolveEdgeAgainstCell(PaddingTop, inlineSize), pR = ResolveEdgeAgainstCell(PaddingRight, inlineSize);
+        double pB = ResolveEdgeAgainstCell(PaddingBottom, inlineSize), pL = ResolveEdgeAgainstCell(PaddingLeft, inlineSize);
+        double bT = NativeBorderPx(BorderTopWidth, BorderTopStyle), bR = NativeBorderPx(BorderRightWidth, BorderRightStyle);
+        double bB = NativeBorderPx(BorderBottomWidth, BorderBottomStyle), bL = NativeBorderPx(BorderLeftWidth, BorderLeftStyle);
+
+        var (contentW, contentH) = PositionAreaGrid.ContentSizeFillingImcb(
+            target.ImcbWidth, target.ImcbHeight,
+            new PositionAreaEdges(mT, mR, mB, mL),
+            new PositionAreaEdges(bT, bR, bB, bL),
+            new PositionAreaEdges(pT, pR, pB, pL));
+
+        // Write the resolved margins/padding as px (the bridge writes these inline too) so
+        // the box's own box-model reads the cell-resolved used values, not percentages
+        // re-resolved against the box's own width. Padding is what the content-box
+        // background/ClientRectangle depend on.
+        var px = System.Globalization.CultureInfo.InvariantCulture;
+        MarginTop = mT.ToString(px) + "px"; MarginRight = mR.ToString(px) + "px";
+        MarginBottom = mB.ToString(px) + "px"; MarginLeft = mL.ToString(px) + "px";
+        PaddingTop = pT.ToString(px) + "px"; PaddingRight = pR.ToString(px) + "px";
+        PaddingBottom = pB.ToString(px) + "px"; PaddingLeft = pL.ToString(px) + "px";
+
+        // Border box = content + padding + border; margin box origin sits at the IMCB origin.
+        double borderBoxW = contentW + pL + pR + bL + bR;
+        double borderBoxH = contentH + pT + pB + bT + bB;
+        Size = new System.Drawing.SizeF((float)borderBoxW, (float)borderBoxH);
+
+        double borderBoxLeft = target.ImcbLeft + mL;
+        double borderBoxTop = target.ImcbTop + mT;
+        OffsetLeft(borderBoxLeft - Location.X);
+        OffsetTop(borderBoxTop - Location.Y);
+    }
+
+    /// <summary>Resolves a margin/padding component against the cell inline size:
+    /// a percentage → that fraction of <paramref name="cellW"/>, a px length (or bare
+    /// number) → itself, anything else → 0. Mirrors the bridge's <c>ResolvePctOrPx</c>.</summary>
+    private static double ResolveEdgeAgainstCell(string? value, double cellW)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && value!.TrimEnd().EndsWith('%')
+            && double.TryParse(value.Trim().TrimEnd('%'), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var pct))
+            return cellW * pct / 100.0;
+        return ParsePxOnly(value) ?? 0;
+    }
+
+    private static bool HasPercent(string? value) => value != null && value.Contains('%');
+
+    /// <summary>
+    /// Font-free used border width for one side: <c>0</c> when the border style is
+    /// absent/<c>none</c>; otherwise the CSS <c>thin</c>/<c>medium</c>/<c>thick</c>
+    /// keywords map to <c>1</c>/<c>3</c>/<c>4</c> px (default <c>medium</c>) and a
+    /// pixel length is taken as-is. Mirrors the bridge's <c>ResolveBorderWidth</c> and
+    /// <c>CssLengthParser.GetActualBorderWidth</c> so the native and baked paths agree.
+    /// </summary>
+    private double NativeBorderPx(string? width, string? style)
+    {
+        if (string.IsNullOrEmpty(style) || string.Equals(style, "none", StringComparison.OrdinalIgnoreCase))
+            return 0;
+        var w = width?.Trim();
+        if (string.IsNullOrEmpty(w) || string.Equals(w, "medium", StringComparison.OrdinalIgnoreCase))
+            return 3;
+        if (string.Equals(w, "thin", StringComparison.OrdinalIgnoreCase)) return 1;
+        if (string.Equals(w, "thick", StringComparison.OrdinalIgnoreCase)) return 4;
+        return ParsePxOnly(w) ?? 3;
+    }
+
+    /// <summary>Font-free used padding for one side: a pixel length (or bare number),
+    /// else <c>0</c>. Percentage padding is excluded upstream by the size gate.</summary>
+    private double NativePaddingPx(string? value) => ParsePxOnly(value) ?? 0;
+
+    private static double? ParsePxOnly(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var v = value!.Trim();
+        if (v.Contains('%')) return null;
+        if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            v = v[..^2];
+        return double.TryParse(v, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var px)
+            ? px
+            : null;
+    }
+
+    /// <summary>
     /// Computes where this <c>position-area</c> box's border box should sit against its
     /// named anchor. Returns <c>false</c> (leave the box where it is) when the box is
     /// not an MVP anchor-positioned box or its anchor is not registered.
     /// </summary>
-    internal bool TryResolvePositionAreaTarget(AnchorRegistry registry, out PositionAreaBox target)
+    internal bool TryResolvePositionAreaTarget(AnchorRegistry registry, out PositionAreaBox target, out PositionAreaCell cell)
     {
         target = default;
+        cell = default;
 
         var area = PositionArea;
         if (string.IsNullOrEmpty(area) || area == "none")
@@ -94,20 +293,68 @@ partial class CssBox
         GetAbsoluteContainingBlockPaddingBox(cb, out double cbX, out double cbY, out double cbW, out double cbH);
 
         var parsed = PositionAreaValue.Parse(area);
-        var cell = registry.ResolvePositionAreaCell(anchorName, parsed, cbX, cbY, cbW, cbH);
-        if (cell is not { } c)
+        // Scope resolution: when several elements share this anchor-name, bind to the
+        // candidate inside the query's own containing block (the anchor box a descendant of
+        // `cb`), mirroring the bridge's ResolveAnchorForElement; unique names are unaffected.
+        var resolved = registry.ResolvePositionAreaCell(anchorName, parsed, cbX, cbY, cbW, cbH,
+            inScope: scope => scope is CssBox src && IsBoxDescendantOf(src, cb));
+        if (resolved is not { } c)
             return false; // Anchor not registered.
+        cell = c;
 
-        // Reposition-only MVP: keep the box's already-laid-out border-box size, resolve
-        // insets against the cell, and align the box within the cell.
+        // Width/height inputs to the grid resolution. For a size-apply box (childless,
+        // content-box, no percentage box props — see CanApplyNativeAnchorSize) feed the
+        // box's authored CSS width/height so the used size fills the cell / honours an
+        // explicit or percentage length exactly as the baked bridge path does. For every
+        // other box keep the reposition-only MVP inputs (the already-laid-out border-box
+        // size), so its alignment position is byte-identical to the shipped behaviour.
+        double? explicitW, percentW, explicitH, percentH;
+        if (CanApplyNativeAnchorSize())
+        {
+            (explicitW, percentW) = ParseSizeComponent(Width);
+            (explicitH, percentH) = ParseSizeComponent(Height);
+        }
+        else
+        {
+            (explicitW, percentW) = (Size.Width, null);
+            (explicitH, percentH) = (Size.Height, null);
+        }
+
         target = PositionAreaGrid.ResolveElementBox(
             c,
             ResolveInset(Top, c.Height), ResolveInset(Right, c.Width),
             ResolveInset(Bottom, c.Height), ResolveInset(Left, c.Width),
-            explicitWidth: Size.Width, percentWidth: null,
-            explicitHeight: Size.Height, percentHeight: null,
+            explicitWidth: explicitW, percentWidth: percentW,
+            explicitHeight: explicitH, percentHeight: percentH,
             parsed);
         return true;
+    }
+
+    /// <summary>
+    /// Parses a CSS <c>width</c>/<c>height</c> component into the (explicit-px, percent)
+    /// pair <see cref="PositionAreaGrid.ResolveElementBox"/> expects: a pixel length (or
+    /// bare number) → <c>(px, null)</c>; a percentage like <c>50%</c> → <c>(null, 50)</c>;
+    /// <c>auto</c>/unparseable/other units → <c>(null, null)</c> (fill the cell). Mirrors
+    /// the bridge's <c>TryParsePx</c>/<c>TryParsePercent</c> exactly for parity.
+    /// </summary>
+    internal static (double? explicitPx, double? percent) ParseSizeComponent(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return (null, null);
+        var v = value!.Trim();
+        if (v.EndsWith('%'))
+        {
+            return double.TryParse(v[..^1], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var pct)
+                ? (null, pct)
+                : (null, null);
+        }
+        if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            v = v[..^2];
+        return double.TryParse(v, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var px)
+            ? (px, null)
+            : (null, null);
     }
 
     /// <summary>

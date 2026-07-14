@@ -1742,12 +1742,115 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
     `RenderHtmlFileBitmapPublic` pipeline (bridge in native mode does **not** bake — see
     `NativeAnchorBridgeModeTests` — so the correct placement is the engine's), and that the baked and
     native paths agree pixel-wise. Cli `~NativeAnchor` (3) and `~Anchor|~PositionArea` (13) green.
+- **P5.8d.2b — native used-SIZE (first expansion) — COMPLETED** 2026-07-14 (Broiler.Layout only,
+  additive, behind the default-OFF flag). The P5.8c pass was reposition-only (the box's already-laid-out
+  border-box size was kept). It now also applies the grid-derived used **size** — fill-the-cell (the
+  `place-self: stretch` default), an explicit length, or a percentage of the cell — to the boxes the
+  engine can size without re-flowing a subtree: a **childless**, **content-box**, no-percentage-box-props
+  `position-area` box (`CanApplyNativeAnchorSize` in `Engine/CssBox.Anchor.cs`). For such a box
+  `TryResolvePositionAreaTarget` feeds the box's authored CSS width/height into
+  `PositionAreaGrid.ResolveElementBox` (bridge-matching `ParseSizeComponent`, so px/`%`/`auto` map exactly
+  as the bridge's `TryParsePx`/`TryParsePercent`), and `ApplyNativeAnchorPlacement` sets the border box =
+  content size + font-free padding/border (`NativeBorderPx`/`NativePaddingPx` mirror the bridge's
+  `ResolveBorderWidth` thin/medium/thick→1/3/4 map, avoiding the layout font the `Actual*` getters
+  resolve). Every other box (childful, `box-sizing:border-box`, percentage margin/padding/inset) keeps the
+  reposition-only behaviour and stays on the bridge bake path. Same box *set* flows to the engine as
+  before (the bridge's `IsMvpNativeAnchorBox` gate is unchanged); the engine just sizes the childless ones
+  to match the baked path instead of keeping their flow size. Tests: `Broiler.Layout.Tests/
+  NativeAnchorPlacementTests.cs` grows to 19 (fill-cell, percentage-of-cell, content+padding border box,
+  childful/border-box reposition-only fallbacks, `ParseSizeComponent` parity theory) — needing a minimal
+  fake `ILayoutEnvironment`/`ILayoutFont` so the synthetic block CBs can resolve Actual border widths.
+  Regression check: full `Broiler.Layout.Tests` (127) green; the css-anchor-position **pixel** subset
+  reproduces the identical **8-fail / 31-pass** set both default-off (byte-identical) and lever-on (no
+  passing test regresses); `NativeAnchorPlacementWptTests` (bridge/engine paths agree pixel-wise) green in
+  isolation. Also fixed a pre-existing arch-guard fail from the P5.8d.2b IVT addition
+  (`LayoutArchitectureTests.Internal_Consumers_Are_Explicit_And_Minimal` did not list `Broiler.Wpt`). One
+  observed non-blocker at this slice: lever-on `position-area-scrolling-002` (already failing) dropped
+  97.7 %→68.5 % (native sizing amplified a `box-sizing:border-box` box the size slice left on a partial
+  path); it did not change the fail *set* and production is default-off. **The box-sizing expansion below
+  fixes it** (scrolling-002 now passes lever-on).
+- **P5.8d.2b — native `box-sizing: border-box` (second expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). `CanApplyNativeAnchorSize` no longer excludes
+  `box-sizing: border-box`; the caller forms the border box per box-sizing. The engine paints `Size` as
+  the border box regardless of box-sizing, so for a border-box box the grid-resolved used size (which the
+  bridge feeds as the border-box value and clamps to the cell) IS the border box — `ApplyNativeAnchorPlacement`
+  now uses `borderBox ? max(target.Size, padding+border) : target.Size + padding+border`, the
+  `max(…, padding+border)` mirroring the bridge's `BorderBoxToContentSize` clamp (content ≥ 0). No new
+  parsing — the same `PositionAreaGrid.ResolveElementBox` inputs, just a different border-box assembly.
+  Tests: `NativeAnchorPlacementTests.cs` → 20 (replaced the border-box reposition-only fallback with two
+  border-box sizing cases: explicit width used as the border box — padding/border NOT added — and
+  border-box fill-the-cell). Regression check: full `Broiler.Layout.Tests` (128) green; native e2e (2)
+  green in isolation; the css-anchor-position **pixel** subset stays **byte-identical default-off (8-fail /
+  31-pass)**, and **lever-on improves to 7-fail / 32-pass** — `position-area-scrolling-002` flips to
+  passing (its border-box box now sizes to match the reference) with **zero regressions**.
+- **P5.8d.2b — native percentage box props (third expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). `CanApplyNativeAnchorSize` now admits percentage
+  margin/padding/inset boxes (it is just childless-and-no-words); a new `ApplyPercentBoxPropsPlacement`
+  mirrors the bridge's `hasPercentBoxProps` branch — percentage margins/padding resolve against the cell
+  inline size (`ResolveEdgeAgainstCell`, the bridge's `ResolvePctOrPx`), the margin box stretches to fill
+  the IMCB, content size = `PositionAreaGrid.ContentSizeFillingImcb(imcb, margin, border, padding)`, the
+  resolved padding is written back as px so the content-box background paints right, and the border box is
+  positioned with its margin-box origin at the IMCB origin. `TryResolvePositionAreaTarget` now also outs
+  the `PositionAreaCell` (the percent resolution needs the cell inline size). Tests:
+  `NativeAnchorPlacementTests.cs` → 22 (percent margin shrinks+shifts the border box; percent padding
+  resolves against the cell — not the box's own width — and fills the IMCB). Regression check: full
+  `Broiler.Layout.Tests` (130) green; native e2e (2) green in isolation; the css-anchor-position **pixel**
+  subset stays **byte-identical default-off (8-fail / 31-pass)** and **lever-on unchanged (7-fail /
+  32-pass)** — zero regressions. **No corpus pixel test exercises this path:** the only percentage-box-props
+  test, `position-area-percents-001`, shares `anchor-name: --foo` across four anchors, so the bridge's
+  **uniqueness gate keeps it baked** (and it also needs writing-mode support neither path has). Validation
+  is therefore unit-test geometry (pinned to the promoted `ContentSizeFillingImcb`) plus no-regression. The
+  **uniqueness / `anchor-scope`** gate is the more impactful next blocker — it is what actually excludes
+  `percents-001` and any multi-anchor scenario, so the engine's flat last-wins `AnchorRegistry` needs
+  scope awareness before those boxes can go native.
+- **P5.8d.2b — anchor-name scope / uniqueness (fourth expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout + bridge, both parent-repo, additive, default-off). The engine's flat last-wins
+  `AnchorRegistry` gains **scope awareness**: each name keeps *all* candidates in tree order, each with an
+  opaque caller-supplied scope token, and the resolve methods take an optional `inScope` predicate —
+  binding a query to the LAST candidate in its own scope, else last-wins (mirrors the bridge's
+  `ResolveAnchorForElement`). The registry stays box-tree/DOM-free (the token is `object?`; the caller
+  interprets it). The engine pass registers each anchor with its **source box** as the token and resolves
+  with "anchor box is a descendant of the query's positioned containing block" (`IsBoxDescendantOf`);
+  `TryResolvePositionAreaTarget` now threads that predicate. The bridge's `IsMvpNativeAnchorBox`
+  **uniqueness gate is relaxed** — shared anchor-names may now go native (only "name is registered"
+  remains). Backward-compatible: scope-free `Register`/`Resolve` keep last-wins, so the 7 existing
+  `AnchorRegistry` tests are unchanged. Tests: `AnchorRegistryTests` +2 (scoped last-in-scope /
+  single-candidate ignores scope); `NativeAnchorPlacementTests` +1 (two sibling containers sharing `--a`
+  bind within their own CB — a flat registry would collapse the first's cell). Regression check: full
+  `Broiler.Layout.Tests` (133) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on
+  unchanged (7-fail / 32-pass)** with `position-area-percents-001` improving 98.3 %→98.7 % (its shared-`--foo`
+  boxes now go native, scope-resolved per container, via the percentage-box-props path; only the
+  writing-mode containers still fail). **`AnchorNameScopeTests`** — which regressed when the uniqueness
+  gate was first added — now passes **both** default-off and lever-on in isolation. This is the first
+  expansion with observable pixel-test movement (the size expansions had none, being gate-masked).
+- **P5.8d.2b — writing-mode percentage box props (fifth expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). CSS Writing Modes §7.4: percentage margins/padding resolve
+  against the **inline** size of the containing block. `ApplyPercentBoxPropsPlacement` now resolves them
+  against the cell width for a horizontal CB and the cell **height** for a vertical one (the CB's writing
+  mode via `FindPositionedContainingBlock` + `IsVerticalWritingMode`), instead of always the width; insets
+  keep resolving against their own physical axis. This is the first expansion that deliberately **exceeds**
+  the bridge (which always used the width, so it gets vertical CBs wrong), so native diverges from the
+  baked path only for a vertical CB — a strictly-more-correct divergence. Tests: `NativeAnchorPlacementTests`
+  +1 (non-square cell in a `vertical-rl` CB: percent margin resolves against the cell height). Regression
+  check: full `Broiler.Layout.Tests` (134) green; **default-off byte-identical (8-fail / 31-pass)**;
+  **lever-on unchanged (7-fail / 32-pass)** with `position-area-percents-001` improving 98.7 %→98.8 % (its
+  vertical-CB containers 3&4 now geometrically correct). **Finding — `percents-001` is capped by rendering
+  fidelity, not geometry:** the native render matches Broiler's own `-ref` render to **0.05 %** (400 px of
+  sub-pixel border rounding), and differs from the committed Chromium **golden** by **1.25 %** — but
+  Broiler's render of the plain `-ref` markup (no anchor positioning at all) itself differs from the golden
+  by **1.26 %**. So the residual is Broiler-vs-Chromium anti-aliasing/border fidelity (a separate,
+  pre-existing rendering concern), and the anchor geometry is exact. `percents-001` will not cross the 99 %
+  pixel threshold from anchor work alone.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
-  default-off until each feature is on the engine path — percentage box props → box-sizing → inline-CB
-  promotion (DOM moves) → scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets
-  → position-try. Each is currently excluded by `IsMvpNativeAnchorBox` and stays on the bridge path
-  (baked + `position-area: none`), so enabling the lever globally is already safe (proven above); the
-  expansions widen the MVP gate one feature at a time as the engine grows to reproduce them.
+  default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
+  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → inline-CB promotion (DOM moves) →
+  scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
+  (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
+  props, shared-name scope resolution, AND writing-mode percentage basis now land natively — see the five
+  expansions above.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
+  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
+  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as the
+  engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 

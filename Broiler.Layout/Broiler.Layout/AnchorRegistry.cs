@@ -32,50 +32,102 @@ public readonly record struct AnchorRect(double Left, double Top, double Width, 
 /// </remarks>
 public sealed class AnchorRegistry
 {
-    // Anchor names are custom idents — case-sensitive (ordinal), last registration wins.
-    private readonly Dictionary<string, AnchorRect> _anchors = new(StringComparer.Ordinal);
+    // Anchor names are custom idents — case-sensitive (ordinal). Each name keeps ALL
+    // registered candidates in registration (tree/document) order so a query can bind to
+    // the acceptable anchor in its own scope when several elements share a name; a
+    // scope-free lookup uses the last one (last-wins). Each candidate carries an opaque
+    // caller-supplied scope token (e.g. the source box) the caller's scope predicate
+    // interprets — the registry stays free of any box-tree/DOM knowledge.
+    private readonly Dictionary<string, List<(AnchorRect Rect, object? Scope)>> _anchors =
+        new(StringComparer.Ordinal);
 
-    /// <summary>Number of registered anchors.</summary>
+    /// <summary>Number of distinct registered anchor names.</summary>
     public int Count => _anchors.Count;
 
     /// <summary>
-    /// Registers (or replaces) the border-box rectangle of the anchor named
-    /// <paramref name="anchorName"/>.
+    /// Registers the border-box rectangle of an anchor named <paramref name="anchorName"/>,
+    /// with an optional opaque <paramref name="scope"/> token (interpreted only by the
+    /// scope predicate a caller passes to the resolve methods). Multiple registrations for
+    /// one name are all kept, in order; a scope-free query uses the last.
     /// </summary>
-    public void Register(string anchorName, AnchorRect rect)
+    public void Register(string anchorName, AnchorRect rect, object? scope = null)
     {
         ArgumentNullException.ThrowIfNull(anchorName);
-        _anchors[anchorName] = rect;
+        if (!_anchors.TryGetValue(anchorName, out var list))
+            _anchors[anchorName] = list = [];
+        list.Add((rect, scope));
     }
 
-    /// <summary>Looks up a registered anchor's rectangle.</summary>
-    public bool TryGet(string anchorName, out AnchorRect rect) => _anchors.TryGetValue(anchorName, out rect);
+    /// <summary>Looks up a registered anchor's rectangle (last registration wins).</summary>
+    public bool TryGet(string anchorName, out AnchorRect rect)
+    {
+        if (_anchors.TryGetValue(anchorName, out var list) && list.Count > 0)
+        {
+            rect = list[^1].Rect;
+            return true;
+        }
+        rect = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Resolves the acceptable anchor rectangle for a query. When several elements share
+    /// the name and <paramref name="inScope"/> is supplied, binds to the LAST candidate
+    /// (registration order) whose scope token satisfies the predicate — the query's own
+    /// scope; otherwise (no predicate, single candidate, or none in scope) the last
+    /// registration wins. Mirrors the bridge's <c>ResolveAnchorForElement</c>.
+    /// </summary>
+    private bool TryResolve(string anchorName, Func<object?, bool>? inScope, out AnchorRect rect)
+    {
+        if (!_anchors.TryGetValue(anchorName, out var list) || list.Count == 0)
+        {
+            rect = default;
+            return false;
+        }
+        if (inScope != null && list.Count > 1)
+        {
+            AnchorRect? scoped = null;
+            foreach (var (r, s) in list)
+                if (inScope(s))
+                    scoped = r; // keep the last in-scope candidate
+            if (scoped is { } sr)
+            {
+                rect = sr;
+                return true;
+            }
+        }
+        rect = list[^1].Rect;
+        return true;
+    }
 
     /// <summary>
     /// Resolves the <c>position-area</c> grid cell for an anchored box against the
-    /// named anchor and the box's containing-block frame. Returns <c>null</c> when the
-    /// anchor is not registered (the caller falls back to normal positioning).
+    /// named anchor (in the query's scope, per <paramref name="inScope"/>) and the box's
+    /// containing-block frame. Returns <c>null</c> when the anchor is not registered (the
+    /// caller falls back to normal positioning).
     /// </summary>
     public PositionAreaCell? ResolvePositionAreaCell(
         string anchorName, PositionAreaValue area,
-        double cbX, double cbY, double cbWidth, double cbHeight)
+        double cbX, double cbY, double cbWidth, double cbHeight,
+        Func<object?, bool>? inScope = null)
     {
-        if (!_anchors.TryGetValue(anchorName, out var a))
+        if (!TryResolve(anchorName, inScope, out var a))
             return null;
         return PositionAreaGrid.ComputeCell(
             cbX, cbY, cbWidth, cbHeight, a.Left, a.Top, a.Right, a.Bottom, area);
     }
 
     /// <summary>
-    /// Resolves an <c>anchor(&lt;side&gt;)</c> reference against the named anchor.
-    /// Returns <c>null</c> when the anchor is not registered.
+    /// Resolves an <c>anchor(&lt;side&gt;)</c> reference against the named anchor (in the
+    /// query's scope). Returns <c>null</c> when the anchor is not registered.
     /// </summary>
     public double? ResolveAnchorEdge(
         string anchorName, AnchorSide side,
         double scrollAdjX, double scrollAdjY,
-        AnchorInsetProperty property, double cbWidth, double cbHeight)
+        AnchorInsetProperty property, double cbWidth, double cbHeight,
+        Func<object?, bool>? inScope = null)
     {
-        if (!_anchors.TryGetValue(anchorName, out var a))
+        if (!TryResolve(anchorName, inScope, out var a))
             return null;
         return AnchorGeometry.ResolveEdge(
             a.Left, a.Top, a.Right, a.Bottom, side, scrollAdjX, scrollAdjY, property, cbWidth, cbHeight);
@@ -83,11 +135,12 @@ public sealed class AnchorRegistry
 
     /// <summary>
     /// Resolves an <c>anchor-size(&lt;dimension&gt;)</c> reference against the named
-    /// anchor. Returns <c>null</c> when the anchor is not registered.
+    /// anchor (in the query's scope). Returns <c>null</c> when the anchor is not registered.
     /// </summary>
-    public double? ResolveAnchorSize(string anchorName, AnchorSizeDimension dimension)
+    public double? ResolveAnchorSize(string anchorName, AnchorSizeDimension dimension,
+        Func<object?, bool>? inScope = null)
     {
-        if (!_anchors.TryGetValue(anchorName, out var a))
+        if (!TryResolve(anchorName, inScope, out var a))
             return null;
         return AnchorGeometry.ResolveSize(dimension, a.Width, a.Height);
     }

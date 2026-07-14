@@ -75,6 +75,34 @@ public sealed class AnchorRegistryTests
     }
 
     [Fact]
+    public void ScopedResolve_BindsToLastInScopeCandidate_ElseLastWins()
+    {
+        var scopeA = new object();
+        var scopeB = new object();
+        var r = new AnchorRegistry();
+        r.Register("--a", new AnchorRect(0, 0, 10, 10), scopeA); // width 10
+        r.Register("--a", new AnchorRect(0, 0, 20, 20), scopeB); // width 20 (last)
+
+        // In scopeA → binds the first candidate; in scopeB → the second.
+        Assert.Equal(10, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width, s => s == scopeA));
+        Assert.Equal(20, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width, s => s == scopeB));
+        // None in scope → last-wins.
+        Assert.Equal(20, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width, _ => false));
+        // No predicate → last-wins.
+        Assert.Equal(20, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width));
+    }
+
+    [Fact]
+    public void ScopedResolve_SingleCandidate_IgnoresScopePredicate()
+    {
+        var r = new AnchorRegistry();
+        r.Register("--a", new AnchorRect(0, 0, 10, 10), new object());
+        // A single candidate always resolves, even when the predicate excludes it
+        // (only duplicate names consult scope — matching the bridge).
+        Assert.Equal(10, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width, _ => false));
+    }
+
+    [Fact]
     public void UnknownAnchor_ReturnsNull()
     {
         var r = WithAnchor();
