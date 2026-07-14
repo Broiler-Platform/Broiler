@@ -101,6 +101,16 @@ public sealed class AnchorRegistry
     }
 
     /// <summary>
+    /// Resolves the acceptable anchor rectangle for a query in its own scope (per
+    /// <paramref name="inScope"/>, else last-wins). Public wrapper over the scope
+    /// resolution for callers that need the raw rect (e.g. resolving <c>anchor()</c>
+    /// insets against a caller-computed containing-block frame). Returns <c>false</c>
+    /// when the anchor is not registered.
+    /// </summary>
+    public bool TryResolveRect(string anchorName, Func<object?, bool>? inScope, out AnchorRect rect)
+        => TryResolve(anchorName, inScope, out rect);
+
+    /// <summary>
     /// Resolves the <c>position-area</c> grid cell for an anchored box against the
     /// named anchor (in the query's scope, per <paramref name="inScope"/>) and the box's
     /// containing-block frame. Returns <c>null</c> when the anchor is not registered (the

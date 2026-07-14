@@ -35,6 +35,15 @@ public sealed partial class DomBridge
                 hasAnchorSizeRef = true;
         }
 
+        // Native mode (P5.8d.2b anchor()-insets expansion): for the MVP subset, skip
+        // baking the anchor() insets entirely so the box's `left/right/top/bottom:
+        // anchor(...)` CSS survives to the render and the Broiler.Layout engine's placement
+        // post-pass resolves it natively (see CssBox.TryApplyAnchorInsetPlacement). Every
+        // other anchor() box is baked below.
+        if (hasAnchorRef && NativeAnchorPlacement &&
+            IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry))
+            hasAnchorRef = false;
+
         if (hasAnchorRef)
         {
             // Need CB dimensions for resolving anchor positions in right/bottom contexts.
@@ -150,6 +159,101 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(element))
             ResolveAnchorFunctions(child, anchorRegistry);
     }
+
+    /// <summary>
+    /// Whether an element's <c>anchor()</c> insets are the MVP subset the engine's native
+    /// placement post-pass reproduces (P5.8d.2b), so the bridge can hand them off instead of
+    /// pre-baking (see <see cref="CssBox"/>'s <c>TryApplyAnchorInsetPlacement</c>). Requires:
+    /// every <c>anchor()</c> reference is in a physical inset (<c>left</c>/<c>right</c>/
+    /// <c>top</c>/<c>bottom</c>) and names a registered, accessible anchor; no
+    /// <c>anchor-size()</c>; at most one inset per axis (opposing-inset sizing needs a re-flow
+    /// the reposition-only pass can't do); the box is not fixed/modal and has no intervening
+    /// scroll offset (the engine uses no scroll adjustment); and no <c>position-try</c>.
+    /// </summary>
+    private bool IsMvpNativeAnchorInsetBox(
+        DomElement element, Dictionary<string, string> cssProps,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        // Merge inline styles over matched-rule props (inline wins), matching what the
+        // engine cascade projects onto the box.
+        var merged = new Dictionary<string, string>(cssProps, StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in InlineStyle(element))
+            merged[kv.Key] = kv.Value;
+
+        // No position-try (out of the MVP subset).
+        if (merged.ContainsKey("position-try-fallbacks") || merged.ContainsKey("position-try"))
+            return false;
+
+        // Fixed / modal-dialog targets get a document-scroll adjustment the engine MVP
+        // does not apply — keep them baked.
+        var position = merged.GetValueOrDefault("position");
+        if (position == "fixed")
+            return false;
+        if (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true)
+            return false;
+
+        // Every anchor()/anchor-size() must be an anchor() in a physical inset; any
+        // anchor-size(), or an anchor() outside left/right/top/bottom, stays baked.
+        bool anyAnchorInset = false;
+        foreach (var (key, value) in merged)
+        {
+            if (value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!value.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (key is not ("left" or "right" or "top" or "bottom"))
+                return false;
+            anyAnchorInset = true;
+        }
+        if (!anyAnchorInset)
+            return false;
+
+        // Reposition-only: opposing insets on an axis would size the box (needs a re-flow).
+        if (HasInset(merged, "left") && HasInset(merged, "right"))
+            return false;
+        if (HasInset(merged, "top") && HasInset(merged, "bottom"))
+            return false;
+
+        // Every referenced anchor must be registered, accessible, and moved by no scroll
+        // relative to the target (the engine resolves with a zero scroll adjustment).
+        string? implicitAnchor = merged.GetValueOrDefault("position-anchor");
+        foreach (var key in new[] { "left", "right", "top", "bottom" })
+        {
+            if (!merged.TryGetValue(key, out var value) ||
+                !value.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!AnchorFunction.TryGetFirst(value, out var reference))
+                return false;
+            var name = string.IsNullOrEmpty(reference.Name)
+                ? (implicitAnchor ?? string.Empty)
+                : reference.Name!;
+            if (string.IsNullOrEmpty(name) || name == "auto")
+                return false;
+            if (!anchorRegistry.TryGetValue(name, out var anchor) ||
+                !IsAnchorAccessible(anchor.SourceElement, element))
+                return false;
+            // A non-fixed anchor separated from the target by a scroll container shifts by
+            // that scroller's offset (the bridge subtracts it); the engine MVP does not.
+            if (anchor.SourceElement != null)
+            {
+                bool anchorIsFixed =
+                    GetComputedProps(anchor.SourceElement).GetValueOrDefault("position") == "fixed";
+                if (!anchorIsFixed)
+                {
+                    ComputeInterveningScrollOffset(anchor.SourceElement, element, out var sx, out var sy);
+                    if (sx != 0 || sy != 0)
+                        return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Whether a physical inset in <paramref name="props"/> is present and not
+    /// <c>auto</c>.</summary>
+    private static bool HasInset(Dictionary<string, string> props, string name) =>
+        props.TryGetValue(name, out var v) && !string.IsNullOrWhiteSpace(v) && v.Trim() != "auto";
     /// <summary>
     /// Accumulates the scroll offset of scroll containers that lie between the
     /// anchor and the target — i.e. that are ancestors of <paramref name="anchorEl"/>

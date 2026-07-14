@@ -1874,15 +1874,45 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   (26) and native WPT/scope suites stay green. Validation is therefore the exact-geometry pipeline test plus
   no-regression (the percentage-box-props precedent). The `abs-inline-container` bridge/engine
   blockification disagreement is the follow-up before that test can also go native.
+- **P5.8d.2b — `anchor()` inset placement (seventh expansion) — COMPLETED** 2026-07-14
+  (branch `htmlbridge-phase5-native-anchor-inline-cb`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). A box positioned by `anchor()` functions in its physical insets (`left`/`right`/`top`/
+  `bottom`) rather than `position-area` now goes native — the engine equivalent of the bridge's
+  `ResolveAnchorFunctions` pre-bake, and the first native path that is **not** driven by `position-area`.
+  The raw `anchor()` inset survives the cascade onto `CssBox.Left`/`Top`/`Right`/`Bottom` (verified by probe),
+  so:
+  - **Engine.** `CssBox.TryApplyAnchorInsetPlacement` (in `CssBox.Anchor.cs`, run from the root post-pass
+    when `PositionArea == "none"`) resolves each anchor() inset against the named anchor's document-absolute
+    rect converted to the CB frame, via the already-promoted `AnchorGeometry.ResolveEdge` (mirroring the
+    bridge's bake exactly), then places the box's document-absolute margin edge at the resolved inset and
+    offsets the border box there. MVP: reposition-only (laid-out size kept), at most one inset per axis
+    (opposing-inset sizing needs a re-flow and stays baked); a plain length or a percentage on the other axis
+    resolves normally. `AnchorRegistry` gains a public `TryResolveRect` (scoped rect getter) so the caller can
+    build the CB-frame inset itself. Scope binding reuses the position-area predicate.
+  - **Bridge.** `ResolveAnchorFunctions` skips baking (`hasAnchorRef = false`) for a native-MVP anchor()-inset
+    box (`IsMvpNativeAnchorInsetBox`: every anchor() is in a physical inset naming a registered accessible
+    anchor; no `anchor-size()`; single inset per axis; not fixed/modal; no intervening scroll offset — the
+    engine uses no scroll adjustment; no `position-try`), leaving the `anchor()` CSS to survive to the engine.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +5 (left/top, right/bottom far-edge, mixed
+  anchor+length, implicit `position-anchor`, unregistered→fallback); `Broiler.Cli.Tests/
+  NativeAnchorInsetPipelineTests.cs` (real pipeline: a `left/top: anchor(--a right/bottom)` box lands at the
+  anchor's right/bottom edge); `Broiler.Wpt.Tests/NativeAnchorInsetWptTests.cs` (full render pipeline: engine
+  places it, baked & native paths agree pixel-wise). Regression check: full `Broiler.Layout.Tests` (139)
+  green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged (7-fail / 32-pass) with zero
+  per-test movement.** As with the percentage-box-props expansion, **no corpus pixel test exercises the
+  anchor()-inset MVP path** (the corpus's anchor() tests are testharness/JS — unaffected by the render-only
+  lever — or gate-excluded), so validation is the exact-geometry unit + pipeline + full-render tests plus
+  no-regression.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
-  CB)~~ → abspos-inline CB (blockification reconciliation) → scroll simulation → `position-visibility` →
-  dialog/backdrop → `anchor()` insets → position-try.
+  CB)~~ → ~~`anchor()` insets~~ → abspos-inline CB (blockification reconciliation) → `anchor-size()` →
+  opposing-inset sizing → scroll simulation → `position-visibility` → dialog/backdrop → position-try.
   (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
-  props, shared-name scope resolution, writing-mode percentage basis, AND relatively-positioned inline
-  containing blocks now land natively — see the six expansions above.) Each remaining feature is currently
-  excluded by `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
+  props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
+  containing blocks, AND `anchor()` physical insets now land natively — see the seven expansions above.) Each
+  remaining feature is currently excluded by `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox` (or
+  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
   `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
   widen the gate one feature at a time as the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
