@@ -778,6 +778,37 @@ document.body.appendChild(out);
         Assert.Contains("helloworld", result);
     }
 
+    /// <summary>
+    /// A range spanning two Text nodes stringifies to the start node's selected tail, the fully
+    /// contained middle text, and the end node's selected head — the DOM §4.5 stringifier (now
+    /// delegated to canonical <c>Broiler.Dom.DomRange.ToString</c>). The former bridge copy
+    /// omitted the end node's head, a non-spec bug this pins as fixed.
+    /// </summary>
+    [Fact]
+    public void Range_ToString_Across_Text_Nodes_Includes_End_Container_Text()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""t""><p id=""a"">hello</p><b id=""m"">MID</b><p id=""z"">world</p></div>
+<script>
+var a = document.getElementById('a').firstChild;  // 'hello'
+var z = document.getElementById('z').firstChild;  // 'world'
+var range = document.createRange();
+range.setStart(a, 2);   // 'he|llo' -> tail 'llo'
+range.setEnd(z, 3);     // 'wor|ld' -> head 'wor'
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = 'toString=[' + range.toString() + ']';
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // 'llo' (start tail) + 'MID' (contained) + 'wor' (end head, previously dropped).
+        Assert.Contains("toString=[lloMIDwor]", result);
+    }
+
     // ──────────────────────── Document API additions ────────────────────────
 
     [Fact]
