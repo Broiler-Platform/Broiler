@@ -218,6 +218,48 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(140, target.Size.Height, 3);
     }
 
+    [Fact]
+    public void Pass_PercentMargin_StretchesMarginBoxToImcb()
+    {
+        var (root, _) = FillCellFixture(out var target);
+        // Auto width (stretch) + percentage margin-left → the margin box fills the cell
+        // (IMCB = cell 140), so the border box shrinks by the resolved margin and shifts.
+        target.MarginLeft = "10%"; // 10% of cell 140 = 14
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        Assert.Equal(126, target.Size.Width, 3);   // 140 - 14
+        Assert.Equal(140, target.Size.Height, 3);
+        Assert.Equal(74, target.Location.X, 3);     // imcbLeft 60 + margin 14
+        Assert.Equal(60, target.Location.Y, 3);
+        Assert.Equal("14px", target.MarginLeft);    // resolved px written back
+    }
+
+    [Fact]
+    public void Pass_PercentPadding_ResolvedAgainstCell_FillsImcb()
+    {
+        var (root, _) = FillCellFixture(out var target);
+        // Auto width + percentage padding → the border box still fills the IMCB (140);
+        // padding eats the content box, and is written back resolved against the cell.
+        target.PaddingLeft = "10%"; target.PaddingRight = "10%"; // 14 each of cell 140
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        Assert.Equal(140, target.Size.Width, 3);   // content 112 + padding 14+14
+        Assert.Equal(140, target.Size.Height, 3);
+        Assert.Equal(60, target.Location.X, 3);
+        Assert.Equal("14px", target.PaddingLeft);   // % resolved against cell width, not own width
+        Assert.Equal("14px", target.PaddingRight);
+    }
+
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
     // childless absolutely-positioned "bottom right" target (30×30 at origin).
     private static (CssBox root, CssBox cb) FillCellFixture(out CssBox target)
