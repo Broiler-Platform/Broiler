@@ -220,7 +220,8 @@ public sealed class DomBridgeSessionLifetimeTests
         public int DisposeCount { get; private set; }
 
         public IReadOnlyDictionary<DomElement, BoxGeometry> GetGeometry(
-            DomDocument document, SizeF viewport, string baseUrl)
+            DomDocument document, SizeF viewport, string baseUrl,
+            Func<DomElement, DomDocument?>? contentDocumentResolver = null)
         {
             GetGeometryCount++;
             return Empty;

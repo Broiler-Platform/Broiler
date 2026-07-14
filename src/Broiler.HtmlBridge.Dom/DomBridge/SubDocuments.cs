@@ -21,14 +21,44 @@ public sealed partial class DomBridge
     private readonly HashSet<DomElement> _objectLoadFailures = [];
     private readonly HashSet<DomElement> _onloadFired = [];
 
+    // ── Phase 4 (P4.4b): regime-A nested-browsing-context sever ──────────────
+    // The materialised sub-document of an <iframe>/<object>/<frame> is no longer an in-tree
+    // #subdoc-root child of the container; it is a canonical DomDocument referenced through
+    // these maps. The render path projects it into the box tree via the content-document
+    // resolver (see ResolveContentDocumentForRender), and the reverse map recovers a
+    // sub-document's owning frame where the old code walked ParentEl(#subdoc-root).
+    private readonly Dictionary<DomElement, DomDocument> _contentDocuments = [];
+    private readonly Dictionary<DomDocument, DomElement> _documentContainers = [];
+
+    private DomDocument? GetContentDocument(DomElement containerElement) =>
+        _contentDocuments.TryGetValue(containerElement, out var document) ? document : null;
+
+    /// <summary>The frame element a severed sub-document belongs to, or null for the main /
+    /// a detached (createDocument) document. Replaces <c>ParentEl(#subdoc-root)</c>.</summary>
+    private DomElement? GetFrameForContentDocument(DomNode? docRoot) =>
+        docRoot is DomDocument document && _documentContainers.TryGetValue(document, out var frame)
+            ? frame
+            : null;
+
+    private void LinkContentDocument(DomElement containerElement, DomDocument document)
+    {
+        _contentDocuments[containerElement] = document;
+        _documentContainers[document] = containerElement;
+    }
+
+    /// <summary>The content-document resolver handed to the layout view (P4.4b): maps a
+    /// nested-browsing-context container to its severed sub-document so the box builder
+    /// projects it as a sub-viewport and composes its geometry into the main frame.</summary>
+    private DomDocument? ResolveContentDocumentForRender(DomElement containerElement) =>
+        GetContentDocument(containerElement);
+
     private void InvalidateCachedSubDocument(DomElement containerElement)
     {
-        var existingDocRoot = ChildElements(containerElement).FirstOrDefault(child =>
-            string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
-        if (existingDocRoot != null)
+        if (_contentDocuments.TryGetValue(containerElement, out var existingDocument))
         {
-            RemoveElementsRecursive(existingDocRoot);
-            RemoveChildFrom(containerElement, existingDocRoot);
+            RemoveElementsRecursive(existingDocument);
+            _documentContainers.Remove(existingDocument);
+            _contentDocuments.Remove(containerElement);
         }
 
         _subDocumentCache.Remove(containerElement);
@@ -136,8 +166,7 @@ public sealed partial class DomBridge
 
         var executeHtmlScripts = false;
         string? htmlToExecute = null;
-        var docRoot = ChildElements(containerElement).FirstOrDefault(c =>
-            string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        DomDocument? docRoot = GetContentDocument(containerElement);
         if (docRoot == null)
         {
             if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
@@ -324,14 +353,10 @@ public sealed partial class DomBridge
         SetElementScrollOffsetsWithBehavior(scrollingElement, left, top, relative: relative, clamp: false, behavior: behavior);
     }
 
-    private static DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
+    private DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
     {
-        var docRoot = ChildElements(containerElement).FirstOrDefault(c =>
-            string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
-        if (docRoot == null)
-            return null;
-
-        return ChildElements(docRoot).FirstOrDefault(c => !IsText(c) && !c.TagName.StartsWith('#'));
+        var document = GetContentDocument(containerElement);
+        return document == null ? null : GetDocumentElement(document);
     }
 
     private static DomElement? FindBodyElement(DomElement documentElement) =>
@@ -341,19 +366,21 @@ public sealed partial class DomBridge
 
     private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
     {
-        var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
-        if (ownerDocRoot != null && ParentEl(ownerDocRoot) != null && !ParentEl(ownerDocRoot).TagName.StartsWith('#'))
-            return GetOrCreateSubWindow(ParentEl(ownerDocRoot));
+        // The container's owning document root is a severed sub-document DomDocument when the
+        // container is itself nested in another frame; recover that frame via the reverse map
+        // (was ParentEl(#subdoc-root)).
+        var parentFrame = GetFrameForContentDocument(GetElementRuntimeState(containerElement).OwnerDocRoot);
+        if (parentFrame != null)
+            return GetOrCreateSubWindow(parentFrame);
 
         return _windowJSObject;
     }
 
     private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
-        var ownerDocRoot = GetElementRuntimeState(containerElement).OwnerDocRoot;
-        if (ownerDocRoot != null && ParentEl(ownerDocRoot) != null &&
-            !ParentEl(ownerDocRoot).TagName.StartsWith('#') &&
-            _subDocumentBaseUrlCache.TryGetValue(ParentEl(ownerDocRoot), out var parentBaseUrl) &&
+        var parentFrame = GetFrameForContentDocument(GetElementRuntimeState(containerElement).OwnerDocRoot);
+        if (parentFrame != null &&
+            _subDocumentBaseUrlCache.TryGetValue(parentFrame, out var parentBaseUrl) &&
             !string.IsNullOrWhiteSpace(parentBaseUrl))
         {
             return parentBaseUrl;
@@ -533,14 +560,12 @@ public sealed partial class DomBridge
     /// <summary>
     /// Creates a minimal empty sub-document structure (html > head + body).
     /// </summary>
-    private DomElement BuildEmptySubDocument(DomElement containerElement)
+    private DomDocument BuildEmptySubDocument(DomElement containerElement)
     {
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        SetParent(docRoot, containerElement);
+        var document = CreateBrowsingContextDocument();
 
         var htmlEl = CreateBridgeElement("html");
-        SetParent(htmlEl, docRoot);
-        docRoot.AppendChild(htmlEl);
+        document.AppendChild(htmlEl);
 
         var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
@@ -550,23 +575,21 @@ public sealed partial class DomBridge
         SetParent(bodyEl, htmlEl);
         htmlEl.AppendChild(bodyEl);
 
-        InsertChildAt(containerElement, 0, docRoot);
+        LinkContentDocument(containerElement, document);
 
-        return docRoot;
+        return document;
     }
 
     /// <summary>
     /// Creates a sub-document with plain text content wrapped in a <c>&lt;pre&gt;</c> element.
     /// Used for <c>text/plain</c> resources.
     /// </summary>
-    private DomElement BuildSubDocumentWithText(string textContent, DomElement containerElement)
+    private DomDocument BuildSubDocumentWithText(string textContent, DomElement containerElement)
     {
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        SetParent(docRoot, containerElement);
+        var document = CreateBrowsingContextDocument();
 
         var htmlEl = CreateBridgeElement("html");
-        SetParent(htmlEl, docRoot);
-        docRoot.AppendChild(htmlEl);
+        document.AppendChild(htmlEl);
 
         var headEl = CreateBridgeElement("head");
         SetParent(headEl, htmlEl);
@@ -585,9 +608,9 @@ public sealed partial class DomBridge
         SetParent(textNode, preEl);
         preEl.AppendChild(textNode);
 
-        InsertChildAt(containerElement, 0, docRoot);
+        LinkContentDocument(containerElement, document);
 
-        return docRoot;
+        return document;
     }
 
     /// <summary>
@@ -816,21 +839,19 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a sub-document tree from fetched HTML content.
     /// </summary>
-    private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
+    private DomDocument BuildSubDocumentFromHtml(string html, DomElement containerElement)
     {
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        SetParent(docRoot, containerElement);
+        var document = CreateBrowsingContextDocument();
 
         var (parsedRoot, allElements, _) = BuildDocumentTree(html);
 
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
-        // Move it under #subdoc-root as the documentElement.
-        SetParent(parsedRoot, docRoot);
-        docRoot.AppendChild(parsedRoot);
+        // Append it as the sub-document's documentElement (a canonical DomDocument child).
+        document.AppendChild(parsedRoot);
 
-        InsertChildAt(containerElement, 0, docRoot);
+        LinkContentDocument(containerElement, document);
 
-        return docRoot;
+        return document;
     }
 
     // RF-BRIDGE-1c Phase F (F3c part 2d): unregister the whole node subtree from the bridge's
@@ -1227,10 +1248,9 @@ public sealed partial class DomBridge
     /// For XHTML with valid namespace, also executes embedded scripts.
     /// XML well-formedness errors result in an empty document.
     /// </summary>
-    private DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
+    private DomDocument BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
     {
-        var docRoot = CreateBridgeElement("#subdoc-root");
-        SetParent(docRoot, containerElement);
+        var document = CreateBrowsingContextDocument();
 
         try
         {
@@ -1246,8 +1266,8 @@ public sealed partial class DomBridge
             var xdoc = XDocument.Parse(cleanXml);
             if (xdoc.Root == null)
             {
-                InsertChildAt(containerElement, 0, docRoot);
-                return docRoot;
+                LinkContentDocument(containerElement, document);
+                return document;
             }
 
             // Check XHTML namespace validity
@@ -1257,32 +1277,30 @@ public sealed partial class DomBridge
 
             if (isXhtml && !hasCorrectXhtmlNs)
             {
-                // Wrong XHTML namespace — create empty doc, don't execute scripts
-                var emptyDoc = BuildEmptySubDocument(containerElement);
-                // Remove the docRoot we already created since BuildEmptySubDocument creates its own
-                return emptyDoc;
+                // Wrong XHTML namespace — create empty doc, don't execute scripts. It links
+                // the container to its own document.
+                return BuildEmptySubDocument(containerElement);
             }
 
             // Build DOM tree from XML
             var rootEl = BuildDomElementFromXElement(xdoc.Root);
-            SetParent(rootEl, docRoot);
-            docRoot.AppendChild(rootEl);
+            document.AppendChild(rootEl);
 
-            InsertChildAt(containerElement, 0, docRoot);
+            LinkContentDocument(containerElement, document);
 
             // Execute scripts in XHTML documents with correct namespace
             if (isXhtml && hasCorrectXhtmlNs)
             {
-                ExecuteSubDocumentScripts(docRoot);
+                ExecuteSubDocumentScripts(rootEl);
             }
         }
         catch (System.Xml.XmlException)
         {
             // XML well-formedness error — return empty document, don't execute scripts
-            InsertChildAt(containerElement, 0, docRoot);
+            LinkContentDocument(containerElement, document);
         }
 
-        return docRoot;
+        return document;
     }
 
     /// <summary>

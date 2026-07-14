@@ -61,6 +61,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     internal bool IsNestedViewportRoot { get; set; }
 
     /// <summary>
+    /// RF-BRIDGE-1b / HtmlBridge Phase 4 (P4.4b): marks the box that roots a nested
+    /// browsing context (the sub-viewport of an <c>&lt;iframe&gt;</c>/<c>&lt;object&gt;</c>/
+    /// <c>&lt;frame&gt;</c> sub-document). <see cref="LayoutNestedBrowsingContexts"/> keys off
+    /// this flag — set by the DOM→box builder — instead of a <c>#subdoc-root</c> fake tag name,
+    /// so the sub-document can be projected either from an in-tree materialised subtree (legacy)
+    /// or synthesised from a referenced content <see cref="Dom.DomDocument"/> (Phase 4 sever).
+    /// The box is placed and sized to its frame's content box by <see cref="LayoutSubdocument"/>,
+    /// which also promotes it to an <see cref="IsNestedViewportRoot"/> sub-viewport.
+    /// </summary>
+    internal bool IsNestedBrowsingContextRoot { get; set; }
+
+    /// <summary>
     /// When the block-inside-inline correction splits a positioned inline
     /// element, the original box loses its children to anonymous "left" and
     /// "right" copies.  This list tracks those copies so that
@@ -381,8 +393,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         foreach (var child in box.Boxes)
         {
-            if (child.SourceElement is { } source
-                && string.Equals(source.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+            if (child.IsNestedBrowsingContextRoot)
             {
                 LayoutSubdocument(box, child, g);
             }

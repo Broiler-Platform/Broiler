@@ -678,9 +678,10 @@ public sealed partial class DomBridge
             string.Equals(docRoot.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return (_viewportWidth, _viewportHeight);
 
-        // Walk up from docRoot to find the containing iframe/object element
-        // The docRoot is typically a #subdoc-root child of the iframe element
-        var parent = ParentEl(docRoot);
+        // docRoot is a severed sub-document's documentElement (<html>, post-P4.4b); its parent is
+        // the content DomDocument. Recover the containing iframe/object via the reverse map to read
+        // its CSS dimensions as the sub-viewport size (was ParentEl(#subdoc-root)).
+        var parent = GetFrameForContentDocument(docRoot?.ParentNode);
         if (parent != null && !parent.TagName.StartsWith("#", StringComparison.Ordinal))
         {
             // parent is the iframe/object element — check its style for dimensions
